@@ -30,6 +30,8 @@ The manager detects live Codex and Claude sessions, bootstraps git repos if need
 
 The manager is event-driven. It watches agent session directories for session creation, removal, and rename events and only reconciles after a debounced lifecycle event, with a slow fallback scan for missed events. Transcript content updates do not trigger a full process scan. A singleton lock prevents accidentally running two managers at the same time.
 
+A manager started from a Cargo build is scoped to the repository whose dev config it loaded. It does not try to launch dev watchers for every other active agent repository on the machine; the installed production manager remains responsible for those repositories.
+
 Project watchers are also event-driven by default. They watch the repository root and non-ignored top-level directories, debounce file changes, and then run one `git status --porcelain` pass for the burst. Configured ignored trees such as `.git/` and `target/` are not recursively subscribed, and event bursts are coalesced into a single pending signal. `poll_interval` is the fallback safety scan interval, not the primary loop. New configs use:
 
 ```toml
@@ -39,6 +41,8 @@ poll_interval = "60s"
 ```
 
 If filesystem watching is unavailable, the watcher logs a warning and falls back to polling.
+
+Watcher state is replaced atomically. If an older or interrupted watcher left invalid JSON, the next watcher preserves it beside the state file with a `.corrupt-*` suffix and rebuilds current state from the repository instead of entering a permanent restart loop.
 
 Legacy per-project service-managed watchers can still be installed with:
 

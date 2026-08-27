@@ -44,7 +44,8 @@ use crate::commands::{
     },
     watch_support::{
         resolve_agent_repo_root, should_start_agent_watcher, watcher_command_requires_config_load,
-        watcher_manager_event_requires_reconcile, write_file_if_changed,
+        watcher_manager_config_matches_repo, watcher_manager_event_requires_reconcile,
+        write_file_if_changed,
     },
 };
 
@@ -2160,6 +2161,33 @@ fn watcher_manager_only_reconciles_for_session_lifecycle_events() {
     ));
     assert!(!watcher_manager_event_requires_reconcile(
         &notify::Event::new(notify::EventKind::Access(notify::event::AccessKind::Any),)
+    ));
+}
+
+#[test]
+fn dev_watcher_manager_is_scoped_to_its_loaded_project_config() {
+    let memory = Path::new("/tmp/memory/config.toml");
+    let other = Path::new("/tmp/other/config.toml");
+
+    assert!(watcher_manager_config_matches_repo(
+        Profile::Prod,
+        None,
+        None
+    ));
+    assert!(watcher_manager_config_matches_repo(
+        Profile::Dev,
+        Some(memory),
+        Some(memory)
+    ));
+    assert!(!watcher_manager_config_matches_repo(
+        Profile::Dev,
+        Some(memory),
+        Some(other)
+    ));
+    assert!(!watcher_manager_config_matches_repo(
+        Profile::Dev,
+        None,
+        Some(memory)
     ));
 }
 

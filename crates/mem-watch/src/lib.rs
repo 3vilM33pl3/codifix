@@ -118,22 +118,86 @@ pub async fn load_state(
     let content = tokio::fs::read_to_string(&path)
         .await
         .with_context(|| format!("read automation state {}", path.display()))?;
-    serde_json::from_str(&content).context("parse automation state")
+    match serde_json::from_str(&content) {
+        Ok(state) => Ok(state),
+        Err(error) => {
+            let backup = path.with_extension(format!(
+                "json.corrupt-{}-{}",
+                Utc::now().format("%Y%m%dT%H%M%S%.3fZ"),
+                std::process::id()
+            ));
+            tokio::fs::rename(&path, &backup).await.with_context(|| {
+                format!(
+                    "preserve invalid automation state {} as {} after parse error: {error}",
+                    path.display(),
+                    backup.display()
+                )
+            })?;
+            eprintln!(
+                "watcher automation state was invalid and has been preserved at {}; rebuilding it from repository state: {error}",
+                backup.display()
+            );
+            Ok(AutomationState::new(project, repo_root, config))
+        }
+    }
 }
 
 pub async fn save_state(state: &AutomationState, config: &AutomationConfig) -> Result<()> {
     let repo_root = PathBuf::from(&state.repo_root);
     let path = state_path(config, &repo_root);
-    ensure_runtime_dir(&repo_root).await?;
+    let parent = path.parent().ok_or_else(|| {
+        anyhow::anyhow!("automation state path has no parent: {}", path.display())
+    })?;
+    tokio::fs::create_dir_all(parent)
+        .await
+        .with_context(|| format!("create automation state directory {}", parent.display()))?;
     let next = serde_json::to_vec_pretty(state)?;
     if let Ok(current) = tokio::fs::read(&path).await
         && current == next
     {
         return Ok(());
     }
-    tokio::fs::write(path, next)
+    let temp_path = path.with_extension(format!(
+        "json.tmp-{}-{}",
+        std::process::id(),
+        uuid::Uuid::new_v4()
+    ));
+    tokio::fs::write(&temp_path, next)
         .await
-        .context("write automation state")?;
+        .with_context(|| format!("write automation state {}", temp_path.display()))?;
+    if let Err(error) = tokio::fs::rename(&temp_path, &path).await {
+        #[cfg(target_os = "windows")]
+        if error.kind() == std::io::ErrorKind::AlreadyExists {
+            tokio::fs::remove_file(&path)
+                .await
+                .with_context(|| format!("replace existing automation state {}", path.display()))?;
+            tokio::fs::rename(&temp_path, &path)
+                .await
+                .with_context(|| {
+                    format!(
+                        "move automation state {} to {}",
+                        temp_path.display(),
+                        path.display()
+                    )
+                })?;
+        } else {
+            return Err(error).with_context(|| {
+                format!(
+                    "move automation state {} to {}",
+                    temp_path.display(),
+                    path.display()
+                )
+            });
+        }
+        #[cfg(not(target_os = "windows"))]
+        return Err(error).with_context(|| {
+            format!(
+                "move automation state {} to {}",
+                temp_path.display(),
+                path.display()
+            )
+        });
+    }
     Ok(())
 }
 
@@ -831,6 +895,68 @@ mod tests {
         assert!(!owner_session_is_alive(&dead));
     }
 
+    #[tokio::test]
+    async fn invalid_automation_state_is_preserved_and_rebuilt() {
+        let repo_root = unique_temp_dir("mem-watch-invalid-state");
+        let state_file = repo_root.join("runtime").join("automation-state.json");
+        tokio::fs::create_dir_all(state_file.parent().expect("state parent"))
+            .await
+            .expect("create state directory");
+        tokio::fs::write(&state_file, b"{\"project\":\"memory\"}}")
+            .await
+            .expect("write invalid state");
+        let config = AutomationConfig {
+            state_file_path: Some(state_file.display().to_string()),
+            ..AutomationConfig::default()
+        };
+
+        let state = load_state("memory", &repo_root, &config)
+            .await
+            .expect("recover invalid state");
+
+        assert_eq!(state.project, "memory");
+        assert!(!state_file.exists());
+        assert!(
+            fs::read_dir(state_file.parent().expect("state parent"))
+                .expect("read state directory")
+                .flatten()
+                .any(|entry| entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("automation-state.json.corrupt-"))
+        );
+
+        let _ = fs::remove_dir_all(repo_root);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_automation_state_writes_remain_valid_json() {
+        let repo_root = unique_temp_dir("mem-watch-atomic-state");
+        let state_file = repo_root.join("runtime").join("automation-state.json");
+        let config = AutomationConfig {
+            state_file_path: Some(state_file.display().to_string()),
+            ..AutomationConfig::default()
+        };
+        let mut writes = Vec::new();
+        for index in 0..8 {
+            let mut state = AutomationState::new("memory", &repo_root, &config);
+            state.current_session.changed_files = vec![format!("src/file-{index}.rs")];
+            let config = config.clone();
+            writes.push(tokio::spawn(
+                async move { save_state(&state, &config).await },
+            ));
+        }
+        for write in writes {
+            write.await.expect("join state write").expect("save state");
+        }
+
+        let content = tokio::fs::read(&state_file).await.expect("read state");
+        let state: AutomationState = serde_json::from_slice(&content).expect("parse final state");
+        assert_eq!(state.current_session.changed_files.len(), 1);
+
+        let _ = fs::remove_dir_all(repo_root);
+    }
+
     #[test]
     fn status_reflects_state() {
         let mut state = AutomationState::new(
@@ -949,5 +1075,20 @@ mod tests {
             resolved_config_path: None,
             resolved_dev_overlay_path: None,
         }
+    }
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "{name}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system time should be after Unix epoch")
+                .as_nanos()
+        ));
+        if path.exists() {
+            let _ = fs::remove_dir_all(&path);
+        }
+        path
     }
 }

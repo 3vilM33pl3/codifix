@@ -429,6 +429,9 @@ pub(crate) async fn reconcile_watcher_manager(
     let mut seen = BTreeSet::new();
 
     for (repo_root, session) in sessions {
+        if !watcher_manager_repo_is_in_scope(config, &repo_root) {
+            continue;
+        }
         if !repo_agent_watch_enabled(&repo_root)? {
             state.warnings.push(format!(
                 "Skipped {} session {} in {} because repo opted out of agent-linked watchers.",
@@ -551,6 +554,33 @@ pub(crate) async fn reconcile_watcher_manager(
     state.lock_owner_pid = Some(std::process::id());
     save_watcher_manager_state_if_changed(config.profile, &previous_state, &state)?;
     Ok(())
+}
+
+pub(crate) fn watcher_manager_repo_is_in_scope(config: &AppConfig, repo_root: &Path) -> bool {
+    let repo_config_path =
+        mem_config::project_paths_for_repo(repo_root).map(|paths| paths.config_path());
+    watcher_manager_config_matches_repo(
+        config.profile,
+        config.resolved_config_path.as_deref(),
+        repo_config_path.as_deref(),
+    )
+}
+
+pub(crate) fn watcher_manager_config_matches_repo(
+    profile: Profile,
+    manager_config_path: Option<&Path>,
+    repo_config_path: Option<&Path>,
+) -> bool {
+    if matches!(profile, Profile::Prod) {
+        return true;
+    }
+    let (Some(manager_config_path), Some(repo_config_path)) =
+        (manager_config_path, repo_config_path)
+    else {
+        return false;
+    };
+    fs::canonicalize(manager_config_path).unwrap_or_else(|_| manager_config_path.to_path_buf())
+        == fs::canonicalize(repo_config_path).unwrap_or_else(|_| repo_config_path.to_path_buf())
 }
 
 pub(crate) fn resolve_managed_agent_sessions_by_repo(
