@@ -29,6 +29,12 @@ pub struct ProcessSnapshot {
     pub started_at_ms: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessCommandSnapshot {
+    pub pid: u32,
+    pub command: String,
+}
+
 pub fn process_snapshots() -> Vec<ProcessSnapshot> {
     let process_system = PROCESS_SYSTEM.get_or_init(|| {
         let mut system = System::new_all();
@@ -43,26 +49,55 @@ pub fn process_snapshots() -> Vec<ProcessSnapshot> {
     system
         .processes()
         .iter()
-        .map(|(pid, process)| {
-            let command = if process.cmd().is_empty() {
-                process.name().to_string_lossy().into_owned()
-            } else {
-                process
-                    .cmd()
-                    .iter()
-                    .map(|part| quote_snapshot_argument(&part.to_string_lossy()))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            };
-            ProcessSnapshot {
-                pid: pid.as_u32(),
-                parent_pid: process.parent().map(|pid| pid.as_u32()).unwrap_or_default(),
-                memory_kb: process.memory() / 1024,
-                cpu_percent: f64::from(process.cpu_usage()),
-                command,
-                cwd: process.cwd().map(Path::to_path_buf),
-                started_at_ms: process.start_time().saturating_mul(1000),
-            }
+        .map(|(pid, process)| ProcessSnapshot {
+            pid: pid.as_u32(),
+            parent_pid: process.parent().map(|pid| pid.as_u32()).unwrap_or_default(),
+            memory_kb: process.memory() / 1024,
+            cpu_percent: f64::from(process.cpu_usage()),
+            command: snapshot_command(process),
+            cwd: process.cwd().map(Path::to_path_buf),
+            started_at_ms: process.start_time().saturating_mul(1000),
+        })
+        .collect()
+}
+
+#[cfg(target_os = "linux")]
+pub fn process_command_snapshots() -> Vec<ProcessCommandSnapshot> {
+    let Ok(entries) = fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let pid = entry.file_name().to_string_lossy().parse::<u32>().ok()?;
+            let bytes = fs::read(entry.path().join("cmdline")).ok()?;
+            let command = bytes
+                .split(|byte| *byte == 0)
+                .filter(|part| !part.is_empty())
+                .map(|part| quote_snapshot_argument(&String::from_utf8_lossy(part)))
+                .collect::<Vec<_>>()
+                .join(" ");
+            (!command.is_empty()).then_some(ProcessCommandSnapshot { pid, command })
+        })
+        .collect()
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn process_command_snapshots() -> Vec<ProcessCommandSnapshot> {
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::nothing()
+            .with_exe(UpdateKind::OnlyIfNotSet)
+            .with_cmd(UpdateKind::OnlyIfNotSet),
+    );
+    system
+        .processes()
+        .iter()
+        .map(|(pid, process)| ProcessCommandSnapshot {
+            pid: pid.as_u32(),
+            command: snapshot_command(process),
         })
         .collect()
 }
@@ -85,6 +120,19 @@ fn quote_snapshot_argument(value: &str) -> String {
         format!("\"{}\"", value.replace('"', "\\\""))
     } else {
         value.to_string()
+    }
+}
+
+fn snapshot_command(process: &sysinfo::Process) -> String {
+    if process.cmd().is_empty() {
+        process.name().to_string_lossy().into_owned()
+    } else {
+        process
+            .cmd()
+            .iter()
+            .map(|part| quote_snapshot_argument(&part.to_string_lossy()))
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
@@ -1080,8 +1128,8 @@ mod tests {
 
     use super::{
         derive_default_writer_id, dev_mode_status_line, format_dev_commit_label,
-        managed_watch_service_name, process_is_alive, process_started_at_ms,
-        watch_service_unit_name,
+        managed_watch_service_name, process_command_snapshots, process_is_alive,
+        process_started_at_ms, watch_service_unit_name,
     };
 
     #[cfg(target_os = "windows")]
@@ -1142,6 +1190,11 @@ mod tests {
         assert!(process_started_at_ms(std::process::id()).is_some());
         assert!(!process_is_alive(u32::MAX));
         assert!(process_started_at_ms(u32::MAX).is_none());
+        assert!(
+            process_command_snapshots()
+                .iter()
+                .any(|process| process.pid == std::process::id() && !process.command.is_empty())
+        );
     }
 
     #[test]

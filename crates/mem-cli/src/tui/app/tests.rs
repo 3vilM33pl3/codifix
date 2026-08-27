@@ -1037,19 +1037,16 @@ fn manager_footer_detail_includes_session_and_warning_counts() {
         tracked_sessions: 2,
         warning_count: 1,
         mode: Some(super::ManagerMode::Foreground),
-        runtime_mode: Some("event-driven".to_string()),
-        last_reconcile_reason: Some("session-file-event".to_string()),
-        event_count: 3,
+        runtime_mode: Some("process-polling".to_string()),
+        last_reconcile_reason: Some("process-scan".to_string()),
+        event_count: 0,
         fallback_scan_count: 1,
     });
 
     assert_eq!(manager_status_label(&app), "active");
     assert_eq!(
         manager_status_detail(&app),
-        Some(
-            "manual, event-driven, last session-file-event, 2 sessions, 1 warn, 3 events, 1 fallback"
-                .to_string()
-        )
+        Some("manual, process-polling, last process-scan, 2 sessions, 1 warn, 1 scan".to_string())
     );
 }
 

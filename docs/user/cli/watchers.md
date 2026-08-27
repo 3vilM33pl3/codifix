@@ -28,7 +28,7 @@ That installs a persistent user manager service:
 
 The manager detects live Codex and Claude sessions, bootstraps git repos if needed, and starts one watcher per repository. When several agent sessions use the same repository, the manager selects one stable live session as the watcher owner instead of duplicating filesystem work.
 
-The manager is event-driven. It watches agent session directories for session creation, removal, and rename events and only reconciles after a debounced lifecycle event, with a slow fallback scan for missed events. Transcript content updates do not trigger a full process scan. A singleton lock prevents accidentally running two managers at the same time.
+The manager uses a lightweight process scan every 10 seconds. It reads only process IDs and command lines until it identifies live Codex or Claude processes; it does not subscribe to agent transcript directories or collect TUI metrics such as per-process CPU and memory. Every sixth scan also verifies the managed service units. A singleton lock prevents accidentally running two managers at the same time.
 
 A manager started from a Cargo build is scoped to the repository whose dev config it loaded. It does not try to launch dev watchers for every other active agent repository on the machine; the installed production manager remains responsible for those repositories.
 
@@ -116,7 +116,7 @@ Check watcher manager status:
 memory watcher manager status
 ```
 
-The status output includes the manager mode, last reconcile reason, event count, fallback scan count, and lock owner PID. If another manager is already running, `memory watcher manager run` exits with the active PID instead of starting a duplicate.
+The status output includes the manager mode, last reconcile reason and duration, process scan count, and lock owner PID. If another manager is already running, `memory watcher manager run` exits with the active PID instead of starting a duplicate.
 
 Enable a legacy service-managed watcher:
 

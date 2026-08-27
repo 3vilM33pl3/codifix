@@ -212,10 +212,10 @@ impl MultiCollector {
 }
 
 pub fn collect_lightweight_sessions() -> Vec<LightweightAgentSession> {
-    let shared = SharedProcessData::fetch(Some(&HashMap::new()));
+    let process_info = process::get_process_info_lightweight();
     let mut sessions = Vec::new();
-    sessions.extend(codex::collect_lightweight_sessions(&shared.process_info));
-    sessions.extend(claude::collect_lightweight_sessions(&shared.process_info));
+    sessions.extend(codex::collect_lightweight_sessions(&process_info));
+    sessions.extend(claude::collect_lightweight_sessions(&process_info));
     sessions.sort_by_key(|session| std::cmp::Reverse(session.started_at));
     sessions
 }

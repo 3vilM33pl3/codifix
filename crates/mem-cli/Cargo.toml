@@ -23,7 +23,6 @@ mem-platform = { path = "../mem-platform" }
 mem-service = { path = "../mem-service", optional = true }
 mem-skills = { path = "../mem-skills" }
 mem-watch = { path = "../mem-watch" }
-notify.workspace = true
 ratatui = { workspace = true, optional = true }
 reqwest.workspace = true
 serde.workspace = true

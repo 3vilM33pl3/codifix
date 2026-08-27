@@ -5,7 +5,7 @@ use std::{
     env, fs,
     io::{self, Write},
     path::{Path, PathBuf},
-    process::Command as ProcessCommand,
+    process::{Command as ProcessCommand, Stdio},
     time::Instant,
 };
 
@@ -263,9 +263,8 @@ pub(crate) fn watch_service_status(repo_root: &Path, project: &str) -> Result<St
 
 #[cfg(all(unix, not(target_os = "macos")))]
 pub(crate) const WATCH_MANAGER_UNIT_NAME: &str = "memory-watch-manager.service";
-const WATCH_MANAGER_EVENT_DEBOUNCE_MS: u64 = 500;
-const WATCH_MANAGER_FALLBACK_SCAN_SECONDS: u64 = 30;
-const WATCH_MANAGER_HEALTH_SCAN_SECONDS: u64 = 60;
+const WATCH_MANAGER_SCAN_SECONDS: u64 = 10;
+const WATCH_MANAGER_VERIFY_EVERY_SCANS: u64 = 6;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub(crate) struct WatcherManagerState {
@@ -307,10 +306,10 @@ pub(crate) async fn run_watcher_manager(
     let _lock = WatcherManagerLock::acquire(config.profile)?;
     let version = config.profile.display_version(env!("CARGO_PKG_VERSION"));
     eprintln!(
-        "watcher manager v{version} starting (profile={profile}, service={service_addr}, mode=event-driven, fallback={fallback}s)",
+        "watcher manager v{version} starting (profile={profile}, service={service_addr}, mode=process-polling, scan={scan}s)",
         profile = config.profile,
         service_addr = config.service.bind_addr,
-        fallback = WATCH_MANAGER_FALLBACK_SCAN_SECONDS,
+        scan = WATCH_MANAGER_SCAN_SECONDS,
     );
     if matches!(config.profile, Profile::Dev) {
         eprintln!("{}", platform::dev_mode_status_line(None));
@@ -327,85 +326,53 @@ pub(crate) async fn run_watcher_manager(
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| "unknown".to_string())
     );
-    let mut event_source = match start_watcher_manager_event_source() {
-        Ok(source) => Some(source),
-        Err(error) => {
-            eprintln!(
-                "watcher manager session file events unavailable; using fallback scans only: {error}"
-            );
-            None
-        }
-    };
     reconcile_watcher_manager(&config, config_path.as_deref(), "startup", true, 0, 0).await?;
-    let mut debounce: Option<std::pin::Pin<Box<tokio::time::Sleep>>> = None;
-    let mut fallback = tokio::time::interval(std::time::Duration::from_secs(
-        WATCH_MANAGER_FALLBACK_SCAN_SECONDS,
-    ));
-    fallback.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    fallback.tick().await;
-    let mut health = tokio::time::interval(std::time::Duration::from_secs(
-        WATCH_MANAGER_HEALTH_SCAN_SECONDS,
-    ));
-    health.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    health.tick().await;
-    let mut event_count = 0u64;
-    let mut fallback_scan_count = 0u64;
+    let mut scan =
+        tokio::time::interval(std::time::Duration::from_secs(WATCH_MANAGER_SCAN_SECONDS));
+    scan.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    scan.tick().await;
+    let shutdown = watcher_manager_shutdown_signal();
+    tokio::pin!(shutdown);
+    let mut scan_count = 0u64;
     loop {
         tokio::select! {
-            Some(_) = async {
-                match event_source.as_mut() {
-                    Some(source) => source.rx.recv().await,
-                    None => std::future::pending().await,
-                }
-            }, if event_source.is_some() => {
-                event_count = event_count.saturating_add(1);
-                debounce = Some(Box::pin(tokio::time::sleep(std::time::Duration::from_millis(
-                    WATCH_MANAGER_EVENT_DEBOUNCE_MS,
-                ))));
+            biased;
+            _ = &mut shutdown => {
+                break;
             }
-            _ = async {
-                if let Some(delay) = debounce.as_mut() {
-                    delay.as_mut().await;
-                }
-            }, if debounce.is_some() => {
-                debounce = None;
+            _ = scan.tick() => {
+                scan_count = scan_count.saturating_add(1);
                 if let Err(error) = reconcile_watcher_manager(
                     &config,
                     config_path.as_deref(),
-                    "session-file-event",
-                    false,
-                    event_count,
-                    fallback_scan_count,
-                ).await {
-                    eprintln!("watcher manager reconcile failed: {error}");
-                }
-            }
-            _ = fallback.tick() => {
-                fallback_scan_count = fallback_scan_count.saturating_add(1);
-                if let Err(error) = reconcile_watcher_manager(
-                    &config,
-                    config_path.as_deref(),
-                    "fallback-scan",
-                    false,
-                    event_count,
-                    fallback_scan_count,
-                ).await {
-                    eprintln!("watcher manager reconcile failed: {error}");
-                }
-            }
-            _ = health.tick() => {
-                if let Err(error) = reconcile_watcher_manager(
-                    &config,
-                    config_path.as_deref(),
-                    "health-scan",
-                    true,
-                    event_count,
-                    fallback_scan_count,
+                    "process-scan",
+                    scan_count.is_multiple_of(WATCH_MANAGER_VERIFY_EVERY_SCANS),
+                    0,
+                    scan_count,
                 ).await {
                     eprintln!("watcher manager reconcile failed: {error}");
                 }
             }
         }
+    }
+    Ok(())
+}
+
+async fn watcher_manager_shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+
+        let mut terminate = signal(SignalKind::terminate()).expect("install SIGTERM handler");
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = terminate.recv() => {}
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
     }
 }
 
@@ -546,7 +513,7 @@ pub(crate) async fn reconcile_watcher_manager(
     }
 
     state.updated_at = Some(Utc::now());
-    state.mode = "event-driven".to_string();
+    state.mode = "process-polling".to_string();
     state.last_reconcile_reason = reason.to_string();
     state.last_reconcile_duration_ms = started.elapsed().as_millis();
     state.event_count = event_count;
@@ -1143,58 +1110,11 @@ pub(crate) fn process_is_alive(pid: u32) -> bool {
     #[cfg(unix)]
     ProcessCommand::new("kill")
         .args(["-0", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .map(|status| status.success())
         .unwrap_or(false)
-}
-
-pub(crate) struct WatcherManagerEventSource {
-    _watcher: notify::RecommendedWatcher,
-    rx: tokio::sync::mpsc::Receiver<()>,
-}
-
-pub(crate) fn start_watcher_manager_event_source() -> Result<WatcherManagerEventSource> {
-    let (tx, rx) = tokio::sync::mpsc::channel(1);
-    let mut watcher = notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
-        if result
-            .as_ref()
-            .is_ok_and(watcher_manager_event_requires_reconcile)
-        {
-            let _ = tx.try_send(());
-        }
-    })
-    .context("create watcher manager filesystem watcher")?;
-
-    for dir in watcher_manager_session_dirs() {
-        if dir.is_dir() {
-            notify::Watcher::watch(&mut watcher, &dir, notify::RecursiveMode::Recursive)
-                .with_context(|| format!("watch {}", dir.display()))?;
-        }
-    }
-
-    Ok(WatcherManagerEventSource {
-        _watcher: watcher,
-        rx,
-    })
-}
-
-pub(crate) fn watcher_manager_event_requires_reconcile(event: &notify::Event) -> bool {
-    matches!(
-        event.kind,
-        notify::EventKind::Create(_)
-            | notify::EventKind::Remove(_)
-            | notify::EventKind::Modify(notify::event::ModifyKind::Name(_))
-    )
-}
-
-pub(crate) fn watcher_manager_session_dirs() -> Vec<PathBuf> {
-    let home = platform::user_home_dir().unwrap_or_default();
-    let mut dirs = vec![home.join(".codex").join("sessions")];
-    let claude_base = env::var("CLAUDE_CONFIG_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| home.join(".claude"));
-    dirs.push(claude_base.join("sessions"));
-    dirs
 }
 
 pub(crate) fn enable_watch_manager_service(config_path: &Path) -> Result<String> {
@@ -1395,8 +1315,16 @@ pub(crate) fn watch_manager_service_status(profile: Profile) -> Result<String> {
     } else {
         format!("- warnings: {}", state.warnings.join(" | "))
     };
+    let activity_lines = if state.mode == "process-polling" {
+        format!("- process scans: {}", state.fallback_scan_count)
+    } else {
+        format!(
+            "- event count: {}\n- fallback scans: {}",
+            state.event_count, state.fallback_scan_count
+        )
+    };
     let runtime_lines = format!(
-        "- mode: {}\n- last reconcile reason: {}\n- last reconcile duration: {} ms\n- event count: {}\n- fallback scans: {}\n- lock owner pid: {}",
+        "- mode: {}\n- last reconcile reason: {}\n- last reconcile duration: {} ms\n{}\n- lock owner pid: {}",
         if state.mode.is_empty() {
             "unknown"
         } else {
@@ -1408,8 +1336,7 @@ pub(crate) fn watch_manager_service_status(profile: Profile) -> Result<String> {
             state.last_reconcile_reason.as_str()
         },
         state.last_reconcile_duration_ms,
-        state.event_count,
-        state.fallback_scan_count,
+        activity_lines,
         state
             .lock_owner_pid
             .map(|pid| pid.to_string())

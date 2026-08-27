@@ -2525,7 +2525,6 @@ dependencies = [
  "mem-service",
  "mem-skills",
  "mem-watch",
- "notify",
  "ratatui",
  "reqwest",
  "semver",

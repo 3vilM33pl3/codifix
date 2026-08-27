@@ -476,7 +476,7 @@ Activity is now contextual rather than a top-level TUI tab. The backend still ke
 
 ## Watcher Model
 
-The recommended watcher model is agent-linked. `memory watcher manager` runs as a user service, detects live agent sessions, bootstraps each repo when needed, and starts one `memory watcher run` process per repository. Multiple sessions in one repository share that watcher; a stable live session is retained as its owner until reconciliation requires a replacement.
+The recommended watcher model is agent-linked. `memory watcher manager` runs as a user service, detects live agent sessions with a lightweight command-only process scan, bootstraps each repo when needed, and starts one `memory watcher run` process per repository. Multiple sessions in one repository share that watcher; a stable live session is retained as its owner until reconciliation requires a replacement. The manager deliberately does not watch transcript files because their write volume is unrelated to session lifecycle and caused unnecessary idle CPU work.
 
 Each watcher observes a single repository and maintains a task window containing:
 

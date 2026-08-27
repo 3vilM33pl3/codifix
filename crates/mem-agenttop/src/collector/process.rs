@@ -30,6 +30,24 @@ pub fn get_process_info() -> HashMap<u32, ProcInfo> {
         .collect()
 }
 
+pub fn get_process_info_lightweight() -> HashMap<u32, ProcInfo> {
+    mem_platform::process_command_snapshots()
+        .into_iter()
+        .map(|process| {
+            (
+                process.pid,
+                ProcInfo {
+                    pid: process.pid,
+                    ppid: 0,
+                    rss_kb: 0,
+                    cpu_pct: 0.0,
+                    command: process.command,
+                },
+            )
+        })
+        .collect()
+}
+
 pub fn get_children_map(procs: &HashMap<u32, ProcInfo>) -> HashMap<u32, Vec<u32>> {
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for proc in procs.values() {

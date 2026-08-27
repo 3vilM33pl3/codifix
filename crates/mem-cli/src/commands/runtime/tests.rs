@@ -44,8 +44,7 @@ use crate::commands::{
     },
     watch_support::{
         resolve_agent_repo_root, should_start_agent_watcher, watcher_command_requires_config_load,
-        watcher_manager_config_matches_repo, watcher_manager_event_requires_reconcile,
-        write_file_if_changed,
+        watcher_manager_config_matches_repo, write_file_if_changed,
     },
 };
 
@@ -2137,31 +2136,6 @@ fn managed_watch_unit_name_is_profile_scoped() {
         managed_watch_service_name(Profile::Dev, "session 123"),
         "memory-watch-codex-dev-session-123.service"
     );
-}
-
-#[test]
-fn watcher_manager_only_reconciles_for_session_lifecycle_events() {
-    use notify::event::{CreateKind, DataChange, ModifyKind, RemoveKind, RenameMode};
-
-    assert!(watcher_manager_event_requires_reconcile(
-        &notify::Event::new(notify::EventKind::Create(CreateKind::File),)
-    ));
-    assert!(watcher_manager_event_requires_reconcile(
-        &notify::Event::new(notify::EventKind::Remove(RemoveKind::File),)
-    ));
-    assert!(watcher_manager_event_requires_reconcile(
-        &notify::Event::new(notify::EventKind::Modify(ModifyKind::Name(
-            RenameMode::Both
-        )),)
-    ));
-    assert!(!watcher_manager_event_requires_reconcile(
-        &notify::Event::new(notify::EventKind::Modify(ModifyKind::Data(
-            DataChange::Content
-        )),)
-    ));
-    assert!(!watcher_manager_event_requires_reconcile(
-        &notify::Event::new(notify::EventKind::Access(notify::event::AccessKind::Any),)
-    ));
 }
 
 #[test]

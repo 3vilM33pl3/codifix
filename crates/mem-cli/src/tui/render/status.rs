@@ -228,7 +228,19 @@ pub(in crate::tui) fn manager_status_detail(app: &App) -> Option<String> {
     if status.warning_count > 0 {
         parts.push(format!("{} warn", status.warning_count));
     }
-    if status.event_count > 0 || status.fallback_scan_count > 0 {
+    if status.runtime_mode.as_deref() == Some("process-polling") {
+        if status.fallback_scan_count > 0 {
+            parts.push(format!(
+                "{} scan{}",
+                status.fallback_scan_count,
+                if status.fallback_scan_count == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            ));
+        }
+    } else if status.event_count > 0 || status.fallback_scan_count > 0 {
         parts.push(format!(
             "{} events, {} fallback",
             status.event_count, status.fallback_scan_count
