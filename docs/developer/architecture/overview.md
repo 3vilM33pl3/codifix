@@ -170,7 +170,7 @@ PostgreSQL stores:
 
 ### Automation (`memory watcher`)
 
-`memory watcher` is an optional background process. The recommended local automation model is the Codex-linked watcher manager, which detects live Codex sessions and starts one watcher per session. Legacy per-project watcher services and manual foreground watchers remain compatibility paths.
+`memory watcher` is an optional background process. The recommended local automation model is the agent-linked watcher manager, which detects live agent sessions and starts one watcher per repository. Concurrent sessions in the same repository share that watcher. Legacy per-project watcher services and manual foreground watchers remain compatibility paths.
 
 It does not write directly to database tables. It only orchestrates the existing persistence path.
 

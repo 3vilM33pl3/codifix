@@ -476,7 +476,7 @@ Activity is now contextual rather than a top-level TUI tab. The backend still ke
 
 ## Watcher Model
 
-The recommended watcher model is agent-linked. `memory watcher manager` runs as a user service, detects live Codex sessions, bootstraps each repo when needed, and starts one `memory watcher run` process per agent session.
+The recommended watcher model is agent-linked. `memory watcher manager` runs as a user service, detects live agent sessions, bootstraps each repo when needed, and starts one `memory watcher run` process per repository. Multiple sessions in one repository share that watcher; a stable live session is retained as its owner until reconciliation requires a replacement.
 
 Each watcher observes a single repository and maintains a task window containing:
 
@@ -490,6 +490,7 @@ Two details matter here:
 
 1. The watcher now distinguishes between a file merely being dirty and new activity actually happening. Re-seeing the same dirty files on every poll does not reset the idle timer.
 2. The dedupe fingerprint includes file modification state, not just file names, so repeated edits in the same files can still create new raw captures.
+3. Filesystem events are coalesced and ignored top-level trees are not recursively subscribed, keeping build output and agent transcript churn from consuming CPU while Memory Layer is otherwise idle.
 
 Legacy per-project watcher services and manual foreground watchers still exist for compatibility and diagnostics, but the manager-first model is the primary path for normal agent work.
 

@@ -90,7 +90,7 @@ pub async fn run_loop(
         heartbeat_watcher(&client, &config, &heartbeat_request).await,
     );
 
-    let mut repo_events = if config.automation.file_events {
+    let mut repo_event_source = if config.automation.file_events {
         match start_repo_event_source(&repo_root, &config.automation.ignored_paths) {
             Ok(rx) => Some(rx),
             Err(error) => {
@@ -111,45 +111,18 @@ pub async fn run_loop(
     let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(30));
     heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     heartbeat.tick().await;
+    let shutdown = shutdown_signal();
+    tokio::pin!(shutdown);
 
     loop {
         tokio::select! {
-            Some(_) = async {
-                match repo_events.as_mut() {
-                    Some(rx) => rx.recv().await,
-                    None => std::future::pending().await,
+            biased;
+            _ = &mut shutdown => {
+                let request = build_watcher_unregister_request(&project, &watcher_id);
+                if let Err(error) = unregister_watcher(&client, &config, &request).await {
+                    eprintln!("watcher unregister failed: {error}");
                 }
-            }, if repo_events.is_some() => {
-                debounce = Some(Box::pin(tokio::time::sleep(std::time::Duration::from_secs(2))));
-            }
-            _ = async {
-                if let Some(delay) = debounce.as_mut() {
-                    delay.as_mut().await;
-                }
-            }, if debounce.is_some() => {
-                debounce = None;
-                run_once(
-                    &config,
-                    &client,
-                    &project,
-                    &repo_root,
-                    false,
-                    false,
-                    &writer_id,
-                    writer_name.as_deref(),
-                ).await?;
-            }
-            _ = fallback_poll.tick() => {
-                run_once(
-                    &config,
-                    &client,
-                    &project,
-                    &repo_root,
-                    false,
-                    false,
-                    &writer_id,
-                    writer_name.as_deref(),
-                ).await?;
+                break;
             }
             _ = liveness.tick() => {
                 if !owner_session_is_alive(&owner) {
@@ -182,23 +155,102 @@ pub async fn run_loop(
                     fetch_service_instance_id(&client, &config).await?,
                 )?;
             }
-            _ = shutdown_signal() => {
-                let request = build_watcher_unregister_request(&project, &watcher_id);
-                if let Err(error) = unregister_watcher(&client, &config, &request).await {
-                    eprintln!("watcher unregister failed: {error}");
+            _ = fallback_poll.tick() => {
+                refresh_repo_event_source(&mut repo_event_source);
+                run_once(
+                    &config,
+                    &client,
+                    &project,
+                    &repo_root,
+                    false,
+                    false,
+                    &writer_id,
+                    writer_name.as_deref(),
+                ).await?;
+            }
+            _ = async {
+                if let Some(delay) = debounce.as_mut() {
+                    delay.as_mut().await;
                 }
-                break;
+            }, if debounce.is_some() => {
+                debounce = None;
+                refresh_repo_event_source(&mut repo_event_source);
+                run_once(
+                    &config,
+                    &client,
+                    &project,
+                    &repo_root,
+                    false,
+                    false,
+                    &writer_id,
+                    writer_name.as_deref(),
+                ).await?;
+            }
+            Some(_) = async {
+                match repo_event_source.as_mut() {
+                    Some(source) => source.rx.recv().await,
+                    None => std::future::pending().await,
+                }
+            }, if repo_event_source.is_some() => {
+                debounce = Some(Box::pin(tokio::time::sleep(std::time::Duration::from_secs(2))));
             }
         }
     }
     Ok(())
 }
 
+struct RepoEventSource {
+    watcher: notify::RecommendedWatcher,
+    rx: tokio::sync::mpsc::Receiver<()>,
+    repo_root: PathBuf,
+    ignored_paths: Vec<String>,
+    watched_directories: std::collections::BTreeSet<PathBuf>,
+}
+
+impl RepoEventSource {
+    fn refresh_top_level_watches(&mut self) -> Result<()> {
+        for entry in std::fs::read_dir(&self.repo_root)
+            .with_context(|| format!("read {}", self.repo_root.display()))?
+        {
+            let entry = entry?;
+            if !entry.file_type()?.is_dir() {
+                continue;
+            }
+            let path = entry.path();
+            let relative = path
+                .strip_prefix(&self.repo_root)
+                .ok()
+                .and_then(|value| value.to_str())
+                .map(|value| format!("{value}/"));
+            if relative
+                .as_deref()
+                .is_none_or(|value| path_is_ignored(value, &self.ignored_paths))
+            {
+                continue;
+            }
+            if !self.watched_directories.contains(&path) {
+                notify::Watcher::watch(&mut self.watcher, &path, notify::RecursiveMode::Recursive)
+                    .with_context(|| format!("watch {}", path.display()))?;
+                self.watched_directories.insert(path);
+            }
+        }
+        Ok(())
+    }
+}
+
+fn refresh_repo_event_source(source: &mut Option<RepoEventSource>) {
+    if let Some(source) = source
+        && let Err(error) = source.refresh_top_level_watches()
+    {
+        eprintln!("watcher could not refresh repository event subscriptions: {error}");
+    }
+}
+
 fn start_repo_event_source(
     repo_root: &std::path::Path,
     ignored_paths: &[String],
-) -> Result<tokio::sync::mpsc::UnboundedReceiver<()>> {
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+) -> Result<RepoEventSource> {
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
     let root = repo_root.to_path_buf();
     let ignored = ignored_paths.to_vec();
     let mut watcher = notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
@@ -212,14 +264,21 @@ fn start_repo_event_source(
                 .is_some_and(|relative| !path_is_ignored(relative, &ignored))
         });
         if useful {
-            let _ = tx.send(());
+            let _ = tx.try_send(());
         }
     })
     .context("create repository filesystem watcher")?;
-    notify::Watcher::watch(&mut watcher, repo_root, notify::RecursiveMode::Recursive)
+    notify::Watcher::watch(&mut watcher, repo_root, notify::RecursiveMode::NonRecursive)
         .with_context(|| format!("watch {}", repo_root.display()))?;
-    std::mem::forget(watcher);
-    Ok(rx)
+    let mut source = RepoEventSource {
+        watcher,
+        rx,
+        repo_root: repo_root.to_path_buf(),
+        ignored_paths: ignored_paths.to_vec(),
+        watched_directories: std::collections::BTreeSet::new(),
+    };
+    source.refresh_top_level_watches()?;
+    Ok(source)
 }
 
 fn update_backend_instance_state(
@@ -347,7 +406,7 @@ fn resolve_writer_id(config: &AppConfig, cli_writer_id: Option<String>) -> Resul
 mod tests {
     use super::{
         BackendInstanceState, HeartbeatState, log_heartbeat_transition, resolve_project,
-        resolve_writer_id, update_backend_instance_state,
+        resolve_writer_id, start_repo_event_source, update_backend_instance_state,
     };
     use mem_config::AppConfig;
     use mem_record::WatcherPresenceSummary;
@@ -419,6 +478,35 @@ mod tests {
             "sctp"
         );
 
+        let _ = fs::remove_dir_all(repo_root);
+    }
+
+    #[test]
+    fn repository_events_do_not_subscribe_to_ignored_top_level_directories() {
+        let repo_root = unique_temp_dir("mem-watch-event-source");
+        fs::create_dir_all(repo_root.join("src")).expect("create source directory");
+        fs::create_dir_all(repo_root.join("target")).expect("create target directory");
+        fs::create_dir_all(repo_root.join(".git")).expect("create git directory");
+
+        let ignored = vec![".git/".to_string(), "target/".to_string()];
+        let mut source =
+            start_repo_event_source(&repo_root, &ignored).expect("start repository event source");
+
+        assert!(source.watched_directories.contains(&repo_root.join("src")));
+        assert!(
+            !source
+                .watched_directories
+                .contains(&repo_root.join("target"))
+        );
+        assert!(!source.watched_directories.contains(&repo_root.join(".git")));
+
+        fs::create_dir_all(repo_root.join("docs")).expect("create docs directory");
+        source
+            .refresh_top_level_watches()
+            .expect("refresh repository event source");
+        assert!(source.watched_directories.contains(&repo_root.join("docs")));
+
+        drop(source);
         let _ = fs::remove_dir_all(repo_root);
     }
 

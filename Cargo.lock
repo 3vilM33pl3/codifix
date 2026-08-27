@@ -2783,7 +2783,6 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
- "libc",
  "mem-config",
  "mem-platform",
  "mem-record",

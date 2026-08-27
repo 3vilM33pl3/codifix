@@ -439,6 +439,9 @@ pub fn collect_lightweight_sessions(
     for (pid, jsonl_path) in pid_to_jsonl {
         if let Some(mut session) = parse_codex_jsonl_lightweight(&jsonl_path) {
             session.pid = pid;
+            if let Some((started_at, _)) = read_proc_started_at(pid) {
+                session.started_at = started_at;
+            }
             sessions.push(session);
         }
     }

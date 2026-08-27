@@ -327,8 +327,8 @@ pub(crate) async fn run_watcher_manager(
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| "unknown".to_string())
     );
-    let mut event_rx = match start_watcher_manager_event_source() {
-        Ok(rx) => Some(rx),
+    let mut event_source = match start_watcher_manager_event_source() {
+        Ok(source) => Some(source),
         Err(error) => {
             eprintln!(
                 "watcher manager session file events unavailable; using fallback scans only: {error}"
@@ -353,11 +353,11 @@ pub(crate) async fn run_watcher_manager(
     loop {
         tokio::select! {
             Some(_) = async {
-                match event_rx.as_mut() {
-                    Some(rx) => rx.recv().await,
+                match event_source.as_mut() {
+                    Some(source) => source.rx.recv().await,
                     None => std::future::pending().await,
                 }
-            }, if event_rx.is_some() => {
+            }, if event_source.is_some() => {
                 event_count = event_count.saturating_add(1);
                 debounce = Some(Box::pin(tokio::time::sleep(std::time::Duration::from_millis(
                     WATCH_MANAGER_EVENT_DEBOUNCE_MS,
@@ -1118,12 +1118,19 @@ pub(crate) fn process_is_alive(pid: u32) -> bool {
         .unwrap_or(false)
 }
 
-pub(crate) fn start_watcher_manager_event_source()
--> Result<tokio::sync::mpsc::UnboundedReceiver<()>> {
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+pub(crate) struct WatcherManagerEventSource {
+    _watcher: notify::RecommendedWatcher,
+    rx: tokio::sync::mpsc::Receiver<()>,
+}
+
+pub(crate) fn start_watcher_manager_event_source() -> Result<WatcherManagerEventSource> {
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
     let mut watcher = notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
-        if result.is_ok() {
-            let _ = tx.send(());
+        if result
+            .as_ref()
+            .is_ok_and(watcher_manager_event_requires_reconcile)
+        {
+            let _ = tx.try_send(());
         }
     })
     .context("create watcher manager filesystem watcher")?;
@@ -1135,8 +1142,19 @@ pub(crate) fn start_watcher_manager_event_source()
         }
     }
 
-    std::mem::forget(watcher);
-    Ok(rx)
+    Ok(WatcherManagerEventSource {
+        _watcher: watcher,
+        rx,
+    })
+}
+
+pub(crate) fn watcher_manager_event_requires_reconcile(event: &notify::Event) -> bool {
+    matches!(
+        event.kind,
+        notify::EventKind::Create(_)
+            | notify::EventKind::Remove(_)
+            | notify::EventKind::Modify(notify::event::ModifyKind::Name(_))
+    )
 }
 
 pub(crate) fn watcher_manager_session_dirs() -> Vec<PathBuf> {

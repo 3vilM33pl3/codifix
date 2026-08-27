@@ -26,11 +26,11 @@ That installs a persistent user manager service:
 - on macOS it uses a `launchd` LaunchAgent
 - on Windows it uses current-user, least-privilege Task Scheduler tasks
 
-The manager detects live Codex sessions, bootstraps git repos if needed, and starts one watcher per Codex session.
+The manager detects live Codex and Claude sessions, bootstraps git repos if needed, and starts one watcher per repository. When several agent sessions use the same repository, the manager selects one stable live session as the watcher owner instead of duplicating filesystem work.
 
-The manager is event-driven. It watches agent session directories for Codex/Claude changes and only reconciles after a debounced session event, with a slow fallback scan for missed events. A singleton lock prevents accidentally running two managers at the same time.
+The manager is event-driven. It watches agent session directories for session creation, removal, and rename events and only reconciles after a debounced lifecycle event, with a slow fallback scan for missed events. Transcript content updates do not trigger a full process scan. A singleton lock prevents accidentally running two managers at the same time.
 
-Project watchers are also event-driven by default. They watch the repository, debounce file changes, and then run one `git status --porcelain` pass for the burst. `poll_interval` is now the fallback safety scan interval, not the primary loop. New configs use:
+Project watchers are also event-driven by default. They watch the repository root and non-ignored top-level directories, debounce file changes, and then run one `git status --porcelain` pass for the burst. Configured ignored trees such as `.git/` and `target/` are not recursively subscribed, and event bursts are coalesced into a single pending signal. `poll_interval` is the fallback safety scan interval, not the primary loop. New configs use:
 
 ```toml
 [automation]

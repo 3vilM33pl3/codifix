@@ -491,46 +491,14 @@ pub fn detect_hostname() -> String {
 }
 
 pub fn owner_session_is_alive(owner: &WatcherAgentOwner) -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        let Some(pid) = owner.agent_pid else {
-            return true;
-        };
-        let process = mem_platform::process_snapshots()
-            .into_iter()
-            .find(|process| process.pid == pid);
-        process.is_some_and(|process| {
-            owner.agent_started_at.is_none_or(|started_at| {
-                process
-                    .started_at_ms
-                    .abs_diff(started_at.timestamp_millis().max(0) as u64)
-                    <= 5_000
-            })
-        })
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    match owner.agent_pid {
-        Some(pid) => is_pid_alive(pid),
-        None => true, // no PID to check; keep running
-    }
-}
-
-#[cfg(unix)]
-fn is_pid_alive(pid: u32) -> bool {
-    // signal 0 checks process existence without sending a signal
-    let ret = unsafe { libc::kill(pid as i32, 0) };
-    if ret == 0 {
+    let Some(pid) = owner.agent_pid else {
         return true;
-    }
-    let err = std::io::Error::last_os_error();
-    // EPERM means the process exists but we lack permission
-    err.raw_os_error() == Some(libc::EPERM)
-}
-
-#[cfg(all(not(unix), not(target_os = "windows")))]
-fn is_pid_alive(_pid: u32) -> bool {
-    true
+    };
+    mem_platform::process_started_at_ms(pid).is_some_and(|process_started_at_ms| {
+        owner.agent_started_at.is_none_or(|started_at| {
+            process_started_at_ms.abs_diff(started_at.timestamp_millis().max(0) as u64) <= 5_000
+        })
+    })
 }
 
 pub fn build_capture_request(
@@ -839,6 +807,28 @@ mod tests {
         assert!(path_is_ignored("target/debug/memory", &ignored));
         assert!(path_is_ignored(".git/index", &ignored));
         assert!(!path_is_ignored("src/main.rs", &ignored));
+    }
+
+    #[test]
+    fn watcher_owner_liveness_rejects_dead_and_reused_pids() {
+        let current = WatcherAgentOwner {
+            agent_pid: Some(std::process::id()),
+            ..WatcherAgentOwner::default()
+        };
+        assert!(owner_session_is_alive(&current));
+
+        let reused = WatcherAgentOwner {
+            agent_pid: Some(std::process::id()),
+            agent_started_at: Some(DateTime::<Utc>::UNIX_EPOCH),
+            ..WatcherAgentOwner::default()
+        };
+        assert!(!owner_session_is_alive(&reused));
+
+        let dead = WatcherAgentOwner {
+            agent_pid: Some(u32::MAX),
+            ..WatcherAgentOwner::default()
+        };
+        assert!(!owner_session_is_alive(&dead));
     }
 
     #[test]

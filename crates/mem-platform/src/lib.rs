@@ -13,7 +13,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use sysinfo::{
-    MINIMUM_CPU_UPDATE_INTERVAL, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind,
+    MINIMUM_CPU_UPDATE_INTERVAL, Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind,
 };
 
 static PROCESS_SYSTEM: OnceLock<Mutex<System>> = OnceLock::new();
@@ -89,7 +89,20 @@ fn quote_snapshot_argument(value: &str) -> String {
 }
 
 pub fn process_is_alive(pid: u32) -> bool {
-    process_snapshots().iter().any(|process| process.pid == pid)
+    process_started_at_ms(pid).is_some()
+}
+
+pub fn process_started_at_ms(pid: u32) -> Option<u64> {
+    let pid = Pid::from_u32(pid);
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[pid]),
+        true,
+        ProcessRefreshKind::nothing(),
+    );
+    system
+        .process(pid)
+        .map(|process| process.start_time().saturating_mul(1000))
 }
 
 pub fn user_home_dir() -> Option<PathBuf> {
@@ -1067,7 +1080,8 @@ mod tests {
 
     use super::{
         derive_default_writer_id, dev_mode_status_line, format_dev_commit_label,
-        managed_watch_service_name, watch_service_unit_name,
+        managed_watch_service_name, process_is_alive, process_started_at_ms,
+        watch_service_unit_name,
     };
 
     #[cfg(target_os = "windows")]
@@ -1120,6 +1134,14 @@ mod tests {
         assert_eq!(format_dev_commit_label(None, true), "unknown");
         assert_eq!(format_dev_commit_label(Some("   "), false), "unknown");
         assert!(dev_mode_status_line(None).starts_with("DEV MODE  commit="));
+    }
+
+    #[test]
+    fn targeted_process_lookup_reports_identity_without_full_snapshot() {
+        assert!(process_is_alive(std::process::id()));
+        assert!(process_started_at_ms(std::process::id()).is_some());
+        assert!(!process_is_alive(u32::MAX));
+        assert!(process_started_at_ms(u32::MAX).is_none());
     }
 
     #[test]
