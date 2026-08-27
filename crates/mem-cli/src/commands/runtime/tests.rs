@@ -74,10 +74,9 @@ use mem_skills::{
 };
 use zip::{ZipWriter, write::SimpleFileOptions};
 
-#[cfg(target_os = "macos")]
-use chrono::Utc;
-
-#[cfg(target_os = "macos")]
+#[cfg(not(target_os = "windows"))]
+use chrono::{TimeZone, Utc};
+#[cfg(not(target_os = "windows"))]
 use mem_agenttop::LightweightAgentSession;
 
 #[cfg(target_os = "macos")]
@@ -96,7 +95,9 @@ use crate::commands::service_support::parse_systemd_unit_names;
 
 #[cfg(all(unix, not(target_os = "macos")))]
 use crate::commands::watch_support::{
-    managed_watch_service_name, render_watch_manager_unit, render_watch_unit, watch_unit_name,
+    ManagedWatcherSession, managed_watch_service_name, render_watch_manager_unit,
+    render_watch_unit, resolve_managed_agent_sessions_by_repo, select_managed_agent_session,
+    watch_unit_name,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -2135,6 +2136,129 @@ fn managed_watch_unit_name_is_profile_scoped() {
         managed_watch_service_name(Profile::Dev, "session 123"),
         "memory-watch-codex-dev-session-123.service"
     );
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn managed_watcher_prefers_real_session_over_tracked_pending_process() {
+    let repo_root = Path::new("/tmp/memory");
+    let pending = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 10,
+        session_id: "pending-10-1".to_string(),
+        cwd: repo_root.display().to_string(),
+        started_at: 1_000,
+    };
+    let real = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 11,
+        session_id: "session-real".to_string(),
+        cwd: repo_root.display().to_string(),
+        started_at: 2_000,
+    };
+    let mut tracked = std::collections::BTreeMap::new();
+    tracked.insert(
+        pending.session_id.clone(),
+        ManagedWatcherSession {
+            unit_name: "pending.service".to_string(),
+            project: "memory".to_string(),
+            repo_root: repo_root.display().to_string(),
+            agent_cli: "codex".to_string(),
+            agent_session_id: pending.session_id.clone(),
+            agent_pid: pending.pid,
+            agent_started_at: Utc.timestamp_millis_opt(pending.started_at as i64).unwrap(),
+        },
+    );
+
+    let selected = select_managed_agent_session(repo_root, vec![pending, real.clone()], &tracked)
+        .expect("select managed session");
+
+    assert_eq!(selected, real);
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn managed_watcher_keeps_stable_real_session_for_repo() {
+    let repo_root = Path::new("/tmp/memory");
+    let tracked_session = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 10,
+        session_id: "session-tracked".to_string(),
+        cwd: repo_root.display().to_string(),
+        started_at: 2_000,
+    };
+    let older_session = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 11,
+        session_id: "session-older".to_string(),
+        cwd: repo_root.display().to_string(),
+        started_at: 1_000,
+    };
+    let mut tracked = std::collections::BTreeMap::new();
+    tracked.insert(
+        tracked_session.session_id.clone(),
+        ManagedWatcherSession {
+            unit_name: "tracked.service".to_string(),
+            project: "memory".to_string(),
+            repo_root: repo_root.display().to_string(),
+            agent_cli: "codex".to_string(),
+            agent_session_id: tracked_session.session_id.clone(),
+            agent_pid: tracked_session.pid,
+            agent_started_at: Utc
+                .timestamp_millis_opt(tracked_session.started_at as i64)
+                .unwrap(),
+        },
+    );
+
+    let selected = select_managed_agent_session(
+        repo_root,
+        vec![older_session, tracked_session.clone()],
+        &tracked,
+    )
+    .expect("select managed session");
+
+    assert_eq!(selected, tracked_session);
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn managed_watcher_resolves_only_one_session_per_repository() {
+    let repo_root = unique_temp_dir("mem-watch-deduplicate-repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    assert!(
+        std::process::Command::new("git")
+            .args(["init", "--quiet"])
+            .current_dir(&repo_root)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let sessions = vec![
+        LightweightAgentSession {
+            agent_cli: "codex",
+            pid: 10,
+            session_id: "pending-10-1".to_string(),
+            cwd: repo_root.display().to_string(),
+            started_at: 1_000,
+        },
+        LightweightAgentSession {
+            agent_cli: "codex",
+            pid: 11,
+            session_id: "session-real".to_string(),
+            cwd: repo_root.display().to_string(),
+            started_at: 2_000,
+        },
+    ];
+
+    let resolved =
+        resolve_managed_agent_sessions_by_repo(sessions, &std::collections::BTreeMap::new())
+            .unwrap();
+
+    assert_eq!(resolved.len(), 1);
+    assert_eq!(resolved[0].0, repo_root);
+    assert_eq!(resolved[0].1.session_id, "session-real");
+
+    let _ = fs::remove_dir_all(repo_root);
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]

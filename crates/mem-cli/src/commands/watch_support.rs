@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-#[cfg(target_os = "macos")]
-use std::collections::BTreeMap;
 use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
     env, fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -423,13 +422,13 @@ pub(crate) async fn reconcile_watcher_manager(
     let previous_state = state.clone();
     state.warnings.clear();
 
-    let sessions = mem_agenttop::collect_lightweight_agent_sessions();
-    let mut seen = std::collections::BTreeSet::new();
+    let sessions = resolve_managed_agent_sessions_by_repo(
+        mem_agenttop::collect_lightweight_agent_sessions(),
+        &state.sessions,
+    )?;
+    let mut seen = BTreeSet::new();
 
-    for session in sessions {
-        let Some(repo_root) = resolve_agent_repo_root(&session.cwd)? else {
-            continue;
-        };
+    for (repo_root, session) in sessions {
         if !repo_agent_watch_enabled(&repo_root)? {
             state.warnings.push(format!(
                 "Skipped {} session {} in {} because repo opted out of agent-linked watchers.",
@@ -458,13 +457,20 @@ pub(crate) async fn reconcile_watcher_manager(
             .sessions
             .get(&session.session_id)
             .is_some_and(|entry| entry.unit_name == unit_name);
+        let tracked_owner_matches = state
+            .sessions
+            .get(&session.session_id)
+            .is_some_and(|entry| {
+                entry.agent_pid == session.pid
+                    && entry.agent_started_at.timestamp_millis() == session.started_at as i64
+            });
         let mut unit_loaded = tracked && tracked_unit_matches;
         let mut unit_running = tracked && tracked_unit_matches;
         if !tracked || !tracked_unit_matches || verify_units {
             unit_loaded = managed_watch_service_loaded(config.profile, &session.session_id);
             unit_running = managed_watch_service_running(config.profile, &session.session_id);
         }
-        if should_start_agent_watcher(tracked, unit_loaded, unit_running) {
+        if should_start_agent_watcher(tracked && tracked_owner_matches, unit_loaded, unit_running) {
             if unit_loaded {
                 let _ = stop_managed_watch_service(config.profile, &session.session_id);
             }
@@ -545,6 +551,54 @@ pub(crate) async fn reconcile_watcher_manager(
     state.lock_owner_pid = Some(std::process::id());
     save_watcher_manager_state_if_changed(config.profile, &previous_state, &state)?;
     Ok(())
+}
+
+pub(crate) fn resolve_managed_agent_sessions_by_repo(
+    sessions: Vec<LightweightAgentSession>,
+    tracked: &BTreeMap<String, ManagedWatcherSession>,
+) -> Result<Vec<(PathBuf, LightweightAgentSession)>> {
+    let mut repo_roots = HashMap::<String, Option<PathBuf>>::new();
+    let mut grouped = BTreeMap::<PathBuf, Vec<LightweightAgentSession>>::new();
+
+    for session in sessions {
+        let repo_root = if let Some(cached) = repo_roots.get(&session.cwd) {
+            cached.clone()
+        } else {
+            let resolved = resolve_agent_repo_root(&session.cwd)?;
+            repo_roots.insert(session.cwd.clone(), resolved.clone());
+            resolved
+        };
+        if let Some(repo_root) = repo_root {
+            grouped.entry(repo_root).or_default().push(session);
+        }
+    }
+
+    Ok(grouped
+        .into_iter()
+        .filter_map(|(repo_root, sessions)| {
+            select_managed_agent_session(&repo_root, sessions, tracked)
+                .map(|session| (repo_root, session))
+        })
+        .collect())
+}
+
+pub(crate) fn select_managed_agent_session(
+    repo_root: &Path,
+    sessions: Vec<LightweightAgentSession>,
+    tracked: &BTreeMap<String, ManagedWatcherSession>,
+) -> Option<LightweightAgentSession> {
+    sessions.into_iter().min_by_key(|session| {
+        let is_pending = session.session_id.starts_with("pending-");
+        let is_tracked_for_repo = tracked
+            .get(&session.session_id)
+            .is_some_and(|entry| entry.repo_root == repo_root.display().to_string());
+        (
+            is_pending,
+            !is_tracked_for_repo,
+            session.started_at,
+            session.session_id.clone(),
+        )
+    })
 }
 
 pub(crate) fn resolve_agent_repo_root(cwd: &str) -> Result<Option<PathBuf>> {
