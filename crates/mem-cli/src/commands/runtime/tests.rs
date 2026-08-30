@@ -2290,6 +2290,38 @@ fn managed_watcher_resolves_only_one_session_per_repository() {
 
 #[cfg(all(unix, not(target_os = "macos")))]
 #[test]
+fn managed_watcher_reuses_tracked_repository_for_same_process() {
+    let repo_root = unique_temp_dir("mem-watch-tracked-repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    let session = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 10,
+        session_id: "session-tracked".to_string(),
+        cwd: "/path/that/does/not/exist".to_string(),
+        started_at: 2_000,
+    };
+    let mut tracked = std::collections::BTreeMap::new();
+    tracked.insert(
+        session.session_id.clone(),
+        ManagedWatcherSession {
+            unit_name: "tracked.service".to_string(),
+            project: "memory".to_string(),
+            repo_root: repo_root.display().to_string(),
+            agent_cli: "codex".to_string(),
+            agent_session_id: session.session_id.clone(),
+            agent_pid: session.pid,
+            agent_started_at: Utc.timestamp_millis_opt(session.started_at as i64).unwrap(),
+        },
+    );
+
+    let resolved = resolve_managed_agent_sessions_by_repo(vec![session.clone()], &tracked).unwrap();
+
+    assert_eq!(resolved, vec![(repo_root.clone(), session)]);
+    fs::remove_dir_all(repo_root).unwrap();
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
 fn watch_unit_uses_repo_root_and_project() {
     let repo_root = unique_temp_dir("mem-watch-unit");
     fs::create_dir_all(&repo_root).unwrap();

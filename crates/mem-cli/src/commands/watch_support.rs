@@ -559,7 +559,16 @@ pub(crate) fn resolve_managed_agent_sessions_by_repo(
     let mut grouped = BTreeMap::<PathBuf, Vec<LightweightAgentSession>>::new();
 
     for session in sessions {
-        let repo_root = if let Some(cached) = repo_roots.get(&session.cwd) {
+        let tracked_repo_root = tracked.get(&session.session_id).and_then(|entry| {
+            let path = PathBuf::from(&entry.repo_root);
+            (entry.agent_pid == session.pid
+                && entry.agent_started_at.timestamp_millis() == session.started_at as i64
+                && path.is_dir())
+            .then_some(path)
+        });
+        let repo_root = if tracked_repo_root.is_some() {
+            tracked_repo_root
+        } else if let Some(cached) = repo_roots.get(&session.cwd) {
             cached.clone()
         } else {
             let resolved = resolve_agent_repo_root(&session.cwd)?;
