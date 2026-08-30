@@ -2314,10 +2314,9 @@ fn watch_manager_unit_uses_manager_subcommand() {
 #[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn agent_watcher_start_logic_reuses_loaded_active_units() {
-    assert!(!should_start_agent_watcher(true, true, true));
-    assert!(should_start_agent_watcher(true, true, false));
-    assert!(should_start_agent_watcher(true, false, false));
-    assert!(should_start_agent_watcher(false, true, true));
+    assert!(!should_start_agent_watcher(true, true));
+    assert!(should_start_agent_watcher(true, false));
+    assert!(should_start_agent_watcher(false, false));
 }
 
 #[test]
@@ -2623,11 +2622,10 @@ fn direct_llm_eval_accepts_ollama_without_api_key() {
 }
 
 #[test]
-fn watcher_manager_start_check_uses_cached_tracked_state() {
-    assert!(!should_start_agent_watcher(true, true, true));
-    assert!(should_start_agent_watcher(false, true, true));
-    assert!(should_start_agent_watcher(true, false, true));
-    assert!(should_start_agent_watcher(true, true, false));
+fn watcher_manager_start_check_uses_live_unit_health() {
+    assert!(!should_start_agent_watcher(true, true));
+    assert!(should_start_agent_watcher(false, true));
+    assert!(should_start_agent_watcher(true, false));
 }
 
 #[test]

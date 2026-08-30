@@ -435,20 +435,13 @@ pub(crate) async fn reconcile_watcher_manager(
             .sessions
             .get(&session.session_id)
             .is_some_and(|entry| entry.unit_name == unit_name);
-        let tracked_owner_matches = state
-            .sessions
-            .get(&session.session_id)
-            .is_some_and(|entry| {
-                entry.agent_pid == session.pid
-                    && entry.agent_started_at.timestamp_millis() == session.started_at as i64
-            });
         let mut unit_loaded = tracked && tracked_unit_matches;
         let mut unit_running = tracked && tracked_unit_matches;
         if !tracked || !tracked_unit_matches || verify_units {
             unit_loaded = managed_watch_service_loaded(config.profile, &session.session_id);
             unit_running = managed_watch_service_running(config.profile, &session.session_id);
         }
-        if should_start_agent_watcher(tracked && tracked_owner_matches, unit_loaded, unit_running) {
+        if should_start_agent_watcher(unit_loaded, unit_running) {
             if unit_loaded {
                 let _ = stop_managed_watch_service(config.profile, &session.session_id);
             }
@@ -1481,12 +1474,8 @@ pub(crate) fn unit_is_loaded(unit_name: &str) -> bool {
     !load_state.is_empty() && load_state != "not-found"
 }
 
-pub(crate) fn should_start_agent_watcher(
-    session_tracked: bool,
-    unit_loaded: bool,
-    unit_active: bool,
-) -> bool {
-    !session_tracked || !unit_loaded || !unit_active
+pub(crate) fn should_start_agent_watcher(unit_loaded: bool, unit_active: bool) -> bool {
+    !unit_loaded || !unit_active
 }
 
 pub(crate) fn stop_managed_watch_service(profile: Profile, session_id: &str) -> Result<()> {
