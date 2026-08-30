@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
 use std::process::Command;
 
 /// Collector for OpenAI Codex CLI sessions.
@@ -410,8 +410,25 @@ impl CodexCollector {
         pids
     }
 
-    /// Map codex PIDs to their open rollout-*.jsonl files via lsof.
-    #[cfg(not(target_os = "windows"))]
+    /// Map Codex PIDs to open rollout files without spawning `lsof` on Linux.
+    #[cfg(target_os = "linux")]
+    fn map_pid_to_jsonl(pids: &[u32]) -> HashMap<u32, PathBuf> {
+        pids.iter()
+            .filter_map(|pid| {
+                let fd_dir = PathBuf::from(format!("/proc/{pid}/fd"));
+                let rollout = fs::read_dir(fd_dir).ok()?.flatten().find_map(|entry| {
+                    let path = fs::read_link(entry.path()).ok()?;
+                    let filename = path.file_name()?.to_str()?;
+                    (filename.starts_with("rollout-") && filename.ends_with(".jsonl"))
+                        .then_some(path)
+                })?;
+                Some((*pid, rollout))
+            })
+            .collect()
+    }
+
+    /// Other Unix platforms use `lsof` because they do not expose Linux procfs.
+    #[cfg(target_os = "macos")]
     fn map_pid_to_jsonl(pids: &[u32]) -> HashMap<u32, PathBuf> {
         let mut map = HashMap::new();
         if pids.is_empty() {
@@ -980,6 +997,21 @@ mod tests {
         );
         let refreshed = collector.parse_codex_jsonl_cached(file.path()).unwrap();
         assert_eq!(refreshed.turn_count, 1);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_codex_collector_maps_open_rollout_from_procfs() {
+        let file = tempfile::Builder::new()
+            .prefix("rollout-")
+            .suffix(".jsonl")
+            .tempfile()
+            .unwrap();
+        let pid = std::process::id();
+
+        let mapped = CodexCollector::map_pid_to_jsonl(&[pid]);
+
+        assert_eq!(mapped.get(&pid), Some(&file.path().to_path_buf()));
     }
 
     #[test]
