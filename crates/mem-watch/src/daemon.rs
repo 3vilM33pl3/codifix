@@ -274,13 +274,7 @@ fn start_repo_event_source(
         let Ok(event) = result else {
             return;
         };
-        let useful = event.paths.iter().any(|path| {
-            path.strip_prefix(&root)
-                .ok()
-                .and_then(|relative| relative.to_str())
-                .is_some_and(|relative| !path_is_ignored(relative, &ignored))
-        });
-        if useful {
+        if repository_event_is_useful(&event, &root, &ignored) {
             let _ = tx.try_send(());
         }
     })
@@ -296,6 +290,22 @@ fn start_repo_event_source(
     };
     source.refresh_directory_watches()?;
     Ok(source)
+}
+
+fn repository_event_is_useful(
+    event: &notify::Event,
+    repo_root: &std::path::Path,
+    ignored_paths: &[String],
+) -> bool {
+    if matches!(event.kind, notify::EventKind::Access(_)) {
+        return false;
+    }
+    event.paths.iter().any(|path| {
+        path.strip_prefix(repo_root)
+            .ok()
+            .and_then(|relative| relative.to_str())
+            .is_some_and(|relative| !path_is_ignored(relative, ignored_paths))
+    })
 }
 
 fn update_backend_instance_state(
@@ -422,12 +432,12 @@ fn resolve_writer_id(config: &AppConfig, cli_writer_id: Option<String>) -> Resul
 #[cfg(test)]
 mod tests {
     use super::{
-        BackendInstanceState, HeartbeatState, log_heartbeat_transition, resolve_project,
-        resolve_writer_id, start_repo_event_source, update_backend_instance_state,
+        BackendInstanceState, HeartbeatState, log_heartbeat_transition, repository_event_is_useful,
+        resolve_project, resolve_writer_id, start_repo_event_source, update_backend_instance_state,
     };
     use mem_config::AppConfig;
     use mem_record::WatcherPresenceSummary;
-    use std::{fs, sync::Mutex};
+    use std::{fs, path::PathBuf, sync::Mutex};
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -552,6 +562,33 @@ mod tests {
 
         drop(source);
         let _ = fs::remove_dir_all(repo_root);
+    }
+
+    #[test]
+    fn repository_events_ignore_directory_access_but_keep_source_changes() {
+        use notify::event::{AccessKind, AccessMode, ModifyKind};
+
+        let repo_root = PathBuf::from("/tmp/memory-repo");
+        let ignored = vec!["target/".to_string()];
+        let access =
+            notify::Event::new(notify::EventKind::Access(AccessKind::Open(AccessMode::Any)))
+                .add_path(repo_root.join("src"));
+        let source_change = notify::Event::new(notify::EventKind::Modify(ModifyKind::Any))
+            .add_path(repo_root.join("src/lib.rs"));
+        let ignored_change = notify::Event::new(notify::EventKind::Modify(ModifyKind::Any))
+            .add_path(repo_root.join("target/debug/memory"));
+
+        assert!(!repository_event_is_useful(&access, &repo_root, &ignored));
+        assert!(repository_event_is_useful(
+            &source_change,
+            &repo_root,
+            &ignored
+        ));
+        assert!(!repository_event_is_useful(
+            &ignored_change,
+            &repo_root,
+            &ignored
+        ));
     }
 
     #[test]
