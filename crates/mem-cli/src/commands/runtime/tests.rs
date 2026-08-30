@@ -44,7 +44,7 @@ use crate::commands::{
     },
     watch_support::{
         resolve_agent_repo_root, should_start_agent_watcher, watcher_command_requires_config_load,
-        watcher_manager_config_matches_repo, write_file_if_changed,
+        watcher_manager_config_matches_repo, watcher_repo_needs_bootstrap, write_file_if_changed,
     },
 };
 
@@ -2658,6 +2658,13 @@ fn watcher_manager_start_check_uses_live_unit_health() {
     assert!(!should_start_agent_watcher(true, true));
     assert!(should_start_agent_watcher(false, true));
     assert!(should_start_agent_watcher(true, false));
+}
+
+#[test]
+fn watcher_manager_repairs_repositories_only_when_needed() {
+    assert!(watcher_repo_needs_bootstrap("startup", true));
+    assert!(watcher_repo_needs_bootstrap("process-scan", false));
+    assert!(!watcher_repo_needs_bootstrap("process-scan", true));
 }
 
 #[test]

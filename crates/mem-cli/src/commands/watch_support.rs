@@ -418,8 +418,6 @@ pub(crate) async fn reconcile_watcher_manager(
         }
 
         let project = resolve_manager_project_slug(&repo_root);
-        ensure_agent_watch_repo_bootstrap(&repo_root, &project)?;
-
         if legacy_watch_service_is_active(&project) {
             state.warnings.push(format!(
                 "Skipped agent-linked watcher for project {} because legacy watcher service {} is active.",
@@ -431,6 +429,9 @@ pub(crate) async fn reconcile_watcher_manager(
 
         let unit_name = managed_watch_service_name(config.profile, &session.session_id);
         let tracked = state.sessions.contains_key(&session.session_id);
+        if watcher_repo_needs_bootstrap(reason, tracked) {
+            ensure_agent_watch_repo_bootstrap(&repo_root, &project)?;
+        }
         let tracked_unit_matches = state
             .sessions
             .get(&session.session_id)
@@ -520,8 +521,16 @@ pub(crate) async fn reconcile_watcher_manager(
     state.event_count = event_count;
     state.fallback_scan_count = fallback_scan_count;
     state.lock_owner_pid = Some(std::process::id());
-    save_watcher_manager_state_if_changed(config.profile, &previous_state, &state)?;
+    if verify_units {
+        save_watcher_manager_state(config.profile, &state)?;
+    } else {
+        save_watcher_manager_state_if_changed(config.profile, &previous_state, &state)?;
+    }
     Ok(())
+}
+
+pub(crate) fn watcher_repo_needs_bootstrap(reason: &str, tracked: bool) -> bool {
+    reason == "startup" || !tracked
 }
 
 pub(crate) fn watcher_manager_repo_is_in_scope(config: &AppConfig, repo_root: &Path) -> bool {
@@ -1029,6 +1038,8 @@ pub(crate) fn save_watcher_manager_state_if_changed(
     comparable_next.updated_at = None;
     comparable_previous.last_reconcile_duration_ms = 0;
     comparable_next.last_reconcile_duration_ms = 0;
+    comparable_previous.event_count = comparable_next.event_count;
+    comparable_previous.fallback_scan_count = comparable_next.fallback_scan_count;
     if comparable_previous == comparable_next {
         return Ok(());
     }
