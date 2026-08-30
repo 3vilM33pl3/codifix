@@ -303,6 +303,7 @@ pub(crate) async fn run_watcher_manager(
     config: AppConfig,
     config_path: Option<PathBuf>,
 ) -> Result<()> {
+    let config_path = effective_watcher_manager_config_path(&config, config_path);
     let _lock = WatcherManagerLock::acquire(config.profile)?;
     let version = config.profile.display_version(env!("CARGO_PKG_VERSION"));
     eprintln!(
@@ -356,6 +357,13 @@ pub(crate) async fn run_watcher_manager(
         }
     }
     Ok(())
+}
+
+pub(crate) fn effective_watcher_manager_config_path(
+    config: &AppConfig,
+    fallback: Option<PathBuf>,
+) -> Option<PathBuf> {
+    config.resolved_config_path.clone().or(fallback)
 }
 
 async fn watcher_manager_shutdown_signal() {

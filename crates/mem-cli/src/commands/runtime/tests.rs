@@ -95,9 +95,9 @@ use crate::commands::service_support::parse_systemd_unit_names;
 
 #[cfg(all(unix, not(target_os = "macos")))]
 use crate::commands::watch_support::{
-    ManagedWatcherSession, managed_watch_service_name, render_watch_manager_unit,
-    render_watch_unit, resolve_managed_agent_sessions_by_repo, select_managed_agent_session,
-    watch_unit_name,
+    ManagedWatcherSession, effective_watcher_manager_config_path, managed_watch_service_name,
+    render_watch_manager_unit, render_watch_unit, resolve_managed_agent_sessions_by_repo,
+    select_managed_agent_session, watch_unit_name,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -2628,6 +2628,27 @@ fn watcher_manager_start_check_uses_cached_tracked_state() {
     assert!(should_start_agent_watcher(false, true, true));
     assert!(should_start_agent_watcher(true, false, true));
     assert!(should_start_agent_watcher(true, true, false));
+}
+
+#[test]
+fn watcher_manager_uses_resolved_project_config_for_children() {
+    let mut config = test_app_config();
+    config.resolved_config_path = Some(PathBuf::from("/tmp/project/config.toml"));
+
+    let path =
+        effective_watcher_manager_config_path(&config, Some(PathBuf::from("/tmp/fallback.toml")));
+
+    assert_eq!(path, config.resolved_config_path);
+}
+
+#[test]
+fn watcher_manager_uses_cli_fallback_without_resolved_config() {
+    let config = test_app_config();
+    let fallback = PathBuf::from("/tmp/memory-layer.toml");
+
+    let path = effective_watcher_manager_config_path(&config, Some(fallback.clone()));
+
+    assert_eq!(path, Some(fallback));
 }
 
 #[test]
