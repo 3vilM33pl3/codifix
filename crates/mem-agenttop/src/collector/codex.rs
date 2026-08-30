@@ -28,6 +28,13 @@ pub struct CodexCollector {
     sessions_dir: PathBuf,
     /// Latest rate limit info parsed from Codex JSONL token_count events.
     pub last_rate_limit: Option<RateLimitInfo>,
+    transcript_cache: HashMap<PathBuf, CachedCodexTranscript>,
+}
+
+struct CachedCodexTranscript {
+    file_len: u64,
+    modified: std::time::SystemTime,
+    result: CodexJSONLResult,
 }
 
 impl CodexCollector {
@@ -36,6 +43,7 @@ impl CodexCollector {
         Self {
             sessions_dir: home.join(".codex").join("sessions"),
             last_rate_limit: None,
+            transcript_cache: HashMap::new(),
         }
     }
 
@@ -111,6 +119,7 @@ impl CodexCollector {
                 if seen_jsonl.contains(&path) {
                     continue;
                 }
+                seen_jsonl.insert(path.clone());
                 // Only show recently finished sessions (< 5 min old)
                 if let Ok(meta) = fs::metadata(&path)
                     && let Ok(modified) = meta.modified()
@@ -146,6 +155,8 @@ impl CodexCollector {
         }
 
         sessions.sort_by_key(|s| std::cmp::Reverse(s.started_at));
+        self.transcript_cache
+            .retain(|path, _| seen_jsonl.contains(path));
         sessions
     }
 
@@ -160,7 +171,7 @@ impl CodexCollector {
     }
 
     fn load_session_with_rate_limit(
-        &self,
+        &mut self,
         pid: Option<u32>,
         is_exec: bool,
         jsonl_path: &Path,
@@ -168,7 +179,7 @@ impl CodexCollector {
         children_map: &HashMap<u32, Vec<u32>>,
         ports: &HashMap<u32, Vec<u16>>,
     ) -> Option<(AgentSession, Option<RateLimitInfo>)> {
-        let result = parse_codex_jsonl(jsonl_path)?;
+        let result = self.parse_codex_jsonl_cached(jsonl_path)?;
 
         let proc = pid.and_then(|p| process_info.get(&p));
         let mem_mb = proc.map(|p| p.rss_kb / 1024).unwrap_or(0);
@@ -279,6 +290,29 @@ impl CodexCollector {
             },
             rate_limit,
         ))
+    }
+
+    fn parse_codex_jsonl_cached(&mut self, path: &Path) -> Option<CodexJSONLResult> {
+        let metadata = fs::metadata(path).ok()?;
+        let file_len = metadata.len();
+        let modified = metadata.modified().ok()?;
+        if let Some(cached) = self.transcript_cache.get(path)
+            && cached.file_len == file_len
+            && cached.modified == modified
+        {
+            return Some(cached.result.clone());
+        }
+
+        let result = parse_codex_jsonl(path)?;
+        self.transcript_cache.insert(
+            path.to_path_buf(),
+            CachedCodexTranscript {
+                file_len,
+                modified,
+                result: result.clone(),
+            },
+        );
+        Some(result)
     }
 
     fn load_pending_session(
@@ -617,6 +651,7 @@ impl super::AgentCollector for CodexCollector {
 }
 
 /// Parsed result from a Codex rollout JSONL file.
+#[derive(Clone)]
 struct CodexJSONLResult {
     session_id: String,
     cwd: String,
@@ -919,6 +954,32 @@ mod tests {
         assert_eq!(result.cwd, "/home/user/project");
         assert_eq!(result.version, "0.1.5");
         assert_eq!(result.git_branch, "feature/x");
+    }
+
+    #[test]
+    fn test_codex_collector_caches_unchanged_transcripts() {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        write_lines(&mut file, &[SESSION_META]);
+        let mut collector = CodexCollector::new();
+
+        let first = collector.parse_codex_jsonl_cached(file.path()).unwrap();
+        assert_eq!(first.turn_count, 0);
+        collector
+            .transcript_cache
+            .get_mut(file.path())
+            .unwrap()
+            .result
+            .turn_count = 42;
+
+        let cached = collector.parse_codex_jsonl_cached(file.path()).unwrap();
+        assert_eq!(cached.turn_count, 42);
+
+        write_lines(
+            &mut file,
+            &[r#"{"type":"event_msg","payload":{"type":"agent_message"}}"#],
+        );
+        let refreshed = collector.parse_codex_jsonl_cached(file.path()).unwrap();
+        assert_eq!(refreshed.turn_count, 1);
     }
 
     #[test]

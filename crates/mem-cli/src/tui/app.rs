@@ -196,9 +196,6 @@ pub(crate) async fn run(api: ApiClient, project: String, repo_root: PathBuf) -> 
 
 /// Fast cadence used while the Agents tab is visible.
 pub(super) const AGENT_POLL_ACTIVE: Duration = Duration::from_secs(5);
-/// Slow cadence used when no tab displays agent_snapshot. Switching to the
-/// Agents tab sends a wake signal so the user doesn't wait this long.
-pub(super) const AGENT_POLL_IDLE: Duration = Duration::from_secs(30);
 
 pub(super) fn start_agent_snapshot_worker(
     tx: mpsc::UnboundedSender<BackgroundEvent>,
@@ -208,6 +205,17 @@ pub(super) fn start_agent_snapshot_worker(
     std::thread::spawn(move || {
         let mut collector = mem_agenttop::AgentTop::new();
         loop {
+            // Agent snapshots can include large CLI transcripts. There is no
+            // consumer for them while the tab is hidden, so wait for the tab
+            // transition instead of doing periodic background work.
+            if !agents_tab_visible.load(Ordering::Relaxed) {
+                if wake_rx.recv().is_err() {
+                    break;
+                }
+                if !agents_tab_visible.load(Ordering::Relaxed) {
+                    continue;
+                }
+            }
             let snapshot = collector.collect_snapshot();
             if tx
                 .send(BackgroundEvent::AgentsLoaded {
@@ -217,12 +225,7 @@ pub(super) fn start_agent_snapshot_worker(
             {
                 break;
             }
-            let interval = if agents_tab_visible.load(Ordering::Relaxed) {
-                AGENT_POLL_ACTIVE
-            } else {
-                AGENT_POLL_IDLE
-            };
-            match wake_rx.recv_timeout(interval) {
+            match wake_rx.recv_timeout(AGENT_POLL_ACTIVE) {
                 Ok(()) | Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => break,
             }
