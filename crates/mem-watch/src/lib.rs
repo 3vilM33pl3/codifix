@@ -289,9 +289,17 @@ pub fn update_session_from_repo(
 }
 
 pub fn path_is_ignored(path: &str, ignored_paths: &[String]) -> bool {
-    ignored_paths
-        .iter()
-        .any(|ignored| path.starts_with(ignored))
+    let path = path.replace('\\', "/");
+    let path = path.trim_start_matches("./").trim_matches('/');
+    if path.is_empty() {
+        return false;
+    }
+    let searchable = format!("/{path}/");
+    ignored_paths.iter().any(|ignored| {
+        let ignored = ignored.replace('\\', "/");
+        let ignored = ignored.trim_start_matches("./").trim_matches('/');
+        !ignored.is_empty() && searchable.contains(&format!("/{ignored}/"))
+    })
 }
 
 pub fn should_capture(
@@ -869,7 +877,13 @@ mod tests {
     fn ignored_paths_match_prefixes() {
         let ignored = vec![".git/".to_string(), "target/".to_string()];
         assert!(path_is_ignored("target/debug/memory", &ignored));
+        assert!(path_is_ignored(
+            "crates/mem-cli/target/debug/memory",
+            &ignored
+        ));
         assert!(path_is_ignored(".git/index", &ignored));
+        assert!(path_is_ignored("vendor/checkout/.git/index", &ignored));
+        assert!(!path_is_ignored("targeted/source.rs", &ignored));
         assert!(!path_is_ignored("src/main.rs", &ignored));
     }
 

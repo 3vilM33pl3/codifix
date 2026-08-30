@@ -32,7 +32,7 @@ The manager uses a lightweight process scan every 10 seconds. It reads only proc
 
 A manager started from a Cargo build is scoped to the repository whose dev config it loaded. It does not try to launch dev watchers for every other active agent repository on the machine; the installed production manager remains responsible for those repositories.
 
-Project watchers are also event-driven by default. They watch the repository root and non-ignored top-level directories, debounce file changes, and then run one `git status --porcelain` pass for the burst. Configured ignored trees such as `.git/` and `target/` are not recursively subscribed, and event bursts are coalesced into a single pending signal. `poll_interval` is the fallback safety scan interval, not the primary loop. New configs use:
+Project watchers are also event-driven by default. They use non-recursive subscriptions for the repository root and each relevant directory, prune configured ignored paths at any depth, and stop at nested Git repository or submodule boundaries. A burst of file changes is coalesced before one `git status --porcelain` pass. This avoids subscribing to large generated trees such as nested `target/` directories. `poll_interval` is used only when filesystem events are unavailable. New configs use:
 
 ```toml
 [automation]

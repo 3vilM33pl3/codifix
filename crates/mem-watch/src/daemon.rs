@@ -155,8 +155,7 @@ pub async fn run_loop(
                     fetch_service_instance_id(&client, &config).await?,
                 )?;
             }
-            _ = fallback_poll.tick() => {
-                refresh_repo_event_source(&mut repo_event_source);
+            _ = fallback_poll.tick(), if repo_event_source.is_none() => {
                 run_once(
                     &config,
                     &client,
@@ -208,30 +207,48 @@ struct RepoEventSource {
 }
 
 impl RepoEventSource {
-    fn refresh_top_level_watches(&mut self) -> Result<()> {
-        for entry in std::fs::read_dir(&self.repo_root)
-            .with_context(|| format!("read {}", self.repo_root.display()))?
-        {
-            let entry = entry?;
-            if !entry.file_type()?.is_dir() {
-                continue;
-            }
-            let path = entry.path();
-            let relative = path
-                .strip_prefix(&self.repo_root)
-                .ok()
-                .and_then(|value| value.to_str())
-                .map(|value| format!("{value}/"));
-            if relative
-                .as_deref()
-                .is_none_or(|value| path_is_ignored(value, &self.ignored_paths))
-            {
-                continue;
-            }
-            if !self.watched_directories.contains(&path) {
-                notify::Watcher::watch(&mut self.watcher, &path, notify::RecursiveMode::Recursive)
+    fn refresh_directory_watches(&mut self) -> Result<()> {
+        let mut pending = vec![self.repo_root.clone()];
+        while let Some(directory) = pending.pop() {
+            let entries = match std::fs::read_dir(&directory) {
+                Ok(entries) => entries,
+                Err(error) if directory == self.repo_root => {
+                    return Err(error).with_context(|| format!("read {}", directory.display()));
+                }
+                Err(_) => continue,
+            };
+            for entry in entries.flatten() {
+                let Ok(file_type) = entry.file_type() else {
+                    continue;
+                };
+                if !file_type.is_dir() {
+                    continue;
+                }
+                let path = entry.path();
+                let Some(relative) = path
+                    .strip_prefix(&self.repo_root)
+                    .ok()
+                    .and_then(|value| value.to_str())
+                else {
+                    continue;
+                };
+                if path_is_ignored(relative, &self.ignored_paths) {
+                    continue;
+                }
+                if self.watched_directories.insert(path.clone()) {
+                    notify::Watcher::watch(
+                        &mut self.watcher,
+                        &path,
+                        notify::RecursiveMode::NonRecursive,
+                    )
                     .with_context(|| format!("watch {}", path.display()))?;
-                self.watched_directories.insert(path);
+                }
+                // Nested repositories and submodules own their build and
+                // metadata trees. Their root event still exposes checkout
+                // changes without subscribing to every child directory.
+                if !path.join(".git").exists() {
+                    pending.push(path);
+                }
             }
         }
         Ok(())
@@ -240,7 +257,7 @@ impl RepoEventSource {
 
 fn refresh_repo_event_source(source: &mut Option<RepoEventSource>) {
     if let Some(source) = source
-        && let Err(error) = source.refresh_top_level_watches()
+        && let Err(error) = source.refresh_directory_watches()
     {
         eprintln!("watcher could not refresh repository event subscriptions: {error}");
     }
@@ -275,9 +292,9 @@ fn start_repo_event_source(
         rx,
         repo_root: repo_root.to_path_buf(),
         ignored_paths: ignored_paths.to_vec(),
-        watched_directories: std::collections::BTreeSet::new(),
+        watched_directories: std::collections::BTreeSet::from([repo_root.to_path_buf()]),
     };
-    source.refresh_top_level_watches()?;
+    source.refresh_directory_watches()?;
     Ok(source)
 }
 
@@ -482,29 +499,56 @@ mod tests {
     }
 
     #[test]
-    fn repository_events_do_not_subscribe_to_ignored_top_level_directories() {
+    fn repository_events_prune_ignored_and_nested_repository_directories() {
         let repo_root = unique_temp_dir("mem-watch-event-source");
-        fs::create_dir_all(repo_root.join("src")).expect("create source directory");
-        fs::create_dir_all(repo_root.join("target")).expect("create target directory");
+        fs::create_dir_all(repo_root.join("src").join("nested")).expect("create source directory");
+        fs::create_dir_all(repo_root.join("src").join("target").join("debug"))
+            .expect("create nested target directory");
         fs::create_dir_all(repo_root.join(".git")).expect("create git directory");
+        fs::create_dir_all(repo_root.join("vendor").join("checkout").join(".git"))
+            .expect("create nested repository metadata");
+        fs::create_dir_all(repo_root.join("vendor").join("checkout").join("src"))
+            .expect("create nested repository source");
 
         let ignored = vec![".git/".to_string(), "target/".to_string()];
         let mut source =
             start_repo_event_source(&repo_root, &ignored).expect("start repository event source");
 
+        assert!(source.watched_directories.contains(&repo_root));
         assert!(source.watched_directories.contains(&repo_root.join("src")));
+        assert!(
+            source
+                .watched_directories
+                .contains(&repo_root.join("src").join("nested"))
+        );
         assert!(
             !source
                 .watched_directories
-                .contains(&repo_root.join("target"))
+                .contains(&repo_root.join("src").join("target"))
         );
         assert!(!source.watched_directories.contains(&repo_root.join(".git")));
+        assert!(
+            source
+                .watched_directories
+                .contains(&repo_root.join("vendor").join("checkout"))
+        );
+        assert!(
+            !source
+                .watched_directories
+                .contains(&repo_root.join("vendor").join("checkout").join("src"))
+        );
 
-        fs::create_dir_all(repo_root.join("docs")).expect("create docs directory");
+        fs::create_dir_all(repo_root.join("docs").join("reference"))
+            .expect("create docs directory");
         source
-            .refresh_top_level_watches()
+            .refresh_directory_watches()
             .expect("refresh repository event source");
         assert!(source.watched_directories.contains(&repo_root.join("docs")));
+        assert!(
+            source
+                .watched_directories
+                .contains(&repo_root.join("docs").join("reference"))
+        );
 
         drop(source);
         let _ = fs::remove_dir_all(repo_root);

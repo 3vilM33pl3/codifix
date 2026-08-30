@@ -478,6 +478,8 @@ Activity is now contextual rather than a top-level TUI tab. The backend still ke
 
 The recommended watcher model is agent-linked. `memory watcher manager` runs as a user service, detects live agent sessions with a lightweight command-only process scan, bootstraps each repo when needed, and starts one `memory watcher run` process per repository. Multiple sessions in one repository share that watcher; a stable live session is retained as its owner until reconciliation requires a replacement. The manager deliberately does not watch transcript files because their write volume is unrelated to session lifecycle and caused unnecessary idle CPU work.
 
+Repository watchers use pruned, non-recursive directory subscriptions rather than one recursive whole-tree subscription. Ignored path components are excluded at any depth, nested Git repositories are treated as ownership boundaries, and polling runs only when the platform event source cannot be created.
+
 Each watcher observes a single repository and maintains a task window containing:
 
 - changed files
