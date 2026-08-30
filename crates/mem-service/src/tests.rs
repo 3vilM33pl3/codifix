@@ -1169,6 +1169,30 @@ fn stale_manual_watcher_is_counted_as_unhealthy() {
 }
 
 #[test]
+fn agent_linked_watcher_restarts_belong_to_watcher_manager() {
+    let now = chrono::Utc::now();
+    let legacy = test_presence(
+        "watcher-legacy",
+        "memory",
+        "host-a",
+        AutomationMode::Auto,
+        now,
+    );
+    let linked = WatcherPresence {
+        agent_session_id: Some("session-123".to_string()),
+        ..legacy.clone()
+    };
+    let blank = WatcherPresence {
+        agent_session_id: Some("  ".to_string()),
+        ..legacy.clone()
+    };
+
+    assert!(watcher_restart_is_manager_owned(&linked));
+    assert!(!watcher_restart_is_manager_owned(&legacy));
+    assert!(!watcher_restart_is_manager_owned(&blank));
+}
+
+#[test]
 fn watcher_restart_service_name_prefers_managed_session_identity() {
     let managed = WatcherRestartRequest {
         project: "memory".to_string(),

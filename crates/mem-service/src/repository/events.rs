@@ -767,6 +767,13 @@ pub(crate) fn update_local_watcher_restart_state(
     }
 }
 
+pub(crate) fn watcher_restart_is_manager_owned(watcher: &WatcherPresence) -> bool {
+    watcher
+        .agent_session_id
+        .as_deref()
+        .is_some_and(|session_id| !session_id.trim().is_empty())
+}
+
 pub(crate) async fn run_watcher_watchdog(state: AppState) -> Result<()> {
     let tick = Duration::from_secs(15);
     let stale_after =
@@ -792,6 +799,34 @@ pub(crate) async fn run_watcher_watchdog(state: AppState) -> Result<()> {
             let now = chrono::Utc::now();
             for watcher in registry.values_mut() {
                 if now - watcher.last_heartbeat_at <= stale_after {
+                    continue;
+                }
+
+                if watcher_restart_is_manager_owned(watcher) {
+                    if watcher.health != WatcherHealth::Stale {
+                        let previous_health = watcher.health.clone();
+                        watcher.health = WatcherHealth::Stale;
+                        activity_events.push((
+                            watcher.project.clone(),
+                            format!("Watcher {} went stale", watcher.watcher_id),
+                            ActivityDetails::WatcherHealth {
+                                watcher_id: watcher.watcher_id.clone(),
+                                hostname: watcher.hostname.clone(),
+                                health: WatcherHealth::Stale,
+                                managed_by_service: watcher.managed_by_service,
+                                restart_attempt_count: watcher.restart_attempt_count,
+                                agent_cli: watcher.agent_cli.clone(),
+                                agent_session_id: watcher.agent_session_id.clone(),
+                                agent_pid: watcher.agent_pid,
+                                previous_health: Some(previous_health),
+                                recovered_after_restart_attempts: None,
+                                message: Some(
+                                    "heartbeat missed; watcher manager owns restart recovery"
+                                        .to_string(),
+                                ),
+                            },
+                        ));
+                    }
                     continue;
                 }
 
