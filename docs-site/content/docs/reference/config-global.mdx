@@ -120,7 +120,7 @@ This is separate from the per-repo `curation.replacement_policy` agent setting, 
 
 ## Consolidation section
 
-The `[consolidation]` section controls [memory consolidation](/docs/how-it-works/memory-quality#consolidation-and-insights): discovering clusters of related memories and synthesizing higher-level `insight` memories. Off by default and dry-run first, matching the reinforcement posture. When enabled, a deterministic cluster scan runs on the curate path and surfaces `consolidation_due`; with `auto_trigger` on, a due cluster wakes the LLM synthesis in the background. Every result is a human-gated proposal.
+The `[consolidation]` section controls [memory consolidation](/docs/how-it-works/memory-quality#consolidation-and-insights): discovering clusters of related memories and synthesizing higher-level `insight` memories. Off by default and dry-run first, matching the reinforcement posture. When enabled, curation queues a deterministic cluster scan after durable writes instead of delaying the request; queued captures are coalesced per project. With `auto_trigger` on, a due cluster wakes the LLM synthesis in the background. Every result is a human-gated proposal.
 
 ```toml
 [consolidation]

@@ -74,7 +74,7 @@ Because an insight is an ordinary memory — embedded, ranked, and linked — th
 
 ## Configuration
 
-Consolidation lives in the `[consolidation]` section of the [global config](/docs/reference/config-global#consolidation-section). It is disabled and dry-run by default. When enabled, a deterministic cluster scan runs on the curate path and reports `consolidation_due`; with `auto_trigger` on, a due cluster wakes the LLM synthesis in the background, still bounded by the dry-run flag and a daily cap.
+Consolidation lives in the `[consolidation]` section of the [global config](/docs/reference/config-global#consolidation-section). It is disabled and dry-run by default. When enabled, curation queues one deterministic cluster scan after its durable memory writes complete; requests do not wait for this advisory work. Queued curation is coalesced per project so a burst of captures produces one scan. With `auto_trigger` on, a due cluster wakes LLM synthesis in the background, still bounded by the dry-run flag and a daily cap.
 
 ```toml
 [consolidation]

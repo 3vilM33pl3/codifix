@@ -83,9 +83,9 @@ revalidation time. Both entry points share it:
 - the **background scheduler** (`run_reinforcement_scheduler`, default every
   15 min) validates up to `validation_batch_size` memories per cycle within
   a global `daily_validation_cap` of non-dry-run LLM runs per day;
-- the **curator workflow**: after `/v1/curate`, due memories are reported in
-  `CurateResponse.validation_due` and the scheduler is nudged to run
-  promptly.
+- the **curator workflow**: after `/v1/curate` commits its durable writes, a
+  background enrichment worker checks due memories and nudges the scheduler
+  promptly. The HTTP response does not wait for this advisory pass.
 
 Each run has three stages:
 

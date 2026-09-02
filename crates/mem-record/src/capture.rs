@@ -212,12 +212,14 @@ pub struct CurateResponse {
     pub dry_run: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<DiagnosticInfo>,
-    /// Memories whose reinforcement activation makes them due for
-    /// validation, reported when the reinforcement system is enabled.
+    /// Memories whose reinforcement activation makes them due for validation.
+    /// Curation enrichment may report these asynchronously after the durable
+    /// response has returned, so callers must treat this as advisory.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub validation_due: Vec<ValidationDueInfo>,
     /// Clusters of related memories that passed the value gate and are not yet
-    /// covered by an insight, reported when consolidation is enabled.
+    /// covered by an insight. Consolidation is asynchronous after curation,
+    /// so callers must treat this as advisory.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub consolidation_due: Vec<ConsolidationDueInfo>,
 }

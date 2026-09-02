@@ -2,6 +2,8 @@
 
 use crate::prelude::*;
 use crate::*;
+use mem_record::{CurateRequest, CurateResponse};
+use std::collections::HashSet;
 
 pub(crate) const QUERY_ACTIVITY_GRAPH_CONNECTION_LIMIT: usize = 5;
 
@@ -23,9 +25,157 @@ pub(crate) struct AppState {
     pub(crate) recent_activity: Arc<Mutex<VecDeque<ServiceEvent>>>,
     pub(crate) watchers: Arc<Mutex<HashMap<String, WatcherPresence>>>,
     pub(crate) provenance: Arc<Mutex<ProvenanceRuntimeState>>,
+    pub(crate) post_curation: PostCurationRuntime,
     pub(crate) reinforcement: Option<crate::reinforcement::ReinforcementRuntime>,
     pub(crate) cluster: ClusterRuntime,
     pub(crate) shutdown: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+}
+
+/// Serializes advisory curation work per project while allowing HTTP curation
+/// requests to return as soon as their durable writes have committed.
+#[derive(Clone, Default)]
+pub(crate) struct PostCurationRuntime {
+    state: Arc<Mutex<PostCurationQueue>>,
+}
+
+#[derive(Default)]
+struct PostCurationQueue {
+    pending: HashMap<String, VecDeque<PostCurationWork>>,
+    running: HashSet<String>,
+}
+
+#[derive(Clone)]
+pub(crate) struct PostCurationWork {
+    pub(crate) request: CurateRequest,
+    pub(crate) response: CurateResponse,
+}
+
+impl PostCurationRuntime {
+    /// Queues work and returns true only for the caller that should start the
+    /// project's background worker.
+    pub(crate) fn enqueue(&self, work: PostCurationWork) -> bool {
+        let project = work.request.project.clone();
+        let mut state = self
+            .state
+            .lock()
+            .expect("post-curation queue lock poisoned");
+        state
+            .pending
+            .entry(project.clone())
+            .or_default()
+            .push_back(work);
+        state.running.insert(project)
+    }
+
+    /// Takes every item currently queued for one running project. New work
+    /// arriving after this call is handled by the next batch.
+    pub(crate) fn take_batch(&self, project: &str) -> Vec<PostCurationWork> {
+        let mut state = self
+            .state
+            .lock()
+            .expect("post-curation queue lock poisoned");
+        state
+            .pending
+            .get_mut(project)
+            .map(|pending| pending.drain(..).collect())
+            .unwrap_or_default()
+    }
+
+    /// Releases the worker only when no new work arrived while it was running.
+    /// Returns true when the caller can exit its worker loop.
+    pub(crate) fn finish_if_idle(&self, project: &str) -> bool {
+        let mut state = self
+            .state
+            .lock()
+            .expect("post-curation queue lock poisoned");
+        if state
+            .pending
+            .get(project)
+            .is_some_and(|pending| !pending.is_empty())
+        {
+            return false;
+        }
+        state.pending.remove(project);
+        state.running.remove(project);
+        true
+    }
+}
+
+#[cfg(test)]
+mod post_curation_tests {
+    use super::*;
+
+    fn work(project: &str, raw_capture_id: Uuid) -> PostCurationWork {
+        PostCurationWork {
+            request: CurateRequest {
+                project: project.to_string(),
+                batch_size: Some(1),
+                raw_capture_id: Some(raw_capture_id),
+                replacement_policy: None,
+                dry_run: false,
+            },
+            response: CurateResponse {
+                project_id: Uuid::new_v4(),
+                run_id: Uuid::new_v4(),
+                input_count: 1,
+                output_count: 1,
+                memory_ids: Vec::new(),
+                replaced_count: 0,
+                proposal_count: 0,
+                replacements: Vec::new(),
+                dry_run: false,
+                warnings: Vec::new(),
+                validation_due: Vec::new(),
+                consolidation_due: Vec::new(),
+            },
+        }
+    }
+
+    #[test]
+    fn post_curation_queue_starts_one_worker_and_preserves_fifo_batches() {
+        let runtime = PostCurationRuntime::default();
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+
+        assert!(runtime.enqueue(work("memory", first)));
+        assert!(!runtime.enqueue(work("memory", second)));
+
+        let batch = runtime.take_batch("memory");
+        assert_eq!(batch.len(), 2);
+        assert_eq!(batch[0].request.raw_capture_id, Some(first));
+        assert_eq!(batch[1].request.raw_capture_id, Some(second));
+        assert!(runtime.finish_if_idle("memory"));
+
+        assert!(runtime.enqueue(work("memory", Uuid::new_v4())));
+    }
+
+    #[test]
+    fn post_curation_queue_keeps_worker_active_for_work_arriving_mid_batch() {
+        let runtime = PostCurationRuntime::default();
+        assert!(runtime.enqueue(work("memory", Uuid::new_v4())));
+        assert_eq!(runtime.take_batch("memory").len(), 1);
+
+        assert!(!runtime.enqueue(work("memory", Uuid::new_v4())));
+        assert!(!runtime.finish_if_idle("memory"));
+        assert_eq!(runtime.take_batch("memory").len(), 1);
+        assert!(runtime.finish_if_idle("memory"));
+    }
+
+    #[test]
+    fn post_curation_queue_recovers_after_a_failed_batch() {
+        let runtime = PostCurationRuntime::default();
+        assert!(runtime.enqueue(work("memory", Uuid::new_v4())));
+
+        // The worker logs and discards a failed advisory job, then must release
+        // its project slot so later durable captures are never stranded.
+        let failed_batch = runtime.take_batch("memory");
+        assert_eq!(failed_batch.len(), 1);
+        assert!(runtime.finish_if_idle("memory"));
+
+        assert!(runtime.enqueue(work("memory", Uuid::new_v4())));
+        assert_eq!(runtime.take_batch("memory").len(), 1);
+        assert!(runtime.finish_if_idle("memory"));
+    }
 }
 
 #[derive(Clone, Debug)]

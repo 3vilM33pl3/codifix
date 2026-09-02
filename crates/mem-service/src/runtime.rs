@@ -194,6 +194,7 @@ pub(crate) async fn build_state(
             status: "idle".to_string(),
             ..ProvenanceRuntimeState::default()
         })),
+        post_curation: PostCurationRuntime::default(),
         reinforcement: reinforcement.as_ref().map(|(runtime, _)| runtime.clone()),
         cluster: ClusterRuntime {
             peers: Arc::new(Mutex::new(HashMap::new())),

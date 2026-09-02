@@ -20,28 +20,62 @@ pub(crate) async fn curate_memory(
     if request.dry_run {
         return Ok(Json(response));
     }
-    // The post-curate pipeline (embedding rebuild, semantic dedup, validation
-    // and consolidation due checks) can outlive the client's timeout on large
-    // projects. Run it in a detached task so a client disconnect — axum drops
-    // the handler future — cannot cancel it mid-flight; awaiting the handle
-    // keeps the response complete for clients that do wait.
-    let task = tokio::spawn(finish_curate(state, request, response));
-    match task.await {
-        Ok(result) => result.map(Json),
-        Err(error) => Err(ApiError::io(anyhow::anyhow!(
-            "post-curate pipeline task failed: {error}"
-        ))),
+    // Durable curation is complete. Publish it before queuing advisory work so
+    // task-start checkpoints can verify their new task memory immediately.
+    notify_curation_completed(&state, &request, &response);
+
+    let project = request.project.clone();
+    let should_start_worker = state.post_curation.enqueue(PostCurationWork {
+        request,
+        response: response.clone(),
+    });
+    if should_start_worker {
+        let worker_state = state.clone();
+        tokio::spawn(async move {
+            drain_post_curation_queue(worker_state, project).await;
+        });
+    }
+    Ok(Json(response))
+}
+
+/// Drains all currently queued enrichment work for one project, then performs
+/// one consolidation scan for the batch. New work arriving while the scan is
+/// running is picked up by the next iteration instead of starting another
+/// concurrent scan.
+async fn drain_post_curation_queue(state: AppState, project: String) {
+    loop {
+        let batch = state.post_curation.take_batch(&project);
+        if batch.is_empty() {
+            if state.post_curation.finish_if_idle(&project) {
+                return;
+            }
+            continue;
+        }
+
+        let project_id = batch[0].response.project_id;
+        for work in batch {
+            if let Err(error) = finish_curate_enrichment(&state, work.request, work.response).await
+            {
+                tracing::warn!(project = %project, error = ?error, "post-curate enrichment failed");
+            }
+        }
+        if let Err(error) = run_project_consolidation(&state, &project, project_id).await {
+            tracing::warn!(project = %project, error = ?error, "post-curate consolidation failed");
+        }
+
+        if state.post_curation.finish_if_idle(&project) {
+            return;
+        }
     }
 }
 
-/// Everything that happens after the curate transaction commits: advisory
-/// passes that enrich the response but must survive client disconnects.
-async fn finish_curate(
-    state: AppState,
+/// Everything that happens after the durable curation transaction commits.
+/// These advisory passes must never delay an HTTP response.
+async fn finish_curate_enrichment(
+    state: &AppState,
     request: CurateRequest,
-    mut response: mem_record::CurateResponse,
-) -> Result<mem_record::CurateResponse, ApiError> {
-    let project = request.project.clone();
+    response: mem_record::CurateResponse,
+) -> Result<(), ApiError> {
     let embedders = state.embedders.read().await;
     if !embedders.is_empty() {
         let rebuild_result = if request.raw_capture_id.is_some() {
@@ -74,8 +108,8 @@ async fn finish_curate(
                     "automatic_embedding_creation",
                     DiagnosticSeverity::Warning,
                 );
-                notify_project_diagnostic(&state, request.project.clone(), diagnostic.clone());
-                response.warnings.push(diagnostic);
+                tracing::warn!(project = %request.project, message = %diagnostic.message, "automatic embedding creation failed");
+                notify_project_diagnostic(state, request.project.clone(), diagnostic);
             }
             Ok(_) => {
                 // Embeddings for the new memories exist now, so the semantic
@@ -100,7 +134,7 @@ async fn finish_curate(
                             .await
                             {
                                 Ok(queued) if queued > 0 => {
-                                    response.proposal_count += queued as i64;
+                                    tracing::info!(project = %request.project, queued, "queued semantic dedup proposals");
                                 }
                                 Ok(_) => {}
                                 Err(error) => {
@@ -132,21 +166,28 @@ async fn finish_curate(
             {
                 runtime.notify.notify_one();
             }
-            response.validation_due = due;
         }
         Err(error) => {
             tracing::warn!(error = %error, "reinforcement due-validation check failed");
         }
     }
-    // Consolidation accumulator: when enabled, report clusters worth
-    // consolidating and, if auto-trigger is on, wake the LLM synthesis in the
-    // background. Deterministic scan only; advisory and never fails curation.
+    Ok(())
+}
+
+/// Runs the project-wide, potentially expensive consolidation scan once after
+/// a batch of curation enrichment. It is intentionally outside the request
+/// path and never changes the completed curation response.
+async fn run_project_consolidation(
+    state: &AppState,
+    project: &str,
+    project_id: Uuid,
+) -> Result<(), ApiError> {
     if state.config.consolidation.enabled {
         let cfg = &state.config.consolidation;
         let half_life_secs = state.config.reinforcement.half_life.as_secs_f64().max(1.0);
         match crate::repository::handlers::consolidation::run_memory_consolidation(
             &state.pool()?,
-            &request.project,
+            project,
             cfg,
             half_life_secs,
         )
@@ -160,8 +201,8 @@ async fn finish_curate(
                     // utility has collapsed. Advisory learning acting only on
                     // automation cadence.
                     let suppressed = auto_trigger_suppressed_by_utility(
-                        &state,
-                        response.project_id,
+                        state,
+                        project_id,
                         mem_loops::LOOP_MEMORY_CONSOLIDATION,
                     )
                     .await;
@@ -172,7 +213,7 @@ async fn finish_curate(
                         );
                     } else {
                         let state = state.clone();
-                        let project = request.project.clone();
+                        let project = project.to_string();
                         tokio::spawn(async move {
                             if let Err(error) = crate::consolidate::emit_consolidation_proposals(
                                 &state, &project, None,
@@ -184,15 +225,23 @@ async fn finish_curate(
                         });
                     }
                 }
-                response.consolidation_due = due;
             }
             Err(error) => {
                 tracing::warn!(error = %error.message, "consolidation due check failed");
             }
         }
     }
+    Ok(())
+}
+
+fn notify_curation_completed(
+    state: &AppState,
+    request: &CurateRequest,
+    response: &mem_record::CurateResponse,
+) {
+    let project = request.project.clone();
     notify_project_changed(
-        &state,
+        state,
         project,
         None,
         ActivityKind::Curate,
@@ -213,7 +262,7 @@ async fn finish_curate(
     );
     for replacement in &response.replacements {
         notify_project_changed(
-            &state,
+            state,
             request.project.clone(),
             Some(replacement.new_memory_id),
             ActivityKind::MemoryReplacement,
@@ -231,7 +280,6 @@ async fn finish_curate(
             }),
         );
     }
-    Ok(response)
 }
 
 pub(crate) async fn project_replacement_proposals(
