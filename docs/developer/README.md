@@ -28,6 +28,7 @@ For the full isolation contract, default ports, override flags, and troubleshoot
 
 - [Dev Stack vs Installed Stack](dev-stack.md)
 - [Architecture Overview](architecture/overview.md)
+- [Protocol-Neutral Federation Spike Contract](adr/0008-protocol-neutral-federation-spike.md)
 - [Authentication And Authorization](architecture/authentication.md)
 - [Code Map](architecture/code-map.md)
 - [Built-In MCP Server](architecture/mcp-server.md)
@@ -47,6 +48,7 @@ For the full isolation contract, default ports, override flags, and troubleshoot
 - [Skills And Agent Material](skills/README.md)
 - [How Skills Work](skills/how-skills-work.md)
 - [Examples](examples/README.md)
+- [Federation Protocol Spike](../future-development/federation-protocol-spike.md)
 
 ## Related Docs
 
