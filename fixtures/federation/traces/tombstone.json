@@ -1,0 +1,79 @@
+{
+  "name": "tombstone",
+  "records": [
+    {
+      "requestId": "grant-alice",
+      "authority": "root",
+      "publisher": "root",
+      "kind": "grant",
+      "subject": "alice",
+      "capability": "publish",
+      "evidenceRefs": [],
+      "tombstone": false
+    },
+    {
+      "requestId": "evidence-1",
+      "authority": "alice",
+      "publisher": "alice",
+      "kind": "evidence",
+      "evidenceId": "ev-1",
+      "source": "repo",
+      "locator": "records/evidence-1",
+      "digest": "sha256:d3fb85109453d9da6f91fb6f3869ee58b68d956839491f407705d0f0bd3dd9cd",
+      "evidenceRefs": [],
+      "tombstone": false
+    },
+    {
+      "requestId": "memory-1-v1",
+      "authority": "alice",
+      "publisher": "alice",
+      "kind": "memory",
+      "canonicalId": "mem-1",
+      "version": 1,
+      "author": "alice",
+      "source": "repo",
+      "locator": "records/memory-1-v1",
+      "digest": "sha256:cf2a088307621323c037f42566a7870f6f2c39e88f674e422a47f5df3265f321",
+      "evidenceRefs": ["ev-1"],
+      "tombstone": false
+    },
+    {
+      "requestId": "memory-1-v2",
+      "authority": "alice",
+      "publisher": "alice",
+      "kind": "memory",
+      "canonicalId": "mem-1",
+      "version": 2,
+      "author": "alice",
+      "source": "repo",
+      "locator": "records/memory-1-v2",
+      "digest": "sha256:61a8ebddf8f71675a9da2dcdb8fb35ff3d177a74e14417b24e950a7c0deef3d5",
+      "evidenceRefs": ["ev-1"],
+      "tombstone": true
+    }
+  ],
+  "expected": {
+    "outcomes": ["acceptedGrant", "acceptedEvidence", "acceptedMemory", "acceptedMemory"],
+    "summary": {
+      "seenRequestCount": 4,
+      "evidenceCount": 1,
+      "memoryVersionCount": 2,
+      "activeCanonicalCount": 0,
+      "activePublishers": ["alice"],
+      "revokedPublishers": [],
+      "canonicalHeads": [
+        {
+          "canonicalId": "mem-1",
+          "version": 2,
+          "publisher": "alice",
+          "author": "alice",
+          "source": "repo",
+          "locator": "records/memory-1-v2",
+          "digest": "sha256:61a8ebddf8f71675a9da2dcdb8fb35ff3d177a74e14417b24e950a7c0deef3d5",
+          "evidenceCount": 1,
+          "tombstone": true
+        }
+      ]
+    }
+  }
+}

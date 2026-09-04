@@ -1,0 +1,41 @@
+{
+  "name": "missing-evidence",
+  "records": [
+    {
+      "requestId": "grant-alice",
+      "authority": "root",
+      "publisher": "root",
+      "kind": "grant",
+      "subject": "alice",
+      "capability": "publish",
+      "evidenceRefs": [],
+      "tombstone": false
+    },
+    {
+      "requestId": "memory-1-v1",
+      "authority": "alice",
+      "publisher": "alice",
+      "kind": "memory",
+      "canonicalId": "mem-1",
+      "version": 1,
+      "author": "alice",
+      "source": "repo",
+      "locator": "records/memory-1-v1",
+      "digest": "sha256:3fed3fc3799e730b26f1cedbfd67d7880cacfe428505488dcd4a534e745e4043",
+      "evidenceRefs": ["ev-404"],
+      "tombstone": false
+    }
+  ],
+  "expected": {
+    "outcomes": ["acceptedGrant", "missingEvidence"],
+    "summary": {
+      "seenRequestCount": 1,
+      "evidenceCount": 0,
+      "memoryVersionCount": 0,
+      "activeCanonicalCount": 0,
+      "activePublishers": ["alice"],
+      "revokedPublishers": [],
+      "canonicalHeads": []
+    }
+  }
+}

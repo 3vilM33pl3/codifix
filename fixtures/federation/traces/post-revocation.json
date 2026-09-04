@@ -1,0 +1,49 @@
+{
+  "name": "post-revocation",
+  "records": [
+    {
+      "requestId": "grant-alice",
+      "authority": "root",
+      "publisher": "root",
+      "kind": "grant",
+      "subject": "alice",
+      "capability": "publish",
+      "evidenceRefs": [],
+      "tombstone": false
+    },
+    {
+      "requestId": "revoke-alice",
+      "authority": "root",
+      "publisher": "root",
+      "kind": "revoke",
+      "subject": "alice",
+      "capability": "publish",
+      "evidenceRefs": [],
+      "tombstone": false
+    },
+    {
+      "requestId": "evidence-1",
+      "authority": "alice",
+      "publisher": "alice",
+      "kind": "evidence",
+      "evidenceId": "ev-1",
+      "source": "repo",
+      "locator": "records/evidence-1",
+      "digest": "sha256:d3fb85109453d9da6f91fb6f3869ee58b68d956839491f407705d0f0bd3dd9cd",
+      "evidenceRefs": [],
+      "tombstone": false
+    }
+  ],
+  "expected": {
+    "outcomes": ["acceptedGrant", "acceptedRevoke", "revokedPublisher"],
+    "summary": {
+      "seenRequestCount": 2,
+      "evidenceCount": 0,
+      "memoryVersionCount": 0,
+      "activeCanonicalCount": 0,
+      "activePublishers": [],
+      "revokedPublishers": ["alice"],
+      "canonicalHeads": []
+    }
+  }
+}

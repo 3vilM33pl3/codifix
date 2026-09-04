@@ -1,0 +1,53 @@
+{
+  "name": "version-gap",
+  "records": [
+    {
+      "requestId": "grant-alice",
+      "authority": "root",
+      "publisher": "root",
+      "kind": "grant",
+      "subject": "alice",
+      "capability": "publish",
+      "evidenceRefs": [],
+      "tombstone": false
+    },
+    {
+      "requestId": "evidence-1",
+      "authority": "alice",
+      "publisher": "alice",
+      "kind": "evidence",
+      "evidenceId": "ev-1",
+      "source": "repo",
+      "locator": "records/evidence-1",
+      "digest": "sha256:d3fb85109453d9da6f91fb6f3869ee58b68d956839491f407705d0f0bd3dd9cd",
+      "evidenceRefs": [],
+      "tombstone": false
+    },
+    {
+      "requestId": "memory-1-v2",
+      "authority": "alice",
+      "publisher": "alice",
+      "kind": "memory",
+      "canonicalId": "mem-1",
+      "version": 2,
+      "author": "alice",
+      "source": "repo",
+      "locator": "records/memory-1-v2-gap",
+      "digest": "sha256:7a3a7524310039ef88fd8146e34f899ef0329c42c3aaaeec7f3c6e9cc5ba9742",
+      "evidenceRefs": ["ev-1"],
+      "tombstone": false
+    }
+  ],
+  "expected": {
+    "outcomes": ["acceptedGrant", "acceptedEvidence", "versionGap"],
+    "summary": {
+      "seenRequestCount": 2,
+      "evidenceCount": 1,
+      "memoryVersionCount": 0,
+      "activeCanonicalCount": 0,
+      "activePublishers": ["alice"],
+      "revokedPublishers": [],
+      "canonicalHeads": []
+    }
+  }
+}
