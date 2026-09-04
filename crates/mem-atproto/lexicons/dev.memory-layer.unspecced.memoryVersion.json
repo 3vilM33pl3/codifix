@@ -1,0 +1,34 @@
+{
+  "lexicon": 1,
+  "id": "dev.memory-layer.unspecced.memoryVersion",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["space", "canonicalId", "versionNo", "memoryType", "capturedAt"],
+        "properties": {
+          "space": { "type": "string", "maxLength": 256 },
+          "canonicalId": { "type": "string", "format": "uuid" },
+          "versionNo": { "type": "integer", "minimum": 0 },
+          "memoryType": { "type": "string", "maxLength": 128 },
+          "summary": { "type": "string", "maxLength": 4096 },
+          "content": { "type": "string", "maxLength": 65535 },
+          "confidencePpm": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+          "importance": { "type": "integer", "minimum": 0, "maximum": 65535 },
+          "capturedAt": { "type": "string", "format": "datetime" },
+          "writer": {
+            "type": "object",
+            "required": ["did"],
+            "properties": {
+              "did": { "type": "string", "format": "did" },
+              "handle": { "type": "string", "maxLength": 253 }
+            }
+          },
+          "payload": { "type": "unknown" }
+        }
+      }
+    }
+  }
+}

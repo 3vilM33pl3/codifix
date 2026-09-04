@@ -1,0 +1,26 @@
+{
+  "lexicon": 1,
+  "id": "dev.memory-layer.unspecced.membership",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["membershipId", "space", "memberDid", "capabilities", "grantedBy", "grantedAt"],
+        "properties": {
+          "membershipId": { "type": "string", "format": "uuid" },
+          "space": { "type": "string", "maxLength": 256 },
+          "memberDid": { "type": "string", "format": "did" },
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 64 },
+            "maxLength": 16
+          },
+          "grantedBy": { "type": "string", "format": "did" },
+          "grantedAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}

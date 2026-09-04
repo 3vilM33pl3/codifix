@@ -1,0 +1,23 @@
+{
+  "lexicon": 1,
+  "id": "dev.memory-layer.unspecced.evidence",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["evidenceId", "space", "sourceUri", "checkedAt"],
+        "properties": {
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "space": { "type": "string", "maxLength": 256 },
+          "canonicalId": { "type": "string", "format": "uuid" },
+          "sourceUri": { "type": "string", "maxLength": 4096 },
+          "checkedAt": { "type": "string", "format": "datetime" },
+          "sourceHash": { "type": "string", "maxLength": 512 },
+          "details": { "type": "unknown" }
+        }
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@ members = [
   "crates/mem-agenttop",
   "crates/mem-analyze",
   "crates/mem-platform",
+  "crates/mem-federation",
   "crates/mem-record",
   "crates/mem-config",
   "crates/mem-watch",

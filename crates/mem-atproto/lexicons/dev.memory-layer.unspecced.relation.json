@@ -1,0 +1,29 @@
+{
+  "lexicon": 1,
+  "id": "dev.memory-layer.unspecced.relation",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": [
+          "space",
+          "sourceCanonicalId",
+          "targetCanonicalId",
+          "relationType",
+          "origin",
+          "observedAt"
+        ],
+        "properties": {
+          "space": { "type": "string", "maxLength": 256 },
+          "sourceCanonicalId": { "type": "string", "format": "uuid" },
+          "targetCanonicalId": { "type": "string", "format": "uuid" },
+          "relationType": { "type": "string", "maxLength": 128 },
+          "origin": { "type": "string", "maxLength": 64 },
+          "observedAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}

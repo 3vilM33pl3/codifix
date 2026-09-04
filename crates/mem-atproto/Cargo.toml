@@ -1,0 +1,29 @@
+[package]
+name = "mem-atproto"
+version = "2.0.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+authors = ["Olivier Van Acker"]
+
+[dependencies]
+atrium-api = { version = "=0.25.8", default-features = false }
+atrium-repo = "=0.1.8"
+atrium-xrpc = "=0.12.4"
+http = "1.3.1"
+mem-federation = { path = "../mem-federation" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_ipld_dagcbor = "=0.6.0"
+serde_json = "1.0.145"
+sha2 = "0.10.9"
+thiserror = "2.0.17"
+uuid = { version = "1.18.1", features = ["serde", "v4"] }
+
+[dev-dependencies]
+futures = { version = "0.3.31", default-features = false, features = ["alloc", "executor", "std"] }
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unwrap_used = "deny"
+
+[workspace]

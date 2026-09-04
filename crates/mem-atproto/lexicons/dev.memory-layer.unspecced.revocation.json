@@ -1,0 +1,22 @@
+{
+  "lexicon": 1,
+  "id": "dev.memory-layer.unspecced.revocation",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["revocationId", "space", "subjectDid", "revokedBy", "revokedAt"],
+        "properties": {
+          "revocationId": { "type": "string", "format": "uuid" },
+          "space": { "type": "string", "maxLength": 256 },
+          "subjectDid": { "type": "string", "format": "did" },
+          "revokedBy": { "type": "string", "format": "did" },
+          "revokedAt": { "type": "string", "format": "datetime" },
+          "reason": { "type": "string", "maxLength": 4096 }
+        }
+      }
+    }
+  }
+}
