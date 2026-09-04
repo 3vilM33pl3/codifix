@@ -26,6 +26,7 @@ jobs:
       package: ${{ steps.filter.outputs.package }}
       plugin: ${{ steps.filter.outputs.plugin }}
       formal: ${{ steps.filter.outputs.formal }}
+      federation_pds: ${{ steps.filter.outputs.federation_pds }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v3
@@ -79,6 +80,25 @@ jobs:
               - "formal/memory-federation/**"
               - "fixtures/federation/traces/**"
               - "crates/mem-federation/**"
+            federation_pds:
+              - "tests/federation-pds/**"
+              - "crates/mem-atproto/**"
+              - "fixtures/federation/atproto/**"
+              - ".github/workflows/ci.yml"
+
+  federation-pds:
+    name: Private PDS Prerequisite Probe
+    runs-on: [self-hosted, memory, Linux, X64]
+    needs: changes
+    if: needs.changes.outputs.federation_pds == 'true'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: docker pull ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
+      - run: node tests/federation-pds/run.mjs
 
   plugin-contract:
     name: Codex Plugin Contract

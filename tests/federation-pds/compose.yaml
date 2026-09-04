@@ -1,8 +1,8 @@
 # Disposable private-PDS prerequisite gate, NOT a production deployment.
 services:
-  pds:
+  pds: &pds
     image: ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
-    environment:
+    environment: &pds-environment
       PDS_PORT: "2583"
       PDS_HOSTNAME: pds.federation.example.com
       PDS_SERVICE_HANDLE_DOMAINS: .federation.example.com
@@ -22,6 +22,14 @@ services:
       - pds:/pds
       - ${GATE_RUNTIME_DIR:?}:/gate-tls:ro
     networks: [private]
+  pds-recovery:
+    <<: *pds
+    environment:
+      <<: *pds-environment
+      PDS_HOSTNAME: recovery.federation.example.com
+    volumes:
+      - recovery:/pds
+      - ${GATE_RUNTIME_DIR:?}:/gate-tls:ro
   probe:
     image: ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
     entrypoint: [node, /gate/probe.cjs]
@@ -30,14 +38,18 @@ services:
       NODE_EXTRA_CA_CERTS: /gate-tls/cert.pem
     volumes:
       - ./probe.cjs:/gate/probe.cjs:ro
+      - ../../crates/mem-atproto/lexicons:/gate/lexicons:ro
+      - ../../fixtures/federation/atproto/xrpc/create_record_request.json:/gate/create_record_request.json:ro
       - ${GATE_RUNTIME_DIR:?}:/gate-tls:ro
     networks:
       private:
         aliases:
           - space.federation.example.com
           - pds.federation.example.com
+          - recovery.federation.example.com
 networks:
   private:
     internal: true
 volumes:
   pds:
+  recovery:
