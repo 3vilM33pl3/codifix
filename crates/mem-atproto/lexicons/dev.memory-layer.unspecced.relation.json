@@ -4,24 +4,31 @@
   "defs": {
     "main": {
       "type": "record",
-      "key": "tid",
+      "key": "any",
       "record": {
         "type": "object",
         "required": [
-          "space",
-          "sourceCanonicalId",
-          "targetCanonicalId",
+          "schemaVersion",
+          "recordId",
+          "projectSpaceId",
+          "author",
+          "authoredAt",
+          "srcCanonicalId",
           "relationType",
-          "origin",
-          "observedAt"
+          "dstCanonicalId",
+          "assertedAt"
         ],
         "properties": {
-          "space": { "type": "string", "maxLength": 256 },
-          "sourceCanonicalId": { "type": "string", "format": "uuid" },
-          "targetCanonicalId": { "type": "string", "format": "uuid" },
-          "relationType": { "type": "string", "maxLength": 128 },
-          "origin": { "type": "string", "maxLength": 64 },
-          "observedAt": { "type": "string", "format": "datetime" }
+          "schemaVersion": { "type": "integer", "minimum": 1 },
+          "recordId": { "type": "string" },
+          "projectSpaceId": { "type": "string" },
+          "author": { "type": "string" },
+          "authoredAt": { "type": "string", "format": "datetime" },
+          "causationId": { "type": "string" },
+          "srcCanonicalId": { "type": "string" },
+          "relationType": { "type": "string" },
+          "dstCanonicalId": { "type": "string" },
+          "assertedAt": { "type": "string", "format": "datetime" }
         }
       }
     }

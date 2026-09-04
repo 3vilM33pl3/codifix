@@ -15,7 +15,11 @@ pub enum MemAtprotoError {
     #[error(transparent)]
     AtriumApi(#[from] atrium_api::error::Error),
     #[error(transparent)]
+    Chrono(#[from] chrono::ParseError),
+    #[error(transparent)]
     DagCbor(#[from] serde_ipld_dagcbor::EncodeError<std::convert::Infallible>),
+    #[error(transparent)]
+    Federation(#[from] mem_federation::FederationError),
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
 }

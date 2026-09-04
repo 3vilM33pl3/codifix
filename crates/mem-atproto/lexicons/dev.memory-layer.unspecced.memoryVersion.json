@@ -4,29 +4,72 @@
   "defs": {
     "main": {
       "type": "record",
-      "key": "tid",
+      "key": "any",
       "record": {
         "type": "object",
-        "required": ["space", "canonicalId", "versionNo", "memoryType", "capturedAt"],
+        "required": [
+          "schemaVersion",
+          "recordId",
+          "projectSpaceId",
+          "author",
+          "authoredAt",
+          "memoryId",
+          "canonicalId",
+          "versionNo",
+          "canonicalText",
+          "summary",
+          "memoryType",
+          "importance",
+          "confidencePpm",
+          "status",
+          "tags",
+          "evidenceRefs",
+          "relatedMemories",
+          "createdAt",
+          "updatedAt",
+          "isTombstone"
+        ],
         "properties": {
-          "space": { "type": "string", "maxLength": 256 },
-          "canonicalId": { "type": "string", "format": "uuid" },
-          "versionNo": { "type": "integer", "minimum": 0 },
-          "memoryType": { "type": "string", "maxLength": 128 },
-          "summary": { "type": "string", "maxLength": 4096 },
-          "content": { "type": "string", "maxLength": 65535 },
+          "schemaVersion": { "type": "integer", "minimum": 1 },
+          "recordId": { "type": "string" },
+          "projectSpaceId": { "type": "string" },
+          "author": { "type": "string" },
+          "authoredAt": { "type": "string", "format": "datetime" },
+          "causationId": { "type": "string" },
+          "memoryId": { "type": "string" },
+          "canonicalId": { "type": "string" },
+          "versionNo": { "type": "integer", "minimum": 1 },
+          "canonicalText": { "type": "string" },
+          "summary": { "type": "string" },
+          "memoryType": { "type": "string" },
+          "importance": { "type": "integer" },
           "confidencePpm": { "type": "integer", "minimum": 0, "maximum": 1000000 },
-          "importance": { "type": "integer", "minimum": 0, "maximum": 65535 },
-          "capturedAt": { "type": "string", "format": "datetime" },
-          "writer": {
-            "type": "object",
-            "required": ["did"],
-            "properties": {
-              "did": { "type": "string", "format": "did" },
-              "handle": { "type": "string", "maxLength": 253 }
+          "status": { "type": "string" },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "relatedMemories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["memoryId", "relationType", "summary", "memoryType", "confidencePpm"],
+              "properties": {
+                "memoryId": { "type": "string" },
+                "relationType": { "type": "string" },
+                "summary": { "type": "string" },
+                "memoryType": { "type": "string" },
+                "confidencePpm": { "type": "integer", "minimum": 0, "maximum": 1000000 }
+              }
             }
           },
-          "payload": { "type": "unknown" }
+          "createdAt": { "type": "string", "format": "datetime" },
+          "updatedAt": { "type": "string", "format": "datetime" },
+          "isTombstone": { "type": "boolean" }
         }
       }
     }

@@ -4,18 +4,53 @@
   "defs": {
     "main": {
       "type": "record",
-      "key": "tid",
+      "key": "any",
       "record": {
         "type": "object",
-        "required": ["evidenceId", "space", "sourceUri", "checkedAt"],
+        "required": [
+          "schemaVersion",
+          "recordId",
+          "projectSpaceId",
+          "author",
+          "authoredAt",
+          "evidenceId",
+          "sourceId",
+          "memoryId",
+          "canonicalId",
+          "versionNo",
+          "sourceKind",
+          "observedAt"
+        ],
         "properties": {
-          "evidenceId": { "type": "string", "format": "uuid" },
-          "space": { "type": "string", "maxLength": 256 },
-          "canonicalId": { "type": "string", "format": "uuid" },
-          "sourceUri": { "type": "string", "maxLength": 4096 },
-          "checkedAt": { "type": "string", "format": "datetime" },
-          "sourceHash": { "type": "string", "maxLength": 512 },
-          "details": { "type": "unknown" }
+          "schemaVersion": { "type": "integer", "minimum": 1 },
+          "recordId": { "type": "string" },
+          "projectSpaceId": { "type": "string" },
+          "author": { "type": "string" },
+          "authoredAt": { "type": "string", "format": "datetime" },
+          "causationId": { "type": "string" },
+          "evidenceId": { "type": "string" },
+          "sourceId": { "type": "string" },
+          "memoryId": { "type": "string" },
+          "canonicalId": { "type": "string" },
+          "versionNo": { "type": "integer", "minimum": 1 },
+          "sourceKind": { "type": "string" },
+          "taskId": { "type": "string" },
+          "filePath": { "type": "string" },
+          "gitCommit": { "type": "string" },
+          "symbolName": { "type": "string" },
+          "symbolKind": { "type": "string" },
+          "excerpt": { "type": "string" },
+          "provenance": {
+            "type": "object",
+            "required": ["status", "checkedAt"],
+            "properties": {
+              "status": { "type": "string" },
+              "checkedAt": { "type": "string", "format": "datetime" },
+              "reason": { "type": "string" },
+              "resolvedPath": { "type": "string" }
+            }
+          },
+          "observedAt": { "type": "string", "format": "datetime" }
         }
       }
     }

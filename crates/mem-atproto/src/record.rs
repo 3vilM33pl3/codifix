@@ -1,25 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use crate::{
-    AtUri, MemAtprotoError, CANONICAL_STATE_NSID, EVIDENCE_NSID, MEMBERSHIP_NSID,
-    MEMORY_VERSION_NSID, RELATION_NSID, REVOCATION_NSID,
-};
+use crate::{AtUri, MemAtprotoError};
 use atrium_api::types::{
-    string::{Cid, Datetime, Did, RecordKey},
     Object, Unknown,
+    string::{Cid, Datetime, RecordKey},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use uuid::Uuid;
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ActorRefData {
-    pub did: Did,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub handle: Option<String>,
-}
-
-pub type ActorRef = Object<ActorRefData>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,36 +20,72 @@ pub type TransportMetadata = Object<TransportMetadataData>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct NeutralEnvelopeData {
-    pub kind: String,
+pub struct TransportEnvelopeData {
     pub record: Unknown,
     pub transport: TransportMetadata,
 }
 
-pub type NeutralEnvelope = Object<NeutralEnvelopeData>;
+pub type TransportEnvelope = Object<TransportEnvelopeData>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommonFieldsData {
+    pub schema_version: u32,
+    pub record_id: String,
+    pub project_space_id: String,
+    pub author: String,
+    pub authored_at: Datetime,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub causation_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelatedMemoryData {
+    pub memory_id: String,
+    pub relation_type: String,
+    pub summary: String,
+    pub memory_type: String,
+    pub confidence_ppm: u32,
+}
+
+pub type RelatedMemory = Object<RelatedMemoryData>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceProvenanceData {
+    pub status: String,
+    pub checked_at: Datetime,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_path: Option<String>,
+}
+
+pub type SourceProvenance = Object<SourceProvenanceData>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryVersionData {
     #[serde(rename = "$type")]
     pub record_type: String,
-    pub space: String,
-    pub canonical_id: Uuid,
-    pub version_no: u64,
+    #[serde(flatten)]
+    pub common: CommonFieldsData,
+    pub memory_id: String,
+    pub canonical_id: String,
+    pub version_no: u32,
+    pub canonical_text: String,
+    pub summary: String,
     pub memory_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub summary: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub confidence_ppm: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub importance: Option<u16>,
-    pub captured_at: Datetime,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub writer: Option<ActorRef>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload: Option<Unknown>,
+    pub importance: i32,
+    pub confidence_ppm: u32,
+    pub status: String,
+    pub tags: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub related_memories: Vec<RelatedMemory>,
+    pub created_at: Datetime,
+    pub updated_at: Datetime,
+    pub is_tombstone: bool,
 }
 
 pub type MemoryVersion = Object<MemoryVersionData>;
@@ -72,14 +95,15 @@ pub type MemoryVersion = Object<MemoryVersionData>;
 pub struct CanonicalStateData {
     #[serde(rename = "$type")]
     pub record_type: String,
-    pub space: String,
-    pub canonical_id: Uuid,
-    pub head_version_no: u64,
+    #[serde(flatten)]
+    pub common: CommonFieldsData,
+    pub canonical_id: String,
+    pub memory_id: String,
+    pub version_no: u32,
+    pub is_tombstone: bool,
     pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub archived_at: Option<Datetime>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tombstoned_at: Option<Datetime>,
+    pub confidence_ppm: u32,
+    pub updated_at: Datetime,
 }
 
 pub type CanonicalState = Object<CanonicalStateData>;
@@ -89,16 +113,29 @@ pub type CanonicalState = Object<CanonicalStateData>;
 pub struct EvidenceData {
     #[serde(rename = "$type")]
     pub record_type: String,
-    pub evidence_id: Uuid,
-    pub space: String,
+    #[serde(flatten)]
+    pub common: CommonFieldsData,
+    pub evidence_id: String,
+    pub source_id: String,
+    pub memory_id: String,
+    pub canonical_id: String,
+    pub version_no: u32,
+    pub source_kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub canonical_id: Option<Uuid>,
-    pub source_uri: String,
-    pub checked_at: Datetime,
+    pub task_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_hash: Option<String>,
+    pub file_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<Unknown>,
+    pub git_commit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excerpt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<SourceProvenance>,
+    pub observed_at: Datetime,
 }
 
 pub type Evidence = Object<EvidenceData>;
@@ -108,12 +145,12 @@ pub type Evidence = Object<EvidenceData>;
 pub struct RelationData {
     #[serde(rename = "$type")]
     pub record_type: String,
-    pub space: String,
-    pub source_canonical_id: Uuid,
-    pub target_canonical_id: Uuid,
+    #[serde(flatten)]
+    pub common: CommonFieldsData,
+    pub src_canonical_id: String,
     pub relation_type: String,
-    pub origin: String,
-    pub observed_at: Datetime,
+    pub dst_canonical_id: String,
+    pub asserted_at: Datetime,
 }
 
 pub type Relation = Object<RelationData>;
@@ -123,12 +160,10 @@ pub type Relation = Object<RelationData>;
 pub struct MembershipData {
     #[serde(rename = "$type")]
     pub record_type: String,
-    pub membership_id: Uuid,
-    pub space: String,
-    pub member_did: Did,
-    pub capabilities: Vec<String>,
-    pub granted_by: Did,
-    pub granted_at: Datetime,
+    #[serde(flatten)]
+    pub common: CommonFieldsData,
+    pub member: String,
+    pub capability: String,
 }
 
 pub type Membership = Object<MembershipData>;
@@ -138,142 +173,16 @@ pub type Membership = Object<MembershipData>;
 pub struct RevocationData {
     #[serde(rename = "$type")]
     pub record_type: String,
-    pub revocation_id: Uuid,
-    pub space: String,
-    pub subject_did: Did,
-    pub revoked_by: Did,
-    pub revoked_at: Datetime,
+    #[serde(flatten)]
+    pub common: CommonFieldsData,
+    pub member: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capability: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
 }
 
 pub type Revocation = Object<RevocationData>;
-
-impl MemoryVersionData {
-    pub fn new(
-        space: impl Into<String>,
-        canonical_id: Uuid,
-        version_no: u64,
-        memory_type: impl Into<String>,
-        captured_at: Datetime,
-    ) -> Self {
-        Self {
-            record_type: MEMORY_VERSION_NSID.to_owned(),
-            space: space.into(),
-            canonical_id,
-            version_no,
-            memory_type: memory_type.into(),
-            summary: None,
-            content: None,
-            confidence_ppm: None,
-            importance: None,
-            captured_at,
-            writer: None,
-            payload: None,
-        }
-    }
-}
-
-impl CanonicalStateData {
-    pub fn new(
-        space: impl Into<String>,
-        canonical_id: Uuid,
-        head_version_no: u64,
-        status: impl Into<String>,
-    ) -> Self {
-        Self {
-            record_type: CANONICAL_STATE_NSID.to_owned(),
-            space: space.into(),
-            canonical_id,
-            head_version_no,
-            status: status.into(),
-            archived_at: None,
-            tombstoned_at: None,
-        }
-    }
-}
-
-impl EvidenceData {
-    pub fn new(
-        evidence_id: Uuid,
-        space: impl Into<String>,
-        source_uri: impl Into<String>,
-        checked_at: Datetime,
-    ) -> Self {
-        Self {
-            record_type: EVIDENCE_NSID.to_owned(),
-            evidence_id,
-            space: space.into(),
-            canonical_id: None,
-            source_uri: source_uri.into(),
-            checked_at,
-            source_hash: None,
-            details: None,
-        }
-    }
-}
-
-impl RelationData {
-    pub fn new(
-        space: impl Into<String>,
-        source_canonical_id: Uuid,
-        target_canonical_id: Uuid,
-        relation_type: impl Into<String>,
-        origin: impl Into<String>,
-        observed_at: Datetime,
-    ) -> Self {
-        Self {
-            record_type: RELATION_NSID.to_owned(),
-            space: space.into(),
-            source_canonical_id,
-            target_canonical_id,
-            relation_type: relation_type.into(),
-            origin: origin.into(),
-            observed_at,
-        }
-    }
-}
-
-impl MembershipData {
-    pub fn new(
-        membership_id: Uuid,
-        space: impl Into<String>,
-        member_did: Did,
-        capabilities: Vec<String>,
-        granted_by: Did,
-        granted_at: Datetime,
-    ) -> Self {
-        Self {
-            record_type: MEMBERSHIP_NSID.to_owned(),
-            membership_id,
-            space: space.into(),
-            member_did,
-            capabilities,
-            granted_by,
-            granted_at,
-        }
-    }
-}
-
-impl RevocationData {
-    pub fn new(
-        revocation_id: Uuid,
-        space: impl Into<String>,
-        subject_did: Did,
-        revoked_by: Did,
-        revoked_at: Datetime,
-    ) -> Self {
-        Self {
-            record_type: REVOCATION_NSID.to_owned(),
-            revocation_id,
-            space: space.into(),
-            subject_did,
-            revoked_by,
-            revoked_at,
-            reason: None,
-        }
-    }
-}
 
 pub fn confidence_to_ppm(confidence: f32) -> Result<u32, MemAtprotoError> {
     if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
@@ -296,31 +205,12 @@ pub fn uuid_rkey(id: Uuid) -> Result<RecordKey, MemAtprotoError> {
         .map_err(|err| MemAtprotoError::message(err.to_string()))
 }
 
-pub fn wrap_record<T>(
-    kind: impl Into<String>,
-    record: Object<T>,
-    transport: TransportMetadata,
-) -> Result<NeutralEnvelope, MemAtprotoError>
-where
-    Object<T>: Serialize,
-{
-    Ok(Object::from(NeutralEnvelopeData {
-        kind: kind.into(),
-        record: object_to_unknown(&record)?,
-        transport,
-    }))
+pub fn wrap_unknown_record(record: Unknown, transport: TransportMetadata) -> TransportEnvelope {
+    Object::from(TransportEnvelopeData { record, transport })
 }
 
-pub fn unwrap_record<T>(
-    envelope: NeutralEnvelope,
-) -> Result<(Object<T>, TransportMetadata), MemAtprotoError>
-where
-    Object<T>: DeserializeOwned,
-{
-    Ok((
-        object_from_unknown(envelope.data.record)?,
-        envelope.data.transport,
-    ))
+pub fn unwrap_unknown_record(envelope: TransportEnvelope) -> (Unknown, TransportMetadata) {
+    (envelope.data.record, envelope.data.transport)
 }
 
 pub fn object_to_unknown<T>(object: &Object<T>) -> Result<Unknown, MemAtprotoError>
@@ -340,16 +230,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::MEMORY_VERSION_NSID;
     use serde_json::json;
-
-    fn sample_transport() -> TransportMetadata {
-        serde_json::from_value(json!({
-            "uri": "at://did:web:memory.example/dev.memory-layer.unspecced.memoryVersion/123e4567-e89b-12d3-a456-426614174000",
-            "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
-            "rkey": "123e4567-e89b-12d3-a456-426614174000"
-        }))
-        .unwrap()
-    }
 
     #[test]
     fn confidence_round_trip_stays_within_one_ppm() {
@@ -375,33 +257,50 @@ mod tests {
     }
 
     #[test]
-    fn envelope_round_trip_preserves_unknown_fields() {
+    fn object_unknown_round_trip_preserves_extra_fields() {
         let record: MemoryVersion = serde_json::from_value(json!({
             "$type": MEMORY_VERSION_NSID,
-            "space": "memory/demo",
-            "canonicalId": "123e4567-e89b-12d3-a456-426614174001",
+            "schemaVersion": 1,
+            "recordId": "memory-version:123e4567-e89b-12d3-a456-426614174001:7",
+            "projectSpaceId": "project.memory",
+            "author": "did:example:alice",
+            "authoredAt": "2026-09-04T09:30:00.000000Z",
+            "memoryId": "memory:123e4567-e89b-12d3-a456-426614174001",
+            "canonicalId": "canonical:123e4567-e89b-12d3-a456-426614174001",
             "versionNo": 7,
-            "memoryType": "implementation",
-            "capturedAt": "2026-09-04T09:30:00.000000Z",
+            "canonicalText": "Canonical memory text",
             "summary": "Adapter record",
-            "payload": {"k": "v"},
+            "memoryType": "implementation",
+            "importance": 8,
+            "confidencePpm": 750000,
+            "status": "active",
+            "tags": ["adapter", "offline"],
+            "evidenceRefs": ["evidence:123e4567-e89b-12d3-a456-426614174001:123e4567-e89b-12d3-a456-426614174002"],
+            "relatedMemories": [{
+              "memoryId": "memory:123e4567-e89b-12d3-a456-426614174099",
+              "relationType": "supports",
+              "summary": "Nested related memory",
+              "memoryType": "decision",
+              "confidencePpm": 500000,
+              "nestedExtra": {"retained": true}
+            }],
+            "createdAt": "2026-09-04T09:00:00.000000Z",
+            "updatedAt": "2026-09-04T09:30:00.000000Z",
+            "isTombstone": false,
             "customField": {"nested": true}
         }))
         .unwrap();
 
-        let envelope =
-            wrap_record(MEMORY_VERSION_NSID, record.clone(), sample_transport()).unwrap();
-        let (decoded, transport) = unwrap_record::<MemoryVersionData>(envelope).unwrap();
-
-        assert_eq!(decoded.data, record.data);
-        assert_eq!(
-            transport.data.rkey.as_ref(),
-            "123e4567-e89b-12d3-a456-426614174000"
-        );
-
+        let decoded: MemoryVersion =
+            object_from_unknown(object_to_unknown(&record).unwrap()).unwrap();
         let decoded_json = serde_json::to_value(decoded).unwrap();
+
         assert_eq!(
             decoded_json["customField"]["nested"],
+            serde_json::Value::Bool(true)
+        );
+        assert_eq!(
+            decoded_json["relatedMemories"][0]["nestedExtra"]["retained"],
             serde_json::Value::Bool(true)
         );
     }

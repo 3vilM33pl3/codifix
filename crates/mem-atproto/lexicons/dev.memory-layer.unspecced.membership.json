@@ -4,21 +4,27 @@
   "defs": {
     "main": {
       "type": "record",
-      "key": "tid",
+      "key": "any",
       "record": {
         "type": "object",
-        "required": ["membershipId", "space", "memberDid", "capabilities", "grantedBy", "grantedAt"],
+        "required": [
+          "schemaVersion",
+          "recordId",
+          "projectSpaceId",
+          "author",
+          "authoredAt",
+          "member",
+          "capability"
+        ],
         "properties": {
-          "membershipId": { "type": "string", "format": "uuid" },
-          "space": { "type": "string", "maxLength": 256 },
-          "memberDid": { "type": "string", "format": "did" },
-          "capabilities": {
-            "type": "array",
-            "items": { "type": "string", "maxLength": 64 },
-            "maxLength": 16
-          },
-          "grantedBy": { "type": "string", "format": "did" },
-          "grantedAt": { "type": "string", "format": "datetime" }
+          "schemaVersion": { "type": "integer", "minimum": 1 },
+          "recordId": { "type": "string" },
+          "projectSpaceId": { "type": "string" },
+          "author": { "type": "string" },
+          "authoredAt": { "type": "string", "format": "datetime" },
+          "causationId": { "type": "string" },
+          "member": { "type": "string" },
+          "capability": { "type": "string" }
         }
       }
     }

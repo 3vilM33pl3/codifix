@@ -1,0 +1,1 @@
+https://example.test/xrpc/com.atproto.repo.listRecords?collection=dev.memory-layer.unspecced.memoryVersion&cursor=cursor-0&limit=10&repo=did%3Aweb%3Amemory.example&reverse=true

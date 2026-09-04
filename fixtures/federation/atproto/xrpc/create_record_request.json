@@ -1,0 +1,35 @@
+{
+  "collection": "dev.memory-layer.unspecced.memoryVersion",
+  "record": {
+    "$type": "dev.memory-layer.unspecced.memoryVersion",
+    "author": "did:example:alice",
+    "authoredAt": "2026-09-04T09:30:00.000000Z",
+    "canonicalId": "canonical:123e4567-e89b-12d3-a456-426614174001",
+    "canonicalText": "Canonical memory text",
+    "causationId": "task:123e4567-e89b-12d3-a456-426614174000",
+    "confidencePpm": 750000,
+    "createdAt": "2026-09-04T09:00:00.000000Z",
+    "evidenceRefs": [
+      "evidence:123e4567-e89b-12d3-a456-426614174001:123e4567-e89b-12d3-a456-426614174002"
+    ],
+    "importance": 8,
+    "isTombstone": false,
+    "memoryId": "memory:123e4567-e89b-12d3-a456-426614174001",
+    "memoryType": "implementation",
+    "projectSpaceId": "project.memory",
+    "recordId": "memory-version:123e4567-e89b-12d3-a456-426614174001:7",
+    "relatedMemories": [],
+    "schemaVersion": 1,
+    "status": "active",
+    "summary": "Adapter record",
+    "tags": [
+      "adapter",
+      "offline"
+    ],
+    "updatedAt": "2026-09-04T09:30:00.000000Z",
+    "versionNo": 7
+  },
+  "repo": "did:web:memory.example",
+  "rkey": "c2e4b992-8931-5bee-99c2-f9c87fba49cb",
+  "validate": true
+}

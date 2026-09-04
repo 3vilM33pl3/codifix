@@ -2,14 +2,22 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+mod adapter;
 mod aturi;
 mod error;
+mod fixtures;
 mod lexicon;
+mod mst;
 mod record;
+mod syntax;
+mod xrpc;
 
+pub use adapter::*;
 pub use aturi::*;
 pub use error::*;
+pub use fixtures::*;
 pub use lexicon::*;
-pub use record::*;
-
 pub use mem_federation as federation;
+pub use mst::*;
+pub use record::*;
+pub use xrpc::*;
