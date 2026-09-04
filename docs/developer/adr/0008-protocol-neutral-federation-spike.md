@@ -1,13 +1,14 @@
 # ADR-0008: Protocol-neutral federation spike contract
 
-Status: accepted as a bounded contract for an offline spike; protocol outcome remains undecided.
+Status: accepted; the bounded spike selected ATProto as an adapter/profile.
 Date: 2026-09-04
 
 ## Context
 
 Memory Layer is exploring a federation proof that must stay offline, non-production, and bounded. The spike is intentionally ahead of the normal Notion plan order so the team can test the transport and formal model before any productization work is allowed to branch out.
 
-This document defines the spike contract. It does not choose the final federation protocol.
+This document defines the spike contract. The completed evidence report is in
+[`docs/future-development/federation-protocol-spike.md`](../../future-development/federation-protocol-spike.md).
 
 ## Contract
 
@@ -81,4 +82,12 @@ The spike explicitly does not cover:
 
 ## Consequences
 
-The docs in this spike are the contract for the bounded experiment. They give implementation work a stable target while keeping the protocol choice open until the evidence is in.
+The neutral Rust model remains the source of federation semantics. ATProto is an
+external profile only, so the core does not inherit AT identities, repository
+layout, wire types, or public-network assumptions. A bespoke external protocol
+is deferred unless a later security or live-network spike demonstrates semantic
+loss that cannot be isolated in the adapter.
+
+The outcome does not approve private spaces, signing, encryption, OAuth,
+identity resolution, unified live cursors, a gateway, network liveness, live PDS
+operation, or any production publication path.

@@ -15,12 +15,12 @@ Use this map to find the right PR boundary before opening the large files.
 - `crates/mem-mcp`: read-only MCP protocol adapter over the service HTTP API.
 - `crates/mem-eval`: eval suite schemas, scoring, comparisons, gates, and report rendering.
 - `crates/mem-test-support`: pgvector-backed integration test harness.
-- `crates/mem-federation`: planned transport-neutral federation core for replica modeling, conformance traces, and offline reducer logic.
-- `crates/mem-atproto`: planned offline ATProto/Atrium adapter and fixture harness over `mem-federation`.
+- `crates/mem-federation`: transport-neutral federation records, Memory projection, replica reducer, and shared offline conformance traces.
+- `crates/mem-atproto`: offline ATProto/Atrium encoding, unpublished Lexicons, fake XRPC requests, syntax fixtures, and MST checks over `mem-federation`.
 
 ## Formal
 
-- `formal/memory-federation`: planned Lean 4.33.1 proof project for reducer invariants and trace conformance, kept separate from the Rust runtime crates.
+- `formal/memory-federation`: Lean 4.33.1 reducer proofs and executable shared-trace conformance, kept separate from the Rust runtime crates.
 
 ## Frontends
 
