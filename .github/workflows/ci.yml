@@ -25,6 +25,7 @@ jobs:
       evals: ${{ steps.filter.outputs.evals }}
       package: ${{ steps.filter.outputs.package }}
       plugin: ${{ steps.filter.outputs.plugin }}
+      formal: ${{ steps.filter.outputs.formal }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v3
@@ -35,6 +36,7 @@ jobs:
               - "Cargo.toml"
               - "Cargo.lock"
               - "crates/**"
+              - "fixtures/federation/**"
               - "migrations/**"
               - "memory-layer.toml.example"
             db:
@@ -73,6 +75,10 @@ jobs:
               - ".agents/plugins/marketplace.json"
               - "scripts/check-codex-plugin.py"
               - "docs/user/codex-desktop-plugin.md"
+            formal:
+              - "formal/memory-federation/**"
+              - "fixtures/federation/traces/**"
+              - "crates/mem-federation/**"
 
   plugin-contract:
     name: Codex Plugin Contract
@@ -82,6 +88,24 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: python3 scripts/check-codex-plugin.py
+
+  formal-proof:
+    name: Federation Formal Proofs
+    runs-on: [self-hosted, memory, Linux, X64]
+    needs: changes
+    if: needs.changes.outputs.formal == 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
+        with:
+          lake-package-directory: formal/memory-federation
+          build: true
+          test: true
+          lint: false
+          use-mathlib-cache: false
+          leanchecker: true
+          nanoda: true
+          nanoda-allow-sorry: false
 
   rust-fmt:
     name: Rust Format

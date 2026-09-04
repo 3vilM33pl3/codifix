@@ -155,7 +155,7 @@ async fn finish_curate_enrichment(
     // nudge the background scheduler so they validate promptly. Advisory —
     // never fails curation.
     match crate::repository::handlers::reinforcement::due_validation_infos(
-        &state,
+        state,
         response.project_id,
     )
     .await

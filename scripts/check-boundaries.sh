@@ -37,6 +37,18 @@ for dep in tokio sqlx axum duckdb; do
   fi
 done
 
+# 3a. mem-federation purity: protocol-neutral domain and state only. Runtime,
+# persistence, and concrete AT Protocol dependencies belong in adapters.
+federation_tree=$(cargo tree -p mem-federation -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in tokio config sqlx axum mem-platform duckdb atrium-api atrium-xrpc atrium-repo; do
+  if echo "$federation_tree" | grep -qx "$dep"; then
+    err "mem-federation depends on $dep"
+  fi
+done
+if grep -RInE 'atrium(_|::)|atrium-' crates/mem-federation/src --include='*.rs'; then
+  err "mem-federation source references Atrium"
+fi
+
 # 4. No monolith re-forms in the new crates.
 while read -r lines file; do
   if [ "$lines" -gt 1200 ] && [ "$file" != "total" ]; then
