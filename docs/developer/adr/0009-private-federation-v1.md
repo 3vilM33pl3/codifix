@@ -2,6 +2,12 @@
 
 Status: implementation in progress; live interoperability gate not yet passed.
 
+The approved [federation-first execution roadmap](../../reviews/federation-first/README.md)
+requires two independently operated Memory instances in the first paid pilots.
+The private gateway profile below remains the implementation candidate. Native
+ATProto Spaces alpha is a separate, non-sensitive compatibility experiment, not
+a replacement production dependency or a claim of native Spaces interoperability.
+
 ## Decision
 
 Memory owns the federation domain and an authoritative gateway per space. An
