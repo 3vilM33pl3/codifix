@@ -1,0 +1,21 @@
+{
+  "format_version": 1,
+  "assessed_on": "2026-09-07",
+  "production_candidate": "memory-private-gateway-v1",
+  "pds": {
+    "image": "ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12",
+    "source_revision": "374cf1d4ba782d4391bbb73e4e2d3f320d4846d6",
+    "embedded_pds_version": "0.5.27"
+  },
+  "atrium": { "api": "0.25.8", "xrpc": "0.12.4", "repo": "0.1.8", "api_default_features": false },
+  "interop_fixtures_commit": "056e5741bb330757205d6b16db5266fffcae937b",
+  "spaces_proposal": {
+    "repository": "https://github.com/bluesky-social/proposals",
+    "commit": "35a2d378297d9178561a5cc643c74a1262122266",
+    "path": "0016-permissioned-data/README.md",
+    "sha256": "3c77d7f94eb4bfd4b6d7de341bb0b8bd89947c0040c8915f2a055b47763d037c",
+    "assessment": "specification and adapter contract comparison only",
+    "native_runtime_tested": false,
+    "production_allowed": false
+  }
+}

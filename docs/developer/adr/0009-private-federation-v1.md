@@ -7,6 +7,8 @@ requires two independently operated Memory instances in the first paid pilots.
 The private gateway profile below remains the implementation candidate. Native
 ATProto Spaces alpha is a separate, non-sensitive compatibility experiment, not
 a replacement production dependency or a claim of native Spaces interoperability.
+The [profile compatibility and schema policy](../architecture/federation-profile.md)
+pins that distinction and the namespace publication gate.
 
 ## Decision
 

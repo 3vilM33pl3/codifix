@@ -69,6 +69,10 @@ try {
     { env, encoding: 'utf8' });
   if (configResult.status !== 0) throw new Error('Cannot validate isolated Compose configuration');
   const config = JSON.parse(configResult.stdout);
+  const upstream = JSON.parse(await readFile(join(directory, '../../fixtures/federation/upstream-lock.json'), 'utf8'));
+  if (Object.values(config.services).some(service => service.image !== upstream.pds.image)) {
+    throw new Error('Every PDS fixture image must match the reviewed upstream lock');
+  }
   if (Object.values(config.networks).some(network => network.internal !== true)
       || Object.values(config.services).some(service => service.ports?.length
         || service.network_mode || service.privileged)) {

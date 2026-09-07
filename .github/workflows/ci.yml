@@ -82,6 +82,7 @@ jobs:
               - "crates/mem-federation/**"
             federation_pds:
               - "tests/federation-pds/**"
+              - "fixtures/federation/upstream-lock.json"
               - "crates/mem-atproto/**"
               - "fixtures/federation/atproto/**"
               - ".github/workflows/ci.yml"

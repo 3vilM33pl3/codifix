@@ -27,10 +27,10 @@ substitute native Spaces, a forked PDS, security bypasses or a bespoke protocol.
 
 ## A. Protocol contract and prerequisites
 
-- [ ] A1 Pin upstream versions and specifications under test; document private-profile versus native-Spaces identity, addressing, authentication, repository verification, synchronization, revocation, deletion and audit differences.
+- [x] A1 Pin upstream versions and specifications under test; document private-profile versus native-Spaces identity, addressing, authentication, repository verification, synchronization, revocation, deletion and audit differences. Evidence: fixtures/federation/upstream-lock.json and docs/developer/architecture/federation-profile.md; this is a pinned specification comparison, not a native Spaces runtime test.
 - [x] A2 Re-run the existing PDS prerequisite assertions and complete missing recovery evidence before further product integration; stop for design review if a PDS fork or broad security bypass is required. Evidence: tests/federation-pds/README.md, including encrypted cold recovery into a fresh volume after source-volume removal (2026-09-07); full Memory/gateway recovery remains a product gate.
-- [ ] A3 Test pinned Atrium coverage for production operations and keep network/authentication dependencies outside the neutral core.
-- [ ] A4 Define schema compatibility, namespace ownership, evolution and publication policy before publishing production Lexicons.
+- [x] A3 Test pinned Atrium coverage for production operations and keep network/authentication dependencies outside the neutral core. Evidence: crates/mem-atproto/src/sdk_coverage.rs tests generated binary import/export, credential selection and fail-closed authentication handling; the profile documents missing network/authentication implementation and native Spaces support.
+- [x] A4 Define schema compatibility, namespace ownership, evolution and publication policy before publishing production Lexicons. Evidence: docs/developer/architecture/federation-profile.md. Production namespace ownership is not verified and no production Lexicon was published.
 
 Native Spaces compatibility tests must be bounded, disposable and non-sensitive.
 The signed-MST experiment does not prove native Spaces compatibility. Its

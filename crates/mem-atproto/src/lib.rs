@@ -12,6 +12,9 @@ mod record;
 mod syntax;
 mod xrpc;
 
+#[cfg(test)]
+mod sdk_coverage;
+
 pub use adapter::*;
 pub use aturi::*;
 pub use error::*;
