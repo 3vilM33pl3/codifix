@@ -20,7 +20,7 @@ services:
       LOG_LEVEL: warn
     volumes:
       - pds:/pds
-      - ${GATE_RUNTIME_DIR:?}:/gate-tls:ro
+      - ${GATE_RUNTIME_DIR:?}/tls:/gate-tls:ro
     networks: [private]
   pds-recovery:
     <<: *pds
@@ -29,18 +29,53 @@ services:
       PDS_HOSTNAME: recovery.federation.example.com
     volumes:
       - recovery:/pds
-      - ${GATE_RUNTIME_DIR:?}:/gate-tls:ro
+      - ${GATE_RUNTIME_DIR:?}/tls:/gate-tls:ro
+  pds-restored:
+    <<: *pds
+    profiles: [restore]
+    environment:
+      <<: *pds-environment
+      PDS_HOSTNAME: recovery.federation.example.com
+    volumes:
+      - restored:/pds
+      - ${GATE_RUNTIME_DIR:?}/tls:/gate-tls:ro
+  backup: &backup
+    image: ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
+    profiles: [maintenance]
+    entrypoint: [node, /gate/backup.cjs]
+    environment:
+      GATE_HOST_UID: ${GATE_HOST_UID:?}
+      GATE_HOST_GID: ${GATE_HOST_GID:?}
+      GATE_JWT_SECRET: ${GATE_JWT_SECRET:?}
+      GATE_ADMIN_PASSWORD: ${GATE_ADMIN_PASSWORD:?}
+      GATE_ROTATION_KEY: ${GATE_ROTATION_KEY:?}
+    volumes:
+      - recovery:/source:ro
+      - restored:/restore
+      - ./backup.cjs:/gate/backup.cjs:ro
+      - ${GATE_RUNTIME_DIR:?}/key:/gate-key:ro
+      - ${GATE_RUNTIME_DIR:?}/state:/gate-state
+    networks: [private]
+  restore:
+    <<: *backup
+    volumes:
+      - restored:/restore
+      - ./backup.cjs:/gate/backup.cjs:ro
+      - ${GATE_RUNTIME_DIR:?}/key:/gate-key:ro
+      - ${GATE_RUNTIME_DIR:?}/state:/gate-state
   probe:
     image: ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
     entrypoint: [node, /gate/probe.cjs]
     environment:
       GATE_ADMIN_PASSWORD: ${GATE_ADMIN_PASSWORD:?}
+      GATE_PHASE: ${GATE_PHASE:-seed}
       NODE_EXTRA_CA_CERTS: /gate-tls/cert.pem
     volumes:
       - ./probe.cjs:/gate/probe.cjs:ro
       - ../../crates/mem-atproto/lexicons:/gate/lexicons:ro
       - ../../fixtures/federation/atproto/xrpc/create_record_request.json:/gate/create_record_request.json:ro
-      - ${GATE_RUNTIME_DIR:?}:/gate-tls:ro
+      - ${GATE_RUNTIME_DIR:?}/tls:/gate-tls:ro
+      - ${GATE_RUNTIME_DIR:?}/state:/gate-state
     networks:
       private:
         aliases:
@@ -53,3 +88,4 @@ networks:
 volumes:
   pds:
   recovery:
+  restored:

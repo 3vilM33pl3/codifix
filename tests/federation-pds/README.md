@@ -1,7 +1,8 @@
 # Private PDS prerequisite probe
 
-Run `node tests/federation-pds/run.mjs` from the repository root. Requires Docker
-Compose, Node and OpenSSL. Pull the pinned image before running on an air-gapped
+Run `node tests/federation-pds/run.mjs` from the repository root. Requires Linux,
+Docker Compose, Node and OpenSSL. Run the encryption-envelope unit tests with
+`node tests/federation-pds/backup.test.cjs`. Pull the pinned image before running on an air-gapped
 host. This is a disposable protocol test, **not a production deployment**.
 
 The runner creates a uniquely named internal Docker network, isolated PDS volumes,
@@ -32,10 +33,30 @@ through the supported account-migration path, rotates to a distinct signing key,
 and retains the original record. The independent verifier is the upstream SDK
 bundled in the image. These assertions also run in the scoped CI prerequisite job.
 
-An exit code of zero means only that the implemented probe assertions passed.
-It does **not** establish the full production gate: disaster backup/restore,
-gateway access controls, two Memory nodes, and all production release gates must
-also pass. No production integration is enabled by this fixture. CAR migration
-is evidence for repository recovery, not restoration of every account database,
-credential, outbox or cursor. In-place signing-key rotation is not claimed;
-the tested operational route uses a replacement PDS and controlled DID update.
+## Cold disaster recovery evidence
+
+The expanded gate passed locally on 2026-09-07. After the migration checks it
+stops both PDS writers, encrypts the complete recovery PDS volume together with
+its synthetic account state and runtime credentials, removes the source volume
+and unencrypted seed state, then restores into a fresh volume. AES-256-GCM
+authenticates the complete bounded fixture archive before any extraction;
+corruption and a wrong key must fail with an untouched restore volume.
+
+The new PDS starts with credentials recovered from that archive. The probe
+checks password login, pre-backup access and refresh credentials, signing key,
+exact commit, records and blob bytes, then creates and independently verifies a
+new record. It also tests restored administrator access. The original PDSs do
+not run during this verification. All services remain on an internal network.
+
+The archive key is separate from the encrypted archive and is mounted only into
+the maintenance helpers. Generated TLS material is kept separately. This is a
+bounded synthetic cold-backup experiment (64 MiB limit), **not** an offsite backup
+service, production key-custody design, online/PITR backup, or arbitrary archive
+importer. Secrets stay in temporary mode-0600 files and are never printed.
+
+An exit code of zero means only that these PDS prerequisite assertions passed.
+It does **not** establish the full product gate: actual gateway access controls,
+two Memory nodes, transactional outbox/inbox/cursor recovery, writer fencing and
+all production release gates remain required. No production integration is
+enabled by this fixture. In-place signing-key rotation is not claimed; the
+tested rotation route uses a replacement PDS and controlled DID update.

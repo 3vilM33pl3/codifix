@@ -98,6 +98,7 @@ jobs:
         with:
           node-version: 22
       - run: docker pull ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
+      - run: node tests/federation-pds/backup.test.cjs
       - run: node tests/federation-pds/run.mjs
 
   plugin-contract:

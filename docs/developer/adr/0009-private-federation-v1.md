@@ -38,7 +38,7 @@ types outside mem-federation. Extend executable Rust/Lean conformance together.
   instances cannot access raw PDS endpoints, cross-space CAR files or firehoses.
 - DID resolution must not allow arbitrary SSRF. Private deployment must work
   without globally disabling upstream SSRF protection or using development mode
-  as a production workaround.
+as a production workaround.
 - Raw captures, sessions, task logs, local absolute paths and unselected related
   memory content stay local. Reviewed snapshot bytes must equal published bytes.
 - Imported content is data, not executable instructions. External model forwarding
@@ -62,6 +62,12 @@ verification, key rotation and recovery with no public exposure. If a PDS fork
 or broad security bypass is required, stop and report rather than silently
 substitute a different design. Downstream work remains unimplemented until the
 gate passes or the user explicitly approves a revised contract.
+
+The [disposable PDS gate](../../../tests/federation-pds/README.md) now includes a
+complete encrypted cold-volume restore, tested locally on 2026-09-07 after
+removing its source volume. This passes the bounded PDS prerequisite, not the
+Memory product gate: gateway isolation, two Memory instances, transactional
+outbox/inbox/cursor recovery and writer fencing still need product tests.
 
 ## Delivery and exclusions
 

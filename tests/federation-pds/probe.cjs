@@ -2,7 +2,7 @@
 // Runs against the actual upstream image, using its independent AT SDK verifier.
 const assert = require('node:assert/strict');
 const { createRequire } = require('node:module');
-const { readFileSync, readdirSync } = require('node:fs');
+const { readFileSync, readdirSync, writeFileSync } = require('node:fs');
 const https = require('node:https');
 const { randomBytes, randomUUID } = require('node:crypto');
 const appRequire = createRequire('/app/index.ts');
@@ -40,12 +40,12 @@ function setDocument(signingDid, endpoint = 'https://pds.federation.example.com'
 }
 
 async function rpc(nsid, { body, token, query, admin = false, method,
-  base = 'http://pds:2583', rawBody } = {}) {
+  base = 'http://pds:2583', rawBody, contentType = 'application/vnd.ipld.car' } = {}) {
   const url = new URL(`/xrpc/${nsid}`, base);
   if (query) url.search = new URLSearchParams(query).toString();
   const headers = {};
   if (body !== undefined) headers['content-type'] = 'application/json';
-  if (rawBody !== undefined) headers['content-type'] = 'application/vnd.ipld.car';
+  if (rawBody !== undefined) headers['content-type'] = contentType;
   if (token) headers.authorization = `Bearer ${token}`;
   if (admin) headers.authorization = `Basic ${Buffer.from(`admin:${process.env.GATE_ADMIN_PASSWORD}`).toString('base64')}`;
   const res = await fetch(url, { method: method ?? (body === undefined ? 'GET' : 'POST'),
@@ -53,23 +53,27 @@ async function rpc(nsid, { body, token, query, admin = false, method,
     signal: AbortSignal.timeout(15_000), redirect: 'error' });
   const value = res.headers.get('content-type')?.includes('json')
     ? await res.json() : new Uint8Array(await res.arrayBuffer());
-  if (!res.ok) throw new Error(`${nsid}: HTTP ${res.status} ${JSON.stringify(value)}`);
+  if (!res.ok) throw new Error(`${nsid}: HTTP ${res.status}`);
   return value;
+}
+
+async function waitReady(base) {
+  for (let i = 0; i < 60; i++) {
+    try {
+      await rpc('com.atproto.server.describeServer', { base });
+      return;
+    } catch (error) {
+      if (i === 59) throw error;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
 }
 
 async function main() {
   const initialKey = await Secp256k1Keypair.create({ exportable: true });
   setDocument(initialKey.did());
   await new Promise(resolve => server.listen(443, '0.0.0.0', resolve));
-  for (let i = 0; i < 60; i++) {
-    try {
-      await rpc('com.atproto.server.describeServer');
-      break;
-    } catch (error) {
-      if (i === 59) throw error;
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-  }
+  await waitReady('http://pds:2583');
   console.log('PASS upstream production-mode PDS readiness');
   const invite = await rpc('com.atproto.server.createInviteCode', { admin: true, body: { useCount: 1 } });
   const jwt = await createServiceJwt({ iss: did, aud: serviceDid,
@@ -114,9 +118,10 @@ async function main() {
   const migrationAuth = await rpc('com.atproto.server.getServiceAuth', { token,
     query: { aud: recoveryDid, lxm: 'com.atproto.server.createAccount' },
   });
+  const recoveryPassword = randomBytes(24).toString('hex');
   const migrated = await rpc('com.atproto.server.createAccount', { base: recovery,
     token: migrationAuth.token, body: { did, handle, email: 'gate@federation.example.com',
-      password: randomBytes(24).toString('hex'), inviteCode: recoveryInvite.code },
+      password: recoveryPassword, inviteCode: recoveryInvite.code },
   });
   const recoveredCredentials = await rpc('com.atproto.identity.getRecommendedDidCredentials', {
     base: recovery, token: migrated.accessJwt,
@@ -131,9 +136,14 @@ async function main() {
     base: recovery, token: migrated.accessJwt, method: 'POST',
   });
   await rpc('com.atproto.server.deactivateAccount', { token, body: {} });
-  const recoveryRecord = { ...record, recordId: randomUUID() };
+  const blobBytes = Buffer.from('Synthetic Memory PDS disaster-recovery evidence only.');
+  const uploaded = await rpc('com.atproto.repo.uploadBlob', { base: recovery,
+    token: migrated.accessJwt, method: 'POST', rawBody: blobBytes,
+    contentType: 'application/octet-stream' });
+  const recoveryRecord = { ...record, recordId: randomUUID(), fixtureBlob: uploaded.blob };
+  const recoveryRkey = randomUUID();
   await rpc('com.atproto.repo.createRecord', { base: recovery, token: migrated.accessJwt,
-    body: { repo: did, collection: record.$type, rkey: randomUUID(),
+    body: { repo: did, collection: record.$type, rkey: recoveryRkey,
       record: recoveryRecord, validate: false },
   });
   const recoveredBytes = await rpc('com.atproto.sync.getRepo', { base: recovery, query: { did } });
@@ -144,11 +154,57 @@ async function main() {
   } });
   assert.deepEqual(retained.value, record);
   console.log('PASS supported PDS migration rotates signing key and preserves signed repository records');
+  const commit = await rpc('com.atproto.sync.getLatestCommit', { base: recovery, query: { did } });
+  writeFileSync('/gate-state/recovery-state.json', JSON.stringify({ did, handle, document,
+    signingKey: recoveredKey, wrongKey: signingKey, password: recoveryPassword,
+    accessJwt: migrated.accessJwt, refreshJwt: migrated.refreshJwt, commit,
+    records: [{ rkey: golden.rkey, value: record }, { rkey: recoveryRkey, value: recoveryRecord }],
+    blobCid: uploaded.blob.ref.$link, blobBytes: blobBytes.toString('base64'),
+  }), { mode: 0o600 });
   console.log('NOTE raw upstream reads are public inside the private network; gateway isolation is mandatory');
-  console.log('PARTIAL GATE: disaster restore, exposure controls and Memory integration remain untested');
 }
 
-main().catch(error => {
+async function restore() {
+  const state = JSON.parse(readFileSync('/gate-state/restored-state.json', 'utf8'));
+  document = state.document;
+  await new Promise(resolve => server.listen(443, '0.0.0.0', resolve));
+  const base = 'http://pds-restored:2583';
+  await waitReady(base);
+  // No original PDS is running and this process only uses decrypted backup state.
+  const account = await rpc('com.atproto.server.getSession', { base, token: state.accessJwt });
+  assert.equal(account.did, state.did);
+  const login = await rpc('com.atproto.server.createSession', { base,
+    body: { identifier: state.handle, password: state.password } });
+  assert.equal(login.did, state.did);
+  const refreshed = await rpc('com.atproto.server.refreshSession', {
+    base, token: state.refreshJwt, method: 'POST' });
+  assert.equal(refreshed.did, state.did);
+  const commit = await rpc('com.atproto.sync.getLatestCommit', { base, query: { did: state.did } });
+  assert.deepEqual(commit, state.commit);
+  const credentials = await rpc('com.atproto.identity.getRecommendedDidCredentials', {
+    base, token: login.accessJwt });
+  assert.equal(credentials.verificationMethods.atproto, state.signingKey);
+  for (const record of state.records) {
+    const restored = await rpc('com.atproto.repo.getRecord', { base,
+      query: { repo: state.did, collection: record.value.$type, rkey: record.rkey } });
+    assert.deepEqual(restored.value, record.value);
+  }
+  const blob = await rpc('com.atproto.sync.getBlob', { base,
+    query: { did: state.did, cid: state.blobCid } });
+  assert.deepEqual(Buffer.from(blob), Buffer.from(state.blobBytes, 'base64'));
+  console.log('PASS cold restore preserves account/password, access/refresh credentials, signing key, commit, records and blob bytes');
+  const next = { ...state.records[0].value, recordId: randomUUID() };
+  await rpc('com.atproto.repo.createRecord', { base, token: refreshed.accessJwt,
+    body: { repo: state.did, collection: next.$type, rkey: randomUUID(), record: next, validate: false } });
+  const bytes = await rpc('com.atproto.sync.getRepo', { base, query: { did: state.did } });
+  await verifyRepoCar(bytes, state.did, state.signingKey);
+  await assert.rejects(verifyRepoCar(bytes, state.did, state.wrongKey));
+  await rpc('com.atproto.server.createInviteCode', { base, admin: true, body: { useCount: 1 } });
+  console.log('PASS restored PDS can authenticate, administer and publish new verifiable records');
+  console.log('PARTIAL PRODUCT GATE: Memory gateway access, outbox/inbox recovery, two Memory instances and writer fencing remain unproven');
+}
+
+(process.env.GATE_PHASE === 'restore' ? restore() : main()).catch(error => {
   // Never log auth tokens, private keys, or full request bodies.
   console.error(error.message);
   process.exitCode = 1;
