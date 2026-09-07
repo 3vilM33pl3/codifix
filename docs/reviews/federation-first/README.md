@@ -75,7 +75,7 @@ retention contract; native Spaces is not the public relay topology.
 ## Core reliability, evaluation, retrieval and expert correction
 
 - [ ] R1 Replace in-memory post-curation work with durable jobs, bounded retries, leases and observable failures; close the mutation/event-log transaction gap.
-- [ ] R2 Repair parent/child evaluation token double-counting; separate physical execution costs, whole-task success and step diagnostics, and add regression tests.
+- [x] R2 Repair parent/child evaluation token double-counting; separate physical execution costs, whole-task success and step diagnostics, and add regression tests. Evidence: crates/mem-eval/src/accounting_tests.rs. Overall statistics count paired tasks once; step-prefixed groups are non-additive diagnostics. Legacy mixed comparison artifacts require recomparison before release gating. This does not establish held-out product quality or complete provider billing coverage.
 - [ ] R3 Run real isolated quality gates with fixed evaluation time and no reinforcement writeback; include handover-document and simpler-retrieval baselines at comparable information/budget, not only no-access baselines.
 - [ ] R4 Apply authorized-project restrictions before candidate limits; batch source reads, bound concurrent retrieval, calibrate ranking by ablation, and exclude obsolete/tombstoned consolidation inputs.
 - [ ] R5 Test changed numbers, negations, contradictions, stale facts, weak-evidence refusal, provenance collisions, malicious imported claims and cross-space retrieval; signatures must not imply truth or boost confidence automatically.

@@ -465,10 +465,21 @@ file recall, semantic candidate counts, and graph candidate counts. If a
 `retrieval_qa` item declares `expected_tags` or `expected_files`, those
 expectations affect success; they are not just documentation. Grounded-answer
 and resume items report assertion/topic recall and forbidden-hit counts.
-Comparisons are paired by item id, repeat index, and sequence sub-result id,
-then include success-rate deltas, McNemar p-values, bootstrap confidence
-intervals for numeric metric deltas, grouped summaries, token deltas, and
-cost-adjusted success deltas.
+Overall comparisons pair whole tasks by item id and repeat index. Sequence
+parents already include step costs, so steps are not counted again in overall
+tokens, durations, success rates or sample counts. Step diagnostics pair by
+sub-result id separately and appear under `step:` groups, such as
+`step:reasoning_mode:deductive`. Group costs overlap; never add them to the total.
+Comparisons include success-rate deltas, McNemar p-values, bootstrap confidence
+intervals, grouped summaries, token deltas and cost-adjusted success deltas.
+These totals cover paired, non-skipped tasks with reported usage, not every
+provider charge; missing token usage is not evidence of zero cost.
+
+Comparisons generated before task-level accounting remain readable but fail
+release gates with a recomparison message. Run `memory eval compare` again on
+the original run files (no model rerun is needed just to fix aggregation). Update
+any deliberately step-level group policy to its `step:` key; do not reduce a
+whole-task sample-size requirement to preserve an old pass.
 
 Agent build tasks report agent exit code, setup command pass count, score
 command pass count, required/forbidden file checks, required content checks,

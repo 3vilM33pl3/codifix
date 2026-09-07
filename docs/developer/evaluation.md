@@ -205,6 +205,19 @@ assertions, forbidden assertions, and task commands have been reviewed.
 - paired bootstrap 95% confidence intervals for metric deltas
 - token and latency deltas for paired items
 
+Overall statistics use whole tasks, not tasks plus their steps. Sequence parents
+already aggregate step token usage and wall time. Step-only groups have a
+`step:` prefix (for example `step:reasoning_mode:deductive`); they are diagnostic,
+not independent trials or additional execution spend. Group costs overlap and
+must not be summed. Paired totals exclude unmatched/skipped tasks; missing usage
+does not establish zero cost. Use raw run/provider evidence for total expenditure.
+
+New comparisons record `basis: "task_level"`. Old comparison JSON remains
+readable as `legacy_mixed`, but cannot pass a release gate: regenerate it with
+`memory eval compare` from the original run artifacts. Whole-task sample counts
+may be smaller than old mixed counts. Do not lower gates merely to preserve an
+old pass. Explicit step-level policy floors must use the new `step:` group key.
+
 Run artifacts include `run_group_id`, `repeat_index`, `suite_checksum`,
 `fixture_checksum`, `config_fingerprint` when supplied, `git_head`,
 `service_version`, per-item `duration_ms`, and per-item token usage. These fields

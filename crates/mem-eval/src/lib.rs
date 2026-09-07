@@ -492,8 +492,23 @@ pub struct EvalSubResult {
     pub notes: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvalComparisonBasis {
+    /// Old artifacts mixed aggregate parents and steps; regenerate from runs.
+    #[default]
+    LegacyMixed,
+    /// Whole tasks determine overall statistics; step groups are diagnostics.
+    TaskLevel,
+}
+
+#[cfg(test)]
+mod accounting_tests;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvalComparison {
+    #[serde(default)]
+    pub basis: EvalComparisonBasis,
     pub baseline_condition: EvalCondition,
     pub candidate_condition: EvalCondition,
     pub paired_items: usize,
@@ -1324,10 +1339,19 @@ pub fn compare_run_sets(baselines: &[EvalRun], candidates: &[EvalRun]) -> EvalCo
         .first()
         .map(|run| run.profile)
         .unwrap_or(EvalProfile::Llm);
-    let pairs = paired_observations(baselines, candidates);
+    let pairs = paired_observations(baselines, candidates, ObservationScope::Task);
     let overall = summarize_pairs(&pairs);
-    let groups = grouped_summaries(&pairs);
+    let mut groups = grouped_summaries(&pairs);
+    // Parents already aggregate step execution costs. Steps are diagnostics, not
+    // independent whole-task trials or additional physical token expenditure.
+    let step_pairs = paired_observations(baselines, candidates, ObservationScope::Step);
+    groups.extend(
+        grouped_summaries(&step_pairs)
+            .into_iter()
+            .map(|(name, summary)| (format!("step:{name}"), summary)),
+    );
     EvalComparison {
+        basis: EvalComparisonBasis::TaskLevel,
         baseline_condition,
         candidate_condition,
         paired_items: overall.paired_items,
@@ -1364,19 +1388,26 @@ struct EvalObservation {
     token_usage: Option<TokenUsage>,
 }
 
+#[derive(Clone, Copy)]
+enum ObservationScope {
+    Task,
+    Step,
+}
+
 fn paired_observations(
     baselines: &[EvalRun],
     candidates: &[EvalRun],
+    scope: ObservationScope,
 ) -> Vec<(EvalObservation, EvalObservation)> {
     let baseline_by_key = baselines
         .iter()
-        .flat_map(observations_for_run)
+        .flat_map(|run| observations_for_run(run, scope))
         .filter(|observation| !observation.skipped)
         .map(|observation| (observation.key.clone(), observation))
         .collect::<HashMap<_, _>>();
     candidates
         .iter()
-        .flat_map(observations_for_run)
+        .flat_map(|run| observations_for_run(run, scope))
         .filter(|observation| !observation.skipped)
         .filter_map(|candidate| {
             baseline_by_key
@@ -1387,20 +1418,23 @@ fn paired_observations(
         .collect()
 }
 
-fn observations_for_run(run: &EvalRun) -> Vec<EvalObservation> {
+fn observations_for_run(run: &EvalRun, scope: ObservationScope) -> Vec<EvalObservation> {
     let mut observations = Vec::new();
-    for result in &run.results {
+    for result in run.results.iter().filter(|result| !result.skipped) {
         let base_key = format!("{}::r{}", result.item_id, run.repeat_index);
-        observations.push(EvalObservation {
-            key: base_key.clone(),
-            eval_type: result.eval_type.clone(),
-            metadata: result.metadata.clone(),
-            success: result.success,
-            skipped: result.skipped,
-            scores: result.scores.clone(),
-            duration_ms: result.duration_ms,
-            token_usage: result.token_usage.clone(),
-        });
+        if matches!(scope, ObservationScope::Task) {
+            observations.push(EvalObservation {
+                key: base_key,
+                eval_type: result.eval_type.clone(),
+                metadata: result.metadata.clone(),
+                success: result.success,
+                skipped: result.skipped,
+                scores: result.scores.clone(),
+                duration_ms: result.duration_ms,
+                token_usage: result.token_usage.clone(),
+            });
+            continue;
+        }
         for sub_result in &result.sub_results {
             observations.push(EvalObservation {
                 key: format!("{base_key}::{}", sub_result.id),
@@ -1561,6 +1595,12 @@ fn cost_adjusted_success_delta(
 
 pub fn evaluate_gate(comparison: &EvalComparison, policy: &EvalGatePolicy) -> EvalGateResult {
     let mut reasons = Vec::new();
+    if comparison.basis != EvalComparisonBasis::TaskLevel {
+        reasons.push(
+            "legacy mixed comparison: regenerate with eval compare from original run artifacts"
+                .to_string(),
+        );
+    }
     if comparison.paired_items < policy.min_paired_items {
         reasons.push(format!(
             "paired_items {} is below required {}",
@@ -1685,6 +1725,7 @@ fn bootstrap_ci95(values: &[f64]) -> (f64, f64) {
 
 pub fn comparison_text(comparison: &EvalComparison) -> String {
     let mut lines = vec![
+        comparison_accounting_note(comparison).to_string(),
         format!(
             "{} [{}] vs {} [{}] ({} paired item(s))",
             comparison.candidate_condition,
@@ -1754,6 +1795,8 @@ pub fn comparison_markdown(comparison: &EvalComparison) -> String {
         String::new(),
         "## Summary".to_string(),
         String::new(),
+        comparison_accounting_note(comparison).to_string(),
+        String::new(),
         "| Metric | Baseline | Candidate | Delta |".to_string(),
         "| --- | ---: | ---: | ---: |".to_string(),
         format!(
@@ -1816,6 +1859,17 @@ pub fn comparison_markdown(comparison: &EvalComparison) -> String {
             .to_string(),
     );
     lines.join("\n")
+}
+
+fn comparison_accounting_note(comparison: &EvalComparison) -> &'static str {
+    match comparison.basis {
+        EvalComparisonBasis::TaskLevel => {
+            "Overall statistics count paired whole tasks only. Step-prefixed groups are diagnostics; group costs overlap and must not be added to overall tokens. Missing token usage is not evidence of zero cost."
+        }
+        EvalComparisonBasis::LegacyMixed => {
+            "WARNING: legacy mixed parent/step accounting; regenerate this comparison from original run artifacts before using it for a release gate."
+        }
+    }
 }
 
 fn push_metric_table(lines: &mut Vec<String>, metric_deltas: &BTreeMap<String, MetricDelta>) {
@@ -2098,10 +2152,10 @@ mod tests {
             std::slice::from_ref(&candidate),
         );
 
-        assert_eq!(comparison.paired_items, 2);
+        assert_eq!(comparison.paired_items, 1);
         let group = comparison
             .groups
-            .get("reasoning_mode:deductive")
+            .get("step:reasoning_mode:deductive")
             .expect("reasoning group");
         assert_eq!(group.paired_items, 1);
         assert_eq!(group.success_rate_delta, 1.0);
@@ -2111,6 +2165,7 @@ mod tests {
     #[test]
     fn gate_reports_failed_policy_reasons() {
         let comparison = EvalComparison {
+            basis: EvalComparisonBasis::TaskLevel,
             baseline_condition: EvalCondition::NoMemory,
             candidate_condition: EvalCondition::FullMemory,
             paired_items: 2,
@@ -2162,6 +2217,7 @@ mod tests {
     #[test]
     fn gate_enforces_absolute_success_rate_floors() {
         let comparison = EvalComparison {
+            basis: EvalComparisonBasis::TaskLevel,
             baseline_condition: EvalCondition::NoMemory,
             candidate_condition: EvalCondition::FullMemory,
             paired_items: 4,
@@ -2449,7 +2505,7 @@ mod tests {
         }
     }
 
-    fn sequence_result(success: bool, reasoning_mode: &str) -> EvalItemResult {
+    pub(super) fn sequence_result(success: bool, reasoning_mode: &str) -> EvalItemResult {
         EvalItemResult {
             item_id: "sequence".to_string(),
             eval_type: "agent_build_sequence".to_string(),
