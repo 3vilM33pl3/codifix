@@ -7,6 +7,9 @@ and protocol remain general-purpose. Preserve expert knowledge locally, improve
 it through reviewed corrections, and exchange selected knowledge across
 organizational boundaries without sharing databases.
 
+Implementation evidence: [2026-09-07 checkpoint](2026-09-07-implementation.md).
+The full roadmap remains incomplete; checked items have deliberately bounded scope.
+
 ## Source contracts and existing evidence
 
 - Notion architecture: https://app.notion.com/p/robotmotel/Why-AT-Protocol-Should-Be-the-Communication-Fabric-for-a-Distributed-Memory-Layer-3be8990715f48190b7bac810bad21aab
