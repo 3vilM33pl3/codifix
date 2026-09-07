@@ -25,7 +25,9 @@ def defaultFixtureNames : List String :=
     "version-gap.json",
     "missing-evidence.json",
     "tombstone.json",
-    "post-revocation.json"
+    "post-revocation.json",
+    "publisher-author.json",
+    "forged-publisher.json"
   ]
 
 def fixturePath (traceDir : System.FilePath) (name : String) : System.FilePath :=

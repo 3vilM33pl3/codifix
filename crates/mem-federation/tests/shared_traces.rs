@@ -4,9 +4,10 @@ use std::{fs, path::PathBuf};
 
 use chrono::{TimeZone, Utc};
 use mem_federation::{
-    ApplyOutcome, AuthorIdentity, FederationRecord, MembershipRecord, MemoryVersionRecord,
-    ProjectSpaceId, QuarantineReason, RecordLocator, RejectReason, ReplicaState, RevocationRecord,
-    SharedRecordEnvelope, SourceIdentity, SpaceCapability, TransportRecord,
+    ApplyOutcome, AuthenticatedRecord, AuthorIdentity, FederationRecord, MembershipRecord,
+    MemoryVersionRecord, ProjectSpaceId, QuarantineReason, RecordLocator, RejectReason,
+    ReplicaState, RevocationRecord, SharedRecordEnvelope, SourceIdentity, SpaceCapability,
+    TransportRecord,
 };
 use mem_record::{MemoryStatus, MemoryType};
 use serde::Deserialize;
@@ -55,7 +56,6 @@ struct TraceCanonicalHead {
 struct TraceRecord {
     request_id: String,
     authority: String,
-    #[allow(dead_code)]
     publisher: String,
     kind: String,
     #[serde(default)]
@@ -93,8 +93,8 @@ fn shared_federation_traces_match_expected_outcomes_and_summaries() {
     paths.sort();
     assert_eq!(
         paths.len(),
-        7,
-        "expected exactly seven shared trace fixtures"
+        9,
+        "expected exactly nine shared trace fixtures"
     );
 
     let mut digest_mismatches = Vec::new();
@@ -158,10 +158,15 @@ fn execute_fixture(fixture: &TraceFixture) -> (Vec<String>, TraceSummary, Vec<St
         .single()
         .expect("fixed base timestamp");
     for record in &fixture.records {
+        let publisher =
+            author_identity(&record.publisher).expect("authenticated fixture publisher");
         match record.kind.as_str() {
             "grant" => {
                 let transport = membership_transport(&space_id, record, authored_at, true);
-                let outcome = replica.apply(transport.expect("valid grant transport"));
+                let outcome = replica.apply_authenticated(AuthenticatedRecord::new(
+                    publisher,
+                    transport.expect("valid grant transport"),
+                ));
                 if outcome == ApplyOutcome::Applied {
                     accepted_trace_records += 1;
                 }
@@ -169,7 +174,10 @@ fn execute_fixture(fixture: &TraceFixture) -> (Vec<String>, TraceSummary, Vec<St
             }
             "revoke" => {
                 let transport = membership_transport(&space_id, record, authored_at, false);
-                let outcome = replica.apply(transport.expect("valid revoke transport"));
+                let outcome = replica.apply_authenticated(AuthenticatedRecord::new(
+                    publisher,
+                    transport.expect("valid revoke transport"),
+                ));
                 if outcome == ApplyOutcome::Applied {
                     accepted_trace_records += 1;
                 }
@@ -186,7 +194,8 @@ fn execute_fixture(fixture: &TraceFixture) -> (Vec<String>, TraceSummary, Vec<St
                         record.request_id, expected_digest, actual_digest
                     ));
                 }
-                let outcome = replica.apply(transport);
+                let outcome =
+                    replica.apply_authenticated(AuthenticatedRecord::new(publisher, transport));
                 if outcome == ApplyOutcome::Applied {
                     accepted_trace_records += 1;
                 }
@@ -203,7 +212,9 @@ fn execute_fixture(fixture: &TraceFixture) -> (Vec<String>, TraceSummary, Vec<St
                         record.request_id, expected_digest, actual_digest
                     ));
                 }
-                let outcome = match replica.apply(memory) {
+                let outcome = match replica
+                    .apply_authenticated(AuthenticatedRecord::new(publisher, memory))
+                {
                     ApplyOutcome::Applied => {
                         accepted_trace_records += 1;
                         "acceptedMemory".to_string()
@@ -219,6 +230,18 @@ fn execute_fixture(fixture: &TraceFixture) -> (Vec<String>, TraceSummary, Vec<St
     }
 
     let replica_summary = replica.summary();
+    let mut replayed = ReplicaState::new(space_id, author_identity("root").expect("authority"));
+    assert!(
+        replayed
+            .replay_authenticated(replica.applied_authenticated_records())
+            .iter()
+            .all(|outcome| *outcome == ApplyOutcome::Applied)
+    );
+    assert_eq!(
+        replayed.summary(),
+        replica_summary,
+        "authenticated replay preserves publisher attribution"
+    );
     let summary = TraceSummary {
         seen_request_count: accepted_trace_records,
         evidence_count: replica_summary.evidence_count,
@@ -403,8 +426,9 @@ fn map_simple_outcome(outcome: ApplyOutcome, accepted_label: &str) -> String {
 fn map_reject_reason(reason: RejectReason) -> String {
     match reason {
         RejectReason::UnauthorizedMembershipChange { .. }
+        | RejectReason::PublisherMismatch { .. }
         | RejectReason::UnauthorizedDataWrite { .. } => "unauthorized".to_string(),
-        RejectReason::RevokedAuthor { .. } => "revokedPublisher".to_string(),
+        RejectReason::RevokedPublisher { .. } => "revokedPublisher".to_string(),
         RejectReason::Equivocation { .. } => "equivocation".to_string(),
         _ => "invalidShape".to_string(),
     }

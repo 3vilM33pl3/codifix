@@ -18,6 +18,7 @@ struct StoredMemoryVersion {
     digest: ContentDigest,
     record: MemoryVersionRecord,
     author: String,
+    publisher: String,
     source: String,
     locator: String,
 }
@@ -53,6 +54,11 @@ pub enum DuplicateReason {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RejectReason {
+    /// An already accepted source/locator cannot be attributed to another peer.
+    PublisherMismatch {
+        expected: AuthorIdentity,
+        actual: AuthorIdentity,
+    },
     WrongProjectSpace {
         expected: ProjectSpaceId,
         actual: ProjectSpaceId,
@@ -71,10 +77,10 @@ pub enum RejectReason {
         actor: AuthorIdentity,
     },
     UnauthorizedDataWrite {
-        author: AuthorIdentity,
+        publisher: AuthorIdentity,
     },
-    RevokedAuthor {
-        author: AuthorIdentity,
+    RevokedPublisher {
+        publisher: AuthorIdentity,
     },
     MemoryVersionConflict {
         canonical_id: RecordLocator,
@@ -134,6 +140,7 @@ pub struct ReplicaState {
     capabilities: HashMap<AuthorIdentity, HashSet<SpaceCapability>>,
     revoked_publish: HashSet<AuthorIdentity>,
     seen_digests: HashMap<SourceLocatorKey, ContentDigest>,
+    seen_publishers: HashMap<SourceLocatorKey, AuthorIdentity>,
     memory_versions: HashMap<MemoryVersionKey, StoredMemoryVersion>,
     memory_ids: HashMap<RecordLocator, MemoryVersionRecord>,
     canonical_states: HashMap<RecordLocator, CanonicalStateRecord>,
@@ -141,6 +148,32 @@ pub struct ReplicaState {
     evidence: HashMap<RecordLocator, (ContentDigest, EvidenceRecord)>,
     relations: HashMap<RelationKey, ContentDigest>,
     applied: Vec<TransportRecord>,
+    applied_publishers: Vec<AuthorIdentity>,
+}
+
+/// Input after the caller has authenticated the transport and resolved its
+/// publisher. This is deliberately not deserializable from an incoming payload.
+/// Construction is not authentication: a gateway must supply a verified identity,
+/// not an author field, query parameter, header claim or local application role.
+/// The spike's principal identifier type is reused until stable instance IDs land.
+#[derive(Debug, Clone)]
+pub struct AuthenticatedRecord {
+    publisher: AuthorIdentity,
+    record: TransportRecord,
+}
+
+impl AuthenticatedRecord {
+    pub fn new(publisher: AuthorIdentity, record: TransportRecord) -> Self {
+        Self { publisher, record }
+    }
+
+    pub fn publisher(&self) -> &AuthorIdentity {
+        &self.publisher
+    }
+
+    pub fn record(&self) -> &TransportRecord {
+        &self.record
+    }
 }
 
 impl ReplicaState {
@@ -160,6 +193,7 @@ impl ReplicaState {
             capabilities,
             revoked_publish: HashSet::new(),
             seen_digests: HashMap::new(),
+            seen_publishers: HashMap::new(),
             memory_versions: HashMap::new(),
             memory_ids: HashMap::new(),
             canonical_states: HashMap::new(),
@@ -167,6 +201,7 @@ impl ReplicaState {
             evidence: HashMap::new(),
             relations: HashMap::new(),
             applied: Vec::new(),
+            applied_publishers: Vec::new(),
         }
     }
 
@@ -178,11 +213,21 @@ impl ReplicaState {
         &self.authority
     }
 
+    /// Legacy offline-spike convenience: assumes the author is the publisher.
+    /// Never use this to authorize received records. Use `apply_authenticated`
+    /// after independently authenticating the transport publisher instead.
     pub fn apply(&mut self, record: TransportRecord) -> ApplyOutcome {
+        self.apply_authenticated(AuthenticatedRecord::new(
+            record.envelope().author.clone(),
+            record,
+        ))
+    }
+
+    pub fn apply_authenticated(&mut self, input: AuthenticatedRecord) -> ApplyOutcome {
         let mut candidate = self.clone();
-        let outcome = candidate.apply_inner(&record);
+        let outcome = candidate.apply_inner(&input.publisher, &input.record);
         if matches!(outcome, ApplyOutcome::Applied) {
-            candidate.record_applied(record);
+            candidate.record_applied(input.publisher, input.record);
             *self = candidate;
         }
         outcome
@@ -198,6 +243,17 @@ impl ReplicaState {
             .collect()
     }
 
+    /// Replay requires the authenticated attribution as well as the wire bytes.
+    pub fn replay_authenticated<I>(&mut self, records: I) -> Vec<ApplyOutcome>
+    where
+        I: IntoIterator<Item = AuthenticatedRecord>,
+    {
+        records
+            .into_iter()
+            .map(|record| self.apply_authenticated(record))
+            .collect()
+    }
+
     pub fn has_capability(&self, author: &AuthorIdentity, capability: SpaceCapability) -> bool {
         self.capabilities
             .get(author)
@@ -210,6 +266,14 @@ impl ReplicaState {
 
     pub fn applied_records(&self) -> &[TransportRecord] {
         self.applied.as_slice()
+    }
+
+    pub fn applied_authenticated_records(&self) -> impl Iterator<Item = AuthenticatedRecord> + '_ {
+        self.applied_publishers
+            .iter()
+            .cloned()
+            .zip(self.applied.iter().cloned())
+            .map(|(publisher, record)| AuthenticatedRecord::new(publisher, record))
     }
 
     pub fn summary(&self) -> ReplicaSummary {
@@ -250,7 +314,7 @@ impl ReplicaState {
             .map(|stored| CanonicalHeadSummary {
                 canonical_id: stored.record.canonical_id.as_str().to_string(),
                 version: stored.record.version_no,
-                publisher: stored.author.clone(),
+                publisher: stored.publisher.clone(),
                 author: stored.author.clone(),
                 source: stored.source.clone(),
                 locator: stored.locator.clone(),
@@ -274,7 +338,11 @@ impl ReplicaState {
         }
     }
 
-    fn apply_inner(&mut self, record: &TransportRecord) -> ApplyOutcome {
+    fn apply_inner(
+        &mut self,
+        publisher: &AuthorIdentity,
+        record: &TransportRecord,
+    ) -> ApplyOutcome {
         let actual = match CanonicalJsonCodec::digest(record.envelope()) {
             Ok(actual) => actual,
             Err(_) => {
@@ -308,6 +376,16 @@ impl ReplicaState {
             record.source_identity().clone(),
             record.record_locator().clone(),
         );
+        if let Some(existing) = self.seen_publishers.get(&seen_key)
+            && existing != publisher
+        {
+            return ApplyOutcome::Rejected {
+                reason: RejectReason::PublisherMismatch {
+                    expected: existing.clone(),
+                    actual: publisher.clone(),
+                },
+            };
+        }
         if let Some(existing_digest) = self.seen_digests.get(&seen_key) {
             if existing_digest == record.content_digest() {
                 return ApplyOutcome::Duplicate {
@@ -325,28 +403,32 @@ impl ReplicaState {
         }
 
         match &record.envelope().record {
-            FederationRecord::Membership(membership) => self.apply_membership(record, membership),
-            FederationRecord::Revocation(revocation) => self.apply_revocation(record, revocation),
+            FederationRecord::Membership(membership) => {
+                self.apply_membership(publisher, membership)
+            }
+            FederationRecord::Revocation(revocation) => {
+                self.apply_revocation(publisher, revocation)
+            }
             FederationRecord::MemoryVersion(memory_version) => {
-                match self.require_publish_capability(record.envelope().author.clone()) {
+                match self.require_publish_capability(publisher.clone()) {
                     Err(outcome) => outcome,
-                    Ok(()) => self.apply_memory_version(record, memory_version),
+                    Ok(()) => self.apply_memory_version(publisher, record, memory_version),
                 }
             }
             FederationRecord::CanonicalState(state) => {
-                match self.require_publish_capability(record.envelope().author.clone()) {
+                match self.require_publish_capability(publisher.clone()) {
                     Err(outcome) => outcome,
                     Ok(()) => self.apply_canonical_state(record, state),
                 }
             }
             FederationRecord::Evidence(evidence) => {
-                match self.require_publish_capability(record.envelope().author.clone()) {
+                match self.require_publish_capability(publisher.clone()) {
                     Err(outcome) => outcome,
                     Ok(()) => self.apply_evidence(record, evidence),
                 }
             }
             FederationRecord::Relation(relation) => {
-                match self.require_publish_capability(record.envelope().author.clone()) {
+                match self.require_publish_capability(publisher.clone()) {
                     Err(outcome) => outcome,
                     Ok(()) => self.apply_relation(record, relation),
                 }
@@ -354,7 +436,15 @@ impl ReplicaState {
         }
     }
 
-    fn record_applied(&mut self, record: TransportRecord) {
+    fn record_applied(&mut self, publisher: AuthorIdentity, record: TransportRecord) {
+        self.seen_publishers.insert(
+            (
+                record.source_identity().clone(),
+                record.record_locator().clone(),
+            ),
+            publisher.clone(),
+        );
+        self.applied_publishers.push(publisher);
         self.seen_digests.insert(
             (
                 record.source_identity().clone(),
@@ -367,13 +457,13 @@ impl ReplicaState {
 
     fn apply_membership(
         &mut self,
-        record: &TransportRecord,
+        publisher: &AuthorIdentity,
         membership: &crate::MembershipRecord,
     ) -> ApplyOutcome {
-        if record.envelope().author != self.authority {
+        if *publisher != self.authority {
             return ApplyOutcome::Rejected {
                 reason: RejectReason::UnauthorizedMembershipChange {
-                    actor: record.envelope().author.clone(),
+                    actor: publisher.clone(),
                 },
             };
         }
@@ -395,13 +485,13 @@ impl ReplicaState {
 
     fn apply_revocation(
         &mut self,
-        record: &TransportRecord,
+        publisher: &AuthorIdentity,
         revocation: &RevocationRecord,
     ) -> ApplyOutcome {
-        if record.envelope().author != self.authority {
+        if *publisher != self.authority {
             return ApplyOutcome::Rejected {
                 reason: RejectReason::UnauthorizedMembershipChange {
-                    actor: record.envelope().author.clone(),
+                    actor: publisher.clone(),
                 },
             };
         }
@@ -432,6 +522,7 @@ impl ReplicaState {
 
     fn apply_memory_version(
         &mut self,
+        publisher: &AuthorIdentity,
         record: &TransportRecord,
         memory_version: &MemoryVersionRecord,
     ) -> ApplyOutcome {
@@ -512,6 +603,7 @@ impl ReplicaState {
                 digest: record.content_digest().clone(),
                 record: memory_version.clone(),
                 author: record.envelope().author.as_str().to_string(),
+                publisher: publisher.as_str().to_string(),
                 source: record.source_identity().as_str().to_string(),
                 locator: record.record_locator().as_str().to_string(),
             },
@@ -663,17 +755,17 @@ impl ReplicaState {
         ApplyOutcome::Applied
     }
 
-    fn require_publish_capability(&self, author: AuthorIdentity) -> Result<(), ApplyOutcome> {
-        if self.has_capability(&author, SpaceCapability::Publish) {
+    fn require_publish_capability(&self, publisher: AuthorIdentity) -> Result<(), ApplyOutcome> {
+        if self.has_capability(&publisher, SpaceCapability::Publish) {
             return Ok(());
         }
-        if self.revoked_publish.contains(&author) {
+        if self.revoked_publish.contains(&publisher) {
             return Err(ApplyOutcome::Rejected {
-                reason: RejectReason::RevokedAuthor { author },
+                reason: RejectReason::RevokedPublisher { publisher },
             });
         }
         Err(ApplyOutcome::Rejected {
-            reason: RejectReason::UnauthorizedDataWrite { author },
+            reason: RejectReason::UnauthorizedDataWrite { publisher },
         })
     }
 }
@@ -876,6 +968,77 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_cannot_be_reattributed_to_a_different_publisher() {
+        let mut replica = ReplicaState::new(project_space_id(), authority());
+        let grant = publish_membership(writer(), SpaceCapability::Publish, "grant");
+        assert_eq!(
+            replica.apply_authenticated(AuthenticatedRecord::new(authority(), grant.clone())),
+            ApplyOutcome::Applied
+        );
+        let before = replica.summary();
+        assert_eq!(
+            replica.apply_authenticated(AuthenticatedRecord::new(writer(), grant)),
+            ApplyOutcome::Rejected {
+                reason: RejectReason::PublisherMismatch {
+                    expected: authority(),
+                    actual: writer(),
+                }
+            }
+        );
+        assert_eq!(replica.summary(), before);
+        assert_eq!(replica.applied_authenticated_records().count(), 1);
+    }
+
+    #[test]
+    fn an_authority_author_field_does_not_authorize_the_publisher() {
+        let mut replica = ReplicaState::new(project_space_id(), authority());
+        let grant = publish_membership(writer(), SpaceCapability::Publish, "forged-grant");
+        assert_eq!(
+            replica.apply_authenticated(AuthenticatedRecord::new(writer(), grant)),
+            ApplyOutcome::Rejected {
+                reason: RejectReason::UnauthorizedMembershipChange { actor: writer() }
+            }
+        );
+        assert!(!replica.has_capability(&writer(), SpaceCapability::Publish));
+        for record in projected_records(authority(), Uuid::new_v4(), 1) {
+            assert_eq!(
+                replica.apply_authenticated(AuthenticatedRecord::new(writer(), record)),
+                ApplyOutcome::Rejected {
+                    reason: RejectReason::UnauthorizedDataWrite {
+                        publisher: writer()
+                    }
+                }
+            );
+        }
+        assert!(replica.applied_records().is_empty());
+    }
+
+    proptest! {
+        #[test]
+        fn authenticated_replay_keeps_original_author_and_publisher_separate(expert in 0u32..10000, copies in 1usize..8) {
+            let mut replica = ReplicaState::new(project_space_id(), authority());
+            let author = AuthorIdentity::new(format!("expert:{expert}")).expect("author");
+            let grant = publish_membership(writer(), SpaceCapability::Publish, "grant");
+            prop_assert_eq!(replica.apply_authenticated(AuthenticatedRecord::new(authority(), grant)), ApplyOutcome::Applied);
+            let inputs = projected_records(author.clone(), Uuid::new_v4(), 1).into_iter()
+                .map(|record| AuthenticatedRecord::new(writer(), record)).collect::<Vec<_>>();
+            prop_assert!(replica.replay_authenticated(inputs.clone()).iter().all(|outcome| *outcome == ApplyOutcome::Applied));
+            let expected = replica.summary();
+            prop_assert_eq!(&expected.canonical_heads[0].author, author.as_str());
+            let publisher = writer();
+            prop_assert_eq!(&expected.canonical_heads[0].publisher, publisher.as_str());
+            for _ in 0..copies {
+                let duplicates = replica.replay_authenticated(inputs.clone()).iter().all(|outcome| matches!(outcome, ApplyOutcome::Duplicate { .. }));
+                prop_assert!(duplicates);
+                prop_assert_eq!(replica.summary(), expected.clone());
+            }
+            let mut replayed = ReplicaState::new(project_space_id(), authority());
+            replayed.replay_authenticated(replica.applied_authenticated_records());
+            prop_assert_eq!(replayed.summary(), expected);
+        }
+    }
+
+    #[test]
     fn exact_duplicate_is_idempotent() {
         let mut replica = ReplicaState::new(project_space_id(), authority());
         let grant = publish_membership(
@@ -1061,7 +1224,9 @@ mod tests {
         assert_eq!(
             replica.apply(evidence),
             ApplyOutcome::Rejected {
-                reason: RejectReason::RevokedAuthor { author: writer() }
+                reason: RejectReason::RevokedPublisher {
+                    publisher: writer()
+                }
             }
         );
         assert_eq!(
@@ -1103,7 +1268,9 @@ mod tests {
         assert_eq!(
             replica.apply(evidence),
             ApplyOutcome::Rejected {
-                reason: RejectReason::UnauthorizedDataWrite { author: writer() }
+                reason: RejectReason::UnauthorizedDataWrite {
+                    publisher: writer()
+                }
             }
         );
     }

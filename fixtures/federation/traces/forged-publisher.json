@@ -1,0 +1,15 @@
+{
+  "name": "forged-publisher",
+  "records": [
+    {"requestId":"forged-grant","authority":"root","publisher":"mallory","kind":"grant","subject":"mallory","capability":"publish","evidenceRefs":[],"tombstone":false},
+    {"requestId":"forged-memory","authority":"mallory","publisher":"mallory","kind":"memory","canonicalId":"mem-1","version":1,"author":"root","source":"repo","locator":"records/forged-memory","digest":"sha256:77c43fc3a361e40d81ab4ec63f90ea19ed1d6f971424c13262e7d84b9dbae2e1","evidenceRefs":[],"tombstone":false},
+    {"requestId":"forged-revoke","authority":"root","publisher":"mallory","kind":"revoke","subject":"root","capability":"publish","evidenceRefs":[],"tombstone":false}
+  ],
+  "expected": {
+    "outcomes":["unauthorized","unauthorized","unauthorized"],
+    "summary": {
+      "seenRequestCount":0,"evidenceCount":0,"memoryVersionCount":0,"activeCanonicalCount":0,
+      "activePublishers":[],"revokedPublishers":[],"canonicalHeads":[]
+    }
+  }
+}

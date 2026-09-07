@@ -57,6 +57,27 @@ conformance for credentials, addressing, commits, synchronization, revocation,
 deletion and audit-policy compatibility. Record the exact runtime image digest
 and SDK commit then; do not claim a runtime pin or passed test that does not exist.
 
+## Authenticated publisher versus original author
+
+`mem-federation` now offers `AuthenticatedRecord`, `apply_authenticated` and
+`replay_authenticated`. Membership, publication and revocation checks use the
+resolved publisher, while memory projections preserve the original author. An
+accepted source/locator cannot subsequently be attributed to another publisher.
+Replay inputs must retain authenticated attribution; replaying just payloads
+would lose that distinction. The wrapper is not deserializable from wire JSON.
+
+The caller must authenticate the transport and bind the source repository to an
+enrolled instance before constructing this input. A constructor is not proof of
+identity. The old `apply`/`replay` methods remain offline-spike conveniences that
+assume author equals publisher; they must not authorize production ingestion.
+There is no production ingestion route yet. The existing `AuthorIdentity` type
+still represents principals here; stable instance identities, origin ownership,
+separate shared versions and state revisions remain outstanding domain work.
+
+Nine Rust/Lean traces cover the modeled reducer, including independent authorship
+and rejected forged authorship. This is not proof of runtime authentication,
+durable ordering or two-instance product operation.
+
 ## Namespace ownership and publication gate
 
 - `dev.memory-layer.unspecced.*` is an unpublished fixture namespace, never a

@@ -14,6 +14,18 @@ authenticated replication core:
 The proofs are in `MemoryFederation/Proofs.lean`. The executable and tests read
 the shared JSON traces under `../../fixtures/federation/traces/`.
 
+The nine traces now include distinct original author/authenticated publisher and
+forged authority authorship. Rust consumes the publisher field (previously its
+spike harness ignored that field), matching the model's existing distinction.
+The Rust `AuthenticatedRecord` input assumes transport authentication has already
+established that identity. Constructing the value is not authentication, and the
+Lean proofs do not verify credentials or signatures. The Rust-only defense against
+reattributing an accepted source/locator is not an additional Lean theorem.
+
+Stable instance IDs, shared-versus-local versions, mutable-state revisions,
+origin ownership, proposals and durable gateway ordering are still forthcoming;
+these proofs must not be presented as covering that unimplemented contract.
+
 Local commands:
 
 ```bash

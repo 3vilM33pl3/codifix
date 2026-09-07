@@ -43,6 +43,12 @@ and deletion behavior require separate evidence and a future explicit decision.
 - [ ] B2 Define explicit local-permission/gateway-capability mappings without allowing local roles to grant remote authority automatically; retain all AT-specific types behind the adapter.
 - [ ] B3 Expand executable Rust/Lean conformance together, including the new production semantics; do not claim proofs of the complete service, runtime, cryptography or deployment.
 
+B1/B3 progress (not completion): the existing reducer now takes an independently
+authenticated publisher, preserves original authorship through replay, and shares
+nine Rust/Lean traces including forged-authority and distinct-author cases.
+Stable IDs, origin ownership, shared/state versioning and remaining production
+semantics are still unimplemented; see the profile compatibility document.
+
 ## C. Durable publication and synchronization
 
 - [ ] C1 Commit source mutations with publication intent; gateway authorization, reducer application, accepted order and outbound intent together; receiver inbox, projections and cursor together.

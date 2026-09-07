@@ -1,0 +1,19 @@
+{
+  "name": "publisher-author",
+  "records": [
+    {"requestId":"grant-alice","authority":"root","publisher":"root","kind":"grant","subject":"alice","capability":"publish","evidenceRefs":[],"tombstone":false},
+    {"requestId":"evidence-1","authority":"alice","publisher":"alice","kind":"evidence","evidenceId":"ev-1","source":"repo","locator":"records/evidence-1","digest":"sha256:d3fb85109453d9da6f91fb6f3869ee58b68d956839491f407705d0f0bd3dd9cd","evidenceRefs":[],"tombstone":false},
+    {"requestId":"memory-1-v1","authority":"alice","publisher":"alice","kind":"memory","canonicalId":"mem-1","version":1,"author":"original-expert","source":"repo","locator":"records/memory-1-v1","digest":"sha256:7bb42dbc860574e561a034cd5a3fc9fe9f3abb325762905a679b7e45cc7b0885","evidenceRefs":["ev-1"],"tombstone":false},
+    {"requestId":"memory-1-v1","authority":"alice","publisher":"alice","kind":"memory","canonicalId":"mem-1","version":1,"author":"original-expert","source":"repo","locator":"records/memory-1-v1","digest":"sha256:7bb42dbc860574e561a034cd5a3fc9fe9f3abb325762905a679b7e45cc7b0885","evidenceRefs":["ev-1"],"tombstone":false},
+    {"requestId":"revoke-alice","authority":"root","publisher":"root","kind":"revoke","subject":"alice","capability":"publish","evidenceRefs":[],"tombstone":false},
+    {"requestId":"memory-1-v2","authority":"alice","publisher":"alice","kind":"memory","canonicalId":"mem-1","version":2,"author":"original-expert","source":"repo","locator":"records/memory-1-v2","digest":"sha256:9ccebe7526a7785c362b8c49df2c56375d63d5c83752828361c8b157916bed19","evidenceRefs":["ev-1"],"tombstone":false}
+  ],
+  "expected": {
+    "outcomes":["acceptedGrant","acceptedEvidence","acceptedMemory","duplicateReplay","acceptedRevoke","revokedPublisher"],
+    "summary": {
+      "seenRequestCount":4,"evidenceCount":1,"memoryVersionCount":1,"activeCanonicalCount":1,
+      "activePublishers":[],"revokedPublishers":["alice"],
+      "canonicalHeads":[{"canonicalId":"mem-1","version":1,"publisher":"alice","author":"original-expert","source":"repo","locator":"records/memory-1-v1","digest":"sha256:7bb42dbc860574e561a034cd5a3fc9fe9f3abb325762905a679b7e45cc7b0885","evidenceCount":1,"tombstone":false}]
+    }
+  }
+}

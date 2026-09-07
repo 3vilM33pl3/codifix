@@ -448,4 +448,15 @@ theorem replay_equals_reference_fold
   simpa [referenceFold] using
     (replayTrace_eq_referenceFoldFrom { finalState := state, outcomes := [] } records).symm
 
+-- Claiming root authority in record metadata does not authorize another peer.
+theorem membership_requires_root_publisher
+    (state : ReplicaState) (record : TraceRecord)
+    (hUnseen : record.requestId ∉ state.seenRequests)
+    (hPublisher : record.publisher ≠ rootAuthority)
+    (hKind : record.kind = .grant ∨ record.kind = .revoke) :
+    applyRecord state record = { state := state, outcome := .unauthorized } := by
+  rcases hKind with hGrant | hRevoke
+  · simp [applyRecord, hUnseen, authorityValid, hGrant, hPublisher]
+  · simp [applyRecord, hUnseen, authorityValid, hRevoke, hPublisher]
+
 end MemoryFederation
