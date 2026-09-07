@@ -32,4 +32,15 @@ Local commands:
 ~/.elan/bin/lake build
 ~/.elan/bin/lake test
 ~/.elan/bin/lake exe memory_federation_tests
+~/.elan/bin/lake env leanchecker
 ```
+
+The Lake package name matches the `MemoryFederation` root module. The pinned
+lean-action infers that module name for both leanchecker and nanoda. Its nanoda
+helper does not recognize Lake's top-level TOML package name, so this project
+uses `lakefile.lean`, not a nonstandard `[package]` TOML workaround. The root
+library is a default target so the independent checker has an exported module.
+See the pinned [leanchecker helper](https://github.com/leanprover/lean-action/blob/38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9/scripts/run_leanchecker.sh)
+and [nanoda helper](https://github.com/leanprover/lean-action/blob/38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9/scripts/run_nanoda.sh).
+`lake build`, `lake test` and `leanchecker` can be checked locally with the pinned
+toolchain. A local kernel check is not an independent nanoda or remote CI pass.
