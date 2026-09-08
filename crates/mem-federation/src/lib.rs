@@ -7,6 +7,7 @@ mod codec;
 mod digest;
 mod error;
 mod projection;
+pub mod publication;
 mod record;
 mod replica;
 
