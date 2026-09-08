@@ -7,7 +7,8 @@ and protocol remain general-purpose. Preserve expert knowledge locally, improve
 it through reviewed corrections, and exchange selected knowledge across
 organizational boundaries without sharing databases.
 
-Implementation evidence: [2026-09-07 checkpoint](2026-09-07-implementation.md).
+Implementation evidence: [2026-09-07 checkpoint](2026-09-07-implementation.md)
+and [2026-09-08 domain checkpoint](2026-09-08-publication-domain.md).
 The full roadmap remains incomplete; checked items have deliberately bounded scope.
 
 ## Source contracts and existing evidence
@@ -42,15 +43,16 @@ and deletion behavior require separate evidence and a future explicit decision.
 
 ## B. Production federation domain
 
-- [ ] B1 Extend the neutral domain with stable instance/space identities, authenticated publisher distinct from author, shared versions independent of local versions, mutable-state revisions, immutable reviewed evidence, origin-owned streams, proposals, membership capabilities, relation retraction, causation and deterministic authority ordering.
+- [x] B1 Extend the neutral domain with stable instance/space identities, authenticated publisher distinct from author, shared versions independent of local versions, mutable-state revisions, immutable reviewed evidence, origin-owned streams, proposals, membership capabilities, relation retraction, causation and deterministic authority ordering. Evidence: crates/mem-federation/src/publication and docs/developer/architecture/federation-publications.md. Complete at the pure reference-domain scope, not durable persistence, credential verification, production wire adaptation or end-to-end product integration.
 - [ ] B2 Define explicit local-permission/gateway-capability mappings without allowing local roles to grant remote authority automatically; retain all AT-specific types behind the adapter.
 - [ ] B3 Expand executable Rust/Lean conformance together, including the new production semantics; do not claim proofs of the complete service, runtime, cryptography or deployment.
 
-B1/B3 progress (not completion): the existing reducer now takes an independently
-authenticated publisher, preserves original authorship through replay, and shares
-nine Rust/Lean traces including forged-authority and distinct-author cases.
-Stable IDs, origin ownership, shared/state versioning and remaining production
-semantics are still unimplemented; see the profile compatibility document.
+B1 implements the reference domain without changing the old six-record spike
+schema or adapter. B3 remains partial: nine legacy traces plus two new publication
+traces pass in Rust/Lean. New proofs cover ownership, publishing membership,
+shared/state counters, accepted-command retention, retries, revocation and replay.
+New evidence-review, proposal and relation transitions have Rust tests but are not
+yet modeled in Lean. B2 and all durable/runtime/wire integration gates remain open.
 
 ## C. Durable publication and synchronization
 

@@ -15,7 +15,7 @@ Use this map to find the right PR boundary before opening the large files.
 - `crates/mem-mcp`: read-only MCP protocol adapter over the service HTTP API.
 - `crates/mem-eval`: eval suite schemas, scoring, comparisons, gates, and report rendering.
 - `crates/mem-test-support`: pgvector-backed integration test harness.
-- `crates/mem-federation`: transport-neutral federation records, Memory projection, replica reducer, and shared offline conformance traces.
+- `crates/mem-federation`: transport-neutral federation records, Memory projection, legacy replica reducer, and the [origin-owned publication domain](federation-publications.md) with shared offline conformance traces. No runtime or persistence implementation.
 - `crates/mem-atproto`: offline ATProto/Atrium encoding, unpublished Lexicons, fake XRPC requests, syntax fixtures, and MST checks over `mem-federation`.
 
 ## Formal

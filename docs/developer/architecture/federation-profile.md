@@ -71,12 +71,26 @@ enrolled instance before constructing this input. A constructor is not proof of
 identity. The old `apply`/`replay` methods remain offline-spike conveniences that
 assume author equals publisher; they must not authorize production ingestion.
 There is no production ingestion route yet. The existing `AuthorIdentity` type
-still represents principals here; stable instance identities, origin ownership,
-separate shared versions and state revisions remain outstanding domain work.
+still represents principals in this legacy spike interface.
 
 Nine Rust/Lean traces cover the modeled reducer, including independent authorship
 and rejected forged authorship. This is not proof of runtime authentication,
 durable ordering or two-instance product operation.
+
+The new [`publication` domain](federation-publications.md) uses distinct non-nil
+UUID instance/space identities, origin-qualified streams, shared/local counters,
+state revisions, reviewed evidence, proposals and relation retractions. Its
+in-memory reducer requires a separately authenticated publisher and contiguous
+authority acceptance order. Authentication and establishing that committed order
+remain caller duties, not properties supplied by deserialization or a counter.
+Two additional Rust/Lean traces cover a bounded subset of these new semantics.
+Evidence/proposal/relation transitions currently have Rust-only tests.
+
+This is a versioned neutral-domain extension, **not a new production ATProto
+adapter**. The six spike Lexicons, fixture round-trips and MST evidence are
+unchanged; they do not establish compatibility of publication schema version 2.
+Production wire mappings, unknown-field retention/compatibility tests, explicit
+local permission mapping and durable gateway/receiver integration remain gates.
 
 ## Namespace ownership and publication gate
 
