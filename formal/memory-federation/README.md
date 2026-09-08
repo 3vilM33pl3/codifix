@@ -24,11 +24,11 @@ reattributing an accepted source/locator is not an additional Lean theorem.
 
 ## Origin-owned publication model
 
-`MemoryFederation/Publication.lean` separately models a subset of the new
-`mem_federation::publication` domain. Two additional shared JSON traces under
+`MemoryFederation/Publication.lean` separately models the publication reducer's
+eight record variants. Five shared JSON traces under
 `../../fixtures/federation/publication-traces/` run through both this model and
 the real Rust reducer during `lake test` / Rust integration tests. The legacy
-nine fixtures and their proofs are unchanged.
+nine fixtures and their proofs are unchanged (fourteen traces in total).
 
 The new model proves exact retry idempotence, unchanged non-applied state,
 accepted memory ownership/publishing membership and next shared version,
@@ -37,16 +37,32 @@ next state revision, revocation denying subsequent memory application, and
 recursive replay equality with the reference fold. The version statements are
 one-step transition invariants, not a theorem about the complete Rust service.
 
+`MemoryFederation/PublicationInvariants.lean` additionally proves causal dependency
+existence, publishing membership for every data variant, evidence origin/space
+binding and scoped reference existence, changed-binding rejection, proposals not
+rewriting versions, origin/pending/causal requirements for resolution, stale
+approval preserving state, exact proposed content/author/evidence retention,
+atomic version append plus resolution, rejection not appending content, relation
+endpoint/type stability and next revision, and configured membership authority.
+All declarations are imported by the root library for `leanchecker` and CI.
+
 Natural-number IDs abstract validated non-nil UUIDs. Positive `u32` counters,
 canonical encoding, envelope digests, space binding and authenticated identity
 are Rust/caller prerequisites, not Lean parser/cryptography proofs. The fixtures
 use a fixed space/authority, derive locators from record IDs, and normalize unused
 fields; see their [format contract](../../fixtures/federation/publication-traces/README.md).
 
-The new evidence-review, proposal and relation transitions have Rust regression
-tests but **are not in this new Lean model**. Local-role mapping, durable
-acceptance, outbox/inbox, transport verification and gateway fencing remain
-unimplemented. Neither the new nor legacy proofs establish those release gates.
+Evidence, proposals, relation assertion/retraction, causation and all three
+capabilities now have shared executable coverage. The model retains selected
+evidence text but assumes review-digest/byte validation has already succeeded;
+it neither proves SHA-256 correctness nor that a human approved the snapshot.
+Rust tests validate canonical review-byte equality and malformed inputs.
+
+The [B2 local policy intersection](../../docs/developer/architecture/federation-permissions.md)
+is implemented and exhaustively tested over current local permission sets in
+Rust, not formally verified in Lean. Durable acceptance, outbox/inbox, transport
+verification and gateway fencing remain unimplemented. Neither model proves the
+complete Rust implementation, its serializers, runtime or deployment.
 
 Local commands:
 

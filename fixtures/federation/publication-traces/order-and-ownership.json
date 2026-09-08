@@ -20,7 +20,9 @@
   "outcomes": ["applied","applied","forged_publisher","not_origin","version_gap","missing_dependency","order_gap","applied","equivocation","revision_gap","applied","applied","counter_conflict","stale_order","unauthorized"],
   "sequence": 5,
   "publishers": [1,2,3],
+  "pullers": [1], "managers": [1],
+  "evidence": [], "proposals": [], "relations": [],
   "streams": [
-    {"origin":2,"canonical":10,"shared":2,"local":42,"revision":1,"author":"expert","current":false,"tombstone":false}
+    {"origin":2,"canonical":10,"shared":2,"local":42,"revision":1,"author":"expert","current":false,"tombstone":false,"text":"knowledge","evidence":[]}
   ]
 }

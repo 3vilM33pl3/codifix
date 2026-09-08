@@ -1,0 +1,22 @@
+{
+  "name":"independent capabilities and configured authority cannot be replaced by grants",
+  "records":[
+    {"sequence":1,"id":1,"publisher":1,"authenticated":1,"kind":"grant","subject":2,"capability":"pull"},
+    {"sequence":2,"id":10,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27},
+    {"sequence":2,"id":2,"publisher":1,"authenticated":1,"kind":"grant","subject":2,"capability":"manage_membership"},
+    {"sequence":3,"id":11,"publisher":2,"authenticated":2,"kind":"grant","subject":3},
+    {"sequence":3,"id":3,"publisher":1,"authenticated":1,"kind":"revoke","subject":1,"capability":"manage_membership"},
+    {"sequence":3,"id":3,"publisher":1,"authenticated":1,"kind":"revoke","subject":1,"capability":""},
+    {"sequence":3,"id":3,"publisher":1,"authenticated":1,"kind":"grant","subject":2},
+    {"sequence":4,"id":10,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27},
+    {"sequence":5,"id":4,"publisher":1,"authenticated":1,"kind":"revoke","subject":2,"capability":"pull"},
+    {"sequence":6,"id":11,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":2,"local":42},
+    {"sequence":7,"id":5,"publisher":1,"authenticated":1,"kind":"revoke","subject":2,"capability":""},
+    {"sequence":8,"id":12,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":3,"local":45},
+    {"sequence":4,"id":10,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27}
+  ],
+  "outcomes":["applied","unauthorized","applied","unauthorized","authority_revocation","authority_revocation","applied","applied","applied","applied","applied","unauthorized","duplicate"],
+  "sequence":7,"publishers":[1],"pullers":[1],"managers":[1],
+  "streams":[{"origin":2,"canonical":10,"shared":2,"local":42,"revision":0,"author":"expert","current":false,"tombstone":false,"text":"knowledge","evidence":[]}],
+  "evidence":[],"proposals":[],"relations":[]
+}

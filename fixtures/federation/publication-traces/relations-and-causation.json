@@ -1,0 +1,32 @@
+{
+  "name":"relation assertion retraction and causal dependency checks",
+  "records":[
+    {"sequence":1,"id":1,"publisher":1,"authenticated":1,"kind":"grant","subject":2},
+    {"sequence":2,"id":2,"publisher":1,"authenticated":1,"kind":"grant","subject":3},
+    {"sequence":3,"id":10,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27,"causation":{"publisher":2,"id":999}},
+    {"sequence":3,"id":10,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27,"causation":{"publisher":1,"id":1}},
+    {"sequence":4,"id":20,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":1},
+    {"sequence":4,"id":10,"publisher":3,"authenticated":3,"kind":"memory","origin":3,"canonical":10,"shared":1,"local":7},
+    {"sequence":5,"id":20,"publisher":3,"authenticated":3,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":1},
+    {"sequence":5,"id":20,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":1,"active":false},
+    {"sequence":5,"id":20,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":2},
+    {"sequence":5,"id":20,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":1,"causation":{"publisher":2,"id":10}},
+    {"sequence":6,"id":21,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":2,"targetCanonical":10,"revision":2},
+    {"sequence":6,"id":21,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":2,"relationType":"supports"},
+    {"sequence":6,"id":21,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":3,"active":false},
+    {"sequence":6,"id":21,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":2,"active":false,"causation":{"publisher":2,"id":20}},
+    {"sequence":6,"id":21,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":2,"active":false,"causation":{"publisher":2,"id":20}},
+    {"sequence":7,"id":22,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":2},
+    {"sequence":7,"id":20,"publisher":3,"authenticated":3,"kind":"relation","origin":3,"canonical":10,"relationId":100,"targetOrigin":2,"targetCanonical":10,"revision":1},
+    {"sequence":8,"id":3,"publisher":1,"authenticated":1,"kind":"revoke","subject":2},
+    {"sequence":9,"id":22,"publisher":2,"authenticated":2,"kind":"relation","origin":2,"canonical":10,"relationId":100,"targetOrigin":3,"targetCanonical":10,"revision":3}
+  ],
+  "outcomes":["applied","applied","missing_dependency","applied","missing_dependency","applied","not_origin","missing_dependency","revision_gap","applied","relation_conflict","relation_conflict","revision_gap","applied","duplicate","counter_conflict","applied","applied","unauthorized"],
+  "sequence":8,"publishers":[1,3],"pullers":[1],"managers":[1],
+  "streams":[
+    {"origin":2,"canonical":10,"shared":1,"local":27,"revision":0,"author":"expert","current":false,"tombstone":false,"text":"knowledge","evidence":[]},
+    {"origin":3,"canonical":10,"shared":1,"local":7,"revision":0,"author":"expert","current":false,"tombstone":false,"text":"knowledge","evidence":[]}
+  ],
+  "evidence":[],"proposals":[],
+  "relations":[{"publisher":2,"id":100,"revisions":[1,2],"active":[true,false]},{"publisher":3,"id":100,"revisions":[1],"active":[true]}]
+}
