@@ -61,9 +61,10 @@ to their source origin and have independent revisions for assertion/retraction.
 
 This domain is a deterministic in-memory reference, not the storage engine.
 The separate [durability crate](federation-durability.md) now composes it with
-PostgreSQL transactions; service and live transport integration remain open.
-No authentication,
-signature checking, review UI, local grant persistence, PDS publication, model forwarding,
-network recovery or durable cursor is implied by its constructors. Imported strings
-remain untrusted data. Offline copies cannot be recalled. Production adapter and
-schema compatibility tests must be added before exposing these records externally.
+PostgreSQL transactions and an opt-in runtime with real-PDS integration tests.
+None of those capabilities is implied by the domain constructors themselves.
+Schema-v2 wire compatibility and unknown-field tests live in `mem-atproto`;
+service review/admin UI, runtime signature verification, model-forwarding policy
+and production deployment security remain separate gates. Imported strings remain
+untrusted data. Offline copies cannot be recalled. The wire namespace is still
+unpublished, so this is not a stable external release contract.

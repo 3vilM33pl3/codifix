@@ -10,7 +10,8 @@ organizational boundaries without sharing databases.
 Implementation evidence: [2026-09-07 checkpoint](2026-09-07-implementation.md)
 and [2026-09-08 domain checkpoint](2026-09-08-publication-domain.md), followed by
 the [B2/B3 permission and conformance increment](2026-09-08-b2-b3.md) and
-[Stage C durability foundation](2026-09-08-c-durability.md).
+[Stage C durability foundation](2026-09-08-c-durability.md) and
+[completed C integration](2026-09-08-c-completion.md).
 The full roadmap remains incomplete; checked items have deliberately bounded scope.
 
 ## Source contracts and existing evidence
@@ -53,23 +54,23 @@ B1 implements the reference domain without changing the old six-record spike
 schema or adapter. B2/B3 now complete the bounded domain/policy/model stage, not
 the product. Fourteen shared traces cover all publication variants, independent
 capabilities and causal links. Review-digest validity remains a Rust prerequisite,
-not a proof of human approval or cryptography. Production schema-version-2 adapter
-round-trips/unknown-field compatibility, local grant persistence and all
-durable/runtime/two-instance integration gates remain open before publication.
+not a proof of human approval or cryptography. Stage C now adds schema-version-2
+adapter compatibility, durable local grants and source/gateway/receiver runtime
+integration. Production security, deployed two-party user workflows and external
+namespace publication remain gated below.
 
 ## C. Durable publication and synchronization
 
-- [ ] C1 Commit source mutations with publication intent; gateway authorization, reducer application, accepted order and outbound intent together; receiver inbox, projections and cursor together.
-- [ ] C2 Publish to PDS idempotently after gateway acceptance, and expose queued, accepted, published and replicated as distinct states.
-- [ ] C3 Handle duplicates, gaps, retries, unavailable peers and full resynchronization; preserve local work offline and never infer application order from repository keys or database sequence allocation.
+- [x] C1 Commit source mutations with publication intent; gateway authorization, reducer application, accepted order and outbound intent together; receiver inbox, projections and cursor together. Evidence: migrations 0033–0035, mem-federation-store sharing APIs/deferred source hooks and real three-database C workflow. Explicit reviewed stream opt-in; no default enrollment or automatic evidence expansion.
+- [x] C2 Publish to PDS idempotently after gateway acceptance, and expose queued, accepted, published and replicated as distinct states. Evidence: schema-v2 Atrium adapter, mem-federation-runtime immutable create/exact readback and status APIs; real pinned-PDS test loses a successful reply and independently verifies the resulting signed repository. Status UI remains E; runtime signature verification remains D.
+- [x] C3 Handle duplicates, gaps, retries, unavailable peers and full resynchronization; preserve local work offline and never infer application order from repository keys or database sequence allocation. Evidence: durable worker scheduling, current local/remote permission checks, leased retry/writer fencing and atomic verified-prefix paginated replay; real PostgreSQL, service-worker and PDS regressions. Local PostgreSQL is required; O(history)/16 MiB resync limits are explicit.
 
-The [Stage C foundation](2026-09-08-c-durability.md) implements transactional
-PostgreSQL intent/acceptance/outbound/inbox/projections/cursors, leased retries,
-writer fencing and verified-prefix replay in `mem-federation-store`, with real
-database tests and a fake immutable publisher. C1–C3 remain open because current
-source handlers do not call the new APIs, schema-v2/live PDS publication is not
-implemented, and authenticated cross-instance scheduling remains unwired. No
-existing project is automatically enrolled and no network path is enabled.
+The [C completion evidence](2026-09-08-c-completion.md) closes the foundation's
+missing source hooks, schema-v2 live PDS path and authenticated worker scheduling.
+Service startup is opt-in; trusted review/enrollment APIs are in-process at this
+stage. Separate databases/runtime instances in controlled tests are not completed
+customer installations or browser workflows. D/E/R1 and all release gates remain
+open; no customer deployment or production Lexicon publication is authorized.
 
 ## D. Trust boundary
 

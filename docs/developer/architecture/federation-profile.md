@@ -88,14 +88,24 @@ proposals, relation retraction, causation and independent capabilities. Scoped
 proofs accompany them; validated UUIDs, review digests and encoding remain
 prerequisites, not proofs of transport authentication or human approval.
 
-This is a versioned neutral-domain extension, **not a new production ATProto
-adapter**. The six spike Lexicons, fixture round-trips and MST evidence are
-unchanged; they do not establish compatibility of publication schema version 2.
+This versioned neutral-domain extension now has its own schema-v2 adapter and
+eight-variant round-trip/unknown-field tests in `mem-atproto::publication`. The
+six spike Lexicons and MST fixtures are unchanged. The additional unpublished
+`dev.memory-layer.unspecced.publication` wrapper carries a validated neutral
+delivery; its permissive Lexicon `unknown` field is not a semantic validator.
+Rust validates schema, identifiers, known fields and digests before acceptance.
+Unknown extensions survive at the adapter boundary; unknown semantic kinds or
+versions fail closed. Real PDS create/readback, independently calculated CID and
+signed CAR verification in the disposable harness are separate evidence from MST
+determinism. See [Stage C runtime](federation-durability.md).
 The [local permission policy](federation-permissions.md) is implemented as a pure
 intersection of exact-project permissions, explicit local sharing grants and
 independent gateway capabilities, with no implicit admin/role bypass. Production
-wire mappings, unknown-field retention/compatibility tests, local grant storage
-and durable gateway/receiver integration remain gates.
+local grants are persisted and independently checked again before transmission.
+The opt-in runtime pins administrator-configured origins and tokens, disallows
+redirects/proxies and bounds response sizes/time. Automatic session refresh,
+live DID/signing-key verification, TLS deployment, private network enforcement
+and production namespace publication remain D/E/deployment gates.
 
 ## Namespace ownership and publication gate
 

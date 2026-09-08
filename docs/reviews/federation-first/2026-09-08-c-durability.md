@@ -39,6 +39,10 @@ documents assumptions and limits. The implementation reconstructs projections
 from all retained events: auditable reference persistence, O(history), not a
 production-scale checkpoint/index implementation.
 
+This is a historical foundation checkpoint. Its remaining C integration work is
+now completed by the [subsequent C increment](2026-09-08-c-completion.md); the
+validation and open-item statements below describe this earlier checkpoint.
+
 ## Evidence and validation
 
 Tests in `crates/mem-federation-store/tests/durability.rs` exercise a real
