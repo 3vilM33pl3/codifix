@@ -578,6 +578,222 @@ fn capabilities_and_dependency_failures_do_not_grant_authority_or_mutate_state()
     );
 }
 
+fn local_policy_inputs(origin: u128) -> (LocalProjectAccess, LocalSpaceGrant) {
+    let local = LocalProjectAccess {
+        principal: Uuid::from_u128(1000),
+        project: Uuid::from_u128(1001),
+        permissions: mem_record::AuthRole::Admin.permissions(),
+        read_only: false,
+    };
+    let grant = LocalSpaceGrant {
+        principal: local.principal,
+        project: local.project,
+        space: space(),
+        instance: instance(origin),
+        capabilities: vec![
+            SpaceCapability::Pull,
+            SpaceCapability::Publish,
+            SpaceCapability::ManageMembership,
+        ],
+    };
+    (local, grant)
+}
+
+#[test]
+fn local_policy_intersects_exact_permissions_not_role_names() {
+    use mem_record::{Permission, PermissionSet};
+    let state = PublicationState::new(space(), instance(1));
+    let (mut local, grant) = local_policy_inputs(1);
+    let publication = delivery(1, 1, 1, version(1, 1, 27)).envelope;
+    let mut tombstone = delivery(1, 1, 2, state_record(1, 1, true)).envelope;
+    if let PublicationRecord::CanonicalState { stream, .. } = &mut tombstone.record {
+        stream.origin = instance(1);
+    }
+    let membership = delivery(
+        1,
+        1,
+        3,
+        PublicationRecord::Membership {
+            member: instance(2),
+            capability: SpaceCapability::Publish,
+        },
+    )
+    .envelope;
+    for bits in 0..(1 << Permission::ALL.len()) {
+        local.permissions = Permission::ALL.iter().enumerate().fold(
+            PermissionSet::EMPTY,
+            |set, (index, permission)| {
+                if bits & (1 << index) != 0 {
+                    set.with(*permission)
+                } else {
+                    set
+                }
+            },
+        );
+        let has = |permission| local.permissions.contains(permission);
+        let can_publish = has(Permission::MemoryRead)
+            && has(Permission::MemoryCurate)
+            && has(Permission::BundleExport);
+        assert_eq!(
+            state
+                .authorize_pull(&local, Some(&grant), instance(1))
+                .is_ok(),
+            has(Permission::MemoryRead)
+        );
+        assert_eq!(
+            state
+                .authorize_publication(&local, Some(&grant), &publication)
+                .is_ok(),
+            can_publish
+        );
+        assert_eq!(
+            state
+                .authorize_publication(&local, Some(&grant), &tombstone)
+                .is_ok(),
+            can_publish && has(Permission::MemoryDelete)
+        );
+        assert_eq!(
+            state
+                .authorize_publication(&local, Some(&grant), &membership)
+                .is_ok(),
+            has(Permission::MemoryRead) && has(Permission::AuthManage)
+        );
+    }
+}
+
+#[test]
+fn local_roles_never_create_sharing_grants_or_remote_enrollment() {
+    use mem_record::AuthRole;
+    let state = PublicationState::new(space(), instance(1));
+    let (mut local, grant) = local_policy_inputs(2);
+    let envelope = delivery(1, 2, 10, version(2, 1, 27)).envelope;
+    for role in [
+        AuthRole::Reader,
+        AuthRole::Writer,
+        AuthRole::Operator,
+        AuthRole::Admin,
+    ] {
+        local.permissions = role.permissions();
+        assert_eq!(
+            state.authorize_publication(&local, None, &envelope),
+            Err(LocalPolicyReject::MissingLocalGrant)
+        );
+        assert_eq!(
+            state.authorize_publication(&local, Some(&grant), &envelope),
+            Err(LocalPolicyReject::MissingGatewayCapability(
+                SpaceCapability::Publish
+            ))
+        );
+    }
+    let state = initial();
+    let (local, mut grant) = local_policy_inputs(2);
+    for capability in [SpaceCapability::Pull, SpaceCapability::ManageMembership] {
+        grant.capabilities = vec![capability];
+        assert_eq!(
+            state.authorize_publication(&local, Some(&grant), &envelope),
+            Err(LocalPolicyReject::MissingLocalCapability(
+                SpaceCapability::Publish
+            ))
+        );
+    }
+}
+
+#[test]
+fn local_policy_rejects_cross_context_grants_and_read_only_writes() {
+    let state = PublicationState::new(space(), instance(1));
+    let before = state.clone();
+    let (mut local, grant) = local_policy_inputs(1);
+    let envelope = delivery(1, 1, 10, version(1, 1, 27)).envelope;
+    let mut wrong = grant.clone();
+    wrong.principal = Uuid::from_u128(2000);
+    assert_eq!(
+        state.authorize_publication(&local, Some(&wrong), &envelope),
+        Err(LocalPolicyReject::WrongPrincipal)
+    );
+    wrong = grant.clone();
+    wrong.project = Uuid::from_u128(2000);
+    assert_eq!(
+        state.authorize_publication(&local, Some(&wrong), &envelope),
+        Err(LocalPolicyReject::WrongProject)
+    );
+    wrong = grant.clone();
+    wrong.space = SpaceId::new(Uuid::from_u128(2000)).unwrap();
+    assert_eq!(
+        state.authorize_publication(&local, Some(&wrong), &envelope),
+        Err(LocalPolicyReject::WrongSpace)
+    );
+    wrong = grant.clone();
+    wrong.instance = instance(2);
+    assert_eq!(
+        state.authorize_publication(&local, Some(&wrong), &envelope),
+        Err(LocalPolicyReject::WrongInstance)
+    );
+    local.read_only = true;
+    assert_eq!(
+        state.authorize_publication(&local, Some(&grant), &envelope),
+        Err(LocalPolicyReject::ReadOnly)
+    );
+    assert_eq!(
+        state.authorize_pull(&local, Some(&grant), instance(1)),
+        Ok(())
+    );
+    local.principal = Uuid::nil();
+    assert_eq!(
+        state.authorize_pull(&local, Some(&grant), instance(1)),
+        Err(LocalPolicyReject::InvalidLocalIdentity)
+    );
+    assert_eq!(state, before);
+}
+
+#[test]
+fn gateway_revocation_and_authority_identity_override_local_admin_grants() {
+    let mut state = initial();
+    let (local, grant) = local_policy_inputs(2);
+    let envelope = delivery(3, 2, 10, version(2, 1, 27)).envelope;
+    assert_eq!(
+        state.authorize_publication(&local, Some(&grant), &envelope),
+        Ok(())
+    );
+    accept(
+        &mut state,
+        1,
+        10,
+        PublicationRecord::Revocation {
+            member: instance(2),
+            capability: None,
+        },
+    );
+    assert_eq!(
+        state.authorize_publication(&local, Some(&grant), &envelope),
+        Err(LocalPolicyReject::MissingGatewayCapability(
+            SpaceCapability::Publish
+        ))
+    );
+    accept(
+        &mut state,
+        1,
+        11,
+        PublicationRecord::Membership {
+            member: instance(2),
+            capability: SpaceCapability::ManageMembership,
+        },
+    );
+    let membership = delivery(
+        5,
+        2,
+        12,
+        PublicationRecord::Membership {
+            member: instance(3),
+            capability: SpaceCapability::Publish,
+        },
+    )
+    .envelope;
+    assert_eq!(
+        state.authorize_publication(&local, Some(&grant), &membership),
+        Err(LocalPolicyReject::NotSpaceAuthority)
+    );
+}
+
 proptest! {
     #[test]
     fn arbitrary_local_versions_do_not_control_shared_order(locals in prop::collection::vec(1u32..u32::MAX, 1..30)) {
