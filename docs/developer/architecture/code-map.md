@@ -16,6 +16,7 @@ Use this map to find the right PR boundary before opening the large files.
 - `crates/mem-eval`: eval suite schemas, scoring, comparisons, gates, and report rendering.
 - `crates/mem-test-support`: pgvector-backed integration test harness.
 - `crates/mem-federation`: transport-neutral federation records, Memory projection, legacy replica reducer, and the [origin-owned publication domain](federation-publications.md) with shared offline conformance traces. No runtime or persistence implementation.
+- `crates/mem-federation-store`: [PostgreSQL federation durability](federation-durability.md): transactional intent, ordered gateway acceptance, leased publication work, receiver inbox/projection/cursor and verified-prefix resync. Trusted in-process APIs; not yet wired into service publication handlers or a live PDS client.
 - `crates/mem-atproto`: offline ATProto/Atrium encoding, unpublished Lexicons, fake XRPC requests, syntax fixtures, and MST checks over `mem-federation`.
 
 ## Formal

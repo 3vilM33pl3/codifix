@@ -9,7 +9,8 @@ organizational boundaries without sharing databases.
 
 Implementation evidence: [2026-09-07 checkpoint](2026-09-07-implementation.md)
 and [2026-09-08 domain checkpoint](2026-09-08-publication-domain.md), followed by
-the [B2/B3 permission and conformance increment](2026-09-08-b2-b3.md).
+the [B2/B3 permission and conformance increment](2026-09-08-b2-b3.md) and
+[Stage C durability foundation](2026-09-08-c-durability.md).
 The full roadmap remains incomplete; checked items have deliberately bounded scope.
 
 ## Source contracts and existing evidence
@@ -61,6 +62,14 @@ durable/runtime/two-instance integration gates remain open before publication.
 - [ ] C1 Commit source mutations with publication intent; gateway authorization, reducer application, accepted order and outbound intent together; receiver inbox, projections and cursor together.
 - [ ] C2 Publish to PDS idempotently after gateway acceptance, and expose queued, accepted, published and replicated as distinct states.
 - [ ] C3 Handle duplicates, gaps, retries, unavailable peers and full resynchronization; preserve local work offline and never infer application order from repository keys or database sequence allocation.
+
+The [Stage C foundation](2026-09-08-c-durability.md) implements transactional
+PostgreSQL intent/acceptance/outbound/inbox/projections/cursors, leased retries,
+writer fencing and verified-prefix replay in `mem-federation-store`, with real
+database tests and a fake immutable publisher. C1–C3 remain open because current
+source handlers do not call the new APIs, schema-v2/live PDS publication is not
+implemented, and authenticated cross-instance scheduling remains unwired. No
+existing project is automatically enrolled and no network path is enabled.
 
 ## D. Trust boundary
 

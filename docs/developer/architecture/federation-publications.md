@@ -59,8 +59,10 @@ to their source origin and have independent revisions for assertion/retraction.
 
 ## Deliberate limits
 
-This domain is a deterministic in-memory reference for later transactional
-integration, not the production storage implementation. No authentication,
+This domain is a deterministic in-memory reference, not the storage engine.
+The separate [durability crate](federation-durability.md) now composes it with
+PostgreSQL transactions; service and live transport integration remain open.
+No authentication,
 signature checking, review UI, local grant persistence, PDS publication, model forwarding,
 network recovery or durable cursor is implied by its constructors. Imported strings
 remain untrusted data. Offline copies cannot be recalled. Production adapter and
