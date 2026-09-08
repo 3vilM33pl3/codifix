@@ -18,10 +18,19 @@ pub struct GatewayStore {
     pub(crate) pool: PgPool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Acceptance {
     pub outcome: PublicationOutcome,
     pub delivery: Option<PublicationDelivery>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct PublishedPage {
+    pub space: SpaceId,
+    pub authority: InstanceId,
+    pub after: u32,
+    pub published_through: u32,
+    pub records: Vec<PublicationDelivery>,
 }
 
 impl GatewayStore {
@@ -163,6 +172,19 @@ impl GatewayStore {
         after: u32,
         limit: u32,
     ) -> Result<Vec<PublicationDelivery>> {
+        Ok(self
+            .pull_page(space, authenticated, after, limit)
+            .await?
+            .records)
+    }
+
+    pub async fn pull_page(
+        &self,
+        space: SpaceId,
+        authenticated: InstanceId,
+        after: u32,
+        limit: u32,
+    ) -> Result<PublishedPage> {
         if !(1..=1000).contains(&limit) {
             return Err(StoreError::Limits);
         }
@@ -189,7 +211,13 @@ impl GatewayStore {
             .cloned()
             .collect();
         tx.commit().await?;
-        Ok(deliveries)
+        Ok(PublishedPage {
+            space,
+            authority: state.authority(),
+            after,
+            published_through: published as u32,
+            records: deliveries,
+        })
     }
 
     /// Trusted administrative observation, NOT a remotely authorized endpoint.

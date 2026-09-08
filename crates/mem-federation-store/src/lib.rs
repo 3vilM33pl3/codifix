@@ -6,7 +6,9 @@ mod gateway;
 mod projection;
 mod publisher;
 mod replica;
+mod sharing;
 mod source;
+pub use sharing::*;
 
 pub use gateway::*;
 pub use publisher::*;

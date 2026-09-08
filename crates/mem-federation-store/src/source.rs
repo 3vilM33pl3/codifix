@@ -44,17 +44,28 @@ pub async fn queue_intent(
             return Err(StoreError::Binding);
         }
     }
-    sqlx::query("INSERT INTO federation_source_outbox (space,publisher,record_id,project_id,locator,envelope) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING")
+    persist_intent(tx, access.project, access.principal, intent).await
+}
+
+pub(crate) async fn persist_intent(
+    tx: &mut Transaction<'_, Postgres>,
+    project: uuid::Uuid,
+    principal: uuid::Uuid,
+    intent: &PublicationIntent,
+) -> Result<()> {
+    let e = &intent.envelope;
+    sqlx::query("INSERT INTO federation_source_outbox (space,publisher,record_id,project_id,locator,envelope,principal_id) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING")
         .bind(e.space.as_uuid()).bind(e.publisher.as_uuid()).bind(e.record_id.as_uuid())
-        .bind(access.project).bind(intent.locator.as_str()).bind(sqlx::types::Json(e))
+        .bind(project).bind(intent.locator.as_str()).bind(sqlx::types::Json(e)).bind(principal)
         .execute(&mut **tx).await?;
-    let row = sqlx::query("SELECT project_id, locator, envelope FROM federation_source_outbox WHERE space=$1 AND publisher=$2 AND record_id=$3")
+    let row = sqlx::query("SELECT project_id,principal_id,locator,envelope FROM federation_source_outbox WHERE space=$1 AND publisher=$2 AND record_id=$3")
         .bind(e.space.as_uuid()).bind(e.publisher.as_uuid()).bind(e.record_id.as_uuid())
         .fetch_optional(&mut **tx).await?.ok_or(StoreError::Binding)?;
     let stored: sqlx::types::Json<PublicationEnvelope> = row.try_get("envelope")?;
     if stored.0 != *e
         || row.try_get::<String, _>("locator")? != intent.locator.as_str()
-        || row.try_get::<uuid::Uuid, _>("project_id")? != access.project
+        || row.try_get::<uuid::Uuid, _>("project_id")? != project
+        || row.try_get::<Option<uuid::Uuid>, _>("principal_id")? != Some(principal)
     {
         return Err(StoreError::Binding);
     }
