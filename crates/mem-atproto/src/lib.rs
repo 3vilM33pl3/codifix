@@ -8,6 +8,7 @@ mod error;
 mod fixtures;
 mod lexicon;
 mod mst;
+pub mod publication;
 mod record;
 mod syntax;
 mod xrpc;

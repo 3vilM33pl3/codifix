@@ -1,0 +1,18 @@
+{
+  "lexicon": 1,
+  "id": "dev.memory-layer.unspecced.publication",
+  "description": "UNPUBLISHED schema-v2 private Memory profile fixture. Memory validates the complete delivery schema, integrity and domain separately.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": ["delivery"],
+        "properties": {
+          "delivery": { "type": "unknown", "description": "Validated version-2 PublicationDelivery, including authority order and neutral envelope digest. No floats." }
+        }
+      }
+    }
+  }
+}
