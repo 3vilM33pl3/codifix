@@ -85,7 +85,45 @@ pub enum WorkerOutcome {
     Waiting,
 }
 
+/// Trusted operational view; errors are fixed categories, never raw transport
+/// responses that might contain credentials or private repository contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingPublication {
+    pub sequence: u32,
+    pub attempts: u32,
+    pub blocked: bool,
+    pub leased: bool,
+    pub due: bool,
+    pub last_error: Option<String>,
+}
+
 impl GatewayStore {
+    pub async fn pending_publication(
+        &self,
+        fence: WriterFence,
+    ) -> Result<Option<PendingPublication>> {
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, fence).await?;
+        let row = sqlx::query("SELECT sequence,attempts,blocked,lease_until>clock_timestamp() AS leased,available_at<=clock_timestamp() AS due,last_error FROM federation_publish_outbox WHERE space=$1 AND NOT published ORDER BY sequence LIMIT 1")
+            .bind(fence.space.as_uuid()).fetch_optional(&mut *tx).await?;
+        let pending = row
+            .map(|row| -> Result<_> {
+                Ok(PendingPublication {
+                    sequence: u32::try_from(row.try_get::<i64, _>("sequence")?)
+                        .map_err(|_| StoreError::Corrupt)?,
+                    attempts: u32::try_from(row.try_get::<i32, _>("attempts")?)
+                        .map_err(|_| StoreError::Corrupt)?,
+                    blocked: row.try_get("blocked")?,
+                    leased: row.try_get::<Option<bool>, _>("leased")?.unwrap_or(false),
+                    due: row.try_get("due")?,
+                    last_error: row.try_get("last_error")?,
+                })
+            })
+            .transpose()?;
+        tx.commit().await?;
+        Ok(pending)
+    }
+
     /// Head-of-line publication deliberately prevents a later record bypassing
     /// failed membership/evidence. Different spaces can publish independently.
     pub async fn claim_publication(

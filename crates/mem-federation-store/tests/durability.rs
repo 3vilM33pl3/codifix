@@ -544,6 +544,70 @@ async fn lease_expiry_retry_limits_conflicts_and_recovery_fence_stale_workers() 
         f.gateway.claim_publication(fresh, policy).await.unwrap(),
         Claim::Blocked
     ));
+    let pending = f.gateway.pending_publication(fresh).await.unwrap().unwrap();
+    assert_eq!(pending.sequence, 1);
+    assert!(pending.blocked);
+    assert!(!pending.leased);
+    assert_eq!(pending.last_error.as_deref(), Some("immutable_conflict"));
+}
+
+#[tokio::test]
+async fn quarantined_or_cross_space_intents_never_consume_order_or_outbox_work() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let stream = StreamId {
+        origin: f.authority,
+        canonical: record_id(),
+    };
+    let missing_version = f.intent(f.authority, memory(stream, record_id(), 2));
+    let result = f
+        .gateway
+        .accept(f.fence, f.authority, &missing_version)
+        .await
+        .unwrap();
+    assert_eq!(
+        result.outcome,
+        PublicationOutcome::Quarantined(PublicationQuarantine::VersionGap)
+    );
+    assert!(result.delivery.is_none());
+    let mut missing_evidence = f.intent(f.authority, memory(stream, record_id(), 1));
+    let PublicationRecord::MemoryVersion { publication, .. } =
+        &mut missing_evidence.envelope.record
+    else {
+        unreachable!()
+    };
+    publication.evidence.push(RecordKey {
+        publisher: f.authority,
+        id: record_id(),
+    });
+    assert_eq!(
+        f.gateway
+            .accept(f.fence, f.authority, &missing_evidence)
+            .await
+            .unwrap()
+            .outcome,
+        PublicationOutcome::Quarantined(PublicationQuarantine::MissingDependency)
+    );
+    let mut wrong_space = f.membership(SpaceCapability::Pull);
+    wrong_space.envelope.space = SpaceId::new(Uuid::new_v4()).unwrap();
+    assert_eq!(
+        f.gateway
+            .accept(f.fence, f.authority, &wrong_space)
+            .await
+            .unwrap()
+            .outcome,
+        PublicationOutcome::Rejected(PublicationReject::WrongSpace)
+    );
+    assert_eq!(f.count("federation_accepted").await, 0);
+    assert_eq!(f.count("federation_publish_outbox").await, 0);
+    assert_eq!(
+        f.accept(&f.membership(SpaceCapability::Pull))
+            .await
+            .sequence
+            .get(),
+        1
+    );
 }
 
 #[tokio::test]
