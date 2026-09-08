@@ -1,0 +1,223 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+use std::{future::Future, pin::Pin};
+
+use mem_federation::publication::PublicationDelivery;
+use sqlx::{Row, types::Json};
+use uuid::Uuid;
+
+use crate::{GatewayStore, Result, StoreError, WriterFence};
+
+#[derive(Debug, Clone, Copy)]
+pub struct RetryPolicy {
+    pub max_attempts: u32,
+    pub lease_seconds: u32,
+    pub backoff_seconds: u32,
+}
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_attempts: 8,
+            lease_seconds: 60,
+            backoff_seconds: 5,
+        }
+    }
+}
+impl RetryPolicy {
+    fn validate(self) -> Result<Self> {
+        if !(1..=100).contains(&self.max_attempts)
+            || !(1..=3600).contains(&self.lease_seconds)
+            || !(1..=3600).contains(&self.backoff_seconds)
+        {
+            return Err(StoreError::Limits);
+        }
+        Ok(self)
+    }
+}
+
+#[derive(Debug)]
+pub struct PublicationLease {
+    delivery: PublicationDelivery,
+    token: Uuid,
+    fence: WriterFence,
+    attempt: u32,
+}
+impl PublicationLease {
+    pub fn delivery(&self) -> &PublicationDelivery {
+        &self.delivery
+    }
+    pub fn attempt(&self) -> u32 {
+        self.attempt
+    }
+}
+
+#[derive(Debug)]
+pub enum Claim {
+    Ready(Box<PublicationLease>),
+    Idle,
+    Waiting,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PublishFailure {
+    Unavailable,
+    Conflict,
+    InvalidReceipt,
+}
+
+/// This interface is trusted. Success means the exact immutable record exists
+/// at this locator (create, or verified equal read-back after an uncertain write).
+/// A PDS implementation must verify CID/bytes; "already exists" is NOT success.
+/// No PDS client or credentials are supplied by this persistence crate.
+pub trait ImmutablePublisher: Send + Sync {
+    fn publish<'a>(
+        &'a self,
+        delivery: &'a PublicationDelivery,
+    ) -> Pin<Box<dyn Future<Output = std::result::Result<(), PublishFailure>> + Send + 'a>>;
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum WorkerOutcome {
+    Published(u32),
+    Retrying,
+    Blocked,
+    Idle,
+    Waiting,
+}
+
+impl GatewayStore {
+    /// Head-of-line publication deliberately prevents a later record bypassing
+    /// failed membership/evidence. Different spaces can publish independently.
+    pub async fn claim_publication(
+        &self,
+        fence: WriterFence,
+        policy: RetryPolicy,
+    ) -> Result<Claim> {
+        let policy = policy.validate()?;
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, fence).await?;
+        let row = sqlx::query("SELECT o.sequence,o.attempts,o.blocked,o.available_at<=clock_timestamp() AS due, (o.lease_until IS NULL OR o.lease_until<=clock_timestamp()) AS expired,a.delivery FROM federation_publish_outbox o JOIN federation_accepted a USING(space,sequence) WHERE o.space=$1 AND NOT o.published ORDER BY o.sequence LIMIT 1 FOR UPDATE OF o")
+            .bind(fence.space.as_uuid()).fetch_optional(&mut *tx).await?;
+        let Some(row) = row else {
+            tx.commit().await?;
+            return Ok(Claim::Idle);
+        };
+        let attempts: i32 = row.try_get("attempts")?;
+        let sequence: i64 = row.try_get("sequence")?;
+        if row.try_get::<bool, _>("blocked")? {
+            tx.commit().await?;
+            return Ok(Claim::Blocked);
+        }
+        if !row.try_get::<bool, _>("due")? || !row.try_get::<bool, _>("expired")? {
+            tx.commit().await?;
+            return Ok(Claim::Waiting);
+        }
+        if i64::from(attempts) >= i64::from(policy.max_attempts) {
+            sqlx::query("UPDATE federation_publish_outbox SET blocked=TRUE,last_error='attempts_exhausted',lease_token=NULL,lease_until=NULL WHERE space=$1 AND sequence=$2")
+                .bind(fence.space.as_uuid()).bind(sequence).execute(&mut *tx).await?;
+            tx.commit().await?;
+            return Ok(Claim::Blocked);
+        }
+        let token = Uuid::new_v4();
+        sqlx::query("UPDATE federation_publish_outbox SET attempts=attempts+1,lease_token=$3,lease_until=clock_timestamp()+make_interval(secs => $4) WHERE space=$1 AND sequence=$2")
+            .bind(fence.space.as_uuid()).bind(sequence).bind(token).bind(f64::from(policy.lease_seconds))
+            .execute(&mut *tx).await?;
+        let delivery: Json<PublicationDelivery> = row.try_get("delivery")?;
+        tx.commit().await?;
+        Ok(Claim::Ready(Box::new(PublicationLease {
+            delivery: delivery.0,
+            token,
+            fence,
+            attempt: (attempts + 1) as u32,
+        })))
+    }
+
+    /// Called only after immutable transport success. The lease CAS rejects late
+    /// acknowledgements, including a successful old attempt after writer recovery.
+    pub async fn acknowledge_publication(&self, lease: &PublicationLease) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, lease.fence).await?;
+        let count = sqlx::query("UPDATE federation_publish_outbox SET published=TRUE,lease_token=NULL,lease_until=NULL,last_error=NULL WHERE space=$1 AND sequence=$2 AND lease_token=$3 AND lease_until>clock_timestamp() AND NOT published")
+            .bind(lease.fence.space.as_uuid()).bind(i64::from(lease.delivery.sequence.get())).bind(lease.token)
+            .execute(&mut *tx).await?.rows_affected();
+        if count != 1 {
+            return Err(StoreError::Fenced);
+        }
+        let count = sqlx::query("UPDATE federation_gateway_spaces SET published_sequence=$2 WHERE space=$1 AND published_sequence=$2-1")
+            .bind(lease.fence.space.as_uuid()).bind(i64::from(lease.delivery.sequence.get()))
+            .execute(&mut *tx).await?.rows_affected();
+        if count != 1 {
+            return Err(StoreError::Corrupt);
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn fail_publication(
+        &self,
+        lease: &PublicationLease,
+        policy: RetryPolicy,
+        failure: PublishFailure,
+    ) -> Result<bool> {
+        let policy = policy.validate()?;
+        let blocked =
+            failure != PublishFailure::Unavailable || lease.attempt >= policy.max_attempts;
+        let error = match failure {
+            PublishFailure::Unavailable => "unavailable",
+            PublishFailure::Conflict => "immutable_conflict",
+            PublishFailure::InvalidReceipt => "invalid_receipt",
+        };
+        let backoff = policy
+            .backoff_seconds
+            .saturating_mul(1u32 << lease.attempt.saturating_sub(1).min(10))
+            .min(3600);
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, lease.fence).await?;
+        let count = sqlx::query("UPDATE federation_publish_outbox SET blocked=$4,last_error=$5,lease_token=NULL,lease_until=NULL,available_at=clock_timestamp()+make_interval(secs => $6) WHERE space=$1 AND sequence=$2 AND lease_token=$3 AND lease_until>clock_timestamp() AND NOT published")
+            .bind(lease.fence.space.as_uuid()).bind(i64::from(lease.delivery.sequence.get())).bind(lease.token)
+            .bind(blocked).bind(error).bind(f64::from(backoff)).execute(&mut *tx).await?.rows_affected();
+        if count != 1 {
+            return Err(StoreError::Fenced);
+        }
+        tx.commit().await?;
+        Ok(blocked)
+    }
+
+    /// Explicit operator retry of a blocked head. Never silently discard or skip.
+    pub async fn retry_blocked(&self, fence: WriterFence) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, fence).await?;
+        sqlx::query("UPDATE federation_publish_outbox SET blocked=FALSE,attempts=0,available_at=clock_timestamp(),last_error=NULL WHERE space=$1 AND blocked AND NOT published")
+            .bind(fence.space.as_uuid()).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// One scheduling step, without holding a transaction across network I/O.
+    pub async fn publish_one(
+        &self,
+        fence: WriterFence,
+        policy: RetryPolicy,
+        transport: &impl ImmutablePublisher,
+    ) -> Result<WorkerOutcome> {
+        let lease = match self.claim_publication(fence, policy).await? {
+            Claim::Ready(lease) => lease,
+            Claim::Idle => return Ok(WorkerOutcome::Idle),
+            Claim::Waiting => return Ok(WorkerOutcome::Waiting),
+            Claim::Blocked => return Ok(WorkerOutcome::Blocked),
+        };
+        match transport.publish(lease.delivery()).await {
+            Ok(()) => {
+                self.acknowledge_publication(&lease).await?;
+                Ok(WorkerOutcome::Published(lease.delivery.sequence.get()))
+            }
+            Err(failure) => {
+                if self.fail_publication(&lease, policy, failure).await? {
+                    Ok(WorkerOutcome::Blocked)
+                } else {
+                    Ok(WorkerOutcome::Retrying)
+                }
+            }
+        }
+    }
+}

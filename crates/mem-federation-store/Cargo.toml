@@ -1,0 +1,23 @@
+[package]
+name = "mem-federation-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+mem-federation = { path = "../mem-federation" }
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+mem-record = { path = "../mem-record" }
+mem-test-support = { path = "../mem-test-support" }
+chrono.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -5,6 +5,7 @@ members = [
   "crates/mem-atproto",
   "crates/mem-platform",
   "crates/mem-federation",
+  "crates/mem-federation-store",
   "crates/mem-record",
   "crates/mem-config",
   "crates/mem-watch",

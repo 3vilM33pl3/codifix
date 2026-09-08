@@ -2887,6 +2887,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mem-federation-store"
+version = "2.0.0"
+dependencies = [
+ "chrono",
+ "mem-federation",
+ "mem-record",
+ "mem-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "mem-graph"
 version = "2.0.0"
 dependencies = [
