@@ -509,7 +509,7 @@ async fn lease_expiry_retry_limits_conflicts_and_recovery_fence_stale_workers() 
     assert_eq!(old.delivery(), next.delivery());
     assert!(matches!(
         f.gateway.acknowledge_publication(&old).await,
-        Err(StoreError::Fenced)
+        Err(StoreError::LostLease)
     ));
     f.due().await;
     assert!(matches!(

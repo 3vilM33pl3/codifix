@@ -31,8 +31,10 @@ pub enum StoreError {
     LocalPolicy(LocalPolicyReject),
     #[error("record not applied: {0:?}")]
     Outcome(PublicationOutcome),
-    #[error("stale writer or expired publication lease")]
+    #[error("stale gateway writer epoch")]
     Fenced,
+    #[error("expired or superseded publication attempt lease")]
+    LostLease,
     #[error("identity, scope or immutable binding mismatch")]
     Binding,
     #[error("stored log, projection or cursor is inconsistent")]

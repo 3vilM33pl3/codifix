@@ -179,7 +179,7 @@ impl GatewayStore {
             .bind(lease.fence.space.as_uuid()).bind(i64::from(lease.delivery.sequence.get())).bind(lease.token)
             .execute(&mut *tx).await?.rows_affected();
         if count != 1 {
-            return Err(StoreError::Fenced);
+            return Err(StoreError::LostLease);
         }
         let count = sqlx::query("UPDATE federation_gateway_spaces SET published_sequence=$2 WHERE space=$1 AND published_sequence=$2-1")
             .bind(lease.fence.space.as_uuid()).bind(i64::from(lease.delivery.sequence.get()))
@@ -215,7 +215,7 @@ impl GatewayStore {
             .bind(lease.fence.space.as_uuid()).bind(i64::from(lease.delivery.sequence.get())).bind(lease.token)
             .bind(blocked).bind(error).bind(f64::from(backoff)).execute(&mut *tx).await?.rows_affected();
         if count != 1 {
-            return Err(StoreError::Fenced);
+            return Err(StoreError::LostLease);
         }
         tx.commit().await?;
         Ok(blocked)

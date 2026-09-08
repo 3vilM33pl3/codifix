@@ -166,13 +166,8 @@ async fn pds_rpc(State(f): State<PdsFixture>, request: Request) -> Response<Body
         let record = json!({"uri":format!("at://{}/{}/{}",body["repo"].as_str().unwrap(),mem_atproto::publication::COLLECTION,body["rkey"].as_str().unwrap()),"cid":wire.cid().unwrap(),"value":body["record"]});
         let mut records = f.records.lock().unwrap();
         let key = body["rkey"].as_str().unwrap().to_owned();
-        if records.contains_key(&key) {
-            (
-                StatusCode::BAD_REQUEST,
-                json!({"error":"RecordAlreadyExists"}),
-            )
-        } else {
-            records.insert(key, record.clone());
+        if let std::collections::btree_map::Entry::Vacant(entry) = records.entry(key) {
+            entry.insert(record.clone());
             if f.lost_reply.swap(false, Ordering::SeqCst) {
                 (
                     StatusCode::SERVICE_UNAVAILABLE,
@@ -181,6 +176,11 @@ async fn pds_rpc(State(f): State<PdsFixture>, request: Request) -> Response<Body
             } else {
                 (StatusCode::OK, record)
             }
+        } else {
+            (
+                StatusCode::BAD_REQUEST,
+                json!({"error":"RecordAlreadyExists"}),
+            )
         }
     };
     Response::builder()
@@ -384,6 +384,18 @@ async fn c_source_gateway_pds_receiver_and_recovery_across_three_databases() {
     )
     .await
     .unwrap();
+    let before_commit: i64 = sqlx::query_scalar("SELECT count(*) FROM federation_source_changes")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(before_commit, 0);
+    // A mutation after the review call in that same transaction must be captured
+    // at commit, rather than freezing an intermediate state at review time.
+    sqlx::query("UPDATE memory_canonical_state SET confidence=0.83 WHERE canonical_id=$1")
+        .bind(canonical.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
     assert_eq!(a_sync.cycle(&a_access).await.unwrap(), 3); // evidence, content, state
     assert_eq!(b_sync.catch_up().await.unwrap(), 4); // accepted is NOT published
@@ -393,6 +405,10 @@ async fn c_source_gateway_pds_receiver_and_recovery_across_three_databases() {
     assert_eq!(b_sync.cycle(&b_access).await.unwrap(), 0);
     let first = b_sync.replica().snapshot().await.unwrap();
     assert_eq!(first.content_version(stream), 1);
+    assert_eq!(
+        first.current_state(stream).unwrap().confidence.get(),
+        830_000
+    );
     assert_eq!(
         first.history(stream)[0].publication.source.version.get(),
         27

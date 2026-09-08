@@ -120,7 +120,12 @@ pub(crate) async fn start(
                 loop {
                     match crate::auth::federation_local_access(&state,principal,project).await {
                         Ok(access)=>{if sync.cycle(&access).await.is_err() {tracing::warn!("federation instance work paused/retrying; inspect durable synchronization status");}}
-                        Err(_)=>tracing::warn!("federation local principal is not authorized"),
+                        Err(_)=>{
+                            if sync.note_local_authorization_failure().await.is_err() {
+                                tracing::warn!("cannot persist federation authorization pause");
+                            }
+                            tracing::warn!("federation local principal is not authorized");
+                        }
                     }
                     tokio::time::sleep(Duration::from_secs(2)).await;
                 }
@@ -323,6 +328,24 @@ mod tests {
                 .await
                 .is_err()
         );
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let error: Option<String> = sqlx::query_scalar(
+                    "SELECT sync_error FROM federation_replicas WHERE space=$1 AND receiver=$2",
+                )
+                .bind(space.as_uuid())
+                .bind(instance.as_uuid())
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+                if error.as_deref() == Some("local_authorization") {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .unwrap();
         let aborted = tasks.0[0].abort_handle();
         drop(tasks);
         tokio::time::timeout(Duration::from_secs(1), async {

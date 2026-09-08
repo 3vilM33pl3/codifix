@@ -180,6 +180,13 @@ impl InstanceSync {
     pub async fn resynchronize(&self) -> Result<u32> {
         self.client.resynchronize(&self.replica).await
     }
+    /// A service cannot construct LocalProjectAccess for a removed/disabled
+    /// principal. Preserve that pause as durable status rather than only a log.
+    pub async fn note_local_authorization_failure(&self) -> Result<()> {
+        sqlx::query("UPDATE federation_replicas SET sync_failures=LEAST(sync_failures+1,10),sync_error='local_authorization',retry_at=clock_timestamp()+interval '30 seconds' WHERE space=$1 AND receiver=$2")
+            .bind(self.client.space.as_uuid()).bind(self.instance.as_uuid()).execute(&self.pool).await.map_err(mem_federation_store::StoreError::from)?;
+        Ok(())
+    }
     pub async fn cycle(&self, access: &LocalProjectAccess) -> Result<u32> {
         let space = self.client.space.as_uuid();
         let instance = self.instance.as_uuid();
