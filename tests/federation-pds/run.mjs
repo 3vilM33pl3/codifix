@@ -25,6 +25,7 @@ const env = {
   GATE_ROTATION_KEY: key.getPrivateKey('hex'),
 };
 const compose = ['compose', '-p', project, '-f', join(directory, 'compose.yaml')];
+const runtimeMode = process.argv.includes('--runtime');
 function composeRun(args, environment = env) {
   const result = spawnSync('docker', [...compose, ...args],
     { env: environment, stdio: 'inherit', timeout: 60_000 });
@@ -54,6 +55,63 @@ async function probe(services, environment = env) {
 
 let started = false;
 let cleaned = true;
+async function runtimeTest() {
+  if (!process.env.MEMORY_LAYER_TEST_DATABASE_URL) {
+    throw new Error('--runtime requires an explicitly disposable test PostgreSQL URL with CREATE DATABASE rights');
+  }
+  const runtimeEnv = { ...env, GATE_PHASE: 'runtime' };
+  composeRun(['up', '-d', 'pds', 'pds-recovery', 'probe'], runtimeEnv);
+  for (let attempt = 0; ; attempt++) {
+    try { await readFile(join(stateDirectory, 'runtime-ready')); break; }
+    catch (error) {
+      if (error.code !== 'ENOENT') throw new Error(`Cannot read private readiness marker: ${error.code}`);
+      if (attempt % 10 === 0) {
+        const status = spawnSync('docker', [...compose, 'ps', '-a', '--format', 'json', 'probe'],
+          { env: runtimeEnv, encoding: 'utf8' });
+        if (status.status !== 0) throw new Error('Cannot inspect provisioning status');
+        const probe = status.stdout.trim() ? JSON.parse(status.stdout) : null;
+        if (probe?.State === 'exited') {
+          composeRun(['logs', 'probe'], runtimeEnv);
+          throw new Error('PDS runtime provisioning probe exited before readiness');
+        }
+      }
+      if (attempt >= 360) {
+        composeRun(['logs', 'probe'], runtimeEnv);
+        throw new Error('PDS runtime provisioning did not become ready within 180 seconds');
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+  const container = spawnSync('docker', [...compose, 'ps', '-q', 'pds-recovery'],
+    { env: runtimeEnv, encoding: 'utf8' });
+  if (container.status !== 0 || !/^[a-f0-9]+$/.test(container.stdout.trim())) throw new Error('Missing fixture PDS');
+  const inspected = spawnSync('docker', ['inspect', container.stdout.trim()], { encoding: 'utf8' });
+  if (inspected.status !== 0) throw new Error('Cannot inspect isolated fixture network');
+  const network = JSON.parse(inspected.stdout)[0].NetworkSettings.Networks[`${project}_private`];
+  if (!network || !/^[0-9.]+$/.test(network.IPAddress)) throw new Error('Missing private fixture address');
+  const state = JSON.parse(await readFile(join(stateDirectory, 'recovery-state.json'), 'utf8'));
+  const fixture = join(runtime, 'pds-fixture.json');
+  await writeFile(fixture, JSON.stringify({ base: `http://${network.IPAddress}:2583`,
+    repository: state.did, token: state.accessJwt }), { mode: 0o600 });
+  const testEnv = { ...process.env, MEMORY_FEDERATION_PDS_FIXTURE: fixture, MEMORY_LAYER_TEST_REQUIRE_DB: '1' };
+  delete testEnv.MEMORY_LAYER_CLIENT_TOKEN;
+  delete testEnv.DATABASE_URL;
+  delete testEnv.MEMORY_LAYER_FEDERATION_CONFIG;
+  const child = spawn('cargo', ['test', '-p', 'mem-federation-runtime', '--test', 'c_workflow', '--locked', '--', '--nocapture'],
+    { cwd: join(directory, '../..'), env: testEnv, stdio: 'inherit' });
+  const timer = setTimeout(() => child.kill('SIGTERM'), 540_000);
+  try {
+    const code = await new Promise((resolve, reject) => {
+      child.once('error', reject); child.once('exit', resolve);
+    });
+    if (code !== 0) throw new Error('Rust-to-real-PDS workflow failed');
+  } finally { clearTimeout(timer); }
+  await writeFile(join(stateDirectory, 'runtime-finished'), 'complete', { mode: 0o600 });
+  const probeId = spawnSync('docker', [...compose, 'ps', '-aq', 'probe'], { env: runtimeEnv, encoding: 'utf8' });
+  const completed = spawnSync('docker', ['wait', probeId.stdout.trim()], { encoding: 'utf8', timeout: 60_000 });
+  composeRun(['logs', 'probe'], runtimeEnv);
+  if (completed.status !== 0 || completed.stdout.trim() !== '0') throw new Error('Independent PDS verification failed');
+}
 try {
   for (const path of [tlsDirectory, stateDirectory, keyDirectory]) await mkdir(path, { mode: 0o700 });
   await writeFile(join(keyDirectory, 'backup-key'), randomBytes(32), { mode: 0o600 });
@@ -91,6 +149,9 @@ try {
   }
   console.log('PASS internal-only network, no host ports, production security flags and crawling disabled');
   started = true;
+  if (runtimeMode) {
+    await runtimeTest();
+  } else {
   await probe(['pds', 'pds-recovery']);
   // `up --abort-on-container-exit` has stopped both PDS writers before backup.
   composeRun(['run', '--rm', '--no-deps', 'backup', 'backup']);
@@ -106,6 +167,7 @@ try {
     GATE_HOST_UID: env.GATE_HOST_UID, GATE_HOST_GID: env.GATE_HOST_GID,
     ...restoredSecrets };
   await probe(['pds-restored'], restoredEnvironment);
+  }
 } finally {
   if (started) {
     const cleanup = spawnSync('docker', [...compose, '--profile', '*', 'down', '--volumes'],

@@ -52,6 +52,8 @@ jobs:
               - "crates/mem-test-support/**"
               - "crates/mem-federation/**"
               - "crates/mem-federation-store/**"
+              - "crates/mem-federation-runtime/**"
+              - "crates/mem-atproto/**"
               - "migrations/**"
             web:
               - "web/**"
@@ -84,6 +86,13 @@ jobs:
               - "fixtures/federation/publication-traces/**"
               - "crates/mem-federation/**"
             federation_pds:
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "crates/mem-federation/**"
+              - "crates/mem-federation-store/**"
+              - "crates/mem-federation-runtime/**"
+              - "crates/mem-service/**"
+              - "migrations/**"
               - "tests/federation-pds/**"
               - "fixtures/federation/upstream-lock.json"
               - "crates/mem-atproto/**"
@@ -91,19 +100,39 @@ jobs:
               - ".github/workflows/ci.yml"
 
   federation-pds:
-    name: Private PDS Prerequisite Probe
+    name: Private PDS Prerequisites and Durable Federation
     runs-on: [self-hosted, memory, Linux, X64]
     needs: changes
     if: needs.changes.outputs.federation_pds == 'true'
-    timeout-minutes: 10
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: memory
+          POSTGRES_PASSWORD: memory
+          POSTGRES_DB: memory_test
+        ports:
+          - 55433:5432
+        options: >-
+          --health-cmd "pg_isready -U memory -d memory_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MEMORY_LAYER_TEST_DATABASE_URL: postgres://memory:memory@localhost:55433/memory_test
+      MEMORY_LAYER_TEST_REQUIRE_DB: "1"
     steps:
       - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: docker pull ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
       - run: node tests/federation-pds/backup.test.cjs
       - run: node tests/federation-pds/run.mjs
+      - run: cargo test -p mem-federation-runtime --test c_workflow --locked --no-run
+      - run: node tests/federation-pds/run.mjs --runtime
 
   plugin-contract:
     name: Codex Plugin Contract
@@ -191,7 +220,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test -p mem-test-support -p mem-federation-store -p mem-graph -p mem-curate -p mem-reinforce -p mem-search -p mem-service --locked
+      - run: cargo test -p mem-test-support -p mem-federation-store -p mem-federation-runtime -p mem-graph -p mem-curate -p mem-reinforce -p mem-search -p mem-service --locked
 
 
   feature-matrix:

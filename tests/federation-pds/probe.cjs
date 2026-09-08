@@ -2,7 +2,7 @@
 // Runs against the actual upstream image, using its independent AT SDK verifier.
 const assert = require('node:assert/strict');
 const { createRequire } = require('node:module');
-const { readFileSync, readdirSync, writeFileSync } = require('node:fs');
+const { readFileSync, readdirSync, writeFileSync, existsSync, chownSync } = require('node:fs');
 const https = require('node:https');
 const { randomBytes, randomUUID } = require('node:crypto');
 const appRequire = createRequire('/app/index.ts');
@@ -204,7 +204,37 @@ async function restore() {
   console.log('PARTIAL PRODUCT GATE: Memory gateway access, outbox/inbox recovery, two Memory instances and writer fencing remain unproven');
 }
 
-(process.env.GATE_PHASE === 'restore' ? restore() : main()).catch(error => {
+async function runtime() {
+  await main();
+  chownSync('/gate-state/recovery-state.json', Number(process.env.GATE_HOST_UID), Number(process.env.GATE_HOST_GID));
+  writeFileSync('/gate-state/runtime-ready', 'ready', { mode: 0o600 });
+  chownSync('/gate-state/runtime-ready', Number(process.env.GATE_HOST_UID), Number(process.env.GATE_HOST_GID));
+  const deadline = Date.now() + 600_000;
+  while (!existsSync('/gate-state/runtime-finished')) {
+    assert.ok(Date.now() < deadline, 'Rust runtime verification timed out');
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  const state = JSON.parse(readFileSync('/gate-state/recovery-state.json', 'utf8'));
+  const base = 'http://pds-recovery:2583';
+  const collection = 'dev.memory-layer.unspecced.publication';
+  const schemas = new Lexicons(readdirSync('/gate/publication-lexicons').map(file =>
+    JSON.parse(readFileSync(`/gate/publication-lexicons/${file}`, 'utf8'))));
+  const records = await rpc('com.atproto.repo.listRecords', { base,
+    query: { repo: state.did, collection, limit: 100 } });
+  assert.ok(records.records.length > 32, 'Rust workflow must publish a multi-page history');
+  for (const record of records.records) {
+    schemas.assertValidRecord(collection, record.value);
+    assert.equal(record.value.delivery.envelope.schema_version, 2);
+    assert.ok(!JSON.stringify(record.value).includes('NEVER_SHARE'));
+  }
+  const bytes = await rpc('com.atproto.sync.getRepo', { base, query: { did: state.did } });
+  await verifyRepoCar(bytes, state.did, state.signingKey);
+  await assert.rejects(verifyRepoCar(bytes, state.did, state.wrongKey));
+  console.log('PASS Rust v2 publications in real PDS, independent Lexicon and signed CAR verification, wrong-key rejection');
+}
+
+(process.env.GATE_PHASE === 'restore' ? restore()
+  : process.env.GATE_PHASE === 'runtime' ? runtime() : main()).catch(error => {
   // Never log auth tokens, private keys, or full request bodies.
   console.error(error.message);
   process.exitCode = 1;

@@ -69,10 +69,13 @@ services:
     environment:
       GATE_ADMIN_PASSWORD: ${GATE_ADMIN_PASSWORD:?}
       GATE_PHASE: ${GATE_PHASE:-seed}
+      GATE_HOST_UID: ${GATE_HOST_UID:?}
+      GATE_HOST_GID: ${GATE_HOST_GID:?}
       NODE_EXTRA_CA_CERTS: /gate-tls/cert.pem
     volumes:
       - ./probe.cjs:/gate/probe.cjs:ro
       - ../../crates/mem-atproto/lexicons:/gate/lexicons:ro
+      - ../../crates/mem-atproto/publication-lexicons:/gate/publication-lexicons:ro
       - ../../fixtures/federation/atproto/xrpc/create_record_request.json:/gate/create_record_request.json:ro
       - ${GATE_RUNTIME_DIR:?}/tls:/gate-tls:ro
       - ${GATE_RUNTIME_DIR:?}/state:/gate-state

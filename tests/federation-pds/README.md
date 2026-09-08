@@ -60,3 +60,39 @@ two Memory nodes, transactional outbox/inbox/cursor recovery, writer fencing and
 all production release gates remain required. No production integration is
 enabled by this fixture. In-place signing-key rotation is not claimed; the
 tested rotation route uses a replacement PDS and controlled DID update.
+
+## Stage C: real Rust publication and synchronization
+
+The additional runtime mode uses the same pinned PDS, internal-only network,
+private DID and production security flags. It provisions/migrates a synthetic
+account, keeps the DID fixture alive, and runs the real Rust gateway/PDS/receiver
+workflow with three newly created independent databases. It needs an explicitly
+disposable pgvector/PostgreSQL 16 URL whose test role can create/drop databases:
+
+```bash
+cargo test -p mem-federation-runtime --test c_workflow --locked --no-run
+MEMORY_LAYER_TEST_DATABASE_URL=postgres://TEST_USER:TEST_PASSWORD@127.0.0.1:TEST_PORT/TEST_DB \
+  node tests/federation-pds/run.mjs --runtime
+```
+
+Do not supply a development or customer database. Rust creates UUID-named source,
+gateway and receiver databases, and drops only those exact databases after success.
+Compose services expose no host ports; on the Linux Docker host, the test reaches
+the recovery PDS's internal bridge IP. This runner therefore requires Linux host
+bridge access, not Docker Desktop's VM-only container addresses. No broad public
+network or PDS security bypass is introduced to accommodate other hosts.
+
+The test exercises actual existing `mem-curate` validation mutation code and the
+deferred source hooks, explicit evidence review, acceptance before publication,
+lost successful PDS response, source disconnection/restart, duplicated/tampered
+delivery, a 32-record page boundary, complete resync, independent state revisions,
+tombstones, local permission removal and immediate gateway revocation. The proxy
+drops the first successful upstream create reply; the production Rust publisher
+must recover using exact URI/CID/value readback. The upstream SDK independently
+validates all stored v2 Lexicon wrappers and the signed repository, rejecting a
+wrong signing key. All data and credentials are ephemeral and private.
+
+Both the original cold-recovery mode and runtime mode pass locally on 2026-09-08.
+The scoped CI job runs both, after compiling the Rust integration test. Runtime
+mode establishes C's software integration, **not** D/E's complete deployed trust
+boundary, signed-ingestion path, browser workflows or customer release gates.
