@@ -79,6 +79,7 @@ jobs:
             formal:
               - "formal/memory-federation/**"
               - "fixtures/federation/traces/**"
+              - "fixtures/federation/publication-traces/**"
               - "crates/mem-federation/**"
             federation_pds:
               - "tests/federation-pds/**"

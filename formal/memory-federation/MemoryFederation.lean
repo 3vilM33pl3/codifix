@@ -1,3 +1,5 @@
 import MemoryFederation.Model
 import MemoryFederation.Proofs
 import MemoryFederation.Trace
+import MemoryFederation.Publication
+import MemoryFederation.PublicationTrace

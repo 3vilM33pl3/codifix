@@ -1,0 +1,26 @@
+{
+  "name": "publication order gaps and ownership fail without changing state",
+  "records": [
+    {"sequence":1,"id":1,"publisher":1,"authenticated":1,"kind":"grant","subject":2},
+    {"sequence":2,"id":2,"publisher":1,"authenticated":1,"kind":"grant","subject":3},
+    {"sequence":3,"id":10,"publisher":2,"authenticated":3,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27},
+    {"sequence":3,"id":10,"publisher":3,"authenticated":3,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27},
+    {"sequence":3,"id":11,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":2,"local":27},
+    {"sequence":3,"id":12,"publisher":2,"authenticated":2,"kind":"state","origin":2,"canonical":10,"shared":1,"revision":1},
+    {"sequence":4,"id":13,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27},
+    {"sequence":3,"id":13,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27},
+    {"sequence":3,"id":13,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":1,"local":27,"text":"changed bytes"},
+    {"sequence":4,"id":14,"publisher":2,"authenticated":2,"kind":"state","origin":2,"canonical":10,"shared":1,"revision":2},
+    {"sequence":4,"id":14,"publisher":2,"authenticated":2,"kind":"state","origin":2,"canonical":10,"shared":1,"revision":1,"tombstone":true},
+    {"sequence":5,"id":15,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":2,"local":42},
+    {"sequence":6,"id":16,"publisher":2,"authenticated":2,"kind":"state","origin":2,"canonical":10,"shared":1,"revision":2},
+    {"sequence":4,"id":17,"publisher":2,"authenticated":2,"kind":"memory","origin":2,"canonical":10,"shared":3,"local":43},
+    {"sequence":6,"id":18,"publisher":3,"authenticated":3,"kind":"grant","subject":4}
+  ],
+  "outcomes": ["applied","applied","forged_publisher","not_origin","version_gap","missing_dependency","order_gap","applied","equivocation","revision_gap","applied","applied","counter_conflict","stale_order","unauthorized"],
+  "sequence": 5,
+  "publishers": [1,2,3],
+  "streams": [
+    {"origin":2,"canonical":10,"shared":2,"local":42,"revision":1,"author":"expert","current":false,"tombstone":false}
+  ]
+}

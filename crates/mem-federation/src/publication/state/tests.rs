@@ -497,6 +497,87 @@ fn delivery_failures_never_mutate_state_and_revocation_preserves_prior_records()
     assert_eq!(replayed, state);
 }
 
+#[test]
+fn capabilities_and_dependency_failures_do_not_grant_authority_or_mutate_state() {
+    let mut state = PublicationState::new(space(), instance(1));
+    for (record, capability) in [SpaceCapability::Pull, SpaceCapability::ManageMembership]
+        .into_iter()
+        .enumerate()
+    {
+        accept(
+            &mut state,
+            1,
+            record as u128 + 1,
+            PublicationRecord::Membership {
+                member: instance(2),
+                capability,
+            },
+        );
+    }
+    let seq = state.sequence() + 1;
+    for record in [
+        version(2, 1, 27),
+        PublicationRecord::Membership {
+            member: instance(3),
+            capability: SpaceCapability::Publish,
+        },
+    ] {
+        reject_unchanged(
+            &mut state,
+            2,
+            delivery(seq, 2, 10, record),
+            PublicationOutcome::Rejected(PublicationReject::Unauthorized),
+        );
+    }
+    reject_unchanged(
+        &mut state,
+        1,
+        delivery(
+            seq,
+            1,
+            10,
+            PublicationRecord::Revocation {
+                member: instance(1),
+                capability: None,
+            },
+        ),
+        PublicationOutcome::Rejected(PublicationReject::AuthorityRevocation),
+    );
+    accept(
+        &mut state,
+        1,
+        10,
+        PublicationRecord::Membership {
+            member: instance(2),
+            capability: SpaceCapability::Publish,
+        },
+    );
+    let seq = state.sequence() + 1;
+    let missing = RecordKey {
+        publisher: instance(2),
+        id: id(999),
+    };
+    let mut memory = version(2, 1, 27);
+    if let PublicationRecord::MemoryVersion { publication, .. } = &mut memory {
+        publication.evidence.push(missing);
+    }
+    reject_unchanged(
+        &mut state,
+        2,
+        delivery(seq, 2, 11, memory),
+        PublicationOutcome::Quarantined(PublicationQuarantine::MissingDependency),
+    );
+    let mut causal = delivery(seq, 2, 12, version(2, 1, 27));
+    causal.envelope.causation = Some(missing);
+    causal.digest = CanonicalJsonCodec::digest(&causal.envelope).unwrap();
+    reject_unchanged(
+        &mut state,
+        2,
+        causal,
+        PublicationOutcome::Quarantined(PublicationQuarantine::MissingDependency),
+    );
+}
+
 proptest! {
     #[test]
     fn arbitrary_local_versions_do_not_control_shared_order(locals in prop::collection::vec(1u32..u32::MAX, 1..30)) {
@@ -513,5 +594,29 @@ proptest! {
     fn ppm_round_trip_has_at_most_one_ppm_error(value in 0.0f32..=1.0) {
         let ppm = ConfidencePpm::from_confidence(value).unwrap();
         prop_assert!((value - ppm.as_confidence()).abs() <= 0.000001);
+    }
+    #[test]
+    fn reordered_delivery_converges_after_ordered_resync(priorities in prop::collection::vec(any::<u32>(), 1..30)) {
+        let mut expected = initial();
+        let records: Vec<_> = priorities.iter().enumerate().map(|(index, _)| {
+            accept(&mut expected, 2, 100 + index as u128, version(2, index as u32 + 1, 27 + index as u32 * 3))
+        }).collect();
+        let mut order: Vec<_> = priorities.iter().enumerate().collect();
+        order.sort_by_key(|(index, priority)| (**priority, *index));
+        let mut actual = initial();
+        for (index, _) in order {
+            let before = actual.clone();
+            let result = actual.apply(instance(2), records[index].clone());
+            if result != PublicationOutcome::Applied {
+                prop_assert_eq!(&actual, &before);
+                prop_assert_eq!(result, PublicationOutcome::Quarantined(PublicationQuarantine::OrderGap));
+            }
+        }
+        actual.replay(records.iter().cloned().map(|r| (instance(2), r)));
+        prop_assert_eq!(&actual, &expected);
+        let before = actual.clone();
+        let outcomes = actual.replay(records.into_iter().map(|r| (instance(2), r)));
+        prop_assert!(outcomes.iter().all(|r| *r == PublicationOutcome::Duplicate));
+        prop_assert_eq!(actual, before);
     }
 }

@@ -22,9 +22,31 @@ established that identity. Constructing the value is not authentication, and the
 Lean proofs do not verify credentials or signatures. The Rust-only defense against
 reattributing an accepted source/locator is not an additional Lean theorem.
 
-Stable instance IDs, shared-versus-local versions, mutable-state revisions,
-origin ownership, proposals and durable gateway ordering are still forthcoming;
-these proofs must not be presented as covering that unimplemented contract.
+## Origin-owned publication model
+
+`MemoryFederation/Publication.lean` separately models a subset of the new
+`mem_federation::publication` domain. Two additional shared JSON traces under
+`../../fixtures/federation/publication-traces/` run through both this model and
+the real Rust reducer during `lake test` / Rust integration tests. The legacy
+nine fixtures and their proofs are unchanged.
+
+The new model proves exact retry idempotence, unchanged non-applied state,
+accepted memory ownership/publishing membership and next shared version,
+verbatim accepted-command retention, independent content/state projections,
+next state revision, revocation denying subsequent memory application, and
+recursive replay equality with the reference fold. The version statements are
+one-step transition invariants, not a theorem about the complete Rust service.
+
+Natural-number IDs abstract validated non-nil UUIDs. Positive `u32` counters,
+canonical encoding, envelope digests, space binding and authenticated identity
+are Rust/caller prerequisites, not Lean parser/cryptography proofs. The fixtures
+use a fixed space/authority, derive locators from record IDs, and normalize unused
+fields; see their [format contract](../../fixtures/federation/publication-traces/README.md).
+
+The new evidence-review, proposal and relation transitions have Rust regression
+tests but **are not in this new Lean model**. Local-role mapping, durable
+acceptance, outbox/inbox, transport verification and gateway fencing remain
+unimplemented. Neither the new nor legacy proofs establish those release gates.
 
 Local commands:
 
