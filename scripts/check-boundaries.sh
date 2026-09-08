@@ -49,6 +49,15 @@ if grep -RInE 'atrium(_|::)|atrium-' crates/mem-federation/src --include='*.rs';
   err "mem-federation source references Atrium"
 fi
 
+# 3b. Transactional storage may use SQL/runtime, but must not become a network
+# adapter or service router. Production PDS/auth integration is a separate edge.
+federation_store_tree=$(cargo tree -p mem-federation-store -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in atrium-api atrium-xrpc atrium-repo axum reqwest mem-service; do
+  if echo "$federation_store_tree" | grep -qx "$dep"; then
+    err "mem-federation-store depends on $dep"
+  fi
+done
+
 # 4. No monolith re-forms in the new crates.
 while read -r lines file; do
   if [ "$lines" -gt 1200 ] && [ "$file" != "total" ]; then

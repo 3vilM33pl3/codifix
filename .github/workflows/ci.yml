@@ -50,6 +50,8 @@ jobs:
               - "crates/mem-search/**"
               - "crates/mem-service/**"
               - "crates/mem-test-support/**"
+              - "crates/mem-federation/**"
+              - "crates/mem-federation-store/**"
               - "migrations/**"
             web:
               - "web/**"
@@ -189,7 +191,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test -p mem-test-support -p mem-graph -p mem-curate -p mem-reinforce -p mem-search -p mem-service --locked
+      - run: cargo test -p mem-test-support -p mem-federation-store -p mem-graph -p mem-curate -p mem-reinforce -p mem-search -p mem-service --locked
 
 
   feature-matrix:
