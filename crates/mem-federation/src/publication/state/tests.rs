@@ -465,6 +465,24 @@ fn delivery_failures_never_mutate_state_and_revocation_preserves_prior_records()
         wrong,
         PublicationOutcome::Rejected(PublicationReject::Equivocation),
     );
+    // Normalized Lean fixtures derive the locator from the record ID. Check
+    // both non-normalized alias directions against the real reducer here.
+    let mut relocated = record.clone();
+    relocated.locator = RecordLocator::new("record:another-location").unwrap();
+    reject_unchanged(
+        &mut state,
+        2,
+        relocated,
+        PublicationOutcome::Rejected(PublicationReject::Equivocation),
+    );
+    let mut alias = delivery(seq + 1, 2, 63, version(2, 2, 31));
+    alias.locator = record.locator.clone();
+    reject_unchanged(
+        &mut state,
+        2,
+        alias,
+        PublicationOutcome::Rejected(PublicationReject::Equivocation),
+    );
     accept(
         &mut state,
         1,
