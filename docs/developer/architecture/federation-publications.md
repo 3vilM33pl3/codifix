@@ -1,6 +1,6 @@
 # Origin-owned publication domain
 
-Implementation contract for roadmap B1/B3; not a deployed protocol. The legacy
+Implementation contract for roadmap B1/B2/B3; not a deployed protocol. The legacy
 six-record spike remains a compatibility fixture. `mem_federation::publication`
 extends the same neutral crate with a production-shaped schema, reusing canonical
 JSON, digests, authorship and capabilities. No alternative transport, new protocol
@@ -19,6 +19,12 @@ not authored time, UUID/repository key order or an allocated database sequence.
 All counters are bounded positive integers; exhaustion fails closed. The domain
 models committed order, but does not itself provide the database transaction or
 writer fencing needed to establish that order.
+
+The [local permission policy](federation-permissions.md) independently intersects
+exact-project permissions, explicit sharing opt-in and current gateway capability.
+Neither local role presets nor a delegated ManageMembership capability establish
+space authority. This check gates intent; the gateway must authenticate and
+recheck current authority within its future acceptance transaction.
 
 Accepted records bind publisher/record ID, opaque transport locator, digest and
 acceptance sequence. Exact duplicates are no-ops; changed bindings are rejected.
@@ -55,7 +61,7 @@ to their source origin and have independent revisions for assertion/retraction.
 
 This domain is a deterministic in-memory reference for later transactional
 integration, not the production storage implementation. No authentication,
-signature checking, review UI, local-role mapping, PDS publication, model forwarding,
+signature checking, review UI, local grant persistence, PDS publication, model forwarding,
 network recovery or durable cursor is implied by its constructors. Imported strings
 remain untrusted data. Offline copies cannot be recalled. Production adapter and
 schema compatibility tests must be added before exposing these records externally.

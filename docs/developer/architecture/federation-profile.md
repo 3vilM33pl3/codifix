@@ -83,14 +83,19 @@ state revisions, reviewed evidence, proposals and relation retractions. Its
 in-memory reducer requires a separately authenticated publisher and contiguous
 authority acceptance order. Authentication and establishing that committed order
 remain caller duties, not properties supplied by deserialization or a counter.
-Two additional Rust/Lean traces cover a bounded subset of these new semantics.
-Evidence/proposal/relation transitions currently have Rust-only tests.
+Five publication Rust/Lean traces now cover every variant, including evidence,
+proposals, relation retraction, causation and independent capabilities. Scoped
+proofs accompany them; validated UUIDs, review digests and encoding remain
+prerequisites, not proofs of transport authentication or human approval.
 
 This is a versioned neutral-domain extension, **not a new production ATProto
 adapter**. The six spike Lexicons, fixture round-trips and MST evidence are
 unchanged; they do not establish compatibility of publication schema version 2.
-Production wire mappings, unknown-field retention/compatibility tests, explicit
-local permission mapping and durable gateway/receiver integration remain gates.
+The [local permission policy](federation-permissions.md) is implemented as a pure
+intersection of exact-project permissions, explicit local sharing grants and
+independent gateway capabilities, with no implicit admin/role bypass. Production
+wire mappings, unknown-field retention/compatibility tests, local grant storage
+and durable gateway/receiver integration remain gates.
 
 ## Namespace ownership and publication gate
 

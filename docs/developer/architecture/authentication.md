@@ -26,9 +26,10 @@ not replace OIDC browser identity.
 ## Principal Model
 
 Principal kinds are `human_oidc`, `service_token`, `legacy_service_token`, and
-`internal`. Effective access is the maximum of a global role, explicit project
-memberships, and matching Authentik group rules. Roles are ordered:
-`reader < writer < operator < admin`.
+`internal`. Effective access is the union of global permissions, explicit project
+permissions and matching Authentik group-rule grants. Reader, writer, operator
+and admin are named permission-set presets; custom sets are not a role ladder.
+Project-scoped actions use `permissions_for_project`, not permission held anywhere.
 
 The service resolves credentials once in central middleware, resolves the
 resource project from path/body/query/resource ID, applies the route policy,
@@ -39,6 +40,16 @@ repository guards remain an internal defense rather than the authority.
 In multi-user mode, capture writer identity, workspace writer identity, loop
 setting attribution, and proposal reviewers are stamped from the server-side
 principal. Client-supplied attribution cannot override them.
+
+## Federation permission boundary
+
+The [federation policy](federation-permissions.md) adds a pure, disabled-by-default
+integration contract: exact-project local permissions, explicit local sharing
+grants and independently enrolled gateway capabilities must all allow an action.
+Local admin does not become remote space authority. The helper has no wire
+deserializer and must receive trusted server-resolved context. It is not wired
+to service routes or grant persistence yet; current local authentication routes
+and behavior are unchanged.
 
 ## Browser OIDC
 

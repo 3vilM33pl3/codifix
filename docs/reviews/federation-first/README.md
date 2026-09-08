@@ -8,7 +8,8 @@ it through reviewed corrections, and exchange selected knowledge across
 organizational boundaries without sharing databases.
 
 Implementation evidence: [2026-09-07 checkpoint](2026-09-07-implementation.md)
-and [2026-09-08 domain checkpoint](2026-09-08-publication-domain.md).
+and [2026-09-08 domain checkpoint](2026-09-08-publication-domain.md), followed by
+the [B2/B3 permission and conformance increment](2026-09-08-b2-b3.md).
 The full roadmap remains incomplete; checked items have deliberately bounded scope.
 
 ## Source contracts and existing evidence
@@ -44,15 +45,16 @@ and deletion behavior require separate evidence and a future explicit decision.
 ## B. Production federation domain
 
 - [x] B1 Extend the neutral domain with stable instance/space identities, authenticated publisher distinct from author, shared versions independent of local versions, mutable-state revisions, immutable reviewed evidence, origin-owned streams, proposals, membership capabilities, relation retraction, causation and deterministic authority ordering. Evidence: crates/mem-federation/src/publication and docs/developer/architecture/federation-publications.md. Complete at the pure reference-domain scope, not durable persistence, credential verification, production wire adaptation or end-to-end product integration.
-- [ ] B2 Define explicit local-permission/gateway-capability mappings without allowing local roles to grant remote authority automatically; retain all AT-specific types behind the adapter.
-- [ ] B3 Expand executable Rust/Lean conformance together, including the new production semantics; do not claim proofs of the complete service, runtime, cryptography or deployment.
+- [x] B2 Define explicit local-permission/gateway-capability mappings without allowing local roles to grant remote authority automatically; retain all AT-specific types behind the adapter. Evidence: publication/policy.rs and docs/developer/architecture/federation-permissions.md; exact-project permissions intersect an explicit local grant and current gateway membership. All 2048 current local permission combinations are tested. This is a pure policy API, not enabled routes, authentication or durable local grant storage.
+- [x] B3 Expand executable Rust/Lean conformance together, including the new production semantics; do not claim proofs of the complete service, runtime, cryptography or deployment. Evidence: five publication traces plus nine legacy traces run through Rust and Lean; PublicationInvariants.lean adds evidence, causation, proposal, relation and authority proofs. UUID/wire/hash/review validation and runtime guarantees remain outside the model; B2 local policy is exhaustively tested in Rust, not proved in Lean.
 
 B1 implements the reference domain without changing the old six-record spike
-schema or adapter. B3 remains partial: nine legacy traces plus two new publication
-traces pass in Rust/Lean. New proofs cover ownership, publishing membership,
-shared/state counters, accepted-command retention, retries, revocation and replay.
-New evidence-review, proposal and relation transitions have Rust tests but are not
-yet modeled in Lean. B2 and all durable/runtime/wire integration gates remain open.
+schema or adapter. B2/B3 now complete the bounded domain/policy/model stage, not
+the product. Fourteen shared traces cover all publication variants, independent
+capabilities and causal links. Review-digest validity remains a Rust prerequisite,
+not a proof of human approval or cryptography. Production schema-version-2 adapter
+round-trips/unknown-field compatibility, local grant persistence and all
+durable/runtime/two-instance integration gates remain open before publication.
 
 ## C. Durable publication and synchronization
 
