@@ -6,6 +6,7 @@
 mod auth;
 mod consolidate;
 mod error;
+pub mod federation;
 mod handlers;
 mod llm;
 mod mcp_http;

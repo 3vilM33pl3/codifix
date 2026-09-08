@@ -1,0 +1,30 @@
+[package]
+name = "mem-federation-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+mem-federation = { path = "../mem-federation" }
+mem-federation-store = { path = "../mem-federation-store" }
+mem-atproto = { path = "../mem-atproto" }
+mem-record = { path = "../mem-record" }
+axum.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+mem-test-support = { path = "../mem-test-support" }
+mem-curate = { path = "../mem-curate" }
+chrono.workspace = true
+
+[lints]
+workspace = true

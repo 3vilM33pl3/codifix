@@ -42,6 +42,11 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let shutdown_handle = Arc::new(Mutex::new(Some(shutdown_tx)));
         let state = build_state(config.clone(), shutdown_handle.clone()).await?;
+        let _federation_tasks = federation::start(
+            state.clone(),
+            std::env::var_os("MEMORY_LAYER_FEDERATION_CONFIG").map(PathBuf::from),
+        )
+        .await?;
         let app = routes::build_http_app(state.clone());
         let listener = bind_http_listener_with_handoff(&config, addr)
             .await

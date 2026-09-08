@@ -433,6 +433,30 @@ async fn principal_from_row(
     })
 }
 
+/// Background federation reuses the service's current membership/group policy,
+/// rather than inventing a role-to-remote-capability mapping or caching a role.
+pub(crate) async fn federation_local_access(
+    state: &AppState,
+    principal: Uuid,
+    project: Uuid,
+) -> Result<mem_federation::publication::LocalProjectAccess, ApiError> {
+    let pool = state.pool()?;
+    let row=sqlx::query("SELECT id,kind,display_name,email,issuer,subject,groups_json,global_role,global_permissions_json FROM auth_principals WHERE id=$1 AND disabled_at IS NULL")
+        .bind(principal).fetch_optional(&pool).await.map_err(ApiError::sql)?.ok_or_else(||ApiError::unauthorized("federation principal disabled or missing"))?;
+    let current = principal_from_row(&pool, state, &row).await?;
+    let slug: String = sqlx::query_scalar("SELECT slug FROM projects WHERE id=$1")
+        .bind(project)
+        .fetch_one(&pool)
+        .await
+        .map_err(ApiError::sql)?;
+    Ok(mem_federation::publication::LocalProjectAccess {
+        principal,
+        project,
+        permissions: current.permissions_for_project(&slug),
+        read_only: state.config.service.read_only,
+    })
+}
+
 async fn load_memberships(
     pool: &PgPool,
     principal_id: Uuid,

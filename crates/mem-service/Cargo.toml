@@ -15,6 +15,9 @@ config.workspace = true
 mem-agenttop = { path = "../mem-agenttop" }
 mem-config = { path = "../mem-config" }
 mem-record = { path = "../mem-record" }
+mem-federation = { path = "../mem-federation" }
+mem-federation-store = { path = "../mem-federation-store" }
+mem-federation-runtime = { path = "../mem-federation-runtime" }
 async-trait = "0.1"
 mem-consolidate = { path = "../mem-consolidate" }
 mem-curate = { path = "../mem-curate" }

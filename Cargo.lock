@@ -2887,6 +2887,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "mem-federation-runtime"
+version = "2.0.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "mem-atproto",
+ "mem-curate",
+ "mem-federation",
+ "mem-federation-store",
+ "mem-record",
+ "mem-test-support",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "mem-federation-store"
 version = "2.0.0"
 dependencies = [
@@ -3029,6 +3052,9 @@ dependencies = [
  "mem-config",
  "mem-consolidate",
  "mem-curate",
+ "mem-federation",
+ "mem-federation-runtime",
+ "mem-federation-store",
  "mem-graph",
  "mem-loops",
  "mem-mcp",
