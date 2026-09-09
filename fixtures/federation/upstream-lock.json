@@ -7,7 +7,7 @@
     "source_revision": "374cf1d4ba782d4391bbb73e4e2d3f320d4846d6",
     "embedded_pds_version": "0.5.27"
   },
-  "atrium": { "api": "0.25.8", "xrpc": "0.12.4", "repo": "0.1.8", "api_default_features": false },
+  "atrium": { "api": "0.25.8", "xrpc": "0.12.4", "repo": "0.1.8", "crypto": "0.1.3", "crypto_adapter_added_on": "2026-09-09", "api_default_features": false },
   "interop_fixtures_commit": "056e5741bb330757205d6b16db5266fffcae937b",
   "spaces_proposal": {
     "repository": "https://github.com/bluesky-social/proposals",

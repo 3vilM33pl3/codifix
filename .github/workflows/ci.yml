@@ -54,6 +54,7 @@ jobs:
               - "crates/mem-federation-store/**"
               - "crates/mem-federation-runtime/**"
               - "crates/mem-atproto/**"
+              - "crates/mem-atproto-verify/**"
               - "migrations/**"
             web:
               - "web/**"
@@ -96,6 +97,7 @@ jobs:
               - "tests/federation-pds/**"
               - "fixtures/federation/upstream-lock.json"
               - "crates/mem-atproto/**"
+              - "crates/mem-atproto-verify/**"
               - "fixtures/federation/atproto/**"
               - ".github/workflows/ci.yml"
 

@@ -40,7 +40,7 @@ done
 # 3a. mem-federation purity: protocol-neutral domain and state only. Runtime,
 # persistence, and concrete AT Protocol dependencies belong in adapters.
 federation_tree=$(cargo tree -p mem-federation -e normal --prefix none | awk '{print $1}' | sort -u)
-for dep in tokio config sqlx axum mem-platform duckdb atrium-api atrium-xrpc atrium-repo; do
+for dep in tokio config sqlx axum mem-platform duckdb atrium-api atrium-xrpc atrium-repo atrium-crypto mem-atproto-verify; do
   if echo "$federation_tree" | grep -qx "$dep"; then
     err "mem-federation depends on $dep"
   fi
@@ -52,9 +52,24 @@ fi
 # 3b. Transactional storage may use SQL/runtime, but must not become a network
 # adapter or service router. Production PDS/auth integration is a separate edge.
 federation_store_tree=$(cargo tree -p mem-federation-store -e normal --prefix none | awk '{print $1}' | sort -u)
-for dep in atrium-api atrium-xrpc atrium-repo axum reqwest mem-service; do
+for dep in atrium-api atrium-xrpc atrium-repo atrium-crypto mem-atproto-verify axum reqwest mem-service; do
   if echo "$federation_store_tree" | grep -qx "$dep"; then
     err "mem-federation-store depends on $dep"
+  fi
+done
+
+# 3c. The offline wire adapter stays separate from repository trust/networking.
+atproto_tree=$(cargo tree -p mem-atproto -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in atrium-crypto mem-atproto-verify reqwest sqlx axum; do
+  if echo "$atproto_tree" | grep -qx "$dep"; then
+    err "mem-atproto depends on $dep"
+  fi
+done
+# Verification is a security adapter, not an identity resolver or service.
+verify_tree=$(cargo tree -p mem-atproto-verify -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in reqwest sqlx axum mem-service mem-federation-store; do
+  if echo "$verify_tree" | grep -qx "$dep"; then
+    err "mem-atproto-verify depends on $dep"
   fi
 done
 
