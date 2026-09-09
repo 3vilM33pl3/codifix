@@ -13,7 +13,8 @@ the [B2/B3 permission and conformance increment](2026-09-08-b2-b3.md) and
 [Stage C durability foundation](2026-09-08-c-durability.md) and
 [completed C integration](2026-09-08-c-completion.md). The
 [repository-authenticity increment](2026-09-09-d-repository-verification.md) is now
-followed by [completed Stage D implementation](2026-09-09-d-completion.md).
+followed by [completed Stage D implementation](2026-09-09-d-completion.md) and
+[Stage E end-to-end integration](2026-09-09-e-completion.md).
 The full roadmap remains incomplete; checked items have deliberately bounded scope.
 
 ## Source contracts and existing evidence
@@ -84,21 +85,21 @@ legal/customer and release decisions.
 
 - [x] D1 Keep each instance database private and independently authorized; only the gateway accesses PDS credentials and endpoints, with no CAR/firehose/repository/cross-space bypass. Evidence: dedicated executable, restricted SQL grants and two-space disposable TLS/container isolation; not customer installation.
 - [x] D2 Verify identities safely without SSRF; reject forged publishers, malformed records and invalid signatures. Evidence: pinned DID/PDS verification, receipt chains, fresh signed pages, explicit key windows and recovery revalidation; no dynamic discovery.
-- [x] D3 Keep raw captures, sessions, paths and unselected evidence local; ensure reviewed snapshot bytes equal published bytes; treat imported content as untrusted data and gate external-model forwarding with explicit space policy. Evidence: immutable reviews, segregated imports, scoped context and guarded default-deny provider API; actual provider/user workflow integration remains E.
+- [x] D3 Keep raw captures, sessions, paths and unselected evidence local; ensure reviewed snapshot bytes equal published bytes; treat imported content as untrusted data and gate external-model forwarding with explicit space policy. Evidence: immutable reviews, segregated imports, scoped context and guarded default-deny provider API; E adds explicit user retrieval/citation, not automatic external-provider forwarding.
 - [x] D4 Implement and document revocation/offline-copy behavior, audit receipts, retention/deletion/legal-hold boundaries; administrators and admitted recipients can read plaintext, and previously delivered bytes cannot be recalled. Evidence: immutable receipts/history/intents, authority-only hold/erasure requests, tested revocation/local access and decommission limits; legal policy and full deployment DR remain release gates.
 
 ## E. End-to-end federated knowledge workflow
 
-The [first E increment](2026-09-09-e-service.md) adds the [authenticated local
-workflow API](../../user/federation-workflow.md): local grants, exact review,
-retry-safe queueing, status and retained citations. It does not close any complete
-E item below: remote enrollment, corrections, client parity and the full
-independently administered two-party workflow still need implementation/evidence.
+The [completed E integration](2026-09-09-e-completion.md) builds on the historical
+[first API increment](2026-09-09-e-service.md). Evidence uses two separate Memory
+service processes, databases and credentials on a controlled host, an actual
+gateway and pinned PDS, and real browser/CLI/PTY clients. It is not a customer
+deployment, customer SSO proof, or clearance of the remaining release gates.
 
-- [ ] E1 Enroll two independently operated Memory instances with separate databases and administrative boundaries in a private project space.
-- [ ] E2 Review/publish selected memory and evidence, retrieve/cite on the second instance with publisher/author/version attribution, propose correction to origin, and approve as a new shared version preserving provenance.
-- [ ] E3 Provide Web/CLI/TUI parity for membership, publication review, proposals and sync state; keep origin/sharing restrictions in retrieval results.
-- [ ] E4 Verify disconnection, catch-up, duplication and revocation end to end, including denying subsequent access/publication according to policy.
+- [x] E1 Enroll two independently operated Memory instances with separate databases and administrative boundaries in a private project space. Evidence: two_instance.rs and real-PDS client gate; separate OS processes, non-superuser database credentials and application/gateway identities; cross-instance DB connection and HTTP-token reuse denied. Controlled synthetic deployment only.
+- [x] E2 Review/publish selected memory and evidence, retrieve/cite on the second instance with publisher/author/version attribution, propose correction to origin, and approve as a new shared version preserving provenance. Evidence: browser journey, idempotent HTTP actions and correction regression tests. Approval pauses local subscription without laundering imported text into ordinary local memory; fresh review reconciles shared counters.
+- [x] E3 Provide Web/CLI/TUI parity for membership, publication review, proposals and sync state; keep origin/sharing restrictions in retrieval results. Evidence: Web federation workspace, memory federation CLI and focused TUI, shared local API, component tests and real browser/CLI/PTY interactions. Credentials/trust remain administrator configuration.
+- [x] E4 Verify disconnection, catch-up, duplication and revocation end to end, including denying subsequent access/publication according to policy. Evidence: real gateway disconnect/local queue/reconnect, repeated full resynchronization, revoked writer accepted-sequence check, remote access denial and retained-copy/local-grant behavior; isolation harness rerun.
 
 ## F. Conditional expansion after reliable knowledge federation
 
