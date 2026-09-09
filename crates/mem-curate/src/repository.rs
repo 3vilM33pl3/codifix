@@ -15,6 +15,9 @@ pub async fn store_capture(
     pool: &PgPool,
     request: &CaptureTaskRequest,
 ) -> Result<CaptureTaskResponse, sqlx::Error> {
+    if request.dry_run {
+        return preview_capture(pool, request).await;
+    }
     Ok(store_capture_as(
         pool,
         request,
@@ -47,6 +50,11 @@ pub async fn store_capture_tx(
     request: &CaptureTaskRequest,
     context: &mem_store::events::MutationContext,
 ) -> Result<CaptureMutation, sqlx::Error> {
+    if request.dry_run {
+        return Err(sqlx::Error::Protocol(
+            "use preview_capture for dry runs".into(),
+        ));
+    }
     let computed_key = idempotency_key(request);
     // Serialize identical inputs before creating any session/task. Hash
     // collisions merely serialize unrelated requests; the actual key is checked.
@@ -175,10 +183,49 @@ pub async fn preview_capture(
 }
 
 pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResponse, sqlx::Error> {
+    if request.dry_run {
+        return preview_curate(pool, request).await;
+    }
+    Ok(curate_as(
+        pool,
+        request,
+        &mem_store::events::MutationContext::internal("mem-curate"),
+    )
+    .await?
+    .response)
+}
+
+pub struct CurateMutation {
+    pub response: CurateResponse,
+    /// Provisional until the enclosing transaction commits.
+    pub events: Vec<(mem_store::events::TimelineEvent, i64)>,
+}
+
+pub async fn curate_as(
+    pool: &PgPool,
+    request: &CurateRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<CurateMutation, sqlx::Error> {
     let mut tx = pool.begin().await?;
-    let project_row = sqlx::query("SELECT id FROM projects WHERE slug = $1")
+    let result = curate_tx(&mut tx, request, context).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+pub async fn curate_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    request: &CurateRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<CurateMutation, sqlx::Error> {
+    if request.dry_run {
+        return Err(sqlx::Error::Protocol(
+            "use preview_curate for dry runs".into(),
+        ));
+    }
+    // Serialize the project selection and version/state writes across curators.
+    let project_row = sqlx::query("SELECT id FROM projects WHERE slug = $1 FOR UPDATE")
         .bind(&request.project)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
     let project_id: Uuid = project_row.try_get("id")?;
 
@@ -199,7 +246,7 @@ pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResp
     .bind(project_id)
     .bind(limit)
     .bind(request.raw_capture_id)
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut **tx)
     .await?;
 
     let run_id = Uuid::new_v4();
@@ -226,7 +273,7 @@ pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResp
             )
             .bind(project_id)
             .bind(&candidate.canonical_text)
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut **tx)
             .await?;
 
             let memory_id = if let Some(existing) = existing {
@@ -245,16 +292,13 @@ pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResp
                 .bind(memory_id)
                 .bind(candidate.confidence)
                 .bind(candidate.importance)
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
                 memory_id
             } else {
-                match determine_replacement_decision(&mut tx, project_id, &candidate, policy)
-                    .await?
-                {
+                match determine_replacement_decision(tx, project_id, &candidate, policy).await? {
                     ReplacementDecision::InsertNew => {
-                        let memory_id =
-                            insert_candidate_memory(&mut tx, project_id, &candidate).await?;
+                        let memory_id = insert_candidate_memory(tx, project_id, &candidate).await?;
                         output_count += 1;
                         memory_id
                     }
@@ -268,7 +312,7 @@ pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResp
                         // visible to history-aware queries; default search
                         // sees only the new version.
                         let memory_id =
-                            insert_memory_version(&mut tx, project_id, &candidate, Some(target.id))
+                            insert_memory_version(tx, project_id, &candidate, Some(target.id))
                                 .await?;
                         output_count += 1;
                         replaced_count += 1;
@@ -288,7 +332,7 @@ pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResp
                         reasons,
                     } => {
                         queue_replacement_proposal(
-                            &mut tx, project_id, capture_id, task_id, &candidate, &target, policy,
+                            tx, project_id, capture_id, task_id, &candidate, &target, policy,
                             score, &reasons,
                         )
                         .await?;
@@ -298,16 +342,16 @@ pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResp
                 }
             };
 
-            attach_candidate_metadata(&mut tx, memory_id, task_id, &candidate).await?;
-            rebuild_memory_chunks(&mut tx, memory_id).await?;
+            attach_candidate_metadata(tx, memory_id, task_id, &candidate).await?;
+            rebuild_memory_chunks(tx, memory_id).await?;
 
-            refresh_relations(&mut tx, project_id, memory_id).await?;
+            refresh_relations(tx, project_id, memory_id).await?;
             memory_ids.push(memory_id);
         }
 
         sqlx::query("UPDATE raw_captures SET curated_at = now() WHERE id = $1")
             .bind(capture_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
     }
 
@@ -321,12 +365,10 @@ pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResp
     .bind(project_id)
     .bind(captures.len() as i64)
     .bind(output_count)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
 
-    tx.commit().await?;
-
-    Ok(CurateResponse {
+    let response = CurateResponse {
         project_id,
         run_id,
         input_count: captures.len() as i64,
@@ -339,6 +381,69 @@ pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResp
         warnings: Vec::new(),
         validation_due: Vec::new(),
         consolidation_due: Vec::new(),
+    };
+    let mut events = Vec::new();
+    let mut event = mem_store::events::TimelineEvent::new(
+        project_id,
+        mem_record::ActivityKind::Curate,
+        format!(
+            "Curated {} capture(s) into {} memory entry/entries with {} replacement(s) and {} queued update proposal(s).",
+            response.input_count,
+            response.output_count,
+            response.replaced_count,
+            response.proposal_count
+        ),
+    );
+    event.id = run_id;
+    event.operation_id = Some(run_id.to_string());
+    event.details = Some(mem_record::ActivityDetails::Curate {
+        run_id,
+        input_count: response.input_count,
+        output_count,
+        replaced_count,
+        proposal_count,
+    });
+    context.stamp(&mut event);
+    events.push(event);
+    for replacement in &response.replacements {
+        let mut event = mem_store::events::TimelineEvent::new(
+            project_id,
+            mem_record::ActivityKind::MemoryReplacement,
+            format!(
+                "Replaced memory \"{}\" with \"{}\".",
+                replacement.old_summary, replacement.new_summary
+            ),
+        );
+        event.memory_id = Some(replacement.new_memory_id);
+        let identity =
+            sqlx::query("SELECT canonical_id,version_no FROM memory_entries WHERE id=$1")
+                .bind(replacement.new_memory_id)
+                .fetch_one(&mut **tx)
+                .await?;
+        event.canonical_id = Some(identity.try_get("canonical_id")?);
+        event.version_no = Some(identity.try_get("version_no")?);
+        event.operation_id = Some(run_id.to_string());
+        event.details = Some(mem_record::ActivityDetails::MemoryReplacement {
+            old_memory_id: replacement.old_memory_id,
+            old_summary: replacement.old_summary.clone(),
+            new_memory_id: replacement.new_memory_id,
+            new_summary: replacement.new_summary.clone(),
+            automatic: replacement.automatic,
+            policy: replacement.policy,
+        });
+        context.stamp(&mut event);
+        events.push(event);
+    }
+    let mut appended = Vec::new();
+    for event in events {
+        let seq = mem_store::events::append(tx, &event)
+            .await
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+        appended.push((event, seq));
+    }
+    Ok(CurateMutation {
+        response,
+        events: appended,
     })
 }
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#![allow(clippy::unwrap_used)]
 
 use mem_curate::{curate, preview_curate, refresh_semantic_relations, store_capture};
 use mem_record::{
@@ -299,12 +300,101 @@ async fn relation_count(pool: &sqlx::PgPool, src: Uuid, dst: Uuid, relation_type
 }
 
 #[tokio::test]
+async fn curation_rollback_and_competing_curators_preserve_atomic_events() {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let project = mem_test_support::unique_project_slug("r1-curation");
+    let capture = store_capture(
+        &pool,
+        &capture_request(&project, "curate me", "persist once", "one fact"),
+    )
+    .await
+    .unwrap();
+    let request = CurateRequest {
+        project: project.clone(),
+        batch_size: Some(1),
+        raw_capture_id: Some(capture.raw_capture_id),
+        replacement_policy: None,
+        dry_run: false,
+    };
+    let context = mem_store::events::MutationContext::internal("curation-test");
+    let mut tx = pool.begin().await.unwrap();
+    let tentative = mem_curate::curate_tx(&mut tx, &request, &context)
+        .await
+        .unwrap();
+    assert_eq!(tentative.response.input_count, 1);
+    assert_eq!(tentative.events.len(), 1);
+    tx.rollback().await.unwrap();
+    let uncurated: bool =
+        sqlx::query_scalar("SELECT curated_at IS NULL FROM raw_captures WHERE id=$1")
+            .bind(capture.raw_capture_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(uncurated);
+    assert_eq!(
+        mem_store::events::page(&pool, capture.project_id, 0, 10)
+            .await
+            .unwrap()
+            .events
+            .len(),
+        1,
+        "only the committed capture event survives"
+    );
+    let (first, second) = tokio::join!(
+        mem_curate::curate_as(&pool, &request, &context),
+        mem_curate::curate_as(&pool, &request, &context)
+    );
+    let first = first.unwrap();
+    let second = second.unwrap();
+    assert_eq!(first.response.input_count + second.response.input_count, 1);
+    assert_eq!(
+        first.response.output_count + second.response.output_count,
+        1
+    );
+    for result in [first, second] {
+        assert_eq!(result.events.len(), 1);
+        assert_eq!(result.events[0].0.id, result.response.run_id);
+    }
+    assert_eq!(
+        mem_store::events::page(&pool, capture.project_id, 0, 10)
+            .await
+            .unwrap()
+            .events
+            .len(),
+        3
+    );
+    mem_test_support::cleanup_project(&pool, &project)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn capture_transaction_couples_event_and_replay_identity() {
     let Some(pool) = mem_test_support::migrated_pool().await else {
         return;
     };
     let project = mem_test_support::unique_project_slug("r1-capture");
     let request = capture_request(&project, "atomic capture", "synthetic fact", "fact");
+    let mut preview_request = request.clone();
+    preview_request.dry_run = true;
+    assert!(
+        store_capture(&pool, &preview_request)
+            .await
+            .unwrap()
+            .dry_run
+    );
+    let preview_absent: bool =
+        sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM projects WHERE slug=$1)")
+            .bind(&project)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        preview_absent,
+        "direct library preview must not insert sessions, captures or events"
+    );
     let actor = mem_store::events::MutationContext {
         actor_id: Uuid::new_v4().to_string(),
         actor_name: "reviewer".into(),

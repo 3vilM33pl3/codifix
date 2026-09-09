@@ -5,24 +5,31 @@ use crate::*;
 
 pub(crate) async fn curate_memory(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<CurateRequest>,
 ) -> Result<Json<mem_record::CurateResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
-    let response = if request.dry_run {
-        preview_curate(&state.pool()?, &request)
-            .await
-            .map_err(ApiError::sql)?
-    } else {
-        curate(&state.pool()?, &request)
-            .await
-            .map_err(ApiError::sql)?
-    };
     if request.dry_run {
-        return Ok(Json(response));
+        return preview_curate(&state.pool()?, &request)
+            .await
+            .map(Json)
+            .map_err(ApiError::sql);
     }
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "service".into(),
+        occurred_at: None,
+    };
+    let mutation = mem_curate::curate_as(&state.pool()?, &request, &context)
+        .await
+        .map_err(ApiError::sql)?;
+    let response = mutation.response;
     // Durable curation is complete. Publish it before queuing advisory work so
     // task-start checkpoints can verify their new task memory immediately.
-    notify_curation_completed(&state, &request, &response);
+    for (event, seq) in mutation.events {
+        crate::repository::events::broadcast_committed(&state, request.project.clone(), event, seq);
+    }
 
     let project = request.project.clone();
     let should_start_worker = state.post_curation.enqueue(PostCurationWork {
@@ -232,54 +239,6 @@ async fn run_project_consolidation(
         }
     }
     Ok(())
-}
-
-fn notify_curation_completed(
-    state: &AppState,
-    request: &CurateRequest,
-    response: &mem_record::CurateResponse,
-) {
-    let project = request.project.clone();
-    notify_project_changed(
-        state,
-        project,
-        None,
-        ActivityKind::Curate,
-        format!(
-            "Curated {} capture(s) into {} memory entry/entries with {} replacement(s) and {} queued update proposal(s).",
-            response.input_count,
-            response.output_count,
-            response.replaced_count,
-            response.proposal_count
-        ),
-        Some(ActivityDetails::Curate {
-            run_id: response.run_id,
-            input_count: response.input_count,
-            output_count: response.output_count,
-            replaced_count: response.replaced_count,
-            proposal_count: response.proposal_count,
-        }),
-    );
-    for replacement in &response.replacements {
-        notify_project_changed(
-            state,
-            request.project.clone(),
-            Some(replacement.new_memory_id),
-            ActivityKind::MemoryReplacement,
-            format!(
-                "Replaced memory \"{}\" with \"{}\".",
-                replacement.old_summary, replacement.new_summary
-            ),
-            Some(ActivityDetails::MemoryReplacement {
-                old_memory_id: replacement.old_memory_id,
-                old_summary: replacement.old_summary.clone(),
-                new_memory_id: replacement.new_memory_id,
-                new_summary: replacement.new_summary.clone(),
-                automatic: replacement.automatic,
-                policy: replacement.policy,
-            }),
-        );
-    }
 }
 
 pub(crate) async fn project_replacement_proposals(
