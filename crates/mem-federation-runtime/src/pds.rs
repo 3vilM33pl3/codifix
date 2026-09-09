@@ -141,7 +141,10 @@ impl PdsPublisher {
         })
         .await
         .map_err(|_| PublishFailure::InvalidReceipt)?
-        .map_err(|_| PublishFailure::InvalidReceipt)?;
+        .map_err(|error| {
+            tracing::warn!(reason = %error, "PDS repository verification failed");
+            PublishFailure::InvalidReceipt
+        })?;
         Ok(())
     }
     pub async fn publish_exact(

@@ -9,8 +9,10 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod car;
+mod mst_store;
 pub use car::MAX_CAR_BYTES;
 use car::{block, parse_car};
+use mst_store::CanonicalMstStore;
 
 #[cfg(any(test, feature = "test-fixtures"))]
 pub mod fixtures;
@@ -29,8 +31,14 @@ pub enum VerifyError {
     Enrollment,
     #[error("repository proof exceeds private-profile resource limits")]
     Limit,
-    #[error("invalid CAR framing or block hash")]
+    #[error("invalid CAR framing")]
     Car,
+    #[error("invalid CAR header")]
+    Header,
+    #[error("unsupported block CID or invalid block hash")]
+    Block,
+    #[error("required repository block is absent")]
+    MissingBlock,
     #[error("invalid or noncanonical signed commit")]
     Commit,
     #[error("repository signature does not match the enrolled identity/key")]
@@ -134,7 +142,7 @@ impl PinnedRepository {
         // entries in fresh memory; root equality proves ordering, layer placement,
         // canonical prefix compression and topology of the received tree.
         let rebuilt = futures::executor::block_on(async {
-            let mut tree = Tree::create(MemoryBlockStore::new())
+            let mut tree = Tree::create(CanonicalMstStore(MemoryBlockStore::new()))
                 .await
                 .map_err(|_| VerifyError::Tree)?;
             for (key, cid) in &entries {
@@ -170,21 +178,23 @@ impl PinnedRepository {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SignedCommit {
+    // Canonical CBOR field order: encoded key length, then bytes. The pinned
+    // serializer sorts maps but NOT structs. Keep the upstream golden tests.
     did: Did,
-    version: i64,
-    data: Cid,
     rev: Tid,
-    prev: Option<Cid>,
     #[serde(with = "serde_bytes")]
     sig: Vec<u8>,
+    data: Cid,
+    prev: Option<Cid>,
+    version: i64,
 }
 #[derive(Serialize)]
 struct UnsignedCommit<'a> {
     did: &'a Did,
-    version: i64,
-    data: Cid,
     rev: &'a Tid,
+    data: Cid,
     prev: Option<Cid>,
+    version: i64,
 }
 impl SignedCommit {
     fn unsigned(&self) -> UnsignedCommit<'_> {
@@ -201,17 +211,17 @@ impl SignedCommit {
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Node {
-    l: Option<Cid>,
     e: Vec<Entry>,
+    l: Option<Cid>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Entry {
-    p: usize,
     #[serde(with = "serde_bytes")]
     k: Vec<u8>,
-    v: Cid,
+    p: usize,
     t: Option<Cid>,
+    v: Cid,
 }
 fn canonical<T: DeserializeOwned + Serialize>(bytes: &[u8]) -> std::result::Result<T, ()> {
     let value: T = serde_ipld_dagcbor::from_slice(bytes).map_err(|_| ())?;

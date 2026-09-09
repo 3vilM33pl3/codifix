@@ -1,0 +1,10 @@
+{
+  "generated_on": "2026-09-09",
+  "generator": "@atproto/repo 0.10.10 MST.create(MemoryBlockstore).add(key, recordCid).getPointer()",
+  "image": "ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12",
+  "provenance": "Synthetic Memory-owned inputs, independently encoded by the pinned upstream PDS SDK; no customer data or secrets",
+  "record": {"n": 1},
+  "record_cid": "bafyreigfqy7j4pd2mndwscktqcj5ktaahdujpwrnxjupjbsehji3mgrtx4",
+  "keys": ["dev.example.record/a", "dev.example.record/b", "dev.example.record/c"],
+  "root": "bafyreibtzejmnumnqflnindcbemsgjx2gc4dwdeta5x3fh2t6hqokw6i6m"
+}

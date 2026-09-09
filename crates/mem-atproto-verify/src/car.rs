@@ -15,8 +15,9 @@ const MAX_BLOCKS: usize = 32768;
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Header {
-    pub version: u64,
+    // serde_ipld_dagcbor 0.6 writes struct fields in declaration order.
     pub roots: Vec<Cid>,
+    pub version: u64,
 }
 
 // Decode lengths before allocation, reject overflow/non-minimal varints, and
@@ -58,10 +59,10 @@ pub(crate) fn parse_car(mut bytes: &[u8]) -> Result<(Cid, Blocks<'_>)> {
     if bytes.len() > MAX_CAR_BYTES {
         return Err(VerifyError::Limit);
     }
-    let header: Header = canonical(frame(&mut bytes, 4096)?).map_err(|_| VerifyError::Car)?;
+    let header: Header = canonical(frame(&mut bytes, 4096)?).map_err(|_| VerifyError::Header)?;
     // Deliberately a single-root full snapshot, not an incremental CAR/stream.
     if header.version != 1 || header.roots.len() != 1 {
-        return Err(VerifyError::Car);
+        return Err(VerifyError::Header);
     }
     let mut blocks = BTreeMap::new();
     let mut count = 0;
@@ -72,7 +73,7 @@ pub(crate) fn parse_car(mut bytes: &[u8]) -> Result<(Cid, Blocks<'_>)> {
         }
         let body = frame(&mut bytes, MAX_BLOCK_BYTES)?;
         let mut cursor = Cursor::new(body);
-        let cid = Cid::read_bytes(&mut cursor).map_err(|_| VerifyError::Car)?;
+        let cid = Cid::read_bytes(&mut cursor).map_err(|_| VerifyError::Block)?;
         let offset = cursor.position() as usize;
         // Equality with re-encoding also rules out noncanonical CID varints.
         if cid.codec() != DAG_CBOR
@@ -80,11 +81,11 @@ pub(crate) fn parse_car(mut bytes: &[u8]) -> Result<(Cid, Blocks<'_>)> {
             || cid.hash().size() != 32
             || cid.to_bytes() != body[..offset]
         {
-            return Err(VerifyError::Car);
+            return Err(VerifyError::Block);
         }
         let value = &body[offset..];
         if value.is_empty() || Sha256::digest(value).as_slice() != cid.hash().digest() {
-            return Err(VerifyError::Car);
+            return Err(VerifyError::Block);
         }
         blocks.insert(cid, value);
     }
@@ -92,5 +93,5 @@ pub(crate) fn parse_car(mut bytes: &[u8]) -> Result<(Cid, Blocks<'_>)> {
     Ok((header.roots[0], blocks))
 }
 pub(crate) fn block<'a>(blocks: &Blocks<'a>, cid: &Cid) -> Result<&'a [u8]> {
-    blocks.get(cid).copied().ok_or(VerifyError::Car)
+    blocks.get(cid).copied().ok_or(VerifyError::MissingBlock)
 }

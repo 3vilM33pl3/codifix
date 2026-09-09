@@ -48,7 +48,7 @@ pub fn signed_repo(
             record_cids.push((name, cid));
         }
         let (root, mut cids) = {
-            let mut tree = Tree::create(&mut store).await.unwrap();
+            let mut tree = Tree::create(CanonicalMstStore(&mut store)).await.unwrap();
             for (name, cid) in &record_cids {
                 tree.add(name, *cid).await.unwrap();
             }

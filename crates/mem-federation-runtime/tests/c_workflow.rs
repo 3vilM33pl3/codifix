@@ -272,6 +272,10 @@ async fn publish_all(server: &GatewayServer, pds: &PdsPublisher) {
 /// pinned upstream PDS. Without it, the same test uses an isolated fake XRPC edge.
 #[tokio::test]
 async fn c_source_gateway_pds_receiver_and_recovery_across_three_databases() {
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::WARN)
+        .with_test_writer()
+        .try_init();
     let Some(admin) = mem_test_support::migrated_pool().await else {
         return;
     };
