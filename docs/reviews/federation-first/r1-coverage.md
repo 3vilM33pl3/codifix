@@ -75,3 +75,6 @@ rechecks, durable child identities and the service worker are not implemented by
 this slice. Existing automatic callers still allocate new operation IDs; their
 retry deduplication is not yet wired. Proposal edit/approve/reject transaction
 coverage remains open. No additional R1 contract checkbox is complete.
+
+See [result-boundary evidence](2026-09-09-r1-result-boundaries.md) for the focused
+fault tests, required-database workspace regression result and remaining limits.
