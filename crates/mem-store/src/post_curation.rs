@@ -16,6 +16,29 @@ pub async fn enqueue(
     versions: &[Uuid],
     actor: &JobActor,
 ) -> Result<BackgroundWorkReference> {
+    // Serialize recipe creation before inserting any version identities. A
+    // duplicate operation cannot silently widen the set consumed by its jobs.
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(format!("post-curation:{project}:{operation}"))
+        .execute(&mut **tx)
+        .await?;
+    let known: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM background_jobs WHERE project_id=$1 AND operation_id=$2)",
+    )
+    .bind(project)
+    .bind(operation)
+    .fetch_one(&mut **tx)
+    .await?;
+    if known {
+        let existing: Vec<Uuid> = sqlx::query_scalar("SELECT memory_id FROM background_work_versions WHERE project_id=$1 AND operation_id=$2 ORDER BY memory_id")
+            .bind(project).bind(operation).fetch_all(&mut **tx).await?;
+        let mut requested = versions.to_vec();
+        requested.sort_unstable();
+        requested.dedup();
+        if existing != requested {
+            return Err(crate::Error::Conflict);
+        }
+    }
     for version in versions {
         // Validate before committing the immutable source identity.
         let valid: bool = sqlx::query_scalar(

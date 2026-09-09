@@ -43,8 +43,8 @@ pub(crate) use mem_config::{
     repo_agent_settings_path, resolve_llm_api_key,
 };
 pub(crate) use mem_curate::{
-    approve_replacement_proposal, list_replacement_proposals, preview_capture, preview_curate,
-    refresh_memory_relations, reject_replacement_proposal, store_capture,
+    list_replacement_proposals, preview_capture, preview_curate, refresh_memory_relations,
+    store_capture,
 };
 pub(crate) use mem_platform::{
     managed_watch_service_name, preferred_user_state_dir, restart_local_watcher_service_name,

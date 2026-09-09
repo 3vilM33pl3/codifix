@@ -23,7 +23,7 @@ async fn workspace_lifecycle_rolls_back_on_event_failure_and_preserves_actor() {
         "project":slug,"repo_root":"/private-root","worktree_path":"/private-tree","branch":"test",
         "writer_id":"client-reported-author","task":"private-task-content"
     }))
-    .unwrap();
+    .expect("workspace transaction fixture");
     let context = MutationContext {
         actor_id: Uuid::new_v4().to_string(),
         actor_name: "authenticated operator".into(),
@@ -34,23 +34,23 @@ async fn workspace_lifecycle_rolls_back_on_event_failure_and_preserves_actor() {
         source: "\0".into(),
         ..context.clone()
     };
-    let mut tx = pool.begin().await.unwrap();
+    let mut tx = pool.begin().await.expect("workspace transaction fixture");
     assert!(
         upsert_agent_workspace_start_tx(&mut tx, &request, &broken)
             .await
             .is_err()
     );
-    tx.rollback().await.unwrap();
+    tx.rollback().await.expect("workspace transaction fixture");
     let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM projects WHERE slug=$1)")
         .bind(&slug)
         .fetch_one(&pool)
         .await
-        .unwrap();
+        .expect("workspace transaction fixture");
     assert!(!exists, "implicit project creation must also roll back");
-    let mut tx = pool.begin().await.unwrap();
+    let mut tx = pool.begin().await.expect("workspace transaction fixture");
     let started = upsert_agent_workspace_start_tx(&mut tx, &request, &context)
         .await
-        .unwrap();
+        .expect("workspace transaction fixture");
     assert_eq!(
         started.event.actor_id.as_deref(),
         Some(context.actor_id.as_str())
@@ -59,39 +59,43 @@ async fn workspace_lifecycle_rolls_back_on_event_failure_and_preserves_actor() {
         started.record.writer_id.as_deref(),
         Some("client-reported-author")
     );
-    tx.commit().await.unwrap();
+    tx.commit().await.expect("workspace transaction fixture");
     let heartbeat: mem_record::AgentWorkspaceHeartbeatRequest =
-        serde_json::from_value(serde_json::json!({"head_commit":"new-head"})).unwrap();
+        serde_json::from_value(serde_json::json!({"head_commit":"new-head"}))
+            .expect("workspace transaction fixture");
     let finish: AgentWorkspaceFinishRequest =
-        serde_json::from_value(serde_json::json!({"finish_summary":"private-summary"})).unwrap();
-    let mut tx = pool.begin().await.unwrap();
+        serde_json::from_value(serde_json::json!({"finish_summary":"private-summary"}))
+            .expect("workspace transaction fixture");
+    let mut tx = pool.begin().await.expect("workspace transaction fixture");
     assert!(
         update_agent_workspace_heartbeat_tx(&mut tx, started.record.id, &heartbeat, &broken)
             .await
             .is_err()
     );
-    tx.rollback().await.unwrap();
-    let mut tx = pool.begin().await.unwrap();
+    tx.rollback().await.expect("workspace transaction fixture");
+    let mut tx = pool.begin().await.expect("workspace transaction fixture");
     assert!(
         finish_agent_workspace_record_tx(&mut tx, started.record.id, &finish, &broken)
             .await
             .is_err()
     );
-    tx.rollback().await.unwrap();
-    let records = fetch_agent_workspaces(&pool, &slug, true).await.unwrap();
+    tx.rollback().await.expect("workspace transaction fixture");
+    let records = fetch_agent_workspaces(&pool, &slug, true)
+        .await
+        .expect("workspace transaction fixture");
     assert_eq!(records.workspaces[0].status, AgentWorkspaceStatus::Active);
     assert!(records.workspaces[0].head_commit.is_none());
     update_agent_workspace_heartbeat(&pool, started.record.id, &heartbeat)
         .await
-        .unwrap();
+        .expect("workspace transaction fixture");
     finish_agent_workspace_record(&pool, started.record.id, &finish)
         .await
-        .unwrap();
+        .expect("workspace transaction fixture");
     let events = mem_store::events::page(&pool, started.event.project_id, 0, 100)
         .await
-        .unwrap();
+        .expect("workspace transaction fixture");
     assert_eq!(events.events.len(), 3);
-    let json = serde_json::to_string(&events).unwrap();
+    let json = serde_json::to_string(&events).expect("workspace transaction fixture");
     for private in [
         "private-root",
         "private-tree",
@@ -103,7 +107,7 @@ async fn workspace_lifecycle_rolls_back_on_event_failure_and_preserves_actor() {
     }
     mem_test_support::cleanup_project(&pool, &slug)
         .await
-        .unwrap();
+        .expect("workspace transaction fixture");
 }
 
 #[tokio::test]

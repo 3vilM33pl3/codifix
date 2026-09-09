@@ -191,6 +191,95 @@ async fn capture_curate_and_replacement_proposal_flow_persists_rows() {
     .expect("decode proposal count");
     assert_eq!(proposal_count, 1);
 
+    let proposal: Uuid = sqlx::query_scalar("SELECT mrp.id FROM memory_replacement_proposals mrp JOIN projects p ON p.id=mrp.project_id WHERE p.slug=$1 AND mrp.status='pending'")
+        .bind(&project).fetch_one(&pool).await.unwrap();
+    let broken = mem_store::events::MutationContext {
+        source: "\0".into(),
+        ..mem_store::events::MutationContext::internal("test")
+    };
+    let actor = mem_store::jobs::JobActor::System("local-curation".into());
+    let mut tx = pool.begin().await.unwrap();
+    assert!(
+        mem_curate::approve_replacement_proposal_tx(&mut tx, &project, proposal, &broken, &actor)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    let mut tx = pool.begin().await.unwrap();
+    assert!(
+        mem_curate::reject_replacement_proposal_tx(&mut tx, &project, proposal, &broken, &actor)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    let unchanged: (String, i64) = sqlx::query_as("SELECT status,(SELECT count(*) FROM background_jobs WHERE operation_id=$1) FROM memory_replacement_proposals WHERE id=$1")
+        .bind(proposal).fetch_one(&pool).await.unwrap();
+    assert_eq!(unchanged, ("pending".into(), 0));
+    let approved = mem_curate::approve_replacement_proposal(&pool, &project, proposal)
+        .await
+        .unwrap();
+    assert!(approved.new_memory_id.is_some());
+    let jobs: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM background_jobs WHERE operation_id=$1")
+            .bind(proposal)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(jobs, 4);
+    let events: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM project_timeline_events WHERE operation_id=$1")
+            .bind(proposal.to_string())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(events, 1);
+    let mut tx = pool.begin().await.unwrap();
+    assert!(
+        mem_curate::apply_validation_revision_tx(
+            &mut tx,
+            approved.target_memory_id,
+            "revised",
+            "revised body",
+            &broken,
+            &actor
+        )
+        .await
+        .is_err()
+    );
+    tx.rollback().await.unwrap();
+    let next_version = mem_curate::apply_validation_revision(
+        &pool,
+        approved.target_memory_id,
+        "revised",
+        "revised body",
+    )
+    .await
+    .unwrap();
+    let version_no: i32 = sqlx::query_scalar("SELECT version_no FROM memory_entries WHERE id=$1")
+        .bind(next_version)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        version_no, 3,
+        "a revision of an old version must allocate above the full stream"
+    );
+    let mut tx = pool.begin().await.unwrap();
+    let project_id: Uuid = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+        .bind(&project)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert!(matches!(
+        mem_store::post_curation::enqueue(&mut tx, project_id, proposal, &[next_version], &actor)
+            .await,
+        Err(mem_store::Error::Conflict)
+    ));
+    tx.rollback().await.unwrap();
+    mem_curate::refresh_memory_relations(&pool, &project, next_version)
+        .await
+        .unwrap();
+
     mem_test_support::cleanup_project(&pool, &project)
         .await
         .expect("cleanup test project");

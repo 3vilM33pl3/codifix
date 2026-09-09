@@ -28,9 +28,7 @@ pub(crate) enum JobsCommand {
         limit: u32,
     },
     #[command(about = "Inspect stages, dependencies and attempt history.", after_help = HELP)]
-    Inspect {
-        id: Uuid,
-    },
+    Inspect { id: Uuid },
     #[command(about = "Explicitly retry a failed or blocked stage.", after_help = HELP)]
     Retry {
         id: Uuid,

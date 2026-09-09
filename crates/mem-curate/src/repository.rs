@@ -783,13 +783,43 @@ fn replacement_target_types(candidate: &CandidateAssertion) -> Vec<String> {
 /// reinforcement validation pipeline for auto-applied rewording and
 /// human-approved corrections. Chunk embeddings for the new version are
 /// rebuilt by the service's automatic embedding maintenance, not here.
+pub struct ValidationRevisionMutation {
+    pub memory_id: Uuid,
+    pub event: mem_store::events::TimelineEvent,
+    pub sequence: i64,
+}
+
 pub async fn apply_validation_revision(
-    pool: &sqlx::PgPool,
+    pool: &PgPool,
     previous_memory_id: Uuid,
     new_summary: &str,
     new_canonical_text: &str,
 ) -> Result<Uuid, sqlx::Error> {
     let mut tx = pool.begin().await?;
+    let mutation = apply_validation_revision_tx(
+        &mut tx,
+        previous_memory_id,
+        new_summary,
+        new_canonical_text,
+        &mem_store::events::MutationContext::internal("validation-revision"),
+        &mem_store::jobs::JobActor::System("local-curation".into()),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(mutation.memory_id)
+}
+
+pub async fn apply_validation_revision_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    previous_memory_id: Uuid,
+    new_summary: &str,
+    new_canonical_text: &str,
+    context: &mem_store::events::MutationContext,
+    actor: &mem_store::jobs::JobActor,
+) -> Result<ValidationRevisionMutation, sqlx::Error> {
+    // Fence the canonical stream before allocating its next version.
+    let project: Uuid = sqlx::query_scalar("SELECT cs.project_id FROM memory_canonical_state cs JOIN memory_entries m ON m.canonical_id=cs.canonical_id WHERE m.id=$1 FOR UPDATE OF cs")
+        .bind(previous_memory_id).fetch_one(&mut **tx).await?;
     let new_memory_id = Uuid::new_v4();
     let inserted = sqlx::query(
         r#"
@@ -817,7 +847,7 @@ pub async fn apply_validation_revision(
     .bind(new_memory_id)
     .bind(new_canonical_text)
     .bind(new_summary)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
     if inserted.rows_affected() == 0 {
         return Err(sqlx::Error::RowNotFound);
@@ -831,7 +861,7 @@ pub async fn apply_validation_revision(
     )
     .bind(previous_memory_id)
     .bind(new_memory_id)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
     sqlx::query(
         r#"
@@ -846,11 +876,35 @@ pub async fn apply_validation_revision(
     )
     .bind(previous_memory_id)
     .bind(new_memory_id)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
-    rebuild_memory_chunks(&mut tx, new_memory_id).await?;
-    tx.commit().await?;
-    Ok(new_memory_id)
+    rebuild_memory_chunks(tx, new_memory_id).await?;
+    let mut event = mem_store::events::TimelineEvent::new(
+        project,
+        mem_record::ActivityKind::MemoryValidation,
+        format!("Validation revision: {new_memory_id}"),
+    );
+    event.memory_id = Some(new_memory_id);
+    let subject: (Uuid, i32) =
+        sqlx::query_as("SELECT canonical_id,version_no FROM memory_entries WHERE id=$1")
+            .bind(new_memory_id)
+            .fetch_one(&mut **tx)
+            .await?;
+    event.canonical_id = Some(subject.0);
+    event.version_no = Some(subject.1);
+    context.stamp(&mut event);
+    mem_store::post_curation::enqueue(tx, project, event.id, &[new_memory_id], actor)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    event.operation_id = Some(event.id.to_string());
+    let sequence = mem_store::events::append(tx, &event)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    Ok(ValidationRevisionMutation {
+        memory_id: new_memory_id,
+        event,
+        sequence,
+    })
 }
 
 async fn insert_candidate_memory(
@@ -875,18 +929,14 @@ async fn insert_memory_version(
     let memory_id = Uuid::new_v4();
     let (canonical_id, version_no) = match supersedes {
         Some(old_id) => {
-            let row = sqlx::query(
-                r#"
-                SELECT canonical_id, MAX(m.version_no) OVER (PARTITION BY canonical_id) AS latest
-                FROM memory_entries m
-                WHERE m.id = $1
-                "#,
+            let canonical_id: Uuid = sqlx::query_scalar("SELECT cs.canonical_id FROM memory_canonical_state cs JOIN memory_entries m ON m.canonical_id=cs.canonical_id WHERE m.id=$1 AND m.project_id=$2 FOR UPDATE OF cs")
+                .bind(old_id).bind(project_id).fetch_one(&mut **tx).await?;
+            let latest: i32 = sqlx::query_scalar(
+                "SELECT MAX(version_no) FROM memory_entries WHERE canonical_id=$1",
             )
-            .bind(old_id)
+            .bind(canonical_id)
             .fetch_one(&mut **tx)
             .await?;
-            let canonical_id: Uuid = row.try_get("canonical_id")?;
-            let latest: i32 = row.try_get("latest")?;
             (canonical_id, latest + 1)
         }
         None => (memory_id, 1),
@@ -1025,13 +1075,57 @@ pub async fn refresh_memory_relations(
     memory_id: Uuid,
 ) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
+    refresh_memory_relations_tx(&mut tx, project, memory_id).await?;
+    append_relation_event(&mut tx, project, "Lexical relation refresh").await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// SQL-only composition boundary; the owner appends its operation event last.
+pub async fn refresh_memory_relations_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project: &str,
+    memory_id: Uuid,
+) -> Result<(), sqlx::Error> {
     let project_row = sqlx::query("SELECT id FROM projects WHERE slug = $1")
         .bind(project)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
     let project_id: Uuid = project_row.try_get("id")?;
-    refresh_relations(&mut tx, project_id, memory_id).await?;
-    tx.commit().await?;
+    let valid: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM memory_entries WHERE id=$1 AND project_id=$2)",
+    )
+    .bind(memory_id)
+    .bind(project_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if !valid {
+        return Err(sqlx::Error::RowNotFound);
+    }
+    refresh_relations(tx, project_id, memory_id).await?;
+    Ok(())
+}
+
+async fn append_relation_event(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project: &str,
+    summary: &str,
+) -> Result<(), sqlx::Error> {
+    let project: Option<Uuid> = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+        .bind(project)
+        .fetch_optional(&mut **tx)
+        .await?;
+    if let Some(project) = project {
+        let mut event = mem_store::events::TimelineEvent::new(
+            project,
+            mem_record::ActivityKind::Reindex,
+            summary.into(),
+        );
+        mem_store::events::MutationContext::internal("relation-refresh").stamp(&mut event);
+        mem_store::events::append(tx, &event)
+            .await
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    }
     Ok(())
 }
 
@@ -1066,6 +1160,7 @@ pub async fn refresh_semantic_relations(
 ) -> Result<Vec<SemanticDuplicate>, sqlx::Error> {
     let mut tx = pool.begin().await?;
     let result = refresh_semantic_relations_tx(&mut tx, project, memory_ids, threshold).await?;
+    append_relation_event(&mut tx, project, "Semantic relation refresh").await?;
     tx.commit().await?;
     Ok(result)
 }
@@ -1734,12 +1829,90 @@ pub async fn list_replacement_proposals(
     })
 }
 
+pub struct ReplacementMutation {
+    pub response: ReplacementProposalResolutionResponse,
+    pub event: mem_store::events::TimelineEvent,
+    pub sequence: i64,
+}
+
+async fn finish_replacement_mutation(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    response: ReplacementProposalResolutionResponse,
+    context: &mem_store::events::MutationContext,
+    actor: &mem_store::jobs::JobActor,
+) -> Result<ReplacementMutation, sqlx::Error> {
+    let project: Uuid = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+        .bind(&response.project)
+        .fetch_one(&mut **tx)
+        .await?;
+    if let Some(version) = response.new_memory_id {
+        mem_store::post_curation::enqueue(tx, project, response.proposal_id, &[version], actor)
+            .await
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    }
+    let mut event = mem_store::events::TimelineEvent::new(
+        project,
+        mem_record::ActivityKind::MemoryReplacement,
+        format!(
+            "Replacement proposal {}: {}",
+            response.proposal_id, response.status
+        ),
+    );
+    event.operation_id = Some(response.proposal_id.to_string());
+    if let Some(new_memory_id) = response.new_memory_id {
+        event.details = Some(mem_record::ActivityDetails::MemoryReplacement {
+            old_memory_id: response.target_memory_id,
+            old_summary: response.target_summary.clone(),
+            new_memory_id,
+            new_summary: response.candidate_summary.clone(),
+            automatic: false,
+            policy: response.policy,
+        });
+    }
+    event.memory_id = response.new_memory_id.or(Some(response.target_memory_id));
+    let subject: (Uuid, i32) =
+        sqlx::query_as("SELECT canonical_id, version_no FROM memory_entries WHERE id=$1")
+            .bind(event.memory_id)
+            .fetch_one(&mut **tx)
+            .await?;
+    event.canonical_id = Some(subject.0);
+    event.version_no = Some(subject.1);
+    context.stamp(&mut event);
+    let sequence = mem_store::events::append(tx, &event)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    Ok(ReplacementMutation {
+        response,
+        event,
+        sequence,
+    })
+}
+
 pub async fn approve_replacement_proposal(
     pool: &PgPool,
     project: &str,
     proposal_id: Uuid,
 ) -> Result<ReplacementProposalResolutionResponse, sqlx::Error> {
     let mut tx = pool.begin().await?;
+    let mutation = approve_replacement_proposal_tx(
+        &mut tx,
+        project,
+        proposal_id,
+        &mem_store::events::MutationContext::internal("replacement-review"),
+        &mem_store::jobs::JobActor::System("local-curation".into()),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(mutation.response)
+}
+
+pub async fn approve_replacement_proposal_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project: &str,
+    proposal_id: Uuid,
+    context: &mem_store::events::MutationContext,
+    actor: &mem_store::jobs::JobActor,
+) -> Result<ReplacementMutation, sqlx::Error> {
     let row = sqlx::query(
         r#"
         SELECT
@@ -1754,11 +1927,12 @@ pub async fn approve_replacement_proposal(
         WHERE p.slug = $1
           AND mrp.id = $2
           AND mrp.status = 'pending'
+        FOR UPDATE OF mrp
         "#,
     )
     .bind(project)
     .bind(proposal_id)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut **tx)
     .await?;
     let target_memory_id: Uuid = row.try_get("target_memory_id")?;
     let target_summary: String = row.try_get("target_summary")?;
@@ -1772,26 +1946,25 @@ pub async fn approve_replacement_proposal(
 
     let project_row = sqlx::query("SELECT id FROM projects WHERE slug = $1")
         .bind(project)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
     let project_id: Uuid = project_row.try_get("id")?;
 
     // Record the approval as a new version of the target canonical memory;
     // the old version stays on disk and is visible to history-aware queries.
     let new_memory_id =
-        insert_memory_version(&mut tx, project_id, &candidate.0, Some(target_memory_id)).await?;
-    attach_candidate_metadata(&mut tx, new_memory_id, task_id, &candidate.0).await?;
-    rebuild_memory_chunks(&mut tx, new_memory_id).await?;
+        insert_memory_version(tx, project_id, &candidate.0, Some(target_memory_id)).await?;
+    attach_candidate_metadata(tx, new_memory_id, task_id, &candidate.0).await?;
+    rebuild_memory_chunks(tx, new_memory_id).await?;
     sqlx::query(
         "UPDATE memory_replacement_proposals SET status = 'approved', resolved_at = now() WHERE id = $1",
     )
     .bind(proposal_id)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
-    refresh_relations(&mut tx, project_id, new_memory_id).await?;
-    tx.commit().await?;
+    refresh_relations(tx, project_id, new_memory_id).await?;
 
-    Ok(ReplacementProposalResolutionResponse {
+    let response = ReplacementProposalResolutionResponse {
         project: project.to_string(),
         proposal_id,
         status: "approved".to_string(),
@@ -1800,7 +1973,8 @@ pub async fn approve_replacement_proposal(
         target_summary,
         candidate_summary: candidate.0.summary.clone(),
         new_memory_id: Some(new_memory_id),
-    })
+    };
+    finish_replacement_mutation(tx, response, context, actor).await
 }
 
 pub async fn reject_replacement_proposal(
@@ -1808,6 +1982,26 @@ pub async fn reject_replacement_proposal(
     project: &str,
     proposal_id: Uuid,
 ) -> Result<ReplacementProposalResolutionResponse, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let mutation = reject_replacement_proposal_tx(
+        &mut tx,
+        project,
+        proposal_id,
+        &mem_store::events::MutationContext::internal("replacement-review"),
+        &mem_store::jobs::JobActor::System("local-curation".into()),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(mutation.response)
+}
+
+pub async fn reject_replacement_proposal_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project: &str,
+    proposal_id: Uuid,
+    context: &mem_store::events::MutationContext,
+    actor: &mem_store::jobs::JobActor,
+) -> Result<ReplacementMutation, sqlx::Error> {
     let row = sqlx::query(
         r#"
         UPDATE memory_replacement_proposals mrp
@@ -1823,7 +2017,7 @@ pub async fn reject_replacement_proposal(
     )
     .bind(project)
     .bind(proposal_id)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await?;
     let candidate: sqlx::types::Json<CandidateAssertion> = row.try_get("candidate_json")?;
     let policy = match row.try_get::<String, _>("policy")?.as_str() {
@@ -1831,7 +2025,7 @@ pub async fn reject_replacement_proposal(
         "aggressive" => ReplacementPolicy::Aggressive,
         _ => ReplacementPolicy::Balanced,
     };
-    Ok(ReplacementProposalResolutionResponse {
+    let response = ReplacementProposalResolutionResponse {
         project: project.to_string(),
         proposal_id,
         status: "rejected".to_string(),
@@ -1840,7 +2034,8 @@ pub async fn reject_replacement_proposal(
         target_summary: row.try_get("target_summary")?,
         candidate_summary: candidate.0.summary.clone(),
         new_memory_id: None,
-    })
+    };
+    finish_replacement_mutation(tx, response, context, actor).await
 }
 
 #[cfg(test)]

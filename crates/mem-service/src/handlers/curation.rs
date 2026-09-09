@@ -49,47 +49,60 @@ pub(crate) async fn project_replacement_proposals(
             .map_err(ApiError::sql)?,
     ))
 }
-
 pub(crate) async fn project_replacement_proposal_approve(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path((slug, proposal_id)): Path<(String, Uuid)>,
 ) -> Result<Json<ReplacementProposalResolutionResponse>, ApiError> {
-    let response = approve_replacement_proposal(&state.pool()?, &slug, proposal_id)
-        .await
-        .map_err(ApiError::sql)?;
-    if let Some(new_memory_id) = response.new_memory_id {
-        notify_project_changed(
-            &state,
-            slug.clone(),
-            Some(new_memory_id),
-            ActivityKind::MemoryReplacement,
-            format!(
-                "Replaced memory \"{}\" with \"{}\" after review.",
-                response.target_summary, response.candidate_summary
-            ),
-            Some(ActivityDetails::MemoryReplacement {
-                old_memory_id: response.target_memory_id,
-                old_summary: response.target_summary.clone(),
-                new_memory_id,
-                new_summary: response.candidate_summary.clone(),
-                automatic: false,
-                policy: response.policy,
-            }),
-        );
-    }
-    notify_project_refreshed(&state, slug.clone());
-    Ok(Json(response))
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name.clone(),
+        source: "replacement-review".into(),
+        occurred_at: None,
+    };
+    let actor = mem_store::jobs::JobActor::Credential {
+        principal: principal.id,
+        token: principal.token_id,
+        session: principal.session_id,
+    };
+    let pool = state.pool()?;
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let mutation =
+        mem_curate::approve_replacement_proposal_tx(&mut tx, &slug, proposal_id, &context, &actor)
+            .await
+            .map_err(ApiError::sql)?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    crate::repository::events::broadcast_committed(&state, slug, mutation.event, mutation.sequence);
+    state.background.notify.notify_one();
+    Ok(Json(mutation.response))
 }
 
 pub(crate) async fn project_replacement_proposal_reject(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path((slug, proposal_id)): Path<(String, Uuid)>,
 ) -> Result<Json<ReplacementProposalResolutionResponse>, ApiError> {
-    let response = reject_replacement_proposal(&state.pool()?, &slug, proposal_id)
-        .await
-        .map_err(ApiError::sql)?;
-    notify_project_refreshed(&state, slug.clone());
-    Ok(Json(response))
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name.clone(),
+        source: "replacement-review".into(),
+        occurred_at: None,
+    };
+    let actor = mem_store::jobs::JobActor::Credential {
+        principal: principal.id,
+        token: principal.token_id,
+        session: principal.session_id,
+    };
+    let pool = state.pool()?;
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let mutation =
+        mem_curate::reject_replacement_proposal_tx(&mut tx, &slug, proposal_id, &context, &actor)
+            .await
+            .map_err(ApiError::sql)?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    crate::repository::events::broadcast_committed(&state, slug, mutation.event, mutation.sequence);
+    state.background.notify.notify_one();
+    Ok(Json(mutation.response))
 }
 
 #[derive(Debug, Deserialize)]
