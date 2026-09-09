@@ -28,6 +28,8 @@ pub(crate) struct OfflineSyncState {
 
 #[derive(Clone, Debug, Serialize, SerdeDeserialize)]
 pub(crate) struct QueuedActivityEvent {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) context: Option<mem_store::events::MutationContext>,
     pub(crate) event_id: Uuid,
     pub(crate) project: String,
     pub(crate) kind: ActivityKind,
@@ -118,9 +120,9 @@ async fn sync_activity(pool: &PgPool, payload_json: &str) -> Result<()> {
         r#"
         INSERT INTO project_timeline_events (
             id, project_id, recorded_at, kind, memory_id, summary, details_json,
-            source
+            source, actor_id, actor_name
         )
-        VALUES ($1, $2, $3, $4, NULL, $5, $6, 'offline_sync')
+        VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, $9)
         ON CONFLICT (id) DO NOTHING
         "#,
     )
@@ -130,6 +132,15 @@ async fn sync_activity(pool: &PgPool, payload_json: &str) -> Result<()> {
     .bind(crate::repository::events::activity_kind_label(&event.kind))
     .bind(event.summary)
     .bind(event.details.map(sqlx::types::Json))
+    .bind(
+        event
+            .context
+            .as_ref()
+            .map(|c| c.source.as_str())
+            .unwrap_or("legacy-offline"),
+    )
+    .bind(event.context.as_ref().map(|c| c.actor_id.as_str()))
+    .bind(event.context.as_ref().map(|c| c.actor_name.as_str()))
     .execute(pool)
     .await?;
     Ok(())
@@ -629,6 +640,7 @@ mod tests {
         let path = temp_db_path("offline-activity");
         let store = OfflineStore::open(path.clone()).await.unwrap();
         let event = QueuedActivityEvent {
+            context: None,
             event_id: Uuid::new_v4(),
             project: "memory".to_string(),
             kind: ActivityKind::Checkpoint,
@@ -648,5 +660,44 @@ mod tests {
 
         drop(store);
         let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn activity_replay_preserves_attribution_and_is_idempotent() {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let project = mem_test_support::unique_project_slug("offline-activity-actor");
+        let project_id = crate::repository::handlers::bundle::upsert_project_slug(&pool, &project)
+            .await
+            .unwrap();
+        let context = mem_store::events::MutationContext {
+            actor_id: Uuid::new_v4().to_string(),
+            actor_name: "offline operator".into(),
+            source: "activity-ingest".into(),
+            occurred_at: None,
+        };
+        let event = QueuedActivityEvent {
+            event_id: Uuid::new_v4(),
+            project: project.clone(),
+            kind: ActivityKind::Checkpoint,
+            summary: "offline checkpoint".into(),
+            details: None,
+            recorded_at: chrono::Utc::now(),
+            context: Some(context.clone()),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        sync_activity(&pool, &json).await.unwrap();
+        sync_activity(&pool, &json).await.unwrap();
+        let events = mem_store::events::page(&pool, project_id, 0, 10)
+            .await
+            .unwrap();
+        assert_eq!(events.events.len(), 1);
+        assert_eq!(events.events[0]["actor_id"], context.actor_id);
+        assert_eq!(events.events[0]["actor_name"], context.actor_name);
+        assert_eq!(events.events[0]["source"], context.source);
+        mem_test_support::cleanup_project(&pool, &project)
+            .await
+            .unwrap();
     }
 }

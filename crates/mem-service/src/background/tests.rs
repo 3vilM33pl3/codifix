@@ -255,6 +255,43 @@ fn provider_classification_is_bounded_and_never_exposes_body() {
 }
 
 #[tokio::test]
+async fn failed_timeline_appends_never_broadcast_committed_activity() {
+    let Some(f) = Fixture::new(0).await else {
+        return;
+    };
+    let mut receiver = f.state.events.subscribe();
+    crate::repository::events::notify_project_changed(
+        &f.state,
+        f.slug.clone(),
+        None,
+        ActivityKind::Checkpoint,
+        "\0".into(),
+        None,
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), receiver.recv())
+            .await
+            .is_err()
+    );
+    assert!(f.state.recent_activity.lock().unwrap().is_empty());
+    crate::repository::events::notify_project_changed(
+        &f.state,
+        f.slug.clone(),
+        None,
+        ActivityKind::Checkpoint,
+        "committed".into(),
+        None,
+    );
+    let event = tokio::time::timeout(Duration::from_secs(2), receiver.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(event.seq.is_some());
+    assert_eq!(event.summary, "committed");
+    f.cleanup().await;
+}
+
+#[tokio::test]
 async fn jobs_http_inspection_retry_and_project_policy_are_real_and_sanitized() {
     let Some(mut f) = Fixture::new(0).await else {
         return;
@@ -280,6 +317,41 @@ async fn jobs_http_inspection_retry_and_project_policy_are_real_and_sanitized() 
     });
     let client = reqwest::Client::new();
     let url = format!("{base}/{}/jobs", f.slug);
+    let ingest_url = format!("{}/v1/activity", base.trim_end_matches("/v1/projects"));
+    let mut activity = serde_json::json!({"activity":"checkpoint","project":f.slug,"checkpoint":{"project":f.slug,"repo_root":"/fixture","marked_at":chrono::Utc::now(),"note":"checkpoint receipt"}});
+    let logged: Value = client
+        .post(&ingest_url)
+        .bearer_auth(&token)
+        .json(&activity)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let receipt: (Option<String>, String) =
+        sqlx::query_as("SELECT actor_id,summary FROM project_timeline_events WHERE seq=$1")
+            .bind(logged["seq"].as_i64().unwrap())
+            .fetch_one(&f.pool)
+            .await
+            .unwrap();
+    assert_eq!(receipt.0, Some(principal.to_string()));
+    assert!(receipt.1.contains("checkpoint receipt"));
+    activity["checkpoint"]["note"] = serde_json::json!("\0");
+    assert_eq!(
+        client
+            .post(&ingest_url)
+            .bearer_auth(&token)
+            .json(&activity)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    let before_cursor = logged["seq"].as_i64().unwrap();
     // The existing activity endpoint exposes commit-safe ordered recovery.
     let activity_url = format!("{base}/{}/activities", f.slug);
     let mut first = f.pool.begin().await.unwrap();
@@ -310,7 +382,7 @@ async fn jobs_http_inspection_retry_and_project_policy_are_real_and_sanitized() 
             .is_err()
     );
     let pending: Value = client
-        .get(format!("{activity_url}?after_seq=0&limit=1"))
+        .get(format!("{activity_url}?after_seq={before_cursor}&limit=1"))
         .bearer_auth(&token)
         .send()
         .await
@@ -325,7 +397,7 @@ async fn jobs_http_inspection_retry_and_project_policy_are_real_and_sanitized() 
     let second_seq = second.await.unwrap();
     assert!(second_seq > first_seq);
     let first_page: Value = client
-        .get(format!("{activity_url}?after_seq=0&limit=1"))
+        .get(format!("{activity_url}?after_seq={before_cursor}&limit=1"))
         .bearer_auth(&token)
         .send()
         .await

@@ -129,73 +129,43 @@ pub(crate) async fn append_timeline_event(
     pool: &sqlx::PgPool,
     event: &ServiceEvent,
 ) -> Result<i64, sqlx::Error> {
-    let project_id: Uuid = sqlx::query_scalar("SELECT id FROM projects WHERE slug = $1")
+    let mut tx = pool.begin().await?;
+    let project: Uuid = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
         .bind(&event.project)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await?;
-    let identity = match event.memory_id {
-        Some(memory_id) => {
-            sqlx::query("SELECT canonical_id, version_no FROM memory_entries WHERE id = $1")
-                .bind(memory_id)
-                .fetch_optional(pool)
-                .await?
-                .map(|row| {
-                    Ok::<_, sqlx::Error>((
-                        row.try_get::<Uuid, _>("canonical_id")?,
-                        row.try_get::<i32, _>("version_no")?,
-                    ))
-                })
-                .transpose()?
-        }
-        None => None,
-    };
-    let seq: i64 = sqlx::query_scalar(
-        r#"
-        INSERT INTO project_timeline_events (
-            id, project_id, recorded_at, kind, memory_id, canonical_id, version_no,
-            summary, details_json,
-            actor_id, actor_name, source, operation_id, duration_ms, provider, model,
-            input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens
+    let mut durable =
+        mem_store::events::TimelineEvent::new(project, event.kind.clone(), event.summary.clone());
+    durable.id = event.id;
+    durable.recorded_at = event.recorded_at;
+    durable.memory_id = event.memory_id;
+    durable.details = event.details.clone();
+    durable.actor_id = event.actor_id.clone();
+    durable.actor_name = event.actor_name.clone();
+    durable.source = event.source.clone();
+    durable.operation_id = event.operation_id.clone();
+    durable.duration_ms = event.duration_ms;
+    durable.provider = event.provider.clone();
+    durable.model = event.model.clone();
+    durable.token_usage = event.token_usage.clone();
+    if let Some(id) = event.memory_id {
+        let subject: Option<(Uuid, i32)> = sqlx::query_as(
+            "SELECT canonical_id,version_no FROM memory_entries WHERE id=$1 AND project_id=$2",
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-                $17, $18, $19, $20, $21)
-        RETURNING seq
-        "#,
-    )
-    .bind(event.id)
-    .bind(project_id)
-    .bind(event.recorded_at)
-    .bind(activity_kind_label(&event.kind))
-    .bind(event.memory_id)
-    .bind(identity.map(|(canonical_id, _)| canonical_id))
-    .bind(identity.map(|(_, version_no)| version_no))
-    .bind(&event.summary)
-    .bind(event.details.clone().map(sqlx::types::Json))
-    .bind(&event.actor_id)
-    .bind(&event.actor_name)
-    .bind(&event.source)
-    .bind(&event.operation_id)
-    .bind(event.duration_ms.map(|value| value as i64))
-    .bind(&event.provider)
-    .bind(&event.model)
-    .bind(event.token_usage.as_ref().map(|u| u.input_tokens as i64))
-    .bind(event.token_usage.as_ref().map(|u| u.output_tokens as i64))
-    .bind(
-        event
-            .token_usage
-            .as_ref()
-            .map(|u| u.cache_read_tokens as i64),
-    )
-    .bind(
-        event
-            .token_usage
-            .as_ref()
-            .map(|u| u.cache_write_tokens as i64),
-    )
-    .bind(event.token_usage.as_ref().map(|u| u.total_tokens as i64))
-    .fetch_one(pool)
-    .await?;
-    Ok(seq)
+        .bind(id)
+        .bind(project)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some((canonical, version)) = subject {
+            durable.canonical_id = Some(canonical);
+            durable.version_no = Some(version);
+        }
+    }
+    let sequence = mem_store::events::append(&mut tx, &durable)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    tx.commit().await?;
+    Ok(sequence)
 }
 
 /// Only call after the owning mutation transaction committed. This helper
@@ -301,40 +271,31 @@ pub(crate) fn notify_project_changed_with_metadata(
         token_usage,
         include_activity: true,
     };
-    {
-        let mut history = state
-            .recent_activity
-            .lock()
-            .expect("activity history mutex poisoned");
-        history.push_front(event.clone());
-        while history.len() > 20 {
-            history.pop_back();
-        }
-    }
-    match (event.include_activity, state.pool()) {
-        (true, Ok(pool)) => {
-            // Persist first so subscribers see the log position; failures are
-            // loud, and the event still broadcasts without a seq.
-            let events = state.events.clone();
-            tokio::spawn(async move {
-                let mut event = event;
-                match append_timeline_event(&pool, &event).await {
-                    Ok(seq) => event.seq = Some(seq),
-                    Err(error) => {
-                        tracing::warn!(
-                            error = %error,
-                            project = %event.project,
-                            kind = ?event.kind,
-                            "failed to persist timeline event"
-                        );
-                    }
+    if let Ok(pool) = state.pool() {
+        let state = state.clone();
+        tokio::spawn(async move {
+            let mut event = event;
+            match append_timeline_event(&pool, &event).await {
+                Ok(seq) => event.seq = Some(seq),
+                Err(_) => {
+                    tracing::warn!(project = %event.project, kind = ?event.kind, "timeline append failed; no committed activity broadcast");
+                    return;
                 }
-                let _ = events.send(event);
-            });
-        }
-        _ => {
+            }
+            {
+                let mut history = state
+                    .recent_activity
+                    .lock()
+                    .expect("activity history mutex poisoned");
+                history.push_front(event.clone());
+                while history.len() > 20 {
+                    history.pop_back();
+                }
+            }
             let _ = state.events.send(event);
-        }
+        });
+    } else {
+        tracing::warn!(project = %event.project, "timeline unavailable; no committed activity broadcast");
     }
 }
 

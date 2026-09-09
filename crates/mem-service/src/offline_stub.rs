@@ -40,6 +40,7 @@ pub(crate) struct OfflineSyncState {
 
 #[derive(Debug, Clone)]
 pub(crate) struct QueuedActivityEvent {
+    pub(crate) context: Option<mem_store::events::MutationContext>,
     pub(crate) event_id: Uuid,
     pub(crate) project: String,
     pub(crate) kind: ActivityKind,

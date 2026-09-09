@@ -90,20 +90,27 @@ fn capture_connection_unavailable(error: &sqlx::Error) -> bool {
 /// replaces /v1/{checkpoint,plan,scan,graph}/activity.
 pub(crate) async fn ingest_activity(
     state: State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
     Json(request): Json<mem_record::ActivityIngestRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "activity-ingest".into(),
+        occurred_at: None,
+    };
     match request {
         mem_record::ActivityIngestRequest::Checkpoint(request) => {
-            checkpoint_activity(state, Json(request)).await
+            checkpoint_activity(state, Json(request), &context).await
         }
         mem_record::ActivityIngestRequest::Plan(request) => {
-            plan_activity(state, Json(request)).await
+            plan_activity(state, Json(request), &context).await
         }
         mem_record::ActivityIngestRequest::Scan(request) => {
-            scan_activity(state, Json(request)).await
+            scan_activity(state, Json(request), &context).await
         }
         mem_record::ActivityIngestRequest::Graph(request) => {
-            graph_activity(state, Json(request)).await
+            graph_activity(state, Json(request), &context).await
         }
     }
 }
@@ -111,6 +118,7 @@ pub(crate) async fn ingest_activity(
 pub(crate) async fn scan_activity(
     State(state): State<AppState>,
     Json(request): Json<ScanActivityRequest>,
+    context: &mem_store::events::MutationContext,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
 
@@ -135,32 +143,23 @@ pub(crate) async fn scan_activity(
         capture_id: request.capture_id.clone(),
         curate_run_id: request.curate_run_id.clone(),
     };
-    if !state.pool_available() {
-        return offline_activity_response(
-            &state,
-            request.project.clone(),
-            ActivityKind::Scan,
-            summary,
-            Some(details),
-        )
-        .await;
-    }
-    notify_project_changed(
+    persist_activity(
         &state,
-        request.project.clone(),
-        None,
+        request.project,
         ActivityKind::Scan,
         summary,
         Some(details),
-    );
-    Ok(Json(serde_json::json!({ "logged": true })))
+        context,
+    )
+    .await
 }
 
 pub(crate) async fn graph_activity(
     State(state): State<AppState>,
     Json(request): Json<GraphActivityRequest>,
+    context: &mem_store::events::MutationContext,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    record_graph_activity(&state, request).await?;
+    record_graph_activity(&state, request, context).await?;
     Ok(Json(serde_json::json!({ "logged": true })))
 }
 
@@ -169,30 +168,21 @@ pub(crate) async fn graph_activity(
 pub(crate) async fn record_graph_activity(
     state: &AppState,
     request: GraphActivityRequest,
+    context: &mem_store::events::MutationContext,
 ) -> Result<(), ApiError> {
     request.validate().map_err(ApiError::validation)?;
 
     let summary = graph_activity_summary(&request);
     let details = graph_activity_details(&request);
-    if !state.pool_available() {
-        let _queued = offline_activity_response(
-            state,
-            request.project.clone(),
-            ActivityKind::GraphExtract,
-            summary,
-            Some(details),
-        )
-        .await?;
-        return Ok(());
-    }
-    notify_project_changed(
+    let _ = persist_activity(
         state,
-        request.project.clone(),
-        None,
+        request.project,
         ActivityKind::GraphExtract,
         summary,
         Some(details),
-    );
+        context,
+    )
+    .await?;
     Ok(())
 }
 
@@ -235,6 +225,7 @@ pub(crate) fn graph_activity_details(request: &GraphActivityRequest) -> Activity
 pub(crate) async fn checkpoint_activity(
     State(state): State<AppState>,
     Json(request): Json<CheckpointActivityRequest>,
+    context: &mem_store::events::MutationContext,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
 
@@ -250,30 +241,21 @@ pub(crate) async fn checkpoint_activity(
         git_branch: request.checkpoint.git_branch.clone(),
         git_head: request.checkpoint.git_head.clone(),
     };
-    if !state.pool_available() {
-        return offline_activity_response(
-            &state,
-            request.project.clone(),
-            ActivityKind::Checkpoint,
-            summary,
-            Some(details),
-        )
-        .await;
-    }
-    notify_project_changed(
+    persist_activity(
         &state,
-        request.project.clone(),
-        None,
+        request.project,
         ActivityKind::Checkpoint,
         summary,
         Some(details),
-    );
-    Ok(Json(serde_json::json!({ "logged": true })))
+        context,
+    )
+    .await
 }
 
 pub(crate) async fn plan_activity(
     State(state): State<AppState>,
     Json(request): Json<PlanActivityRequest>,
+    context: &mem_store::events::MutationContext,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
 
@@ -304,61 +286,57 @@ pub(crate) async fn plan_activity(
         source_path: request.source_path.clone(),
         verified_complete,
     };
-    if !state.pool_available() {
-        return offline_activity_response(
-            &state,
-            request.project.clone(),
-            ActivityKind::Plan,
-            summary,
-            Some(details),
-        )
-        .await;
-    }
-    notify_project_changed(
+    persist_activity(
         &state,
-        request.project.clone(),
-        None,
+        request.project,
         ActivityKind::Plan,
         summary,
         Some(details),
-    );
-    Ok(Json(serde_json::json!({ "logged": true })))
+        context,
+    )
+    .await
 }
 
-async fn offline_activity_response(
+async fn persist_activity(
     state: &AppState,
     project: String,
     kind: ActivityKind,
     summary: String,
     details: Option<ActivityDetails>,
+    context: &mem_store::events::MutationContext,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let queue_id = queue_activity_offline(state, project, kind, summary, details).await?;
-    Ok(Json(serde_json::json!({
-        "logged": true,
-        "queued_offline": true,
-        "offline_queue_id": queue_id
-    })))
-}
-
-async fn queue_activity_offline(
-    state: &AppState,
-    project: String,
-    kind: ActivityKind,
-    summary: String,
-    details: Option<ActivityDetails>,
-) -> Result<Uuid, ApiError> {
-    let Some(store) = state.offline_store() else {
-        return Err(ApiError::service_unavailable(
-            "PostgreSQL is unavailable and offline backup is disabled",
+    if !state.pool_available() {
+        let store = state
+            .offline_store()
+            .ok_or_else(|| ApiError::service_unavailable("timeline storage unavailable"))?;
+        let event = QueuedActivityEvent {
+            event_id: Uuid::new_v4(),
+            project,
+            kind,
+            summary,
+            details,
+            recorded_at: chrono::Utc::now(),
+            context: Some(context.clone()),
+        };
+        let queue_id = store.queue_activity(&event).await.map_err(ApiError::io)?;
+        return Ok(Json(
+            serde_json::json!({"logged":true,"queued_offline":true,"offline_queue_id":queue_id}),
         ));
-    };
-    let event = QueuedActivityEvent {
-        event_id: Uuid::new_v4(),
-        project,
-        kind,
-        summary,
-        details,
-        recorded_at: chrono::Utc::now(),
-    };
-    store.queue_activity(&event).await.map_err(ApiError::io)
+    }
+    let pool = state.pool()?;
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let project_id = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+        .bind(&project)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(ApiError::sql)?;
+    let mut event = mem_store::events::TimelineEvent::new(project_id, kind, summary);
+    event.details = details;
+    context.stamp(&mut event);
+    let seq = mem_store::events::append(&mut tx, &event)
+        .await
+        .map_err(|_| ApiError::service_unavailable("timeline append failed"))?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    crate::repository::events::broadcast_committed(state, project, event, seq);
+    Ok(Json(serde_json::json!({"logged":true,"seq":seq})))
 }

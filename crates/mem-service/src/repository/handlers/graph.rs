@@ -62,6 +62,7 @@ pub(crate) async fn project_graph(
 
 pub(crate) async fn project_graph_extract(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(slug): Path<String>,
     Json(mut request): Json<mem_graph::GraphExtractionRequest>,
 ) -> Result<Json<mem_graph::GraphExtractionReport>, ApiError> {
@@ -78,7 +79,13 @@ pub(crate) async fn project_graph_extract(
     };
     if !report.dry_run {
         let activity = mem_graph::activity_request(&report);
-        crate::handlers::activity::record_graph_activity(&state, activity).await?;
+        let context = mem_store::events::MutationContext {
+            actor_id: principal.id.to_string(),
+            actor_name: principal.display_name,
+            source: "graph-extract".into(),
+            occurred_at: None,
+        };
+        crate::handlers::activity::record_graph_activity(&state, activity, &context).await?;
     }
     Ok(Json(report))
 }
