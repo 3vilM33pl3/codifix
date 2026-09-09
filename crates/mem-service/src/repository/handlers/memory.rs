@@ -2,6 +2,25 @@
 
 use crate::prelude::*;
 use crate::*;
+pub mod mutations;
+pub mod retention;
+
+fn mutation_error(error: sqlx::Error) -> ApiError {
+    if matches!(error, sqlx::Error::RowNotFound) {
+        ApiError::not_found("memory or project not found")
+    } else {
+        ApiError::sql(error)
+    }
+}
+
+fn mutation_context(principal: &AuthenticatedPrincipal) -> mem_store::events::MutationContext {
+    mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name.clone(),
+        source: "memory-mutation".into(),
+        occurred_at: None,
+    }
+}
 
 pub async fn fetch_memory_entry(
     pool: &PgPool,
@@ -254,81 +273,34 @@ pub(crate) async fn get_memory_history(
 
 pub(crate) async fn archive(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<ArchiveRequest>,
 ) -> Result<Json<ArchiveResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
-    let project = request.project.clone();
-    let archived_count = if request.dry_run {
-        sqlx::query(
-            r#"
-            SELECT COUNT(*) AS count
-            FROM memory_canonical_state cs
-            JOIN projects p ON p.id = cs.project_id
-            WHERE p.slug = $1
-              AND cs.status = 'active'
-              AND cs.confidence <= $2
-              AND cs.importance <= $3
-            "#,
-        )
-        .bind(&request.project)
-        .bind(request.max_confidence)
-        .bind(request.max_importance)
-        .fetch_one(&state.pool()?)
-        .await
-        .map_err(ApiError::sql)?
-        .try_get::<i64, _>("count")
-        .map_err(ApiError::sql)? as u64
-    } else {
-        sqlx::query(
-            r#"
-            UPDATE memory_canonical_state cs
-            SET status = 'archived', archived_at = now(), updated_at = now()
-            FROM projects p
-            WHERE p.id = cs.project_id
-              AND p.slug = $1
-              AND cs.status = 'active'
-              AND cs.confidence <= $2
-              AND cs.importance <= $3
-            "#,
-        )
-        .bind(&request.project)
-        .bind(request.max_confidence)
-        .bind(request.max_importance)
-        .execute(&state.pool()?)
-        .await
-        .map_err(ApiError::sql)?
-        .rows_affected()
-    };
+    let pool = state.pool()?;
     if request.dry_run {
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM memory_canonical_state cs JOIN projects p ON p.id=cs.project_id WHERE p.slug=$1 AND cs.status='active' AND cs.confidence<=$2 AND cs.importance<=$3")
+            .bind(&request.project).bind(request.max_confidence).bind(request.max_importance).fetch_one(&pool).await.map_err(mutation_error)?;
         return Ok(Json(ArchiveResponse {
-            archived_count,
+            archived_count: count as u64,
             dry_run: true,
         }));
     }
-    notify_project_changed(
+    let mutation = mutations::archive_bulk_as(&pool, &request, &mutation_context(&principal))
+        .await
+        .map_err(mutation_error)?;
+    crate::repository::events::broadcast_committed(
         &state,
-        project,
-        None,
-        ActivityKind::Archive,
-        format!(
-            "Archived {} low-value memory entry/entries.",
-            archived_count
-        ),
-        Some(ActivityDetails::Archive {
-            archived_count,
-            max_confidence: request.max_confidence,
-            max_importance: request.max_importance,
-        }),
+        request.project,
+        mutation.event,
+        mutation.sequence,
     );
-
-    Ok(Json(ArchiveResponse {
-        archived_count,
-        dry_run: false,
-    }))
+    Ok(Json(mutation.response))
 }
 
 pub(crate) async fn archive_memory(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ArchiveMemoryResponse>, ApiError> {
     if id.is_nil() {
@@ -336,126 +308,43 @@ pub(crate) async fn archive_memory(
             "memory id must be non-nil",
         )));
     }
-
-    let archived = sqlx::query(
-        r#"
-        UPDATE memory_canonical_state cs
-        SET status = 'archived',
-            archived_at = COALESCE(cs.archived_at, now()),
-            updated_at = now()
-        FROM memory_entries m
-        JOIN projects p ON p.id = m.project_id
-        WHERE m.id = $1
-          AND cs.canonical_id = m.canonical_id
-        RETURNING p.slug, m.summary, cs.status
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.pool()?)
-    .await
-    .map_err(ApiError::sql)?
-    .ok_or_else(|| ApiError::not_found("memory entry not found"))?;
-
-    let project: String = archived.try_get("slug").map_err(ApiError::sql)?;
-    let summary: String = archived.try_get("summary").map_err(ApiError::sql)?;
-    let status: String = archived.try_get("status").map_err(ApiError::sql)?;
-    let archived_now = status == "archived";
-
-    notify_project_changed(
+    let mutation = mutations::archive_one_as(&state.pool()?, id, &mutation_context(&principal))
+        .await
+        .map_err(mutation_error)?;
+    crate::repository::events::broadcast_committed(
         &state,
-        project.clone(),
-        Some(id),
-        ActivityKind::Archive,
-        format!("Archived memory: {summary}"),
-        None,
+        mutation.response.project.clone(),
+        mutation.event,
+        mutation.sequence,
     );
-
-    Ok(Json(ArchiveMemoryResponse {
-        memory_id: id,
-        project,
-        summary,
-        archived: archived_now,
-    }))
+    Ok(Json(mutation.response))
 }
 
 pub(crate) async fn delete_memory(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<DeleteMemoryRequest>,
 ) -> Result<Json<DeleteMemoryResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
-
-    // Memories are immutable. Delete writes a tombstone version — a row with
-    // the same canonical_id but empty content and is_tombstone=TRUE. Default
-    // searches skip it; history-aware queries can still surface the prior
-    // versions so nothing is truly lost.
-    let pool = &state.pool()?;
-    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
-    let target = sqlx::query(
-        r#"
-        SELECT m.id, m.project_id, p.slug, m.canonical_id, m.summary,
-               (
-                   SELECT MAX(m2.version_no)
-                   FROM memory_entries m2
-                   WHERE m2.canonical_id = m.canonical_id
-               ) AS latest_version
-        FROM memory_entries m
-        JOIN projects p ON p.id = m.project_id
-        WHERE m.id = $1
-        "#,
+    let mutation = mutations::tombstone_as(
+        &state.pool()?,
+        request.memory_id,
+        &mutation_context(&principal),
     )
-    .bind(request.memory_id)
-    .fetch_optional(&mut *tx)
     .await
-    .map_err(ApiError::sql)?
-    .ok_or_else(|| ApiError::not_found("memory entry not found"))?;
-
-    let project_id: Uuid = target.try_get("project_id").map_err(ApiError::sql)?;
-    let project: String = target.try_get("slug").map_err(ApiError::sql)?;
-    let canonical_id: Uuid = target.try_get("canonical_id").map_err(ApiError::sql)?;
-    let latest_version: i32 = target.try_get("latest_version").map_err(ApiError::sql)?;
-    let summary: String = target.try_get("summary").map_err(ApiError::sql)?;
-
-    let tombstone_id = Uuid::new_v4();
-    sqlx::query(
-        r#"
-        INSERT INTO memory_entries
-            (id, project_id, canonical_id, version_no, is_tombstone, canonical_text, summary, memory_type, scope, importance, confidence, created_at, updated_at, search_document)
-        VALUES
-            ($1, $2, $3, $4, TRUE, '', '', 'implementation', 'project', 0, 0.0, now(), now(), to_tsvector('english', ''))
-        "#,
-    )
-    .bind(tombstone_id)
-    .bind(project_id)
-    .bind(canonical_id)
-    .bind(latest_version + 1)
-    .execute(&mut *tx)
-    .await
-    .map_err(ApiError::sql)?;
-    tx.commit().await.map_err(ApiError::sql)?;
-
-    let memory_id = tombstone_id;
-    notify_project_changed(
+    .map_err(mutation_error)?;
+    crate::repository::events::broadcast_committed(
         &state,
-        project.clone(),
-        Some(memory_id),
-        ActivityKind::DeleteMemory,
-        format!("Deleted memory: {summary}"),
-        Some(ActivityDetails::DeleteMemory {
-            deleted: true,
-            summary: summary.clone(),
-        }),
+        mutation.response.project.clone(),
+        mutation.event,
+        mutation.sequence,
     );
-
-    Ok(Json(DeleteMemoryResponse {
-        memory_id,
-        project,
-        summary,
-        deleted: true,
-    }))
+    Ok(Json(mutation.response))
 }
 
 pub(crate) async fn prune_history(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<PruneHistoryRequest>,
 ) -> Result<Json<PruneHistoryResponse>, ApiError> {
     // Fill missing thresholds from server config so the caller can rely on
@@ -474,139 +363,16 @@ pub(crate) async fn prune_history(
     };
     effective.validate().map_err(ApiError::validation)?;
 
-    // Operational timeline events (queries, watcher heartbeats) accrue fast
-    // and carry no institutional value beyond their window; prune them here
-    // so the durable log stays dominated by mutation and provenance events.
-    if let Some(after) = state.config.retention.operational_events_after
-        && !effective.dry_run
-    {
-        let cutoff = chrono::Utc::now()
-            - chrono::Duration::from_std(after)
-                .map_err(|_| ApiError::internal("retention window too large"))?;
-        sqlx::query(
-            "DELETE FROM project_timeline_events              WHERE kind IN ('query', 'watcher_health') AND recorded_at < $1",
-        )
-        .bind(cutoff)
-        .execute(&state.pool()?)
-        .await
-        .map_err(ApiError::sql)?;
+    let mutation = retention::prune_as(
+        &state.pool()?,
+        &effective,
+        state.config.retention.operational_events_after,
+        &mutation_context(&principal),
+    )
+    .await
+    .map_err(ApiError::sql)?;
+    for (project, event, sequence) in mutation.events {
+        crate::repository::events::broadcast_committed(&state, project, event, sequence);
     }
-
-    let pool = &state.pool()?;
-    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
-
-    let project_filter: Option<String> = effective.project.clone();
-    let dry_run = effective.dry_run;
-
-    let mut canonicals_tombstoned_deleted: u64 = 0;
-    if let Some(threshold) = effective.tombstone_after {
-        let seconds = threshold.as_secs_f64();
-        let count_sql = r#"
-            WITH latest AS (
-                SELECT DISTINCT ON (m.canonical_id)
-                       m.canonical_id, m.updated_at, m.is_tombstone
-                FROM memory_entries m
-                JOIN projects p ON p.id = m.project_id
-                WHERE ($1::text IS NULL OR p.slug = $1)
-                ORDER BY m.canonical_id, m.version_no DESC
-            )
-            SELECT COUNT(*) AS count
-            FROM latest
-            WHERE is_tombstone = TRUE
-              AND updated_at < now() - make_interval(secs => $2)
-        "#;
-        let count: i64 = sqlx::query(count_sql)
-            .bind(project_filter.as_deref())
-            .bind(seconds)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(ApiError::sql)?
-            .try_get("count")
-            .map_err(ApiError::sql)?;
-        canonicals_tombstoned_deleted = count.max(0) as u64;
-
-        if !dry_run && canonicals_tombstoned_deleted > 0 {
-            let delete_sql = r#"
-                WITH latest AS (
-                    SELECT DISTINCT ON (m.canonical_id)
-                           m.canonical_id, m.updated_at, m.is_tombstone
-                    FROM memory_entries m
-                    JOIN projects p ON p.id = m.project_id
-                    WHERE ($1::text IS NULL OR p.slug = $1)
-                    ORDER BY m.canonical_id, m.version_no DESC
-                ),
-                dead AS (
-                    SELECT canonical_id FROM latest
-                    WHERE is_tombstone = TRUE
-                      AND updated_at < now() - make_interval(secs => $2)
-                )
-                DELETE FROM memory_entries
-                WHERE canonical_id IN (SELECT canonical_id FROM dead)
-            "#;
-            sqlx::query(delete_sql)
-                .bind(project_filter.as_deref())
-                .bind(seconds)
-                .execute(&mut *tx)
-                .await
-                .map_err(ApiError::sql)?;
-        }
-    }
-
-    let mut superseded_versions_pruned: u64 = 0;
-    if let Some(threshold) = effective.superseded_after {
-        let seconds = threshold.as_secs_f64();
-        let count_sql = r#"
-            SELECT COUNT(*) AS count
-            FROM memory_entries m
-            JOIN projects p ON p.id = m.project_id
-            WHERE ($1::text IS NULL OR p.slug = $1)
-              AND m.is_tombstone = FALSE
-              AND m.updated_at < now() - make_interval(secs => $2)
-              AND m.version_no < (
-                  SELECT MAX(m2.version_no)
-                  FROM memory_entries m2
-                  WHERE m2.canonical_id = m.canonical_id
-              )
-        "#;
-        let count: i64 = sqlx::query(count_sql)
-            .bind(project_filter.as_deref())
-            .bind(seconds)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(ApiError::sql)?
-            .try_get("count")
-            .map_err(ApiError::sql)?;
-        superseded_versions_pruned = count.max(0) as u64;
-
-        if !dry_run && superseded_versions_pruned > 0 {
-            let delete_sql = r#"
-                DELETE FROM memory_entries m
-                USING projects p
-                WHERE m.project_id = p.id
-                  AND ($1::text IS NULL OR p.slug = $1)
-                  AND m.is_tombstone = FALSE
-                  AND m.updated_at < now() - make_interval(secs => $2)
-                  AND m.version_no < (
-                      SELECT MAX(m2.version_no)
-                      FROM memory_entries m2
-                      WHERE m2.canonical_id = m.canonical_id
-                  )
-            "#;
-            sqlx::query(delete_sql)
-                .bind(project_filter.as_deref())
-                .bind(seconds)
-                .execute(&mut *tx)
-                .await
-                .map_err(ApiError::sql)?;
-        }
-    }
-
-    tx.commit().await.map_err(ApiError::sql)?;
-
-    Ok(Json(PruneHistoryResponse {
-        project: project_filter,
-        canonicals_tombstoned_deleted,
-        superseded_versions_pruned,
-        dry_run,
-    }))
+    Ok(Json(mutation.response))
 }

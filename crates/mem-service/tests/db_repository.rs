@@ -1778,6 +1778,160 @@ async fn insert_memory_fixture(pool: &PgPool, project_id: Uuid) -> Uuid {
     memory_id
 }
 
+#[tokio::test]
+async fn archive_and_tombstone_cannot_outlive_failed_events() -> anyhow::Result<()> {
+    use mem_service::repository::handlers::memory::mutations::*;
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return Ok(());
+    };
+    let project = mem_test_support::unique_project_slug("memory-mutation-atomic");
+    let project_id =
+        mem_service::repository::handlers::bundle::upsert_project_slug(&pool, &project).await?;
+    let memory_id = insert_memory_fixture(&pool, project_id).await;
+    let good = mem_store::events::MutationContext::internal("test");
+    let broken = mem_store::events::MutationContext {
+        source: "\0".into(),
+        ..good.clone()
+    };
+    assert!(archive_one_as(&pool, memory_id, &broken).await.is_err());
+    let request = mem_record::ArchiveRequest {
+        project: project.clone(),
+        max_confidence: 1.0,
+        max_importance: 5,
+        dry_run: false,
+    };
+    assert!(archive_bulk_as(&pool, &request, &broken).await.is_err());
+    assert!(tombstone_as(&pool, memory_id, &broken).await.is_err());
+    let status: String =
+        sqlx::query_scalar("SELECT status FROM memory_canonical_state WHERE canonical_id=$1")
+            .bind(memory_id)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(status, "active");
+    let versions: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM memory_entries WHERE canonical_id=$1")
+            .bind(memory_id)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(versions, 1);
+    archive_one_as(&pool, memory_id, &good).await?;
+    let (left, right) = tokio::join!(
+        tombstone_as(&pool, memory_id, &good),
+        tombstone_as(&pool, memory_id, &good)
+    );
+    let left = left?;
+    let right = right?;
+    let mut versions = [left.event.version_no, right.event.version_no];
+    versions.sort();
+    assert_eq!(versions, [Some(2), Some(3)]);
+    let events = mem_store::events::page(&pool, project_id, 0, 100).await?;
+    assert_eq!(events.events.len(), 3);
+    for event in &events.events {
+        assert_eq!(event["canonical_id"], memory_id.to_string());
+    }
+    mem_test_support::cleanup_project(&pool, &project).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn retention_is_atomic_project_scoped_and_reports_lost_timeline_history() -> anyhow::Result<()>
+{
+    use mem_service::repository::handlers::memory::{mutations, retention};
+    use mem_store::events::{MutationContext, TimelineEvent};
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return Ok(());
+    };
+    let slug = mem_test_support::unique_project_slug("retention-atomic");
+    let other = mem_test_support::unique_project_slug("retention-other");
+    let project =
+        mem_service::repository::handlers::bundle::upsert_project_slug(&pool, &slug).await?;
+    let other_project =
+        mem_service::repository::handlers::bundle::upsert_project_slug(&pool, &other).await?;
+    let id = insert_memory_fixture(&pool, project).await;
+    let context = MutationContext::internal("test");
+    let tombstone = mutations::tombstone_as(&pool, id, &context).await?;
+    let mut tx = pool.begin().await?;
+    let mut event =
+        TimelineEvent::new(project, mem_record::ActivityKind::Query, "old query".into());
+    event.recorded_at -= chrono::Duration::days(2);
+    let seq = mem_store::events::append(&mut tx, &event).await?;
+    event.id = Uuid::new_v4();
+    event.project_id = other_project;
+    mem_store::events::append(&mut tx, &event).await?;
+    tx.commit().await?;
+    let request = mem_record::PruneHistoryRequest {
+        project: Some(slug.clone()),
+        tombstone_after: Some(std::time::Duration::ZERO),
+        superseded_after: None,
+        dry_run: false,
+    };
+    let broken = MutationContext {
+        source: "\0".into(),
+        ..context.clone()
+    };
+    assert!(
+        retention::prune_as(
+            &pool,
+            &request,
+            Some(std::time::Duration::from_secs(86400)),
+            &broken
+        )
+        .await
+        .is_err()
+    );
+    let count: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM memory_entries WHERE canonical_id=$1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(count, 2);
+    assert!(
+        !mem_store::events::page(&pool, project, 0, 100)
+            .await?
+            .retention_gap
+    );
+    let preview = retention::prune_as(
+        &pool,
+        &mem_record::PruneHistoryRequest {
+            dry_run: true,
+            ..request.clone()
+        },
+        Some(std::time::Duration::ZERO),
+        &context,
+    )
+    .await?;
+    assert_eq!(preview.response.canonicals_tombstoned_deleted, 1);
+    assert!(preview.events.is_empty());
+    let deleted = retention::prune_as(
+        &pool,
+        &request,
+        Some(std::time::Duration::from_secs(86400)),
+        &context,
+    )
+    .await?;
+    assert_eq!(deleted.response.canonicals_tombstoned_deleted, 1);
+    assert_eq!(deleted.events.len(), 1);
+    let page = mem_store::events::page(&pool, project, 0, 100).await?;
+    assert!(page.retention_gap);
+    assert_eq!(page.deleted_through, Some(seq));
+    assert!(
+        page.events
+            .iter()
+            .any(|e| e["id"] == tombstone.event.id.to_string()),
+        "tombstone activity survives subject deletion"
+    );
+    assert_eq!(
+        mem_store::events::page(&pool, other_project, 0, 100)
+            .await?
+            .events
+            .len(),
+        1
+    );
+    mem_test_support::cleanup_project(&pool, &slug).await?;
+    mem_test_support::cleanup_project(&pool, &other).await?;
+    Ok(())
+}
+
 async fn insert_graph_memory_source(pool: &PgPool, memory_id: Uuid) -> Uuid {
     let source_id = Uuid::new_v4();
     sqlx::query(

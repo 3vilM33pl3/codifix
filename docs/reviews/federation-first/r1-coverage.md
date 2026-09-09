@@ -9,7 +9,7 @@ write-path references before the R1 gate can close.
 | Capture | mem-curate `store_capture_tx`/`store_capture_as` | session/task/capture + attributed event, replay identity and failure rollback | [x] |
 | Curation | mem-curate `curate_tx_with_actor`/`curate_as` | run/memories/automatic replacements + events + version-pinned durable enrichment intents; late-event failure rollback tested | [x] |
 | Replacement/validation versions and relations | mem-curate transaction APIs; mem-reinforce | replacement decisions and new versions/events/job intents coupled; direct relation batches emit operation events; reinforcement review/score orchestration still open | [ ] |
-| Archive/delete/retention | service memory repository | state/deletion + surviving subject event | [ ] |
+| Archive/delete/retention | service memory repository `mutations`/`retention` transaction APIs | state/tombstone/pruning + surviving subject or operation event; direct callers, late-event rollback, concurrent tombstones, scoped retention and dry run tested | [x] |
 | Provenance checks | service provenance repository | check transition + event | [ ] |
 | Bundle import/export | service bundle repository | DB apply + event; external intent/outcome | [ ] |
 | Graph/index/embedding batches | mem-graph, service embedding repository | batch result + operation event | [ ] |
