@@ -89,6 +89,12 @@ legal/customer and release decisions.
 
 ## E. End-to-end federated knowledge workflow
 
+The [first E increment](2026-09-09-e-service.md) adds the [authenticated local
+workflow API](../../user/federation-workflow.md): local grants, exact review,
+retry-safe queueing, status and retained citations. It does not close any complete
+E item below: remote enrollment, corrections, client parity and the full
+independently administered two-party workflow still need implementation/evidence.
+
 - [ ] E1 Enroll two independently operated Memory instances with separate databases and administrative boundaries in a private project space.
 - [ ] E2 Review/publish selected memory and evidence, retrieve/cite on the second instance with publisher/author/version attribution, propose correction to origin, and approve as a new shared version preserving provenance.
 - [ ] E3 Provide Web/CLI/TUI parity for membership, publication review, proposals and sync state; keep origin/sharing restrictions in retrieval results.
