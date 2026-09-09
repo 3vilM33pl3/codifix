@@ -730,6 +730,7 @@ pub(crate) async fn revoke_service_token(
         )));
     }
     let id = Uuid::parse_str(selector).ok();
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
     let rows = sqlx::query(
         r#"
         SELECT id, principal_id, name, token_prefix, created_at, expires_at,
@@ -743,7 +744,7 @@ pub(crate) async fn revoke_service_token(
     )
     .bind(id)
     .bind(selector)
-    .fetch_all(pool)
+    .fetch_all(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
     if rows.is_empty() {
@@ -758,15 +759,15 @@ pub(crate) async fn revoke_service_token(
     let row = &rows[0];
     let token_id: Uuid = row.try_get("id").map_err(ApiError::sql)?;
     let principal_id: Uuid = row.try_get("principal_id").map_err(ApiError::sql)?;
-    sqlx::query(
-        "UPDATE auth_service_tokens SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1",
+    let revoked_at: chrono::DateTime<Utc> = sqlx::query_scalar(
+        "UPDATE auth_service_tokens SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1 RETURNING revoked_at",
     )
     .bind(token_id)
-    .execute(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
-    insert_audit(
-        pool,
+    insert_audit_tx(
+        &mut tx,
         persisted_actor_id(actor),
         "service_token.revoke",
         None,
@@ -775,6 +776,7 @@ pub(crate) async fn revoke_service_token(
         serde_json::json!({}),
     )
     .await?;
+    tx.commit().await.map_err(ApiError::sql)?;
     Ok(AuthServiceTokenResponse {
         id: token_id,
         principal_id,
@@ -782,7 +784,7 @@ pub(crate) async fn revoke_service_token(
         token_prefix: row.try_get("token_prefix").map_err(ApiError::sql)?,
         created_at: row.try_get("created_at").map_err(ApiError::sql)?,
         expires_at: row.try_get("expires_at").map_err(ApiError::sql)?,
-        revoked_at: Some(Utc::now()),
+        revoked_at: Some(revoked_at),
         last_used_at: row.try_get("last_used_at").map_err(ApiError::sql)?,
         token: None,
         projects: project_access_for_principal(pool, principal_id).await?,
@@ -800,9 +802,10 @@ pub(crate) async fn grant_membership(
             "project must be non-empty",
         )));
     }
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
     let principal_kind: String = sqlx::query("SELECT kind FROM auth_principals WHERE id = $1")
         .bind(request.principal_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(ApiError::sql)?
         .ok_or_else(|| ApiError::not_found("principal not found"))?
@@ -815,7 +818,7 @@ pub(crate) async fn grant_membership(
     }
     let project_id: Uuid = sqlx::query("SELECT id FROM projects WHERE slug = $1")
         .bind(project)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(ApiError::sql)?
         .ok_or_else(|| ApiError::not_found("project not found"))?
@@ -839,11 +842,11 @@ pub(crate) async fn grant_membership(
     .bind(project_id)
     .bind(request.role.as_str())
     .bind(actor_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
-    insert_audit(
-        pool,
+    insert_audit_tx(
+        &mut tx,
         actor_id,
         "membership.grant",
         Some(project_id),
@@ -852,6 +855,7 @@ pub(crate) async fn grant_membership(
         serde_json::json!({"role": request.role.as_str()}),
     )
     .await?;
+    tx.commit().await.map_err(ApiError::sql)?;
     Ok(AuthMembershipResponse {
         id: row.try_get("id").map_err(ApiError::sql)?,
         principal_id: request.principal_id,
@@ -897,6 +901,7 @@ pub(crate) async fn revoke_membership(
     actor: &AuthenticatedPrincipal,
     membership_id: Uuid,
 ) -> Result<AuthMembershipResponse, ApiError> {
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
     let row = sqlx::query(
         r#"
         DELETE FROM auth_project_memberships m
@@ -907,15 +912,15 @@ pub(crate) async fn revoke_membership(
         "#,
     )
     .bind(membership_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(ApiError::sql)?
     .ok_or_else(|| ApiError::not_found("membership not found"))?;
     let role_value: String = row.try_get("role").map_err(ApiError::sql)?;
     let project_id: Uuid = row.try_get("project_id").map_err(ApiError::sql)?;
     let principal_id: Uuid = row.try_get("principal_id").map_err(ApiError::sql)?;
-    insert_audit(
-        pool,
+    insert_audit_tx(
+        &mut tx,
         persisted_actor_id(actor),
         "membership.revoke",
         Some(project_id),
@@ -924,6 +929,7 @@ pub(crate) async fn revoke_membership(
         serde_json::json!({}),
     )
     .await?;
+    tx.commit().await.map_err(ApiError::sql)?;
     Ok(AuthMembershipResponse {
         id: membership_id,
         principal_id,
@@ -965,36 +971,6 @@ pub(crate) fn random_secret(bytes: usize) -> String {
     let mut value = vec![0_u8; bytes];
     rand::rng().fill_bytes(&mut value);
     URL_SAFE_NO_PAD.encode(value)
-}
-
-async fn insert_audit(
-    pool: &PgPool,
-    actor_id: Option<Uuid>,
-    event_type: &str,
-    project_id: Option<Uuid>,
-    target_principal_id: Option<Uuid>,
-    target_token_id: Option<Uuid>,
-    metadata: serde_json::Value,
-) -> Result<(), ApiError> {
-    sqlx::query(
-        r#"
-        INSERT INTO auth_audit_events
-            (id, actor_principal_id, event_type, outcome, project_id,
-             target_principal_id, target_token_id, metadata_json, recorded_at)
-        VALUES ($1, $2, $3, 'success', $4, $5, $6, $7, now())
-        "#,
-    )
-    .bind(Uuid::new_v4())
-    .bind(actor_id)
-    .bind(event_type)
-    .bind(project_id)
-    .bind(target_principal_id)
-    .bind(target_token_id)
-    .bind(metadata)
-    .execute(pool)
-    .await
-    .map_err(ApiError::sql)?;
-    Ok(())
 }
 
 /// Records a denied or errored authorization decision. Fire-and-forget:
@@ -1179,6 +1155,110 @@ mod tests {
                 "principal listing must select `{column}`"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn administrative_mutations_roll_back_when_audit_append_fails() {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let project = mem_test_support::unique_project_slug("r1-auth-atomic");
+        crate::repository::handlers::bundle::upsert_project_slug(&pool, &project)
+            .await
+            .unwrap();
+        let owner = legacy_principal();
+        let created = create_service_token(
+            &pool,
+            &owner,
+            AuthServiceTokenCreateRequest {
+                name: "disposable".into(),
+                project: project.clone(),
+                role: AuthRole::Writer,
+                expires_in_seconds: Some(3600),
+            },
+        )
+        .await
+        .unwrap();
+        // This actor doesn't exist: the protected audit FK rejects the append
+        // AFTER the token/membership mutation. The whole mutation must roll back.
+        let mut missing_actor = owner.clone();
+        missing_actor.id = Uuid::new_v4();
+        missing_actor.credential_source = CredentialSource::BrowserSession;
+        assert!(
+            revoke_service_token(&pool, &missing_actor, &created.id.to_string())
+                .await
+                .is_err()
+        );
+        let revoked: Option<chrono::DateTime<Utc>> =
+            sqlx::query_scalar("SELECT revoked_at FROM auth_service_tokens WHERE id=$1")
+                .bind(created.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(revoked.is_none());
+        let membership = grant_membership(
+            &pool,
+            &owner,
+            AuthMembershipGrantRequest {
+                principal_id: created.principal_id,
+                project: project.clone(),
+                role: AuthRole::Operator,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(
+            revoke_membership(&pool, &missing_actor, membership.id)
+                .await
+                .is_err()
+        );
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_project_memberships WHERE id=$1)")
+                .bind(membership.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(exists);
+        let revoked = revoke_service_token(&pool, &owner, &created.id.to_string())
+            .await
+            .unwrap();
+        let again = revoke_service_token(&pool, &owner, &created.id.to_string())
+            .await
+            .unwrap();
+        assert_eq!(
+            revoked.revoked_at, again.revoked_at,
+            "repeated revocation reports the stored timestamp"
+        );
+        revoke_membership(&pool, &owner, membership.id)
+            .await
+            .unwrap();
+        let events: Vec<String> = sqlx::query_scalar("SELECT event_type FROM auth_audit_events WHERE target_principal_id=$1 ORDER BY event_type")
+            .bind(created.principal_id).fetch_all(&pool).await.unwrap();
+        assert_eq!(
+            events,
+            vec![
+                "membership.grant",
+                "membership.revoke",
+                "service_token.create",
+                "service_token.revoke",
+                "service_token.revoke"
+            ]
+        );
+        let leaked: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM project_timeline_events WHERE actor_id=$1")
+                .bind(missing_actor.id.to_string())
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(leaked, 0);
+        sqlx::query("DELETE FROM auth_principals WHERE id=$1")
+            .bind(created.principal_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        mem_test_support::cleanup_project(&pool, &project)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
