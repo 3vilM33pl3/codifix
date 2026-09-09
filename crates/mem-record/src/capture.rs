@@ -196,6 +196,9 @@ pub struct OfflinePendingItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurateResponse {
+    /// Durable stage identities; queued work is not completed enrichment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_work: Option<crate::BackgroundWorkReference>,
     pub project_id: Uuid,
     pub run_id: Uuid,
     pub input_count: i64,

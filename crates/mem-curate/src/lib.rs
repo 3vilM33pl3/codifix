@@ -9,7 +9,8 @@ pub mod ingest;
 
 pub use repository::{
     CaptureMutation, CurateMutation, SemanticDuplicate, apply_validation_revision,
-    approve_replacement_proposal, curate, curate_as, curate_tx, list_replacement_proposals,
-    preview_capture, preview_curate, refresh_memory_relations, refresh_semantic_relations,
-    reject_replacement_proposal, store_capture, store_capture_as, store_capture_tx,
+    approve_replacement_proposal, curate, curate_as, curate_tx, curate_tx_with_actor,
+    list_replacement_proposals, preview_capture, preview_curate, refresh_memory_relations,
+    refresh_semantic_relations, refresh_semantic_relations_tx, reject_replacement_proposal,
+    store_capture, store_capture_as, store_capture_tx,
 };

@@ -6,6 +6,7 @@
 
 pub mod events;
 pub mod jobs;
+pub mod post_curation;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

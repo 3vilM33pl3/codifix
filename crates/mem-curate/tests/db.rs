@@ -10,6 +10,84 @@ use sqlx::Row;
 use uuid::Uuid;
 
 #[tokio::test]
+async fn curation_events_and_version_pinned_job_intents_commit_or_rollback_together() {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let project = mem_test_support::unique_project_slug("curation-job-intents");
+    let capture = store_capture(
+        &pool,
+        &capture_request(
+            &project,
+            "Durable intent",
+            "Background work must retain the immutable memory version identity.",
+            "Durable source",
+        ),
+    )
+    .await
+    .unwrap();
+    let request = CurateRequest {
+        project: project.clone(),
+        batch_size: Some(10),
+        raw_capture_id: Some(capture.raw_capture_id),
+        replacement_policy: None,
+        dry_run: false,
+    };
+    let mut context = mem_store::events::MutationContext::internal("fixture");
+    // Late event failure, after memory, curation run and all stage intents.
+    context.source = "\0".into();
+    assert!(
+        mem_curate::curate_as(&pool, &request, &context)
+            .await
+            .is_err()
+    );
+    let counts: (i64,i64,i64) = sqlx::query_as("SELECT (SELECT count(*) FROM curation_runs c JOIN projects p ON p.id=c.project_id WHERE p.slug=$1),(SELECT count(*) FROM background_jobs j JOIN projects p ON p.id=j.project_id WHERE p.slug=$1),(SELECT count(*) FROM background_work_versions v JOIN projects p ON p.id=v.project_id WHERE p.slug=$1)")
+        .bind(&project).fetch_one(&pool).await.unwrap();
+    assert_eq!(counts, (0, 0, 0));
+    let still_pending: bool =
+        sqlx::query_scalar("SELECT curated_at IS NULL FROM raw_captures WHERE id=$1")
+            .bind(capture.raw_capture_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(still_pending);
+    let response = curate(&pool, &request).await.unwrap();
+    let work = response.background_work.unwrap();
+    assert_eq!(work.operation_id, response.run_id);
+    assert_eq!(work.job_ids.len(), 4);
+    let inputs: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT memory_id FROM background_work_versions WHERE operation_id=$1 ORDER BY memory_id",
+    )
+    .bind(work.operation_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let mut expected = response.memory_ids;
+    expected.sort();
+    assert_eq!(inputs, expected);
+    let validation_deps: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM background_job_dependencies WHERE job_id=$1")
+            .bind(work.job_ids[2])
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(validation_deps, 0);
+    let preview = preview_curate(
+        &pool,
+        &CurateRequest {
+            dry_run: true,
+            ..request
+        },
+    )
+    .await
+    .unwrap();
+    assert!(preview.background_work.is_none());
+    mem_test_support::cleanup_project(&pool, &project)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn capture_curate_and_replacement_proposal_flow_persists_rows() {
     let Some(pool) = mem_test_support::migrated_pool().await else {
         return;

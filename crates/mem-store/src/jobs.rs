@@ -17,12 +17,29 @@ use uuid::Uuid;
 #[serde(tag = "kind", content = "id", rename_all = "snake_case")]
 pub enum JobActor {
     Principal(Uuid),
+    /// Credential IDs are non-secret, and allow revocation to fence queued work.
+    Credential {
+        principal: Uuid,
+        token: Option<Uuid>,
+        session: Option<Uuid>,
+    },
     System(String),
 }
 
 impl JobActor {
     fn validate(&self) -> Result<()> {
         match self {
+            Self::Credential {
+                principal,
+                token,
+                session,
+            } if !principal.is_nil()
+                && !(token.is_some() && session.is_some())
+                && token.is_none_or(|id| !id.is_nil())
+                && session.is_none_or(|id| !id.is_nil()) =>
+            {
+                Ok(())
+            }
             Self::Principal(id) if !id.is_nil() => Ok(()),
             Self::System(name)
                 if !name.is_empty()
@@ -337,6 +354,19 @@ pub async fn finish_result(
     sqlx::query("UPDATE background_job_attempts SET finished_at=clock_timestamp(),outcome=$2,failure=$3 WHERE token=$1 AND finished_at IS NULL")
         .bind(lease.token).bind(status).bind(failure).execute(&mut *tx).await?;
     clear_slot(&mut tx, lease.job.project_id).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Persist reusable successful output without acknowledging the stage. The
+/// lease must still be live at commit, just as for the final result transaction.
+pub async fn checkpoint_result(result: JobResult<'_>) -> Result<()> {
+    let JobResult { mut tx, lease } = result;
+    let alive: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM background_jobs WHERE id=$1 AND lease_token=$2 AND status='running' AND lease_until>clock_timestamp())")
+        .bind(lease.job.id).bind(lease.token).fetch_one(&mut *tx).await?;
+    if !alive {
+        return Err(Error::StaleLease);
+    }
     tx.commit().await?;
     Ok(())
 }

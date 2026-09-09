@@ -217,6 +217,19 @@ pub async fn curate_tx(
     request: &CurateRequest,
     context: &mem_store::events::MutationContext,
 ) -> Result<CurateMutation, sqlx::Error> {
+    let actor = match Uuid::parse_str(&context.actor_id) {
+        Ok(id) => mem_store::jobs::JobActor::Principal(id),
+        Err(_) => mem_store::jobs::JobActor::System("local-curation".into()),
+    };
+    curate_tx_with_actor(tx, request, context, &actor).await
+}
+
+pub async fn curate_tx_with_actor(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    request: &CurateRequest,
+    context: &mem_store::events::MutationContext,
+    actor: &mem_store::jobs::JobActor,
+) -> Result<CurateMutation, sqlx::Error> {
     if request.dry_run {
         return Err(sqlx::Error::Protocol(
             "use preview_curate for dry runs".into(),
@@ -369,6 +382,11 @@ pub async fn curate_tx(
     .await?;
 
     let response = CurateResponse {
+        background_work: Some(
+            mem_store::post_curation::enqueue(tx, project_id, run_id, &memory_ids, actor)
+                .await
+                .map_err(|e| sqlx::Error::Protocol(e.to_string()))?,
+        ),
         project_id,
         run_id,
         input_count: captures.len() as i64,
@@ -518,6 +536,7 @@ pub async fn preview_curate(
     tx.rollback().await?;
 
     Ok(CurateResponse {
+        background_work: None,
         project_id,
         run_id: Uuid::nil(),
         input_count: captures.len() as i64,
@@ -1045,13 +1064,25 @@ pub async fn refresh_semantic_relations(
     memory_ids: &[Uuid],
     threshold: f64,
 ) -> Result<Vec<SemanticDuplicate>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let result = refresh_semantic_relations_tx(&mut tx, project, memory_ids, threshold).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+/// SQL-only result application; the caller owns the transaction and event.
+pub async fn refresh_semantic_relations_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project: &str,
+    memory_ids: &[Uuid],
+    threshold: f64,
+) -> Result<Vec<SemanticDuplicate>, sqlx::Error> {
     if memory_ids.is_empty() {
         return Ok(Vec::new());
     }
-    let mut tx = pool.begin().await?;
     let Some(project_row) = sqlx::query("SELECT id FROM projects WHERE slug = $1")
         .bind(project)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut **tx)
         .await?
     else {
         return Ok(Vec::new());
@@ -1060,7 +1091,19 @@ pub async fn refresh_semantic_relations(
 
     let mut duplicates = Vec::new();
     for &memory_id in memory_ids {
-        let Some(current) = load_memory_profile(&mut tx, memory_id).await? else {
+        let own: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM memory_entries WHERE id=$1 AND project_id=$2)",
+        )
+        .bind(memory_id)
+        .bind(project_id)
+        .fetch_one(&mut **tx)
+        .await?;
+        if !own {
+            return Err(sqlx::Error::Protocol(
+                "semantic source missing or outside project".into(),
+            ));
+        }
+        let Some(current) = load_memory_profile(tx, memory_id).await? else {
             continue;
         };
         let current_tokens = normalize_text(&current.canonical_text);
@@ -1092,7 +1135,7 @@ pub async fn refresh_semantic_relations(
         .bind(memory_id)
         .bind(project_id)
         .bind(threshold)
-        .fetch_all(&mut *tx)
+        .fetch_all(&mut **tx)
         .await?;
 
         for row in neighbors {
@@ -1109,8 +1152,8 @@ pub async fn refresh_semantic_relations(
             } else {
                 MemoryRelationType::Duplicates
             };
-            insert_relation(&mut tx, memory_id, other_memory_id, relation.clone()).await?;
-            insert_relation(&mut tx, other_memory_id, memory_id, relation).await?;
+            insert_relation(tx, memory_id, other_memory_id, relation.clone()).await?;
+            insert_relation(tx, other_memory_id, memory_id, relation).await?;
             duplicates.push(SemanticDuplicate {
                 memory_id,
                 summary: current.summary.clone(),
@@ -1122,7 +1165,6 @@ pub async fn refresh_semantic_relations(
             });
         }
     }
-    tx.commit().await?;
     Ok(duplicates)
 }
 

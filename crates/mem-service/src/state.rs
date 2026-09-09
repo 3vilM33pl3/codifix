@@ -116,6 +116,7 @@ mod post_curation_tests {
                 dry_run: false,
             },
             response: CurateResponse {
+                background_work: None,
                 project_id: Uuid::new_v4(),
                 run_id: Uuid::new_v4(),
                 input_count: 1,
