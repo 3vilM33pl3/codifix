@@ -1,17 +1,18 @@
 # Federation runtime: controlled integration environments
 
-Stage C provides opt-in durable publication and synchronization, **not a released
+Stages C/D provide opt-in durable publication and trust enforcement, **not a released
 customer federation product**. The wire namespace is unpublished. Do not enable
-this against customer data before the [D/E and release gates](../reviews/federation-first/README.md)
+this against customer data before the [E and release gates](../reviews/federation-first/README.md)
 pass. Native Spaces alpha is not used.
 
 ## Enable deliberately
 
 `memory service run` starts no federation tasks by default. An administrator may
 set `MEMORY_LAYER_FEDERATION_CONFIG` to an absolute JSON file path. Each service
-process runs one configured role/space. IDs are stable, non-nil UUIDs selected at
+process runs one configured instance/space. IDs are stable, non-nil UUIDs selected at
 enrollment, not regenerated on restart. Use separate PostgreSQL databases for
-each instance and the gateway; migrations apply on ordinary service startup.
+each instance and the gateway. The general service refuses the gateway role;
+use the dedicated executable described below.
 
 An instance configuration has these fields (replace all examples with enrolled
 identities and an explicitly configured test deployment):
@@ -25,7 +26,12 @@ identities and an explicitly configured test deployment):
   "project": "00000000-0000-0000-0000-000000000004",
   "principal": "00000000-0000-0000-0000-000000000005",
   "gateway": "https://gateway.federation.example.com",
-  "token_file": "/run/secrets/memory-gateway-token"
+  "token_file": "/run/secrets/memory-gateway-token",
+  "receipt_keys": [{
+    "generation": 1,
+    "first_sequence": 1,
+    "public_key": "<independently enrolled gateway audit did:key>"
+  }]
 }
 ```
 
@@ -39,18 +45,29 @@ These APIs are currently in-process `mem_service::federation` interfaces; the
 Web/CLI/TUI enrollment/review/proposal screens are still E work. Do not bypass
 local permission checks with raw HTTP-to-repository API exposure.
 
-The gateway configuration is separate:
+The gateway configuration is separate. Start only
+`memory-federation-gateway /absolute/path/gateway.json`, with a dedicated,
+pre-provisioned database and a non-owner restricted SQL login. The binary never
+runs migrations, the local app, MCP, watchers or model providers. See the
+[private topology and grants](../../deploy/federation/README.md).
 
 ```json
 {
-  "role": "gateway",
   "space": "00000000-0000-0000-0000-000000000001",
   "authority": "00000000-0000-0000-0000-000000000002",
   "listen": "127.0.0.1:4055",
+  "database_url_file": "/run/secrets/gateway-database-url",
   "pds": "https://pds.federation.example.com",
   "repository": "did:web:space.federation.example.com",
   "signing_key": "<enrolled did:key public signing key>",
   "token_file": "/run/secrets/memory-pds-token",
+  "audit_key_file": "/run/secrets/gateway-audit-key",
+  "receipt_keys": [{
+    "generation": 1,
+    "first_sequence": 1,
+    "public_key": "<independently enrolled gateway audit did:key>"
+  }],
+  "policy": { "external_models": [] },
   "credentials": [
     {
       "instance": "00000000-0000-0000-0000-000000000002",
@@ -67,24 +84,36 @@ The gateway configuration is separate:
 Gateway bearer credentials identify enrolled **instances**, not human authors.
 An authority credential can submit explicit membership records at `/v1/accept`;
 merely listing a member token does not grant Pull or Publish. `/v1/pull` requires
-current Pull membership and returns only the contiguous published prefix.
+current Pull membership and returns a fresh nonce-bound signed page with the
+contiguous published prefix, independent publication receipts and current policy.
+The client supplies `after`, `limit` (1–32) and a random UUID `nonce`.
 PDS credentials must never be distributed to participant instances. The listener
 is HTTP and requires a reviewed private-network/TLS termination arrangement;
 the outbound clients require HTTPS. Prevent all raw PDS/CAR/firehose bypasses.
-Those deployment controls are not installed by this setting.
+The [isolation harness](../../tests/federation-isolation/README.md) exercises those
+controls; setting this file does not itself install a network or TLS edge.
 
 `signing_key` is now mandatory: replace the placeholder with the repository's
 canonical compressed `did:key` public signing key, enrolled through a trusted
 administration channel together with the repository DID and space. Missing or
 malformed keys prevent gateway startup. The public key is not a PDS access token
 or private signing key. Do not copy a key from an untrusted record or silently
-trust the first key returned by a server. Discovery and key rotation are not
-implemented; an unexpected key change blocks publication for operator review.
+trust the first key returned by a server. There is no discovery or automatic
+key replacement. PDS key changes require an explicitly verified upstream migration.
+Gateway receipt keys are independent: append a generation with the exact next
+unpublished sequence, distribute trust to receivers and restart with matching
+audit secret and replacement tokens. Existing readers/writers are fenced. See
+[key rollover and recovery](../developer/architecture/federation-security.md).
 
-Token files must be private (0600 on Unix), 32–4096 bytes. Configuration rejects
+Token/database URL files must be private (0600 on Unix), 32–4096 bytes; audit keys
+are exactly 64 hexadecimal characters representing a 32-byte scalar. Never reuse
+a PDS signing key as an audit key. Configuration rejects
 unknown fields, invalid IDs and unsafe URL shapes. Endpoints are pinned origins,
 not discovered from imported records; redirects and environment proxies are
-disabled. `disposable_test_mode: true` permits fixture HTTP only in debug builds;
+disabled. Optional `gateway_ca_file` (instance) and `pds_ca_file` (gateway) select
+a trusted PEM root instead of built-in roots, retaining hostname/certificate
+verification. No insecure TLS option exists.
+`disposable_test_mode: true` permits fixture HTTP only in debug builds;
 release service builds reject it. No automatic session refresh is implemented:
 expired PDS credentials block work until an operator replaces the private token
 file, restarts the role and explicitly retries blocked work. Do not skip a blocked
@@ -98,8 +127,8 @@ The storage APIs expose separate `DeliveryStatus` observations:
 | --- | --- |
 | Queued | Local intent committed; gateway has not accepted it |
 | Accepted | Gateway committed authorization, reducer result, order and PDS work |
-| Published | Exact URI/CID/readback plus signed repository inclusion verified under the enrolled key |
-| Replicated | One named receiver committed its inbox, projection and cursor |
+| Published | Verified exact URI/CID/signed inclusion and independent receipt committed with the published prefix |
+| Replicated | One named receiver verified receipts and committed them with inbox, projection and cursor |
 
 `intent_status`, `GatewayStore::status` and `ReplicaStore::status` report their
 own observation; none implies every participant has received the record. Frozen
@@ -115,7 +144,7 @@ administrator's configured space/instance/project and avoid dumping payloads:
   and its applied cursor. Worker warnings are sanitized; they do not include tokens.
 
 Local PostgreSQL work stays usable while the gateway/PDS/peer is unavailable.
-Receiver pages and projection/cursor commits are atomic. A gap or corrupt batch
+Receiver receipts and inbox/projection/cursor commits are atomic. A gap or corrupt batch
 does not advance the cursor. An authorized recovery path can call
 `InstanceSync::resynchronize` to fetch a complete paginated history and atomically
 rebuild the projection, but it cannot truncate or fork the known prefix. This
@@ -127,11 +156,32 @@ page. Backoff and source/PDS retry budgets are durable; exhausted or invalid wor
 needs intervention. This is not a scalable checkpoint implementation or a complete
 disaster-recovery system. Revocation denies later gateway access/publication but
 does not erase offline copies. Administrators and admitted recipients can read
-shared plaintext. Receiver-side signature/audit proofs, model-forwarding
-restrictions, retention/legal holds, browser parity and production backup
-recovery remain gates.
+shared plaintext. Browser parity, actual deployment security review and complete
+production backup recovery remain gates; the reducer's Lean proofs do not prove
+these runtime or operational guarantees.
 
-## First Stage D trust check and its limits
+## Use and retain shared data deliberately
+
+Imports stay separate from automatic local search, curation and model pipelines.
+The guarded `InstanceSync::retained_context` API requires current local read
+permission and a space grant; it excludes current tombstones/archived streams and
+keeps reviewed evidence and origin/author/version attribution as untrusted data.
+`answer_shared` additionally intersects local export permission, configured local
+provider IDs, every selected record's frozen publication policy, and fresh signed
+gateway policy/Pull access. All provider sets default to deny; offline/revoked
+calls fail before invoking a provider. No commercial provider is enabled by this
+configuration. E still supplies the user journey and concrete tool-free adapter.
+
+An authority token may POST `{"action":"hold","reason":"<owner decision>"}`,
+`release_hold`, or `request_erasure` to `/v1/retention`. These append operational
+decisions. `physical_erasure_authorized` is always false: releasing a hold does
+not approve deleting protocol history, pending work, backups or other people's
+copies. Immutable guards protect retained records, receipts, reviews and intents.
+Actual legal retention periods and whole-space decommission require a separately
+approved policy/procedure. Revocation cannot recall already delivered bytes;
+already-authorized in-flight operations may finish.
+
+## Repository trust check and its limits
 
 Before PDS work is acknowledged, the gateway obtains a full CAR from the fixed
 PDS `getRepo` endpoint and checks SHA-256 block CIDs, the canonical v3 commit,
@@ -155,10 +205,10 @@ The proof establishes inclusion in a signed snapshot, not factual correctness,
 current membership, history freshness or a transferable human-review receipt.
 The five-minute future-revision tolerance is a clock sanity check, not replay
 defense; application order still comes from the transactional gateway sequence.
-Membership/revocation checks remain in the gateway domain. Receivers currently
-trust their pinned gateway/authenticated transport; cryptographic receipts are
-not yet durably stored or delivered to receivers. See the
-[D increment contract](../reviews/federation-first/d-signature-contract.md).
+Membership/revocation checks remain in the gateway domain. Receivers now verify
+independent audit receipts, their chain, key windows and fresh signed pages.
+Retained receipts are re-verified on offline snapshot reads. See the
+[full security contract](../developer/architecture/federation-security.md).
 Previously persisted `Published` observations are not retroactively certified;
 do not treat pre-D state as cryptographic evidence or promote it to a customer
 deployment without a reviewed verification/migration procedure.

@@ -77,7 +77,9 @@ required even after a successful reply. The first D increment additionally requi
 bounded full-repository signature and exact-record inclusion verification under
 an administrator-enrolled DID/key before acknowledgement. A neutral SHA-256
 envelope digest is distinct from that transport CID; neither substitutes for
-signature verification. See [the bounded verifier evidence](../../reviews/federation-first/2026-09-09-d-repository-verification.md).
+signature verification. Stage D now adds independent receipt/hash-chain storage,
+fresh signed pages, explicit key windows and atomic receiver proof/cursor commits.
+See [the security and retention contract](federation-security.md).
 
 Instance ticks pull a bounded published-prefix page, prepare frozen work, submit
 due intents and commit receipts, then catch up again. Retry counters, deadlines,
@@ -95,8 +97,8 @@ Offline here means a local PostgreSQL instance works while the gateway/PDS/peer 
 not that PostgreSQL itself can be absent. R1's existing post-curation queue and
 timeline transaction gap are separate unfinished integration work.
 
-Real-PDS tests do not establish the full production trust boundary, native Spaces,
-receiver cryptographic proof validation, identity/key lifecycle, automatic token
-refresh, offsite recovery or E's
+Real-PDS tests alone do not establish the full production trust boundary. Stage D
+adds separate receiver-proof, key-lifecycle and container isolation tests. Native
+Spaces, automatic token refresh, deployment-specific offsite recovery and E's
 retrieval/citation/proposal/user interfaces. Administrators and authorized recipients
 can read shared plaintext, and revocation cannot recall previously delivered bytes.

@@ -68,8 +68,10 @@ gate passes or the user explicitly approves a revised contract.
 The [disposable PDS gate](../../../tests/federation-pds/README.md) now includes a
 complete encrypted cold-volume restore, tested locally on 2026-09-07 after
 removing its source volume. This passes the bounded PDS prerequisite, not the
-Memory product gate: gateway isolation, two Memory instances, transactional
-outbox/inbox/cursor recovery and writer fencing still need product tests.
+Memory product gate. [C/D implementation evidence](../../reviews/federation-first/2026-09-09-d-completion.md)
+now covers controlled multi-database integration, gateway isolation, durable
+receipts/cursors and explicit key/writer fencing. Real independently administered
+user workflows, complete deployment recovery and paid-pilot release remain gated.
 
 ## Delivery and exclusions
 

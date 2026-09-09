@@ -11,8 +11,9 @@ Implementation evidence: [2026-09-07 checkpoint](2026-09-07-implementation.md)
 and [2026-09-08 domain checkpoint](2026-09-08-publication-domain.md), followed by
 the [B2/B3 permission and conformance increment](2026-09-08-b2-b3.md) and
 [Stage C durability foundation](2026-09-08-c-durability.md) and
-[completed C integration](2026-09-08-c-completion.md). Stage D has started with the
-[runtime repository-authenticity increment](2026-09-09-d-repository-verification.md).
+[completed C integration](2026-09-08-c-completion.md). The
+[repository-authenticity increment](2026-09-09-d-repository-verification.md) is now
+followed by [completed Stage D implementation](2026-09-09-d-completion.md).
 The full roadmap remains incomplete; checked items have deliberately bounded scope.
 
 ## Source contracts and existing evidence
@@ -70,21 +71,21 @@ The [C completion evidence](2026-09-08-c-completion.md) closes the foundation's
 missing source hooks, schema-v2 live PDS path and authenticated worker scheduling.
 Service startup is opt-in; trusted review/enrollment APIs are in-process at this
 stage. Separate databases/runtime instances in controlled tests are not completed
-customer installations or browser workflows. D/E/R1 and all release gates remain
+customer installations or browser workflows. E/R1 and all release gates remain
 open; no customer deployment or production Lexicon publication is authorized.
 
 ## D. Trust boundary
 
-First increment: the gateway now requires bounded signed repository inclusion
-under an explicitly enrolled DID/key before PDS acknowledgement. Hostile proof,
-forged publisher and cross-space tests accompany it. D2 is **not** fully closed:
-identity lifecycle and receiver proof/audit integration are still open, along
-with deployment isolation (D1), forwarding policy (D3) and retention/audit (D4).
+The [D completion evidence](2026-09-09-d-completion.md) covers the dedicated gateway,
+private topology, signed publication/receiver proofs, explicit key rollover,
+scoped untrusted model context and audit/hold semantics. This closes D's implemented
+boundary, not E's user journeys or deployment-specific security, full recovery,
+legal/customer and release decisions.
 
-- [ ] D1 Keep each instance database private and independently authorized; only the gateway accesses PDS credentials and endpoints, with no CAR/firehose/repository/cross-space bypass.
-- [ ] D2 Verify identities safely without SSRF; reject forged publishers, malformed records and invalid signatures.
-- [ ] D3 Keep raw captures, sessions, paths and unselected evidence local; ensure reviewed snapshot bytes equal published bytes; treat imported content as untrusted data and gate external-model forwarding with explicit space policy.
-- [ ] D4 Implement and document revocation/offline-copy behavior, audit receipts, retention/deletion/legal-hold boundaries; administrators and admitted recipients can read plaintext, and previously delivered bytes cannot be recalled.
+- [x] D1 Keep each instance database private and independently authorized; only the gateway accesses PDS credentials and endpoints, with no CAR/firehose/repository/cross-space bypass. Evidence: dedicated executable, restricted SQL grants and two-space disposable TLS/container isolation; not customer installation.
+- [x] D2 Verify identities safely without SSRF; reject forged publishers, malformed records and invalid signatures. Evidence: pinned DID/PDS verification, receipt chains, fresh signed pages, explicit key windows and recovery revalidation; no dynamic discovery.
+- [x] D3 Keep raw captures, sessions, paths and unselected evidence local; ensure reviewed snapshot bytes equal published bytes; treat imported content as untrusted data and gate external-model forwarding with explicit space policy. Evidence: immutable reviews, segregated imports, scoped context and guarded default-deny provider API; actual provider/user workflow integration remains E.
+- [x] D4 Implement and document revocation/offline-copy behavior, audit receipts, retention/deletion/legal-hold boundaries; administrators and admitted recipients can read plaintext, and previously delivered bytes cannot be recalled. Evidence: immutable receipts/history/intents, authority-only hold/erasure requests, tested revocation/local access and decommission limits; legal policy and full deployment DR remain release gates.
 
 ## E. End-to-end federated knowledge workflow
 
