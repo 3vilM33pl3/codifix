@@ -31,9 +31,13 @@ ordering; bundles hashed wall-clock timestamps.
 3. **The timeline log evolves in place** (migration 0030): a backfilled
    monotonic `seq` for cursors and gap detection, a plain canonical/version
    subject reference that survives retention, and loud (logged) persistence.
-   Full same-transaction coupling of event append to its mutation is deferred:
-   handlers commit inside repository functions today, so the append runs
-   immediately after with the resulting seq broadcast to stream subscribers.
+   R1 migration 0039 replaces sequence allocation with a transactional counter
+   held through commit and records retention watermarks. Capture/curation now
+   append inside their repository transactions and broadcast only after commit;
+   new offline captures carry capture/activity intent in one durable item.
+   Other mutation families still require conversion: see the
+   [R1 coverage inventory](../../reviews/federation-first/r1-coverage.md).
+   No claim of full same-transaction coverage follows from ordering alone.
 
 4. **Canonical JSON via serde_json Value round-trip.** serde_json's map is a
    BTreeMap (the `preserve_order` feature is not enabled), so serializing a
@@ -45,7 +49,10 @@ ordering; bundles hashed wall-clock timestamps.
 
 - Content addressing of memory records is safe: nothing mutates a version row
   after insert.
-- Stream consumers detect gaps by seq and resync; the future federation
-  outbox can replay the log from any cursor.
+- Global timeline positions are not contiguous within a project. The new store
+  cursor primitive uses deletion watermarks rather than treating every numeric
+  gap as missing data. Historical missing events cannot be reconstructed.
+  The timeline is not yet a complete mutation synchronization source; the
+  federation outbox continues to use its own transactional source capture.
 - `memory_source_checks` (migration 0031) preserves verification transitions;
   the old table name survives as a latest-wins view for readers.

@@ -2,6 +2,11 @@
 
 `memory curate` turns raw captures into canonical memory entries.
 
+Curation commits its run and automatic-replacement activity with the memory
+changes. Success does not mean that asynchronous embedding, semantic dedup or
+consolidation has finished. The R1 durable-job store is being integrated; the
+existing post-curation worker is still process-local and is not yet restart-safe.
+
 Use it when captures already exist and you want to process them into durable memory.
 
 ## Common Usage

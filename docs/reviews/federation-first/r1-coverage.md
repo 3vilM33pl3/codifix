@@ -6,7 +6,8 @@ write-path references before the R1 gate can close.
 
 | Operation family | Existing ownership | Required durable boundary | Verified |
 | --- | --- | --- | --- |
-| Capture and curation | mem-curate repository | mutation + events + enrichment intent | [ ] |
+| Capture | mem-curate `store_capture_tx`/`store_capture_as` | session/task/capture + attributed event, replay identity and failure rollback | [x] |
+| Curation | mem-curate `curate_tx`/`curate_as` | run/memories/automatic replacements + events coupled; durable enrichment intent still unwired | [ ] |
 | Replacement/validation versions and relations | mem-curate, mem-reinforce | revision/state/edges + event | [ ] |
 | Archive/delete/retention | service memory repository | state/deletion + surviving subject event | [ ] |
 | Provenance checks | service provenance repository | check transition + event | [ ] |
@@ -16,8 +17,10 @@ write-path references before the R1 gate can close.
 | Project/commit/checkpoint/plan activity | service project/activity repositories | mutation + event | [ ] |
 | Agent workspaces | service agents repository | lifecycle/heartbeat + journal/event | [ ] |
 | Loop settings/runs/proposals | mem-loops, service loops | lifecycle/state + audit/event | [ ] |
-| Auth administration/session/token state | service auth store | state + protected audit (not project feed) | [ ] |
-| Offline captures/activity | service offline DuckDB/replay | local atomic intent; PostgreSQL atomic replay | [ ] |
+| Token creation/revocation, membership grant/revoke | service auth store | state + protected audit; audit failure rolls back revocation | [x] |
+| Other auth administration/session/token bookkeeping | service auth store/oidc | state + protected audit or explicit operational journal; remaining inventory | [ ] |
+| New offline captures | service offline DuckDB `QueuedCapture`/`sync_capture` | compound local intent, atomic PostgreSQL replay/attribution, retry before ack | [x] |
+| Legacy offline and other activity operations | service offline/activity | audit remaining paths; old separate capture/activity rows have no R1 atomic-intent guarantee | [ ] |
 | Filesystem/external effects | settings/export/watch/provider boundaries | durable intent + reconciled outcome | [ ] |
 | Post-curation stages | service curation worker | fenced output + attempts + dependent intent | [ ] |
 | Federation | existing federation store/runtime | retain accepted/outbox/inbox/audit boundaries; regression proof | [ ] |
@@ -25,3 +28,15 @@ write-path references before the R1 gate can close.
 Operational data (leases, attempts, retry receipts, access/cache bookkeeping)
 must map to its own journal or an explicitly documented operation-level event.
 They must not recursively enqueue jobs or copy private inputs into activity.
+
+## Proven primitives, not connected workflows
+
+- 0039: commit-held global timeline allocation and retained-history watermarks;
+  store snapshot pagination tested. Existing service cursor endpoints/remaining
+  notification callers have not yet been converted.
+- 0040: immutable work keys, dependency edges, project slots, bounded attempts,
+  retry receipts and fenced result transactions. Store tests cover lease loss,
+  competing claims, rollback, retry/block and dedup. No service worker consumes
+  these jobs yet; the old in-memory post-curation queue still runs.
+- Broad R1 validation and user interface work remain open. The master R1
+  checkbox must remain unchecked until the entire scoped contract passes.

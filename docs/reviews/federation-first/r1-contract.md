@@ -5,7 +5,7 @@ complete the federation-first master roadmap. F remains gated.
 
 ## Transactional persistence
 
-- [ ] R1.1 Introduce a small `mem-store` for transaction-aware event append and durable jobs; pure shared contracts in `mem-record`, execution in `mem-service`. No ATProto, HTTP clients or configuration in the store.
+- [x] R1.1 Introduce a small `mem-store` for transaction-aware event append and durable jobs; pure shared contracts in `mem-record`, execution in `mem-service`. No ATProto, HTTP clients or configuration in the store. Store primitives and contracts implemented; worker integration is R1.7–R1.10, not implied by this item.
 - [ ] R1.2 Couple all persisted knowledge operations (capture, curation, corrections, canonical state, relations, provenance, imports, retention, graph/index and reinforcement) with events and necessary job intents; cover HTTP, background and direct-library callers through transaction-taking APIs and compatible pool wrappers.
 - [ ] R1.3 Cover administrative operations (projects, agent workspaces, loop settings/runs/proposals and auth). Maintain a complete operation-to-event/audit/journal inventory. Use operation-level events for derived batches and attempt journals for jobs, without recursion. Keep global security audits private, authenticated actor separate from authorship, and secrets/unrestricted payloads out of events.
 - [ ] R1.4 Replace timeline allocation with a commit-held transactional counter, preserve old sequences, use consistent lock order, and broadcast committed events only. Support bounded cursor recovery and explicit retention gaps.
