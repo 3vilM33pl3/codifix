@@ -3,14 +3,12 @@
 //! HTTP/UI review and membership administration remain the E-stage workflow.
 use crate::AppState;
 use mem_federation::publication::{InstanceId, SpaceId};
-use mem_federation_runtime::{Endpoint, GatewayClient, GatewayServer, InstanceSync, PdsPublisher};
-use mem_federation_store::GatewayStore;
+use mem_federation_runtime::{Endpoint, GatewayClient, InstanceSync, ReceiptTrust};
 pub use mem_federation_store::{
     SourceSelection, preview_source, retry_source_work, review_and_share, set_local_grant,
 };
 use serde::Deserialize;
 use std::{
-    net::SocketAddr,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -26,28 +24,14 @@ enum WorkerConfig {
         project: Uuid,
         principal: Uuid,
         gateway: String,
+        #[serde(default)]
+        gateway_ca_file: Option<PathBuf>,
         token_file: PathBuf,
+        receipt_keys: Vec<mem_federation_store::ReceiptKey>,
         #[serde(default)]
         disposable_test_mode: bool,
     },
-    Gateway {
-        space: SpaceId,
-        authority: InstanceId,
-        listen: SocketAddr,
-        pds: String,
-        repository: String,
-        signing_key: String,
-        token_file: PathBuf,
-        credentials: Vec<Credential>,
-        #[serde(default)]
-        disposable_test_mode: bool,
-    },
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Credential {
-    instance: InstanceId,
-    token_file: PathBuf,
+    Gateway {},
 }
 
 pub(crate) struct FederationTasks(Vec<tokio::task::JoinHandle<()>>);
@@ -96,18 +80,25 @@ pub(crate) async fn start(
             project,
             principal,
             gateway,
+            gateway_ca_file,
             token_file,
+            receipt_keys,
             disposable_test_mode,
         } => {
             anyhow::ensure!(
                 !disposable_test_mode || cfg!(debug_assertions),
                 "cleartext fixture mode is prohibited in release builds"
             );
+            let ca = gateway_ca_file
+                .as_deref()
+                .map(mem_federation_runtime::root_certificate)
+                .transpose()?;
             let client = GatewayClient::new(
-                Endpoint::new(&gateway, disposable_test_mode)?,
+                Endpoint::with_ca(&gateway, disposable_test_mode, ca.as_deref())?,
                 secret(&token_file)?,
                 space,
                 authority,
+                ReceiptTrust::new(receipt_keys)?,
             )?;
             let sync = InstanceSync::new(
                 state
@@ -132,72 +123,9 @@ pub(crate) async fn start(
                 }
             }));
         }
-        WorkerConfig::Gateway {
-            space,
-            authority,
-            listen,
-            pds,
-            repository,
-            signing_key,
-            token_file,
-            credentials,
-            disposable_test_mode,
-        } => {
-            anyhow::ensure!(
-                !state.config.service.read_only,
-                "read-only instance cannot operate the federation gateway"
-            );
-            anyhow::ensure!(
-                !disposable_test_mode || cfg!(debug_assertions),
-                "cleartext fixture mode is prohibited in release builds"
-            );
-            let mut tokens = Vec::new();
-            for item in credentials {
-                tokens.push((secret(&item.token_file)?, item.instance));
-            }
-            let pds = PdsPublisher::new(
-                Endpoint::new(&pds, disposable_test_mode)?,
-                repository,
-                secret(&token_file)?,
-                signing_key,
-                space,
-            )?;
-            let listener = tokio::net::TcpListener::bind(listen).await?;
-            let server = GatewayServer::new(
-                GatewayStore::new(
-                    state
-                        .pool()
-                        .map_err(|_| anyhow::anyhow!("federation requires local PostgreSQL"))?,
-                ),
-                space,
-                authority,
-                tokens,
-            )
-            .await?;
-            let router = server.router();
-            tasks.push(tokio::spawn(async move {
-                if axum::serve(listener, router).await.is_err() {
-                    tracing::error!("federation gateway listener stopped");
-                }
-            }));
-            tasks.push(tokio::spawn(async move {
-                loop {
-                    match server.publish_one(&pds).await {
-                        Ok(mem_federation_store::WorkerOutcome::Published(_)) => continue,
-                        Err(mem_federation_runtime::RuntimeError::Store(
-                            mem_federation_store::StoreError::Fenced,
-                        )) => break,
-                        Err(_) | Ok(mem_federation_store::WorkerOutcome::Blocked) => {
-                            tracing::warn!(
-                                "federation PDS work blocked/retrying; inspect durable outbox"
-                            )
-                        }
-                        _ => {}
-                    }
-                    tokio::time::sleep(Duration::from_secs(2)).await;
-                }
-            }));
-        }
+        WorkerConfig::Gateway { .. } => anyhow::bail!(
+            "gateway role requires the standalone memory-federation-gateway executable"
+        ),
     }
     Ok(FederationTasks(tasks))
 }
@@ -213,26 +141,14 @@ mod tests {
     fn config_is_explicit_and_secret_files_are_private() {
         assert!(serde_json::from_value::<WorkerConfig>(json!({"role":"automatic"})).is_err());
         let id = Uuid::new_v4();
-        let mut gateway = json!({"role":"gateway", "space":id, "authority":id,
-            "listen":"127.0.0.1:8081", "pds":"https://pds.example.com", "repository":"did:web:space.example.com",
-            "token_file":"/not-opened", "credentials":[]});
         assert!(
-            serde_json::from_value::<WorkerConfig>(gateway.clone()).is_err(),
-            "unsigned configuration must not load"
-        );
-        gateway["signing_key"] = json!("did:key:z1");
-        // Syntactic JSON parsing is separate from enrollment validation; startup
-        // constructs PdsPublisher before binding a socket or changing the fence.
-        assert!(serde_json::from_value::<WorkerConfig>(gateway).is_ok());
-        assert!(
-            PdsPublisher::new(
-                Endpoint::new("https://pds.example.com", false).unwrap(),
-                "did:web:space.example.com".into(),
-                "t".repeat(64),
-                "did:key:z1".into(),
-                SpaceId::new(id).unwrap()
+            serde_json::from_value::<WorkerConfig>(
+                json!({"role":"gateway","pds":"https://pds.example.com"})
             )
             .is_err()
+        );
+        assert!(
+            serde_json::from_value::<WorkerConfig>(json!({"role":"instance","space":id})).is_err()
         );
         let dir = std::env::temp_dir().join(format!("federation-secret-{}", Uuid::new_v4()));
         std::fs::create_dir(&dir).unwrap();
@@ -316,7 +232,8 @@ mod tests {
             &config,
             serde_json::to_vec(&json!({"role":"instance", "space":space,
             "authority":authority,"instance":instance,"project":project,"principal":principal,
-            "gateway":url,"token_file":token,"disposable_test_mode":true}))
+            "gateway":url,"token_file":token,"disposable_test_mode":true,
+            "receipt_keys":mem_federation_runtime::GatewaySecurity::initial(&[3;32],Default::default()).unwrap().trust().keys()}))
             .unwrap(),
         )
         .unwrap();

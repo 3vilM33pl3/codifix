@@ -177,6 +177,9 @@ async fn oversized_gateway_pages_and_redirects_fail_closed() {
         "t".repeat(64),
         delivery.envelope.space,
         delivery.envelope.publisher,
+        mem_federation_runtime::GatewaySecurity::initial(&[3; 32], Default::default())
+            .unwrap()
+            .trust(),
     )
     .unwrap();
     assert!(client.pull(0, 32).await.is_err());
@@ -209,6 +212,9 @@ async fn oversized_gateway_pages_and_redirects_fail_closed() {
         "t".repeat(64),
         delivery.envelope.space,
         delivery.envelope.publisher,
+        mem_federation_runtime::GatewaySecurity::initial(&[3; 32], Default::default())
+            .unwrap()
+            .trust(),
     )
     .unwrap();
     assert!(client.pull(0, 32).await.is_err());

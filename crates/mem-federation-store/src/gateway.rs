@@ -24,13 +24,15 @@ pub struct Acceptance {
     pub delivery: Option<PublicationDelivery>,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PublishedPage {
     pub space: SpaceId,
     pub authority: InstanceId,
     pub after: u32,
     pub published_through: u32,
     pub records: Vec<PublicationDelivery>,
+    pub receipts: Vec<crate::AuditReceipt>,
+    pub policy: crate::SpacePolicy,
 }
 
 impl GatewayStore {
@@ -217,6 +219,8 @@ impl GatewayStore {
             after,
             published_through: published as u32,
             records: deliveries,
+            receipts: Vec::new(),
+            policy: crate::SpacePolicy::default(),
         })
     }
 

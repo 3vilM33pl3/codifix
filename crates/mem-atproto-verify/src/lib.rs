@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod car;
+mod detached;
+pub use detached::{DetachedSigner, DetachedVerifier};
 mod mst_store;
 pub use car::MAX_CAR_BYTES;
 use car::{block, parse_car};
@@ -61,7 +63,7 @@ pub struct PinnedRepository {
 /// Proof of inclusion in this signed snapshot only. It proves neither factual
 /// truth nor current authorization/freshness/append-only history. Durable audit
 /// receipts and receiver verification belong to subsequent Stage D increments.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerifiedRepository {
     pub repository: String,
     pub signing_key: String,
@@ -70,28 +72,30 @@ pub struct VerifiedRepository {
     pub record_cid: String,
 }
 
+fn validate_signing_key(signing_key: &str) -> Result<()> {
+    // Guard Atrium 0.1.3's parse_multikey slice before invoking it. Limit the
+    // encoded key too: decoding an arbitrarily long administrator input is
+    // unnecessary. Only canonical compressed base58btc keys are supported.
+    if signing_key.len() > 128 {
+        return Err(VerifyError::Enrollment);
+    }
+    let encoded = signing_key
+        .strip_prefix("did:key:")
+        .ok_or(VerifyError::Enrollment)?;
+    let (base, decoded) = multibase::decode(encoded).map_err(|_| VerifyError::Enrollment)?;
+    if base != multibase::Base::Base58Btc || decoded.len() != 35 {
+        return Err(VerifyError::Enrollment);
+    }
+    let (algorithm, key) = did::parse_did_key(signing_key).map_err(|_| VerifyError::Enrollment)?;
+    if did::format_did_key(algorithm, &key).map_err(|_| VerifyError::Enrollment)? != signing_key {
+        return Err(VerifyError::Enrollment);
+    }
+    Ok(())
+}
 impl PinnedRepository {
     pub fn new(repository: String, signing_key: String) -> Result<Self> {
         let repository = Did::new(repository).map_err(|_| VerifyError::Enrollment)?;
-        // Guard Atrium 0.1.3's parse_multikey slice before invoking it. Limit the
-        // encoded key too: decoding an arbitrarily long administrator input is
-        // unnecessary. Only canonical compressed base58btc keys are supported.
-        if signing_key.len() > 128 {
-            return Err(VerifyError::Enrollment);
-        }
-        let encoded = signing_key
-            .strip_prefix("did:key:")
-            .ok_or(VerifyError::Enrollment)?;
-        let (base, decoded) = multibase::decode(encoded).map_err(|_| VerifyError::Enrollment)?;
-        if base != multibase::Base::Base58Btc || decoded.len() != 35 {
-            return Err(VerifyError::Enrollment);
-        }
-        let (algorithm, key) =
-            did::parse_did_key(&signing_key).map_err(|_| VerifyError::Enrollment)?;
-        if did::format_did_key(algorithm, &key).map_err(|_| VerifyError::Enrollment)? != signing_key
-        {
-            return Err(VerifyError::Enrollment);
-        }
+        validate_signing_key(&signing_key)?;
         Ok(Self {
             repository,
             signing_key,

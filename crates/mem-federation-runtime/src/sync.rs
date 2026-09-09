@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-use crate::{Endpoint, Result, RuntimeError, http};
+use crate::{Endpoint, ReceiptTrust, Result, RuntimeError, SignedPage, http};
 use mem_federation::publication::*;
 use mem_federation_store::{
     Acceptance, PublicationIntent, PublishedPage, ReplicaStore, prepare_source_changes,
@@ -11,8 +11,9 @@ use sqlx::{PgPool, Row, types::Json};
 pub struct GatewayClient {
     endpoint: Endpoint,
     token: String,
-    space: SpaceId,
-    authority: InstanceId,
+    pub(crate) space: SpaceId,
+    pub(crate) authority: InstanceId,
+    pub(crate) trust: ReceiptTrust,
 }
 impl GatewayClient {
     pub fn new(
@@ -20,6 +21,7 @@ impl GatewayClient {
         token: String,
         space: SpaceId,
         authority: InstanceId,
+        trust: ReceiptTrust,
     ) -> Result<Self> {
         if token.len() < 32 {
             return Err(RuntimeError::Configuration);
@@ -29,6 +31,7 @@ impl GatewayClient {
             token,
             space,
             authority,
+            trust,
         })
     }
     pub async fn accept(&self, intent: &PublicationIntent) -> Result<Acceptance> {
@@ -69,17 +72,22 @@ impl GatewayClient {
         if !(1..=32).contains(&limit) {
             return Err(RuntimeError::Configuration);
         }
+        let nonce = uuid::Uuid::new_v4();
         let response = self
             .endpoint
             .client
             .get(self.endpoint.url("/v1/pull")?)
             .bearer_auth(&self.token)
             .query(&[("after", after), ("limit", limit)])
+            .query(&[("nonce", nonce)])
             .send()
             .await
             .map_err(|_| RuntimeError::Unavailable)?;
         check_status(response.status())?;
-        let page: PublishedPage = http::json(response, 3 * 1024 * 1024).await?;
+        let signed: SignedPage = http::json(response, 3 * 1024 * 1024).await?;
+        let page = self
+            .trust
+            .verify_page(signed, nonce, self.space, self.authority)?;
         if page.space != self.space
             || page.authority != self.authority
             || page.after != after
@@ -101,6 +109,7 @@ impl GatewayClient {
     /// Over 16 MiB fails closed and requires a larger reviewed deployment limit.
     pub async fn resynchronize(&self, replica: &ReplicaStore) -> Result<u32> {
         let mut history = Vec::new();
+        let mut receipts = Vec::new();
         let mut bytes = 0;
         let mut after = 0;
         let mut target = None;
@@ -113,6 +122,12 @@ impl GatewayClient {
             let head = *target.get_or_insert(page.published_through);
             if page.published_through < head {
                 return Err(RuntimeError::InvalidResponse);
+            }
+            for receipt in page.receipts {
+                bytes += serde_json::to_vec(&receipt)
+                    .map_err(|_| RuntimeError::InvalidResponse)?
+                    .len();
+                receipts.push(receipt);
             }
             for record in page.records {
                 bytes += serde_json::to_vec(&record)
@@ -128,7 +143,11 @@ impl GatewayClient {
                 break;
             }
         }
-        Ok(replica.resynchronize(self.authority, &history).await?)
+        self.trust
+            .verify_history(self.authority, &history, &receipts)?;
+        Ok(replica
+            .resynchronize_with_receipts(self.authority, &history, &receipts)
+            .await?)
     }
 }
 fn check_status(status: reqwest::StatusCode) -> Result<()> {
@@ -147,16 +166,17 @@ fn check_status(status: reqwest::StatusCode) -> Result<()> {
 /// outside this object; do not persist an old role/permission snapshot in it.
 #[derive(Clone)]
 pub struct InstanceSync {
-    pool: PgPool,
-    client: GatewayClient,
-    replica: ReplicaStore,
-    instance: InstanceId,
+    pub(crate) pool: PgPool,
+    pub(crate) client: GatewayClient,
+    pub(crate) replica: ReplicaStore,
+    pub(crate) instance: InstanceId,
 }
 impl InstanceSync {
     pub async fn new(pool: PgPool, client: GatewayClient, instance: InstanceId) -> Result<Self> {
         let replica =
             ReplicaStore::initialize(pool.clone(), client.space, instance, client.authority)
                 .await?;
+        replica.enroll_trust(client.trust.keys()).await?;
         Ok(Self {
             pool,
             client,
@@ -168,17 +188,26 @@ impl InstanceSync {
         &self.replica
     }
     pub async fn catch_up(&self) -> Result<u32> {
-        let mut after = self.replica.snapshot().await?.sequence();
+        let mut after = self.verified_snapshot().await?.sequence();
         // One bounded page per tick: unrelated local work stays responsive.
         let page = self.client.pull(after, 32).await?;
         after = self
             .replica
-            .receive(self.client.authority, &page.records)
+            .receive_with_receipts(self.client.authority, &page.records, &page.receipts)
             .await?;
         Ok(after)
     }
     pub async fn resynchronize(&self) -> Result<u32> {
         self.client.resynchronize(&self.replica).await
+    }
+    /// Crypto validation also runs on retained receipts after restart/offline
+    /// access, not just on the original network response.
+    pub async fn verified_snapshot(&self) -> Result<PublicationState> {
+        let (state, receipts) = self.replica.audited_snapshot().await?;
+        self.client
+            .trust
+            .verify_history(self.client.authority, state.accepted(), &receipts)?;
+        Ok(state)
     }
     /// A service cannot construct LocalProjectAccess for a removed/disabled
     /// principal. Preserve that pause as durable status rather than only a log.
@@ -217,7 +246,7 @@ impl InstanceSync {
         self.catch_up().await?;
         // Capture is already durable while disconnected. Prepare can continue
         // from cached membership; the gateway rechecks current authority later.
-        let known = self.replica.snapshot().await?;
+        let known = self.verified_snapshot().await?;
         prepare_source_changes(&self.pool, &known, access, self.instance, 32).await?;
         let rows=sqlx::query("SELECT locator,envelope FROM federation_source_outbox WHERE space=$1 AND publisher=$2 AND project_id=$3 AND principal_id=$4 AND acceptance IS NULL AND NOT blocked AND available_at<=clock_timestamp() ORDER BY queued_at,record_id LIMIT 32")
             .bind(self.client.space.as_uuid()).bind(self.instance.as_uuid()).bind(access.project).bind(access.principal)

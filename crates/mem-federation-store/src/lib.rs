@@ -2,10 +2,16 @@
 //! Trusted, in-process persistence APIs. Authentication, review UI, network
 //! verification and automatic service scheduling are NOT provided by this crate.
 
+mod audit;
 mod gateway;
+pub use audit::*;
 mod projection;
 mod publisher;
 mod replica;
+mod retention;
+pub use retention::*;
+mod replica_audit;
+pub use replica_audit::receipt_matches;
 mod sharing;
 mod source;
 pub use sharing::*;

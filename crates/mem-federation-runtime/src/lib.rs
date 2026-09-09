@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Opt-in private federation runtime. No discovery, arbitrary forwarding or
 //! automatic enrollment. Configure independently operated nodes explicitly.
+mod config;
+mod context;
 mod gateway;
+pub use config::*;
+pub use context::*;
 mod http;
 mod pds;
+mod security;
 mod sync;
 pub use gateway::*;
 pub use http::Endpoint;
 pub use pds::*;
+pub use security::*;
 pub use sync::*;
 
 #[derive(Debug, thiserror::Error)]

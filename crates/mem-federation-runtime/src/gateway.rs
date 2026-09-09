@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-use crate::{PdsPublisher, Result, RuntimeError};
+use crate::{GatewaySecurity, PdsPublisher, Result, RuntimeError, SignedPage};
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Query, State},
@@ -8,8 +8,7 @@ use axum::{
 };
 use mem_federation::publication::*;
 use mem_federation_store::{
-    Acceptance, GatewayStore, PublicationIntent, PublishedPage, RetryPolicy, WorkerOutcome,
-    WriterFence,
+    Acceptance, GatewayStore, PublicationIntent, RetryPolicy, WorkerOutcome, WriterFence,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -21,8 +20,8 @@ use std::sync::Arc;
 pub struct GatewayServer {
     store: GatewayStore,
     fence: WriterFence,
-    space: SpaceId,
     credentials: Vec<([u8; 32], InstanceId)>,
+    security: GatewaySecurity,
 }
 impl GatewayServer {
     pub async fn new(
@@ -30,6 +29,7 @@ impl GatewayServer {
         space: SpaceId,
         authority: InstanceId,
         credentials: Vec<(String, InstanceId)>,
+        security: GatewaySecurity,
     ) -> Result<Self> {
         if credentials.iter().any(|(token, _)| token.len() < 32) {
             return Err(RuntimeError::Configuration);
@@ -44,26 +44,60 @@ impl GatewayServer {
             }
         }
         let old = store.initialize(space, authority).await?;
-        let fence = store.rotate_writer(old).await?;
+        let fence = store
+            .enroll_security(old, security.trust().keys(), security.policy())
+            .await?;
         Ok(Self {
             store,
             fence,
-            space,
             credentials,
+            security,
         })
     }
     pub fn router(&self) -> Router {
         Router::new()
             .route("/v1/accept", post(accept))
             .route("/v1/pull", get(pull))
+            .route("/v1/retention", post(retention))
             .layer(DefaultBodyLimit::max(96 * 1024))
             .with_state(Arc::new(self.clone()))
     }
     pub async fn publish_one(&self, pds: &PdsPublisher) -> Result<WorkerOutcome> {
-        Ok(self
-            .store
-            .publish_one(self.fence, RetryPolicy::default(), pds)
-            .await?)
+        if self
+            .security
+            .trust()
+            .keys()
+            .iter()
+            .any(|key| key.public_key == pds.signing_key)
+        {
+            return Err(RuntimeError::Configuration);
+        }
+        let policy = RetryPolicy::default();
+        let lease = match self.store.claim_publication(self.fence, policy).await? {
+            mem_federation_store::Claim::Ready(lease) => lease,
+            mem_federation_store::Claim::Idle => return Ok(WorkerOutcome::Idle),
+            mem_federation_store::Claim::Waiting => return Ok(WorkerOutcome::Waiting),
+            mem_federation_store::Claim::Blocked => return Ok(WorkerOutcome::Blocked),
+        };
+        match pds.publish_verified(lease.delivery()).await {
+            Ok(proof) => {
+                self.store
+                    .acknowledge_with_receipt(
+                        &lease,
+                        serde_json::to_value(proof).map_err(|_| RuntimeError::InvalidResponse)?,
+                        &self.security,
+                    )
+                    .await?;
+                Ok(WorkerOutcome::Published(lease.delivery().sequence.get()))
+            }
+            Err(failure) => Ok(
+                if self.store.fail_publication(&lease, policy, failure).await? {
+                    WorkerOutcome::Blocked
+                } else {
+                    WorkerOutcome::Retrying
+                },
+            ),
+        }
     }
     fn authenticate(&self, headers: &HeaderMap) -> std::result::Result<InstanceId, StatusCode> {
         if headers.get_all("authorization").iter().count() != 1 {
@@ -88,6 +122,23 @@ impl GatewayServer {
             .map(|(_, id)| *id)
             .ok_or(StatusCode::UNAUTHORIZED)
     }
+}
+async fn retention(
+    State(server): State<Arc<GatewayServer>>,
+    headers: HeaderMap,
+    Json(request): Json<mem_federation_store::RetentionRequest>,
+) -> std::result::Result<Json<mem_federation_store::RetentionStatus>, StatusCode> {
+    let actor = server.authenticate(&headers)?;
+    server
+        .store
+        .retention_decision(server.fence, actor, &request)
+        .await
+        .map(Json)
+        .map_err(|e| match e {
+            mem_federation_store::StoreError::Binding => StatusCode::FORBIDDEN,
+            mem_federation_store::StoreError::Limits => StatusCode::BAD_REQUEST,
+            _ => StatusCode::SERVICE_UNAVAILABLE,
+        })
 }
 async fn accept(
     State(server): State<Arc<GatewayServer>>,
@@ -114,26 +165,31 @@ async fn accept(
 struct PullQuery {
     after: u32,
     limit: u32,
+    nonce: uuid::Uuid,
 }
 async fn pull(
     State(server): State<Arc<GatewayServer>>,
     headers: HeaderMap,
     Query(query): Query<PullQuery>,
-) -> std::result::Result<Json<PublishedPage>, StatusCode> {
+) -> std::result::Result<Json<SignedPage>, StatusCode> {
     let publisher = server.authenticate(&headers)?;
     if !(1..=32).contains(&query.limit) {
         return Err(StatusCode::BAD_REQUEST);
     }
-    server
+    let page = server
         .store
-        .pull_page(server.space, publisher, query.after, query.limit)
+        .pull_audited(server.fence, publisher, query.after, query.limit)
         .await
-        .map(Json)
         .map_err(|e| match e {
             mem_federation_store::StoreError::Outcome(PublicationOutcome::Rejected(
                 PublicationReject::Unauthorized,
             )) => StatusCode::FORBIDDEN,
             mem_federation_store::StoreError::Resync => StatusCode::CONFLICT,
             _ => StatusCode::SERVICE_UNAVAILABLE,
-        })
+        })?;
+    server
+        .security
+        .sign_page(page, query.nonce)
+        .map(Json)
+        .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)
 }

@@ -5,7 +5,10 @@ use mem_federation::publication::PublicationDelivery;
 use sqlx::{Row, types::Json};
 use uuid::Uuid;
 
-use crate::{GatewayStore, Result, StoreError, WriterFence};
+use crate::{
+    AuditReceipt, GatewayStore, ReceiptAuthority, ReceiptClaims, ReceiptKey, Result, SpacePolicy,
+    StoreError, WriterFence, audit_digest,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct RetryPolicy {
@@ -173,8 +176,75 @@ impl GatewayStore {
     /// Called only after immutable transport success. The lease CAS rejects late
     /// acknowledgements, including a successful old attempt after writer recovery.
     pub async fn acknowledge_publication(&self, lease: &PublicationLease) -> Result<()> {
+        self.acknowledge_inner(lease, None).await
+    }
+    pub async fn acknowledge_with_receipt(
+        &self,
+        lease: &PublicationLease,
+        transport: serde_json::Value,
+        signer: &dyn ReceiptAuthority,
+    ) -> Result<()> {
+        self.acknowledge_inner(lease, Some((transport, signer)))
+            .await
+    }
+    async fn acknowledge_inner(
+        &self,
+        lease: &PublicationLease,
+        proof: Option<(serde_json::Value, &dyn ReceiptAuthority)>,
+    ) -> Result<()> {
         let mut tx = self.pool.begin().await?;
-        self.lock(&mut tx, lease.fence).await?;
+        let authority = self.lock(&mut tx, lease.fence).await?;
+        let security = sqlx::query("SELECT keys,policy FROM federation_security WHERE space=$1")
+            .bind(lease.fence.space.as_uuid())
+            .fetch_optional(&mut *tx)
+            .await?;
+        let receipt = match (security, proof) {
+            (Some(row), Some((transport, signer))) => {
+                if serde_json::to_vec(&transport)?.len() > 4096 {
+                    return Err(StoreError::Limits);
+                }
+                let keys: Json<Vec<ReceiptKey>> = row.try_get("keys")?;
+                let current = keys.last().ok_or(StoreError::Binding)?;
+                if current.generation != signer.generation()
+                    || current.public_key != signer.public_key()
+                    || current.first_sequence > lease.delivery.sequence.get()
+                {
+                    return Err(StoreError::Binding);
+                }
+                let policy:Json<SpacePolicy>=sqlx::query_scalar("SELECT publication_policy FROM federation_accepted WHERE space=$1 AND sequence=$2")
+                    .bind(lease.fence.space.as_uuid()).bind(i64::from(lease.delivery.sequence.get())).fetch_one(&mut *tx).await?;
+                let previous = if lease.delivery.sequence.get() == 1 {
+                    None
+                } else {
+                    let prior: Json<AuditReceipt> = sqlx::query_scalar(
+                        "SELECT receipt FROM federation_audit WHERE space=$1 AND sequence=$2",
+                    )
+                    .bind(lease.fence.space.as_uuid())
+                    .bind(i64::from(lease.delivery.sequence.get() - 1))
+                    .fetch_one(&mut *tx)
+                    .await?;
+                    Some(audit_digest(&prior.0)?)
+                };
+                let claims = ReceiptClaims {
+                    purpose: "memory-publication-receipt-v1".into(),
+                    space: lease.fence.space,
+                    authority,
+                    sequence: lease.delivery.sequence.get(),
+                    delivery_digest: audit_digest(&lease.delivery)?,
+                    previous,
+                    key_generation: signer.generation(),
+                    policy: policy.0,
+                    transport,
+                };
+                let receipt = signer.sign(claims.clone())?;
+                if receipt.claims != claims || receipt.signature.len() != 64 {
+                    return Err(StoreError::Binding);
+                }
+                Some(receipt)
+            }
+            (None, None) => None, // reference store tests, never an enrolled runtime
+            _ => return Err(StoreError::Binding),
+        };
         let count = sqlx::query("UPDATE federation_publish_outbox SET published=TRUE,lease_token=NULL,lease_until=NULL,last_error=NULL WHERE space=$1 AND sequence=$2 AND lease_token=$3 AND lease_until>clock_timestamp() AND NOT published")
             .bind(lease.fence.space.as_uuid()).bind(i64::from(lease.delivery.sequence.get())).bind(lease.token)
             .execute(&mut *tx).await?.rows_affected();
@@ -186,6 +256,14 @@ impl GatewayStore {
             .execute(&mut *tx).await?.rows_affected();
         if count != 1 {
             return Err(StoreError::Corrupt);
+        }
+        if let Some(receipt) = receipt {
+            sqlx::query("INSERT INTO federation_audit(space,sequence,receipt) VALUES($1,$2,$3)")
+                .bind(lease.fence.space.as_uuid())
+                .bind(i64::from(lease.delivery.sequence.get()))
+                .bind(Json(receipt))
+                .execute(&mut *tx)
+                .await?;
         }
         tx.commit().await?;
         Ok(())

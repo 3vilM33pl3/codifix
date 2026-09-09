@@ -25,6 +25,8 @@ use std::{
     },
 };
 use uuid::Uuid;
+#[path = "support/d_security.rs"]
+mod d_security;
 
 fn instance() -> InstanceId {
     InstanceId::new(Uuid::new_v4()).unwrap()
@@ -297,9 +299,17 @@ async fn c_source_gateway_pds_receiver_and_recovery_across_three_databases() {
         (b_token.clone(), b),
     ];
     let store = GatewayStore::new(gateway.clone());
-    let server = GatewayServer::new(store.clone(), space, authority, credentials.clone())
-        .await
-        .unwrap();
+    let security = GatewaySecurity::initial(&[3; 32], SpacePolicy::default()).unwrap();
+    let trust = security.trust();
+    let server = GatewayServer::new(
+        store.clone(),
+        space,
+        authority,
+        credentials.clone(),
+        security.clone(),
+    )
+    .await
+    .unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let router = server.router();
@@ -307,10 +317,26 @@ async fn c_source_gateway_pds_receiver_and_recovery_across_three_databases() {
         axum::serve(listener, router).await.unwrap();
     });
     let endpoint = Endpoint::new(&format!("http://{addr}"), true).unwrap();
-    let root = GatewayClient::new(endpoint.clone(), root_token.clone(), space, authority).unwrap();
-    let a_client = GatewayClient::new(endpoint.clone(), a_token.clone(), space, authority).unwrap();
-    let b_client = GatewayClient::new(endpoint.clone(), b_token, space, authority).unwrap();
-    let invalid = GatewayClient::new(endpoint.clone(), token(), space, authority).unwrap();
+    let root = GatewayClient::new(
+        endpoint.clone(),
+        root_token.clone(),
+        space,
+        authority,
+        trust.clone(),
+    )
+    .unwrap();
+    let a_client = GatewayClient::new(
+        endpoint.clone(),
+        a_token.clone(),
+        space,
+        authority,
+        trust.clone(),
+    )
+    .unwrap();
+    let b_client =
+        GatewayClient::new(endpoint.clone(), b_token, space, authority, trust.clone()).unwrap();
+    let invalid =
+        GatewayClient::new(endpoint.clone(), token(), space, authority, trust.clone()).unwrap();
     assert!(matches!(
         invalid.pull(0, 32).await,
         Err(RuntimeError::Unauthorized)
@@ -538,7 +564,7 @@ async fn c_source_gateway_pds_receiver_and_recovery_across_three_databases() {
             .await
             .unwrap();
     assert_eq!(pending_after, pending);
-    let server = GatewayServer::new(store.clone(), space, authority, credentials)
+    let server = GatewayServer::new(store.clone(), space, authority, credentials, security)
         .await
         .unwrap();
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

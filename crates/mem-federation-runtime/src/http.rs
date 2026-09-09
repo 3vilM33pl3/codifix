@@ -12,7 +12,13 @@ pub struct Endpoint {
     pub(crate) client: Client,
 }
 impl Endpoint {
+    pub fn origin(&self) -> &str {
+        self.base.as_str().trim_end_matches('/')
+    }
     pub fn new(origin: &str, disposable_cleartext: bool) -> Result<Self> {
+        Self::with_ca(origin, disposable_cleartext, None)
+    }
+    pub fn with_ca(origin: &str, disposable_cleartext: bool, ca: Option<&[u8]>) -> Result<Self> {
         let base = Url::parse(origin).map_err(|_| RuntimeError::Configuration)?;
         if base.host_str().is_none()
             || !base.username().is_empty()
@@ -24,13 +30,20 @@ impl Endpoint {
         {
             return Err(RuntimeError::Configuration);
         }
-        let client = Client::builder()
+        let mut builder = Client::builder()
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(5))
-            .timeout(Duration::from_secs(20))
-            .build()
-            .map_err(|_| RuntimeError::Configuration)?;
+            .timeout(Duration::from_secs(20));
+        if let Some(ca) = ca {
+            if ca.len() > 16 * 1024 {
+                return Err(RuntimeError::Configuration);
+            }
+            builder = builder.tls_built_in_root_certs(false).add_root_certificate(
+                reqwest::Certificate::from_pem(ca).map_err(|_| RuntimeError::Configuration)?,
+            );
+        }
+        let client = builder.build().map_err(|_| RuntimeError::Configuration)?;
         Ok(Self { base, client })
     }
     pub(crate) fn url(&self, path: &str) -> Result<Url> {

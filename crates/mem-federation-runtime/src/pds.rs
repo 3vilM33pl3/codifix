@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::{Endpoint, Result, RuntimeError, http};
 use mem_atproto::publication::PublicationWire;
-use mem_atproto_verify::{MAX_CAR_BYTES, PinnedRepository};
+use mem_atproto_verify::{MAX_CAR_BYTES, PinnedRepository, VerifiedRepository};
 use mem_federation::publication::{PublicationDelivery, SpaceId};
 use mem_federation_store::{ImmutablePublisher, PublishFailure};
 use serde_json::Value;
@@ -21,6 +21,7 @@ pub struct PdsPublisher {
     token: String,
     space: SpaceId,
     verifier: PinnedRepository,
+    pub(crate) signing_key: String,
     verification_slot: Arc<tokio::sync::Semaphore>,
 }
 impl PdsPublisher {
@@ -38,7 +39,7 @@ impl PdsPublisher {
         }
         mem_atproto::publication::validate_repository(&repository)
             .map_err(|_| RuntimeError::Configuration)?;
-        let verifier = PinnedRepository::new(repository.clone(), signing_key)
+        let verifier = PinnedRepository::new(repository.clone(), signing_key.clone())
             .map_err(|_| RuntimeError::Configuration)?;
         Ok(Self {
             endpoint,
@@ -46,10 +47,14 @@ impl PdsPublisher {
             token,
             space,
             verifier,
+            signing_key,
             verification_slot: Arc::new(tokio::sync::Semaphore::new(1)),
         })
     }
-    async fn readback(&self, wire: &PublicationWire) -> std::result::Result<bool, PublishFailure> {
+    async fn readback(
+        &self,
+        wire: &PublicationWire,
+    ) -> std::result::Result<Option<VerifiedRepository>, PublishFailure> {
         let key = wire
             .record()
             .map_err(|_| PublishFailure::InvalidReceipt)?
@@ -79,7 +84,7 @@ impl PdsPublisher {
                 .await
                 .map_err(|_| PublishFailure::InvalidReceipt)?;
             if (code.as_u16() == 400 || code.as_u16() == 404) && body["error"] == "RecordNotFound" {
-                return Ok(false);
+                return Ok(None);
             }
             return Err(PublishFailure::InvalidReceipt);
         }
@@ -94,13 +99,12 @@ impl PdsPublisher {
         {
             return Err(PublishFailure::Conflict);
         }
-        self.verify_repository(wire).await?;
-        Ok(true)
+        Ok(Some(self.verify_repository(wire).await?))
     }
     async fn verify_repository(
         &self,
         wire: &PublicationWire,
-    ) -> std::result::Result<(), PublishFailure> {
+    ) -> std::result::Result<VerifiedRepository, PublishFailure> {
         // Bound download + CPU concurrency across publisher clones. Move the
         // permit into the blocking task so cancellation cannot release it early.
         let permit = self
@@ -144,20 +148,25 @@ impl PdsPublisher {
         .map_err(|error| {
             tracing::warn!(reason = %error, "PDS repository verification failed");
             PublishFailure::InvalidReceipt
-        })?;
-        Ok(())
+        })
     }
     pub async fn publish_exact(
         &self,
         delivery: &PublicationDelivery,
     ) -> std::result::Result<(), PublishFailure> {
+        self.publish_verified(delivery).await.map(|_| ())
+    }
+    pub async fn publish_verified(
+        &self,
+        delivery: &PublicationDelivery,
+    ) -> std::result::Result<VerifiedRepository, PublishFailure> {
         if delivery.envelope.space != self.space {
             return Err(PublishFailure::InvalidReceipt);
         }
         let wire = PublicationWire::encode(delivery.clone())
             .map_err(|_| PublishFailure::InvalidReceipt)?;
-        if self.readback(&wire).await? {
-            return Ok(());
+        if let Some(proof) = self.readback(&wire).await? {
+            return Ok(proof);
         }
         let body = mem_atproto::publication::create_request(&wire, &self.repository)
             .map_err(|_| PublishFailure::InvalidReceipt)?;
@@ -175,8 +184,8 @@ impl PdsPublisher {
             .json(&body)
             .send()
             .await;
-        if self.readback(&wire).await? {
-            Ok(())
+        if let Some(proof) = self.readback(&wire).await? {
+            Ok(proof)
         } else {
             Err(PublishFailure::Unavailable)
         }

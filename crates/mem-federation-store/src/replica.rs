@@ -6,10 +6,10 @@ use crate::{DeliveryStatus, Result, StoreError, projection::snapshot};
 
 #[derive(Clone)]
 pub struct ReplicaStore {
-    pool: PgPool,
-    space: SpaceId,
-    receiver: InstanceId,
-    authority: InstanceId,
+    pub(crate) pool: PgPool,
+    pub(crate) space: SpaceId,
+    pub(crate) receiver: InstanceId,
+    pub(crate) authority: InstanceId,
 }
 
 impl ReplicaStore {
@@ -41,7 +41,7 @@ impl ReplicaStore {
         })
     }
 
-    async fn load(
+    pub(crate) async fn load(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         verify_projection: bool,
@@ -101,6 +101,22 @@ impl ReplicaStore {
         verified_authority: InstanceId,
         batch: &[PublicationDelivery],
     ) -> Result<u32> {
+        self.receive_inner(verified_authority, batch, None).await
+    }
+    pub async fn receive_with_receipts(
+        &self,
+        authority: InstanceId,
+        batch: &[PublicationDelivery],
+        receipts: &[crate::AuditReceipt],
+    ) -> Result<u32> {
+        self.receive_inner(authority, batch, Some(receipts)).await
+    }
+    async fn receive_inner(
+        &self,
+        verified_authority: InstanceId,
+        batch: &[PublicationDelivery],
+        receipts: Option<&[crate::AuditReceipt]>,
+    ) -> Result<u32> {
         if verified_authority != self.authority {
             return Err(StoreError::Binding);
         }
@@ -117,6 +133,7 @@ impl ReplicaStore {
             }
         }
         self.persist(&mut tx, &state, after).await?;
+        self.persist_receipts(&mut tx, batch, receipts).await?;
         tx.commit().await?;
         Ok(state.sequence())
     }
@@ -128,6 +145,24 @@ impl ReplicaStore {
         &self,
         verified_authority: InstanceId,
         history: &[PublicationDelivery],
+    ) -> Result<u32> {
+        self.resynchronize_inner(verified_authority, history, None)
+            .await
+    }
+    pub async fn resynchronize_with_receipts(
+        &self,
+        authority: InstanceId,
+        history: &[PublicationDelivery],
+        receipts: &[crate::AuditReceipt],
+    ) -> Result<u32> {
+        self.resynchronize_inner(authority, history, Some(receipts))
+            .await
+    }
+    async fn resynchronize_inner(
+        &self,
+        verified_authority: InstanceId,
+        history: &[PublicationDelivery],
+        receipts: Option<&[crate::AuditReceipt]>,
     ) -> Result<u32> {
         if verified_authority != self.authority {
             return Err(StoreError::Binding);
@@ -148,6 +183,7 @@ impl ReplicaStore {
         // Reuse the verified prefix; append plus projection replacement is an
         // atomic swap without destructively clearing a good inbox first.
         self.persist(&mut tx, &state, old.sequence()).await?;
+        self.persist_receipts(&mut tx, history, receipts).await?;
         tx.commit().await?;
         Ok(state.sequence())
     }
