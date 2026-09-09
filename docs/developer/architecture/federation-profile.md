@@ -103,9 +103,18 @@ intersection of exact-project permissions, explicit local sharing grants and
 independent gateway capabilities, with no implicit admin/role bypass. Production
 local grants are persisted and independently checked again before transmission.
 The opt-in runtime pins administrator-configured origins and tokens, disallows
-redirects/proxies and bounds response sizes/time. Automatic session refresh,
-live DID/signing-key verification, TLS deployment, private network enforcement
-and production namespace publication remain D/E/deployment gates.
+redirects/proxies and bounds response sizes/time. The first Stage D increment adds
+`mem-atproto-verify` with exactly pinned Atrium crypto 0.1.3, separate from the
+original wire adapter. Gateway configuration requires a trusted enrolled
+repository DID/public signing-key pair; successful publication now requires
+bounded full-CAR, canonical signed v3 commit, complete MST and exact-record
+inclusion verification. No record-derived URLs, DID resolution, TOFU or unsigned
+fallback are used. [Runtime limits and enrollment](../../user/federation-runtime.md)
+are explicit. This is inclusion in a snapshot, not proof of current history,
+human review or factual truth; no receiver audit proof is stored yet.
+Automatic session refresh, safe DID/key discovery and rotation, receiver proofs,
+TLS deployment, private network enforcement and production namespace publication
+remain D/E/deployment gates.
 
 ## Namespace ownership and publication gate
 

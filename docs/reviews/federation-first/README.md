@@ -11,7 +11,8 @@ Implementation evidence: [2026-09-07 checkpoint](2026-09-07-implementation.md)
 and [2026-09-08 domain checkpoint](2026-09-08-publication-domain.md), followed by
 the [B2/B3 permission and conformance increment](2026-09-08-b2-b3.md) and
 [Stage C durability foundation](2026-09-08-c-durability.md) and
-[completed C integration](2026-09-08-c-completion.md).
+[completed C integration](2026-09-08-c-completion.md). Stage D has started with the
+[runtime repository-authenticity increment](2026-09-09-d-repository-verification.md).
 The full roadmap remains incomplete; checked items have deliberately bounded scope.
 
 ## Source contracts and existing evidence
@@ -73,6 +74,12 @@ customer installations or browser workflows. D/E/R1 and all release gates remain
 open; no customer deployment or production Lexicon publication is authorized.
 
 ## D. Trust boundary
+
+First increment: the gateway now requires bounded signed repository inclusion
+under an explicitly enrolled DID/key before PDS acknowledgement. Hostile proof,
+forged publisher and cross-space tests accompany it. D2 is **not** fully closed:
+identity lifecycle and receiver proof/audit integration are still open, along
+with deployment isolation (D1), forwarding policy (D3) and retention/audit (D4).
 
 - [ ] D1 Keep each instance database private and independently authorized; only the gateway accesses PDS credentials and endpoints, with no CAR/firehose/repository/cross-space bypass.
 - [ ] D2 Verify identities safely without SSRF; reject forged publishers, malformed records and invalid signatures.

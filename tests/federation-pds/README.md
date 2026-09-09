@@ -67,7 +67,7 @@ The additional runtime mode uses the same pinned PDS, internal-only network,
 private DID and production security flags. It provisions/migrates a synthetic
 account, keeps the DID fixture alive, and runs the real Rust gateway/PDS/receiver
 workflow with three newly created independent databases. It needs an explicitly
-disposable pgvector/PostgreSQL 16 URL whose test role can create/drop databases:
+disposable pgvector/PostgreSQL 16 or 17 URL whose test role can create/drop databases:
 
 ```bash
 cargo test -p mem-federation-runtime --test c_workflow --locked --no-run
@@ -88,11 +88,32 @@ lost successful PDS response, source disconnection/restart, duplicated/tampered
 delivery, a 32-record page boundary, complete resync, independent state revisions,
 tombstones, local permission removal and immediate gateway revocation. The proxy
 drops the first successful upstream create reply; the production Rust publisher
-must recover using exact URI/CID/value readback. The upstream SDK independently
+must recover using exact URI/CID/value readback. Since the first Stage D increment,
+the fixture also supplies its provisioned public signing key to the Rust publisher,
+which requires bounded signed full-CAR inclusion before acknowledging any record.
+The unsigned fake path has been removed: synthetic XRPC tests generate real
+signatures too. The upstream SDK independently
 validates all stored v2 Lexicon wrappers and the signed repository, rejecting a
 wrong signing key. All data and credentials are ephemeral and private.
 
-Both the original cold-recovery mode and runtime mode pass locally on 2026-09-08.
+Both the original cold-recovery mode and runtime mode pass locally on 2026-09-09.
 The scoped CI job runs both, after compiling the Rust integration test. Runtime
 mode establishes C's software integration, **not** D/E's complete deployed trust
-boundary, signed-ingestion path, browser workflows or customer release gates.
+boundary, receiver proof/audit path, browser workflows or customer release gates.
+
+## Canonical MST regression
+
+Pinned Atrium 0.1.8 plus `serde_ipld_dagcbor 0.6.0` serializes MST structs in
+noncanonical declaration order. Local insertion-order determinism alone misses
+this. `mem-atproto-verify::CanonicalMstStore` canonicalizes only locally generated
+nodes before hashing, while incoming bytes remain subject to strict validation.
+The independent synthetic upstream golden in
+`fixtures/federation/atproto/verification/mst-canonical.json` records the exact
+generator/image and inputs. Reproduce the raw-Atrium mismatch and corrected root:
+
+```bash
+cargo test -p mem-atproto-verify upstream_golden_proves_canonical_mst_not_just_local_determinism --locked
+```
+
+The full live PDS test validates the integration independently, including canonical
+commit signatures. No PDS fork, dependency patch or weakened security flag is used.

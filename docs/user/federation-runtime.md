@@ -49,6 +49,7 @@ The gateway configuration is separate:
   "listen": "127.0.0.1:4055",
   "pds": "https://pds.federation.example.com",
   "repository": "did:web:space.federation.example.com",
+  "signing_key": "<enrolled did:key public signing key>",
   "token_file": "/run/secrets/memory-pds-token",
   "credentials": [
     {
@@ -72,6 +73,14 @@ is HTTP and requires a reviewed private-network/TLS termination arrangement;
 the outbound clients require HTTPS. Prevent all raw PDS/CAR/firehose bypasses.
 Those deployment controls are not installed by this setting.
 
+`signing_key` is now mandatory: replace the placeholder with the repository's
+canonical compressed `did:key` public signing key, enrolled through a trusted
+administration channel together with the repository DID and space. Missing or
+malformed keys prevent gateway startup. The public key is not a PDS access token
+or private signing key. Do not copy a key from an untrusted record or silently
+trust the first key returned by a server. Discovery and key rotation are not
+implemented; an unexpected key change blocks publication for operator review.
+
 Token files must be private (0600 on Unix), 32–4096 bytes. Configuration rejects
 unknown fields, invalid IDs and unsafe URL shapes. Endpoints are pinned origins,
 not discovered from imported records; redirects and environment proxies are
@@ -89,7 +98,7 @@ The storage APIs expose separate `DeliveryStatus` observations:
 | --- | --- |
 | Queued | Local intent committed; gateway has not accepted it |
 | Accepted | Gateway committed authorization, reducer result, order and PDS work |
-| Published | PDS contains the exact immutable record with matching URI/CID |
+| Published | Exact URI/CID/readback plus signed repository inclusion verified under the enrolled key |
 | Replicated | One named receiver committed its inbox, projection and cursor |
 
 `intent_status`, `GatewayStore::status` and `ReplicaStore::status` report their
@@ -118,8 +127,41 @@ page. Backoff and source/PDS retry budgets are durable; exhausted or invalid wor
 needs intervention. This is not a scalable checkpoint implementation or a complete
 disaster-recovery system. Revocation denies later gateway access/publication but
 does not erase offline copies. Administrators and admitted recipients can read
-shared plaintext. Runtime signature verification, model-forwarding restrictions,
-retention/legal holds, browser parity and production backup recovery remain gates.
+shared plaintext. Receiver-side signature/audit proofs, model-forwarding
+restrictions, retention/legal holds, browser parity and production backup
+recovery remain gates.
+
+## First Stage D trust check and its limits
+
+Before PDS work is acknowledged, the gateway obtains a full CAR from the fixed
+PDS `getRepo` endpoint and checks SHA-256 block CIDs, the canonical v3 commit,
+enrolled DID, low-S secp256k1/P-256 signature, complete canonical MST and the exact
+publication key/bytes. No URLs are derived from DIDs or record contents. Matching
+JSON alone, invalid signatures and oversized/incomplete proofs cannot advance
+the published state. Bad proofs persist as invalid-receipt failures and require
+operator remediation; there is no unsigned fallback or automatic overwrite.
+
+This bounded implementation accepts one-root full CARs up to 16 MiB, 32,768
+physical blocks, 1 MiB per framed block, 4 KiB commit/header, 8,192 records/nodes
+and 64 tree edges. All blocks must have canonical DAG-CBOR/SHA-256 CIDs. Duplicate
+blocks and arbitrary block order are supported; incremental CARs, blobs and
+native Spaces are not this verification contract. Verification/downloads are
+serialized per publisher and CPU work runs outside the async I/O executor.
+Full snapshot verification costs O(repository) per publication and is not yet
+the scalable production synchronization path. Hitting a limit blocks work; do
+not raise limits or bypass verification without assessment.
+
+The proof establishes inclusion in a signed snapshot, not factual correctness,
+current membership, history freshness or a transferable human-review receipt.
+The five-minute future-revision tolerance is a clock sanity check, not replay
+defense; application order still comes from the transactional gateway sequence.
+Membership/revocation checks remain in the gateway domain. Receivers currently
+trust their pinned gateway/authenticated transport; cryptographic receipts are
+not yet durably stored or delivered to receivers. See the
+[D increment contract](../reviews/federation-first/d-signature-contract.md).
+Previously persisted `Published` observations are not retroactively certified;
+do not treat pre-D state as cryptographic evidence or promote it to a customer
+deployment without a reviewed verification/migration procedure.
 
 For synthetic verification, see [the PDS harness](../../tests/federation-pds/README.md)
 and [the transaction contract](../developer/architecture/federation-durability.md).

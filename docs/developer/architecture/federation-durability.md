@@ -73,8 +73,11 @@ PDS credentials are only present on the gateway path. Pinned DID repository keys
 are UUIDv5 over space/publisher/record UUID; neither keys nor CID sort order is
 application order. `createRecord` never overwrites: equal readback with matching
 AT-URI, known delivery, complete unknown fields and computed DAG-CBOR CID is
-required even after a successful reply. A neutral SHA-256 envelope digest is
-distinct from that transport CID. Digests are not signature verification.
+required even after a successful reply. The first D increment additionally requires
+bounded full-repository signature and exact-record inclusion verification under
+an administrator-enrolled DID/key before acknowledgement. A neutral SHA-256
+envelope digest is distinct from that transport CID; neither substitutes for
+signature verification. See [the bounded verifier evidence](../../reviews/federation-first/2026-09-09-d-repository-verification.md).
 
 Instance ticks pull a bounded published-prefix page, prepare frozen work, submit
 due intents and commit receipts, then catch up again. Retry counters, deadlines,
@@ -93,6 +96,7 @@ not that PostgreSQL itself can be absent. R1's existing post-curation queue and
 timeline transaction gap are separate unfinished integration work.
 
 Real-PDS tests do not establish the full production trust boundary, native Spaces,
-runtime signature validation, automatic token refresh, offsite recovery or E's
+receiver cryptographic proof validation, identity/key lifecycle, automatic token
+refresh, offsite recovery or E's
 retrieval/citation/proposal/user interfaces. Administrators and authorized recipients
 can read shared plaintext, and revocation cannot recall previously delivered bytes.

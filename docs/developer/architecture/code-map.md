@@ -19,6 +19,7 @@ Use this map to find the right PR boundary before opening the large files.
 - `crates/mem-federation-store`: [PostgreSQL federation durability](federation-durability.md): reviewed stream subscriptions and transactional source capture, ordered gateway acceptance, leased publication, receiver inbox/projection/cursor and verified-prefix resync. Trusted in-process policy inputs, no network dependencies.
 - `crates/mem-federation-runtime`: opt-in authenticated gateway HTTP, immutable PDS write/readback and durable instance synchronization. `mem-service/src/federation.rs` owns worker lifecycle and resolves current local permissions. Review/admin UI and production security gates remain separate.
 - `crates/mem-atproto`: pure ATProto/Atrium encoding, unpublished legacy and schema-v2 publication Lexicons, generated XRPC requests, syntax fixtures and MST checks over `mem-federation`.
+- `crates/mem-atproto-verify`: bounded full-CAR/commit/MST inclusion verification under an enrolled DID/key. Separate pinned Atrium crypto adapter, no network/discovery/database; the PDS runtime requires verification before acknowledgement.
 
 ## Formal
 
