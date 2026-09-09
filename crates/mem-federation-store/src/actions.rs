@@ -56,8 +56,30 @@ pub(crate) async fn lock_quiet_stream(
         .bind(project).bind(canonical.as_uuid()).fetch_one(&mut **tx).await?;
     sqlx::query("SELECT canonical_id FROM federation_source_subscriptions WHERE space=$1 AND instance=$2 AND canonical_id=$3 FOR UPDATE")
         .bind(known.space().as_uuid()).bind(instance.as_uuid()).bind(canonical.as_uuid()).fetch_optional(&mut **tx).await?;
-    let pending: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM federation_source_changes WHERE space=$1 AND instance=$2 AND canonical_id=$3 AND NOT prepared) OR EXISTS(SELECT 1 FROM federation_source_outbox WHERE space=$1 AND publisher=$2 AND (acceptance IS NULL OR (acceptance->>'sequence')::bigint>$4))")
-        .bind(known.space().as_uuid()).bind(instance.as_uuid()).bind(canonical.as_uuid()).bind(i64::from(known.sequence())).fetch_one(&mut **tx).await?;
+    let stream = StreamId {
+        origin: instance,
+        canonical,
+    };
+    // Only this stream's counters need a quiet boundary. An unrelated failed
+    // membership/proposal must not freeze every source review in the space.
+    // A stale/resolved proposal can never advance this monotonic stream again.
+    let proposals: Vec<RecordKey> = known
+        .accepted()
+        .iter()
+        .filter_map(|d| {
+            let key = d.envelope.key();
+            known
+                .proposal(key)
+                .filter(|p| {
+                    p.proposal.target == stream
+                        && p.proposal.base_version.get() == known.content_version(stream)
+                        && p.resolution == ProposalResolution::Pending
+                })
+                .map(|_| key)
+        })
+        .collect();
+    let pending: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM federation_source_changes WHERE space=$1 AND instance=$2 AND canonical_id=$3 AND NOT prepared) OR EXISTS(SELECT 1 FROM federation_source_outbox WHERE space=$1 AND publisher=$2 AND (acceptance IS NULL OR (acceptance->>'sequence')::bigint>$4) AND (envelope#>>'{record,payload,stream,canonical}'=$3::text OR (envelope#>>'{record,kind}'='resolve_proposal' AND envelope#>'{record,payload,proposal}' IN (SELECT jsonb_array_elements($5::jsonb)))))")
+        .bind(known.space().as_uuid()).bind(instance.as_uuid()).bind(canonical.as_uuid()).bind(i64::from(known.sequence())).bind(Json(proposals)).fetch_one(&mut **tx).await?;
     if pending {
         return Err(StoreError::Binding);
     }

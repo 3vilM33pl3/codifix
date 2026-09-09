@@ -1,5 +1,12 @@
 # Web UI
 
+The **More → federation** workspace exposes the configured private space, local
+grants, authority enrollment, reviewed publication, shared citations, correction
+proposals, approval/rejection, subscriptions and sync controls. Mutations display
+their exact request and require confirmation. Drafts are cleared on project
+changes; imported text is escaped and never forwarded to a model from this view.
+See [Federation workflow](federation-workflow.md) for consent and offline-copy limits.
+
 The web UI is the web companion to the TUI. It is served by `mem-service` and uses the same backend APIs for memories, query, code graph inspection, activities, watchers, embeddings, resume briefings, and curation review.
 
 Open it while the service is running:

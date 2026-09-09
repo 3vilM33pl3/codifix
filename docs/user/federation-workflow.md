@@ -1,11 +1,16 @@
 # Federation application workflow
 
-This experimental local API connects the application to the C/D runtime. It is
-**not a completed two-organization product or an enrollment UI**. Enable only in
-controlled integration environments using the [runtime configuration](federation-runtime.md).
+This experimental local API connects Web, CLI and the focused TUI to the C/D
+runtime. Enable only in controlled integration environments using the
+[runtime configuration](federation-runtime.md); integration evidence does not
+authorize customer release or substitute for the remaining pilot/security gates.
 Each process currently binds one local project to one explicitly enrolled
 instance/space. Remote identities, credentials, TLS roots and receipt keys remain
 administrator configuration; requests cannot replace them.
+
+Open **More → federation** in Web, `memory federation --project <slug> ...` in
+the CLI, or `memory federation --project <slug> tui` for the focused terminal
+workspace. See [commands and confirmation controls](cli/federation.md).
 
 Use the local service's existing authentication: a scoped service token, or a
 browser session with Origin and CSRF for POST. Even single-user retained reads
@@ -181,10 +186,11 @@ disabled/mismatched configuration or absent source; 409 stale review or changed
 binding; 413/422 body limit/shape errors; 503 unavailable or unverifiable state.
 No database errors, endpoints, tokens or trust configuration are returned.
 
-## Still required for E
+## Release boundary
 
-Remote enrollment/member administration, grant listing and consent-management
-clients, origin-owned correction proposals/approval, Web/CLI/TUI parity, and the
-complete independently administered two-instance user journey remain open. This
-API foundation is not permission to release customer federation or use Spaces
-alpha. See the [roadmap](../reviews/federation-first/README.md).
+The controlled two-instance/client gate exercises these workflows against the
+pinned real PDS. It does not establish production namespace ownership, customer
+SSO, offsite disaster recovery, legal retention approval, external-provider
+forwarding or held-out answer quality. Customer release still depends on the
+remaining [roadmap gates](../reviews/federation-first/README.md). Neither native
+Spaces alpha nor public Bluesky publication is enabled by these controls.

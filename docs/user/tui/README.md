@@ -1,5 +1,10 @@
 # TUI Guide
 
+For private federation, launch `memory federation --project <slug> tui`. This
+focused workspace supports membership, exact publication review, shared citations,
+proposals, approval/rejection and synchronization through the same authenticated
+local API as Web and CLI. See [Federation commands and keys](../cli/federation.md).
+
 Memory Layer's TUI is the fastest way to browse project memory, ask cited questions, monitor live agents, switch embedding backends, get back into flow after an interruption, and inspect what the backend has been doing.
 
 ![Memory Layer TUI overview](../../img/tui/overview.png)

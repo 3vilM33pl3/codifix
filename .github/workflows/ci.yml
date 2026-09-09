@@ -93,6 +93,8 @@ jobs:
               - "crates/mem-federation-store/**"
               - "crates/mem-federation-runtime/**"
               - "crates/mem-service/**"
+              - "crates/mem-cli/**"
+              - "web/**"
               - "migrations/**"
               - "tests/federation-pds/**"
               - "tests/federation-isolation/**"
@@ -108,7 +110,7 @@ jobs:
     runs-on: [self-hosted, memory, Linux, X64]
     needs: changes
     if: needs.changes.outputs.federation_pds == 'true'
-    timeout-minutes: 20
+    timeout-minutes: 35
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -136,7 +138,15 @@ jobs:
       - run: node tests/federation-pds/backup.test.cjs
       - run: node tests/federation-pds/run.mjs
       - run: cargo test -p mem-federation-runtime --test c_workflow --locked --no-run
+      - run: cargo build -p mem-cli --locked
+      - run: npm --prefix web ci
+      - run: npm --prefix web run test
+      - run: npm --prefix web run build
+      - run: npx playwright install chromium
+        working-directory: web
       - run: node tests/federation-pds/run.mjs --runtime
+        env:
+          MEMORY_FEDERATION_E_CLIENTS: "1"
       - run: node tests/federation-isolation/run.mjs
 
   plugin-contract:

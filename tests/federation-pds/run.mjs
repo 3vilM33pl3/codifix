@@ -106,6 +106,15 @@ async function runtimeTest() {
     });
     if (code !== 0) throw new Error('Rust-to-real-PDS workflow failed');
   } finally { clearTimeout(timer); }
+  // Stage E exercises the local application contract over this SAME pinned PDS.
+  // Optional client coverage requires a locally built CLI/web and Chromium.
+  const app = spawn('cargo', ['test', '-p', 'mem-service', 'e_two_instance_http_workflow', '--locked', '--', '--test-threads=1', '--nocapture'],
+    { cwd: join(directory, '../..'), env: testEnv, stdio: 'inherit' });
+  const appTimer = setTimeout(() => app.kill('SIGTERM'), 540_000);
+  try {
+    const code = await new Promise((resolve, reject) => { app.once('error', reject); app.once('exit', resolve); });
+    if (code !== 0) throw new Error('Two-instance Memory application workflow failed');
+  } finally { clearTimeout(appTimer); }
   await writeFile(join(stateDirectory, 'runtime-finished'), 'complete', { mode: 0o600 });
   const probeId = spawnSync('docker', [...compose, 'ps', '-aq', 'probe'], { env: runtimeEnv, encoding: 'utf8' });
   const completed = spawnSync('docker', ['wait', probeId.stdout.trim()], { encoding: 'utf8', timeout: 60_000 });

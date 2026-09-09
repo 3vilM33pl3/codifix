@@ -9,8 +9,10 @@ use mem_federation_store::{Claim, GatewayStore, PublicationIntent, RetryPolicy};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use std::sync::Mutex;
+mod two_instance;
 
 struct Fixture {
+    process: Option<two_instance::ServiceProcess>,
     state: AppState,
     pool: PgPool,
     runtime: Arc<ConfiguredInstance>,
@@ -25,6 +27,29 @@ struct Fixture {
     tasks: Vec<tokio::task::JoinHandle<()>>,
     gateway: GatewayStore,
     security: GatewaySecurity,
+}
+
+#[tokio::test]
+async fn unrelated_queued_review_does_not_freeze_another_stream() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    f.grant(f.writer_id, true).await;
+    for _ in 0..2 {
+        let canonical = f.source().await;
+        let review = f.review_request(canonical).await;
+        let (status, response) = f
+            .request(&f.writer, reqwest::Method::POST, "/reviews", review)
+            .await;
+        assert_eq!(status, StatusCode::ACCEPTED, "{response}");
+    }
+    let count: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM federation_source_subscriptions WHERE space=$1")
+            .bind(f.runtime.space.as_uuid())
+            .fetch_one(&f.pool)
+            .await
+            .unwrap();
+    assert_eq!(count, 2);
 }
 
 #[tokio::test]
@@ -260,6 +285,7 @@ async fn correction_actions_pause_local_updates_and_require_fresh_review() {
 }
 impl Drop for Fixture {
     fn drop(&mut self) {
+        self.process.take();
         for task in &self.tasks {
             task.abort();
         }
@@ -400,6 +426,7 @@ impl Fixture {
         *state.federation.write().unwrap() = Some(runtime.clone());
         let (url, task) = serve(crate::routes::build_http_app(state.clone())).await;
         let fixture = Self {
+            process: None,
             state,
             pool,
             runtime,
