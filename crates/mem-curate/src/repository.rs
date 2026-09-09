@@ -1012,7 +1012,7 @@ async fn attach_candidate_metadata(
     Ok(())
 }
 
-async fn rebuild_memory_chunks(
+pub async fn rebuild_memory_chunks(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     memory_id: Uuid,
 ) -> Result<(), sqlx::Error> {

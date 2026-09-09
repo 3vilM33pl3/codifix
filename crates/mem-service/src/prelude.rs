@@ -23,7 +23,7 @@ pub(crate) use std::os::fd::AsRawFd;
 pub(crate) use crate::repository::{
     fetch_project_commit, fetch_project_commits, fetch_project_memories,
     fetch_project_memory_graph, fetch_project_overview, parse_status_filter,
-    preview_project_commit_sync, sync_project_commits,
+    preview_project_commit_sync,
 };
 pub(crate) use anyhow::{Context, Result};
 pub(crate) use axum::{
@@ -43,8 +43,7 @@ pub(crate) use mem_config::{
     repo_agent_settings_path, resolve_llm_api_key,
 };
 pub(crate) use mem_curate::{
-    list_replacement_proposals, preview_capture, preview_curate, refresh_memory_relations,
-    store_capture,
+    list_replacement_proposals, preview_capture, preview_curate, store_capture,
 };
 pub(crate) use mem_platform::{
     managed_watch_service_name, preferred_user_state_dir, restart_local_watcher_service_name,
@@ -91,8 +90,7 @@ pub(crate) use mem_record::{
 };
 pub(crate) use mem_search::{
     EmbeddingRegistry, effective_embedding_base_url, parse_memory_type, parse_relation_type,
-    parse_source_kind, prune_project_embeddings, rebuild_chunks,
-    rebuild_chunks_for_automatic_creation, reembed_project_chunks,
+    parse_source_kind, prune_project_embeddings, rebuild_chunks, reembed_project_chunks,
 };
 pub(crate) use regex::Regex;
 pub(crate) use serde::Deserialize;

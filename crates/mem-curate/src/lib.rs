@@ -7,6 +7,8 @@ mod repository;
 
 pub mod ingest;
 
+pub use repository::rebuild_memory_chunks as rebuild_memory_chunks_tx;
+
 pub use repository::{
     CaptureMutation, CurateMutation, ReplacementMutation, SemanticDuplicate,
     ValidationRevisionMutation, apply_validation_revision, apply_validation_revision_tx,

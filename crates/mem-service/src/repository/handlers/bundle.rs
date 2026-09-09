@@ -445,6 +445,16 @@ pub(crate) async fn preview_bundle_import(
 }
 
 pub async fn upsert_project_slug(pool: &PgPool, slug: &str) -> Result<Uuid, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let id = upsert_project_slug_tx(&mut tx, slug).await?;
+    tx.commit().await?;
+    Ok(id)
+}
+
+pub async fn upsert_project_slug_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    slug: &str,
+) -> Result<Uuid, sqlx::Error> {
     let row = sqlx::query(
         r#"
         INSERT INTO projects (id, slug, name, root_path)
@@ -454,7 +464,7 @@ pub async fn upsert_project_slug(pool: &PgPool, slug: &str) -> Result<Uuid, sqlx
         "#,
     )
     .bind(slug)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await?;
     row.try_get("id")
 }
@@ -518,12 +528,44 @@ pub(crate) async fn project_bundle_import_preview(
 
 pub(crate) async fn project_bundle_import(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(slug): Path<String>,
     body: Bytes,
 ) -> Result<Json<ProjectMemoryImportResponse>, ApiError> {
     let loaded = load_bundle_archive(&body)?;
-    let pool = &state.pool()?;
-    let target_project_id = upsert_project_slug(pool, &slug)
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "bundle-import".into(),
+        occurred_at: None,
+    };
+    let actor = mem_store::jobs::JobActor::Credential {
+        principal: principal.id,
+        token: principal.token_id,
+        session: principal.session_id,
+    };
+    let pool = state.pool()?;
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let mutation = import_bundle_tx(&mut tx, slug.clone(), &loaded, &context, &actor).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    crate::repository::events::broadcast_committed(&state, slug, mutation.event, mutation.sequence);
+    state.background.notify.notify_one();
+    Ok(Json(mutation.response))
+}
+
+struct BundleImportMutation {
+    response: ProjectMemoryImportResponse,
+    event: mem_store::events::TimelineEvent,
+    sequence: i64,
+}
+async fn import_bundle_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    slug: String,
+    loaded: &LoadedBundle,
+    context: &mem_store::events::MutationContext,
+    actor: &mem_store::jobs::JobActor,
+) -> Result<BundleImportMutation, ApiError> {
+    let target_project_id = upsert_project_slug_tx(tx, &slug)
         .await
         .map_err(ApiError::sql)?;
     let import_id = Uuid::new_v4();
@@ -541,7 +583,7 @@ pub(crate) async fn project_bundle_import(
     .bind(&loaded.manifest.source_project)
     .bind(&loaded.manifest.summary_markdown)
     .bind(sqlx::types::Json(&loaded.manifest.options))
-    .execute(pool)
+    .execute(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
 
@@ -565,7 +607,7 @@ pub(crate) async fn project_bundle_import(
         .bind(target_project_id)
         .bind(&loaded.manifest.bundle_id)
         .bind(&entry.entry_key)
-        .fetch_optional(pool)
+        .fetch_optional(&mut **tx)
         .await
         .map_err(ApiError::sql)?;
 
@@ -584,21 +626,20 @@ pub(crate) async fn project_bundle_import(
 
         let memory_id = Uuid::new_v4();
         let (canonical_id, version_no) = if let Some(existing_memory_id) = superseded_memory_id {
-            let row = sqlx::query(
-                r#"
-                SELECT canonical_id, MAX(version_no) OVER (PARTITION BY canonical_id) AS latest
-                FROM memory_entries
-                WHERE id = $1
-                "#,
+            let canonical: Uuid = sqlx::query_scalar("SELECT cs.canonical_id FROM memory_canonical_state cs JOIN memory_entries m ON m.canonical_id=cs.canonical_id WHERE m.id=$1 AND cs.project_id=$2 FOR UPDATE OF cs")
+                .bind(existing_memory_id).bind(target_project_id).fetch_one(&mut **tx).await.map_err(ApiError::sql)?;
+            let latest: i32 = sqlx::query_scalar(
+                "SELECT MAX(version_no) FROM memory_entries WHERE canonical_id=$1",
             )
-            .bind(existing_memory_id)
-            .fetch_one(pool)
+            .bind(canonical)
+            .fetch_one(&mut **tx)
             .await
             .map_err(ApiError::sql)?;
             (
-                row.try_get::<Uuid, _>("canonical_id")
-                    .map_err(ApiError::sql)?,
-                row.try_get::<i32, _>("latest").map_err(ApiError::sql)? + 1,
+                canonical,
+                latest
+                    .checked_add(1)
+                    .ok_or_else(|| ApiError::internal("version limit"))?,
             )
         } else {
             (memory_id, 1)
@@ -622,7 +663,7 @@ pub(crate) async fn project_bundle_import(
         .bind(entry.confidence)
         .bind(entry.created_at)
         .bind(entry.updated_at)
-        .execute(pool)
+        .execute(&mut **tx)
         .await
         .map_err(ApiError::sql)?;
 
@@ -632,7 +673,7 @@ pub(crate) async fn project_bundle_import(
             )
             .bind(memory_id)
             .bind(tag)
-            .execute(pool)
+            .execute(&mut **tx)
             .await
             .map_err(ApiError::sql)?;
         }
@@ -662,7 +703,7 @@ pub(crate) async fn project_bundle_import(
                 SourceKind::Memory => "memory",
             })
             .bind(&source.excerpt)
-            .execute(pool)
+            .execute(&mut **tx)
             .await
             .map_err(ApiError::sql)?;
         }
@@ -684,7 +725,7 @@ pub(crate) async fn project_bundle_import(
         .bind(&hash)
         .bind(memory_id)
         .bind(import_id)
-        .execute(pool)
+        .execute(&mut **tx)
         .await
         .map_err(ApiError::sql)?;
 
@@ -694,7 +735,7 @@ pub(crate) async fn project_bundle_import(
     }
 
     for memory_id in &imported_ids {
-        refresh_memory_relations(pool, &slug, *memory_id)
+        mem_curate::refresh_memory_relations_tx(tx, &slug, *memory_id)
             .await
             .map_err(ApiError::sql)?;
     }
@@ -708,7 +749,7 @@ pub(crate) async fn project_bundle_import(
              (SELECT canonical_id FROM memory_entries WHERE id = $1)",
         )
         .bind(src_memory_id)
-        .execute(pool)
+        .execute(&mut **tx)
         .await
         .map_err(ApiError::sql)?;
         for relation in &entry.relations {
@@ -727,46 +768,46 @@ pub(crate) async fn project_bundle_import(
                 .bind(src_memory_id)
                 .bind(relation.relation_type.to_string())
                 .bind(dst_memory_id)
-                .execute(pool)
+                .execute(&mut **tx)
                 .await
                 .map_err(ApiError::sql)?;
             }
         }
     }
 
-    let embedders = state.embedders.read().await;
-    rebuild_chunks_for_automatic_creation(
-        pool,
-        &slug,
-        &embedders,
-        state
-            .automated_embedding_creation_enabled
-            .load(Ordering::Relaxed),
-    )
-    .await
-    .map_err(ApiError::io)?;
-
-    notify_project_changed(
-        &state,
-        slug.clone(),
-        None,
+    for id in &imported_ids {
+        mem_curate::rebuild_memory_chunks_tx(tx, *id)
+            .await
+            .map_err(ApiError::sql)?;
+    }
+    if !imported_ids.is_empty() {
+        mem_store::post_curation::enqueue(tx, target_project_id, import_id, &imported_ids, actor)
+            .await
+            .map_err(|_| ApiError::service_unavailable("bundle job intent failed"))?;
+    }
+    let mut event = mem_store::events::TimelineEvent::new(
+        target_project_id,
         ActivityKind::BundleImport,
         format!(
-            "Imported memory bundle {} into {} memory entry/entries.",
-            loaded.manifest.bundle_id, imported_count
+            "Imported bundle {}: {imported_count} entries",
+            loaded.manifest.bundle_id
         ),
-        Some(ActivityDetails::BundleTransfer {
-            bundle_id: loaded.manifest.bundle_id.clone(),
-            item_count: imported_count,
-            source_project: Some(loaded.manifest.source_project.clone()),
-        }),
     );
-    notify_project_refreshed(&state, slug.clone());
+    event.operation_id = Some(import_id.to_string());
+    context.stamp(&mut event);
+    event.details = Some(ActivityDetails::BundleTransfer {
+        bundle_id: loaded.manifest.bundle_id.clone(),
+        item_count: imported_count,
+        source_project: Some(loaded.manifest.source_project.clone()),
+    });
+    let sequence = mem_store::events::append(tx, &event)
+        .await
+        .map_err(|_| ApiError::service_unavailable("bundle event append failed"))?;
 
-    Ok(Json(ProjectMemoryImportResponse {
+    let response = ProjectMemoryImportResponse {
         target_project: slug,
-        bundle_id: loaded.manifest.bundle_id,
-        bundle_hash: loaded.manifest.bundle_hash,
+        bundle_id: loaded.manifest.bundle_id.clone(),
+        bundle_hash: loaded.manifest.bundle_hash.clone(),
         imported_count,
         replaced_count,
         skipped_count,
@@ -776,13 +817,74 @@ pub(crate) async fn project_bundle_import(
             .iter()
             .map(|entry| entry.relations.len())
             .sum(),
-    }))
+    };
+    Ok(BundleImportMutation {
+        response,
+        event,
+        sequence,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use mem_record::{MemoryStatus, MemoryType, ProjectMemoryExportOptions};
+
+    #[tokio::test]
+    async fn bundle_import_rolls_back_all_rows_events_and_jobs_and_replays_without_duplicate_versions()
+     {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let slug = mem_test_support::unique_project_slug("bundle-atomic");
+        let (manifest, warnings) = build_bundle_manifest(
+            "origin",
+            &ProjectMemoryExportOptions::default(),
+            &[sample_memory("Selected imported knowledge")],
+        )
+        .unwrap();
+        let loaded = LoadedBundle { manifest, warnings };
+        let actor = mem_store::jobs::JobActor::System("local-curation".into());
+        let context = mem_store::events::MutationContext::internal("test");
+        let broken = mem_store::events::MutationContext {
+            source: "\0".into(),
+            ..context.clone()
+        };
+        let mut tx = pool.begin().await.unwrap();
+        assert!(
+            import_bundle_tx(&mut tx, slug.clone(), &loaded, &broken, &actor)
+                .await
+                .is_err()
+        );
+        tx.rollback().await.unwrap();
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM projects WHERE slug=$1)")
+                .bind(&slug)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(!exists);
+        let mut tx = pool.begin().await.unwrap();
+        let first = import_bundle_tx(&mut tx, slug.clone(), &loaded, &context, &actor)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(first.response.imported_count, 1);
+        let mut tx = pool.begin().await.unwrap();
+        let replay = import_bundle_tx(&mut tx, slug.clone(), &loaded, &context, &actor)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(replay.response.imported_count, 0);
+        assert_eq!(replay.response.skipped_count, 1);
+        let counts: (i64,i64,i64,i64) = sqlx::query_as("SELECT (SELECT count(*) FROM memory_entries WHERE project_id=$1),(SELECT count(*) FROM background_jobs WHERE project_id=$1),(SELECT count(*) FROM project_timeline_events WHERE project_id=$1),(SELECT count(*) FROM memory_chunks c JOIN memory_entries m ON m.id=c.memory_entry_id WHERE m.project_id=$1)")
+            .bind(first.event.project_id).fetch_one(&pool).await.unwrap();
+        assert_eq!((counts.0, counts.1, counts.2), (1, 4, 2));
+        assert!(counts.3 > 0);
+        mem_test_support::cleanup_project(&pool, &slug)
+            .await
+            .unwrap();
+    }
 
     fn sample_memory(text: &str) -> MemoryEntryResponse {
         MemoryEntryResponse {
