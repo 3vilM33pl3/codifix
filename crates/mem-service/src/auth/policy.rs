@@ -1128,6 +1128,52 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             .insert(path.to_string(), policies.to_vec())
             .expect("route policy table entries are unique");
     }
+    for (path, method, permission, semantic_read) in [
+        (
+            "/v1/projects/{slug}/federation/{space}",
+            Method::GET,
+            Permission::MemoryRead,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/grants",
+            Method::POST,
+            Permission::AuthManage,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/memories/{canonical}/preview",
+            Method::GET,
+            Permission::BundleExport,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/reviews",
+            Method::POST,
+            Permission::MemoryCurate,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/context",
+            Method::POST,
+            Permission::MemoryRead,
+            true,
+        ),
+    ] {
+        table
+            .insert(
+                path.to_owned(),
+                vec![(
+                    method,
+                    RoutePolicy {
+                        permission,
+                        scope: ProjectScope::PathProject,
+                        semantic_read,
+                    },
+                )],
+            )
+            .expect("unique federation route policy");
+    }
     table
 }
 

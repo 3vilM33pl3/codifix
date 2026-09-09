@@ -36,14 +36,16 @@ identities and an explicitly configured test deployment):
 ```
 
 The project/principal must exist locally. Starting the worker neither grants
-remote capability nor enrolls a memory. Before sharing, a trusted administration
-path must use `set_local_grant`, authenticate the review principal, compare
-`preview_source`, and call `review_and_share` in a transaction. This opts the
-selected stream into future content/state updates using **only the reviewed
-evidence references**. A fresh explicit review is needed to change that evidence.
-These APIs are currently in-process `mem_service::federation` interfaces; the
-Web/CLI/TUI enrollment/review/proposal screens are still E work. Do not bypass
-local permission checks with raw HTTP-to-repository API exposure.
+remote capability nor enrolls a memory. The first Stage E [application
+API](federation-workflow.md) now exposes centrally authenticated local grants,
+preview/review, retained context and status over this configured runtime.
+Review opts the selected stream into future content/state updates using **only
+the reviewed evidence references**, with explicit standing consent and retry-safe
+submission. A fresh explicit review is needed to change that evidence. The worker
+re-resolves each review owner's local policy before processing their queue;
+it never borrows its configured principal's role. Web/CLI/TUI enrollment, review
+and proposal clients remain E work. Trusted in-process APIs remain available;
+do not expose them without the local authentication/policy boundary.
 
 The gateway configuration is separate. Start only
 `memory-federation-gateway /absolute/path/gateway.json`, with a dedicated,

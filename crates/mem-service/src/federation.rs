@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Explicit publication/review repository APIs and opt-in worker lifecycle.
-//! HTTP/UI review and membership administration remain the E-stage workflow.
+//! Local workflow handlers share only the administrator-enrolled instance.
+pub mod workflow;
 use crate::AppState;
 use mem_federation::publication::{InstanceId, SpaceId};
 use mem_federation_runtime::{Endpoint, GatewayClient, InstanceSync, ReceiptTrust};
@@ -10,6 +11,7 @@ pub use mem_federation_store::{
 use serde::Deserialize;
 use std::{
     path::{Path, PathBuf},
+    sync::{Arc, RwLock},
     time::Duration,
 };
 use uuid::Uuid;
@@ -34,9 +36,25 @@ enum WorkerConfig {
     Gateway {},
 }
 
-pub(crate) struct FederationTasks(Vec<tokio::task::JoinHandle<()>>);
+pub(crate) type Registry = Arc<RwLock<Option<Arc<ConfiguredInstance>>>>;
+
+pub(crate) struct ConfiguredInstance {
+    project: Uuid,
+    space: SpaceId,
+    instance: InstanceId,
+    authority: InstanceId,
+    sync: InstanceSync,
+}
+
+pub(crate) struct FederationTasks(Vec<tokio::task::JoinHandle<()>>, Option<Registry>);
 impl Drop for FederationTasks {
     fn drop(&mut self) {
+        if let Some(registry) = &self.1 {
+            registry
+                .write()
+                .expect("federation registry poisoned")
+                .take();
+        }
         for task in &self.0 {
             task.abort();
         }
@@ -68,7 +86,7 @@ pub(crate) async fn start(
     path: Option<PathBuf>,
 ) -> anyhow::Result<FederationTasks> {
     let Some(path) = path else {
-        return Ok(FederationTasks(Vec::new()));
+        return Ok(FederationTasks(Vec::new(), None));
     };
     let config: WorkerConfig = serde_json::from_slice(&std::fs::read(path)?)?;
     let mut tasks = Vec::new();
@@ -108,7 +126,24 @@ pub(crate) async fn start(
                 instance,
             )
             .await?;
+            {
+                let mut registry = state
+                    .federation
+                    .write()
+                    .expect("federation registry poisoned");
+                anyhow::ensure!(registry.is_none(), "federation runtime already registered");
+                *registry = Some(Arc::new(ConfiguredInstance {
+                    project,
+                    space,
+                    instance,
+                    authority,
+                    sync: sync.clone(),
+                }));
+            }
+            let worker_state = state.clone();
             tasks.push(tokio::spawn(async move {
+                let state = worker_state;
+                let mut after = Uuid::nil();
                 loop {
                     match crate::auth::federation_local_access(&state,principal,project).await {
                         Ok(access)=>{if sync.cycle(&access).await.is_err() {tracing::warn!("federation instance work paused/retrying; inspect durable synchronization status");}}
@@ -119,6 +154,17 @@ pub(crate) async fn start(
                             tracing::warn!("federation local principal is not authorized");
                         }
                     }
+                    // Keyset round-robin: one additional review owner per tick.
+                    // Never borrow the worker's permissions to publish user work.
+                    if let Ok(Some(owner)) = next_owner(&state, project, space, instance, principal, after).await {
+                        after = owner;
+                        if let Ok(access) = crate::auth::federation_local_access(&state, owner, project).await
+                            && sync.publish_pending(&access).await.is_err() {
+                            tracing::warn!("federation review owner's work paused/retrying");
+                        }
+                    } else {
+                        after = Uuid::nil();
+                    }
                     tokio::time::sleep(Duration::from_secs(2)).await;
                 }
             }));
@@ -127,7 +173,20 @@ pub(crate) async fn start(
             "gateway role requires the standalone memory-federation-gateway executable"
         ),
     }
-    Ok(FederationTasks(tasks))
+    Ok(FederationTasks(tasks, Some(state.federation.clone())))
+}
+
+async fn next_owner(
+    state: &AppState,
+    project: Uuid,
+    space: SpaceId,
+    instance: InstanceId,
+    worker: Uuid,
+    after: Uuid,
+) -> anyhow::Result<Option<Uuid>> {
+    Ok(sqlx::query_scalar("SELECT principal_id FROM (SELECT principal_id FROM federation_source_subscriptions WHERE space=$1 AND instance=$2 AND project_id=$3 AND enabled UNION SELECT principal_id FROM federation_source_outbox WHERE space=$1 AND publisher=$2 AND project_id=$3 AND acceptance IS NULL AND NOT blocked) owners WHERE principal_id<>$4 AND principal_id>$5 ORDER BY principal_id LIMIT 1")
+        .bind(space.as_uuid()).bind(instance.as_uuid()).bind(project).bind(worker).bind(after)
+        .fetch_optional(&state.pool().map_err(|_| anyhow::anyhow!("federation database unavailable"))?).await?)
 }
 
 #[cfg(test)]
@@ -238,6 +297,10 @@ mod tests {
         )
         .unwrap();
         let tasks = start(state.clone(), Some(config.clone())).await.unwrap();
+        assert!(state.federation.read().unwrap().is_some());
+        // A disabled/no-op lifecycle must not unregister the live worker.
+        drop(start(state.clone(), None).await.unwrap());
+        assert!(state.federation.read().unwrap().is_some());
         assert_eq!(tasks.0.len(), 1);
         tokio::time::timeout(Duration::from_secs(5),async {
             loop {
@@ -291,6 +354,7 @@ mod tests {
         .unwrap();
         let aborted = tasks.0[0].abort_handle();
         drop(tasks);
+        assert!(state.federation.read().unwrap().is_none());
         tokio::time::timeout(Duration::from_secs(1), async {
             while !aborted.is_finished() {
                 tokio::task::yield_now().await;

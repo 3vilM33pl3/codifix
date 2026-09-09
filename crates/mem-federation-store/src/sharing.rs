@@ -11,6 +11,7 @@ use uuid::Uuid;
 /// The preview is compared again while holding the canonical-state row lock.
 /// Evidence is separately reviewed and must not be derived from raw sources.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SourceSelection {
     pub source: SourceVersionRef,
     pub content: MemoryContent,
@@ -81,7 +82,7 @@ pub async fn set_local_grant(
         .bind(grant.space.as_uuid()).bind(grant.instance.as_uuid()).bind(grant.project).bind(grant.principal).bind(Json(&grant.capabilities)).bind(enabled).execute(&mut **tx).await?;
     Ok(())
 }
-async fn load_grant(
+pub(crate) async fn load_grant(
     tx: &mut Transaction<'_, Postgres>,
     access: &LocalProjectAccess,
     space: SpaceId,

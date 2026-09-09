@@ -1370,6 +1370,182 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /v1/projects/{slug}/federation/{space}:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    get:
+      operationId: get_federation_space_status
+      summary: Retained signed membership and caller-owned publication queue status.
+      description: |
+        Requires local memory_read and an explicit local Pull grant. Membership
+        is observed at retained_through, not a claim of current gateway access.
+        No live gateway request, secrets or endpoints are returned. Cache-Control is no-store.
+      tags: [Federation]
+      x-stability: internal
+      responses:
+        '200':
+          description: Local observations; not global acceptance or replication health.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FederationSpaceStatus' }
+        '401': { description: Local authentication required, including in single-user mode. }
+        '403': { description: Missing project permission or explicit local Pull grant. }
+        '404': { description: Space not configured for this project, or federation disabled. }
+        '503': { description: Local state unavailable or retained verification failed. }
+  /v1/projects/{slug}/federation/{space}/grants:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: set_federation_local_grant
+      summary: Set or disable one local principal's explicit sharing grant.
+      description: |
+        Requires exact-project auth_manage and memory_read, a writable service
+        and an active target principal. Atomically records a local auth audit event.
+        Does not create remote membership, credentials or authority. No role maps
+        automatically to remote capabilities. Maximum body 4096 bytes.
+      tags: [Federation]
+      x-stability: internal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FederationLocalGrant' }
+      responses:
+        '200':
+          description: Local grant saved; not remote enrollment.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FederationLocalGrant' }
+        '400': { description: Invalid, duplicate or excessive capabilities, or inactive target. }
+        '401': { description: Authentication required. }
+        '403': { description: Permission, read-only or browser CSRF denial. }
+        '404': { description: Space not configured for this project. }
+        '413': { description: Body too large. }
+        '422': { description: Invalid JSON contract or unknown input fields. }
+        '503': { description: Local state unavailable. }
+  /v1/projects/{slug}/federation/{space}/memories/{canonical}/preview:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+      - name: canonical
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: preview_federation_publication
+      summary: Preview current source content without expanding private evidence.
+      description: Requires memory_read, bundle_export and an explicit local Pull grant. Echo selection unchanged in a review; evidence is selected separately. No publication side effect.
+      tags: [Federation]
+      x-stability: internal
+      responses:
+        '200':
+          description: Space, stream, exact SourceSelection and requires_future_update_consent=true.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [space, stream, selection, requires_future_update_consent]
+                properties:
+                  space: { type: string, format: uuid }
+                  stream: { $ref: '#/components/schemas/FederationStream' }
+                  selection: { $ref: '#/components/schemas/FederationSourceSelection' }
+                  requires_future_update_consent: { const: true }
+        '401': { description: Authentication required. }
+        '403': { description: Missing local permission or Pull grant. }
+        '404': { description: Space or source not found in this project. }
+        '409': { description: Latest source is a tombstone. }
+        '503': { description: Local state unavailable. }
+  /v1/projects/{slug}/federation/{space}/reviews:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: submit_federation_publication_review
+      summary: Commit an exact reviewed stream selection and standing update consent.
+      description: |
+        Requires memory_read, memory_curate, bundle_export, explicit local
+        Pull/Publish and observed remote Publish membership. Gateway rechecks later.
+        Reviewer and review time are stamped by the service. Consent explicitly
+        includes future content/state changes, never new evidence automatically.
+        Same request_id and payload retry returns the same review_id without new
+        intent. ID scope is project/space/instance/principal. Changed payload or
+        stale source conflicts. Maximum body 128 KiB; selection and each evidence
+        item at most 48 KiB canonical JSON. This endpoint invokes no model.
+      tags: [Federation]
+      x-stability: internal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FederationShareReview' }
+      responses:
+        '202':
+          description: Local submission only; queued is not gateway acceptance, publication or replication. Identical retries preserve this submission result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request_id, review_id, submission]
+                properties:
+                  request_id: { type: string, format: uuid }
+                  review_id: { type: string, format: uuid }
+                  submission: { const: queued }
+        '400': { description: Invalid digest, missing consent or request limits. }
+        '401': { description: Authentication required. }
+        '403': { description: Permission, membership, read-only or CSRF denial. }
+        '404': { description: Space or source not found in this project. }
+        '409': { description: Source changed, request ID reused with different data, or scope/ownership mismatch. }
+        '413': { description: Body exceeds 128 KiB. }
+        '422': { description: Invalid JSON contract or unknown input fields. }
+        '503': { description: Local state unavailable or signature verification failed. }
+  /v1/projects/{slug}/federation/{space}/context:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: read_retained_federation_context
+      summary: Read explicitly selected shared streams with citations and signed provenance.
+      description: |
+        Semantic read allowed in read-only mode. Requires authenticated local
+        memory_read and current explicit Pull grant; browser POST still requires
+        Origin and CSRF. Select 1-16 streams; at most 64 dependencies and 128 KiB
+        context. Tombstones, archived and unknown streams fail closed. This reads
+        retained offline copies, not live remote authorization. Each receipt
+        retains its frozen sharing policy. No implicit search, curation, embedding
+        or model forwarding; external use requires fresh policy through the guarded
+        runtime path. Signatures establish provenance, not truth. Maximum request 4096 bytes.
+      tags: [Federation]
+      x-stability: internal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [streams]
+              properties:
+                streams:
+                  type: array
+                  minItems: 1
+                  maxItems: 16
+                  items: { $ref: '#/components/schemas/FederationStream' }
+      responses:
+        '200':
+          description: Bounded UntrustedContext (records, receipts, citations); see docs/user/federation-workflow.md. All responses use Cache-Control no-store.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: Invalid selection or limits. }
+        '401': { description: Authentication required. }
+        '403': { description: Local grant, project permission, unavailable stream or browser CSRF denial. }
+        '404': { description: Space not configured for this project. }
+        '409': { description: Local sharing binding changed. }
+        '413': { description: Body too large. }
+        '422': { description: Invalid JSON contract or unknown fields. }
+        '503': { description: Retained verification failed or context exceeds bounds. }
   /v1/projects/{slug}/memory-graph:
     parameters:
       - name: slug
@@ -1672,6 +1848,17 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
 components:
+  parameters:
+    FederationProject:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string }
+    FederationSpace:
+      name: space
+      in: path
+      required: true
+      schema: { type: string, format: uuid, description: Administrator-enrolled non-nil space UUID. }
   securitySchemes:
     bearerToken:
       type: http
@@ -1682,6 +1869,107 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    FederationStream:
+      type: object
+      additionalProperties: false
+      required: [origin, canonical]
+      properties:
+        origin: { type: string, format: uuid }
+        canonical: { type: string, format: uuid }
+    FederationDigest:
+      type: object
+      required: [algorithm, hex]
+      properties:
+        algorithm: { const: sha256 }
+        hex: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+    FederationSourceSelection:
+      type: object
+      additionalProperties: false
+      required: [source, content]
+      properties:
+        source:
+          type: object
+          additionalProperties: false
+          required: [record_id, version]
+          properties:
+            record_id: { type: string, format: uuid }
+            version: { type: integer, minimum: 1, maximum: 4294967295 }
+        content:
+          type: object
+          additionalProperties: false
+          required: [text, summary, memory_type, confidence, importance, tags]
+          properties:
+            text: { type: string }
+            summary: { type: string }
+            memory_type: { type: string, description: Existing MemoryType wire value; preserve the preview. }
+            confidence: { type: integer, minimum: 0, maximum: 1000000 }
+            importance: { type: integer, minimum: -2147483648, maximum: 2147483647 }
+            tags: { type: array, items: { type: string } }
+    FederationLocalGrant:
+      type: object
+      additionalProperties: false
+      required: [principal, capabilities, enabled]
+      properties:
+        principal: { type: string, format: uuid }
+        enabled: { type: boolean }
+        capabilities:
+          type: array
+          uniqueItems: true
+          maxItems: 3
+          items: { type: string, enum: [pull, publish, manage_membership] }
+    FederationShareReview:
+      type: object
+      additionalProperties: false
+      required: [request_id, canonical, expected, evidence, confirm_future_updates]
+      properties:
+        request_id: { type: string, format: uuid, description: Non-nil client-generated idempotency key. }
+        canonical: { type: string, format: uuid }
+        expected: { $ref: '#/components/schemas/FederationSourceSelection' }
+        confirm_future_updates: { const: true }
+        evidence:
+          type: array
+          maxItems: 16
+          items:
+            type: object
+            additionalProperties: false
+            required: [snapshot, snapshot_digest]
+            properties:
+              snapshot_digest: { $ref: '#/components/schemas/FederationDigest' }
+              snapshot:
+                type: object
+                additionalProperties: false
+                required: [space, stream, public_source_label, selected_text, observed_at]
+                properties:
+                  space: { type: string, format: uuid }
+                  stream: { $ref: '#/components/schemas/FederationStream' }
+                  public_source_label: { type: string }
+                  selected_text: { type: string }
+                  observed_at: { type: string, format: date-time }
+    FederationSpaceStatus:
+      type: object
+      required: [project, space, instance, authority, retained_through, observed_capabilities, local, offline_copies_may_remain]
+      properties:
+        project: { type: string, format: uuid }
+        space: { type: string, format: uuid }
+        instance: { type: string, format: uuid }
+        authority: { type: string, format: uuid }
+        retained_through: { type: integer, minimum: 0 }
+        observed_capabilities:
+          type: array
+          items: { type: string, enum: [pull, publish, manage_membership] }
+        offline_copies_may_remain: { const: true }
+        local:
+          type: object
+          required: [queued_intents, accepted_not_replicated, replicated_intents, blocked_intents, pending_source_changes, sync_failures, sync_error, retry_at]
+          properties:
+            queued_intents: { type: integer, minimum: 0 }
+            accepted_not_replicated: { type: integer, minimum: 0 }
+            replicated_intents: { type: integer, minimum: 0 }
+            blocked_intents: { type: integer, minimum: 0 }
+            pending_source_changes: { type: integer, minimum: 0 }
+            sync_failures: { type: integer, minimum: 0 }
+            sync_error: { type: [string, 'null'] }
+            retry_at: { type: string, format: date-time }
     AuthProjectAccess:
       type: object
       required: [project, role, source]

@@ -13,6 +13,8 @@ pub use retention::*;
 mod replica_audit;
 pub use replica_audit::receipt_matches;
 mod sharing;
+mod workflow;
+pub use workflow::*;
 mod source;
 pub use sharing::*;
 

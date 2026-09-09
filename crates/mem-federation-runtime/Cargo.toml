@@ -6,6 +6,7 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
+chrono.workspace = true
 mem-federation = { path = "../mem-federation" }
 mem-federation-store = { path = "../mem-federation-store" }
 mem-atproto = { path = "../mem-atproto" }
@@ -26,7 +27,6 @@ tracing.workspace = true
 mem-atproto-verify = { path = "../mem-atproto-verify", features = ["test-fixtures"] }
 mem-test-support = { path = "../mem-test-support" }
 mem-curate = { path = "../mem-curate" }
-chrono.workspace = true
 tracing-subscriber.workspace = true
 
 [lints]

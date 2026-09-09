@@ -16,6 +16,25 @@ pub struct UntrustedContext {
     pub as_of_sequence: u32,
     pub records: Vec<PublicationDelivery>,
     pub receipts: Vec<AuditReceipt>,
+    pub citations: Vec<SharedCitation>,
+    pub untrusted: bool,
+    pub retained_copy: bool,
+    pub external_forwarding_requires_fresh_policy: bool,
+}
+
+/// Attribution comes from the reducer's selected version, including the
+/// original proposal author when an origin owner approves a correction.
+#[derive(Debug, Serialize)]
+pub struct SharedCitation {
+    pub stream: StreamId,
+    pub record: RecordKey,
+    pub shared_version: SharedVersion,
+    pub source: SourceVersionRef,
+    pub author: mem_federation::AuthorIdentity,
+    pub authored_at: chrono::DateTime<chrono::Utc>,
+    pub locator: mem_federation::RecordLocator,
+    pub digest: mem_federation::ContentDigest,
+    pub evidence: Vec<RecordKey>,
 }
 pub struct ModelRequest {
     pub system: &'static str,
@@ -109,7 +128,8 @@ fn select_context(
         return Err(RuntimeError::Configuration);
     }
     let mut pending = Vec::new();
-    for &stream in streams {
+    let mut citations = Vec::new();
+    for stream in streams.iter().copied().collect::<BTreeSet<_>>() {
         if state
             .current_state(stream)
             .is_some_and(|s| s.tombstone || s.status != MemoryStatus::Active)
@@ -120,6 +140,20 @@ fn select_context(
             .history(stream)
             .last()
             .ok_or(RuntimeError::Unauthorized)?;
+        let delivery = state
+            .accepted_record(version.key)
+            .ok_or(RuntimeError::InvalidResponse)?;
+        citations.push(SharedCitation {
+            stream,
+            record: version.key,
+            shared_version: version.publication.version,
+            source: version.publication.source.clone(),
+            author: version.author.clone(),
+            authored_at: version.authored_at,
+            locator: delivery.locator.clone(),
+            digest: delivery.digest.clone(),
+            evidence: version.publication.evidence.clone(),
+        });
         pending.push(version.key);
         pending.extend(&version.publication.evidence);
         if let Some((key, _)) = state.state_history(stream).last() {
@@ -162,6 +196,10 @@ fn select_context(
         as_of_sequence: state.sequence(),
         records: selected,
         receipts: proofs,
+        citations,
+        untrusted: true,
+        retained_copy: true,
+        external_forwarding_requires_fresh_policy: true,
     };
     if serde_json::to_vec(&context)
         .map_err(|_| RuntimeError::InvalidResponse)?

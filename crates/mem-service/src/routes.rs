@@ -208,6 +208,29 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         )
         .route("/v1/projects/{slug}/memories", get(project_memories))
         .route(
+            "/v1/projects/{slug}/federation/{space}",
+            get(crate::federation::workflow::status),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/grants",
+            post(crate::federation::workflow::grant)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/memories/{canonical}/preview",
+            get(crate::federation::workflow::preview),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/reviews",
+            post(crate::federation::workflow::review)
+                .layer(axum::extract::DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/context",
+            post(crate::federation::workflow::context)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
             "/v1/projects/{slug}/memory-graph",
             get(project_memory_graph),
         )
@@ -247,6 +270,9 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             crate::auth::authorization_guard,
+        ))
+        .layer(axum::middleware::from_fn(
+            crate::federation::workflow::private_response,
         ))
         .with_state(state.clone())
         .layer(TraceLayer::new_for_http());

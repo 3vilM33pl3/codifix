@@ -244,6 +244,22 @@ impl InstanceSync {
         )
         .await?;
         self.catch_up().await?;
+        let sent = self.publish_pending(access).await?;
+        self.catch_up().await?;
+        Ok(sent)
+    }
+
+    /// Process one locally authorized review owner's queue without assigning
+    /// the background worker's identity or permissions to that owner. Failures
+    /// here do not change the shared pull scheduler's retry state.
+    pub async fn publish_pending(&self, access: &LocalProjectAccess) -> Result<u32> {
+        mem_federation_store::authorize_source_pull(
+            &self.pool,
+            access,
+            self.client.space,
+            self.instance,
+        )
+        .await?;
         // Capture is already durable while disconnected. Prepare can continue
         // from cached membership; the gateway rechecks current authority later.
         let known = self.verified_snapshot().await?;
@@ -310,7 +326,6 @@ impl InstanceSync {
                 reply?;
             }
         }
-        self.catch_up().await?;
         Ok(sent)
     }
 }

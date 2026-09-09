@@ -43,13 +43,16 @@ principal. Client-supplied attribution cannot override them.
 
 ## Federation permission boundary
 
-The [federation policy](federation-permissions.md) adds a pure, disabled-by-default
-integration contract: exact-project local permissions, explicit local sharing
-grants and independently enrolled gateway capabilities must all allow an action.
-Local admin does not become remote space authority. The helper has no wire
-deserializer and must receive trusted server-resolved context. It is not wired
-to service routes or grant persistence yet; current local authentication routes
-and behavior are unchanged.
+The [federation policy](federation-permissions.md) intersects exact-project local
+permissions, explicit persisted local sharing grants and independently enrolled
+gateway capabilities. Local admin does not become remote space authority. The
+pure helper has no wire deserializer and receives trusted server-resolved context.
+Stage E's opt-in [local workflow API](../../user/federation-workflow.md) uses the
+central route policy, browser CSRF and read-only guards. Requests cannot supply
+their authenticated reviewer, instance credentials or trust roots. Anonymous
+single-user reads do not inherit the owner's persisted sharing grant. Background
+work separately re-resolves each review owner's current policy. No implicit
+import into search, curation or model forwarding is enabled.
 
 ## Browser OIDC
 

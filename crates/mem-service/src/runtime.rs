@@ -200,6 +200,7 @@ pub(crate) async fn build_state(
             ..ProvenanceRuntimeState::default()
         })),
         post_curation: PostCurationRuntime::default(),
+        federation: Default::default(),
         reinforcement: reinforcement.as_ref().map(|(runtime, _)| runtime.clone()),
         cluster: ClusterRuntime {
             peers: Arc::new(Mutex::new(HashMap::new())),
