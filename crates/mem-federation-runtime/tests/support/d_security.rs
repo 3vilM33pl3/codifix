@@ -346,7 +346,7 @@ async fn d_receipts_rollover_policy_retention_and_offline_copies() {
     publish_all(&enabled_server, &pds).await;
     let enabled_client = GatewayClient::new(
         enabled_endpoint.clone(),
-        new_token,
+        new_token.clone(),
         space,
         authority,
         enabled.trust(),
@@ -357,6 +357,24 @@ async fn d_receipts_rollover_policy_retention_and_offline_copies() {
         .unwrap();
     sync3.catch_up().await.unwrap();
     let final_receipts = sync3.replica().receipts().await.unwrap();
+    // Reconstruct retained state in a fresh database from independently trusted
+    // keys, log and receipts. No live gateway or mutable PDS history is needed.
+    let (restored_pool, restored_name) = database(&admin).await;
+    let restored = InstanceSync::new(restored_pool.clone(), enabled_client.clone(), member)
+        .await
+        .unwrap();
+    let retained = sync3.verified_snapshot().await.unwrap();
+    restored
+        .replica()
+        .receive_with_receipts(authority, retained.accepted(), &final_receipts)
+        .await
+        .unwrap();
+    assert_eq!(restored.verified_snapshot().await.unwrap(), retained);
+    restored_pool.close().await;
+    sqlx::query(&format!("DROP DATABASE {restored_name} WITH (FORCE)"))
+        .execute(&admin)
+        .await
+        .unwrap();
     assert_eq!(final_receipts.last().unwrap().claims.key_generation, 2);
     assert!(
         final_receipts
@@ -390,6 +408,16 @@ async fn d_receipts_rollover_policy_retention_and_offline_copies() {
 
     let http = reqwest::Client::new();
     let url = format!("{}/v1/retention", enabled_endpoint.origin());
+    assert_eq!(
+        http.post(&url)
+            .bearer_auth(&new_token)
+            .json(&json!({"action":"release_hold","reason":"unauthorized fixture"}))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
     // Raw repository and application routes are never mounted on the gateway.
     for path in [
         "/xrpc/com.atproto.sync.getRepo",
@@ -489,6 +517,25 @@ async fn d_receipts_rollover_policy_retention_and_offline_copies() {
         .await
         .unwrap();
     assert!(sync3.retained_context(&access, &[stream]).await.is_err());
+    // Simulate a corrupted backup as the disposable database owner, explicitly
+    // outside normal immutable APIs. Startup must reject it before fencing or
+    // blessing more history. Receiver receipts remain independently verifiable.
+    let mut corruption = pool.begin().await.unwrap();
+    sqlx::query("ALTER TABLE federation_audit DISABLE TRIGGER federation_audit_immutable")
+        .execute(&mut *corruption)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE federation_audit SET receipt=jsonb_set(receipt,'{signature}',to_jsonb(array_fill(0,ARRAY[64]))) WHERE space=$1 AND sequence=1").bind(space.as_uuid()).execute(&mut *corruption).await.unwrap();
+    sqlx::query("ALTER TABLE federation_audit ENABLE TRIGGER federation_audit_immutable")
+        .execute(&mut *corruption)
+        .await
+        .unwrap();
+    corruption.commit().await.unwrap();
+    assert!(matches!(
+        GatewayServer::new(store, space, authority, vec![(token(), authority)], enabled).await,
+        Err(RuntimeError::InvalidResponse)
+    ));
+    assert!(sync3.verified_snapshot().await.is_ok());
     pds_task.abort();
     pool.close().await;
     sqlx::query(&format!("DROP DATABASE {name} WITH (FORCE)"))

@@ -44,6 +44,10 @@ impl GatewayServer {
             }
         }
         let old = store.initialize(space, authority).await?;
+        let (records, receipts) = store.audited_history(old).await?;
+        security
+            .trust()
+            .verify_history(authority, &records, &receipts)?;
         let fence = store
             .enroll_security(old, security.trust().keys(), security.policy())
             .await?;

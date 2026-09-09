@@ -137,9 +137,8 @@ fn select_context(
         let record = state
             .accepted_record(key)
             .ok_or(RuntimeError::InvalidResponse)?;
-        if let Some(key) = record.envelope.causation {
-            pending.push(key);
-        }
+        // Preserve causal IDs in the envelope, but do not follow arbitrary
+        // publisher-supplied links into unselected streams' content.
         match &record.envelope.record {
             PublicationRecord::ResolveProposal { proposal, .. } => pending.push(*proposal),
             PublicationRecord::Proposal(p) => pending.extend(&p.evidence),

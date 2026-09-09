@@ -74,6 +74,20 @@ for dep in reqwest sqlx axum mem-service mem-federation-store; do
 done
 
 # 4. No monolith re-forms in the new crates.
+# The dedicated gateway must not acquire general service routes, local capture,
+# automatic retrieval/curation, or model-provider discovery through dependencies.
+federation_runtime_tree=$(cargo tree -p mem-federation-runtime -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in mem-service mem-platform mem-search mem-curate mem-reinforce mem-models duckdb; do
+  if echo "$federation_runtime_tree" | grep -qx "$dep"; then
+    err "mem-federation-runtime depends on $dep"
+  fi
+done
+# Shared imports require the explicit scoped context/egress API, never the
+# application's implicit search, consolidation, embedding or provider pipelines.
+if rg -n 'federation_(inbox|replica_receipts)|mem_federation_runtime' crates/mem-search/src crates/mem-curate/src crates/mem-reinforce/src; then
+  err "implicit local processing reads federation imports"
+fi
+
 while read -r lines file; do
   if [ "$lines" -gt 1200 ] && [ "$file" != "total" ]; then
     err "$file is $lines lines (>1200) - split it"

@@ -213,6 +213,7 @@ impl GatewayStore {
                 }
                 let policy:Json<SpacePolicy>=sqlx::query_scalar("SELECT publication_policy FROM federation_accepted WHERE space=$1 AND sequence=$2")
                     .bind(lease.fence.space.as_uuid()).bind(i64::from(lease.delivery.sequence.get())).fetch_one(&mut *tx).await?;
+                policy.validate()?;
                 let previous = if lease.delivery.sequence.get() == 1 {
                     None
                 } else {

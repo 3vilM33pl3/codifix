@@ -85,6 +85,36 @@ pub trait ReceiptAuthority: Send + Sync {
 }
 
 impl GatewayStore {
+    /// Trusted recovery read, not a member endpoint. Revalidate the independently
+    /// retained published prefix before a process enrolls a new writer epoch.
+    pub async fn audited_history(
+        &self,
+        fence: WriterFence,
+    ) -> Result<(Vec<PublicationDelivery>, Vec<AuditReceipt>)> {
+        let mut tx = self.pool.begin().await?;
+        let authority = self.lock(&mut tx, fence).await?;
+        let state = self.load(&mut tx, fence.space, authority).await?;
+        let head: i64 = sqlx::query_scalar(
+            "SELECT published_sequence FROM federation_gateway_spaces WHERE space=$1",
+        )
+        .bind(fence.space.as_uuid())
+        .fetch_one(&mut *tx)
+        .await?;
+        let rows: Vec<Json<AuditReceipt>> = sqlx::query_scalar(
+            "SELECT receipt FROM federation_audit WHERE space=$1 ORDER BY sequence",
+        )
+        .bind(fence.space.as_uuid())
+        .fetch_all(&mut *tx)
+        .await?;
+        let records = state
+            .accepted()
+            .iter()
+            .filter(|r| i64::from(r.sequence.get()) <= head)
+            .cloned()
+            .collect();
+        tx.commit().await?;
+        Ok((records, rows.into_iter().map(|j| j.0).collect()))
+    }
     /// Administrator-supplied enrollment/rollover is atomic with writer fencing.
     /// Old readers and writers must both use this epoch. Existing unsigned
     /// published history requires explicit revalidation, never automatic adoption.

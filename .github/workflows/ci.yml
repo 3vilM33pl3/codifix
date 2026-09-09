@@ -95,6 +95,8 @@ jobs:
               - "crates/mem-service/**"
               - "migrations/**"
               - "tests/federation-pds/**"
+              - "tests/federation-isolation/**"
+              - "deploy/federation/**"
               - "fixtures/federation/upstream-lock.json"
               - "crates/mem-atproto/**"
               - "crates/mem-atproto-verify/**"
@@ -135,6 +137,7 @@ jobs:
       - run: node tests/federation-pds/run.mjs
       - run: cargo test -p mem-federation-runtime --test c_workflow --locked --no-run
       - run: node tests/federation-pds/run.mjs --runtime
+      - run: node tests/federation-isolation/run.mjs
 
   plugin-contract:
     name: Codex Plugin Contract
