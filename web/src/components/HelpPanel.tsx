@@ -7,6 +7,13 @@ const SHARED_CONTROLS = [
 ];
 
 const WEB_HELP: Record<Tab, { title: string; purpose: string; layout: string[]; controls: string[]; workflows: string[] }> = {
+  jobs: {
+    title: "Jobs Help",
+    purpose: "Inspect durable background stages and act on sanitized failures.",
+    layout: ["Project queue, worker status, bounded pages and attempt history."],
+    controls: ["Refresh jobs to observe changes.", "Inspect a blocked or failed stage, then review and confirm retry."],
+    workflows: ["Curation commits before enrichment finishes.", "Retry retains inputs, completed stages and history; current authority and policy are still required.", "Keep the same request ID after an uncertain response. Provider execution may be billed again."],
+  },
   federation: {
     title: "Federation Help",
     purpose: "Review selected knowledge, cite retained shared copies and propose origin-owned corrections.",

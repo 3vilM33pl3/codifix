@@ -75,6 +75,7 @@ pub(in crate::tui) fn tab_help_markdown(tab: TabKind) -> &'static str {
         TabKind::Automations => include_str!("../help/automations.md"),
         TabKind::Embeddings => include_str!("../help/embeddings.md"),
         TabKind::Resume => include_str!("../help/resume.md"),
+        TabKind::Jobs => include_str!("../help/jobs.md"),
     }
 }
 

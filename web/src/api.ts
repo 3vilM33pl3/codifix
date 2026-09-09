@@ -147,6 +147,15 @@ export async function federationRequest<T>(project: string, space: string | null
   }));
 }
 
+export async function jobsRequest<T>(project: string, suffix = "", body?: unknown, signal?: AbortSignal): Promise<T> {
+  return parseJson(await apiFetch(`/v1/projects/${encodeURIComponent(project)}/jobs${suffix}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal, cache: "no-store",
+  }));
+}
+
 export function authLoginUrl(returnTo = window.location.pathname + window.location.search): string {
   return `/v1/auth/login?return_to=${encodeURIComponent(returnTo)}`;
 }

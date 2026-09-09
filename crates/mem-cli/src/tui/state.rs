@@ -46,6 +46,7 @@ pub(super) struct App {
     pub(in crate::tui) skills: SkillsTabState,
     pub(in crate::tui) automations: AutomationsTabState,
     pub(in crate::tui) embeddings: EmbeddingsTabState,
+    pub(in crate::tui) jobs: super::tabs::jobs::JobsState,
     pub(in crate::tui) filters: Filters,
     pub(in crate::tui) background_tx: mpsc::UnboundedSender<BackgroundEvent>,
 }
@@ -403,6 +404,10 @@ pub(super) struct ProjectRefreshResult {
 }
 
 pub(super) enum BackgroundEvent {
+    Jobs {
+        project: String,
+        result: Result<super::tabs::jobs::JobsResult, String>,
+    },
     ProjectRefreshLoaded(Box<ProjectRefreshResult>),
     StreamConnectCompleted {
         result: Result<Box<StreamSession>, String>,
@@ -512,9 +517,10 @@ pub(super) enum TabKind {
     Automations,
     Embeddings,
     Resume,
+    Jobs,
 }
 
-pub(super) const VISIBLE_TABS: [TabKind; 12] = [
+pub(super) const VISIBLE_TABS: [TabKind; 13] = [
     TabKind::Memories,
     TabKind::Agents,
     TabKind::Query,
@@ -527,6 +533,7 @@ pub(super) const VISIBLE_TABS: [TabKind; 12] = [
     TabKind::Automations,
     TabKind::Embeddings,
     TabKind::Resume,
+    TabKind::Jobs,
 ];
 
 impl TabKind {
@@ -544,6 +551,7 @@ impl TabKind {
             Self::Automations => "Automations",
             Self::Embeddings => "Embeddings",
             Self::Resume => "Resume",
+            Self::Jobs => "Jobs",
         }
     }
 
@@ -560,13 +568,14 @@ impl TabKind {
             Self::Skills => Self::Automations,
             Self::Automations => Self::Embeddings,
             Self::Embeddings => Self::Resume,
-            Self::Resume => Self::Memories,
+            Self::Resume => Self::Jobs,
+            Self::Jobs => Self::Memories,
         }
     }
 
     pub(in crate::tui) fn prev(self) -> Self {
         match self {
-            Self::Memories => Self::Resume,
+            Self::Memories => Self::Jobs,
             Self::Agents => Self::Memories,
             Self::Query => Self::Agents,
             Self::Activity => Self::Query,
@@ -578,6 +587,7 @@ impl TabKind {
             Self::Automations => Self::Skills,
             Self::Embeddings => Self::Automations,
             Self::Resume => Self::Embeddings,
+            Self::Jobs => Self::Resume,
         }
     }
 
@@ -595,6 +605,7 @@ impl TabKind {
             Self::Automations => 9,
             Self::Embeddings => 10,
             Self::Resume => 11,
+            Self::Jobs => 12,
         }
     }
 }

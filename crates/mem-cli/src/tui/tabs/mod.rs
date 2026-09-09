@@ -5,6 +5,7 @@ pub(super) mod agents;
 pub(super) mod automations;
 pub(super) mod embeddings;
 pub(super) mod errors;
+pub(in crate::tui) mod jobs;
 pub(super) mod memories;
 pub(super) mod project;
 pub(super) mod query;
@@ -71,5 +72,6 @@ pub(in crate::tui) fn dispatch_update(
         TabKind::Automations => automations::update(event, &mut app.automations, &mut ctx),
         TabKind::Embeddings => embeddings::update(event, &mut app.embeddings, &mut ctx),
         TabKind::Resume => resume::update(event, &mut app.resume, &mut ctx),
+        TabKind::Jobs => TabAction::None,
     }
 }

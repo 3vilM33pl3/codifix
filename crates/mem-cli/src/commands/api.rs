@@ -27,6 +27,23 @@ use uuid::Uuid;
 
 use crate::commands::output::{service_url, write_headers};
 
+fn jobs_path(project: &str, id: Option<Uuid>, retry: bool) -> Result<String> {
+    let mut url = reqwest::Url::parse("http://localhost/")?;
+    {
+        let mut path = url
+            .path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("invalid base URL"))?;
+        path.extend(["v1", "projects", project, "jobs"]);
+        if let Some(id) = id {
+            path.push(&id.to_string());
+        }
+        if retry {
+            path.push("retry");
+        }
+    }
+    Ok(url.path().to_owned())
+}
+
 #[derive(Clone)]
 pub(crate) struct ApiClient {
     pub(crate) client: Client,
@@ -34,6 +51,65 @@ pub(crate) struct ApiClient {
 }
 
 impl ApiClient {
+    pub(crate) async fn jobs(
+        &self,
+        project: &str,
+        status: Option<mem_record::JobStatus>,
+        after: Option<Uuid>,
+        limit: u32,
+    ) -> Result<mem_record::ProjectJobsResponse> {
+        let path = jobs_path(project, None, false)?;
+        let mut query = vec![("limit", limit.to_string())];
+        if let Some(status) = status {
+            query.push((
+                "status",
+                serde_json::to_value(status)?
+                    .as_str()
+                    .unwrap_or_default()
+                    .into(),
+            ));
+        }
+        if let Some(after) = after {
+            query.push(("after", after.to_string()));
+        }
+        get_json(
+            self.client
+                .get(service_url(&self.config, &path))
+                .query(&query)
+                .headers(write_headers(&self.config)?)
+                .send()
+                .await?,
+        )
+        .await
+    }
+    pub(crate) async fn job(&self, project: &str, id: Uuid) -> Result<mem_record::JobDetail> {
+        let path = jobs_path(project, Some(id), false)?;
+        get_json(
+            self.client
+                .get(service_url(&self.config, &path))
+                .headers(write_headers(&self.config)?)
+                .send()
+                .await?,
+        )
+        .await
+    }
+    pub(crate) async fn retry_job(
+        &self,
+        project: &str,
+        id: Uuid,
+        request_id: Uuid,
+    ) -> Result<mem_record::JobRetryResponse> {
+        let path = jobs_path(project, Some(id), true)?;
+        get_json(
+            self.client
+                .post(service_url(&self.config, &path))
+                .headers(write_headers(&self.config)?)
+                .json(&mem_record::JobRetryRequest { request_id })
+                .send()
+                .await?,
+        )
+        .await
+    }
     pub(crate) fn new(client: Client, config: AppConfig) -> Self {
         Self { client, config }
     }

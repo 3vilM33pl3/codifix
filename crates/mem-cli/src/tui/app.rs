@@ -559,6 +559,7 @@ impl App {
                 table_state: automations_table_state,
                 detail_scroll: 0,
             },
+            jobs: super::tabs::jobs::JobsState::default(),
             embeddings: EmbeddingsTabState {
                 embedding_backends_snapshot: None,
                 embedding_backends_error: None,
@@ -1046,6 +1047,11 @@ impl App {
     fn apply_background_event(&mut self, event: BackgroundEvent) {
         self.chrome.needs_redraw = true;
         match event {
+            BackgroundEvent::Jobs { project, result } => {
+                if project == self.project {
+                    self.jobs.receive(result);
+                }
+            }
             BackgroundEvent::ProjectRefreshLoaded(result) => {
                 self.apply_project_refresh(*result);
             }
@@ -1562,6 +1568,10 @@ impl App {
             return Ok(false);
         }
 
+        if self.active_tab == TabKind::Jobs && self.jobs_key(key, api) {
+            self.chrome.needs_redraw = true;
+            return Ok(false);
+        }
         let tab_action = super::tabs::dispatch_update(self.active_tab, &Event::Key(key), self);
         if !tab_action.handled() {
             // Existing central key handling remains the behavior owner until

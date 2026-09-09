@@ -1335,7 +1335,7 @@ fn tab_order_restores_activity_after_query() {
     assert_eq!(TabKind::Embeddings.index(), 10);
     assert_eq!(TabKind::Resume.index(), 11);
 
-    assert_eq!(TabKind::Memories.prev(), TabKind::Resume);
+    assert_eq!(TabKind::Memories.prev(), TabKind::Jobs);
     assert_eq!(TabKind::Memories.next(), TabKind::Agents);
     assert_eq!(TabKind::Query.next(), TabKind::Activity);
     assert_eq!(TabKind::Activity.prev(), TabKind::Query);
@@ -1355,7 +1355,42 @@ fn tab_order_restores_activity_after_query() {
     assert_eq!(TabKind::Embeddings.prev(), TabKind::Automations);
     assert_eq!(TabKind::Embeddings.next(), TabKind::Resume);
     assert_eq!(TabKind::Resume.prev(), TabKind::Embeddings);
-    assert_eq!(TabKind::Resume.next(), TabKind::Memories);
+    assert_eq!(TabKind::Resume.next(), TabKind::Jobs);
+    assert_eq!(TabKind::Jobs.next(), TabKind::Memories);
+    assert_eq!(TabKind::Jobs.prev(), TabKind::Resume);
+}
+
+#[test]
+fn jobs_ignore_other_project_responses_and_keep_uncertain_retry_identity() {
+    let mut app = new_test_app();
+    let id = Uuid::new_v4();
+    let request = Uuid::new_v4();
+    app.jobs.pending = Some((id, request));
+    app.jobs.busy = true;
+    app.apply_background_event(BackgroundEvent::Jobs {
+        project: "other-project".into(),
+        result: Err("403 forbidden".into()),
+    });
+    assert!(app.jobs.busy);
+    assert!(app.jobs.error.is_none());
+    app.apply_background_event(BackgroundEvent::Jobs {
+        project: app.project.clone(),
+        result: Err("503 uncertain".into()),
+    });
+    assert!(!app.jobs.busy);
+    assert_eq!(app.jobs.pending, Some((id, request)));
+    app.apply_background_event(BackgroundEvent::Jobs {
+        project: app.project.clone(),
+        result: Ok(crate::tui::tabs::jobs::JobsResult::Retried(
+            mem_record::JobRetryResponse {
+                job_id: id,
+                request_id: request,
+                generation: 2,
+            },
+        )),
+    });
+    assert!(app.jobs.pending.is_none());
+    assert!(app.jobs.message.as_ref().unwrap().contains("generation 2"));
 }
 
 #[test]

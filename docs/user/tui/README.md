@@ -1,5 +1,8 @@
 # TUI Guide
 
+The **Jobs** tab inspects durable background stages and provides confirmed retry
+with stable request IDs. See [Background jobs](../cli/jobs.md) for keys and policy.
+
 For private federation, launch `memory federation --project <slug> tui`. This
 focused workspace supports membership, exact publication review, shared citations,
 proposals, approval/rejection and synchronization through the same authenticated

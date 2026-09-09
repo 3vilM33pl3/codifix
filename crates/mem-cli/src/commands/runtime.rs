@@ -1351,6 +1351,8 @@ pub(in crate::commands) enum Command {
     Capture(CaptureArgs),
     #[command(about = "Curate raw captures into canonical memory.", after_help = CURATE_AFTER_HELP)]
     Curate(CurateArgs),
+    #[command(about = "Inspect and explicitly retry durable project background work.", after_help = crate::commands::jobs::HELP)]
+    Jobs(crate::commands::jobs::JobsArgs),
     #[command(about = "Scan a repository for candidate durable memories.", after_help = SCAN_AFTER_HELP)]
     Scan(ScanArgs),
     #[command(about = "Ingest documents from any directory — no git required.", after_help = INGEST_AFTER_HELP)]
@@ -3641,6 +3643,10 @@ pub(super) async fn run() -> Result<()> {
         Command::Loops(args) => {
             let api = ApiClient::new(client, config);
             crate::commands::loops::handle(args, &api).await?;
+        }
+        Command::Jobs(args) => {
+            let api = ApiClient::new(client, config);
+            crate::commands::jobs::handle(args, &api).await?;
         }
         Command::Embeddings(args) => {
             crate::commands::embeddings::handle(args, client, config).await?

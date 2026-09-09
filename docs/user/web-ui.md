@@ -1,5 +1,9 @@
 # Web UI
 
+**More → jobs** provides filtered, bounded background-work inspection, dependency
+and attempt history, queue statistics and explicit retry confirmation. See
+[Background jobs](cli/jobs.md). Enrichment is separate from curation success.
+
 The **More → federation** workspace exposes the configured private space, local
 grants, authority enrollment, reviewed publication, shared citations, correction
 proposals, approval/rejection, subscriptions and sync controls. Mutations display

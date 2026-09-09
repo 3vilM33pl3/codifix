@@ -19,6 +19,7 @@ import { WatchersTab } from "./features/watchers/WatchersTab";
 import { SkillsTab } from "./features/skills/SkillsTab";
 import { AccessTab } from "./features/access/AccessTab";
 import { FederationTab } from "./features/federation/FederationTab";
+import { JobsTab } from "./features/jobs/JobsTab";
 import { useAppShell } from "./hooks/useAppShell";
 import { MORE_TABS, PRIMARY_TABS, type Tab } from "./tabs";
 import type { AuthMeResponse } from "./types";
@@ -555,6 +556,7 @@ export default function App() {
         <AccessTab project={project} />
       ) : null}
       {tab === "federation" ? <FederationTab project={project} /> : null}
+      {tab === "jobs" ? <JobsTab project={project} readOnly={serviceReadOnly} /> : null}
       <footer className="statusbar">{statusMessage}</footer>
     </div>
   );

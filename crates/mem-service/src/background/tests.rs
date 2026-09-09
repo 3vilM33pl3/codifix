@@ -30,6 +30,8 @@ async fn embed(State(fake): State<Fake>, Json(body): Json<Value>) -> (StatusCode
 }
 
 struct Fixture {
+    admin: PgPool,
+    database: String,
     state: AppState,
     pool: PgPool,
     project: Uuid,
@@ -41,7 +43,19 @@ struct Fixture {
 }
 impl Fixture {
     async fn new(mode: usize) -> Option<Self> {
-        let pool = mem_test_support::migrated_pool().await?;
+        let admin = mem_test_support::migrated_pool().await?;
+        // Workers intentionally claim across projects. Each service fixture needs
+        // its own database, otherwise parallel fake providers consume each other's jobs.
+        let database = format!("r1_worker_{}", Uuid::new_v4().simple());
+        sqlx::query(&format!("CREATE DATABASE {database}"))
+            .execute(&admin)
+            .await
+            .unwrap();
+        let mut database_url =
+            reqwest::Url::parse(&std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()).unwrap();
+        database_url.set_path(&database);
+        let pool = PgPool::connect(database_url.as_str()).await.unwrap();
+        mem_test_support::run_migrations(&pool).await.unwrap();
         let project = Uuid::new_v4();
         let slug = project.to_string();
         let operation = Uuid::new_v4();
@@ -63,7 +77,7 @@ impl Fixture {
         });
         let config=serde_json::from_value(serde_json::json!({
             "service":{"bind_addr":"127.0.0.1:0","api_token":"fixture-only"},
-            "database":{"url":std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()},
+            "database":{"url":database_url.as_str()},
             "offline":{"enabled":false},"cluster":{"enabled":false},"reinforcement":{"enabled":false},"consolidation":{"enabled":false},
             "embeddings":{"create_enabled":true,"backends":[{"name":"fixture","provider":"ollama","base_url":format!("http://{addr}/v1"),"model":"fixture","create_enabled":true}]},
             "background_work":{"poll_seconds":1,"lease_seconds":4,"renewal_seconds":1,"initial_delay_seconds":1,"max_delay_seconds":2,"max_attempts":2},
@@ -73,6 +87,8 @@ impl Fixture {
             .await
             .unwrap();
         Some(Self {
+            admin,
+            database,
             state,
             pool,
             project,
@@ -113,6 +129,12 @@ impl Fixture {
     async fn cleanup(self) {
         self.server.abort();
         mem_test_support::cleanup_project(&self.pool, &self.slug)
+            .await
+            .unwrap();
+        self.state.pool().unwrap().close().await;
+        self.pool.close().await;
+        sqlx::query(&format!("DROP DATABASE {} WITH (FORCE)", self.database))
+            .execute(&self.admin)
             .await
             .unwrap();
     }
