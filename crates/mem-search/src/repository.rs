@@ -331,7 +331,7 @@ pub(super) async fn rebuild_chunks_selected(
 ) -> Result<u64> {
     let rows = sqlx::query(
         r#"
-        SELECT m.id, m.canonical_text, m.summary
+        SELECT m.id, p.slug
         FROM memory_entries m
         JOIN memory_canonical_state mstate ON mstate.canonical_id = m.canonical_id
         JOIN projects p ON p.id = m.project_id
@@ -363,7 +363,7 @@ pub(super) async fn rebuild_memory_chunks_selected(
 
     let rows = sqlx::query(
         r#"
-        SELECT m.id, m.canonical_text, m.summary
+        SELECT m.id, p.slug
         FROM memory_entries m
         JOIN memory_canonical_state mstate ON mstate.canonical_id = m.canonical_id
         JOIN projects p ON p.id = m.project_id
@@ -391,61 +391,11 @@ async fn rebuild_memory_chunks_from_row(
     row: &sqlx::postgres::PgRow,
 ) -> Result<()> {
     let memory_id: Uuid = row.try_get("id")?;
-    let canonical_text: String = row.try_get("canonical_text")?;
-    let summary: String = row.try_get("summary")?;
-    sqlx::query("DELETE FROM memory_chunks WHERE memory_entry_id = $1")
-        .bind(memory_id)
-        .execute(pool)
-        .await
-        .context("delete old chunks")?;
-
-    let chunks = split_search_chunks(&summary, &canonical_text);
-
-    let mut batches: Vec<EmbeddingBatch> = Vec::with_capacity(selected.len());
-    for (_, service) in selected {
-        batches.push(
-            service
-                .embed_texts(&chunks, EmbeddingPurpose::Document)
-                .await
-                .context("embed rebuilt chunks")?,
-        );
-    }
-    if selected.is_empty() {
-        batches.push(empty_embedding_batch());
-    }
-
-    for (index, chunk_text) in chunks.iter().enumerate() {
-        let chunk_id = Uuid::new_v4();
-        sqlx::query(
-            r#"
-            INSERT INTO memory_chunks
-                (
-                    id,
-                    memory_entry_id,
-                    chunk_text,
-                    search_text,
-                    tsv
-                )
-            VALUES
-                ($1, $2, $3, $4, to_tsvector('english', $4))
-            "#,
-        )
-        .bind(chunk_id)
-        .bind(memory_id)
-        .bind(chunk_text)
-        .bind(format!("{summary}\n{chunk_text}"))
-        .execute(pool)
-        .await
-        .context("insert rebuilt chunk")?;
-        for batch in &batches {
-            let Some(embedding) = batch.vectors.get(index).cloned() else {
-                continue;
-            };
-            upsert_chunk_embedding(pool, chunk_id, &batch.space, batch.dimension, embedding)
-                .await
-                .context("upsert rebuilt chunk embedding")?;
-        }
-    }
+    let project: String = row.try_get("slug")?;
+    let prepared = crate::rebuild::prepare_selected(pool, &project, memory_id, selected).await?;
+    let mut tx = pool.begin().await?;
+    crate::rebuild::apply(&mut tx, &prepared).await?;
+    tx.commit().await?;
     Ok(())
 }
 

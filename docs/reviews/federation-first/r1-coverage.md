@@ -40,3 +40,19 @@ They must not recursively enqueue jobs or copy private inputs into activity.
   these jobs yet; the old in-memory post-curation queue still runs.
 - Broad R1 validation and user interface work remain open. The master R1
   checkbox must remain unchecked until the entire scoped contract passes.
+
+### Prepared embedding results (2026-09-09)
+
+`mem-search::rebuild` separates provider preparation from transaction-only
+application. Existing rebuild callers now preserve searchable chunks on provider
+failure and atomically replace them after source revalidation. Prepared outputs
+are serializable operational data, with stable chunk identities on replay.
+They must not be exposed in job listings. Current execution authority and policy
+still need to be checked by the future worker.
+
+Required-database `mem-search` tests passed (46 tests), including malformed fake
+provider output, rollback, source changes/deletion, replay, and applying real
+embedding results inside a `mem-store` fence whose expired lease rolls back the
+entire result. Package Clippy and workspace formatting checks passed. This is a
+write boundary, not a connected durable worker or operation-event coverage;
+the embedding and post-curation inventory rows remain open.

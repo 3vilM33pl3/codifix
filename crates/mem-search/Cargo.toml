@@ -21,6 +21,7 @@ thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+mem-store = { path = "../mem-store" }
 mem-test-support = { path = "../mem-test-support" }
 proptest = "1"
 wiremock = "0.6"

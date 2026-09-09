@@ -3072,6 +3072,7 @@ dependencies = [
  "chrono",
  "mem-config",
  "mem-record",
+ "mem-store",
  "mem-test-support",
  "pgvector",
  "proptest",

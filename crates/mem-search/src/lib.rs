@@ -24,6 +24,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 mod embedding_backend;
+pub mod rebuild;
 mod repository;
 
 use embedding_backend::{EmbeddingBackend, EmbeddingSpace};
@@ -269,19 +270,6 @@ impl EmbeddingRegistry {
 pub enum ActivateError {
     #[error("unknown embedding backend: {0}")]
     UnknownBackend(String),
-}
-
-fn empty_embedding_batch() -> EmbeddingBatch {
-    EmbeddingBatch {
-        space: EmbeddingSpace {
-            provider: String::new(),
-            base_url: String::new(),
-            model: String::new(),
-            space_key: String::new(),
-        },
-        dimension: 0,
-        vectors: Vec::new(),
-    }
 }
 
 pub async fn query_memory(
