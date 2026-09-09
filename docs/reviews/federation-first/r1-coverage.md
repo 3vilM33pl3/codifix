@@ -16,7 +16,7 @@ write-path references before the R1 gate can close.
 | Reinforcement and procedural learning | mem-reinforce, service loops | state + dedicated journal/event | [ ] |
 | Project/commit/checkpoint/plan activity | service project/activity repositories | mutation + event | [ ] |
 | Agent workspaces | service agents repository | lifecycle/heartbeat + journal/event | [ ] |
-| Loop settings/runs/proposals | mem-loops, service loops | lifecycle/state + audit/event | [ ] |
+| Loop settings/runs/proposals | mem-loops, service loops | proposal creation + receipt + trace + event coupled; other lifecycle/state transitions still open | [ ] |
 | Token creation/revocation, membership grant/revoke | service auth store | state + protected audit; audit failure rolls back revocation | [x] |
 | Other auth administration/session/token bookkeeping | service auth store/oidc | state + protected audit or explicit operational journal; remaining inventory | [ ] |
 | New offline captures | service offline DuckDB `QueuedCapture`/`sync_capture` | compound local intent, atomic PostgreSQL replay/attribution, retry before ack | [x] |
@@ -56,3 +56,22 @@ embedding results inside a `mem-store` fence whose expired lease rolls back the
 entire result. Package Clippy and workspace formatting checks passed. This is a
 write boundary, not a connected durable worker or operation-event coverage;
 the embedding and post-curation inventory rows remain open.
+
+### Atomic proposal creation (2026-09-09)
+
+`loops::proposal_creation::{create,create_tx}` provides the direct/pool and
+transaction-taking entry points. Migration 0041 adds original-input SHA-256
+receipts keyed by operation UUID; retries cannot overwrite subsequent human
+edits or create another proposal. HTTP creation broadcasts the committed event
+instead of asynchronously appending another one. Other existing proposal
+creators use an explicit internal identity. Referenced runs and target records
+must belong to the same project. Run trace allocation/count updates now share
+the owning run lock and transaction across appenders.
+
+Consolidation provider preparation is separated from proposal persistence;
+provider-attempt audits remain separate external-operation evidence. Source
+snapshot pinning/revalidation, reusable provider outputs, coalescing, policy
+rechecks, durable child identities and the service worker are not implemented by
+this slice. Existing automatic callers still allocate new operation IDs; their
+retry deduplication is not yet wired. Proposal edit/approve/reject transaction
+coverage remains open. No additional R1 contract checkbox is complete.

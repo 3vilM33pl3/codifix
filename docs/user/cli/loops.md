@@ -177,7 +177,18 @@ memory loops reject-memory-proposal <proposal-id> --reviewer olivier --reason "E
 ```
 
 Loop memory proposals are pending durable memory changes produced by loops. They
-support `add`, `update`, `deprecate`, `merge`, and `link`.
+support `add`, `update`, `deprecate`, `merge`, `link`, and `consolidate`.
+
+Proposal creation commits the proposal, its linked run trace (if any), and its
+project timeline event together. An event-storage failure fails creation without
+leaving an unaudited proposal. The timeline records the authenticated creator for
+API requests; direct automation uses an explicit internal identity. Proposal
+contents and evidence remain in the review record, not the creation event.
+
+This guarantee covers creation, not the complete loop lifecycle. Durable
+background scheduling and operator job retry are still under implementation;
+rerunning a CLI creation command is a new creation request, not an idempotent
+worker retry.
 
 Required fields:
 

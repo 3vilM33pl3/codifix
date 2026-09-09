@@ -687,9 +687,9 @@ pub struct LoopMemoryProposalDecisionResponse {
 
 pub fn validate_loop_memory_proposal_type(value: &str) -> Result<(), ValidationError> {
     match value {
-        "add" | "update" | "deprecate" | "merge" | "link" => Ok(()),
+        "add" | "update" | "deprecate" | "merge" | "link" | "consolidate" => Ok(()),
         _ => Err(ValidationError::new(
-            "proposal_type must be add, update, deprecate, merge, or link",
+            "proposal_type must be add, update, deprecate, merge, link, or consolidate",
         )),
     }
 }

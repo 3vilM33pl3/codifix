@@ -172,6 +172,21 @@ async fn synthesize_and_queue(
     run_id: Option<Uuid>,
     cluster: &AcceptedCluster,
 ) -> Result<bool> {
+    let request = prepare_consolidation_proposal(state, project, run_id, cluster).await?;
+    crate::repository::handlers::loops::create_memory_proposal_record(pool, &request).await?;
+    Ok(true)
+}
+
+/// Provider work is separate from proposal persistence. The LLM helper still
+/// records provider-attempt audits; it does not publish a derived proposal.
+/// A future durable worker must pin/revalidate source versions and current
+/// policy, then use proposal_creation::create_tx inside its result fence.
+pub(crate) async fn prepare_consolidation_proposal(
+    state: &AppState,
+    project: &str,
+    run_id: Option<Uuid>,
+    cluster: &AcceptedCluster,
+) -> Result<LoopMemoryProposalCreateRequest> {
     let synthesis = synthesize_consolidation(state, project, &cluster.members).await?;
 
     // Tensions, gaps, and refactors are folded into the stored text so they
@@ -205,7 +220,7 @@ async fn synthesize_and_queue(
         })
         .collect();
 
-    let request = LoopMemoryProposalCreateRequest {
+    Ok(LoopMemoryProposalCreateRequest {
         project: project.to_string(),
         loop_id: mem_loops::LOOP_MEMORY_CONSOLIDATION.to_string(),
         proposal_type: "consolidate".to_string(),
@@ -229,7 +244,5 @@ async fn synthesize_and_queue(
             cluster.members.len(),
             cluster.trigger
         )),
-    };
-    crate::repository::handlers::loops::create_memory_proposal_record(pool, &request).await?;
-    Ok(true)
+    })
 }

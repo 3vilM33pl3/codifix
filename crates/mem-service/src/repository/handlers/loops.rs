@@ -14,6 +14,8 @@ use mem_record::{EffectiveLoopSettings, LoopActionKind};
 use serde_json::json;
 use std::path::PathBuf;
 
+pub mod proposal_creation;
+
 #[derive(Debug, SerdeDeserialize)]
 pub(crate) struct LoopDefinitionQuery {
     pub(crate) project: Option<String>,
@@ -528,22 +530,23 @@ pub(crate) async fn list_loop_memory_proposals(
 
 pub(crate) async fn create_loop_memory_proposal(
     State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
     Json(request): Json<LoopMemoryProposalCreateRequest>,
 ) -> Result<Json<LoopMemoryProposalDecisionResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
-    let response = insert_loop_memory_proposal(&state.pool()?, &request).await?;
-    notify_project_changed(
-        &state,
-        request.project.clone(),
-        None,
-        ActivityKind::ProposalCreated,
-        format!(
-            "Loop {} proposed {} ({})",
-            request.loop_id, request.proposal_type, response.proposal.id
-        ),
-        None,
-    );
-    Ok(Json(response))
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "service".into(),
+        occurred_at: None,
+    };
+    let mutation = proposal_creation::create(&state.pool()?, &request, Uuid::new_v4(), &context)
+        .await
+        .map_err(ApiError::io)?;
+    if let Some((event, sequence)) = mutation.event {
+        crate::repository::events::broadcast_committed(&state, request.project, event, sequence);
+    }
+    Ok(Json(mutation.response))
 }
 
 pub(crate) async fn approve_loop_memory_proposal(
@@ -2042,41 +2045,15 @@ async fn insert_loop_memory_proposal(
     pool: &PgPool,
     request: &LoopMemoryProposalCreateRequest,
 ) -> Result<LoopMemoryProposalDecisionResponse, ApiError> {
-    let project_id = require_project_id(pool, &request.project).await?;
-    let row = sqlx::query(
-        r#"
-        INSERT INTO memory_proposals (
-            id, run_id, project_id, loop_id, proposal_type, target_memory_id,
-            candidate_json, evidence_json, confidence, risk_notes, status, created_at
-        )
-        VALUES (
-            gen_random_uuid(), $1, $2, $3, $4, $5,
-            $6, $7, $8, $9, 'pending', now()
-        )
-        RETURNING
-            id, run_id, (SELECT slug FROM projects WHERE id = memory_proposals.project_id) AS project,
-            loop_id, proposal_type, target_memory_id, candidate_json, evidence_json,
-            confidence, risk_notes, status, created_at, resolved_at
-        "#,
+    proposal_creation::create(
+        pool,
+        request,
+        Uuid::new_v4(),
+        &mem_store::events::MutationContext::internal("loop-proposal"),
     )
-    .bind(request.run_id)
-    .bind(project_id)
-    .bind(&request.loop_id)
-    .bind(&request.proposal_type)
-    .bind(request.target_memory_id)
-    .bind(&request.candidate)
-    .bind(&request.evidence)
-    .bind(request.confidence)
-    .bind(&request.risk_notes)
-    .fetch_one(pool)
     .await
-    .map_err(ApiError::sql)?;
-    let proposal = row_to_memory_proposal(row)?;
-    append_memory_proposal_trace(pool, &proposal, "created", None).await?;
-    Ok(LoopMemoryProposalDecisionResponse {
-        proposal,
-        memory_id: None,
-    })
+    .map(|mutation| mutation.response)
+    .map_err(ApiError::io)
 }
 
 /// Test/CLI-facing wrapper mirroring [`record_loop_memory_proposal_decision`].
@@ -4798,11 +4775,18 @@ async fn append_loop_trace(
     payload: serde_json::Value,
     redacted: bool,
 ) -> Result<LoopTraceRecord, ApiError> {
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    // All appenders take the owning run lock before allocating a sequence.
+    sqlx::query("SELECT id FROM loop_runs WHERE id=$1 FOR UPDATE")
+        .bind(run_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(ApiError::sql)?;
     let sequence: i32 = sqlx::query_scalar(
         "SELECT COALESCE(MAX(sequence), 0) + 1 FROM run_traces WHERE run_id = $1",
     )
     .bind(run_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
     let row = sqlx::query(
@@ -4818,17 +4802,19 @@ async fn append_loop_trace(
     .bind(title)
     .bind(&payload)
     .bind(redacted)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
     sqlx::query(
         "UPDATE loop_runs SET trace_count = trace_count + 1, updated_at = now() WHERE id = $1",
     )
     .bind(run_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
-    row_to_loop_trace(row)
+    let trace = row_to_loop_trace(row)?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(trace)
 }
 
 async fn fetch_loop_approvals(
