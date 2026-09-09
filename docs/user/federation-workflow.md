@@ -1,4 +1,4 @@
-# Federation application API — first Stage E increment
+# Federation application workflow
 
 This experimental local API connects the application to the C/D runtime. It is
 **not a completed two-organization product or an enrollment UI**. Enable only in
@@ -17,6 +17,37 @@ All these responses, including failures, use `Cache-Control: no-store`.
 The common prefix is `/v1/projects/{slug}/federation/{space}`. The [OpenAPI
 specification](../api/openapi.yaml) documents bodies and errors; Rust contracts
 are exported by `mem_service::federation::workflow`.
+
+Discovery is `GET /v1/projects/{slug}/federation`; it returns configured IDs and
+the current local actor, never gateway addresses or credentials. Under the common
+prefix, `GET /catalog?offset=0` pages shared streams, observed memberships,
+proposals, and authorized local grants/subscriptions/review metadata (32 entries
+per list). `GET /proposals/{publisher}/{record}` displays a correction's exact
+content and provenance. These are retained observations, not fresh remote rights.
+
+`POST /review-preview` accepts a canonical ID and explicitly selected evidence
+text, public label and observed time. It returns an **unconfirmed** review request
+with the exact content, evidence digests and current shared version. Inspect all
+bytes and the current shared content before setting `confirm_future_updates` to
+true and posting the request to `/reviews`. Changing local content, evidence or
+the displayed shared version requires a new review. Preserve the request ID and
+bytes when retrying an uncertain response.
+
+`POST /actions` accepts an idempotent `request_id` and one typed action:
+`membership`, `revoke`, `propose`, `resolve`, or `pause`. Membership actions require
+the configured authority and explicit local ManageMembership capability, not just
+a local application role. Corrections are proposals to remote origins; only the
+origin can resolve them. Approval creates a new **shared** version preserving the
+corrector and source basis, and atomically pauses the origin's local subscription.
+It does not copy imported text into ordinary local memory or implicit model
+pipelines. A fresh review is required to resume local updates and intentionally
+supersede the corrected shared branch. Approval waits for outstanding publication
+work to be accepted and observed. A queued approval is not yet accepted remotely.
+
+Pausing stops future captures, not the already reviewed immutable backlog. Revoke
+the local Publish grant to stop sending pending work. Neither recalls delivered
+bytes. `POST /sync` supports `catch_up`, `resynchronize`, and `retry`; retry only
+resets the caller's pending work and still checks current rights before delivery.
 
 | Method and suffix | Operation | Local requirements |
 | --- | --- | --- |

@@ -27,7 +27,7 @@ pub async fn preview_source(
     tx.commit().await?;
     Ok(selection)
 }
-async fn selection(
+pub(crate) async fn selection(
     tx: &mut Transaction<'_, Postgres>,
     project: Uuid,
     canonical: RecordId,
@@ -245,7 +245,7 @@ struct FrozenSource {
     state_at: DateTime<Utc>,
     evidence: Vec<RecordKey>,
 }
-fn intent(
+pub(crate) fn intent(
     space: SpaceId,
     publisher: InstanceId,
     author: AuthorIdentity,

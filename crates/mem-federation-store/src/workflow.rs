@@ -27,6 +27,10 @@ pub struct ShareReviewRequest {
     pub expected: SourceSelection,
     pub evidence: Vec<EvidenceSelection>,
     pub confirm_future_updates: bool,
+    /// Echo the shared version displayed during review, including zero for a
+    /// first publication. Old clients cannot silently undo an approved correction.
+    #[serde(default)]
+    pub expected_shared_version: u32,
 }
 
 /// A lost HTTP reply may be retried without another subscription change,
@@ -106,6 +110,25 @@ pub async fn submit_share_review(
             return Err(StoreError::Binding);
         }
         return Ok(old.try_get("review_id")?);
+    }
+    let stream = StreamId {
+        origin: instance,
+        canonical: request.canonical,
+    };
+    if known.content_version(stream) != request.expected_shared_version {
+        return Err(StoreError::Binding);
+    }
+    crate::actions::lock_quiet_stream(&mut tx, known, access.project, instance, request.canonical)
+        .await?;
+    // The shared branch can advance through origin-approved proposals without
+    // copying imported text into implicit local/model pipelines. A renewed
+    // explicit review reconciles counters and deliberately selects local content.
+    if let Some(version) = known.history(stream).last() {
+        let content = serde_json::json!({"source":version.publication.source,"content":version.publication.content,"evidence":version.publication.evidence});
+        sqlx::query("UPDATE federation_source_subscriptions SET shared_version=$4,state_revision=$5,last_content=$6,last_record=$7 WHERE space=$1 AND instance=$2 AND canonical_id=$3")
+            .bind(known.space().as_uuid()).bind(instance.as_uuid()).bind(request.canonical.as_uuid())
+            .bind(i64::from(known.content_version(stream))).bind(i64::from(known.state_revision(stream))).bind(content).bind(Json(version.key))
+            .execute(&mut *tx).await?;
     }
     let reviewer =
         AuthorIdentity::new(access.principal.to_string()).map_err(PublicationError::from)?;

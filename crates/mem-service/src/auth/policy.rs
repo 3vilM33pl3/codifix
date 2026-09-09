@@ -1130,6 +1130,42 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
     }
     for (path, method, permission, semantic_read) in [
         (
+            "/v1/projects/{slug}/federation",
+            Method::GET,
+            Permission::MemoryRead,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/catalog",
+            Method::GET,
+            Permission::MemoryRead,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/proposals/{publisher}/{record}",
+            Method::GET,
+            Permission::MemoryRead,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/review-preview",
+            Method::POST,
+            Permission::BundleExport,
+            true,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/actions",
+            Method::POST,
+            Permission::MemoryRead,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/sync",
+            Method::POST,
+            Permission::MemoryRead,
+            false,
+        ),
+        (
             "/v1/projects/{slug}/federation/{space}",
             Method::GET,
             Permission::MemoryRead,

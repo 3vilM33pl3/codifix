@@ -26,6 +26,238 @@ struct Fixture {
     gateway: GatewayStore,
     security: GatewaySecurity,
 }
+
+#[tokio::test]
+async fn correction_actions_pause_local_updates_and_require_fresh_review() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    f.grant(f.writer_id, true).await;
+    f.grant(f.reader_id, true).await;
+    let canonical = f.source().await;
+    let (status, draft) = f
+        .request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/review-preview",
+            json!({"canonical":canonical,"evidence":[]}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{draft}");
+    assert_eq!(draft["request"]["confirm_future_updates"], false);
+    let mut review = draft["request"].clone();
+    review["confirm_future_updates"] = json!(true);
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::POST, "/reviews", review.clone())
+            .await
+            .0,
+        StatusCode::ACCEPTED
+    );
+    let access = crate::auth::federation_local_access(&f.state, f.writer_id, f.runtime.project)
+        .await
+        .unwrap();
+    f.runtime.sync.publish_pending(&access).await.unwrap();
+    f.publish_fixture_receipts().await;
+    f.runtime.sync.catch_up().await.unwrap();
+    let stream = StreamId {
+        origin: f.runtime.instance,
+        canonical,
+    };
+    let remote = InstanceId::new(Uuid::new_v4()).unwrap();
+    let fence = f
+        .gateway
+        .initialize(f.runtime.space, f.runtime.authority)
+        .await
+        .unwrap();
+    let member = intent(
+        f.runtime.space,
+        f.runtime.authority,
+        PublicationRecord::Membership {
+            member: remote,
+            capability: SpaceCapability::Publish,
+        },
+    );
+    assert_eq!(
+        f.gateway
+            .accept(fence, f.runtime.authority, &member)
+            .await
+            .unwrap()
+            .outcome,
+        PublicationOutcome::Applied
+    );
+    let known = f.runtime.sync.verified_snapshot().await.unwrap();
+    let mut corrected = known
+        .history(stream)
+        .last()
+        .unwrap()
+        .publication
+        .content
+        .clone();
+    corrected.text = "Remote correction stays in explicitly selected shared context".into();
+    let proposal = intent(
+        f.runtime.space,
+        remote,
+        PublicationRecord::Proposal(CorrectionProposal {
+            target: stream,
+            base_version: SharedVersion::new(1).unwrap(),
+            content: corrected.clone(),
+            evidence: vec![],
+        }),
+    );
+    let key = proposal.envelope.key();
+    assert_eq!(
+        f.gateway
+            .accept(fence, remote, &proposal)
+            .await
+            .unwrap()
+            .outcome,
+        PublicationOutcome::Applied
+    );
+    f.publish_fixture_receipts().await;
+    f.runtime.sync.catch_up().await.unwrap();
+    let (status, catalog) = f
+        .request(&f.reader, reqwest::Method::GET, "/catalog", Value::Null)
+        .await;
+    assert_eq!(status, StatusCode::OK, "{catalog}");
+    assert_eq!(catalog["proposals"]["items"][0]["resolution"], "pending");
+    let (status, detail) = f
+        .request(
+            &f.reader,
+            reqwest::Method::GET,
+            &format!(
+                "/proposals/{}/{}",
+                key.publisher.as_uuid(),
+                key.id.as_uuid()
+            ),
+            Value::Null,
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{detail}");
+    assert_eq!(detail["proposal"]["content"]["text"], corrected.text);
+    let action = json!({"request_id":Uuid::new_v4(),"action":{"kind":"resolve","proposal":key,"approve":true}});
+    assert_eq!(
+        f.request(&f.reader, reqwest::Method::POST, "/actions", action.clone())
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    let (a, b) = tokio::join!(
+        f.request(&f.writer, reqwest::Method::POST, "/actions", action.clone()),
+        f.request(&f.writer, reqwest::Method::POST, "/actions", action.clone())
+    );
+    assert_eq!(a.0, StatusCode::ACCEPTED, "{:?}", a.1);
+    assert_eq!(a, b);
+    let mut reused = action.clone();
+    reused["action"]["approve"] = json!(false);
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::POST, "/actions", reused)
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
+    let enabled: bool = sqlx::query_scalar(
+        "SELECT enabled FROM federation_source_subscriptions WHERE space=$1 AND canonical_id=$2",
+    )
+    .bind(f.runtime.space.as_uuid())
+    .bind(canonical.as_uuid())
+    .fetch_one(&f.pool)
+    .await
+    .unwrap();
+    assert!(!enabled);
+    let text: String = sqlx::query_scalar("SELECT canonical_text FROM memory_entries WHERE id=$1")
+        .bind(canonical.as_uuid())
+        .fetch_one(&f.pool)
+        .await
+        .unwrap();
+    assert_eq!(text, "Reviewed incident diagnosis");
+    f.runtime.sync.publish_pending(&access).await.unwrap();
+    f.publish_fixture_receipts().await;
+    f.runtime.sync.catch_up().await.unwrap();
+    assert_eq!(
+        f.runtime
+            .sync
+            .verified_snapshot()
+            .await
+            .unwrap()
+            .content_version(stream),
+        2
+    );
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::POST, "/actions", action)
+            .await,
+        a
+    );
+    // A different request ID with a stale shared version must not undo correction.
+    review["request_id"] = json!(Uuid::new_v4());
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::POST, "/reviews", review)
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
+    let (_, draft) = f
+        .request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/review-preview",
+            json!({"canonical":canonical,"evidence":[]}),
+        )
+        .await;
+    assert_eq!(draft["request"]["expected_shared_version"], 2);
+    assert_eq!(draft["current_shared_content"]["text"], corrected.text);
+    let mut renewed = draft["request"].clone();
+    renewed["confirm_future_updates"] = json!(true);
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::POST, "/reviews", renewed)
+            .await
+            .0,
+        StatusCode::ACCEPTED
+    );
+    f.runtime.sync.publish_pending(&access).await.unwrap();
+    f.publish_fixture_receipts().await;
+    f.runtime.sync.catch_up().await.unwrap();
+    let known = f.runtime.sync.verified_snapshot().await.unwrap();
+    assert_eq!(known.content_version(stream), 3);
+    assert_eq!(
+        known
+            .history(stream)
+            .last()
+            .unwrap()
+            .publication
+            .source
+            .version
+            .get(),
+        27
+    );
+    assert_eq!(known.history(stream)[1].publication.content, corrected);
+    // A local grant never confers space-authority membership rights.
+    let member = json!({"request_id":Uuid::new_v4(),"action":{"kind":"membership","member":remote,"capability":"pull","enabled":true}});
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::POST, "/actions", member)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    let pause =
+        json!({"request_id":Uuid::new_v4(),"action":{"kind":"pause","canonical":canonical}});
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::POST, "/actions", pause)
+            .await
+            .0,
+        StatusCode::ACCEPTED
+    );
+    assert_eq!(
+        f.request(
+            &f.reader,
+            reqwest::Method::POST,
+            "/sync",
+            json!({"operation":"resynchronize"})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+}
 impl Drop for Fixture {
     fn drop(&mut self) {
         for task in &self.tasks {

@@ -1370,6 +1370,131 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /v1/projects/{slug}/federation:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+    get:
+      operationId: get__v1_projects_slug_federation
+      summary: "Discover configured space and local actor, without granting remote access."
+      tags: [Federation]
+      x-stability: experimental
+      responses:
+        "200":
+          description: Private no-store response. Retained state is not a live authorization claim.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403": { description: Exact project permission or explicit local/gateway capability denied. }
+        "409": { description: Stale review, pending source work or conflicting idempotency key. }
+        "503": { description: Configured peer unavailable or retained verification failed. }
+  /v1/projects/{slug}/federation/{space}/catalog:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+      - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+    get:
+      operationId: get__v1_projects_slug_federation_space_catalog
+      summary: "Page retained stream, proposal and member metadata plus authorized local workflow records."
+      tags: [Federation]
+      x-stability: experimental
+      responses:
+        "200":
+          description: Private no-store response. Retained state is not a live authorization claim.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403": { description: Exact project permission or explicit local/gateway capability denied. }
+        "409": { description: Stale review, pending source work or conflicting idempotency key. }
+        "503": { description: Configured peer unavailable or retained verification failed. }
+  /v1/projects/{slug}/federation/{space}/proposals/{publisher}/{record}:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+      - { name: publisher, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: record, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: get__v1_projects_slug_federation_space_proposals_publisher_record_
+      summary: "Inspect an untrusted shared correction and its provenance before resolution."
+      tags: [Federation]
+      x-stability: experimental
+      responses:
+        "200":
+          description: Private no-store response. Retained state is not a live authorization claim.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403": { description: Exact project permission or explicit local/gateway capability denied. }
+        "409": { description: Stale review, pending source work or conflicting idempotency key. }
+        "503": { description: Configured peer unavailable or retained verification failed. }
+  /v1/projects/{slug}/federation/{space}/review-preview:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: post__v1_projects_slug_federation_space_review_preview
+      summary: "Create an unconfirmed exact-content review draft; no publication occurs."
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FederationReviewDraft' }
+      responses:
+        "200":
+          description: Private no-store response. Retained state is not a live authorization claim.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403": { description: Exact project permission or explicit local/gateway capability denied. }
+        "409": { description: Stale review, pending source work or conflicting idempotency key. }
+        "503": { description: Configured peer unavailable or retained verification failed. }
+  /v1/projects/{slug}/federation/{space}/actions:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: post__v1_projects_slug_federation_space_actions
+      summary: "Queue a policy-checked idempotent membership, correction, resolution or pause action."
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FederationActionRequest' }
+      responses:
+        "202":
+          description: Private no-store response. Retained state is not a live authorization claim.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403": { description: Exact project permission or explicit local/gateway capability denied. }
+        "409": { description: Stale review, pending source work or conflicting idempotency key. }
+        "503": { description: Configured peer unavailable or retained verification failed. }
+  /v1/projects/{slug}/federation/{space}/sync:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: post__v1_projects_slug_federation_space_sync
+      summary: "Explicit catch-up, verified full resynchronization or retry of the caller's pending work."
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FederationSync' }
+      responses:
+        "200":
+          description: Private no-store response. Retained state is not a live authorization claim.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403": { description: Exact project permission or explicit local/gateway capability denied. }
+        "409": { description: Stale review, pending source work or conflicting idempotency key. }
+        "503": { description: Configured peer unavailable or retained verification failed. }
   /v1/projects/{slug}/federation/{space}:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }
@@ -1926,6 +2051,7 @@ components:
         canonical: { type: string, format: uuid }
         expected: { $ref: '#/components/schemas/FederationSourceSelection' }
         confirm_future_updates: { const: true }
+        expected_shared_version: { type: integer, minimum: 0, maximum: 4294967295, default: 0, description: Must match the version shown during review. }
         evidence:
           type: array
           maxItems: 16
@@ -1945,6 +2071,88 @@ components:
                   public_source_label: { type: string }
                   selected_text: { type: string }
                   observed_at: { type: string, format: date-time }
+    FederationReviewDraft:
+      type: object
+      additionalProperties: false
+      required: [canonical, evidence]
+      properties:
+        canonical: { type: string, format: uuid }
+        evidence:
+          type: array
+          maxItems: 16
+          items:
+            type: object
+            additionalProperties: false
+            required: [public_source_label, selected_text, observed_at]
+            properties:
+              public_source_label: { type: string }
+              selected_text: { type: string }
+              observed_at: { type: string, format: date-time }
+    FederationSync:
+      type: object
+      additionalProperties: false
+      required: [operation]
+      properties:
+        operation: { type: string, enum: [catch_up, resynchronize, retry] }
+    FederationRecordKey:
+      type: object
+      additionalProperties: false
+      required: [publisher, id]
+      properties:
+        publisher: { type: string, format: uuid }
+        id: { type: string, format: uuid }
+    FederationActionRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, action]
+      properties:
+        request_id: { type: string, format: uuid, description: Reuse unchanged request bytes after an uncertain reply. }
+        action:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [kind, member, capability, enabled]
+              properties:
+                kind: { const: membership }
+                member: { type: string, format: uuid }
+                capability: { type: string, enum: [pull, publish, manage_membership] }
+                enabled: { type: boolean }
+            - type: object
+              additionalProperties: false
+              required: [kind, member]
+              properties:
+                kind: { const: revoke }
+                member: { type: string, format: uuid }
+            - type: object
+              additionalProperties: false
+              required: [kind, proposal]
+              properties:
+                kind: { const: propose }
+                proposal:
+                  type: object
+                  additionalProperties: false
+                  required: [target, base_version, content, evidence]
+                  properties:
+                    target: { $ref: '#/components/schemas/FederationStream' }
+                    base_version: { type: integer, minimum: 1 }
+                    content: { $ref: '#/components/schemas/FederationSourceSelection/properties/content' }
+                    evidence:
+                      type: array
+                      maxItems: 16
+                      items: { $ref: '#/components/schemas/FederationRecordKey' }
+            - type: object
+              additionalProperties: false
+              required: [kind, proposal, approve]
+              properties:
+                kind: { const: resolve }
+                proposal: { $ref: '#/components/schemas/FederationRecordKey' }
+                approve: { type: boolean, description: Approval creates an origin-owned shared version and pauses its local subscription. }
+            - type: object
+              additionalProperties: false
+              required: [kind, canonical]
+              properties:
+                kind: { const: pause }
+                canonical: { type: string, format: uuid }
     FederationSpaceStatus:
       type: object
       required: [project, space, instance, authority, retained_through, observed_capabilities, local, offline_copies_may_remain]

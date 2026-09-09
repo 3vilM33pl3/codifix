@@ -20,6 +20,8 @@ use mem_record::Permission;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
+mod operations;
+pub(crate) use operations::*;
 
 #[derive(Deserialize)]
 pub(crate) struct SpacePath {
@@ -313,7 +315,7 @@ fn store_error(error: StoreError) -> ApiError {
         StoreError::LocalPolicy(_) => {
             ApiError::forbidden("local sharing grant or publication permission denied")
         }
-        StoreError::Binding => ApiError::status_message(
+        StoreError::Binding | StoreError::Outcome(_) => ApiError::status_message(
             StatusCode::CONFLICT,
             "review, source or sharing binding changed; refresh before retrying",
         ),

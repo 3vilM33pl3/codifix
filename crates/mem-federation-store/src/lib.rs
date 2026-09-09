@@ -15,6 +15,8 @@ pub use replica_audit::receipt_matches;
 mod sharing;
 mod workflow;
 pub use workflow::*;
+mod actions;
+pub use actions::*;
 mod source;
 pub use sharing::*;
 

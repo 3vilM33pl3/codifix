@@ -208,6 +208,33 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         )
         .route("/v1/projects/{slug}/memories", get(project_memories))
         .route(
+            "/v1/projects/{slug}/federation",
+            get(crate::federation::workflow::discover),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/catalog",
+            get(crate::federation::workflow::catalog),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/proposals/{publisher}/{record}",
+            get(crate::federation::workflow::proposal),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/review-preview",
+            post(crate::federation::workflow::review_draft)
+                .layer(axum::extract::DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/actions",
+            post(crate::federation::workflow::action)
+                .layer(axum::extract::DefaultBodyLimit::max(48 * 1024)),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/sync",
+            post(crate::federation::workflow::synchronize)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
             "/v1/projects/{slug}/federation/{space}",
             get(crate::federation::workflow::status),
         )
