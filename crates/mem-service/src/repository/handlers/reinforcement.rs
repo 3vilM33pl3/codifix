@@ -9,15 +9,13 @@ use crate::*;
 use mem_record::ValidationDueInfo;
 use mem_reinforce::repository::{
     SelectionParams, compact_scores, count_validation_runs_since, fetch_due_candidates,
-    insert_score_audit, last_compaction_at, prune_access_events,
+    last_compaction_at, prune_access_events,
 };
 use mem_reinforce::selection::ValidationCandidate;
 
 use crate::state::AppState;
 
 const COMPACTION_INTERVAL_DAYS: i64 = 7;
-/// Volatility EWMA moves larger than this get an audit row.
-const VOLATILITY_AUDIT_DELTA: f32 = 0.5;
 
 pub(crate) async fn run_reinforcement_scheduler(state: AppState) -> Result<()> {
     tokio::time::sleep(StdDuration::from_secs(10)).await;
@@ -218,8 +216,8 @@ pub(crate) async fn due_validation_infos(
 /// Detects provenance status transitions and folds them into the
 /// volatility EWMA of the owning memories. Sources verified for the first
 /// time do not count as changes; only an actual status flip does.
-pub(crate) async fn fold_provenance_volatility(
-    pool: &PgPool,
+pub(crate) async fn fold_provenance_volatility_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     items: &[SourceProvenanceVerification],
     alpha: f64,
 ) -> Result<()> {
@@ -231,7 +229,7 @@ pub(crate) async fn fold_provenance_volatility(
         "SELECT source_id, status FROM memory_source_verifications WHERE source_id = ANY($1)",
     )
     .bind(&source_ids)
-    .fetch_all(pool)
+    .fetch_all(&mut **tx)
     .await?
     .into_iter()
     .collect();
@@ -247,40 +245,15 @@ pub(crate) async fn fold_provenance_volatility(
         return Ok(());
     }
     let memory_ids: Vec<Uuid> = change_counts.keys().copied().collect();
-    let canonical_map = mem_reinforce::repository::resolve_canonicals(pool, &memory_ids).await?;
+    let canonical_map =
+        mem_reinforce::repository::resolve_canonicals(&mut **tx, &memory_ids).await?;
     let mut canonical_counts: HashMap<Uuid, u32> = HashMap::new();
     for (memory_id, count) in &change_counts {
         if let Some((canonical_id, _)) = canonical_map.get(memory_id) {
             *canonical_counts.entry(*canonical_id).or_default() += count;
         }
     }
-    let shifts = mem_reinforce::repository::fold_volatility(pool, &canonical_counts, alpha).await?;
-    audit_volatility_shifts(pool, &shifts).await?;
-    Ok(())
-}
-
-/// Audits large volatility moves reported by a provenance sweep.
-pub(crate) async fn audit_volatility_shifts(
-    pool: &PgPool,
-    shifts: &[mem_reinforce::repository::VolatilityShift],
-) -> Result<()> {
-    for shift in shifts {
-        if (shift.new_volatility - shift.old_volatility).abs() > VOLATILITY_AUDIT_DELTA {
-            insert_score_audit(
-                pool,
-                shift.canonical_id,
-                shift.project_id,
-                "volatility_shift",
-                None,
-                None,
-                serde_json::json!({
-                    "old_volatility": shift.old_volatility,
-                    "new_volatility": shift.new_volatility,
-                }),
-            )
-            .await?;
-        }
-    }
+    mem_reinforce::repository::fold_volatility_tx(tx, &canonical_counts, alpha).await?;
     Ok(())
 }
 

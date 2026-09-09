@@ -5,27 +5,27 @@ use crate::*;
 
 pub(crate) async fn verify_provenance(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<ProvenanceVerificationRequest>,
 ) -> Result<Json<ProvenanceVerificationResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
-    let response = verify_project_provenance_with_volatility(
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "provenance-check".into(),
+        occurred_at: None,
+    };
+    let (response, event) = verify_project_provenance_as(
         &state.pool()?,
         &request,
         state.config.reinforcement.volatility_ewma_alpha,
+        &context,
     )
     .await
     .map_err(ApiError::sql)?;
-    notify_project_changed(
-        &state,
-        request.project.clone(),
-        None,
-        ActivityKind::ProvenanceCheck,
-        format!(
-            "Provenance verified: {} checked, {} verified, {} missing",
-            response.checked_count, response.verified_count, response.missing_file_count
-        ),
-        None,
-    );
+    if let Some((event, sequence)) = event {
+        crate::repository::events::broadcast_committed(&state, request.project, event, sequence);
+    }
     Ok(Json(response))
 }
 
@@ -34,40 +34,65 @@ pub(crate) async fn verify_project_provenance_with_volatility(
     request: &ProvenanceVerificationRequest,
     volatility_alpha: f64,
 ) -> Result<ProvenanceVerificationResponse, sqlx::Error> {
+    Ok(verify_project_provenance_as(
+        pool,
+        request,
+        volatility_alpha,
+        &mem_store::events::MutationContext::internal("provenance-check"),
+    )
+    .await?
+    .0)
+}
+
+pub(crate) async fn verify_project_provenance_as(
+    pool: &PgPool,
+    request: &ProvenanceVerificationRequest,
+    volatility_alpha: f64,
+    context: &mem_store::events::MutationContext,
+) -> Result<
+    (
+        ProvenanceVerificationResponse,
+        Option<(mem_store::events::TimelineEvent, i64)>,
+    ),
+    sqlx::Error,
+> {
     let project_row = sqlx::query("SELECT id, root_path FROM projects WHERE slug = $1")
         .bind(&request.project)
         .fetch_optional(pool)
         .await?;
     let Some(project_row) = project_row else {
-        return Ok(ProvenanceVerificationResponse {
-            project: request.project.clone(),
-            repo_root: request.repo_root.clone().unwrap_or_default(),
-            dry_run: request.dry_run,
-            checked_at: chrono::Utc::now(),
-            checked_count: 0,
-            verified_count: 0,
-            missing_file_count: 0,
-            missing_symbol_count: 0,
-            unverifiable_count: 0,
-            stale_count: 0,
-            stored_count: 0,
-            warnings: vec![DiagnosticInfo {
-                code: "project_not_found".to_string(),
-                source: "memory".to_string(),
-                component: "service".to_string(),
-                operation: "verify_provenance".to_string(),
-                severity: DiagnosticSeverity::Warning,
-                message: format!("Project `{}` was not found.", request.project),
-                raw_error: None,
-                explanation: None,
-                fix_hint: Some(
-                    "Create or initialize the project before verifying provenance.".to_string(),
-                ),
-                doctor_hint: None,
-                command_hint: Some(format!("memory init --project {}", request.project)),
-            }],
-            items: Vec::new(),
-        });
+        return Ok((
+            ProvenanceVerificationResponse {
+                project: request.project.clone(),
+                repo_root: request.repo_root.clone().unwrap_or_default(),
+                dry_run: request.dry_run,
+                checked_at: chrono::Utc::now(),
+                checked_count: 0,
+                verified_count: 0,
+                missing_file_count: 0,
+                missing_symbol_count: 0,
+                unverifiable_count: 0,
+                stale_count: 0,
+                stored_count: 0,
+                warnings: vec![DiagnosticInfo {
+                    code: "project_not_found".to_string(),
+                    source: "memory".to_string(),
+                    component: "service".to_string(),
+                    operation: "verify_provenance".to_string(),
+                    severity: DiagnosticSeverity::Warning,
+                    message: format!("Project `{}` was not found.", request.project),
+                    raw_error: None,
+                    explanation: None,
+                    fix_hint: Some(
+                        "Create or initialize the project before verifying provenance.".to_string(),
+                    ),
+                    doctor_hint: None,
+                    command_hint: Some(format!("memory init --project {}", request.project)),
+                }],
+                items: Vec::new(),
+            },
+            None,
+        ));
     };
     let project_id: Uuid = project_row.try_get("id")?;
     let repo_root = request
@@ -125,34 +150,6 @@ pub(crate) async fn verify_project_provenance_with_volatility(
         items.push(verification);
     }
 
-    let mut stored_count = 0;
-    if !request.dry_run {
-        // Provenance status transitions feed the volatility EWMA. Advisory:
-        // a failure here must never fail verification itself.
-        if let Err(error) =
-            super::reinforcement::fold_provenance_volatility(pool, &items, volatility_alpha).await
-        {
-            tracing::warn!(error = %error, "fold provenance volatility");
-        }
-        for item in &items {
-            sqlx::query(
-                r#"
-                INSERT INTO memory_source_checks
-                    (source_id, status, checked_at, reason, resolved_path)
-                VALUES ($1, $2, $3, $4, $5)
-                "#,
-            )
-            .bind(item.source_id)
-            .bind(item.status.as_str())
-            .bind(checked_at)
-            .bind(&item.reason)
-            .bind(&item.resolved_path)
-            .execute(pool)
-            .await?;
-            stored_count += 1;
-        }
-    }
-
     let verified_count = items
         .iter()
         .filter(|item| item.status == SourceProvenanceStatus::Verified)
@@ -206,7 +203,7 @@ pub(crate) async fn verify_project_provenance_with_volatility(
         })
         .collect();
 
-    Ok(ProvenanceVerificationResponse {
+    let mut response = ProvenanceVerificationResponse {
         project: request.project.clone(),
         repo_root,
         dry_run: request.dry_run,
@@ -217,10 +214,74 @@ pub(crate) async fn verify_project_provenance_with_volatility(
         missing_symbol_count,
         unverifiable_count,
         stale_count,
-        stored_count,
+        stored_count: 0,
         warnings,
         items,
-    })
+    };
+    let event = if request.dry_run {
+        None
+    } else {
+        let mut tx = pool.begin().await?;
+        let event = persist_provenance_checks_tx(
+            &mut tx,
+            project_id,
+            &mut response,
+            volatility_alpha,
+            context,
+        )
+        .await?;
+        tx.commit().await?;
+        Some(event)
+    };
+    Ok((response, event))
+}
+
+/// File and graph observations are prepared before this database transaction.
+/// Serialize checks of each source so transitions see the preceding committed check.
+async fn persist_provenance_checks_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project_id: Uuid,
+    response: &mut ProvenanceVerificationResponse,
+    volatility_alpha: f64,
+    context: &mem_store::events::MutationContext,
+) -> Result<(mem_store::events::TimelineEvent, i64), sqlx::Error> {
+    let ids: Vec<Uuid> = response.items.iter().map(|i| i.source_id).collect();
+    let locked: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT s.id FROM memory_sources s JOIN memory_entries m ON m.id = s.memory_entry_id
+         WHERE s.id = ANY($1) AND m.project_id = $2 ORDER BY s.id FOR UPDATE OF s",
+    )
+    .bind(&ids)
+    .bind(project_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    if locked.len() != ids.len() {
+        return Err(sqlx::Error::Protocol(
+            "provenance sources changed; verify again".into(),
+        ));
+    }
+    super::reinforcement::fold_provenance_volatility_tx(tx, &response.items, volatility_alpha)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    for item in &response.items {
+        sqlx::query("INSERT INTO memory_source_checks (source_id, status, checked_at, reason, resolved_path)
+            VALUES ($1, $2, $3, $4, $5)")
+            .bind(item.source_id).bind(item.status.as_str()).bind(response.checked_at)
+            .bind(&item.reason).bind(&item.resolved_path).execute(&mut **tx).await?;
+    }
+    let mut event = mem_store::events::TimelineEvent::new(
+        project_id,
+        ActivityKind::ProvenanceCheck,
+        format!(
+            "Provenance verified: {} checked, {} verified, {} missing",
+            response.checked_count, response.verified_count, response.missing_file_count
+        ),
+    );
+    context.stamp(&mut event);
+    let sequence = mem_store::events::append(tx, &event)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    response.stored_count = response.items.len();
+    Ok((event, sequence))
 }
 
 pub(crate) async fn run_provenance_reverify_scheduler(state: AppState) -> Result<()> {

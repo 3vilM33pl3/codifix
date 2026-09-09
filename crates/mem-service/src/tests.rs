@@ -185,6 +185,60 @@ async fn verify_project_provenance_marks_missing_symbols() {
         SourceProvenanceStatus::MissingSymbol
     );
 
+    sqlx::query("INSERT INTO memory_scores (canonical_id, project_id) SELECT canonical_id, project_id FROM memory_entries WHERE id = $1")
+        .bind(memory_id).execute(&pool).await.expect("seed score");
+    let request = ProvenanceVerificationRequest {
+        project: slug.clone(),
+        repo_root: Some(root.display().to_string()),
+        dry_run: false,
+    };
+    let mut context = mem_store::events::MutationContext::internal("provenance-test");
+    context.actor_name = "invalid\0actor".into();
+    assert!(
+        crate::repository::handlers::provenance::verify_project_provenance_as(
+            &pool, &request, 0.3, &context
+        )
+        .await
+        .is_err()
+    );
+    let checks: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM memory_source_checks WHERE source_id = $1")
+            .bind(source_id)
+            .fetch_one(&pool)
+            .await
+            .expect("checks");
+    let audits: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM memory_score_audit WHERE project_id = $1")
+            .bind(project_id)
+            .fetch_one(&pool)
+            .await
+            .expect("audits");
+    let volatility: f32 =
+        sqlx::query_scalar("SELECT volatility FROM memory_scores WHERE project_id = $1")
+            .bind(project_id)
+            .fetch_one(&pool)
+            .await
+            .expect("volatility");
+    assert_eq!((checks, audits, volatility), (1, 0, 0.0));
+    context.actor_name = "authenticated operator".into();
+    let (stored, event) = crate::repository::handlers::provenance::verify_project_provenance_as(
+        &pool, &request, 0.3, &context,
+    )
+    .await
+    .expect("atomic check");
+    assert_eq!(stored.stored_count, 1);
+    assert_eq!(
+        event.expect("committed event").0.actor_name.as_deref(),
+        Some("authenticated operator")
+    );
+    let audits: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM memory_score_audit WHERE project_id = $1")
+            .bind(project_id)
+            .fetch_one(&pool)
+            .await
+            .expect("committed audit");
+    assert_eq!(audits, 1);
+
     mem_test_support::cleanup_project(&pool, &slug)
         .await
         .expect("cleanup project");

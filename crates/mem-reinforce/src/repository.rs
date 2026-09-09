@@ -41,8 +41,8 @@ pub struct ScoreCounters {
 }
 
 /// Maps memory version ids to `(canonical_id, project_id)`.
-pub async fn resolve_canonicals(
-    pool: &PgPool,
+pub async fn resolve_canonicals<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     memory_ids: &[Uuid],
 ) -> Result<HashMap<Uuid, (Uuid, Uuid)>> {
     if memory_ids.is_empty() {
@@ -56,7 +56,7 @@ pub async fn resolve_canonicals(
         "#,
     )
     .bind(memory_ids)
-    .fetch_all(pool)
+    .fetch_all(executor)
     .await
     .context("resolve canonical ids for accessed memories")?;
     Ok(rows
@@ -248,8 +248,8 @@ pub async fn insert_access_events(pool: &PgPool, rows: &[AccessEventRow]) -> Res
     Ok(())
 }
 
-pub async fn insert_score_audit(
-    pool: &PgPool,
+pub async fn insert_score_audit<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     canonical_id: Uuid,
     project_id: Uuid,
     reason: &str,
@@ -272,7 +272,7 @@ pub async fn insert_score_audit(
     .bind(old_activation)
     .bind(new_activation)
     .bind(details)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("insert memory score audit row")?;
     Ok(())
@@ -681,6 +681,18 @@ pub async fn fold_volatility(
     change_counts: &HashMap<Uuid, u32>,
     alpha: f64,
 ) -> Result<Vec<VolatilityShift>> {
+    let mut tx = pool.begin().await?;
+    let shifts = fold_volatility_tx(&mut tx, change_counts, alpha).await?;
+    tx.commit().await?;
+    Ok(shifts)
+}
+
+/// Apply volatility and its dedicated audit in the caller's transaction.
+pub async fn fold_volatility_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    change_counts: &HashMap<Uuid, u32>,
+    alpha: f64,
+) -> Result<Vec<VolatilityShift>> {
     if change_counts.is_empty() {
         return Ok(Vec::new());
     }
@@ -717,10 +729,10 @@ pub async fn fold_volatility(
     .bind(&canonical_ids)
     .bind(&counts)
     .bind(alpha.clamp(0.0, 1.0))
-    .fetch_all(pool)
+    .fetch_all(&mut **tx)
     .await
     .context("fold volatility EWMA")?;
-    Ok(rows
+    let shifts: Vec<VolatilityShift> = rows
         .into_iter()
         .map(
             |(canonical_id, project_id, old_volatility, new_volatility)| VolatilityShift {
@@ -730,7 +742,12 @@ pub async fn fold_volatility(
                 new_volatility,
             },
         )
-        .collect())
+        .collect();
+    for shift in &shifts {
+        insert_score_audit(&mut **tx, shift.canonical_id, shift.project_id, "volatility_shift", None, None,
+            serde_json::json!({"old_volatility": shift.old_volatility, "new_volatility": shift.new_volatility})).await?;
+    }
+    Ok(shifts)
 }
 
 /// Full snapshot of the memory version being validated.

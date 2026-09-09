@@ -10,8 +10,8 @@ write-path references before the R1 gate can close.
 | Curation | mem-curate `curate_tx_with_actor`/`curate_as` | run/memories/automatic replacements + events + version-pinned durable enrichment intents; late-event failure rollback tested | [x] |
 | Replacement/validation versions and relations | mem-curate transaction APIs; mem-reinforce | replacement decisions and new versions/events/job intents coupled; direct relation batches emit operation events; reinforcement review/score orchestration still open | [ ] |
 | Archive/delete/retention | service memory repository `mutations`/`retention` transaction APIs | state/tombstone/pruning + surviving subject or operation event; direct callers, late-event rollback, concurrent tombstones, scoped retention and dry run tested | [x] |
-| Provenance checks | service provenance repository | check transition + event | [ ] |
-| Bundle import/export | service bundle repository | DB apply + event; external intent/outcome | [ ] |
+| Provenance checks | service provenance repository prepared checks + transaction apply; mem-reinforce volatility transaction | source checks + serialized status transitions + volatility audit + attributed operation event; failed event rolls all changes back; dry runs stay read-only | [x] |
+| Bundle import/export | service bundle repository | import project/receipt/versions/sources/relations/chunks + enrichment intents + event atomic and replay tested; export/external intent still open | [ ] |
 | Graph/index/embedding batches | mem-graph, service embedding repository | batch result + operation event | [ ] |
 | Reinforcement and procedural learning | mem-reinforce, service loops | state + dedicated journal/event | [ ] |
 | Project/commit/checkpoint/plan activity | service project/activity repositories | mutation + event | [ ] |
