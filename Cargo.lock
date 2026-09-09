@@ -3152,6 +3152,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mem-store"
+version = "2.0.0"
+dependencies = [
+ "chrono",
+ "mem-record",
+ "mem-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "mem-test-support"
 version = "2.0.0"
 dependencies = [

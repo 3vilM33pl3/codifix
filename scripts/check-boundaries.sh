@@ -50,6 +50,15 @@ if grep -RInE 'atrium(_|::)|atrium-' crates/mem-federation/src --include='*.rs';
 fi
 
 # 3b. Transactional storage may use SQL/runtime, but must not become a network
+# Local jobs/events obey the same boundary independently of federation.
+store_tree=$(cargo tree -p mem-store -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in atrium-api atrium-xrpc atrium-repo axum reqwest mem-config mem-service mem-federation-store; do
+  if echo "$store_tree" | grep -qx "$dep"; then
+    err "mem-store depends on $dep"
+  fi
+done
+
+# 3b. Transactional storage may use SQL/runtime, but must not become a network
 # adapter or service router. Production PDS/auth integration is a separate edge.
 federation_store_tree=$(cargo tree -p mem-federation-store -e normal --prefix none | awk '{print $1}' | sort -u)
 for dep in atrium-api atrium-xrpc atrium-repo atrium-crypto mem-atproto-verify axum reqwest mem-service; do
