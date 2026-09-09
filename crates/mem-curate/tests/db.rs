@@ -298,6 +298,87 @@ async fn relation_count(pool: &sqlx::PgPool, src: Uuid, dst: Uuid, relation_type
     .expect("decode relation count")
 }
 
+#[tokio::test]
+async fn capture_transaction_couples_event_and_replay_identity() {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let project = mem_test_support::unique_project_slug("r1-capture");
+    let request = capture_request(&project, "atomic capture", "synthetic fact", "fact");
+    let actor = mem_store::events::MutationContext {
+        actor_id: Uuid::new_v4().to_string(),
+        actor_name: "reviewer".into(),
+        source: "test".into(),
+        occurred_at: None,
+    };
+    let mut tx = pool.begin().await.unwrap();
+    let tentative = mem_curate::store_capture_tx(&mut tx, &request, &actor)
+        .await
+        .unwrap();
+    assert!(tentative.event.is_some());
+    tx.rollback().await.unwrap();
+    let absent: bool =
+        sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM projects WHERE slug=$1)")
+            .bind(&project)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        absent,
+        "project, session, task, capture and event all roll back"
+    );
+    let (first, second) = tokio::join!(
+        mem_curate::store_capture_as(&pool, &request, &actor),
+        mem_curate::store_capture_as(&pool, &request, &actor)
+    );
+    let first = first.unwrap();
+    let second = second.unwrap();
+    assert_eq!(
+        first.response.raw_capture_id,
+        second.response.raw_capture_id
+    );
+    assert_eq!(first.response.session_id, second.response.session_id);
+    assert_eq!(first.response.task_id, second.response.task_id);
+    assert_eq!(
+        usize::from(first.event.is_some()) + usize::from(second.event.is_some()),
+        1
+    );
+    let events = mem_store::events::page(&pool, first.response.project_id, 0, 10)
+        .await
+        .unwrap();
+    assert_eq!(events.events.len(), 1);
+    assert_eq!(events.events[0]["actor_id"], actor.actor_id);
+    let tasks: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM tasks t JOIN sessions s ON s.id=t.session_id WHERE s.project_id=$1",
+    )
+    .bind(first.response.project_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(tasks, 1);
+    mem_test_support::cleanup_project(&pool, &project)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn capture_event_failure_cannot_leave_a_capture_committed() {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let project = mem_test_support::unique_project_slug("r1-capture-fault");
+    // Deliberately exceed the event bound after domain writes have been staged.
+    let request = capture_request(&project, &"x".repeat(65537), "synthetic fact", "fact");
+    assert!(store_capture(&pool, &request).await.is_err());
+    let absent: bool =
+        sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM projects WHERE slug=$1)")
+            .bind(&project)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(absent);
+}
+
 fn capture_request(
     project: &str,
     title: &str,

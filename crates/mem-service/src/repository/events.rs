@@ -198,6 +198,44 @@ pub(crate) async fn append_timeline_event(
     Ok(seq)
 }
 
+/// Only call after the owning mutation transaction committed. This helper
+/// never appends a second event, and loss of a broadcast cannot lose the log.
+pub(crate) fn broadcast_committed(
+    state: &AppState,
+    project: String,
+    event: mem_store::events::TimelineEvent,
+    seq: i64,
+) {
+    let event = ServiceEvent {
+        id: event.id,
+        seq: Some(seq),
+        project,
+        memory_id: event.memory_id,
+        kind: event.kind,
+        summary: event.summary,
+        details: event.details,
+        recorded_at: event.recorded_at,
+        actor_id: event.actor_id,
+        actor_name: event.actor_name,
+        source: event.source,
+        operation_id: event.operation_id,
+        duration_ms: event.duration_ms,
+        provider: event.provider,
+        model: event.model,
+        token_usage: event.token_usage,
+        include_activity: true,
+    };
+    {
+        let mut history = state
+            .recent_activity
+            .lock()
+            .expect("activity history mutex poisoned");
+        history.push_front(event.clone());
+        history.truncate(20);
+    }
+    let _ = state.events.send(event);
+}
+
 pub(crate) fn notify_project_changed(
     state: &AppState,
     project: String,

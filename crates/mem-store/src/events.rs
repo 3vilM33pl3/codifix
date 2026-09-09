@@ -8,6 +8,37 @@ use uuid::Uuid;
 
 use crate::{Error, Result};
 
+/// Trusted execution attribution, kept separate from client-reported author or
+/// writer fields. Domain library wrappers use an explicit internal identity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MutationContext {
+    pub actor_id: String,
+    pub actor_name: String,
+    pub source: String,
+    #[serde(default)]
+    pub occurred_at: Option<DateTime<Utc>>,
+}
+
+impl MutationContext {
+    pub fn internal(source: &str) -> Self {
+        Self {
+            actor_id: format!("system:{source}"),
+            actor_name: source.into(),
+            source: source.into(),
+            occurred_at: None,
+        }
+    }
+
+    pub fn stamp(&self, event: &mut TimelineEvent) {
+        event.actor_id = Some(self.actor_id.clone());
+        event.actor_name = Some(self.actor_name.clone());
+        event.source = Some(self.source.clone());
+        if let Some(time) = self.occurred_at {
+            event.recorded_at = time;
+        }
+    }
+}
+
 /// Explicit subjects survive deletion; never rediscover identity after commit.
 /// Identity is supplied by trusted repository code, not an HTTP body.
 #[derive(Debug, Clone, Serialize, Deserialize)]

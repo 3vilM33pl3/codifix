@@ -15,8 +15,57 @@ pub async fn store_capture(
     pool: &PgPool,
     request: &CaptureTaskRequest,
 ) -> Result<CaptureTaskResponse, sqlx::Error> {
+    Ok(store_capture_as(
+        pool,
+        request,
+        &mem_store::events::MutationContext::internal("mem-curate"),
+    )
+    .await?
+    .response)
+}
+
+pub struct CaptureMutation {
+    pub response: CaptureTaskResponse,
+    /// Provisional until the enclosing transaction commits. None on replay.
+    pub event: Option<(mem_store::events::TimelineEvent, i64)>,
+}
+
+pub async fn store_capture_as(
+    pool: &PgPool,
+    request: &CaptureTaskRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<CaptureMutation, sqlx::Error> {
     let mut tx = pool.begin().await?;
-    let project_id = upsert_project(&mut tx, &request.project).await?;
+    let result = store_capture_tx(&mut tx, request, context).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+/// Caller owns commit/rollback. Capture, session/task and event are inseparable.
+pub async fn store_capture_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    request: &CaptureTaskRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<CaptureMutation, sqlx::Error> {
+    let computed_key = idempotency_key(request);
+    // Serialize identical inputs before creating any session/task. Hash
+    // collisions merely serialize unrelated requests; the actual key is checked.
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 7129))")
+        .bind(&computed_key)
+        .execute(&mut **tx)
+        .await?;
+    if let Some(existing) = sqlx::query("SELECT rc.id,rc.task_id,t.session_id,s.project_id,p.slug FROM raw_captures rc JOIN tasks t ON t.id=rc.task_id JOIN sessions s ON s.id=t.session_id JOIN projects p ON p.id=s.project_id WHERE rc.idempotency_key=$1")
+        .bind(&computed_key).fetch_optional(&mut **tx).await? {
+        if existing.try_get::<String,_>("slug")? != request.project {
+            return Err(sqlx::Error::Protocol("capture idempotency key belongs to another project".into()));
+        }
+        return Ok(CaptureMutation { response: CaptureTaskResponse {
+            project_id: existing.try_get("project_id")?, session_id: existing.try_get("session_id")?,
+            task_id: existing.try_get("task_id")?, raw_capture_id: existing.try_get("id")?,
+            idempotency_key: computed_key, dry_run:false, queued_offline:false,offline_queue_id:None,offline_message:None,
+        }, event:None });
+    }
+    let project_id = upsert_project(tx, &request.project).await?;
     let session_id = Uuid::new_v4();
     sqlx::query(
         r#"
@@ -34,7 +83,7 @@ pub async fn store_capture(
             .clone()
             .unwrap_or_else(|| request.writer_id.clone()),
     )
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
 
     let task_id = Uuid::new_v4();
@@ -49,29 +98,8 @@ pub async fn store_capture(
     .bind(&request.task_title)
     .bind(&request.user_prompt)
     .bind(&request.agent_summary)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
-
-    let computed_key = idempotency_key(request);
-    if let Some(existing) =
-        sqlx::query("SELECT id, task_id FROM raw_captures WHERE idempotency_key = $1 LIMIT 1")
-            .bind(&computed_key)
-            .fetch_optional(&mut *tx)
-            .await?
-    {
-        tx.rollback().await?;
-        return Ok(CaptureTaskResponse {
-            project_id,
-            session_id,
-            task_id: existing.try_get("task_id")?,
-            raw_capture_id: existing.try_get("id")?,
-            idempotency_key: computed_key,
-            dry_run: false,
-            queued_offline: false,
-            offline_queue_id: None,
-            offline_message: None,
-        });
-    }
 
     let raw_capture_id = Uuid::new_v4();
     sqlx::query(
@@ -84,12 +112,10 @@ pub async fn store_capture(
     .bind(task_id)
     .bind(sqlx::types::Json(request))
     .bind(&computed_key)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
 
-    tx.commit().await?;
-
-    Ok(CaptureTaskResponse {
+    let response = CaptureTaskResponse {
         project_id,
         session_id,
         task_id,
@@ -99,6 +125,29 @@ pub async fn store_capture(
         queued_offline: false,
         offline_queue_id: None,
         offline_message: None,
+    };
+    let mut event = mem_store::events::TimelineEvent::new(
+        project_id,
+        mem_record::ActivityKind::CaptureTask,
+        format!("Captured task: {}", request.task_title),
+    );
+    event.id = raw_capture_id;
+    event.operation_id = Some(raw_capture_id.to_string());
+    event.details = Some(mem_record::ActivityDetails::CaptureTask {
+        session_id,
+        task_id,
+        raw_capture_id,
+        idempotency_key: response.idempotency_key.clone(),
+        task_title: Some(request.task_title.clone()),
+        writer_id: request.writer_id.clone(),
+    });
+    context.stamp(&mut event);
+    let seq = mem_store::events::append(tx, &event)
+        .await
+        .map_err(|error| sqlx::Error::Protocol(error.to_string()))?;
+    Ok(CaptureMutation {
+        response,
+        event: Some((event, seq)),
     })
 }
 

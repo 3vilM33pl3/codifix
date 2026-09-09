@@ -77,9 +77,28 @@ pub(crate) async fn sync_offline_batch(
 }
 
 async fn sync_capture(pool: &PgPool, payload_json: &str) -> Result<()> {
-    let request: CaptureTaskRequest = serde_json::from_str(payload_json)?;
-    store_capture(pool, &request).await?;
+    let payload: serde_json::Value = serde_json::from_str(payload_json)?;
+    if payload.get("capture").is_some() {
+        let queued: QueuedCapture = serde_json::from_value(payload)?;
+        if queued.version != 1 {
+            anyhow::bail!("unsupported queued capture version");
+        }
+        mem_curate::store_capture_as(pool, &queued.capture, &queued.context).await?;
+    } else {
+        // Pre-R1 outbox entries have no authenticated actor snapshot. Do not
+        // fabricate one; the library marks this as internal legacy execution.
+        let request: CaptureTaskRequest = serde_json::from_value(payload)?;
+        store_capture(pool, &request).await?;
+    }
     Ok(())
+}
+
+#[derive(Clone, Serialize, SerdeDeserialize)]
+#[serde(deny_unknown_fields)]
+struct QueuedCapture {
+    version: u32,
+    capture: CaptureTaskRequest,
+    context: mem_store::events::MutationContext,
 }
 
 async fn sync_activity(pool: &PgPool, payload_json: &str) -> Result<()> {
@@ -141,11 +160,16 @@ impl OfflineStore {
     pub(crate) async fn queue_capture(
         &self,
         request: &CaptureTaskRequest,
+        context: &mem_store::events::MutationContext,
     ) -> Result<CaptureTaskResponse> {
         let connection = Arc::clone(&self.connection);
         let request = request.clone();
+        let mut context = context.clone();
+        context.occurred_at.get_or_insert_with(chrono::Utc::now);
         tokio::task::spawn_blocking(move || {
-            with_connection(&connection, |conn| queue_capture_sync(conn, &request))
+            with_connection(&connection, |conn| {
+                queue_capture_sync(conn, &request, &context)
+            })
         })
         .await
         .context("join offline capture queue")?
@@ -257,9 +281,10 @@ fn with_connection<T>(
 fn queue_capture_sync(
     conn: &Connection,
     request: &CaptureTaskRequest,
+    context: &mem_store::events::MutationContext,
 ) -> Result<CaptureTaskResponse> {
     let idempotency_key = mem_curate::ingest::idempotency_key(request);
-    if let Some(existing) = queued_capture_response(conn, &idempotency_key)? {
+    if let Some(existing) = queued_capture_response(conn, &idempotency_key, &request.project)? {
         return Ok(existing);
     }
 
@@ -275,7 +300,13 @@ fn queue_capture_sync(
         offline_queue_id: Some(queue_id),
         offline_message: Some("queued locally; PostgreSQL sync is pending".to_string()),
     };
-    let payload_json = serde_json::to_string(request)?;
+    // A single INSERT is an atomic DuckDB transaction. Keeping both intents in
+    // one row avoids capture-success/activity-loss between separate commits.
+    let payload_json = serde_json::to_string(&QueuedCapture {
+        version: 1,
+        capture: request.clone(),
+        context: context.clone(),
+    })?;
     let response_json = serde_json::to_string(&response)?;
     conn.execute(
         r#"
@@ -301,6 +332,7 @@ fn queue_capture_sync(
 fn queued_capture_response(
     conn: &Connection,
     idempotency_key: &str,
+    project: &str,
 ) -> Result<Option<CaptureTaskResponse>> {
     let mut stmt = conn.prepare(
         r#"
@@ -308,12 +340,13 @@ fn queued_capture_response(
         FROM offline_outbox
         WHERE item_kind = 'capture_task'
           AND idempotency_key = ?1
+          AND project = ?2
           AND status = 'pending'
         ORDER BY created_at ASC
         LIMIT 1
         "#,
     )?;
-    let mut rows = stmt.query(params![idempotency_key])?;
+    let mut rows = stmt.query(params![idempotency_key, project])?;
     let Some(row) = rows.next()? else {
         return Ok(None);
     };
@@ -504,8 +537,9 @@ mod tests {
         let store = OfflineStore::open(path.clone()).await.unwrap();
         let request = capture_request();
 
-        let first = store.queue_capture(&request).await.unwrap();
-        let second = store.queue_capture(&request).await.unwrap();
+        let context = mem_store::events::MutationContext::internal("offline-test");
+        let first = store.queue_capture(&request, &context).await.unwrap();
+        let second = store.queue_capture(&request, &context).await.unwrap();
         let pending = store.pending_response(Some("memory"), 10).await.unwrap();
 
         assert!(first.queued_offline);
@@ -520,6 +554,74 @@ mod tests {
 
         drop(store);
         let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn compound_capture_survives_reopen_and_ambiguous_postgres_acknowledgement() {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let path = temp_db_path("r1-compound-capture");
+        let store = OfflineStore::open(path.clone()).await.unwrap();
+        let mut request = capture_request();
+        request.project = mem_test_support::unique_project_slug("r1-offline");
+        request.idempotency_key = Some(Uuid::new_v4().to_string());
+        let context = mem_store::events::MutationContext {
+            actor_id: Uuid::new_v4().to_string(),
+            actor_name: "Offline reviewer".into(),
+            source: "service".into(),
+            occurred_at: Some(chrono::Utc::now() - chrono::Duration::minutes(5)),
+        };
+        store.queue_capture(&request, &context).await.unwrap();
+        assert_eq!(
+            store.pending_count().await.unwrap(),
+            1,
+            "capture and activity use one durable item"
+        );
+        drop(store);
+        let store = OfflineStore::open(path.clone()).await.unwrap();
+        let batch = store.pending_batch(10).await.unwrap();
+        sync_capture(&pool, &batch[0].payload_json).await.unwrap();
+        // Simulate death after PostgreSQL commit but before local acknowledgement.
+        assert_eq!(store.pending_count().await.unwrap(), 1);
+        let runtime = OfflineRuntime::new(store.clone());
+        sync_offline_batch(&pool, &runtime, 10).await.unwrap();
+        assert_eq!(store.pending_count().await.unwrap(), 0);
+        let project: Uuid = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+            .bind(&request.project)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let page = mem_store::events::page(&pool, project, 0, 10)
+            .await
+            .unwrap();
+        assert_eq!(page.events.len(), 1);
+        assert_eq!(page.events[0]["actor_id"], context.actor_id);
+        let recorded: chrono::DateTime<chrono::Utc> =
+            serde_json::from_value(page.events[0]["recorded_at"].clone()).unwrap();
+        assert_eq!(
+            recorded.timestamp_micros(),
+            context.occurred_at.unwrap().timestamp_micros()
+        );
+        let source = mem_curate::store_capture_as(&pool, &request, &context)
+            .await
+            .unwrap();
+        assert!(source.event.is_none());
+        let details = &page.events[0]["details_json"];
+        assert_eq!(
+            details["session_id"],
+            source.response.session_id.to_string()
+        );
+        assert_eq!(
+            details["raw_capture_id"],
+            source.response.raw_capture_id.to_string()
+        );
+        mem_test_support::cleanup_project(&pool, &request.project)
+            .await
+            .unwrap();
+        drop(runtime);
+        drop(store);
+        fs::remove_file(path).unwrap();
     }
 
     #[tokio::test]

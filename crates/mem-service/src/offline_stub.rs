@@ -64,6 +64,7 @@ impl OfflineStore {
     pub(crate) async fn queue_capture(
         &self,
         _request: &CaptureTaskRequest,
+        _context: &mem_store::events::MutationContext,
     ) -> Result<CaptureTaskResponse> {
         unreachable!("offline store cannot exist without the offline feature")
     }

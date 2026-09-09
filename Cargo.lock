@@ -2896,6 +2896,7 @@ version = "2.0.0"
 dependencies = [
  "chrono",
  "mem-record",
+ "mem-store",
  "mem-test-support",
  "serde",
  "serde_json",
@@ -3113,6 +3114,7 @@ dependencies = [
  "mem-reinforce",
  "mem-search",
  "mem-skills",
+ "mem-store",
  "mem-test-support",
  "mem-watch",
  "openidconnect",

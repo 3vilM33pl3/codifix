@@ -13,50 +13,47 @@ pub(crate) async fn capture_task(
     // agent runtime (claude-cli, codex, watcher), not the identity. The
     // identity is the principal, stamped on the activity event below.
     request.validate().map_err(ApiError::validation)?;
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name.clone(),
+        source: "service".into(),
+        occurred_at: None,
+    };
     if !state.pool_available() {
-        return queue_capture_offline(&state, &request).await.map(Json);
-    }
-    let task_title = request.task_title.clone();
-    let project = request.project.clone();
-    let response = if request.dry_run {
-        preview_capture(&state.pool()?, &request)
+        return queue_capture_offline(&state, &request, &context)
             .await
-            .map_err(ApiError::sql)?
-    } else {
-        match store_capture(&state.pool()?, &request).await {
-            Ok(response) => response,
-            Err(error) if state.offline_store().is_some() => {
+            .map(Json);
+    }
+    if request.dry_run {
+        return preview_capture(&state.pool()?, &request)
+            .await
+            .map(Json)
+            .map_err(ApiError::sql);
+    }
+    let mutation = {
+        match mem_curate::store_capture_as(&state.pool()?, &request, &context).await {
+            Ok(mutation) => mutation,
+            Err(error)
+                if state.offline_store().is_some() && capture_connection_unavailable(&error) =>
+            {
                 tracing::warn!(error = %error, "postgres capture failed; queueing offline");
-                return queue_capture_offline(&state, &request).await.map(Json);
+                return queue_capture_offline(&state, &request, &context)
+                    .await
+                    .map(Json);
             }
             Err(error) => return Err(ApiError::sql(error)),
         }
     };
-    if request.dry_run {
-        return Ok(Json(response));
+    if let Some((event, seq)) = mutation.event {
+        crate::repository::events::broadcast_committed(&state, request.project, event, seq);
     }
-    notify_project_changed_by(
-        &state,
-        &principal,
-        project,
-        None,
-        ActivityKind::CaptureTask,
-        format!("Captured task: {task_title}"),
-        Some(ActivityDetails::CaptureTask {
-            session_id: response.session_id,
-            task_id: response.task_id,
-            raw_capture_id: response.raw_capture_id,
-            idempotency_key: response.idempotency_key.clone(),
-            task_title: Some(task_title.clone()),
-            writer_id: request.writer_id.clone(),
-        }),
-    );
-    Ok(Json(response))
+    Ok(Json(mutation.response))
 }
 
 async fn queue_capture_offline(
     state: &AppState,
     request: &CaptureTaskRequest,
+    context: &mem_store::events::MutationContext,
 ) -> Result<mem_record::CaptureTaskResponse, ApiError> {
     if request.dry_run {
         return Err(ApiError::service_unavailable(
@@ -68,24 +65,25 @@ async fn queue_capture_offline(
             "PostgreSQL is unavailable and offline backup is disabled",
         ));
     };
-    let response = store.queue_capture(request).await.map_err(ApiError::io)?;
-    let details = ActivityDetails::CaptureTask {
-        session_id: response.session_id,
-        task_id: response.task_id,
-        raw_capture_id: response.raw_capture_id,
-        idempotency_key: response.idempotency_key.clone(),
-        task_title: Some(request.task_title.clone()),
-        writer_id: request.writer_id.clone(),
-    };
-    let _ = queue_activity_offline(
-        state,
-        request.project.clone(),
-        ActivityKind::CaptureTask,
-        format!("Captured task: {}", request.task_title),
-        Some(details),
-    )
-    .await?;
-    Ok(response)
+    // One durable item contains both capture and its authenticated activity
+    // intent. PostgreSQL replay generates the activity using persisted IDs.
+    store
+        .queue_capture(request, context)
+        .await
+        .map_err(ApiError::io)
+}
+
+fn capture_connection_unavailable(error: &sqlx::Error) -> bool {
+    match error {
+        sqlx::Error::Io(_)
+        | sqlx::Error::Tls(_)
+        | sqlx::Error::PoolTimedOut
+        | sqlx::Error::PoolClosed => true,
+        sqlx::Error::Database(error) => error
+            .code()
+            .is_some_and(|code| code.starts_with("08") || code == "57P01"),
+        _ => false,
+    }
 }
 
 /// Single ingestion route for typed activity events; the tagged request
