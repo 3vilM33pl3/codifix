@@ -3,6 +3,63 @@
 use crate::prelude::*;
 use crate::*;
 use axum::Extension;
+use mem_store::events::{MutationContext, TimelineEvent};
+
+pub struct WorkspaceMutation {
+    pub record: AgentWorkspaceRecord,
+    pub event: TimelineEvent,
+    pub sequence: i64,
+}
+
+async fn workspace_event(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    record: AgentWorkspaceRecord,
+    action: &str,
+    context: &MutationContext,
+) -> Result<WorkspaceMutation, sqlx::Error> {
+    let project = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+        .bind(&record.project)
+        .fetch_one(&mut **tx)
+        .await?;
+    let mut event = TimelineEvent::new(
+        project,
+        ActivityKind::WorkspaceChanged,
+        format!("Agent workspace {action}: {}", record.id),
+    );
+    context.stamp(&mut event);
+    let sequence = mem_store::events::append(tx, &event)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    Ok(WorkspaceMutation {
+        record,
+        event,
+        sequence,
+    })
+}
+
+fn workspace_context(principal: &AuthenticatedPrincipal) -> MutationContext {
+    MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name.clone(),
+        source: "agent-workspace".into(),
+        occurred_at: None,
+    }
+}
+
+async fn commit_workspace(
+    state: &AppState,
+    tx: sqlx::Transaction<'_, sqlx::Postgres>,
+    mutation: WorkspaceMutation,
+) -> Result<Json<AgentWorkspaceRecord>, ApiError> {
+    tx.commit().await.map_err(ApiError::sql)?;
+    crate::repository::events::broadcast_committed(
+        state,
+        mutation.record.project.clone(),
+        mutation.event,
+        mutation.sequence,
+    );
+    Ok(Json(mutation.record))
+}
 
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct AgentWorkspacesQuery {
@@ -36,50 +93,57 @@ pub(crate) async fn list_agent_workspaces(
 
 pub(crate) async fn start_agent_workspace(
     State(state): State<AppState>,
-    Extension(_principal): Extension<AuthenticatedPrincipal>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
     Json(request): Json<AgentWorkspaceStartRequest>,
 ) -> Result<Json<AgentWorkspaceRecord>, ApiError> {
-    // writer_id labels the agent runtime, not the identity; workspace
-    // activity events (added with the event-log wave) will carry the
-    // principal.
     request.validate().map_err(ApiError::validation)?;
-    let record = upsert_agent_workspace_start(&state.pool()?, &request)
-        .await
-        .map_err(ApiError::sql)?;
-    notify_project_changed_by(
-        &state,
-        &_principal,
-        request.project.clone(),
-        None,
-        ActivityKind::WorkspaceChanged,
-        format!("Agent workspace started: {}", record.id),
-        None,
-    );
-    Ok(Json(record))
+    let pool = state.pool()?;
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let mutation =
+        upsert_agent_workspace_start_tx(&mut tx, &request, &workspace_context(&principal))
+            .await
+            .map_err(ApiError::sql)?;
+    commit_workspace(&state, tx, mutation).await
 }
 
 pub(crate) async fn heartbeat_agent_workspace(
     State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
     Path(workspace_id): Path<Uuid>,
     Json(request): Json<AgentWorkspaceHeartbeatRequest>,
 ) -> Result<Json<AgentWorkspaceRecord>, ApiError> {
-    update_agent_workspace_heartbeat(&state.pool()?, workspace_id, &request)
-        .await
-        .map_err(ApiError::sql)?
-        .ok_or_else(|| ApiError::not_found("agent workspace not found"))
-        .map(Json)
+    let pool = state.pool()?;
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let mutation = update_agent_workspace_heartbeat_tx(
+        &mut tx,
+        workspace_id,
+        &request,
+        &workspace_context(&principal),
+    )
+    .await
+    .map_err(ApiError::sql)?
+    .ok_or_else(|| ApiError::not_found("agent workspace not found"))?;
+    commit_workspace(&state, tx, mutation).await
 }
 
 pub(crate) async fn finish_agent_workspace(
     State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
     Path(workspace_id): Path<Uuid>,
     Json(request): Json<AgentWorkspaceFinishRequest>,
 ) -> Result<Json<AgentWorkspaceRecord>, ApiError> {
-    finish_agent_workspace_record(&state.pool()?, workspace_id, &request)
-        .await
-        .map_err(ApiError::sql)?
-        .ok_or_else(|| ApiError::not_found("agent workspace not found"))
-        .map(Json)
+    let pool = state.pool()?;
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let mutation = finish_agent_workspace_record_tx(
+        &mut tx,
+        workspace_id,
+        &request,
+        &workspace_context(&principal),
+    )
+    .await
+    .map_err(ApiError::sql)?
+    .ok_or_else(|| ApiError::not_found("agent workspace not found"))?;
+    commit_workspace(&state, tx, mutation).await
 }
 
 pub async fn fetch_agent_workspaces(
@@ -125,8 +189,23 @@ pub async fn upsert_agent_workspace_start(
     pool: &PgPool,
     request: &AgentWorkspaceStartRequest,
 ) -> Result<AgentWorkspaceRecord, sqlx::Error> {
-    let project_id =
-        crate::repository::handlers::bundle::upsert_project_slug(pool, &request.project).await?;
+    let mut tx = pool.begin().await?;
+    let mutation = upsert_agent_workspace_start_tx(
+        &mut tx,
+        request,
+        &MutationContext::internal("agent-workspace"),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(mutation.record)
+}
+
+pub async fn upsert_agent_workspace_start_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    request: &AgentWorkspaceStartRequest,
+    context: &MutationContext,
+) -> Result<WorkspaceMutation, sqlx::Error> {
+    let project_id: Uuid = sqlx::query_scalar("INSERT INTO projects(id,slug,name,root_path) VALUES(gen_random_uuid(),$1,$1,$1) ON CONFLICT(slug) DO UPDATE SET name=EXCLUDED.name RETURNING id").bind(&request.project).fetch_one(&mut **tx).await?;
     let workspace_id = Uuid::new_v4();
     let session_key = agent_session_key(request.agent_session_id.as_deref());
     let row = sqlx::query(
@@ -185,12 +264,12 @@ pub async fn upsert_agent_workspace_start(
     .bind(normalize_optional(request.profile.as_deref()))
     .bind(normalize_optional(request.service_endpoint.as_deref()))
     .bind(&request.project)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await?;
 
     let mut workspace = row_to_agent_workspace(row)?;
     annotate_workspace_warnings(std::slice::from_mut(&mut workspace));
-    Ok(workspace)
+    workspace_event(tx, workspace, "started", context).await
 }
 
 pub async fn update_agent_workspace_heartbeat(
@@ -198,6 +277,24 @@ pub async fn update_agent_workspace_heartbeat(
     workspace_id: Uuid,
     request: &AgentWorkspaceHeartbeatRequest,
 ) -> Result<Option<AgentWorkspaceRecord>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let mutation = update_agent_workspace_heartbeat_tx(
+        &mut tx,
+        workspace_id,
+        request,
+        &MutationContext::internal("agent-workspace"),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(mutation.map(|m| m.record))
+}
+
+pub async fn update_agent_workspace_heartbeat_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    workspace_id: Uuid,
+    request: &AgentWorkspaceHeartbeatRequest,
+    context: &MutationContext,
+) -> Result<Option<WorkspaceMutation>, sqlx::Error> {
     let row = sqlx::query(
         r#"
         UPDATE agent_workspaces aw
@@ -222,9 +319,14 @@ pub async fn update_agent_workspace_heartbeat(
     .bind(normalize_optional(request.head_commit.as_deref()))
     .bind(&request.dirty_files)
     .bind(normalize_optional(request.service_endpoint.as_deref()))
-    .fetch_optional(pool)
+    .fetch_optional(&mut **tx)
     .await?;
-    row.map(row_to_agent_workspace).transpose()
+    match row {
+        Some(row) => Ok(Some(
+            workspace_event(tx, row_to_agent_workspace(row)?, "heartbeat", context).await?,
+        )),
+        None => Ok(None),
+    }
 }
 
 pub async fn finish_agent_workspace_record(
@@ -232,6 +334,24 @@ pub async fn finish_agent_workspace_record(
     workspace_id: Uuid,
     request: &AgentWorkspaceFinishRequest,
 ) -> Result<Option<AgentWorkspaceRecord>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let mutation = finish_agent_workspace_record_tx(
+        &mut tx,
+        workspace_id,
+        request,
+        &MutationContext::internal("agent-workspace"),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(mutation.map(|m| m.record))
+}
+
+pub async fn finish_agent_workspace_record_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    workspace_id: Uuid,
+    request: &AgentWorkspaceFinishRequest,
+    context: &MutationContext,
+) -> Result<Option<WorkspaceMutation>, sqlx::Error> {
     let status = request
         .status
         .clone()
@@ -268,9 +388,14 @@ pub async fn finish_agent_workspace_record(
     .bind(normalize_optional(request.finish_summary.as_deref()))
     .bind(request.pushed_branch)
     .bind(normalize_optional(request.merged_commit.as_deref()))
-    .fetch_optional(pool)
+    .fetch_optional(&mut **tx)
     .await?;
-    row.map(row_to_agent_workspace).transpose()
+    match row {
+        Some(row) => Ok(Some(
+            workspace_event(tx, row_to_agent_workspace(row)?, "finished", context).await?,
+        )),
+        None => Ok(None),
+    }
 }
 
 fn row_to_agent_workspace(row: sqlx::postgres::PgRow) -> Result<AgentWorkspaceRecord, sqlx::Error> {

@@ -15,7 +15,7 @@ write-path references before the R1 gate can close.
 | Graph/index/embedding batches | mem-graph, service embedding repository | batch result + operation event | [ ] |
 | Reinforcement and procedural learning | mem-reinforce, service loops | state + dedicated journal/event | [ ] |
 | Project/commit/checkpoint/plan activity | service project/activity repositories | mutation + event | [ ] |
-| Agent workspaces | service agents repository | lifecycle/heartbeat + journal/event | [ ] |
+| Agent workspaces | service agents repository `_tx` APIs and pool wrappers | start/heartbeat/finish + attributed event; implicit project creation and late-event failure rollback tested; only committed HTTP broadcasts | [x] |
 | Loop settings/runs/proposals | mem-loops, service loops | proposal creation + receipt + trace + event coupled; other lifecycle/state transitions still open | [ ] |
 | Token creation/revocation, membership grant/revoke | service auth store | state + protected audit; audit failure rolls back revocation | [x] |
 | Other auth administration/session/token bookkeeping | service auth store/oidc | state + protected audit or explicit operational journal; remaining inventory | [ ] |

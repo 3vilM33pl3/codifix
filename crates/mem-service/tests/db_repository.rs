@@ -12,6 +12,101 @@ use std::{fs, path::Path, path::PathBuf, process::Command};
 use uuid::Uuid;
 
 #[tokio::test]
+async fn workspace_lifecycle_rolls_back_on_event_failure_and_preserves_actor() {
+    use mem_service::repository::handlers::agents::*;
+    use mem_store::events::MutationContext;
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let slug = mem_test_support::unique_project_slug("workspace-atomic");
+    let request: AgentWorkspaceStartRequest = serde_json::from_value(serde_json::json!({
+        "project":slug,"repo_root":"/private-root","worktree_path":"/private-tree","branch":"test",
+        "writer_id":"client-reported-author","task":"private-task-content"
+    }))
+    .unwrap();
+    let context = MutationContext {
+        actor_id: Uuid::new_v4().to_string(),
+        actor_name: "authenticated operator".into(),
+        source: "test".into(),
+        occurred_at: None,
+    };
+    let broken = MutationContext {
+        source: "\0".into(),
+        ..context.clone()
+    };
+    let mut tx = pool.begin().await.unwrap();
+    assert!(
+        upsert_agent_workspace_start_tx(&mut tx, &request, &broken)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM projects WHERE slug=$1)")
+        .bind(&slug)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(!exists, "implicit project creation must also roll back");
+    let mut tx = pool.begin().await.unwrap();
+    let started = upsert_agent_workspace_start_tx(&mut tx, &request, &context)
+        .await
+        .unwrap();
+    assert_eq!(
+        started.event.actor_id.as_deref(),
+        Some(context.actor_id.as_str())
+    );
+    assert_eq!(
+        started.record.writer_id.as_deref(),
+        Some("client-reported-author")
+    );
+    tx.commit().await.unwrap();
+    let heartbeat: mem_record::AgentWorkspaceHeartbeatRequest =
+        serde_json::from_value(serde_json::json!({"head_commit":"new-head"})).unwrap();
+    let finish: AgentWorkspaceFinishRequest =
+        serde_json::from_value(serde_json::json!({"finish_summary":"private-summary"})).unwrap();
+    let mut tx = pool.begin().await.unwrap();
+    assert!(
+        update_agent_workspace_heartbeat_tx(&mut tx, started.record.id, &heartbeat, &broken)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    let mut tx = pool.begin().await.unwrap();
+    assert!(
+        finish_agent_workspace_record_tx(&mut tx, started.record.id, &finish, &broken)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    let records = fetch_agent_workspaces(&pool, &slug, true).await.unwrap();
+    assert_eq!(records.workspaces[0].status, AgentWorkspaceStatus::Active);
+    assert!(records.workspaces[0].head_commit.is_none());
+    update_agent_workspace_heartbeat(&pool, started.record.id, &heartbeat)
+        .await
+        .unwrap();
+    finish_agent_workspace_record(&pool, started.record.id, &finish)
+        .await
+        .unwrap();
+    let events = mem_store::events::page(&pool, started.event.project_id, 0, 100)
+        .await
+        .unwrap();
+    assert_eq!(events.events.len(), 3);
+    let json = serde_json::to_string(&events).unwrap();
+    for private in [
+        "private-root",
+        "private-tree",
+        "private-task-content",
+        "private-summary",
+        "client-reported-author",
+    ] {
+        assert!(!json.contains(private));
+    }
+    mem_test_support::cleanup_project(&pool, &slug)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn agent_workspace_repository_records_and_lists_active_work() {
     let Some(pool) = mem_test_support::migrated_pool().await else {
         return;
