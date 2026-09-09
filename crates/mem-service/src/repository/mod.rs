@@ -653,10 +653,50 @@ async fn fetch_curation_stats(pool: &PgPool, slug: &str) -> Result<CurationStats
     })
 }
 
+pub struct CommitMutation {
+    pub response: CommitSyncResponse,
+    pub event: mem_store::events::TimelineEvent,
+    pub sequence: i64,
+}
+
 pub async fn sync_project_commits(
     pool: &PgPool,
     request: &CommitSyncRequest,
 ) -> Result<CommitSyncResponse, sqlx::Error> {
+    if request.dry_run {
+        return preview_project_commit_sync(pool, request).await;
+    }
+    Ok(sync_project_commits_as(
+        pool,
+        request,
+        &mem_store::events::MutationContext::internal("commit-sync"),
+    )
+    .await?
+    .response)
+}
+
+pub async fn sync_project_commits_as(
+    pool: &PgPool,
+    request: &CommitSyncRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<CommitMutation, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let result = sync_project_commits_tx(&mut tx, request, context).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+pub async fn sync_project_commits_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    request: &CommitSyncRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<CommitMutation, sqlx::Error> {
+    request
+        .validate()
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    if request.dry_run {
+        return Err(sqlx::Error::Protocol("use the commit preview".into()));
+    }
     let project_row = sqlx::query(
         r#"
         INSERT INTO projects (id, slug, name, root_path)
@@ -667,7 +707,7 @@ pub async fn sync_project_commits(
     )
     .bind(&request.project)
     .bind(&request.repo_root)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await?;
     let project_id: Uuid = project_row.try_get("id")?;
 
@@ -728,7 +768,7 @@ pub async fn sync_project_commits(
         .bind(commit.committed_at)
         .bind(&commit.parent_hashes)
         .bind(&commit.changed_paths)
-        .fetch_one(pool)
+        .fetch_one(&mut **tx)
         .await?;
         let inserted: bool = row.try_get("inserted")?;
         if inserted {
@@ -749,7 +789,7 @@ pub async fn sync_project_commits(
         .min_by_key(|commit| commit.committed_at)
         .map(|commit| commit.hash.clone());
 
-    Ok(CommitSyncResponse {
+    let response = CommitSyncResponse {
         project_id,
         imported_count,
         updated_count,
@@ -757,6 +797,30 @@ pub async fn sync_project_commits(
         newest_commit,
         oldest_commit,
         dry_run: false,
+    };
+    let mut event = mem_store::events::TimelineEvent::new(
+        project_id,
+        mem_record::ActivityKind::CommitSync,
+        format!(
+            "Synced {} commits: {} imported, {} updated",
+            response.total_received, response.imported_count, response.updated_count
+        ),
+    );
+    event.details = Some(mem_record::ActivityDetails::CommitSync {
+        imported_count: response.imported_count,
+        updated_count: response.updated_count,
+        total_received: response.total_received,
+        newest_commit: response.newest_commit.clone(),
+        oldest_commit: response.oldest_commit.clone(),
+    });
+    context.stamp(&mut event);
+    let sequence = mem_store::events::append(tx, &event)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    Ok(CommitMutation {
+        response,
+        event,
+        sequence,
     })
 }
 

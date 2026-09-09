@@ -12,6 +12,82 @@ use std::{fs, path::Path, path::PathBuf, process::Command};
 use uuid::Uuid;
 
 #[tokio::test]
+async fn commit_sync_couples_project_commits_and_attributed_event() -> anyhow::Result<()> {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return Ok(());
+    };
+    let project = mem_test_support::unique_project_slug("commit-sync-atomic");
+    let request: mem_record::CommitSyncRequest = serde_json::from_value(serde_json::json!({
+        "project":project,"repo_root":"/private-repo","commits":[{"hash":"abc","short_hash":"abc","subject":"change","body":"private commit body","author_name":"git author","author_email":"author@example.test","committed_at":chrono::Utc::now(),"parent_hashes":[],"changed_paths":[]}]
+    }))?;
+    let context = mem_store::events::MutationContext {
+        actor_id: Uuid::new_v4().to_string(),
+        actor_name: "authenticated operator".into(),
+        source: "test".into(),
+        occurred_at: None,
+    };
+    let broken = mem_store::events::MutationContext {
+        source: "\0".into(),
+        ..context.clone()
+    };
+    assert!(
+        mem_service::repository::sync_project_commits_as(&pool, &request, &broken)
+            .await
+            .is_err()
+    );
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM projects WHERE slug=$1)")
+        .bind(&project)
+        .fetch_one(&pool)
+        .await?;
+    assert!(!exists);
+    let result =
+        mem_service::repository::sync_project_commits_as(&pool, &request, &context).await?;
+    assert_eq!(result.response.imported_count, 1);
+    let repeated = mem_service::repository::sync_project_commits(&pool, &request).await?;
+    assert_eq!(repeated.imported_count, 0);
+    assert_eq!(repeated.updated_count, 1);
+    let page = mem_store::events::page(&pool, result.response.project_id, 0, 100).await?;
+    assert_eq!(page.events.len(), 2);
+    assert_eq!(page.events[0]["actor_id"], context.actor_id);
+    let json = serde_json::to_string(&page)?;
+    assert!(!json.contains("private commit body"));
+    assert!(!json.contains("author@example.test"));
+    let mut update = request.clone();
+    update.repo_root = "/changed-root".into();
+    update.commits.push(update.commits[0].clone());
+    update.commits[1].hash = "def".into();
+    update.commits[1].subject = "\0".into();
+    assert!(
+        mem_service::repository::sync_project_commits_as(&pool, &update, &context)
+            .await
+            .is_err()
+    );
+    let root: String = sqlx::query_scalar("SELECT root_path FROM projects WHERE slug=$1")
+        .bind(&project)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(root, request.repo_root);
+    let preview = mem_service::repository::sync_project_commits(
+        &pool,
+        &mem_record::CommitSyncRequest {
+            dry_run: true,
+            ..request
+        },
+    )
+    .await?;
+    assert!(preview.dry_run);
+    assert_eq!(
+        mem_store::events::page(&pool, result.response.project_id, 0, 100)
+            .await?
+            .events
+            .len(),
+        2
+    );
+    mem_test_support::cleanup_project(&pool, &project).await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn workspace_lifecycle_rolls_back_on_event_failure_and_preserves_actor() {
     use mem_service::repository::handlers::agents::*;
     use mem_store::events::MutationContext;

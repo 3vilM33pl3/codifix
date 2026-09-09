@@ -5,40 +5,32 @@ use crate::*;
 
 pub(crate) async fn sync_commits(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<CommitSyncRequest>,
 ) -> Result<Json<CommitSyncResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
-    let project = request.project.clone();
-    let response = if request.dry_run {
-        preview_project_commit_sync(&state.pool()?, &request)
-            .await
-            .map_err(ApiError::sql)?
-    } else {
-        sync_project_commits(&state.pool()?, &request)
-            .await
-            .map_err(ApiError::sql)?
-    };
     if request.dry_run {
-        return Ok(Json(response));
+        return preview_project_commit_sync(&state.pool()?, &request)
+            .await
+            .map(Json)
+            .map_err(ApiError::sql);
     }
-    notify_project_changed(
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "commit-sync".into(),
+        occurred_at: None,
+    };
+    let mutation = crate::repository::sync_project_commits_as(&state.pool()?, &request, &context)
+        .await
+        .map_err(ApiError::sql)?;
+    crate::repository::events::broadcast_committed(
         &state,
-        project,
-        None,
-        ActivityKind::CommitSync,
-        format!(
-            "Synced {} commit(s): {} imported, {} updated.",
-            response.total_received, response.imported_count, response.updated_count
-        ),
-        Some(ActivityDetails::CommitSync {
-            imported_count: response.imported_count,
-            updated_count: response.updated_count,
-            total_received: response.total_received,
-            newest_commit: response.newest_commit.clone(),
-            oldest_commit: response.oldest_commit.clone(),
-        }),
+        request.project,
+        mutation.event,
+        mutation.sequence,
     );
-    Ok(Json(response))
+    Ok(Json(mutation.response))
 }
 
 #[derive(Debug, Default, Deserialize)]
