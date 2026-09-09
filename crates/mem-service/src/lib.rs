@@ -4,6 +4,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 mod auth;
+mod background;
 mod consolidate;
 mod error;
 pub mod federation;

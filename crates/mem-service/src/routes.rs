@@ -50,6 +50,15 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
     let web_assets = state.web_root.clone();
     let mcp_config = state.config.mcp.clone();
     let mut app = Router::new()
+        .route("/v1/projects/{slug}/jobs", get(crate::handlers::jobs::list))
+        .route(
+            "/v1/projects/{slug}/jobs/{id}",
+            get(crate::handlers::jobs::detail),
+        )
+        .route(
+            "/v1/projects/{slug}/jobs/{id}/retry",
+            post(crate::handlers::jobs::retry),
+        )
         .route("/healthz", get(healthz))
         .route("/v1/openapi.yaml", get(openapi_spec))
         .route("/ws", get(websocket))

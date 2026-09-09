@@ -7,7 +7,7 @@ write-path references before the R1 gate can close.
 | Operation family | Existing ownership | Required durable boundary | Verified |
 | --- | --- | --- | --- |
 | Capture | mem-curate `store_capture_tx`/`store_capture_as` | session/task/capture + attributed event, replay identity and failure rollback | [x] |
-| Curation | mem-curate `curate_tx`/`curate_as` | run/memories/automatic replacements + events coupled; durable enrichment intent still unwired | [ ] |
+| Curation | mem-curate `curate_tx_with_actor`/`curate_as` | run/memories/automatic replacements + events + version-pinned durable enrichment intents; late-event failure rollback tested | [x] |
 | Replacement/validation versions and relations | mem-curate, mem-reinforce | revision/state/edges + event | [ ] |
 | Archive/delete/retention | service memory repository | state/deletion + surviving subject event | [ ] |
 | Provenance checks | service provenance repository | check transition + event | [ ] |
@@ -36,10 +36,27 @@ They must not recursively enqueue jobs or copy private inputs into activity.
   notification callers have not yet been converted.
 - 0040: immutable work keys, dependency edges, project slots, bounded attempts,
   retry receipts and fenced result transactions. Store tests cover lease loss,
-  competing claims, rollback, retry/block and dedup. No service worker consumes
-  these jobs yet; the old in-memory post-curation queue still runs.
+  competing claims, rollback, retry/block and dedup. The service now consumes
+  these jobs through `background.rs`; the in-memory queue has been removed.
 - Broad R1 validation and user interface work remain open. The master R1
   checkbox must remain unchecked until the entire scoped contract passes.
+
+### Connected worker and operator backend (2026-09-10)
+
+Migrations 0042–0044 pin curation versions, retain private provider outputs and
+synthesis inputs, journal budget reservations and fence concurrent version
+insertion. The worker runs independent validation checks, embedding-dependent
+semantic work and coalesced consolidation with durable synthesis children.
+Credential, membership and internal-automation policy checks run inside fenced
+result transactions. HTTP jobs endpoints provide bounded project-only listings,
+attempts, stage dependencies and request-ID retry receipts.
+
+Required-database tests exercise fake-provider transient recovery, shutdown
+during provider execution, expired-lease recovery and revoked credentials before
+execution. HTTP tests cover pagination, sanitized details, cross-project denial,
+read-only mode and idempotent retry. Full R1 fault coverage remains open,
+especially source/policy races, synthesis partial delivery, reconnect and the
+remaining mutation families. This evidence does not complete R1.
 
 ### Prepared embedding results (2026-09-09)
 

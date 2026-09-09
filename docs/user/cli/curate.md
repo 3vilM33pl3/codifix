@@ -4,8 +4,10 @@
 
 Curation commits its run and automatic-replacement activity with the memory
 changes. Success does not mean that asynchronous embedding, semantic dedup or
-consolidation has finished. The R1 durable-job store is being integrated; the
-existing post-curation worker is still process-local and is not yet restart-safe.
+consolidation has finished. Version-pinned background job intents commit in the
+same transaction. The service polls PostgreSQL and recovers unfinished leases
+after restart. Inspect progress with `memory jobs --project memory`; blocked or
+failed stages require the documented operator retry workflow.
 
 Use it when captures already exist and you want to process them into durable memory.
 

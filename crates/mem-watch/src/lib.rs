@@ -1058,6 +1058,7 @@ mod tests {
 
     fn test_app_config() -> AppConfig {
         AppConfig {
+            background_work: Default::default(),
             service: mem_config::ServiceConfig {
                 bind_addr: "127.0.0.1:4040".to_string(),
                 web_root: None,

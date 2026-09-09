@@ -42,6 +42,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let shutdown_handle = Arc::new(Mutex::new(Some(shutdown_tx)));
         let state = build_state(config.clone(), shutdown_handle.clone()).await?;
+        let _background_tasks = crate::background::start(state.clone());
         let _federation_tasks = federation::start(
             state.clone(),
             std::env::var_os("MEMORY_LAYER_FEDERATION_CONFIG").map(PathBuf::from),
@@ -145,6 +146,10 @@ pub(crate) async fn build_state(
     config: AppConfig,
     shutdown: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 ) -> Result<AppState> {
+    config
+        .background_work
+        .validate()
+        .map_err(anyhow::Error::msg)?;
     let http_client = reqwest::Client::builder()
         .timeout(config.service.request_timeout)
         .build()
@@ -199,7 +204,7 @@ pub(crate) async fn build_state(
             status: "idle".to_string(),
             ..ProvenanceRuntimeState::default()
         })),
-        post_curation: PostCurationRuntime::default(),
+        background: crate::background::Runtime::default(),
         federation: Default::default(),
         reinforcement: reinforcement.as_ref().map(|(runtime, _)| runtime.clone()),
         cluster: ClusterRuntime {

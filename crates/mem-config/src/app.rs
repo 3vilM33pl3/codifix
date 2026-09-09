@@ -40,6 +40,8 @@ pub struct TelemetryConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    #[serde(default)]
+    pub background_work: crate::pipeline::BackgroundWorkConfig,
     pub service: ServiceConfig,
     #[serde(default)]
     pub auth: AuthConfig,

@@ -27,6 +27,55 @@ use uuid::Uuid;
 use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct BackgroundWorkConfig {
+    pub enabled: bool,
+    pub internal_automation: bool,
+    pub concurrent_projects: usize,
+    pub poll_seconds: u64,
+    pub lease_seconds: u32,
+    pub renewal_seconds: u64,
+    pub max_attempts: u32,
+    pub initial_delay_seconds: u32,
+    pub max_delay_seconds: u32,
+}
+
+impl Default for BackgroundWorkConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            internal_automation: true,
+            concurrent_projects: 2,
+            poll_seconds: 2,
+            lease_seconds: 120,
+            renewal_seconds: 30,
+            max_attempts: 5,
+            initial_delay_seconds: 10,
+            max_delay_seconds: 600,
+        }
+    }
+}
+impl BackgroundWorkConfig {
+    pub fn validate(&self) -> Result<(), String> {
+        if !(1..=16).contains(&self.concurrent_projects)
+            || !(1..=60).contains(&self.poll_seconds)
+            || !(4..=3600).contains(&self.lease_seconds)
+            || self.renewal_seconds == 0
+            || self.renewal_seconds.saturating_mul(2) >= u64::from(self.lease_seconds)
+            || !(1..=20).contains(&self.max_attempts)
+            || self.initial_delay_seconds == 0
+            || self.initial_delay_seconds > self.max_delay_seconds
+            || self.max_delay_seconds > 86400
+        {
+            return Err(
+                "invalid background_work polling, concurrency, lease or retry bounds".into(),
+            );
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomationConfig {
     #[serde(default)]
     pub enabled: bool,

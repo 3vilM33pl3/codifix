@@ -457,6 +457,113 @@ pub(crate) async fn federation_local_access(
     })
 }
 
+/// Current local job authority, locked through the result commit. No transport
+/// or federation capability mapping. Revocation waits for an already-authorized
+/// committing result, and all later results see the revoked state.
+pub(crate) async fn background_permissions(
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    actor: &mem_store::jobs::JobActor,
+    project: Uuid,
+) -> Result<PermissionSet, ApiError> {
+    use mem_store::jobs::JobActor;
+    if state.config.service.read_only {
+        return Err(ApiError::forbidden(
+            "background writes disabled in read-only mode",
+        ));
+    }
+    let (principal, token, session) = match actor {
+        JobActor::System(name)
+            if name == "local-curation" && state.config.background_work.internal_automation =>
+        {
+            return Ok(AuthRole::Operator.permissions());
+        }
+        JobActor::System(_) => {
+            return Err(ApiError::forbidden("internal job identity is not enabled"));
+        }
+        JobActor::Principal(id) => (*id, None, None),
+        JobActor::Credential {
+            principal,
+            token,
+            session,
+        } => (*principal, *token, *session),
+    };
+    let row =
+        sqlx::query("SELECT * FROM auth_principals WHERE id=$1 AND disabled_at IS NULL FOR SHARE")
+            .bind(principal)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(ApiError::sql)?
+            .ok_or_else(|| ApiError::forbidden("job principal is disabled or missing"))?;
+    let memberships = sqlx::query(
+        "SELECT role,permissions_json FROM auth_project_memberships WHERE principal_id=$1 AND project_id=$2 FOR SHARE",
+    )
+    .bind(principal)
+    .bind(project)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(ApiError::sql)?;
+    if let Some(token) = token {
+        let live = sqlx::query("SELECT id FROM auth_service_tokens WHERE id=$1 AND principal_id=$2 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>clock_timestamp()) FOR SHARE")
+            .bind(token).bind(principal).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?;
+        if live.is_none() {
+            return Err(ApiError::forbidden("job token revoked or expired"));
+        }
+    }
+    if let Some(session) = session {
+        let live = sqlx::query("SELECT id FROM auth_web_sessions WHERE id=$1 AND principal_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR SHARE")
+            .bind(session).bind(principal).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?;
+        if live.is_none() {
+            return Err(ApiError::forbidden("job session revoked or expired"));
+        }
+    }
+    let slug: String = sqlx::query_scalar("SELECT slug FROM projects WHERE id=$1")
+        .bind(project)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(ApiError::sql)?;
+    let global = if row.try_get::<String, _>("kind").map_err(ApiError::sql)? == "human_oidc" {
+        None
+    } else {
+        row.try_get::<Option<String>, _>("global_role")
+            .map_err(ApiError::sql)?
+            .as_deref()
+            .and_then(parse_role)
+    };
+    let mut permissions = permission_set_override(
+        row.try_get("global_permissions_json")
+            .map_err(ApiError::sql)?,
+    )?
+    .unwrap_or_else(|| {
+        global
+            .map(AuthRole::permissions)
+            .unwrap_or(PermissionSet::EMPTY)
+    });
+    for membership in memberships {
+        let role: String = membership.try_get("role").map_err(ApiError::sql)?;
+        let role = parse_role(&role).ok_or_else(|| ApiError::internal("invalid project role"))?;
+        permissions = permissions.union(
+            permission_set_override(
+                membership
+                    .try_get("permissions_json")
+                    .map_err(ApiError::sql)?,
+            )?
+            .unwrap_or_else(|| role.permissions()),
+        );
+    }
+    let groups: Vec<String> =
+        serde_json::from_value(row.try_get("groups_json").map_err(ApiError::sql)?)
+            .map_err(|_| ApiError::internal("invalid principal groups"))?;
+    for rule in &state.config.auth.group_mappings.rules {
+        if groups.contains(&rule.group)
+            && (rule.global || rule.project.as_deref() == Some(slug.as_str()))
+        {
+            permissions = permissions.union(rule.role.permissions());
+        }
+    }
+    Ok(permissions)
+}
+
 async fn load_memberships(
     pool: &PgPool,
     principal_id: Uuid,

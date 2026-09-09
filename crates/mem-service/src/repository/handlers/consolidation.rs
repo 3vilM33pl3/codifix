@@ -28,6 +28,7 @@ const DEFAULT_HALF_LIFE_SECS: f64 = 30.0 * 86_400.0;
 /// One active memory considered for clustering.
 #[derive(Debug, Clone)]
 struct MemoryRow {
+    version_id: Uuid,
     canonical_id: Uuid,
     summary: String,
     canonical_text: String,
@@ -48,6 +49,8 @@ struct ConsolidationInputs {
 /// A member of an accepted cluster, carried into synthesis.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ClusterMember {
+    #[serde(default)]
+    pub version_id: Uuid,
     pub canonical_id: Uuid,
     pub summary: String,
     pub canonical_text: String,
@@ -210,6 +213,7 @@ pub(crate) async fn run_memory_consolidation(
             .iter()
             .filter_map(|id| by_id.get(id))
             .map(|m| ClusterMember {
+                version_id: m.version_id,
                 canonical_id: m.canonical_id,
                 summary: m.summary.clone(),
                 canonical_text: m.canonical_text.clone(),
@@ -304,6 +308,7 @@ async fn fetch_active_memories(
     let rows = sqlx::query(
         r#"
         SELECT
+            m.id AS version_id,
             m.canonical_id,
             m.summary,
             m.canonical_text,
@@ -339,6 +344,7 @@ async fn fetch_active_memories(
     rows.into_iter()
         .map(|row| {
             Ok(MemoryRow {
+                version_id: row.try_get("version_id")?,
                 canonical_id: row.try_get("canonical_id")?,
                 summary: row.try_get("summary")?,
                 canonical_text: row.try_get("canonical_text")?,

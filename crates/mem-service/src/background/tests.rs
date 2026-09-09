@@ -1,0 +1,373 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+use super::*;
+use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
+use mem_record::JobStatus;
+use std::sync::{Mutex, atomic::AtomicUsize};
+
+#[derive(Clone)]
+struct Fake {
+    calls: Arc<AtomicUsize>,
+    mode: usize,
+}
+async fn embed(State(fake): State<Fake>, Json(body): Json<Value>) -> (StatusCode, Json<Value>) {
+    let call = fake.calls.fetch_add(1, Ordering::SeqCst);
+    if fake.mode == 1 && call == 0 {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"error":"synthetic unavailable"})),
+        );
+    }
+    if fake.mode == 2 && call == 0 {
+        tokio::time::sleep(Duration::from_secs(8)).await;
+    }
+    let n = body["input"].as_array().map_or(1, Vec::len);
+    (
+        StatusCode::OK,
+        Json(
+            serde_json::json!({"data":(0..n).map(|i|serde_json::json!({"index":i,"embedding":[0.25,0.75]})).collect::<Vec<_>>()}),
+        ),
+    )
+}
+
+struct Fixture {
+    state: AppState,
+    pool: PgPool,
+    project: Uuid,
+    slug: String,
+    operation: Uuid,
+    versions: Vec<Uuid>,
+    fake: Fake,
+    server: JoinHandle<()>,
+}
+impl Fixture {
+    async fn new(mode: usize) -> Option<Self> {
+        let pool = mem_test_support::migrated_pool().await?;
+        let project = Uuid::new_v4();
+        let slug = project.to_string();
+        let operation = Uuid::new_v4();
+        let version = Uuid::new_v4();
+        sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,'background fixture','/disposable')").bind(project).bind(&slug).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,false,'Durable input.','Durable input','implementation','project',3,0.9,now(),now(),to_tsvector('english','durable'))")
+            .bind(version).bind(project).execute(&pool).await.unwrap();
+        let fake = Fake {
+            calls: Arc::new(AtomicUsize::new(0)),
+            mode,
+        };
+        let app = Router::new()
+            .route("/v1/embeddings", post(embed))
+            .with_state(fake.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let config=serde_json::from_value(serde_json::json!({
+            "service":{"bind_addr":"127.0.0.1:0","api_token":"fixture-only"},
+            "database":{"url":std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()},
+            "offline":{"enabled":false},"cluster":{"enabled":false},"reinforcement":{"enabled":false},"consolidation":{"enabled":false},
+            "embeddings":{"create_enabled":true,"backends":[{"name":"fixture","provider":"ollama","base_url":format!("http://{addr}/v1"),"model":"fixture","create_enabled":true}]},
+            "background_work":{"poll_seconds":1,"lease_seconds":4,"renewal_seconds":1,"initial_delay_seconds":1,"max_delay_seconds":2,"max_attempts":2},
+            "mcp":{"enabled":false}
+        })).unwrap();
+        let state = crate::runtime::build_state(config, Arc::new(Mutex::new(None)))
+            .await
+            .unwrap();
+        Some(Self {
+            state,
+            pool,
+            project,
+            slug,
+            operation,
+            versions: vec![version],
+            fake,
+            server,
+        })
+    }
+    async fn enqueue(&self, actor: JobActor) -> Uuid {
+        let mut tx = self.pool.begin().await.unwrap();
+        let work = mem_store::post_curation::enqueue(
+            &mut tx,
+            self.project,
+            self.operation,
+            &self.versions,
+            &actor,
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        work.job_ids[0]
+    }
+    async fn wait(&self, id: Uuid, status: JobStatus) -> mem_record::JobDetail {
+        tokio::time::timeout(Duration::from_secs(20), async {
+            loop {
+                let detail = jobs::detail(&self.pool, self.project, id).await.unwrap();
+                if detail.job.status == status {
+                    return detail;
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .expect("worker did not reach expected status")
+    }
+    async fn cleanup(self) {
+        self.server.abort();
+        mem_test_support::cleanup_project(&self.pool, &self.slug)
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn worker_retries_provider_failure_and_completes_independent_stages() {
+    let Some(f) = Fixture::new(1).await else {
+        return;
+    };
+    let id = f.enqueue(JobActor::System("local-curation".into())).await;
+    let workers = start(f.state.clone()).unwrap();
+    let done = f.wait(id, JobStatus::Succeeded).await;
+    assert_eq!(done.job.attempts, 2);
+    assert_eq!(f.fake.calls.load(Ordering::SeqCst), 2);
+    assert!(
+        done.history
+            .iter()
+            .any(|attempt| attempt.failure == Some(Code::Transient))
+    );
+    let validation = Uuid::new_v5(&f.operation, b"validation_due");
+    assert_eq!(
+        f.wait(validation, JobStatus::Skipped).await.job.reason,
+        Some(JobReason::Disabled)
+    );
+    f.wait(
+        Uuid::new_v5(&f.operation, b"semantic_dedup"),
+        JobStatus::Succeeded,
+    )
+    .await;
+    f.wait(
+        Uuid::new_v5(&f.operation, b"consolidation"),
+        JobStatus::Skipped,
+    )
+    .await;
+    let count: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM background_job_outputs WHERE job_id=$1")
+            .bind(id)
+            .fetch_one(&f.pool)
+            .await
+            .unwrap();
+    assert_eq!(count, 1);
+    drop(workers);
+    f.cleanup().await;
+}
+
+#[tokio::test]
+async fn shutdown_cancels_owned_work_and_a_new_worker_recovers_lease() {
+    let Some(f) = Fixture::new(2).await else {
+        return;
+    };
+    let id = f.enqueue(JobActor::System("local-curation".into())).await;
+    let workers = start(f.state.clone()).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while f.fake.calls.load(Ordering::SeqCst) == 0 {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    drop(workers);
+    // A fresh supervisor recovers by database polling, without an enqueue notification.
+    let replacement = start(f.state.clone()).unwrap();
+    let done = f.wait(id, JobStatus::Succeeded).await;
+    assert_eq!(done.job.attempts, 2);
+    assert!(
+        done.history
+            .iter()
+            .any(|a| a.failure == Some(Code::LeaseLost) && a.uncertain)
+    );
+    assert_eq!(f.fake.calls.load(Ordering::SeqCst), 2);
+    drop(replacement);
+    f.cleanup().await;
+}
+
+#[tokio::test]
+async fn revoked_credential_blocks_worker_before_provider_call() {
+    let Some(f) = Fixture::new(0).await else {
+        return;
+    };
+    let principal = Uuid::new_v4();
+    let token = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_principals(id,kind,display_name,global_role) VALUES($1,'internal','fixture','operator')").bind(principal).execute(&f.pool).await.unwrap();
+    sqlx::query("INSERT INTO auth_service_tokens(id,principal_id,name,token_hash,token_prefix,revoked_at) VALUES($1,$2,'fixture',$3,'fixture',now())")
+        .bind(token).bind(principal).bind(token.as_bytes().as_slice()).execute(&f.pool).await.unwrap();
+    let id = f
+        .enqueue(JobActor::Credential {
+            principal,
+            token: Some(token),
+            session: None,
+        })
+        .await;
+    let workers = start(f.state.clone()).unwrap();
+    let done = f.wait(id, JobStatus::Blocked).await;
+    assert_eq!(done.job.last_failure, Some(Code::Authorization));
+    assert_eq!(f.fake.calls.load(Ordering::SeqCst), 0);
+    drop(workers);
+    sqlx::query("DELETE FROM auth_principals WHERE id=$1")
+        .bind(principal)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    f.cleanup().await;
+}
+
+#[test]
+fn provider_classification_is_bounded_and_never_exposes_body() {
+    for (message, code) in [
+        ("429 insufficient_quota secret body", Code::Quota),
+        ("429 rate limit", Code::RateLimited),
+        ("401 invalid key", Code::Credentials),
+        ("403 forbidden", Code::Authorization),
+        ("503 unavailable", Code::Transient),
+        ("unexpected format", Code::Configuration),
+    ] {
+        assert_eq!(classify(&anyhow::anyhow!(message)), code);
+    }
+}
+
+#[tokio::test]
+async fn jobs_http_inspection_retry_and_project_policy_are_real_and_sanitized() {
+    let Some(mut f) = Fixture::new(0).await else {
+        return;
+    };
+    let id = f.enqueue(JobActor::System("local-curation".into())).await;
+    let principal = Uuid::new_v4();
+    let token = Uuid::new_v4().to_string();
+    sqlx::query("INSERT INTO auth_principals(id,kind,display_name) VALUES($1,'service_token','job operator')").bind(principal).execute(&f.pool).await.unwrap();
+    sqlx::query("INSERT INTO auth_project_memberships(id,principal_id,project_id,role) VALUES($1,$2,$3,'operator')").bind(Uuid::new_v4()).bind(principal).bind(f.project).execute(&f.pool).await.unwrap();
+    sqlx::query("INSERT INTO auth_service_tokens(id,principal_id,name,token_hash,token_prefix) VALUES($1,$2,'fixture',$3,'fixture')")
+        .bind(Uuid::new_v4()).bind(principal).bind(crate::auth::hash_secret(&token)).execute(&f.pool).await.unwrap();
+    f.state.config.auth.mode = mem_record::AuthMode::MultiUser;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}/v1/projects", listener.local_addr().unwrap());
+    let app = crate::routes::build_http_app(f.state.clone());
+    let server = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+    let client = reqwest::Client::new();
+    let url = format!("{base}/{}/jobs", f.slug);
+    let page: Value = client
+        .get(format!("{url}?limit=1"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(page["jobs"].as_array().unwrap().len(), 1);
+    assert!(page["next_after"].is_string());
+    assert_eq!(page["stats"]["queued"], 4);
+    let detail = client
+        .get(format!("{url}/{id}"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(!detail.contains("Durable input"));
+    assert!(!detail.contains("config_fingerprint"));
+    assert!(!detail.contains("cluster_snapshot"));
+    let detail: Value = serde_json::from_str(&detail).unwrap();
+    assert_eq!(detail["stages"].as_array().unwrap().len(), 4);
+    assert_eq!(
+        client
+            .get(format!("{base}/another-project/jobs"))
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    sqlx::query("UPDATE background_jobs SET status='blocked',last_failure='quota' WHERE id=$1")
+        .bind(id)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    let request = serde_json::json!({"request_id":Uuid::new_v4()});
+    for _ in 0..2 {
+        let response = client
+            .post(format!("{url}/{id}/retry"))
+            .bearer_auth(&token)
+            .json(&request)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::OK,
+            "{}",
+            response.text().await.unwrap()
+        );
+    }
+    assert_eq!(
+        jobs::detail(&f.pool, f.project, id)
+            .await
+            .unwrap()
+            .job
+            .generation,
+        2
+    );
+    assert_eq!(
+        client
+            .post(format!("{url}/{id}/retry"))
+            .bearer_auth(&token)
+            .json(&serde_json::json!({"request_id":Uuid::new_v4()}))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::CONFLICT
+    );
+    server.abort();
+    f.state.config.service.read_only = true;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let app = crate::routes::build_http_app(f.state.clone());
+    let readonly = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+    assert_eq!(
+        client
+            .post(format!(
+                "http://{address}/v1/projects/{}/jobs/{id}/retry",
+                f.slug
+            ))
+            .bearer_auth(&token)
+            .json(&request)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    readonly.abort();
+    sqlx::query("DELETE FROM auth_principals WHERE id=$1")
+        .bind(principal)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    f.cleanup().await;
+}

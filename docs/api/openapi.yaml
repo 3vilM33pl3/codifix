@@ -27,6 +27,88 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/projects/{slug}/jobs:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listProjectJobs
+      summary: Bounded project job inspection, safe failures and queue health.
+      x-stability: internal
+      parameters:
+        - { name: after, in: query, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/JobStatus' } }
+      responses:
+        '200':
+          description: Project-scoped page. No private stage inputs or provider bodies.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobs, next_after, stats, worker]
+                properties:
+                  jobs: { type: array, items: { $ref: '#/components/schemas/JobSummary' } }
+                  next_after: { type: [string, 'null'], format: uuid }
+                  stats: { type: object, description: Project-only queue depth, running/retry/blocked/failed counts and oldest ready age in seconds. }
+                  worker: { type: object, description: Worker enablement and last poll Unix timestamp, or null before polling. }
+        '403': { description: Project access denied. }
+        '400': { description: Invalid pagination or filter. }
+  /v1/projects/{slug}/jobs/{id}:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getProjectJob
+      summary: Inspect dependencies and bounded attempt history.
+      x-stability: internal
+      responses:
+        '200':
+          description: Sanitized job detail; history is newest-first with explicit truncation.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job, dependencies, history, history_truncated]
+                properties:
+                  job: { $ref: '#/components/schemas/JobSummary' }
+                  dependencies: { type: array, items: { type: string, format: uuid } }
+                  history: { type: array, maxItems: 200, items: { type: object } }
+                  history_truncated: { type: boolean }
+        '403': { description: Project access denied. }
+        '404': { description: No such job in this project. }
+  /v1/projects/{slug}/jobs/{id}/retry:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: retryProjectJob
+      summary: Explicit idempotent retry retaining inputs, completed stages and history.
+      description: Requires loops_run, memory_curate and current original execution authority. Browser sessions require CSRF. Denied in read-only mode. Running and successful jobs cannot restart.
+      x-stability: internal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [request_id]
+              properties:
+                request_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Retry generation opened, or original receipt replayed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request_id, job_id, generation]
+                properties:
+                  request_id: { type: string, format: uuid }
+                  job_id: { type: string, format: uuid }
+                  generation: { type: integer }
+        '403': { description: Permission, CSRF or read-only denial. }
+        '409': { description: Ineligible job state or request ID conflict. }
   /v1/openapi.yaml:
     get:
       operationId: get_v1_openapi_yaml
@@ -1994,6 +2076,25 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    JobStatus:
+      type: string
+      enum: [queued, running, retry_wait, blocked, failed, succeeded, skipped]
+    JobSummary:
+      type: object
+      required: [id, project_id, operation_id, kind, status, generation, attempts, created_at, available_at, lease_until, last_failure]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        operation_id: { type: string, format: uuid }
+        kind: { type: string, enum: [embedding, semantic_dedup, validation_due, consolidation, consolidation_synthesis] }
+        status: { $ref: '#/components/schemas/JobStatus' }
+        generation: { type: integer }
+        attempts: { type: integer }
+        created_at: { type: string, format: date-time }
+        available_at: { type: string, format: date-time }
+        lease_until: { type: [string, 'null'], format: date-time }
+        last_failure: { type: [string, 'null'], description: Safe enumerated classification, never a raw provider error. }
+        reason: { type: string, enum: [disabled, no_inputs, dependency_skipped, dry_run, utility_floor, coalesced] }
     FederationStream:
       type: object
       additionalProperties: false

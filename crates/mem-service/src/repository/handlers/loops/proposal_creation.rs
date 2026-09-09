@@ -39,6 +39,32 @@ pub async fn create_tx(
     operation: Uuid,
     context: &MutationContext,
 ) -> Result<ProposalMutation> {
+    let pending = prepare_tx(tx, request, operation, context).await?;
+    let event = if let Some(event) = pending.event {
+        let sequence = mem_store::events::append(tx, &event).await?;
+        Some((event, sequence))
+    } else {
+        None
+    };
+    Ok(ProposalMutation {
+        response: pending.response,
+        event,
+    })
+}
+
+pub(crate) struct PendingProposal {
+    pub response: LoopMemoryProposalDecisionResponse,
+    pub event: Option<TimelineEvent>,
+}
+
+/// For batch callers only: append all returned events after all domain writes,
+/// then commit through the owning result fence. Never commit without the events.
+pub(crate) async fn prepare_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &LoopMemoryProposalCreateRequest,
+    operation: Uuid,
+    context: &MutationContext,
+) -> Result<PendingProposal> {
     request.validate()?;
     ensure!(!operation.is_nil(), "nil proposal operation");
     let digest = format!(
@@ -66,7 +92,7 @@ pub async fn create_tx(
         let proposal_id: Uuid = receipt.try_get("proposal_id")?;
         let row = sqlx::query("SELECT mp.*,p.slug AS project FROM memory_proposals mp JOIN projects p ON p.id=mp.project_id WHERE mp.id=$1")
             .bind(proposal_id).fetch_one(&mut **tx).await?;
-        return Ok(ProposalMutation {
+        return Ok(PendingProposal {
             response: LoopMemoryProposalDecisionResponse {
                 proposal: super::row_to_memory_proposal(row).map_err(|e| anyhow::anyhow!(e.message))?,
                 memory_id: None,
@@ -126,13 +152,12 @@ pub async fn create_tx(
     event.id = Uuid::new_v5(&operation, b"proposal-created-event-v1");
     event.operation_id = Some(operation.to_string());
     context.stamp(&mut event);
-    let sequence = mem_store::events::append(tx, &event).await?;
-    Ok(ProposalMutation {
+    Ok(PendingProposal {
         response: LoopMemoryProposalDecisionResponse {
             proposal,
             memory_id: None,
         },
-        event: Some((event, sequence)),
+        event: Some(event),
     })
 }
 

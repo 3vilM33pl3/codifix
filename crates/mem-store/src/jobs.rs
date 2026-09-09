@@ -132,6 +132,10 @@ fn decode<T: serde::de::DeserializeOwned>(row: &PgRow, column: &str) -> Result<T
 
 fn summary(row: &PgRow) -> Result<JobSummary> {
     Ok(JobSummary {
+        reason: row
+            .try_get::<Option<String>, _>("reason")?
+            .map(|s| serde_json::from_value(Value::String(s)))
+            .transpose()?,
         id: row.try_get("id")?,
         project_id: row.try_get("project_id")?,
         operation_id: row.try_get("operation_id")?,
@@ -310,8 +314,11 @@ pub async fn begin_result<'a>(pool: &'a PgPool, lease: &JobLease) -> Result<JobR
 pub async fn renew(pool: &PgPool, lease: &JobLease, policy: JobPolicy) -> Result<()> {
     policy.validate()?;
     let JobResult { mut tx, .. } = begin_result(pool, lease).await?;
-    sqlx::query("UPDATE background_jobs SET lease_until=clock_timestamp()+make_interval(secs=>$2) WHERE id=$1")
-        .bind(lease.job.id).bind(f64::from(policy.lease_seconds)).execute(&mut *tx).await?;
+    let renewed=sqlx::query("UPDATE background_jobs SET lease_until=clock_timestamp()+make_interval(secs=>$2) WHERE id=$1 AND lease_token=$3 AND lease_until>clock_timestamp()")
+        .bind(lease.job.id).bind(f64::from(policy.lease_seconds)).bind(lease.token).execute(&mut *tx).await?.rows_affected();
+    if renewed != 1 {
+        return Err(Error::StaleLease);
+    }
     sqlx::query("UPDATE background_project_slots SET lease_until=(SELECT lease_until FROM background_jobs WHERE id=$2) WHERE project_id=$1")
         .bind(lease.job.project_id).bind(lease.job.id).execute(&mut *tx).await?;
     tx.commit().await?;
@@ -380,14 +387,27 @@ pub async fn retry(
     request: Uuid,
     actor: &JobActor,
 ) -> Result<JobRetryResponse> {
+    let mut tx = pool.begin().await?;
+    let response = retry_tx(&mut tx, project, id, request, actor).await?;
+    tx.commit().await?;
+    Ok(response)
+}
+
+/// Caller holds authorization locks through retry commit.
+pub async fn retry_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    project: Uuid,
+    id: Uuid,
+    request: Uuid,
+    actor: &JobActor,
+) -> Result<JobRetryResponse> {
     actor.validate()?;
     if request.is_nil() {
         return Err(Error::Invalid("retry request id"));
     }
-    let mut tx = pool.begin().await?;
     sqlx::query("SELECT project_id FROM background_project_slots WHERE project_id=$1 FOR UPDATE")
         .bind(project)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
     let actor_value = serde_json::to_value(actor)?;
     let receipt = sqlx::query(
@@ -395,7 +415,7 @@ pub async fn retry(
     )
     .bind(project)
     .bind(request)
-    .fetch_optional(&mut *tx)
+    .fetch_optional(&mut **tx)
     .await?;
     if let Some(receipt) = receipt {
         if receipt.try_get::<Uuid, _>("job_id")? != id
@@ -409,14 +429,13 @@ pub async fn retry(
             generation: receipt.try_get("generation")?,
         });
     }
-    let generation: Option<i32> = sqlx::query_scalar("UPDATE background_jobs SET status='queued',generation=generation+1,attempts=0,last_failure=NULL,available_at=clock_timestamp() WHERE project_id=$1 AND id=$2 AND status IN ('failed','blocked') RETURNING generation")
-        .bind(project).bind(id).fetch_optional(&mut *tx).await?;
+    let generation: Option<i32> = sqlx::query_scalar("UPDATE background_jobs SET status='queued',generation=generation+1,attempts=0,last_failure=NULL,reason=NULL,available_at=clock_timestamp() WHERE project_id=$1 AND id=$2 AND status IN ('failed','blocked') RETURNING generation")
+        .bind(project).bind(id).fetch_optional(&mut **tx).await?;
     let Some(generation) = generation else {
         return Err(Error::Conflict);
     };
     sqlx::query("INSERT INTO background_job_retry_receipts(project_id,request_id,job_id,generation,actor) VALUES($1,$2,$3,$4,$5)")
-        .bind(project).bind(request).bind(id).bind(generation).bind(actor_value).execute(&mut *tx).await?;
-    tx.commit().await?;
+        .bind(project).bind(request).bind(id).bind(generation).bind(actor_value).execute(&mut **tx).await?;
     Ok(JobRetryResponse {
         request_id: request,
         job_id: id,
@@ -467,6 +486,14 @@ pub async fn detail(pool: &PgPool, project: Uuid, id: Uuid) -> Result<JobDetail>
     .bind(id)
     .fetch_all(&mut *tx)
     .await?;
+    let stage_rows=sqlx::query("SELECT * FROM background_jobs WHERE project_id=$1 AND operation_id=$2 ORDER BY created_at,id LIMIT 201")
+        .bind(project).bind(job.operation_id).fetch_all(&mut *tx).await?;
+    let stages_truncated = stage_rows.len() > 200;
+    let stages = stage_rows
+        .iter()
+        .take(200)
+        .map(summary)
+        .collect::<Result<Vec<_>>>()?;
     let rows = sqlx::query("SELECT * FROM background_job_attempts WHERE job_id=$1 ORDER BY generation DESC,attempt DESC LIMIT 201")
         .bind(id).fetch_all(&mut *tx).await?;
     let history_truncated = rows.len() > 200;
@@ -491,6 +518,8 @@ pub async fn detail(pool: &PgPool, project: Uuid, id: Uuid) -> Result<JobDetail>
     tx.commit().await?;
     Ok(JobDetail {
         job,
+        stages,
+        stages_truncated,
         dependencies,
         history,
         history_truncated,

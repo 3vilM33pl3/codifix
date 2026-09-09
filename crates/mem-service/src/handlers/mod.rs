@@ -3,4 +3,5 @@
 pub(crate) mod activity;
 pub(crate) mod authentication;
 pub(crate) mod curation;
+pub(crate) mod jobs;
 pub(crate) mod query;
