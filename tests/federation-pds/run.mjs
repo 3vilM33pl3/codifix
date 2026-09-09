@@ -92,7 +92,7 @@ async function runtimeTest() {
   const state = JSON.parse(await readFile(join(stateDirectory, 'recovery-state.json'), 'utf8'));
   const fixture = join(runtime, 'pds-fixture.json');
   await writeFile(fixture, JSON.stringify({ base: `http://${network.IPAddress}:2583`,
-    repository: state.did, token: state.accessJwt }), { mode: 0o600 });
+    repository: state.did, token: state.accessJwt, signing_key: state.signingKey }), { mode: 0o600 });
   const testEnv = { ...process.env, MEMORY_FEDERATION_PDS_FIXTURE: fixture, MEMORY_LAYER_TEST_REQUIRE_DB: '1' };
   delete testEnv.MEMORY_LAYER_CLIENT_TOKEN;
   delete testEnv.DATABASE_URL;

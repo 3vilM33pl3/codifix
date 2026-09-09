@@ -36,6 +36,7 @@ enum WorkerConfig {
         listen: SocketAddr,
         pds: String,
         repository: String,
+        signing_key: String,
         token_file: PathBuf,
         credentials: Vec<Credential>,
         #[serde(default)]
@@ -137,6 +138,7 @@ pub(crate) async fn start(
             listen,
             pds,
             repository,
+            signing_key,
             token_file,
             credentials,
             disposable_test_mode,
@@ -157,6 +159,8 @@ pub(crate) async fn start(
                 Endpoint::new(&pds, disposable_test_mode)?,
                 repository,
                 secret(&token_file)?,
+                signing_key,
+                space,
             )?;
             let listener = tokio::net::TcpListener::bind(listen).await?;
             let server = GatewayServer::new(
@@ -208,6 +212,28 @@ mod tests {
     #[test]
     fn config_is_explicit_and_secret_files_are_private() {
         assert!(serde_json::from_value::<WorkerConfig>(json!({"role":"automatic"})).is_err());
+        let id = Uuid::new_v4();
+        let mut gateway = json!({"role":"gateway", "space":id, "authority":id,
+            "listen":"127.0.0.1:8081", "pds":"https://pds.example.com", "repository":"did:web:space.example.com",
+            "token_file":"/not-opened", "credentials":[]});
+        assert!(
+            serde_json::from_value::<WorkerConfig>(gateway.clone()).is_err(),
+            "unsigned configuration must not load"
+        );
+        gateway["signing_key"] = json!("did:key:z1");
+        // Syntactic JSON parsing is separate from enrollment validation; startup
+        // constructs PdsPublisher before binding a socket or changing the fence.
+        assert!(serde_json::from_value::<WorkerConfig>(gateway).is_ok());
+        assert!(
+            PdsPublisher::new(
+                Endpoint::new("https://pds.example.com", false).unwrap(),
+                "did:web:space.example.com".into(),
+                "t".repeat(64),
+                "did:key:z1".into(),
+                SpaceId::new(id).unwrap()
+            )
+            .is_err()
+        );
         let dir = std::env::temp_dir().join(format!("federation-secret-{}", Uuid::new_v4()));
         std::fs::create_dir(&dir).unwrap();
         let path = dir.join("token");

@@ -414,6 +414,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "atrium-crypto"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03dd32c12479c334544ff2a0066d591530e9738edafead49a92e137f0d360267"
+dependencies = [
+ "ecdsa",
+ "generic-array",
+ "k256",
+ "multibase",
+ "p256",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "atrium-repo"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2450,6 +2464,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "k256"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6e3919bbaa2945715f0bb6d3934a173d1e9a59ac23767fbaaef277265a7411b"
+dependencies = [
+ "cfg-if",
+ "ecdsa",
+ "elliptic-curve",
+ "sha2",
+]
+
+[[package]]
 name = "kasuari"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2783,6 +2809,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "mem-atproto-verify"
+version = "2.0.0"
+dependencies = [
+ "atrium-api",
+ "atrium-crypto",
+ "atrium-repo",
+ "chrono",
+ "futures",
+ "mem-atproto",
+ "mem-federation",
+ "multibase",
+ "proptest",
+ "serde",
+ "serde_bytes",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "mem-cli"
 version = "2.0.0"
 dependencies = [
@@ -2893,6 +2941,7 @@ dependencies = [
  "axum",
  "chrono",
  "mem-atproto",
+ "mem-atproto-verify",
  "mem-curate",
  "mem-federation",
  "mem-federation-store",

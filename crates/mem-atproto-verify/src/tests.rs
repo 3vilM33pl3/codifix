@@ -1,0 +1,226 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+#![allow(clippy::unwrap_used)]
+use super::*;
+use fixtures::{FixtureKey, pack, signed_repo};
+use mem_federation::{RecordLocator, publication::*};
+use proptest::prelude::*;
+use serde_json::json;
+use uuid::Uuid;
+
+const REPO: &str = "did:web:fixture.example.com";
+fn wire() -> PublicationWire {
+    let id = Uuid::from_u128(1);
+    let envelope = serde_json::from_value(json!({"schema_version":2,"space":id,
+        "publisher":id,"record_id":Uuid::from_u128(2),"author":"original-expert",
+        "authored_at":"2026-09-08T00:00:00Z","causation":null,
+        "record":{"kind":"membership","payload":{"member":id,"capability":"pull"}}}))
+    .unwrap();
+    PublicationWire::encode(
+        PublicationDelivery::new(
+            AuthoritySequence::new(1).unwrap(),
+            RecordLocator::new("record:one").unwrap(),
+            envelope,
+        )
+        .unwrap(),
+    )
+    .unwrap()
+}
+fn records(wire: &PublicationWire) -> BTreeMap<String, atrium_api::types::Unknown> {
+    BTreeMap::from([(
+        format!(
+            "{}/{}",
+            mem_atproto::publication::COLLECTION,
+            wire.record().unwrap().rkey.as_ref()
+        ),
+        wire.raw().clone(),
+    )])
+}
+fn verify(car: &[u8], key: FixtureKey) -> Result<VerifiedRepository> {
+    PinnedRepository::new(REPO.into(), key.did_key())
+        .unwrap()
+        .verify_full_car(car, &wire(), u64::MAX)
+}
+fn unpack(car: &[u8]) -> (Cid, BTreeMap<Cid, Vec<u8>>) {
+    let (root, blocks) = parse_car(car).unwrap();
+    (
+        root,
+        blocks
+            .into_iter()
+            .map(|(cid, bytes)| (cid, bytes.to_vec()))
+            .collect(),
+    )
+}
+fn insert<T: Serialize>(blocks: &mut BTreeMap<Cid, Vec<u8>>, value: &T) -> Cid {
+    let cid = mem_atproto::dag_cbor_cid(value).unwrap();
+    blocks.insert(cid, serde_ipld_dagcbor::to_vec(value).unwrap());
+    cid
+}
+fn alter_commit(
+    car: &[u8],
+    edit: impl FnOnce(&mut SignedCommit, &mut BTreeMap<Cid, Vec<u8>>),
+) -> Vec<u8> {
+    let (root, mut blocks) = unpack(car);
+    let mut commit: SignedCommit = canonical(&blocks[&root]).unwrap();
+    edit(&mut commit, &mut blocks);
+    commit.sig = FixtureKey::K256.sign(&serde_ipld_dagcbor::to_vec(&commit.unsigned()).unwrap());
+    let root = insert(&mut blocks, &commit);
+    pack(root, &blocks)
+}
+
+#[test]
+fn both_curves_verify_full_inclusion_and_preserve_unknown_fields() {
+    let mut raw = serde_json::to_value(wire().raw()).unwrap();
+    raw["future"] = json!({"preserved":["exact","bytes"]});
+    let wire = PublicationWire::decode(serde_json::from_value(raw).unwrap()).unwrap();
+    for key in [FixtureKey::K256, FixtureKey::P256] {
+        let car = signed_repo(REPO, &records(&wire), key);
+        let pin = PinnedRepository::new(REPO.into(), key.did_key()).unwrap();
+        let receipt = pin.verify_full_car(&car, &wire, u64::MAX).unwrap();
+        assert_eq!(receipt.repository, REPO);
+        assert_eq!(receipt.record_cid, wire.cid().unwrap());
+    }
+}
+
+#[test]
+fn reject_wrong_key_did_version_future_revision_and_bad_signatures() {
+    let car = signed_repo(REPO, &records(&wire()), FixtureKey::K256);
+    assert_eq!(verify(&car, FixtureKey::P256), Err(VerifyError::Signature));
+    let forged = alter_commit(&car, |c, _| {
+        c.did = Did::new("did:web:forged.example.com".into()).unwrap()
+    });
+    assert_eq!(verify(&forged, FixtureKey::K256), Err(VerifyError::Commit));
+    let forged = alter_commit(&car, |c, _| c.version = 2);
+    assert_eq!(verify(&forged, FixtureKey::K256), Err(VerifyError::Commit));
+    let pin = PinnedRepository::new(REPO.into(), FixtureKey::K256.did_key()).unwrap();
+    assert_eq!(
+        pin.verify_full_car(&car, &wire(), 0),
+        Err(VerifyError::Commit)
+    );
+    for length in [0, 63, 64, 65, 72] {
+        let (root, mut blocks) = unpack(&car);
+        let mut c: SignedCommit = canonical(&blocks[&root]).unwrap();
+        c.sig = vec![0; length];
+        let root = insert(&mut blocks, &c);
+        assert!(verify(&pack(root, &blocks), FixtureKey::K256).is_err());
+    }
+    // Malleable high-S must be rejected, even though ordinary ECDSA accepts it.
+    let (root, mut blocks) = unpack(&car);
+    let mut c: SignedCommit = canonical(&blocks[&root]).unwrap();
+    let order: [u8; 32] = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36,
+        0x41, 0x41,
+    ];
+    let mut borrow = 0i16;
+    for i in (0..32).rev() {
+        let n = i16::from(order[i]) - i16::from(c.sig[32 + i]) - borrow;
+        c.sig[32 + i] = n as u8;
+        borrow = i16::from(n < 0);
+    }
+    let root = insert(&mut blocks, &c);
+    assert_eq!(
+        verify(&pack(root, &blocks), FixtureKey::K256),
+        Err(VerifyError::Signature)
+    );
+}
+
+#[test]
+fn signed_tree_must_reach_exact_record_and_have_canonical_structure() {
+    let car = signed_repo(REPO, &records(&wire()), FixtureKey::K256);
+    let (root, mut blocks) = unpack(&car);
+    blocks.remove(&wire().cid().unwrap().parse().unwrap());
+    assert!(verify(&pack(root, &blocks), FixtureKey::K256).is_err());
+    for mode in 0..5 {
+        let forged = alter_commit(&car, |c, blocks| {
+            let mut node: Node = canonical(&blocks[&c.data]).unwrap();
+            match mode {
+                0 => node.e[0].p = 999, // invalid prefix (used to panic upstream)
+                1 => node.e[0].k = b"dev.example.other/different".to_vec(),
+                2 => {
+                    node.e.clear();
+                } // valid signed tree, detached record block
+                3 => node.l = Some(c.data), // repeated nodes/noncanonical topology
+                _ => node.e[0].v = insert(blocks, &json!({"changed":"record"})),
+            }
+            c.data = insert(blocks, &node);
+        });
+        assert!(verify(&forged, FixtureKey::K256).is_err(), "mode {mode}");
+    }
+}
+
+#[test]
+fn framing_hash_bounds_and_noncanonical_commit_fail_closed() {
+    let car = signed_repo(REPO, &records(&wire()), FixtureKey::K256);
+    for bytes in [
+        vec![],
+        vec![0],
+        vec![128; 10],
+        vec![255; 9],
+        vec![129, 0, 0],
+        vec![255, 255, 255, 127],
+    ] {
+        assert!(verify(&bytes, FixtureKey::K256).is_err());
+    }
+    assert_eq!(
+        verify(&vec![0; MAX_CAR_BYTES + 1], FixtureKey::K256),
+        Err(VerifyError::Limit)
+    );
+    let mut bad = car.clone();
+    let last = bad.len() - 1;
+    bad[last] ^= 1;
+    assert_eq!(verify(&bad, FixtureKey::K256), Err(VerifyError::Car));
+    let (root, mut blocks) = unpack(&car);
+    let commit: SignedCommit = canonical(&blocks[&root]).unwrap();
+    let mut value = serde_json::to_value(&commit).unwrap();
+    value["unknown"] = json!(true);
+    let root = insert(&mut blocks, &value);
+    assert_eq!(
+        verify(&pack(root, &blocks), FixtureKey::K256),
+        Err(VerifyError::Commit)
+    );
+}
+
+#[test]
+fn enrollment_rejects_short_noncanonical_and_unsupported_keys_without_panics() {
+    for key in [
+        "",
+        "did:key:z",
+        "did:key:z1",
+        "did:key:z11",
+        "did:web:example.com",
+        "did:key:mAQ",
+    ] {
+        assert!(PinnedRepository::new(REPO.into(), key.into()).is_err());
+    }
+    assert!(
+        PinnedRepository::new(
+            "https://metadata.internal".into(),
+            FixtureKey::K256.did_key()
+        )
+        .is_err()
+    );
+}
+
+proptest! {
+    #[test]
+    fn arbitrary_framing_never_panics(bytes in proptest::collection::vec(any::<u8>(), 0..8192)) {
+        let _ = parse_car(&bytes);
+    }
+    #[test]
+    fn insertion_order_and_duplicates_do_not_change_verified_snapshot(count in 1usize..50) {
+        let mut records = records(&wire());
+        for i in 0..count {
+            records.insert(format!("dev.example.record/{i}"), serde_json::from_value(json!({"n":i})).unwrap());
+        }
+        let car = signed_repo(REPO, &records, FixtureKey::K256);
+        let (root, blocks) = parse_car(&car).unwrap();
+        let mut reordered = pack(root, &BTreeMap::new());
+        for (cid, bytes) in blocks.iter().rev() {
+            let frame = pack(root, &BTreeMap::from([(*cid, bytes.to_vec())]));
+            let header_len = pack(root, &BTreeMap::new()).len();
+            reordered.extend_from_slice(&frame[header_len..]);
+            reordered.extend_from_slice(&frame[header_len..]);
+        }
+        prop_assert_eq!(verify(&car, FixtureKey::K256).unwrap(), verify(&reordered, FixtureKey::K256).unwrap());
+    }
+}

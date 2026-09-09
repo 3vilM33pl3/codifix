@@ -6,6 +6,7 @@ use axum::{
     routing::{get, post},
 };
 use mem_atproto::publication::PublicationWire;
+use mem_atproto_verify::fixtures::{FixtureKey, signed_repo};
 use mem_federation::{AuthorIdentity, RecordLocator, SpaceCapability, publication::*};
 use mem_federation_runtime::{Endpoint, GatewayClient, PdsPublisher};
 use mem_federation_store::PublishFailure;
@@ -86,12 +87,81 @@ async fn conflicting_or_malformed_pds_readback_never_triggers_overwrite() {
                 }),
             );
         let (endpoint, task) = serve(router).await;
-        let publisher = PdsPublisher::new(endpoint, repo.into(), "fixture".repeat(8)).unwrap();
+        let publisher = PdsPublisher::new(
+            endpoint,
+            repo.into(),
+            "fixture".repeat(8),
+            FixtureKey::K256.did_key(),
+            delivery.envelope.space,
+        )
+        .unwrap();
         assert!(matches!(
             publisher.publish_exact(&delivery).await,
             Err(PublishFailure::Conflict | PublishFailure::InvalidReceipt)
         ));
         assert_eq!(writes.load(Ordering::SeqCst), 0);
+        task.abort();
+    }
+}
+
+#[tokio::test]
+async fn exact_json_requires_signed_inclusion_and_cannot_cross_space() {
+    let delivery = delivery();
+    let wire = PublicationWire::encode(delivery.clone()).unwrap();
+    let repo = "did:web:space.federation.example.com";
+    let expected = json!({"uri":wire.uri(&repo.parse().unwrap()).unwrap(),"cid":wire.cid().unwrap(),"value":wire.raw()});
+    let records = std::collections::BTreeMap::from([(
+        format!(
+            "{}/{}",
+            mem_atproto::publication::COLLECTION,
+            wire.record().unwrap().rkey.as_ref()
+        ),
+        wire.raw().clone(),
+    )]);
+    let signed = signed_repo(repo, &records, FixtureKey::K256);
+    for (proof, valid) in [
+        (b"unsigned repository".to_vec(), false),
+        (signed_repo(repo, &records, FixtureKey::P256), false),
+        (
+            signed_repo(repo, &std::collections::BTreeMap::new(), FixtureKey::K256),
+            false,
+        ),
+        (vec![0; mem_atproto_verify::MAX_CAR_BYTES + 1], false),
+        (signed, true),
+    ] {
+        let body = expected.clone();
+        let hits = Arc::new(AtomicUsize::new(0));
+        let seen = hits.clone();
+        let router = Router::new()
+            .route(
+                "/xrpc/com.atproto.repo.getRecord",
+                get(move || async move { Json(body) }),
+            )
+            .route(
+                "/xrpc/com.atproto.sync.getRepo",
+                get(move || async move {
+                    seen.fetch_add(1, Ordering::SeqCst);
+                    proof
+                }),
+            );
+        let (endpoint, task) = serve(router).await;
+        let publisher = PdsPublisher::new(
+            endpoint,
+            repo.into(),
+            "fixture".repeat(8),
+            FixtureKey::K256.did_key(),
+            delivery.envelope.space,
+        )
+        .unwrap();
+        assert_eq!(publisher.publish_exact(&delivery).await.is_ok(), valid);
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+        let mut wrong_space = delivery.clone();
+        wrong_space.envelope.space = SpaceId::new(Uuid::new_v4()).unwrap();
+        assert_eq!(
+            publisher.publish_exact(&wrong_space).await,
+            Err(PublishFailure::InvalidReceipt)
+        );
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
         task.abort();
     }
 }

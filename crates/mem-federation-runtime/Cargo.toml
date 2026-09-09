@@ -9,6 +9,7 @@ authors.workspace = true
 mem-federation = { path = "../mem-federation" }
 mem-federation-store = { path = "../mem-federation-store" }
 mem-atproto = { path = "../mem-atproto" }
+mem-atproto-verify = { path = "../mem-atproto-verify" }
 mem-record = { path = "../mem-record" }
 axum.workspace = true
 reqwest.workspace = true
@@ -22,6 +23,7 @@ thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+mem-atproto-verify = { path = "../mem-atproto-verify", features = ["test-fixtures"] }
 mem-test-support = { path = "../mem-test-support" }
 mem-curate = { path = "../mem-curate" }
 chrono.workspace = true

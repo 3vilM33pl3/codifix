@@ -7,6 +7,7 @@ use axum::{
     http::{Response, StatusCode},
     routing::any,
 };
+use mem_atproto_verify::fixtures::{FixtureKey, signed_repo};
 use mem_federation::{
     AuthorIdentity, CanonicalJsonCodec, RecordLocator, SpaceCapability, publication::*,
 };
@@ -145,6 +146,26 @@ async fn pds_rpc(State(f): State<PdsFixture>, request: Request) -> Response<Body
             .body(Body::from(bytes))
             .unwrap();
     }
+    if path.ends_with("getRepo") {
+        let records = f
+            .records
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(key, value)| {
+                (
+                    format!("{}/{key}", mem_atproto::publication::COLLECTION),
+                    serde_json::from_value(value["value"].clone()).unwrap(),
+                )
+            })
+            .collect();
+        let bytes = signed_repo("did:web:fixture.example.com", &records, FixtureKey::K256);
+        return Response::builder()
+            .status(200)
+            .header("content-type", "application/vnd.ipld.car")
+            .body(Body::from(bytes))
+            .unwrap();
+    }
     let (status, body) = if path.ends_with("getRecord") {
         let url = reqwest::Url::parse(&format!("http://fixture/?{query}")).unwrap();
         let params: BTreeMap<_, _> = url.query_pairs().into_owned().collect();
@@ -194,8 +215,9 @@ struct LivePds {
     base: String,
     repository: String,
     token: String,
+    signing_key: String,
 }
-async fn publisher() -> (PdsPublisher, tokio::task::JoinHandle<()>, Arc<AtomicBool>) {
+async fn publisher(space: SpaceId) -> (PdsPublisher, tokio::task::JoinHandle<()>, Arc<AtomicBool>) {
     let fixture = std::env::var_os("MEMORY_FEDERATION_PDS_FIXTURE")
         .map(|path| serde_json::from_slice::<LivePds>(&std::fs::read(path).unwrap()).unwrap());
     let lost_reply = Arc::new(AtomicBool::new(true));
@@ -209,6 +231,7 @@ async fn publisher() -> (PdsPublisher, tokio::task::JoinHandle<()>, Arc<AtomicBo
     let router = Router::new()
         .route("/xrpc/com.atproto.repo.getRecord", any(pds_rpc))
         .route("/xrpc/com.atproto.repo.createRecord", any(pds_rpc))
+        .route("/xrpc/com.atproto.sync.getRepo", any(pds_rpc))
         .with_state(state);
     let task = tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
@@ -217,12 +240,17 @@ async fn publisher() -> (PdsPublisher, tokio::task::JoinHandle<()>, Arc<AtomicBo
         .as_ref()
         .map_or("did:web:fixture.example.com", |f| f.repository.as_str())
         .to_owned();
+    let signing_key = fixture
+        .as_ref()
+        .map_or_else(|| FixtureKey::K256.did_key(), |f| f.signing_key.clone());
     let auth = fixture.map_or_else(token, |f| f.token);
     (
         PdsPublisher::new(
             Endpoint::new(&format!("http://{addr}"), true).unwrap(),
             repo,
             auth,
+            signing_key,
+            space,
         )
         .unwrap(),
         task,
@@ -283,6 +311,54 @@ async fn c_source_gateway_pds_receiver_and_recovery_across_three_databases() {
         invalid.pull(0, 32).await,
         Err(RuntimeError::Unauthorized)
     ));
+    // Authenticated token identity, never claimed publisher, owns authority.
+    let forged = intent(
+        space,
+        authority,
+        PublicationRecord::Membership {
+            member: a,
+            capability: SpaceCapability::Publish,
+        },
+    );
+    assert_eq!(
+        a_client.accept(&forged).await.unwrap().outcome,
+        PublicationOutcome::Rejected(PublicationReject::ForgedPublisher)
+    );
+    let foreign = intent(
+        SpaceId::new(Uuid::new_v4()).unwrap(),
+        authority,
+        PublicationRecord::Membership {
+            member: a,
+            capability: SpaceCapability::Publish,
+        },
+    );
+    let foreign: Acceptance = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .unwrap()
+        .post(format!("http://{addr}/v1/accept"))
+        .bearer_auth(&root_token)
+        .json(&foreign)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        foreign.outcome,
+        PublicationOutcome::Rejected(PublicationReject::WrongSpace)
+    );
+    let accepted: i64 = sqlx::query_scalar("SELECT count(*) FROM federation_accepted")
+        .fetch_one(&gateway)
+        .await
+        .unwrap();
+    assert_eq!(
+        accepted, 0,
+        "rejected identities must not change acceptance state"
+    );
     for member in [a, b] {
         for capability in [SpaceCapability::Pull, SpaceCapability::Publish] {
             assert_eq!(
@@ -298,7 +374,7 @@ async fn c_source_gateway_pds_receiver_and_recovery_across_three_databases() {
             );
         }
     }
-    let (pds, pds_task, lost_reply) = publisher().await;
+    let (pds, pds_task, lost_reply) = publisher(space).await;
     assert!(a_client.pull(0, 32).await.unwrap().records.is_empty());
     publish_all(&server, &pds).await;
     assert!(!lost_reply.load(Ordering::SeqCst)); // real/fake create succeeded, response was discarded

@@ -39,7 +39,11 @@ impl Endpoint {
             .map_err(|_| RuntimeError::Configuration)
     }
 }
-pub(crate) async fn json<T: DeserializeOwned>(mut response: Response, limit: usize) -> Result<T> {
+pub(crate) async fn json<T: DeserializeOwned>(response: Response, limit: usize) -> Result<T> {
+    serde_json::from_slice(&bytes(response, limit).await?)
+        .map_err(|_| RuntimeError::InvalidResponse)
+}
+pub(crate) async fn bytes(mut response: Response, limit: usize) -> Result<Vec<u8>> {
     if response.content_length().is_some_and(|n| n > limit as u64) {
         return Err(RuntimeError::InvalidResponse);
     }
@@ -54,5 +58,5 @@ pub(crate) async fn json<T: DeserializeOwned>(mut response: Response, limit: usi
         }
         bytes.extend_from_slice(&chunk);
     }
-    serde_json::from_slice(&bytes).map_err(|_| RuntimeError::InvalidResponse)
+    Ok(bytes)
 }

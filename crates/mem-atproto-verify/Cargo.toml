@@ -1,0 +1,33 @@
+[package]
+name = "mem-atproto-verify"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+test-fixtures = []
+
+[dependencies]
+mem-atproto = { path = "../mem-atproto" }
+atrium-api = { version = "=0.25.8", default-features = false }
+atrium-repo = "=0.1.8"
+atrium-crypto = "=0.1.3"
+multibase = "=0.9.3"
+serde.workspace = true
+serde_bytes = "0.11.19"
+serde_ipld_dagcbor = "=0.6.0"
+sha2.workspace = true
+thiserror.workspace = true
+futures = { version = "0.3.31", default-features = false, features = ["alloc", "executor", "std"] }
+
+[dev-dependencies]
+mem-federation = { path = "../mem-federation" }
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+proptest = "1.9.0"
+
+[lints]
+workspace = true
