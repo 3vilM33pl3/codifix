@@ -1871,6 +1871,18 @@ paths:
     get:
       operationId: get_v1_projects_slug_activities
       summary: "Project activity timeline."
+      description: "Without after_seq returns the legacy newest-first view. after_seq selects bounded commit-order recovery; it cannot be combined with kind/since/before. Persist cursor.next_after only after processing the page. retention_gap means retained history is incomplete; rebuild from a snapshot rather than silently advancing."
+      parameters:
+        - name: after_seq
+          in: query
+          schema: { type: integer, format: int64, minimum: 0 }
+        - name: limit
+          in: query
+          description: "1–200 in cursor mode; defaults to 100."
+          schema: { type: integer, minimum: 1, maximum: 200 }
+        - name: include_details
+          in: query
+          schema: { type: boolean, default: true }
       tags: ["Projects"]
       x-stability: core
       responses:

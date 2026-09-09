@@ -247,6 +247,7 @@ pub(crate) async fn project_resume(
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ActivityListQuery {
+    after_seq: Option<i64>,
     limit: Option<usize>,
     kind: Option<String>,
     since: Option<chrono::DateTime<chrono::Utc>>,
@@ -259,6 +260,68 @@ pub(crate) async fn project_activities(
     Path(slug): Path<String>,
     Query(query): Query<ActivityListQuery>,
 ) -> Result<Json<ActivityListResponse>, ApiError> {
+    if let Some(after) = query.after_seq {
+        if query.since.is_some() || query.before.is_some() || query.kind.is_some() {
+            return Err(ApiError::validation(ValidationError::new(
+                "after_seq cannot be combined with time or kind filters",
+            )));
+        }
+        let limit = query.limit.unwrap_or(100);
+        if after < 0 || !(1..=200).contains(&limit) {
+            return Err(ApiError::validation(ValidationError::new(
+                "after_seq must be nonnegative and cursor limit must be 1..200",
+            )));
+        }
+        let pool = state.pool()?;
+        let project = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+            .bind(&slug)
+            .fetch_optional(&pool)
+            .await
+            .map_err(ApiError::sql)?
+            .ok_or_else(|| ApiError::not_found("project not found"))?;
+        let page = mem_store::events::page(&pool, project, after, limit as u32)
+            .await
+            .map_err(|_| ApiError::service_unavailable("timeline unavailable"))?;
+        let mut items = Vec::with_capacity(page.events.len());
+        for mut event in page.events {
+            event["project"] = serde_json::Value::String(slug.clone());
+            event["kind"] = serde_json::to_value(parse_activity_kind(
+                event["kind"].as_str().unwrap_or_default(),
+            ))
+            .map_err(|_| ApiError::service_unavailable("invalid persisted timeline event"))?;
+            event["details"] = if query.include_details.unwrap_or(true) {
+                event["details_json"].clone()
+            } else {
+                serde_json::Value::Null
+            };
+            let token = |key: &str| event[key].as_u64().unwrap_or_default();
+            let usage = TokenUsage {
+                input_tokens: token("input_tokens"),
+                output_tokens: token("output_tokens"),
+                cache_read_tokens: token("cache_read_tokens"),
+                cache_write_tokens: token("cache_write_tokens"),
+                total_tokens: token("total_tokens"),
+            };
+            event["token_usage"] = serde_json::to_value(usage)
+                .map_err(|_| ApiError::service_unavailable("invalid persisted timeline event"))?;
+            items.push(
+                serde_json::from_value(event).map_err(|_| {
+                    ApiError::service_unavailable("invalid persisted timeline event")
+                })?,
+            );
+        }
+        return Ok(Json(ActivityListResponse {
+            project: slug,
+            total_returned: items.len(),
+            items,
+            cursor: Some(mem_record::ActivityCursor {
+                next_after: page.next_after,
+                has_more: page.has_more,
+                retention_gap: page.retention_gap,
+                deleted_through: page.deleted_through,
+            }),
+        }));
+    }
     let limit = query.limit.unwrap_or(100).clamp(1, 500);
     let mut items = fetch_project_activities(
         &state.pool()?,
@@ -277,6 +340,7 @@ pub(crate) async fn project_activities(
         }
     }
     Ok(Json(ActivityListResponse {
+        cursor: None,
         project: slug,
         total_returned: items.len(),
         items,

@@ -280,6 +280,110 @@ async fn jobs_http_inspection_retry_and_project_policy_are_real_and_sanitized() 
     });
     let client = reqwest::Client::new();
     let url = format!("{base}/{}/jobs", f.slug);
+    // The existing activity endpoint exposes commit-safe ordered recovery.
+    let activity_url = format!("{base}/{}/activities", f.slug);
+    let mut first = f.pool.begin().await.unwrap();
+    let first_event = TimelineEvent::new(
+        f.project,
+        ActivityKind::Checkpoint,
+        "earlier transaction".into(),
+    );
+    let first_seq = mem_store::events::append(&mut first, &first_event)
+        .await
+        .unwrap();
+    let second_pool = f.pool.clone();
+    let project = f.project;
+    let mut second = tokio::spawn(async move {
+        let mut tx = second_pool.begin().await.unwrap();
+        let event = TimelineEvent::new(
+            project,
+            ActivityKind::Checkpoint,
+            "later transaction".into(),
+        );
+        let seq = mem_store::events::append(&mut tx, &event).await.unwrap();
+        tx.commit().await.unwrap();
+        seq
+    });
+    assert!(
+        tokio::time::timeout(Duration::from_millis(50), &mut second)
+            .await
+            .is_err()
+    );
+    let pending: Value = client
+        .get(format!("{activity_url}?after_seq=0&limit=1"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(pending["items"].as_array().unwrap().len(), 0);
+    first.commit().await.unwrap();
+    let second_seq = second.await.unwrap();
+    assert!(second_seq > first_seq);
+    let first_page: Value = client
+        .get(format!("{activity_url}?after_seq=0&limit=1"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(first_page["items"][0]["seq"], first_seq);
+    assert_eq!(first_page["cursor"]["has_more"], true);
+    assert_eq!(first_page["cursor"]["retention_gap"], false);
+    let next_page: Value = client
+        .get(format!("{activity_url}?after_seq={first_seq}&limit=1"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(next_page["items"][0]["seq"], second_seq);
+    sqlx::query("DELETE FROM project_timeline_events WHERE id=$1")
+        .bind(first_event.id)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    let gap: Value = client
+        .get(format!("{activity_url}?after_seq=0"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(gap["cursor"]["retention_gap"], true);
+    assert_eq!(gap["cursor"]["deleted_through"], first_seq);
+    for query in [
+        "after_seq=-1",
+        "after_seq=0&limit=201",
+        "after_seq=0&kind=checkpoint",
+    ] {
+        assert_eq!(
+            client
+                .get(format!("{activity_url}?{query}"))
+                .bearer_auth(&token)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
     let page: Value = client
         .get(format!("{url}?limit=1"))
         .bearer_auth(&token)

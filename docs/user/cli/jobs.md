@@ -18,6 +18,13 @@ sanitized failure codes and explicit skip reasons. Queue counts and oldest-ready
 age are project-scoped; the worker timestamp reports the serving process's poll.
 Raw prompts, source contents and provider responses are never included.
 
+For timeline recovery, `GET /v1/projects/{slug}/activities?after_seq=0&limit=100`
+returns ascending commit order and `cursor.next_after`, `has_more`,
+`retention_gap` and `deleted_through`. Save the cursor only after processing the
+page. A retention gap requires snapshot recovery, not silent cursor advancement.
+Cursor mode accepts 1–200 items and cannot be combined with time/kind filters;
+omitting `after_seq` preserves the legacy newest-first activity view.
+
 Retry only blocked or failed jobs after addressing their cause. It needs
 `LoopsRun`, the operation's execution permissions, and the original execution
 identity's current authority. Read-only services reject retries. Completed stages

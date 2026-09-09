@@ -273,10 +273,20 @@ pub struct ActivityEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActivityListResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<ActivityCursor>,
     pub project: String,
     pub total_returned: usize,
     #[serde(default)]
     pub items: Vec<ActivityEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityCursor {
+    pub next_after: i64,
+    pub has_more: bool,
+    pub retention_gap: bool,
+    pub deleted_through: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
