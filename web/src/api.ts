@@ -134,6 +134,19 @@ function readCookie(name: string): string | null {
   return null;
 }
 
+/** The configured LOCAL service is the only target; remote endpoints and trust
+ * material are never accepted from this workflow or stored in the browser. */
+export async function federationRequest<T>(project: string, space: string | null, suffix = "", body?: unknown, signal?: AbortSignal): Promise<T> {
+  const base = `/v1/projects/${encodeURIComponent(project)}/federation${space ? `/${encodeURIComponent(space)}` : ""}`;
+  return parseJson(await apiFetch(base + suffix, {
+    method: body === undefined ? "GET" : "POST",
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
+    cache: "no-store",
+  }));
+}
+
 export function authLoginUrl(returnTo = window.location.pathname + window.location.search): string {
   return `/v1/auth/login?return_to=${encodeURIComponent(returnTo)}`;
 }

@@ -1395,6 +1395,11 @@ pub(in crate::commands) enum Command {
     Service(ServiceArgs),
     #[command(about = "Inspect identity and administer scoped service access.", after_help = AUTH_GROUP_AFTER_HELP)]
     Auth(AuthArgs),
+    #[command(
+        about = "Review and exchange selected knowledge through a private federation space.",
+        after_help = "Examples:\n  memory federation --project example discover\n  memory federation --project example status\n  memory federation --project example tui\n\nAgent notes:\nDocs: docs/user/cli/federation.md\nPublication is explicit. Queued is not accepted. Delivered copies cannot be recalled."
+    )]
+    Federation(crate::commands::federation::FederationArgs),
     #[command(about = "Manage project watchers and watcher daemons.", after_help = WATCHER_GROUP_AFTER_HELP)]
     Watcher(WatcherArgs),
     #[command(about = "Coordinate concurrent agent workspaces.", after_help = AGENT_GROUP_AFTER_HELP)]
@@ -3548,6 +3553,9 @@ pub(super) async fn run() -> Result<()> {
         }) => unreachable!("service run is handled before config loading"),
         Command::Service(_) => unreachable!("service management is handled before config loading"),
         Command::Auth(args) => crate::commands::auth::handle(args, client, config).await?,
+        Command::Federation(args) => {
+            crate::commands::federation::handle(args, client, config).await?
+        }
         Command::Mcp(args) => crate::commands::mcp::handle(args, config).await?,
         Command::Watcher(WatcherArgs {
             command:

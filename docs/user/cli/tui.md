@@ -23,6 +23,10 @@ memory tui --project memory
 
 ## Related Docs
 
+The focused federation workspace is `memory federation --project <slug> tui`.
+It supplies membership, exact publication review, proposals and synchronization
+controls through the same local API. See [Federation](federation.md).
+
 - [TUI Guide](../tui/README.md)
 - [Memories Tab](../tui/memories.md)
 - [Query Tab](../tui/query.md)

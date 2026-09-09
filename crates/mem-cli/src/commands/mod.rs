@@ -18,6 +18,7 @@ mod doctor;
 mod embeddings;
 mod eval;
 pub(crate) mod eval_support;
+mod federation;
 mod graph;
 mod health;
 mod history;

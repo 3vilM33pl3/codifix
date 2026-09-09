@@ -1,0 +1,11 @@
+.federation-workspace { max-width: 76rem; margin: auto; overflow-wrap: anywhere; }
+.federation-workspace fieldset { margin: 1rem 0; padding: 1rem; border: 1px solid #8886; border-radius: .5rem; }
+.federation-workspace label { display: grid; gap: .35rem; margin: .7rem 0; }
+.federation-workspace input:not([type=checkbox]), .federation-workspace textarea, .federation-workspace select { width: 100%; max-width: 55rem; box-sizing: border-box; }
+.federation-workspace button { margin: .3rem .5rem .3rem 0; }
+.federation-status { display: grid; grid-template-columns: repeat(auto-fit,minmax(10rem,1fr)); gap: 1rem; }
+.federation-status dd { margin: .4rem 0; font-size: 1.6rem; }
+.federation-json { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 28rem; overflow: auto; padding: .75rem; border: 1px solid #8886; }
+.federation-text { white-space: pre-wrap; padding: .75rem; border-left: 3px solid #888; }
+.federation-confirm { padding: 1rem; border: 2px solid #bc8433; border-radius: .5rem; }
+.federation-workspace [role=alert] { padding: .7rem; border-left: 3px solid #d55; }

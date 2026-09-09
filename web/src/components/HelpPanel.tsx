@@ -7,6 +7,13 @@ const SHARED_CONTROLS = [
 ];
 
 const WEB_HELP: Record<Tab, { title: string; purpose: string; layout: string[]; controls: string[]; workflows: string[] }> = {
+  federation: {
+    title: "Federation Help",
+    purpose: "Review selected knowledge, cite retained shared copies and propose origin-owned corrections.",
+    layout: ["Local status and retained inventory.", "Separate local grants and authority enrollment.", "Exact-content publication review and explicit confirmation."],
+    controls: ["Refresh local status to load inventories.", "Inspect all content and evidence before confirming an action.", ...SHARED_CONTROLS],
+    workflows: ["Queued does not mean accepted or published.", "Approval pauses local automatic updates until a fresh review.", "Revocation cannot recall delivered copies; imported content is never executable instructions."],
+  },
   memories: {
     title: "Memories Help",
     purpose: "Browse canonical project memory, inspect details, provenance, embeddings, history, and related memories.",
