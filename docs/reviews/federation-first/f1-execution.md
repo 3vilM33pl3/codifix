@@ -238,3 +238,44 @@ The earlier full-rehearsal gaps remain: requester preparation/consent, durable
 origin execution/results, synthesis, user interfaces and actual PDS/game service
 rehearsal. Existing services and credentials were not changed. This increment
 does not mark any end-to-end F1 requirement or customer gate complete.
+
+### Requester consent persistence increment — 2026-09-10
+
+Commit `91100f7` adds origin-private question preparation, exact digest
+confirmation and transaction-aware retrieval of consented questions. Migration
+0051 stores the exact private payload separately from its metadata-only receipt;
+neither enters a project timeline, PDS, gateway database or retrieval corpus.
+Preparation is read-only. Confirmation and the receipt commit together, and
+concurrent exact retries reuse the original request ID without replacing consent.
+Any changed question, principal, project or reviewed advertisement fails closed.
+
+Each read rechecks the current local `AskExpertise` grant, active principal,
+project read/export permissions, read-only policy, capability consent and the
+operator's permitted output destinations. Model mode remains denied. The store
+is a trusted in-process boundary: the future service must bind authenticated
+identity, lock current project permissions, obtain the signed advertisement and
+supply operator-owned destination policy. A client-supplied allowlist is not
+authorization. Service submission must commit consent first, then reload it in
+a fresh transaction before contacting the gateway. This increment does not yet
+wire that service or user workflow, or claim that a remote request was sent.
+
+Payload retention is 24 hours and metadata retention is 30 days. Cleanup respects
+holds, while read-time expiry applies even under a hold. Expired questions cannot
+be restarted through a retained consent receipt. The new tables are inaccessible
+to the deployment gateway role. Disposable database tests cover rollback,
+concurrent confirmation, journal failure, changed-input and stale-advertisement
+rejection, exact identity/project scope, revoked grants, empty destination policy,
+read-only operation, expiry and held-payload cleanup. No existing deployment or
+credential was changed. Automatic origin execution/results, HTTP/Web/CLI/TUI/MCP
+workflows, optional synthesis and the complete service/PDS/game rehearsal remain
+outstanding; F1 is not complete.
+
+Verification for this increment: 829 tests across 50 test binaries pass, with
+zero failures or ignored tests. Required-database workspace all-target tests
+run serially with `MEMORY_LAYER_TEST_REQUIRE_DB=1` and `--locked`; workspace
+all-target Clippy (`-D warnings`), formatting and boundary checks also pass.
+Existing Rust federation regressions are included. Web, Lean, lean CLI and the
+container/PDS isolation rehearsal were not rerun for this storage-only change.
+Temporary logs are under `/tmp/memory-f1-consent.BYrd9m/`. The disposable database
+was stopped/removed after verification. A partial dev Memory checkpoint records
+`91100f7`; the approved plan remains open.

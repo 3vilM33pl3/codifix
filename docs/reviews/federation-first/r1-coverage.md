@@ -38,6 +38,7 @@ participate in the caller's transaction and never broadcast before commit.
 | Federation | Existing source/outbox/accepted-order/inbox/projection/cursor/audit transactions retained | Store durability, runtime C/D, HTTP verification, service E two-instance required-DB tests | yes |
 | F1 origin collection persistence (component only) | `mem-federation-store::expertise_collections`: reviewed snapshots, explicit service grants, metadata-only review journal and publication outbox in caller transaction | Required-DB activation rollback, immutable retry, changed-source and current-grant tests | yes, storage boundary only |
 | F1 gateway private mailbox (component only) | Request/digest, claim/result and bounded budget reservations commit with private metadata attempt journal; not project timeline or PDS | Required-DB journal fault, competing claims, stale lease, uncertain reservation, TTL and hold tests | yes, storage boundary only |
+| F1 requester consent (component only) | Exact question confirmation and metadata-only receipt commit in caller transaction; idempotent request identity; private TTL/hold maintenance | Required-DB concurrent confirmation, rollback, injected journal failure, scope/policy and retention tests | yes, storage boundary only; service transmission pending |
 
 ## Operational boundaries and limits
 
