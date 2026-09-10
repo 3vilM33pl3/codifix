@@ -1906,8 +1906,14 @@ async fn archive_and_tombstone_cannot_outlive_failed_events() -> anyhow::Result<
     versions.sort();
     assert_eq!(versions, [Some(2), Some(3)]);
     let events = mem_store::events::page(&pool, project_id, 0, 100).await?;
-    assert_eq!(events.events.len(), 3);
-    for event in &events.events {
+    assert_eq!(events.events.len(), 4); // registration, archive, two tombstones
+    let mutations: Vec<_> = events
+        .events
+        .iter()
+        .filter(|event| event["kind"] != "project_changed")
+        .collect();
+    assert_eq!(mutations.len(), 3);
+    for event in mutations {
         assert_eq!(event["canonical_id"], memory_id.to_string());
     }
     mem_test_support::cleanup_project(&pool, &project).await?;
@@ -2006,7 +2012,7 @@ async fn retention_is_atomic_project_scoped_and_reports_lost_timeline_history() 
             .await?
             .events
             .len(),
-        1
+        2 // project registration plus the unrelated project's existing event
     );
     mem_test_support::cleanup_project(&pool, &slug).await?;
     mem_test_support::cleanup_project(&pool, &other).await?;
