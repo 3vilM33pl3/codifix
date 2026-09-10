@@ -1,6 +1,6 @@
 # ADR 0010: DSPy as an offline LLM-program optimization layer
 
-Status: accepted
+Status: proposed
 Date: 2026-09-10
 
 ## Context
