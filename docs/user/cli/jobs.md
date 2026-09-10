@@ -46,5 +46,6 @@ The same request ID is retained after an uncertain response.
 TUI: open **Jobs**, press `r` to load, `s` to cycle filters, `j/k` to select,
 `Enter` to inspect and `PgDn` for the next page. `R` prepares a failed/blocked
 stage's retry; `y` confirms and `n` or Escape cancels. `d`/`PgUp` scroll details.
-The confirmation names the project, job and stable request UUID. Refresh to see
+Inspection replaces the list; Escape returns to it. The confirmation names the
+project, job and stable request UUID. Refresh to see
 subsequent status changes. Read-only services disable retry.

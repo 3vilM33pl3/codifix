@@ -7,14 +7,16 @@ finishes. Job details contain sanitized reasons, dependencies and attempt histor
 
 ## Layout
 
-Project queue statistics, bounded stage list and selected attempt details.
-Retry confirmation stays visible above the list, including its stable request ID.
+Project queue statistics and a bounded stage list. Inspection replaces the list
+with scrollable attempt details, including on an 80x24 terminal. Retry
+confirmation replaces the details and includes its stable request ID.
 
 ## Controls
 
 - `r`: refresh the first page. `PgDn`: next page. `s`: cycle status filter.
 - `j/k` or arrows: select. `Enter`: inspect. `PgUp`: scroll details up.
 - `d`: scroll details down. `R`: review retry for a failed or blocked stage.
+- Escape outside confirmation: return from details to the list.
 - `y`: confirm the exact retry. `n` or Escape: cancel.
 
 ## Workflows

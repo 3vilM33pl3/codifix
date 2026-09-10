@@ -108,6 +108,10 @@ impl App {
             return true;
         }
         match key.code {
+            KeyCode::Esc if self.jobs.detail.is_some() => {
+                self.jobs.detail = None;
+                self.jobs.scroll = 0;
+            }
             KeyCode::Char('r') => self.request_jobs(api, Request::List(None)),
             KeyCode::PageDown => {
                 if let Some(after) = self.jobs.page.as_ref().and_then(|p| p.page.next_after) {
@@ -155,8 +159,8 @@ impl App {
                     self.jobs.pending = Some((detail.job.id, Uuid::new_v4()));
                 }
             }
-            KeyCode::Char('d') => self.jobs.scroll = self.jobs.scroll.saturating_add(8),
-            KeyCode::PageUp => self.jobs.scroll = self.jobs.scroll.saturating_sub(8),
+            KeyCode::Char('d') => self.jobs.scroll = self.jobs.scroll.saturating_add(1),
+            KeyCode::PageUp => self.jobs.scroll = self.jobs.scroll.saturating_sub(1),
             _ => return false,
         }
         true
@@ -186,7 +190,12 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
         ));
         lines.push(Line::from("Current authority/policy required; repeat provider billing possible. Reuse this ID after uncertain replies."));
     }
-    if let Some(page) = &state.page {
+    // Inspection owns the viewport: the wrapped list can otherwise consume
+    // the entire standard 80x24 terminal and make history impossible to read.
+    if let Some(page) = &state.page
+        && state.detail.is_none()
+        && state.pending.is_none()
+    {
         lines.push(Line::from(format!("Queued {} running {} retry-wait {} blocked {} failed {} | worker {} last poll {:?} | oldest ready {:?}s", page.stats.queued,page.stats.running,page.stats.retry_wait,page.stats.blocked,page.stats.failed,page.worker.enabled,page.worker.last_poll_at,page.stats.oldest_ready_age_seconds)));
         if page.read_only {
             lines.push(Line::from("Read-only service: retry disabled."));
@@ -218,17 +227,20 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
             lines.push(Line::from("PgDn: next page"));
         }
     }
-    if let Some(detail) = &state.detail {
+    if let Some(detail) = &state.detail
+        && state.pending.is_none()
+    {
+        lines.push(Line::from(
+            "Details: d/PgUp scroll; Esc returns to list; R reviews retry.",
+        ));
         let mut content = vec![Line::from(format!(
-            "{}: next eligible {} | dependencies {:?}",
-            detail.job.id, detail.job.available_at, detail.dependencies
+            "{} {:?} {:?} | next eligible {} | dependencies {:?}",
+            detail.job.id,
+            detail.job.kind,
+            detail.job.status,
+            detail.job.available_at,
+            detail.dependencies
         ))];
-        for stage in &detail.stages {
-            content.push(Line::from(format!(
-                "Stage {} {:?}: {:?}",
-                stage.id, stage.kind, stage.status
-            )));
-        }
         for a in &detail.history {
             content.push(Line::from(format!(
                 "Generation {} attempt {}: {:?}, failure {:?}, uncertain={} | {} to {:?}",
@@ -239,6 +251,12 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
                 a.uncertain,
                 a.started_at,
                 a.finished_at
+            )));
+        }
+        for stage in &detail.stages {
+            content.push(Line::from(format!(
+                "Stage {} {:?}: {:?}",
+                stage.id, stage.kind, stage.status
             )));
         }
         if detail.stages_truncated || detail.history_truncated {

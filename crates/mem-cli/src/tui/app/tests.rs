@@ -1394,6 +1394,90 @@ fn jobs_ignore_other_project_responses_and_keep_uncertain_retry_identity() {
 }
 
 #[test]
+fn jobs_inspection_and_confirmation_fit_standard_terminal() {
+    let mut app = new_test_app();
+    app.active_tab = TabKind::Jobs;
+    let id = Uuid::new_v4();
+    let summary = mem_record::JobSummary {
+        reason: None,
+        id,
+        project_id: Uuid::new_v4(),
+        operation_id: Uuid::new_v4(),
+        kind: mem_record::JobKind::Embedding,
+        status: mem_record::JobStatus::Blocked,
+        generation: 1,
+        attempts: 1,
+        created_at: Utc::now(),
+        available_at: Utc::now(),
+        lease_until: None,
+        last_failure: Some(mem_record::JobFailureCode::Credentials),
+    };
+    app.jobs.page = Some(mem_record::ProjectJobsResponse {
+        read_only: false,
+        page: mem_record::JobList {
+            jobs: vec![summary.clone(); 50],
+            next_after: Some(id),
+        },
+        stats: mem_record::JobQueueStats {
+            queued: 49,
+            running: 0,
+            retry_wait: 0,
+            blocked: 1,
+            failed: 0,
+            oldest_ready_age_seconds: None,
+        },
+        worker: mem_record::JobWorkerHealth {
+            enabled: true,
+            last_poll_at: None,
+        },
+    });
+    app.jobs.detail = Some(mem_record::JobDetail {
+        job: summary.clone(),
+        stages: vec![summary; 4],
+        stages_truncated: false,
+        dependencies: vec![],
+        history_truncated: false,
+        history: vec![mem_record::JobAttempt {
+            generation: 1,
+            attempt: 1,
+            started_at: Utc::now(),
+            finished_at: None,
+            outcome: Some("blocked".into()),
+            failure: Some(mem_record::JobFailureCode::Credentials),
+            uncertain: true,
+        }],
+    });
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let render = |terminal: &mut Terminal<TestBackend>, app: &App| {
+        terminal
+            .draw(|frame| {
+                crate::tui::tabs::jobs::draw(frame, app, ratatui::layout::Rect::new(0, 6, 80, 14))
+            })
+            .unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>()
+    };
+    let inspection = render(&mut terminal, &app);
+    assert!(
+        inspection.contains("Generation 1 attempt 1"),
+        "{inspection}"
+    );
+    assert!(inspection.contains("Credentials"));
+    let request = Uuid::new_v4();
+    app.jobs.pending = Some((id, request));
+    let confirmation = render(&mut terminal, &app);
+    assert!(confirmation.contains(&id.to_string()));
+    assert!(confirmation.contains(&request.to_string()));
+    assert!(confirmation.contains("y confirm / n cancel"));
+    assert!(!confirmation.contains("Generation 1 attempt 1"));
+}
+
+#[test]
 fn backend_activity_dedupes_by_persisted_event_id_and_formats_tokens() {
     let mut app = new_test_app();
     let id = Uuid::new_v4();
