@@ -67,6 +67,7 @@ pub struct NewJob {
 
 #[derive(Debug, Clone, Copy)]
 pub struct JobPolicy {
+    pub concurrent_projects: u32,
     pub lease_seconds: u32,
     pub max_attempts: u32,
     pub initial_delay_seconds: u32,
@@ -76,6 +77,7 @@ pub struct JobPolicy {
 impl Default for JobPolicy {
     fn default() -> Self {
         Self {
+            concurrent_projects: 2,
             lease_seconds: 120,
             max_attempts: 5,
             initial_delay_seconds: 10,
@@ -86,7 +88,8 @@ impl Default for JobPolicy {
 
 impl JobPolicy {
     pub fn validate(&self) -> Result<()> {
-        if !(2..=3600).contains(&self.lease_seconds)
+        if !(1..=16).contains(&self.concurrent_projects)
+            || !(2..=3600).contains(&self.lease_seconds)
             || !(1..=20).contains(&self.max_attempts)
             || self.initial_delay_seconds == 0
             || self.initial_delay_seconds > self.max_delay_seconds
@@ -210,11 +213,23 @@ pub async fn enqueue(tx: &mut Transaction<'_, Postgres>, job: &NewJob) -> Result
     Ok(id)
 }
 
-/// Lock order everywhere: project slot -> job -> attempts/receipts -> events.
-/// Across processes at most one stage may hold a live lease for each project.
+/// Claims take admission -> project slot -> job -> attempts/receipts -> events.
+/// Other writes start at the project slot and never acquire admission. Across
+/// processes, live projects share the configured cap and each has one stage.
 pub async fn claim(pool: &PgPool, policy: JobPolicy) -> Result<Option<JobLease>> {
     policy.validate()?;
     let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('background-admission',0))")
+        .execute(&mut *tx)
+        .await?;
+    let active: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM background_project_slots WHERE lease_until>clock_timestamp()",
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if active >= i64::from(policy.concurrent_projects) {
+        return Ok(None);
+    }
     let project: Option<Uuid> = sqlx::query_scalar(
         "SELECT s.project_id FROM background_project_slots s
          WHERE (s.lease_until IS NULL OR s.lease_until<=clock_timestamp()) AND EXISTS (

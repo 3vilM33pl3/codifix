@@ -102,6 +102,7 @@ pub(crate) fn start(state: AppState) -> Option<Workers> {
 fn policy(state: &AppState) -> JobPolicy {
     let c = &state.config.background_work;
     JobPolicy {
+        concurrent_projects: c.concurrent_projects as u32,
         lease_seconds: c.lease_seconds,
         max_attempts: c.max_attempts,
         initial_delay_seconds: c.initial_delay_seconds,

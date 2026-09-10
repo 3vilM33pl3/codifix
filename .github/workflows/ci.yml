@@ -244,7 +244,11 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      # Tests create independent databases and owner sessions. Bound the harness,
+      # not the explicitly concurrent transactions/workers exercised by tests.
       - run: cargo test --workspace --all-targets --locked
+        env:
+          RUST_TEST_THREADS: 8
       - run: cargo build -p mem-cli --bin memory --locked
       - run: node scripts/r1-process-smoke.mjs
 

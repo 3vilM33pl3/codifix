@@ -56,6 +56,40 @@ async fn cleanup(pool: &sqlx::PgPool, project: Uuid) {
 }
 
 #[tokio::test]
+async fn independent_claimers_share_the_global_project_limit() {
+    let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
+        return;
+    };
+    let pool = &database.pool;
+    for _ in 0..3 {
+        put(pool, &setup(pool).await).await;
+    }
+    let policy = JobPolicy::default();
+    let (a, b, c) = tokio::join!(
+        claim(pool, policy),
+        claim(pool, policy),
+        claim(pool, policy)
+    );
+    let leases: Vec<_> = [a.unwrap(), b.unwrap(), c.unwrap()]
+        .into_iter()
+        .flatten()
+        .collect();
+    assert_eq!(leases.len(), 2);
+    assert_ne!(leases[0].job.project_id, leases[1].job.project_id);
+    finish_result(
+        begin_result(pool, &leases[0]).await.unwrap(),
+        Completion::Succeeded,
+        policy,
+    )
+    .await
+    .unwrap();
+    let next = claim(pool, policy).await.unwrap().unwrap();
+    assert_ne!(next.job.project_id, leases[0].job.project_id);
+    assert_ne!(next.job.project_id, leases[1].job.project_id);
+    database.cleanup().await.unwrap();
+}
+
+#[tokio::test]
 async fn enqueue_is_atomic_immutable_and_idempotent() {
     let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
         return;
