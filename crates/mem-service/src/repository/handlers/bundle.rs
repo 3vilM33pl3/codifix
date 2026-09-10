@@ -445,12 +445,38 @@ pub(crate) async fn preview_bundle_import(
 }
 
 pub async fn upsert_project_slug(pool: &PgPool, slug: &str) -> Result<Uuid, sqlx::Error> {
+    upsert_project_slug_as(
+        pool,
+        slug,
+        &mem_store::events::MutationContext::internal("project-upsert"),
+    )
+    .await
+}
+
+pub async fn upsert_project_slug_as(
+    pool: &PgPool,
+    slug: &str,
+    context: &mem_store::events::MutationContext,
+) -> Result<Uuid, sqlx::Error> {
     let mut tx = pool.begin().await?;
     let id = upsert_project_slug_tx(&mut tx, slug).await?;
+    let mut event = mem_store::events::TimelineEvent::new(
+        id,
+        ActivityKind::ProjectChanged,
+        "Project registered or updated".into(),
+    );
+    context.stamp(&mut event);
+    mem_store::events::append(&mut tx, &event)
+        .await
+        .map_err(|error| match error {
+            mem_store::Error::Database(error) => error,
+            other => sqlx::Error::Protocol(other.to_string()),
+        })?;
     tx.commit().await?;
     Ok(id)
 }
 
+/// Compose with the caller's operation-level event, appended after all writes.
 pub async fn upsert_project_slug_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     slug: &str,
@@ -482,26 +508,40 @@ pub(crate) async fn project_bundle_export_preview(
 
 pub(crate) async fn project_bundle_export(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(slug): Path<String>,
     Json(options): Json<ProjectMemoryExportOptions>,
 ) -> Result<Response, ApiError> {
     let pool = &state.pool()?;
     let memories = load_project_bundle_entries(pool, &slug, &options).await?;
     let (manifest, _) = build_bundle_manifest(&slug, &options, &memories)?;
+    let project_id = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+        .bind(&slug)
+        .fetch_one(pool)
+        .await
+        .map_err(ApiError::sql)?;
+    let mut context = crate::effects::actor(&principal);
+    context.source = "bundle-export".into();
+    let effect = mem_store::effects::EffectIntent {
+        id: Uuid::new_v4(),
+        project_id: Some(project_id),
+        kind: mem_store::effects::EffectKind::ExportPrepare,
+        host_id: state.config.cluster.service_id.clone(),
+        resource: manifest.bundle_id.clone(),
+        input_fingerprint: hex_sha256(&canonical_json_bytes(&manifest)?),
+        actor_id: context.actor_id.clone(),
+        source: context.source.clone(),
+    };
+    mem_store::effects::begin(pool, &effect)
+        .await
+        .map_err(|error| ApiError::io(error.into()))?;
     let bytes = serialize_bundle_archive(&manifest)?;
     let filename = bundle_filename(&slug, &manifest.bundle_id);
-    notify_project_changed(
-        &state,
-        slug.clone(),
-        None,
-        ActivityKind::BundleExport,
-        format!("Exported memory bundle {}", manifest.bundle_id),
-        Some(ActivityDetails::BundleTransfer {
-            bundle_id: manifest.bundle_id.clone(),
-            item_count: manifest.entries.len(),
-            source_project: Some(slug.clone()),
-        }),
-    );
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let (event, sequence) =
+        confirm_export_prepared_tx(&mut tx, &effect, &manifest, &context).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    crate::repository::events::broadcast_committed(&state, slug, event, sequence);
     let mut response = Response::new(bytes.into());
     response.headers_mut().insert(
         header::CONTENT_TYPE,
@@ -513,6 +553,43 @@ pub(crate) async fn project_bundle_export(
             .map_err(|error| ApiError::io(error.into()))?,
     );
     Ok(response)
+}
+
+/// Preparation is observed; receipt does not claim the client received bytes.
+async fn confirm_export_prepared_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    effect: &mem_store::effects::EffectIntent,
+    manifest: &ProjectMemoryBundleManifest,
+    context: &mem_store::events::MutationContext,
+) -> Result<(mem_store::events::TimelineEvent, i64), ApiError> {
+    mem_store::effects::conclude_tx(
+        tx,
+        effect.id,
+        Uuid::new_v5(&effect.id, b"prepared"),
+        mem_store::effects::EffectStatus::Confirmed,
+        mem_store::effects::EffectReason::Observed,
+    )
+    .await
+    .map_err(|error| ApiError::io(error.into()))?;
+    let mut event = mem_store::events::TimelineEvent::new(
+        effect
+            .project_id
+            .ok_or_else(|| ApiError::internal("export missing project"))?,
+        ActivityKind::BundleExport,
+        format!("Prepared memory bundle {} for download", manifest.bundle_id),
+    );
+    event.id = Uuid::new_v5(&effect.id, b"event");
+    event.operation_id = Some(effect.id.to_string());
+    event.details = Some(ActivityDetails::BundleTransfer {
+        bundle_id: manifest.bundle_id.clone(),
+        item_count: manifest.entries.len(),
+        source_project: Some(manifest.source_project.clone()),
+    });
+    context.stamp(&mut event);
+    let sequence = mem_store::events::append(tx, &event)
+        .await
+        .map_err(|error| ApiError::io(error.into()))?;
+    Ok((event, sequence))
 }
 
 pub(crate) async fn project_bundle_import_preview(
@@ -828,6 +905,103 @@ async fn import_bundle_tx(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn project_and_export_receipts_roll_back_on_late_event_failure() {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let slug = Uuid::new_v4().to_string();
+        let mut context = mem_store::events::MutationContext::internal("export-test");
+        context.actor_id = "late\0failure".into();
+        assert!(
+            upsert_project_slug_as(&pool, &slug, &context)
+                .await
+                .is_err()
+        );
+        assert!(
+            !sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM projects WHERE slug=$1)")
+                .bind(&slug)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        );
+        context.actor_id = Uuid::new_v4().to_string();
+        let project = upsert_project_slug_as(&pool, &slug, &context)
+            .await
+            .unwrap();
+        let actor: String = sqlx::query_scalar("SELECT actor_id FROM project_timeline_events WHERE project_id=$1 AND kind='project_changed'").bind(project).fetch_one(&pool).await.unwrap();
+        assert_eq!(actor, context.actor_id);
+        let (manifest, _) =
+            build_bundle_manifest(&slug, &ProjectMemoryExportOptions::default(), &[]).unwrap();
+        let effect = mem_store::effects::EffectIntent {
+            id: Uuid::new_v4(),
+            project_id: Some(project),
+            kind: mem_store::effects::EffectKind::ExportPrepare,
+            host_id: "fixture-export".into(),
+            resource: manifest.bundle_id.clone(),
+            input_fingerprint: hex_sha256(&canonical_json_bytes(&manifest).unwrap()),
+            actor_id: context.actor_id.clone(),
+            source: context.source.clone(),
+        };
+        mem_store::effects::begin(&pool, &effect).await.unwrap();
+        context.actor_name = "late\0failure".into();
+        let mut tx = pool.begin().await.unwrap();
+        assert!(
+            confirm_export_prepared_tx(&mut tx, &effect, &manifest, &context)
+                .await
+                .is_err()
+        );
+        tx.rollback().await.unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, String>("SELECT status FROM external_effects WHERE id=$1")
+                .bind(effect.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            "pending"
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT count(*) FROM external_effect_outcomes WHERE effect_id=$1"
+            )
+            .bind(effect.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+            0
+        );
+        context.actor_name = "fixture".into();
+        let mut tx = pool.begin().await.unwrap();
+        let (event, _) = confirm_export_prepared_tx(&mut tx, &effect, &manifest, &context)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert!(event.summary.starts_with("Prepared"));
+        assert_eq!(
+            sqlx::query_scalar::<_, String>("SELECT status FROM external_effects WHERE id=$1")
+                .bind(effect.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            "confirmed"
+        );
+        sqlx::query("DELETE FROM external_effect_outcomes WHERE effect_id=$1")
+            .bind(effect.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM external_effects WHERE id=$1")
+            .bind(effect.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM projects WHERE id=$1")
+            .bind(project)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
     use mem_record::{MemoryStatus, MemoryType, ProjectMemoryExportOptions};
 
     #[tokio::test]

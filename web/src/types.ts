@@ -855,7 +855,21 @@ export type ActivityKind =
   | "delete_memory"
   | "briefing"
   | "diagnostic"
-  | "llm_audit";
+  | "llm_audit"
+  | "memory_validation"
+  | "loop_run_started"
+  | "loop_run_finished"
+  | "loop_run_failed"
+  | "loop_setting_changed"
+  | "proposal_created"
+  | "proposal_decided"
+  | "proposal_applied"
+  | "consolidation"
+  | "provenance_check"
+  | "workspace_changed"
+  | "project_changed"
+  | "trigger_received"
+  | "auth_event";
 
 export type DiagnosticSeverity = "info" | "warning" | "error";
 

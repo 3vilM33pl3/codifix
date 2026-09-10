@@ -107,6 +107,7 @@ pub(crate) fn activity_kind_text(kind: &mem_record::ActivityKind) -> &'static st
         mem_record::ActivityKind::Consolidation => "consolidation",
         mem_record::ActivityKind::ProvenanceCheck => "provenance_check",
         mem_record::ActivityKind::WorkspaceChanged => "workspace_changed",
+        mem_record::ActivityKind::ProjectChanged => "project_changed",
         mem_record::ActivityKind::TriggerReceived => "trigger_received",
         mem_record::ActivityKind::AuthEvent => "auth_event",
     }

@@ -54,6 +54,7 @@ pub enum ActivityKind {
     Consolidation,
     ProvenanceCheck,
     WorkspaceChanged,
+    ProjectChanged,
     TriggerReceived,
     AuthEvent,
 }

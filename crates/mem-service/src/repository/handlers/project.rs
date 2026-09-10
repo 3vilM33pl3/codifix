@@ -1033,6 +1033,7 @@ pub(crate) fn infer_current_thread(
                 "Recent work tracked agent workspaces operating on the project."
             }
             ActivityKind::AuthEvent => "",
+            ActivityKind::ProjectChanged => "Recent work updated the project registration.",
             ActivityKind::Checkpoint => "",
         };
         if !thread.is_empty() {

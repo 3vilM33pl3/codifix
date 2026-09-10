@@ -48,6 +48,7 @@ pub(crate) fn parse_activity_kind(value: &str) -> ActivityKind {
         "consolidation" => ActivityKind::Consolidation,
         "provenance_check" => ActivityKind::ProvenanceCheck,
         "workspace_changed" => ActivityKind::WorkspaceChanged,
+        "project_changed" => ActivityKind::ProjectChanged,
         "trigger_received" => ActivityKind::TriggerReceived,
         "auth_event" => ActivityKind::AuthEvent,
         _ => ActivityKind::Query,
@@ -523,6 +524,7 @@ pub(crate) fn activity_kind_label(kind: &ActivityKind) -> &'static str {
         ActivityKind::Consolidation => "consolidation",
         ActivityKind::ProvenanceCheck => "provenance_check",
         ActivityKind::WorkspaceChanged => "workspace_changed",
+        ActivityKind::ProjectChanged => "project_changed",
         ActivityKind::TriggerReceived => "trigger_received",
         ActivityKind::AuthEvent => "auth_event",
     }
@@ -1086,6 +1088,7 @@ mod tests {
             ActivityKind::Consolidation,
             ActivityKind::ProvenanceCheck,
             ActivityKind::WorkspaceChanged,
+            ActivityKind::ProjectChanged,
             ActivityKind::TriggerReceived,
             ActivityKind::AuthEvent,
         ];

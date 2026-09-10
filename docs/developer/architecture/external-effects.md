@@ -30,6 +30,11 @@ can still modify files outside the service.
 
 ## Provider requests and watcher restarts
 
+Bundle downloads record export preparation intent, then commit the preparation
+receipt and attributed `bundle_export` event together before returning the ZIP.
+The event says **prepared**, not delivered: a lost HTTP connection cannot prove
+that the recipient saved the file. Export previews are read-only.
+
 Strict-JSON LLM calls and local/remote watcher restart requests record an intent
 before sending the request. Successful responses confirm that operation; errors
 or cancellation leave an uncertain outcome, not a claim that the remote action

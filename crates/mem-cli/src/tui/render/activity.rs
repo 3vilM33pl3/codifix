@@ -982,6 +982,7 @@ pub(in crate::tui) fn activity_kind_span(kind: &ActivityKind) -> Span<'static> {
         ActivityKind::Consolidation => ("consolidation", Theme::ACCENT_STRONG),
         ActivityKind::ProvenanceCheck => ("provenance", Theme::ACCENT),
         ActivityKind::WorkspaceChanged => ("workspace", Theme::ACCENT),
+        ActivityKind::ProjectChanged => ("project", Theme::ACCENT),
         ActivityKind::TriggerReceived => ("trigger", Theme::ACCENT),
         ActivityKind::AuthEvent => ("auth", Theme::WARNING),
     };
