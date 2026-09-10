@@ -280,6 +280,9 @@ async fn reproduce_suite(args: EvalReproduceArgs, cwd: &Path, api: &ApiClient) -
 
 pub(super) async fn handle_eval_command(args: EvalArgs, cwd: &Path, api: &ApiClient) -> Result<()> {
     match args.command {
+        EvalCommand::Campaign(args) => {
+            super::eval_campaign::handle(args.command).await?;
+        }
         EvalCommand::Doctor(args) => {
             let suite = mem_eval::load_suite(&args.suite)?;
             let mut checks = Vec::new();

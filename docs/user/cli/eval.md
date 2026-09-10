@@ -11,6 +11,27 @@ The command is intentionally file-based: suites live in the repository and run
 results are written as immutable JSON artifacts under `target/memory-evals/`.
 That makes comparisons reproducible and easy to attach to release notes.
 
+## Isolated R3 campaigns (in progress)
+
+`memory eval campaign plan --manifest <campaign.json> [--split development|held-out]`
+validates asset hashes, suite items, split sizes and deterministic condition
+ordering without querying a service. It reports unresolved label/model/budget
+gates rather than treating a draft as approved.
+
+`memory eval campaign report --manifest <campaign.json> --artifact <artifact.json>`
+validates task-level observations and reports scenario-clustered comparisons.
+Offline results cannot pass the product-quality gate. Incomplete legacy run
+files must use the existing `compare`/`report` commands instead.
+
+`campaign run --offline --allow-shell --manifest <campaign.json> --driver <executable>
+--out <new-directory>` is an integration interface for a reviewed isolation driver
+whose bytes are a locked configuration asset. No complete driver is shipped yet;
+paid execution is disabled pending per-request mediation and isolation tests.
+It does not use the CLI's ambient service or provider credentials. Output paths
+must be new; interrupted evidence is retained, never overwritten or blindly retried.
+
+See [R3 draft material and remaining integration](../../../evals/r3/README.md).
+
 ## Suite Format
 
 Create a directory containing `suite.toml` and `items.jsonl`:

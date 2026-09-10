@@ -2351,6 +2351,8 @@ pub(in crate::commands) struct EvalArgs {
 
 #[derive(Debug, Subcommand)]
 pub(in crate::commands) enum EvalCommand {
+    #[command(about = "Plan, execute or report an isolated R3 campaign.")]
+    Campaign(EvalCampaignArgs),
     #[command(
         about = "Check whether an eval suite and environment are ready.",
         after_help = EVAL_DOCTOR_AFTER_HELP
@@ -2391,6 +2393,50 @@ pub(in crate::commands) enum EvalCommand {
         after_help = EVAL_GATE_AFTER_HELP
     )]
     Gate(EvalGateArgs),
+}
+
+#[derive(Debug, Args)]
+pub(in crate::commands) struct EvalCampaignArgs {
+    #[command(subcommand)]
+    pub(crate) command: EvalCampaignCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub(in crate::commands) enum EvalCampaignCommand {
+    /// Verify hashes and print deterministic work order, without service calls.
+    Plan {
+        #[arg(long)]
+        manifest: PathBuf,
+        #[arg(long, default_value = "development")]
+        split: String,
+    },
+    /// Run a reviewed, hash-locked isolation driver; never use the ambient service.
+    Run {
+        #[arg(long)]
+        manifest: PathBuf,
+        #[arg(long)]
+        driver: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, default_value = "development")]
+        split: String,
+        /// Explicit consent to execute the reviewed campaign driver.
+        #[arg(long)]
+        allow_shell: bool,
+        /// Fake-provider harness evidence only; never product-quality evidence.
+        #[arg(long)]
+        offline: bool,
+        /// Separate human-authored label and spend approvals bound to this manifest.
+        #[arg(long = "approval")]
+        approvals: Vec<PathBuf>,
+    },
+    /// Validate all evidence and report clustered paired outcomes.
+    Report {
+        #[arg(long)]
+        manifest: PathBuf,
+        #[arg(long)]
+        artifact: PathBuf,
+    },
 }
 
 #[derive(Debug, Args)]

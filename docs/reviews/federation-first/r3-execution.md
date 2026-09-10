@@ -7,7 +7,7 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
 ## Delivery gates
 
 - [x] Checkpoint approved contract and inspect existing evaluation machinery.
-- [ ] Operator-only frozen semantic clock and no-learning service profile.
+- [x] Operator-only frozen semantic clock and no-learning service profile.
 - [ ] Sealed/reset disposable datasets and restricted agent containers.
 - [ ] Equal-information document, lexical, vector and full-Memory baselines.
 - [ ] Synthetic development/held-out knowledge and coding review pack.
@@ -59,3 +59,20 @@ leases and latency measurement. No user query parameter can change semantic time
 Implementation completion, valid experiment completion and product-quality pass
 are distinct. No official result may be claimed from fake/offline runs or draft
 labels. No existing deployment is changed by this work.
+
+## 2026-09-10 implementation increment
+
+The service/search clock and no-learning changes are implemented and tested with
+disposable PostgreSQL. Measurement startup also refuses privileged/unsealed DB
+roles. Source/reinforcement DML is denied; allowed operational journals remain
+outside benchmark content. No existing deployment was restarted or migrated.
+
+Pure baseline comparators, campaign manifests/approval contracts, conservative
+reservations, clustered reports and CLI plan/report interfaces are implemented.
+An offline driver interface is present but **the full driver is not implemented**;
+paid dispatch fails before execution. These are not complete R3 end-to-end results.
+
+The draft review generator prepares all 156 tasks. All 48 coding reference
+graders pass. The draft knowledge scorer still requires semantic/citation
+adjudication; coding difficulty is explicitly limited to small functions.
+See `evals/r3/README.md` for the remaining integration list. R3 stays unchecked.
