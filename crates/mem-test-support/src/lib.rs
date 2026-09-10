@@ -49,6 +49,45 @@ pub async fn run_migrations(pool: &PgPool) -> Result<()> {
         .context("run Memory Layer migrations")
 }
 
+/// Database-wide claimers must not consume another test's queued work. Requires
+/// CREATEDB on the explicitly configured disposable PostgreSQL test instance.
+pub struct IsolatedDatabase {
+    pub pool: PgPool,
+    admin: PgPool,
+    name: String,
+}
+
+impl IsolatedDatabase {
+    pub async fn new() -> Option<Self> {
+        let admin = migrated_pool().await?;
+        let name = format!("memory_fixture_{}", Uuid::new_v4().simple());
+        // Identifier is generated here from ASCII prefix and UUID, never input.
+        sqlx::query(&format!("CREATE DATABASE {name}"))
+            .execute(&admin)
+            .await
+            .expect("create isolated disposable test database");
+        let options = admin.connect_options().as_ref().clone().database(&name);
+        let pool = PgPoolOptions::new()
+            .max_connections(10)
+            .connect_with(options)
+            .await
+            .expect("connect isolated test database");
+        run_migrations(&pool)
+            .await
+            .expect("migrate isolated test database");
+        Some(Self { pool, admin, name })
+    }
+
+    pub async fn cleanup(self) -> Result<()> {
+        self.pool.close().await;
+        sqlx::query(&format!("DROP DATABASE {} WITH (FORCE)", self.name))
+            .execute(&self.admin)
+            .await?;
+        self.admin.close().await;
+        Ok(())
+    }
+}
+
 fn compatible_migrator() -> sqlx::migrate::Migrator {
     let mut migrator = sqlx::migrate!("../../migrations");
     migrator.migrations = std::borrow::Cow::Owned(

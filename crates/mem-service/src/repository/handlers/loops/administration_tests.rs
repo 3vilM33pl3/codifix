@@ -112,7 +112,7 @@ async fn cancellation_and_approval_are_atomic_with_the_run_journal() {
     .execute(&pool)
     .await
     .unwrap();
-    sqlx::query("INSERT INTO loop_runs(id,loop_id,definition_version,project_id,scope_type,scope_id,mode,status) VALUES($1,'test',1,$2,'project',$3,'manual','running')")
+    sqlx::query("INSERT INTO loop_runs(id,loop_id,definition_version,project_id,scope_type,scope_id,mode,status) VALUES($1,'test',1,$2,'project',$3,'suggest_only','running')")
         .bind(run).bind(project).bind(project.to_string()).execute(&pool).await.unwrap();
     sqlx::query("INSERT INTO approval_requests(id,project_id,run_id,loop_id,action_type,proposed_action_json,risk_reason,status) VALUES($1,$2,$3,'test','write_memory_proposal','{}','Review required','pending')")
         .bind(approval).bind(project).bind(run).execute(&pool).await.unwrap();

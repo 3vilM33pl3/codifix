@@ -188,8 +188,10 @@ mod tests {
         .execute(pool)
         .await
         .unwrap();
-        sqlx::query("INSERT INTO loop_runs(id,loop_id,definition_version,project_id,scope_type,scope_id,mode,status) VALUES($1,'memory.consolidation',1,$2,'project',$3,'manual','completed')")
+        sqlx::query("INSERT INTO loop_runs(id,loop_id,definition_version,project_id,scope_type,scope_id,mode,status) VALUES($1,'memory.consolidation',1,$2,'project',$3,'suggest_only','succeeded')")
             .bind(run).bind(project).bind(project.to_string()).execute(pool).await.unwrap();
+        let member = Uuid::new_v4();
+        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,false,'Fixture source','Source','implementation','project',3,0.9,now(),now(),to_tsvector('english','fixture'))").bind(member).bind(project).execute(pool).await.unwrap();
         (
             project,
             LoopMemoryProposalCreateRequest {
@@ -198,7 +200,7 @@ mod tests {
                 proposal_type: "consolidate".into(),
                 run_id: Some(run),
                 target_memory_id: None,
-                candidate: serde_json::json!({"summary":"private proposed output"}),
+                candidate: serde_json::json!({"summary":"private proposed output","member_canonical_ids":[member]}),
                 evidence: serde_json::json!([]),
                 confidence: 0.7,
                 risk_notes: None,
@@ -311,9 +313,10 @@ mod tests {
     async fn wrong_project_run_is_rejected_and_lease_loss_rolls_back_proposal() {
         use mem_record::{JobKind, JobStatus};
         use mem_store::jobs::{self, Completion, JobActor, JobPolicy, NewJob};
-        let Some(pool) = mem_test_support::migrated_pool().await else {
+        let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
             return;
         };
+        let pool = database.pool.clone();
         let (project, request) = fixture(&pool).await;
         let (_, other) = fixture(&pool).await;
         let context = MutationContext::internal("consolidation");
@@ -376,5 +379,6 @@ mod tests {
         mem_test_support::cleanup_project(&pool, &other.project)
             .await
             .unwrap();
+        database.cleanup().await.unwrap();
     }
 }

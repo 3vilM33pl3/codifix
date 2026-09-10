@@ -692,10 +692,16 @@ mod tests {
         let events = mem_store::events::page(&pool, project_id, 0, 10)
             .await
             .unwrap();
-        assert_eq!(events.events.len(), 1);
-        assert_eq!(events.events[0]["actor_id"], context.actor_id);
-        assert_eq!(events.events[0]["actor_name"], context.actor_name);
-        assert_eq!(events.events[0]["source"], context.source);
+        assert_eq!(events.events.len(), 2); // project registration plus one replayed activity
+        let replayed: Vec<_> = events
+            .events
+            .iter()
+            .filter(|row| row["id"] == event.event_id.to_string())
+            .collect();
+        assert_eq!(replayed.len(), 1);
+        assert_eq!(replayed[0]["actor_id"], context.actor_id);
+        assert_eq!(replayed[0]["actor_name"], context.actor_name);
+        assert_eq!(replayed[0]["source"], context.source);
         mem_test_support::cleanup_project(&pool, &project)
             .await
             .unwrap();
