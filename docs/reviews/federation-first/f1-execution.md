@@ -113,3 +113,18 @@ scoped Lean expertise ownership/revision/revocation proofs build without `sorry`
 Focused federation/adapter/store/runtime Clippy passes. This is not a working
 remote question service: collection persistence, mailbox, client workflows and
 disposable end-to-end evidence are still pending.
+
+Persistence increment: migrations 0048–0049 add origin-only collection reviews,
+explicit automation grants and metadata-only review journals, plus a separate
+gateway mailbox, attempt journal and transactionally reserved model budgets.
+Collection review/outbox writes are atomic. Exact retries, changed-source
+exclusion, tombstones, explicit third-instance permission, concurrent claims,
+expired-worker fencing, ambiguous provider reservations, holds and read-time
+payload expiry are covered by required-database tests using disposable pgvector
+PostgreSQL and fake receipt signatures. These tests establish storage behavior,
+not network authentication or deployed isolation. Gateway-role grants exclude
+origin collections and allow deletion only of expiring Q&A payloads/receipts.
+The complete federation/store/runtime regression suite and workspace Clippy
+passed for the collection increment; mailbox-specific store tests pass. There
+are still no enabled F1 service routes, workers or end-user workflows, and the
+two-service/PDS rehearsal remains pending. No existing service was reconfigured.

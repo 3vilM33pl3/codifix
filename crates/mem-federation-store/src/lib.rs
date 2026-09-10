@@ -3,8 +3,12 @@
 //! verification and automatic service scheduling are NOT provided by this crate.
 
 mod audit;
+mod expertise_collections;
+mod expertise_mailbox;
 mod gateway;
 pub use audit::*;
+pub use expertise_collections::*;
+pub use expertise_mailbox::*;
 mod projection;
 mod publisher;
 mod replica;
@@ -31,6 +35,8 @@ use sqlx::{PgConnection, Row};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
+    #[error(transparent)]
+    Expertise(#[from] mem_federation::expertise::ExpertiseReject),
     #[error(transparent)]
     Database(#[from] sqlx::Error),
     #[error(transparent)]
