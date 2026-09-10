@@ -150,12 +150,11 @@ remain rejected and release-mode gateways cannot enable the rehearsal RPC.
 
 1. Add durable requester preparation/consent and origin result persistence,
    automatic service-identity workers and lifecycle/reconnection handling.
-2. Implement fresh origin eligibility authorization for **each delivery of a
-   retained answer**, not just generation. Current mailbox reads recheck gateway
-   membership, advertisement revision and policy, but cannot observe a local
-   source update on their own. The component harness checks origin eligibility
-   while generating; it does not close this later-delivery race. Production
-   enablement must remain unavailable until this boundary is implemented/tested.
+2. Integrate the component-tested fresh origin authorization into the complete
+   service rehearsal. Each retained-answer delivery now requires a live,
+   single-use origin check; metadata/status and exact submit retries contain no
+   answer. The optional service delivery validator is implemented, but automatic
+   question execution and the full requester workflow remain outstanding.
 3. Integrate restricted models, configured call/token budgets, uncertain outcomes
    and metadata-only provider auditing. No paid invocation is authorized.
 4. Add project-scoped review/consent/result endpoints and matching Web/CLI/TUI/MCP
@@ -195,3 +194,47 @@ shared traces pass (pre-existing Lean linter warnings remain).
 The disposable PostgreSQL container was stopped/removed after verification;
 its synthetic fixture data is regenerable from the tests. A resumable partial
 checkpoint was recorded at `398cd01`. The approved plan was not marked complete.
+
+### Retained-answer delivery increment — 2026-09-10
+
+Commits `24ce30b` and `de05bc9` add a fresh, nonce-bound origin check for every
+retained-answer transfer, plus an optional disposable-only service validator.
+Migration 0050 adds metadata-only delivery challenges and attempt actions. Each
+approval is addressed, lease-fenced, expires within 15 seconds and can release
+only the original immutable answer to the live waiting read. Exact submit retries
+and metadata reads cannot bypass this check. Gateway writer/key recovery expires
+old challenges. Retention cleanup respects holds and does not erase publication
+or audit history.
+
+The validator polls every two seconds using a separate internal identity. It
+resolves and locks current project permissions, collection grants and reviewed
+source eligibility through its approval call. It rederives deterministic excerpts
+and exact citations rather than trusting stored text. It does not execute queued
+questions or invoke providers. Model answers remain disabled. The gateway release
+commit is an authorization point, not a distributed transaction with the origin
+or proof that the recipient received bytes. Already-authorized in-flight transfers
+cannot be recalled; disconnected origins cannot authorize fresh reads.
+
+Required-database store/runtime regressions pass, including two independent
+origin databases, real signed loopback HTTP, denial after source-only updates and
+local collection-grant revocation, altered/replayed approvals, expired challenges,
+writer fencing, journal-failure rollback and the 32-request bound. All ten
+federation service tests pass, including current project permission locking,
+revocation, rejecting global worker authority, disposable-only configuration,
+separate identity enforcement and worker shutdown. Workspace Clippy with
+`-D warnings`, formatting and boundary checks pass. A partial dev Memory
+checkpoint was saved at `de05bc9`; no completion verification was invoked.
+
+The required-database workspace all-target test run also passes serially: 827
+tests across 49 test binaries, with zero failures or ignored tests
+(`MEMORY_LAYER_TEST_REQUIRE_DB=1`, `--locked`, `--test-threads=1`), including the
+existing federation C/D/E and durable-job regressions. Parallel workspace tests,
+Web, Lean, the lean CLI build and the container-network/PDS isolation rehearsal
+were not rerun for this increment; their prior evidence above is not relabeled
+as new coverage. Logs are in `/tmp/memory-f1-delivery.U72WlQ/` (temporary, not a
+durable artifact). The disposable PostgreSQL fixture was stopped after testing.
+
+The earlier full-rehearsal gaps remain: requester preparation/consent, durable
+origin execution/results, synthesis, user interfaces and actual PDS/game service
+rehearsal. Existing services and credentials were not changed. This increment
+does not mark any end-to-end F1 requirement or customer gate complete.
