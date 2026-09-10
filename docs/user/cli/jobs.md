@@ -32,6 +32,10 @@ and original inputs are retained; a new bounded retry generation is opened.
 Running and successful jobs cannot be restarted here. Retry cannot transfer
 authority from a revoked requester to an operator or bypass configuration policy.
 
+Pre-cutover enrichment has no reconstructed historical jobs. Database operators
+can explicitly request fresh, version-pinned repair work using the
+[R1 rollout and repair procedure](../../developer/architecture/r1-rollout.md).
+
 Choose a request UUID once. If a reply is lost, repeat the **same** request UUID.
 Provider execution is not exactly once: an uncertain attempt can be billed again.
 Credential, quota, authorization and configuration failures need intervention;

@@ -9,6 +9,72 @@ use mem_record::{BackgroundWorkReference, JobKind};
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
+/// Privileged maintenance entry point. The caller must already be authorized
+/// to administer this database. Execution still checks the principal's current
+/// project permissions. This creates fresh work, never historic curation rows.
+pub async fn request_repair(
+    tx: &mut Transaction<'_, Postgres>,
+    project: Uuid,
+    operation: Uuid,
+    principal: Uuid,
+    versions: &[Uuid],
+) -> Result<BackgroundWorkReference> {
+    if principal.is_nil() || operation.is_nil() || versions.is_empty() || versions.len() > 200 {
+        return Err(crate::Error::Invalid("repair identities or batch size"));
+    }
+    for version in versions {
+        let current: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM memory_entries m JOIN memory_canonical_state cs ON cs.canonical_id=m.canonical_id WHERE m.id=$1 AND m.project_id=$2 AND cs.status='active' AND NOT m.is_tombstone AND m.version_no=(SELECT max(version_no) FROM memory_entries WHERE canonical_id=m.canonical_id))")
+            .bind(version).bind(project).fetch_one(&mut **tx).await?;
+        if !current {
+            return Err(crate::Error::Invalid(
+                "repair requires current active versions",
+            ));
+        }
+    }
+    let work = enqueue(
+        tx,
+        project,
+        operation,
+        versions,
+        &JobActor::Principal(principal),
+    )
+    .await?;
+    let mut event = crate::events::TimelineEvent::new(
+        project,
+        mem_record::ActivityKind::Reembed,
+        "Operator requested enrichment repair; completion is tracked in Jobs".into(),
+    );
+    event.id = Uuid::new_v5(&operation, b"repair-requested");
+    let existing: Option<(Uuid, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT project_id,actor_id,source FROM project_timeline_events WHERE id=$1",
+    )
+    .bind(event.id)
+    .fetch_optional(&mut **tx)
+    .await?;
+    if let Some(existing) = existing {
+        if existing
+            != (
+                project,
+                Some(principal.to_string()),
+                Some("operator-repair".into()),
+            )
+        {
+            return Err(crate::Error::Conflict);
+        }
+        return Ok(work);
+    }
+    event.operation_id = Some(operation.to_string());
+    crate::events::MutationContext {
+        actor_id: principal.to_string(),
+        actor_name: principal.to_string(),
+        source: "operator-repair".into(),
+        occurred_at: None,
+    }
+    .stamp(&mut event);
+    crate::events::append(tx, &event).await?;
+    Ok(work)
+}
+
 pub async fn enqueue(
     tx: &mut Transaction<'_, Postgres>,
     project: Uuid,

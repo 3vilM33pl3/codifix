@@ -194,10 +194,13 @@ leaving an unaudited proposal. The timeline records the authenticated creator fo
 API requests; direct automation uses an explicit internal identity. Proposal
 contents and evidence remain in the review record, not the creation event.
 
-This guarantee covers creation, not the complete loop lifecycle. Durable
-background scheduling and operator job retry are still under implementation;
-rerunning a CLI creation command is a new creation request, not an idempotent
-worker retry.
+Loop state changes now commit with their dedicated audit/run trace and relevant
+project event. Foreground ownership prevents disconnected executors from
+publishing new phases. Interrupted runs retain prior results and become failed;
+external commands are not automatically replayed. Trigger intake is receipt,
+not proof of completed routing: inspect linked runs before requesting missing
+work again. Rerunning a CLI proposal creation command is still a new request,
+not an idempotent background-worker retry.
 
 Required fields:
 

@@ -75,9 +75,10 @@ the target directory. Inspect the exact journal entry and target before removing
 that temporary file. It may contain private configuration. Do not use a broad
 cleanup command or treat it as the authoritative configuration.
 
-Other external-effect producers and interrupted loop/provider recovery remain
-tracked in the [R1 inventory](../../reviews/federation-first/r1-coverage.md).
-This slice is not the completed R1 gate or a disaster-recovery demonstration.
+Producer coverage and interrupted loop/provider recovery are recorded in the
+[R1 inventory](../../reviews/federation-first/r1-coverage.md). Deployment follows
+the [coordinated rollout](r1-rollout.md); these journals alone are not a
+disaster-recovery demonstration.
 
 ## Foreground ownership primitive
 
@@ -93,8 +94,8 @@ This requires direct or session-pooled PostgreSQL connections, not a
 transaction-pooling proxy. Budget one additional connection per active
 foreground execution; owners do not consume transaction-pool slots. Tests kill
 only an owned session on disposable PostgreSQL and prove stale-result rollback,
-live-owner exclusion and atomic recovery. Domain integration remains tracked
-in the R1 inventory until its own tests pass.
+live-owner exclusion and atomic recovery, including the connected validation
+and loop domain integrations described below.
 
 Validation now registers ownership with its requested-run event and checks it
 before publishing evidence or score/version changes. Completion or ordinary

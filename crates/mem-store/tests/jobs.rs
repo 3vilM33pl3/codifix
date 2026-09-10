@@ -56,6 +56,85 @@ async fn cleanup(pool: &sqlx::PgPool, project: Uuid) {
 }
 
 #[tokio::test]
+async fn operator_repair_is_fresh_atomic_and_idempotent_without_changing_memory() {
+    let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
+        return;
+    };
+    let pool = &database.pool;
+    let seed = setup(pool).await;
+    let version = Uuid::new_v4();
+    sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,false,'pre-cutover fixture','fixture','implementation','project',3,0.9,now(),now(),to_tsvector('english','fixture'))")
+        .bind(version).bind(seed.project_id).execute(pool).await.unwrap();
+    let operation = Uuid::new_v4();
+    let principal = Uuid::new_v4();
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query("CREATE TEMP TABLE project_timeline_events (LIKE public.project_timeline_events INCLUDING DEFAULTS, CHECK(FALSE)) ON COMMIT DROP").execute(&mut *tx).await.unwrap();
+    assert!(
+        mem_store::post_curation::request_repair(
+            &mut tx,
+            seed.project_id,
+            operation,
+            principal,
+            &[version]
+        )
+        .await
+        .is_err()
+    );
+    tx.rollback().await.unwrap();
+    assert!(
+        list(pool, seed.project_id, None, None, 100)
+            .await
+            .unwrap()
+            .jobs
+            .is_empty()
+    );
+    for _ in 0..2 {
+        let mut tx = pool.begin().await.unwrap();
+        mem_store::post_curation::request_repair(
+            &mut tx,
+            seed.project_id,
+            operation,
+            principal,
+            &[version],
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+    }
+    assert_eq!(
+        list(pool, seed.project_id, None, None, 100)
+            .await
+            .unwrap()
+            .jobs
+            .len(),
+        4
+    );
+    assert_eq!(sqlx::query_scalar::<_,i64>("SELECT count(*) FROM project_timeline_events WHERE project_id=$1 AND source='operator-repair'").bind(seed.project_id).fetch_one(pool).await.unwrap(),1);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM memory_entries WHERE project_id=$1")
+            .bind(seed.project_id)
+            .fetch_one(pool)
+            .await
+            .unwrap(),
+        1
+    );
+    let mut tx = pool.begin().await.unwrap();
+    assert!(
+        mem_store::post_curation::request_repair(
+            &mut tx,
+            seed.project_id,
+            operation,
+            Uuid::new_v4(),
+            &[version]
+        )
+        .await
+        .is_err()
+    );
+    tx.rollback().await.unwrap();
+    database.cleanup().await.unwrap();
+}
+
+#[tokio::test]
 async fn independent_claimers_share_the_global_project_limit() {
     let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
         return;
