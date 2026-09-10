@@ -1,5 +1,7 @@
 # R1 foundation and first transaction conversions
 
+Historical slice report. For current status, see [R1 completion](2026-09-10-r1-completion.md).
+
 **R1 is not complete.** The scoped contract currently has 1/16 fully completed
 items, with partial implementation across several others. The approved full
 plan and federation-first master remain open; neither is archived.

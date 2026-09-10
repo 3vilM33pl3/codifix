@@ -5,7 +5,7 @@ Use this map to find the right PR boundary before opening the large files.
 ## Crates
 
 - `crates/mem-record`: shared request/response and domain record types (pure serde, no I/O).
-- `crates/mem-store`: local transaction-aware timeline and durable-job primitives; no network/configuration/service dependency. Capture/curation use transactional event writes; job worker/client integration remains tracked in the [R1 inventory](../../reviews/federation-first/r1-coverage.md).
+- `crates/mem-store`: transaction-aware local events, durable jobs, execution/effect journals and operator repair; no network/configuration/service dependency. Connected workers are in `mem-service/src/background.rs`, clients in Web/CLI/TUI Jobs; see the [R1 inventory](../../reviews/federation-first/r1-coverage.md).
 - `crates/mem-config`: configuration loading, discovery, and validation helpers.
 - `crates/mem-cli`: the `memory` binary, CLI command routing, TUI, setup wizard, eval runner orchestration, and local service tooling.
 - `crates/mem-service`: HTTP service runtime, routes, repository reads, migrations entrypoint, activity persistence, and service-mounted MCP.

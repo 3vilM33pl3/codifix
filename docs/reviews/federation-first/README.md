@@ -14,7 +14,8 @@ the [B2/B3 permission and conformance increment](2026-09-08-b2-b3.md) and
 [completed C integration](2026-09-08-c-completion.md). The
 [repository-authenticity increment](2026-09-09-d-repository-verification.md) is now
 followed by [completed Stage D implementation](2026-09-09-d-completion.md) and
-[Stage E end-to-end integration](2026-09-09-e-completion.md).
+[Stage E end-to-end integration](2026-09-09-e-completion.md) and
+[R1 durable-work completion](2026-09-10-r1-completion.md).
 The full roadmap remains incomplete; checked items have deliberately bounded scope.
 
 ## Source contracts and existing evidence
@@ -112,7 +113,7 @@ retention contract; native Spaces is not the public relay topology.
 
 ## Core reliability, evaluation, retrieval and expert correction
 
-- [ ] R1 Replace in-memory post-curation work with durable jobs, bounded retries, leases and observable failures; close the mutation/event-log transaction gap.
+- [x] R1 Replace in-memory post-curation work with durable jobs, bounded retries, leases and observable failures; close the mutation/event-log transaction gap. Evidence: [R1 completion](2026-09-10-r1-completion.md), [coverage](r1-coverage.md) and [rollout/repair](../../developer/architecture/r1-rollout.md). All 16 scoped engineering items verified; customer DR, deployment readiness, evaluation quality and F remain separately gated.
 - [x] R2 Repair parent/child evaluation token double-counting; separate physical execution costs, whole-task success and step diagnostics, and add regression tests. Evidence: crates/mem-eval/src/accounting_tests.rs. Overall statistics count paired tasks once; step-prefixed groups are non-additive diagnostics. Legacy mixed comparison artifacts require recomparison before release gating. This does not establish held-out product quality or complete provider billing coverage.
 - [ ] R3 Run real isolated quality gates with fixed evaluation time and no reinforcement writeback; include handover-document and simpler-retrieval baselines at comparable information/budget, not only no-access baselines.
 - [ ] R4 Apply authorized-project restrictions before candidate limits; batch source reads, bound concurrent retrieval, calibrate ranking by ablation, and exclude obsolete/tombstoned consolidation inputs.

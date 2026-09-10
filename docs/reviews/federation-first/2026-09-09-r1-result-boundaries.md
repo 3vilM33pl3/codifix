@@ -1,5 +1,7 @@
 # R1 continuation: transactional provider-result boundaries
 
+Historical slice report. For current status, see [R1 completion](2026-09-10-r1-completion.md).
+
 Date: 2026-09-09. Branch: `codex/federation-v1`.
 
 R1 remains in progress. This is evidence for two bounded implementation slices,

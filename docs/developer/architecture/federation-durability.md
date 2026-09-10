@@ -94,8 +94,9 @@ larger installations need a reviewed staging/checkpoint implementation.
 See the [operator configuration](../../user/federation-runtime.md) and
 [C completion evidence](../../reviews/federation-first/2026-09-08-c-completion.md).
 Offline here means a local PostgreSQL instance works while the gateway/PDS/peer is down,
-not that PostgreSQL itself can be absent. R1's existing post-curation queue and
-timeline transaction gap are separate unfinished integration work.
+not that PostgreSQL itself can be absent. R1's local durable jobs and timeline
+transactions are separate from federation authority ordering; see the
+[R1 evidence](../../reviews/federation-first/2026-09-10-r1-completion.md).
 
 Real-PDS tests alone do not establish the full production trust boundary. Stage D
 adds separate receiver-proof, key-lifecycle and container isolation tests. Native

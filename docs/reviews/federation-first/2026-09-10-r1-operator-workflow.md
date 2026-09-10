@@ -86,5 +86,5 @@ PostgreSQL readiness, avoiding the image's temporary initialization server.
 CI's required-database bucket now runs the entire workspace and this process
 smoke. No remote CI run is claimed by the local result.
 
-Still required by the full gate: remaining mutation/external-operation inventory,
-final validation and the coordinated writer-stop rollout procedure.
+The remaining inventory and rollout work is now recorded in the
+[R1 completion evidence](2026-09-10-r1-completion.md).
