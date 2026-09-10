@@ -43,6 +43,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         let shutdown_handle = Arc::new(Mutex::new(Some(shutdown_tx)));
         let state = build_state(config.clone(), shutdown_handle.clone()).await?;
         let _background_tasks = crate::background::start(state.clone());
+        let _effect_recovery = crate::effects::start(state.clone());
         let _federation_tasks = federation::start(
             state.clone(),
             std::env::var_os("MEMORY_LAYER_FEDERATION_CONFIG").map(PathBuf::from),
@@ -185,6 +186,7 @@ pub(crate) async fn build_state(
     let reinforcement = crate::reinforcement::build_runtime(&config.reinforcement);
 
     let state = AppState {
+        configuration_write: Arc::new(tokio::sync::Mutex::new(())),
         role,
         instance_id: Uuid::new_v4().to_string(),
         startup_at: chrono::Utc::now(),

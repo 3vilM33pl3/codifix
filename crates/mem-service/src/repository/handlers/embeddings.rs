@@ -426,167 +426,128 @@ pub(crate) fn equivalent_openai_embedding_space_key(space: &str) -> Option<Strin
 
 pub(crate) async fn activate_embedding_backend(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<ActivateEmbeddingBackendRequest>,
 ) -> Result<Json<EmbeddingBackendsResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
-
-    let previous_active = {
-        let mut embedders = state.embedders.write().await;
-        let previous = embedders.active_name().map(|s| s.to_string());
+    let mut embedders = state.embedders.write().await;
+    if embedders.get(&request.name).is_none() {
+        return Err(ApiError::validation(ValidationError::new(
+            "unknown embedding backend",
+        )));
+    }
+    let outcome = persist_active_embedding_backend(
+        &state,
+        Some(&request.name),
+        &crate::effects::actor(&principal),
+    )
+    .await?;
+    if outcome.applied {
         embedders
             .set_active(&request.name)
-            .map_err(|err| ApiError::validation(ValidationError::new(err.to_string())))?;
-        previous
-    };
-
-    if let Err(err) = persist_active_embedding_backend(&state, Some(&request.name)).await {
-        // Revert in-memory state so config and registry stay in sync.
-        let mut embedders = state.embedders.write().await;
-        if let Some(name) = previous_active {
-            let _ = embedders.set_active(&name);
-        }
-        return Err(err);
+            .map_err(|e| ApiError::io(e.into()))?;
     }
-
+    drop(embedders);
+    outcome.require_confirmed()?;
     build_embedding_backends_response(&state, None).await
 }
 
 pub(crate) async fn deactivate_embedding_backend(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(_request): Json<mem_record::DeactivateEmbeddingBackendRequest>,
 ) -> Result<Json<EmbeddingBackendsResponse>, ApiError> {
-    let previous_active = {
-        let mut embedders = state.embedders.write().await;
-        let previous = embedders.active_name().map(|s| s.to_string());
+    let mut embedders = state.embedders.write().await;
+    let outcome =
+        persist_active_embedding_backend(&state, None, &crate::effects::actor(&principal)).await?;
+    if outcome.applied {
         embedders.clear_active();
-        previous
-    };
-
-    if let Err(err) = persist_active_embedding_backend(&state, None).await {
-        if let Some(name) = previous_active {
-            let mut embedders = state.embedders.write().await;
-            let _ = embedders.set_active(&name);
-        }
-        return Err(err);
     }
-
+    drop(embedders);
+    outcome.require_confirmed()?;
     build_embedding_backends_response(&state, None).await
 }
 
 pub(crate) async fn set_embedding_creation_enabled(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<SetEmbeddingCreationRequest>,
 ) -> Result<Json<EmbeddingBackendsResponse>, ApiError> {
     let name = request.name.trim();
-    if name.is_empty() {
+    if name.is_empty()
+        || !state
+            .config
+            .embeddings
+            .backends
+            .iter()
+            .any(|b| b.name == name)
+    {
         return Err(ApiError::validation(ValidationError::new(
-            "name must be non-empty",
+            "unknown embedding backend",
         )));
     }
-    if !state
-        .config
-        .embeddings
-        .backends
-        .iter()
-        .any(|backend| backend.name == name)
-    {
-        return Err(ApiError::validation(ValidationError::new(format!(
-            "unknown embedding backend: {name}"
-        ))));
-    }
-
-    let previous = {
-        let mut embedders = state.embedders.write().await;
-        let previous = embedders.create_enabled(name);
+    let mut embedders = state.embedders.write().await;
+    let outcome = persist_embedding_creation_enabled(
+        &state,
+        name,
+        request.enabled,
+        &crate::effects::actor(&principal),
+    )
+    .await?;
+    if outcome.applied {
         if embedders.get(name).is_some() {
             embedders
                 .set_create_enabled(name, request.enabled)
-                .map_err(|err| ApiError::validation(ValidationError::new(err.to_string())))?;
-        }
-        previous
-    };
-    let previous_global = state
-        .automated_embedding_creation_enabled
-        .swap(true, Ordering::Relaxed);
-    if let Err(err) = persist_embedding_creation_enabled(&state, name, request.enabled).await {
-        let mut embedders = state.embedders.write().await;
-        if embedders.get(name).is_some() {
-            let _ = embedders.set_create_enabled(name, previous);
+                .map_err(|e| ApiError::io(e.into()))?;
         }
         state
             .automated_embedding_creation_enabled
-            .store(previous_global, Ordering::Relaxed);
-        return Err(err);
+            .store(true, Ordering::Relaxed);
     }
-
+    drop(embedders);
+    outcome.require_confirmed()?;
     build_embedding_backends_response(&state, None).await
 }
 
 pub(crate) async fn persist_active_embedding_backend(
     state: &AppState,
     active_name: Option<&str>,
-) -> Result<(), ApiError> {
-    let Some(config_path) = state.config.resolved_config_path.clone() else {
-        // Ephemeral (env-var only) config — no file to rewrite. The
-        // in-memory activation is still applied, but it will not survive
-        // a restart. Surface this to the caller as a soft warning via
-        // tracing rather than an error.
-        tracing::warn!(
-            "changed active embedding backend without persistence: no TOML config file is resolved"
-        );
-        return Ok(());
+    context: &mem_store::events::MutationContext,
+) -> Result<crate::effects::FileOutcome, ApiError> {
+    let Some(path) = state.config.resolved_config_path.clone() else {
+        tracing::warn!("active embedding setting is ephemeral: no config file");
+        return Ok(crate::effects::FileOutcome::ephemeral());
     };
-    let existing = tokio::fs::read_to_string(&config_path)
-        .await
-        .map_err(|err| ApiError::io(anyhow::anyhow!("read {}: {err}", config_path.display())))?;
-    let rendered = set_active_embedding_backend_in_toml(&existing, active_name)
-        .map_err(|err| ApiError::io(anyhow::anyhow!("update {}: {err}", config_path.display())))?;
-    let tmp_path = config_path.with_extension("toml.tmp");
-    tokio::fs::write(&tmp_path, rendered.as_bytes())
-        .await
-        .map_err(|err| ApiError::io(anyhow::anyhow!("write {}: {err}", tmp_path.display())))?;
-    tokio::fs::rename(&tmp_path, &config_path)
-        .await
-        .map_err(|err| {
-            ApiError::io(anyhow::anyhow!(
-                "rename {} -> {}: {err}",
-                tmp_path.display(),
-                config_path.display()
-            ))
-        })?;
-    Ok(())
+    crate::effects::replace_file(
+        &state.pool()?,
+        &state.config.cluster.service_id,
+        None,
+        &path,
+        context,
+        |existing| set_active_embedding_backend_in_toml(existing, active_name),
+    )
+    .await
 }
 
 pub(crate) async fn persist_embedding_creation_enabled(
     state: &AppState,
     name: &str,
     enabled: bool,
-) -> Result<(), ApiError> {
-    let Some(config_path) = state.config.resolved_config_path.clone() else {
-        tracing::warn!(
-            "changed automatic embedding creation without persistence: no TOML config file is resolved"
-        );
-        return Ok(());
+    context: &mem_store::events::MutationContext,
+) -> Result<crate::effects::FileOutcome, ApiError> {
+    let Some(path) = state.config.resolved_config_path.clone() else {
+        tracing::warn!("embedding creation setting is ephemeral: no config file");
+        return Ok(crate::effects::FileOutcome::ephemeral());
     };
-    let existing = tokio::fs::read_to_string(&config_path)
-        .await
-        .map_err(|err| ApiError::io(anyhow::anyhow!("read {}: {err}", config_path.display())))?;
-    let rendered = set_embedding_creation_enabled_in_toml(&existing, name, enabled)
-        .map_err(|err| ApiError::io(anyhow::anyhow!("update {}: {err}", config_path.display())))?;
-    let tmp_path = config_path.with_extension("toml.tmp");
-    tokio::fs::write(&tmp_path, rendered.as_bytes())
-        .await
-        .map_err(|err| ApiError::io(anyhow::anyhow!("write {}: {err}", tmp_path.display())))?;
-    tokio::fs::rename(&tmp_path, &config_path)
-        .await
-        .map_err(|err| {
-            ApiError::io(anyhow::anyhow!(
-                "rename {} -> {}: {err}",
-                tmp_path.display(),
-                config_path.display()
-            ))
-        })?;
-    Ok(())
+    crate::effects::replace_file(
+        &state.pool()?,
+        &state.config.cluster.service_id,
+        None,
+        &path,
+        context,
+        |existing| set_embedding_creation_enabled_in_toml(existing, name, enabled),
+    )
+    .await
 }
 
 pub(crate) async fn llm_audit_status(
@@ -597,8 +558,10 @@ pub(crate) async fn llm_audit_status(
 
 pub(crate) async fn set_llm_audit_enabled(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<SetLlmAuditRequest>,
 ) -> Result<Json<LlmAuditStatusResponse>, ApiError> {
+    let _configuration = state.configuration_write.lock().await;
     let previous = state
         .llm_audit
         .read()
@@ -606,14 +569,16 @@ pub(crate) async fn set_llm_audit_enabled(
         .clone();
     let mut next = previous.clone();
     next.enabled = request.enabled;
-    persist_llm_audit_config(&state, &next).await?;
-    {
+    let outcome =
+        persist_llm_audit_config(&state, &next, &crate::effects::actor(&principal)).await?;
+    if outcome.applied {
         let mut guard = state
             .llm_audit
             .write()
             .expect("llm audit config lock poisoned");
         *guard = next;
     }
+    outcome.require_confirmed()?;
 
     Ok(Json(build_llm_audit_status_response(&state)))
 }
@@ -637,32 +602,19 @@ pub(crate) fn build_llm_audit_status_response(state: &AppState) -> LlmAuditStatu
 pub(crate) async fn persist_llm_audit_config(
     state: &AppState,
     audit: &LlmAuditConfig,
-) -> Result<(), ApiError> {
-    let Some(config_path) = llm_audit_config_path(&state.config) else {
-        return Err(ApiError::status_message(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "cannot persist LLM audit setting: no TOML config file is resolved",
-        ));
-    };
-    let existing = tokio::fs::read_to_string(&config_path)
-        .await
-        .map_err(|err| ApiError::io(anyhow::anyhow!("read {}: {err}", config_path.display())))?;
-    let rendered = set_llm_audit_enabled_in_toml(&existing, audit.enabled)
-        .map_err(|err| ApiError::io(anyhow::anyhow!("update {}: {err}", config_path.display())))?;
-    let tmp_path = config_path.with_extension("toml.tmp");
-    tokio::fs::write(&tmp_path, rendered.as_bytes())
-        .await
-        .map_err(|err| ApiError::io(anyhow::anyhow!("write {}: {err}", tmp_path.display())))?;
-    tokio::fs::rename(&tmp_path, &config_path)
-        .await
-        .map_err(|err| {
-            ApiError::io(anyhow::anyhow!(
-                "rename {} -> {}: {err}",
-                tmp_path.display(),
-                config_path.display()
-            ))
-        })?;
-    Ok(())
+    context: &mem_store::events::MutationContext,
+) -> Result<crate::effects::FileOutcome, ApiError> {
+    let path = llm_audit_config_path(&state.config)
+        .ok_or_else(|| ApiError::internal("no audit config file is resolved"))?;
+    crate::effects::replace_file(
+        &state.pool()?,
+        &state.config.cluster.service_id,
+        None,
+        &path,
+        context,
+        |existing| set_llm_audit_enabled_in_toml(existing, audit.enabled),
+    )
+    .await
 }
 
 pub(crate) fn llm_audit_config_path(config: &AppConfig) -> Option<PathBuf> {

@@ -21,7 +21,7 @@ write-path references before the R1 gate can close.
 | Other auth administration/session/token bookkeeping | service auth store/oidc | bootstrap, last-used touches, OIDC flow consumption, login identity/session creation and logout coupled to protected audits; injected audit failure rolls back login/session | [x] |
 | New offline captures | service offline DuckDB `QueuedCapture`/`sync_capture` | compound local intent, atomic PostgreSQL replay/attribution, retry before ack | [x] |
 | Legacy offline and other activity operations | service offline/activity | audit remaining paths; old separate capture/activity rows have no R1 atomic-intent guarantee | [ ] |
-| Filesystem/external effects | settings/export/watch/provider boundaries | durable intent + reconciled outcome | [ ] |
+| Filesystem/external effects | settings/export/watch/provider boundaries | configuration-file intent/outcome and host-local reconciliation implemented and fault-tested; export/watch/provider and local CLI journals remain under audit; [file journal](../../developer/architecture/external-effects.md) | [ ] |
 | Post-curation stages | service curation worker | fenced output + attempts + dependent intent | [ ] |
 | Federation | existing federation store/runtime | retain accepted/outbox/inbox/audit boundaries; regression proof | [ ] |
 

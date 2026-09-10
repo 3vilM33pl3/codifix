@@ -19,6 +19,7 @@ pub(crate) struct AppState {
     pub(crate) embedders: Arc<tokio::sync::RwLock<EmbeddingRegistry>>,
     pub(crate) automated_embedding_creation_enabled: Arc<AtomicBool>,
     pub(crate) llm_audit: Arc<RwLock<LlmAuditConfig>>,
+    pub(crate) configuration_write: Arc<tokio::sync::Mutex<()>>,
     pub(crate) events: broadcast::Sender<ServiceEvent>,
     pub(crate) recent_activity: Arc<Mutex<VecDeque<ServiceEvent>>>,
     pub(crate) watchers: Arc<Mutex<HashMap<String, WatcherPresence>>>,

@@ -130,6 +130,7 @@ pub(crate) async fn project_replacement_policy(
 
 pub(crate) async fn project_replacement_policy_update(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(slug): Path<String>,
     Json(request): Json<ReplacementPolicyRequest>,
 ) -> Result<Json<ReplacementPolicyResponse>, ApiError> {
@@ -140,8 +141,24 @@ pub(crate) async fn project_replacement_policy_update(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| ApiError::validation(ValidationError::new("repo_root must be non-empty")))?;
-    write_replacement_policy(FsPath::new(repo_root), request.replacement_policy)
-        .map_err(ApiError::io)?;
+    let pool = state.pool()?;
+    let (project, trusted_root): (Uuid, String) =
+        sqlx::query_as("SELECT id,root_path FROM projects WHERE slug=$1")
+            .bind(&slug)
+            .fetch_one(&pool)
+            .await
+            .map_err(ApiError::sql)?;
+    let policy_path = project_policy_path(FsPath::new(&trusted_root), FsPath::new(repo_root))?;
+    crate::effects::replace_file(
+        &pool,
+        &state.config.cluster.service_id,
+        Some(project),
+        &policy_path,
+        &crate::effects::actor(&principal),
+        |existing| render_replacement_policy(existing, request.replacement_policy),
+    )
+    .await?
+    .require_confirmed()?;
     notify_project_refreshed(&state, slug.clone());
     Ok(Json(ReplacementPolicyResponse {
         project: slug,
@@ -187,24 +204,39 @@ pub(crate) fn resolve_project_repo_root(
     }
 }
 
-pub(crate) fn write_replacement_policy(
-    repo_root: &FsPath,
+pub(crate) fn render_replacement_policy(
+    existing: &str,
     policy: ReplacementPolicy,
-) -> Result<()> {
-    let path = repo_agent_settings_path(repo_root);
-    let mut document = if path.exists() {
-        std::fs::read_to_string(&path)
-            .with_context(|| format!("read {}", path.display()))?
+) -> Result<String> {
+    let mut document = if !existing.is_empty() {
+        existing
             .parse::<toml_edit::DocumentMut>()
-            .with_context(|| format!("parse {}", path.display()))?
+            .context("parse replacement policy")?
     } else {
         toml_edit::DocumentMut::new()
     };
     document["curation"]["replacement_policy"] = toml_edit::value(policy.to_string());
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+    Ok(document.to_string())
+}
+
+pub(crate) fn project_policy_path(
+    trusted: &FsPath,
+    requested: &FsPath,
+) -> Result<PathBuf, ApiError> {
+    let trusted = std::fs::canonicalize(trusted)
+        .map_err(|_| ApiError::forbidden("project has no accessible registered repository root"))?;
+    let requested = std::fs::canonicalize(requested)
+        .map_err(|_| ApiError::forbidden("requested repository root is not accessible"))?;
+    if requested != trusted {
+        return Err(ApiError::forbidden(
+            "repository root does not belong to the authorized project",
+        ));
     }
-    std::fs::write(&path, document.to_string())
-        .with_context(|| format!("write {}", path.display()))?;
-    Ok(())
+    let path = crate::effects::resolve_file_target(&repo_agent_settings_path(&trusted))?;
+    if !path.starts_with(&trusted) {
+        return Err(ApiError::forbidden(
+            "project policy path resolves outside its registered root",
+        ));
+    }
+    Ok(path)
 }

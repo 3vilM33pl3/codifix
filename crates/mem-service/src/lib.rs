@@ -6,6 +6,7 @@
 mod auth;
 mod background;
 mod consolidate;
+mod effects;
 mod error;
 pub mod federation;
 mod handlers;
