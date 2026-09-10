@@ -90,7 +90,7 @@ pub(crate) use mem_record::{
 };
 pub(crate) use mem_search::{
     EmbeddingRegistry, effective_embedding_base_url, parse_memory_type, parse_relation_type,
-    parse_source_kind, prune_project_embeddings, rebuild_chunks, reembed_project_chunks,
+    parse_source_kind,
 };
 pub(crate) use regex::Regex;
 pub(crate) use serde::Deserialize;

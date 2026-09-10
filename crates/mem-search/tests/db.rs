@@ -5,6 +5,105 @@ use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 #[tokio::test]
+async fn maintenance_events_are_atomic_with_rebuild_backfill_and_pruning() {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let slug = mem_test_support::unique_project_slug("maintenance-atomic");
+    let project = Uuid::new_v4();
+    let memory = Uuid::new_v4();
+    insert_embedding_reindex_fixture(&pool, &slug, project, memory).await;
+    let first = mem_search::test_support::static_embedding_registry(&[("first", 1.0)]);
+    let both =
+        mem_search::test_support::static_embedding_registry(&[("first", 1.0), ("second", 2.0)]);
+    let first_space = first.get("first").expect("first").embedding_space_key();
+    let second_space = both.get("second").expect("second").embedding_space_key();
+    mem_search::rebuild_chunks(&pool, &slug, &first, None)
+        .await
+        .expect("initial index");
+    let before: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM memory_chunks WHERE memory_entry_id = $1 ORDER BY id")
+            .bind(memory)
+            .fetch_all(&pool)
+            .await
+            .expect("before chunks");
+    let mut context = mem_store::events::MutationContext::internal("maintenance-test");
+    context.actor_name = "invalid\0actor".into();
+    assert!(
+        mem_search::rebuild_chunks_as(&pool, &slug, &both, None, &context)
+            .await
+            .is_err()
+    );
+    assert!(
+        mem_search::reembed_project_chunks_as(&pool, &slug, &both, None, &context)
+            .await
+            .is_err()
+    );
+    assert!(
+        mem_search::prune_project_embeddings_as(
+            &pool,
+            &slug,
+            &mem_search::test_support::static_embedding_registry(&[]),
+            &context
+        )
+        .await
+        .is_err()
+    );
+    let after: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM memory_chunks WHERE memory_entry_id = $1 ORDER BY id")
+            .bind(memory)
+            .fetch_all(&pool)
+            .await
+            .expect("after chunks");
+    assert_eq!(before, after);
+    assert_eq!(
+        count_embeddings_for_space(&pool, memory, &first_space).await,
+        before.len() as i64
+    );
+    assert_eq!(
+        count_embeddings_for_space(&pool, memory, &second_space).await,
+        0
+    );
+    let events: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM project_timeline_events WHERE project_id = $1")
+            .bind(project)
+            .fetch_one(&pool)
+            .await
+            .expect("events");
+    assert_eq!(events, 1);
+    context.actor_name = "Operator".into();
+    let result = mem_search::reembed_project_chunks_as(&pool, &slug, &both, None, &context)
+        .await
+        .expect("backfill");
+    assert_eq!(result.count, before.len() as u64);
+    assert_eq!(
+        result.receipt.expect("receipt").0.actor_name.as_deref(),
+        Some("Operator")
+    );
+    assert_eq!(
+        mem_search::reembed_project_chunks(&pool, &slug, &both, None)
+            .await
+            .expect("repeat"),
+        0
+    );
+    let pruned = mem_search::prune_project_embeddings_as(&pool, &slug, &first, &context)
+        .await
+        .expect("prune");
+    assert_eq!(pruned.count, before.len() as u64);
+    assert_eq!(
+        count_embeddings_for_space(&pool, memory, &first_space).await,
+        before.len() as i64
+    );
+    assert_eq!(
+        count_embeddings_for_space(&pool, memory, &second_space).await,
+        0
+    );
+    mem_test_support::cleanup_project(&pool, &slug)
+        .await
+        .expect("cleanup");
+}
+
+#[tokio::test]
 async fn backend_scoped_reindex_preserves_other_backend_embeddings() {
     let Some(pool) = mem_test_support::migrated_pool().await else {
         return;

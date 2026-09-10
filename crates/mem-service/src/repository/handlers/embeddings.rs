@@ -5,6 +5,7 @@ use crate::*;
 
 pub(crate) async fn reindex(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<ReindexRequest>,
 ) -> Result<Json<ReindexResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
@@ -23,6 +24,13 @@ pub(crate) async fn reindex(
             .collect()
     };
     let project = request.project.clone();
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "reindex".into(),
+        occurred_at: None,
+    };
+    let mut receipt = None;
     let count = if request.dry_run {
         if request.backend.is_some() {
             count_missing_embedding_chunks(&state.pool()?, &request.project, &selected_keys).await?
@@ -43,11 +51,12 @@ pub(crate) async fn reindex(
             .map_err(ApiError::sql)? as u64
         }
     } else {
-        rebuild_chunks(
+        let mutation = mem_search::rebuild_chunks_as(
             &state.pool()?,
             &request.project,
             &embedders,
             request.backend.as_deref(),
+            &context,
         )
         .await
         .map_err(|error| {
@@ -60,7 +69,9 @@ pub(crate) async fn reindex(
                     DiagnosticSeverity::Error,
                 ),
             )
-        })?
+        })?;
+        receipt = mutation.receipt;
+        mutation.count
     };
     if request.dry_run {
         return Ok(Json(ReindexResponse {
@@ -68,16 +79,9 @@ pub(crate) async fn reindex(
             dry_run: true,
         }));
     }
-    notify_project_changed(
-        &state,
-        project,
-        None,
-        ActivityKind::Reindex,
-        format!("Reindexed {count} memory entry/entries."),
-        Some(ActivityDetails::Reindex {
-            reindexed_entries: count,
-        }),
-    );
+    if let Some((event, sequence)) = receipt {
+        crate::repository::events::broadcast_committed(&state, project, event, sequence);
+    }
     Ok(Json(ReindexResponse {
         reindexed_entries: count,
         dry_run: false,
@@ -86,6 +90,7 @@ pub(crate) async fn reindex(
 
 pub(crate) async fn reembed(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<ReembedRequest>,
 ) -> Result<Json<ReembedResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
@@ -110,6 +115,13 @@ pub(crate) async fn reembed(
             .collect(),
     };
     let project = request.project.clone();
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "reembed".into(),
+        occurred_at: None,
+    };
+    let mut receipt = None;
     let count = if request.dry_run {
         let space_keys = selected_keys
             .iter()
@@ -117,11 +129,12 @@ pub(crate) async fn reembed(
             .collect::<Vec<_>>();
         count_missing_embedding_chunks(&state.pool()?, &request.project, &space_keys).await?
     } else {
-        reembed_project_chunks(
+        let mutation = mem_search::reembed_project_chunks_as(
             &state.pool()?,
             &request.project,
             &embedders,
             request.backend.as_deref(),
+            &context,
         )
         .await
         .map_err(|error| {
@@ -134,7 +147,9 @@ pub(crate) async fn reembed(
                     DiagnosticSeverity::Error,
                 ),
             )
-        })?
+        })?;
+        receipt = mutation.receipt;
+        mutation.count
     };
     if request.dry_run {
         return Ok(Json(ReembedResponse {
@@ -142,16 +157,9 @@ pub(crate) async fn reembed(
             dry_run: true,
         }));
     }
-    notify_project_changed(
-        &state,
-        project,
-        None,
-        ActivityKind::Reembed,
-        format!("Re-embedded {count} chunk(s)."),
-        Some(ActivityDetails::Reembed {
-            reembedded_chunks: count,
-        }),
-    );
+    if let Some((event, sequence)) = receipt {
+        crate::repository::events::broadcast_committed(&state, project, event, sequence);
+    }
     Ok(Json(ReembedResponse {
         reembedded_chunks: count,
         dry_run: false,
@@ -196,6 +204,7 @@ pub(crate) async fn count_missing_embedding_chunks(
 
 pub(crate) async fn prune_embeddings(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<PruneEmbeddingsRequest>,
 ) -> Result<Json<PruneEmbeddingsResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
@@ -210,6 +219,13 @@ pub(crate) async fn prune_embeddings(
         .map(|(_, service)| service.embedding_space_key())
         .collect();
     let project = request.project.clone();
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "prune_embeddings".into(),
+        occurred_at: None,
+    };
+    let mut receipt = None;
     let count = if request.dry_run {
         sqlx::query(
             r#"
@@ -231,19 +247,26 @@ pub(crate) async fn prune_embeddings(
         .try_get::<i64, _>("count")
         .map_err(ApiError::sql)? as u64
     } else {
-        prune_project_embeddings(&state.pool()?, &request.project, &embedders)
-            .await
-            .map_err(|error| {
-                ApiError::diagnostic(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    classify_anyhow_diagnostic(
-                        &error,
-                        "embeddings",
-                        "prune_embeddings",
-                        DiagnosticSeverity::Error,
-                    ),
-                )
-            })?
+        let mutation = mem_search::prune_project_embeddings_as(
+            &state.pool()?,
+            &request.project,
+            &embedders,
+            &context,
+        )
+        .await
+        .map_err(|error| {
+            ApiError::diagnostic(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                classify_anyhow_diagnostic(
+                    &error,
+                    "embeddings",
+                    "prune_embeddings",
+                    DiagnosticSeverity::Error,
+                ),
+            )
+        })?;
+        receipt = mutation.receipt;
+        mutation.count
     };
     if request.dry_run {
         return Ok(Json(PruneEmbeddingsResponse {
@@ -251,16 +274,9 @@ pub(crate) async fn prune_embeddings(
             dry_run: true,
         }));
     }
-    notify_project_changed(
-        &state,
-        project,
-        None,
-        ActivityKind::Reembed,
-        format!("Pruned {count} inactive embedding row(s)."),
-        Some(ActivityDetails::Reembed {
-            reembedded_chunks: count,
-        }),
-    );
+    if let Some((event, sequence)) = receipt {
+        crate::repository::events::broadcast_committed(&state, project, event, sequence);
+    }
     Ok(Json(PruneEmbeddingsResponse {
         pruned_embeddings: count,
         dry_run: false,

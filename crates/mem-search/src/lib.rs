@@ -136,10 +136,6 @@ impl EmbeddingService {
         })
     }
 
-    fn embedding_space(&self) -> EmbeddingSpace {
-        self.backend.space().clone()
-    }
-
     pub fn embedding_space_key(&self) -> String {
         self.backend.space().space_key.clone()
     }
@@ -627,22 +623,26 @@ fn retain_authorized_candidates(
     });
 }
 
+pub use repository::maintenance::{
+    MaintenanceResult, prune_project_embeddings_as, prune_project_embeddings_tx, rebuild_chunks_as,
+    reembed_project_chunks_as,
+};
+
 pub async fn rebuild_chunks(
     pool: &PgPool,
     project: &str,
     registry: &EmbeddingRegistry,
     target_backend: Option<&str>,
 ) -> Result<u64> {
-    if let Some(name) = target_backend {
-        // Chunks are shared by every embedding backend. Rebuilding chunks for a
-        // single backend would delete the shared chunk rows and cascade-delete
-        // embeddings for other backends. Treat a backend-scoped rebuild as a
-        // safe backfill of missing vectors in that backend's space instead.
-        return reembed_project_chunks(pool, project, registry, Some(name)).await;
-    }
-
-    let selected: Vec<(&str, &EmbeddingService)> = registry.iter().collect();
-    repository::rebuild_chunks_selected(pool, project, selected).await
+    Ok(rebuild_chunks_as(
+        pool,
+        project,
+        registry,
+        target_backend,
+        &mem_store::events::MutationContext::internal("reindex"),
+    )
+    .await?
+    .count)
 }
 
 pub async fn rebuild_chunks_for_automatic_creation(
@@ -651,13 +651,20 @@ pub async fn rebuild_chunks_for_automatic_creation(
     registry: &EmbeddingRegistry,
     global_create_enabled: bool,
 ) -> Result<u64> {
-    let selected: Vec<(&str, &EmbeddingService)> = if global_create_enabled {
+    let selected = if global_create_enabled {
         registry.iter_create_enabled().collect()
     } else {
         Vec::new()
     };
-
-    repository::rebuild_chunks_selected(pool, project, selected).await
+    Ok(repository::maintenance::rebuild_selected(
+        pool,
+        project,
+        None,
+        selected,
+        &mem_store::events::MutationContext::internal("automatic-index"),
+    )
+    .await?
+    .count)
 }
 
 pub async fn rebuild_memory_chunks_for_automatic_creation(
@@ -667,13 +674,23 @@ pub async fn rebuild_memory_chunks_for_automatic_creation(
     registry: &EmbeddingRegistry,
     global_create_enabled: bool,
 ) -> Result<u64> {
-    let selected: Vec<(&str, &EmbeddingService)> = if global_create_enabled {
+    if memory_ids.is_empty() {
+        return Ok(0);
+    }
+    let selected = if global_create_enabled {
         registry.iter_create_enabled().collect()
     } else {
         Vec::new()
     };
-
-    repository::rebuild_memory_chunks_selected(pool, project, memory_ids, selected).await
+    Ok(repository::maintenance::rebuild_selected(
+        pool,
+        project,
+        Some(memory_ids),
+        selected,
+        &mem_store::events::MutationContext::internal("automatic-index"),
+    )
+    .await?
+    .count)
 }
 
 pub async fn reembed_project_chunks(
@@ -682,19 +699,15 @@ pub async fn reembed_project_chunks(
     registry: &EmbeddingRegistry,
     target_backend: Option<&str>,
 ) -> Result<u64> {
-    let selected: Vec<(&str, &EmbeddingService)> = match target_backend {
-        Some(name) => registry
-            .get(name)
-            .map(|service| vec![(name, service)])
-            .ok_or_else(|| anyhow::anyhow!("unknown embedding backend: {name}"))?,
-        None => registry.iter().collect(),
-    };
-
-    let mut total_reembedded = 0u64;
-    for (_, embedder) in &selected {
-        total_reembedded += repository::reembed_single_backend(pool, project, embedder).await?;
-    }
-    Ok(total_reembedded)
+    Ok(reembed_project_chunks_as(
+        pool,
+        project,
+        registry,
+        target_backend,
+        &mem_store::events::MutationContext::internal("reembed"),
+    )
+    .await?
+    .count)
 }
 
 pub async fn prune_project_embeddings(
@@ -702,11 +715,14 @@ pub async fn prune_project_embeddings(
     project: &str,
     registry: &EmbeddingRegistry,
 ) -> Result<u64> {
-    let keep: Vec<String> = registry
-        .iter()
-        .map(|(_, service)| service.embedding_space_key())
-        .collect();
-    repository::prune_project_embeddings(pool, project, &keep).await
+    Ok(prune_project_embeddings_as(
+        pool,
+        project,
+        registry,
+        &mem_store::events::MutationContext::internal("prune-embeddings"),
+    )
+    .await?
+    .count)
 }
 
 pub fn parse_memory_type(value: &str) -> MemoryType {

@@ -253,11 +253,12 @@ mod tests {
             assert_eq!(chunks(&pool, memory).await, before);
             // Existing public rebuild path must also preserve the old data.
             assert!(
-                crate::repository::rebuild_memory_chunks_selected(
+                crate::repository::maintenance::rebuild_selected(
                     &pool,
                     &slug,
-                    &[memory],
-                    vec![("fake", &service)]
+                    Some(&[memory]),
+                    vec![("fake", &service)],
+                    &mem_store::events::MutationContext::internal("test"),
                 )
                 .await
                 .is_err()

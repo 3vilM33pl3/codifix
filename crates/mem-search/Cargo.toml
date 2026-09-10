@@ -10,6 +10,7 @@ anyhow.workspace = true
 chrono.workspace = true
 mem-config = { path = "../mem-config" }
 mem-record = { path = "../mem-record" }
+mem-store = { path = "../mem-store" }
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -21,7 +22,6 @@ thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-mem-store = { path = "../mem-store" }
 mem-test-support = { path = "../mem-test-support" }
 proptest = "1"
 wiremock = "0.6"
