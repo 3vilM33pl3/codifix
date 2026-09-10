@@ -61,7 +61,15 @@ pub(crate) fn spawn_access_worker(state: AppState, mut rx: mpsc::Receiver<Access
             let Ok(pool) = state.pool() else {
                 continue;
             };
-            match mem_reinforce::record_access_batch(&pool, &batch, &params, threshold).await {
+            match persist_access_and_learning(
+                &pool,
+                &batch,
+                &params,
+                threshold,
+                &state.config.procedural,
+            )
+            .await
+            {
                 Ok(crossings) => {
                     for crossing in crossings {
                         tracing::info!(
@@ -75,22 +83,33 @@ pub(crate) fn spawn_access_worker(state: AppState, mut rx: mpsc::Receiver<Access
                     tracing::warn!(error = %error, "record reinforcement access batch");
                 }
             }
-            if let Err(error) = reward_cited_loop_producers(&state, &pool, &batch).await {
-                tracing::warn!(error = %error, "reward loops for cited memories");
-            }
         }
     });
+}
+
+async fn persist_access_and_learning(
+    pool: &sqlx::PgPool,
+    batch: &AccessBatch,
+    params: &ScoreParams,
+    threshold: f64,
+    procedural: &mem_config::ProceduralConfig,
+) -> anyhow::Result<Vec<mem_reinforce::ThresholdCrossing>> {
+    let mut tx = pool.begin().await?;
+    let crossings =
+        mem_reinforce::recorder::record_access_batch_tx(&mut tx, batch, params, threshold).await?;
+    reward_cited_loop_producers(&mut tx, procedural, batch).await?;
+    tx.commit().await?;
+    Ok(crossings)
 }
 
 /// Citation bonus for procedural utility: a loop-produced memory being cited
 /// in an answer is delayed evidence the loop was valuable. Advisory, best
 /// effort, never affects scoring or gates.
 async fn reward_cited_loop_producers(
-    state: &AppState,
-    pool: &sqlx::PgPool,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    procedural: &mem_config::ProceduralConfig,
     batch: &AccessBatch,
 ) -> anyhow::Result<()> {
-    let procedural = &state.config.procedural;
     if !procedural.enabled {
         return Ok(());
     }
@@ -103,7 +122,7 @@ async fn reward_cited_loop_producers(
     if cited.is_empty() {
         return Ok(());
     }
-    let hits = mem_reinforce::repository::loop_producers_for_memories(pool, &cited).await?;
+    let hits = mem_reinforce::repository::loop_producers_for_memories(&mut **tx, &cited).await?;
     if hits.is_empty() {
         return Ok(());
     }
@@ -112,24 +131,14 @@ async fn reward_cited_loop_producers(
     let event = mem_reinforce::RewardEvent::MemoryCited;
     for hit in hits {
         let reward = event.reward(&rewards);
-        let update = mem_reinforce::repository::apply_utility_reward(
-            pool,
+        mem_reinforce::repository::apply_utility_reward_tx(
+            tx,
             hit.project_id,
             "loop",
             &hit.loop_id,
             reward,
             &params,
-        )
-        .await?;
-        mem_reinforce::repository::insert_utility_audit(
-            pool,
-            hit.project_id,
-            "loop",
-            &hit.loop_id,
             event.audit_reason(),
-            reward,
-            params.alpha,
-            &update,
             serde_json::json!({ "canonical_id": hit.canonical_id }),
         )
         .await?;

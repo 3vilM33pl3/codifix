@@ -75,6 +75,82 @@ fn test_params() -> ScoreParams {
 }
 
 #[tokio::test]
+async fn utility_audit_rolls_back_access_and_serializes_concurrent_rewards() {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let project = Uuid::new_v4();
+    let slug = project.to_string();
+    let memory = Uuid::new_v4();
+    insert_project(&pool, &slug, project).await;
+    insert_memory(&pool, project, memory, "Synthetic citation").await;
+    let batch = AccessBatch {
+        operation_id: Some(Uuid::new_v4().to_string()),
+        events: vec![(memory, AccessKind::Citation)],
+    };
+    let params = mem_reinforce::UtilityParams::default();
+    let mut tx = pool.begin().await.unwrap();
+    mem_reinforce::recorder::record_access_batch_tx(&mut tx, &batch, &test_params(), 1.0)
+        .await
+        .unwrap();
+    assert!(
+        mem_reinforce::repository::apply_utility_reward_tx(
+            &mut tx,
+            project,
+            "loop",
+            "producer",
+            1.0,
+            &params,
+            "fail\0audit",
+            serde_json::json!({})
+        )
+        .await
+        .is_err()
+    );
+    tx.rollback().await.unwrap();
+    for table in [
+        "memory_access_events",
+        "procedural_utility",
+        "procedural_utility_audit",
+    ] {
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(&format!(
+                "SELECT count(*) FROM {table} WHERE project_id=$1"
+            ))
+            .bind(project)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+            0
+        );
+    }
+    let (a, b) = tokio::join!(
+        mem_reinforce::repository::apply_utility_reward(
+            &pool, project, "loop", "producer", 1.0, &params
+        ),
+        mem_reinforce::repository::apply_utility_reward(
+            &pool, project, "loop", "producer", 1.0, &params
+        )
+    );
+    let mut updates = [a.unwrap(), b.unwrap()];
+    updates.sort_by_key(|u| u.update_count);
+    assert_eq!(updates[0].update_count, 1);
+    assert_eq!(updates[1].update_count, 2);
+    assert_eq!(updates[0].new_utility, updates[1].old_utility);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM procedural_utility_audit WHERE project_id=$1"
+        )
+        .bind(project)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        2
+    );
+    cleanup(&pool, &slug, project).await;
+}
+
+#[tokio::test]
 async fn failed_access_journal_rolls_back_every_score_in_the_batch() {
     let Some(pool) = mem_test_support::migrated_pool().await else {
         return;

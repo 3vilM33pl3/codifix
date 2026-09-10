@@ -395,19 +395,51 @@ pub struct UtilityUpdate {
 
 /// Applies the ACT-R delta rule `U + alpha*(reward - U)` (clamped) to a
 /// producer's utility in one race-free upsert, mirroring [`apply_score_boost`].
-/// Executor-generic so callers can run it inside the same transaction as the
-/// decision that earned the reward.
-pub async fn apply_utility_reward<'e, E>(
-    executor: E,
+/// The pool wrapper commits its audit with the update. Composite mutations use
+/// `apply_utility_reward_tx` with an operation-specific reason and bounded details.
+pub async fn apply_utility_reward(
+    pool: &PgPool,
     project_id: Uuid,
     producer_kind: &str,
     producer_id: &str,
     reward: f64,
     params: &crate::procedural::UtilityParams,
-) -> Result<UtilityUpdate>
-where
-    E: sqlx::PgExecutor<'e>,
-{
+) -> Result<UtilityUpdate> {
+    let mut tx = pool.begin().await?;
+    let result = apply_utility_reward_tx(
+        &mut tx,
+        project_id,
+        producer_kind,
+        producer_id,
+        reward,
+        params,
+        "reward_applied",
+        serde_json::json!({}),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn apply_utility_reward_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project_id: Uuid,
+    producer_kind: &str,
+    producer_id: &str,
+    reward: f64,
+    params: &crate::procedural::UtilityParams,
+    reason: &str,
+    details: serde_json::Value,
+) -> Result<UtilityUpdate> {
+    // Lock even the absent utility row. The audit's old value must be the
+    // immediately preceding committed value, not a concurrent MVCC snapshot.
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+        .bind(format!(
+            "utility:{project_id}:{producer_kind}:{producer_id}"
+        ))
+        .execute(&mut **tx)
+        .await?;
     let alpha = params.alpha.clamp(0.0, 1.0);
     let (old_utility, new_utility, update_count): (f64, f64, i64) = sqlx::query_as(
         r#"
@@ -447,14 +479,27 @@ where
     .bind(params.min_utility)
     .bind(params.max_utility)
     .bind(params.initial_utility)
-    .fetch_one(executor)
+    .fetch_one(&mut **tx)
     .await
     .context("apply procedural utility reward")?;
-    Ok(UtilityUpdate {
+    let update = UtilityUpdate {
         old_utility,
         new_utility,
         update_count,
-    })
+    };
+    insert_utility_audit(
+        &mut **tx,
+        project_id,
+        producer_kind,
+        producer_id,
+        reason,
+        reward,
+        alpha,
+        &update,
+        details,
+    )
+    .await?;
+    Ok(update)
 }
 
 /// Audits one utility update. Executor-generic for the same atomicity reason.
@@ -538,8 +583,8 @@ pub struct LoopProducerHit {
 
 /// Resolves which cited memories were produced by a loop, for the citation
 /// reward. Version ids in, producer links out.
-pub async fn loop_producers_for_memories(
-    pool: &PgPool,
+pub async fn loop_producers_for_memories<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     memory_ids: &[Uuid],
 ) -> Result<Vec<LoopProducerHit>> {
     if memory_ids.is_empty() {
@@ -551,10 +596,11 @@ pub async fn loop_producers_for_memories(
         FROM memory_entries me
         JOIN loop_produced_memory lpm ON lpm.canonical_id = me.canonical_id
         WHERE me.id = ANY($1)
+        ORDER BY lpm.project_id, lpm.loop_id, lpm.canonical_id
         "#,
     )
     .bind(memory_ids)
-    .fetch_all(pool)
+    .fetch_all(executor)
     .await
     .context("resolve loop producers for cited memories")?;
     Ok(rows

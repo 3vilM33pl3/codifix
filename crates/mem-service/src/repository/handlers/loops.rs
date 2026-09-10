@@ -479,11 +479,17 @@ pub(crate) async fn approve_loop_approval(
 ) -> Result<Json<LoopApprovalDecisionResponse>, ApiError> {
     stamp_actor(&principal, &mut request.reviewer);
     Ok(Json(
-        resolve_loop_approval_decision(
+        resolve_loop_approval_as(
             &state.pool()?,
             approval_id,
             LoopApprovalStatus::Approved,
             &request,
+            &mem_store::events::MutationContext {
+                actor_id: principal.id.to_string(),
+                actor_name: principal.display_name.clone(),
+                source: "http".into(),
+                occurred_at: None,
+            },
         )
         .await?,
     ))
@@ -497,11 +503,17 @@ pub(crate) async fn reject_loop_approval(
 ) -> Result<Json<LoopApprovalDecisionResponse>, ApiError> {
     stamp_actor(&principal, &mut request.reviewer);
     Ok(Json(
-        resolve_loop_approval_decision(
+        resolve_loop_approval_as(
             &state.pool()?,
             approval_id,
             LoopApprovalStatus::Rejected,
             &request,
+            &mem_store::events::MutationContext {
+                actor_id: principal.id.to_string(),
+                actor_name: principal.display_name.clone(),
+                source: "http".into(),
+                occurred_at: None,
+            },
         )
         .await?,
     ))
@@ -520,11 +532,17 @@ pub(crate) async fn edit_loop_approval(
         )));
     }
     Ok(Json(
-        resolve_loop_approval_decision(
+        resolve_loop_approval_as(
             &state.pool()?,
             approval_id,
             LoopApprovalStatus::Edited,
             &request,
+            &mem_store::events::MutationContext {
+                actor_id: principal.id.to_string(),
+                actor_name: principal.display_name.clone(),
+                source: "http".into(),
+                occurred_at: None,
+            },
         )
         .await?,
     ))
@@ -2202,29 +2220,15 @@ async fn emit_proposal_reward(
     let params = mem_reinforce::UtilityParams::from(procedural);
     let rewards = mem_reinforce::ProceduralRewards::from(procedural);
     let reward = event.reward(&rewards);
-    let update = mem_reinforce::repository::apply_utility_reward(
-        &mut **tx,
+    mem_reinforce::repository::apply_utility_reward_tx(
+        tx,
         proposal.project_id,
         "loop",
         &proposal.record.loop_id,
         reward,
         &params,
-    )
-    .await
-    .map_err(ApiError::io)?;
-    mem_reinforce::repository::insert_utility_audit(
-        &mut **tx,
-        proposal.project_id,
-        "loop",
-        &proposal.record.loop_id,
         event.audit_reason(),
-        reward,
-        params.alpha,
-        &update,
-        serde_json::json!({
-            "proposal_id": proposal.record.id,
-            "run_id": proposal.record.run_id,
-        }),
+        serde_json::json!({"proposal_id": proposal.record.id, "run_id": proposal.record.run_id}),
     )
     .await
     .map_err(ApiError::io)?;
@@ -4703,6 +4707,19 @@ async fn cancel_loop_run_record(
     run_id: Uuid,
     request: &LoopCancelRequest,
 ) -> Result<LoopRunResponse, ApiError> {
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    cancel_loop_run_tx(&mut tx, run_id, request).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(LoopRunResponse {
+        run: fetch_loop_run_detail(pool, run_id).await?,
+    })
+}
+
+async fn cancel_loop_run_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    run_id: Uuid,
+    request: &LoopCancelRequest,
+) -> Result<(), ApiError> {
     sqlx::query(
         r#"
         UPDATE loop_runs
@@ -4718,21 +4735,19 @@ async fn cancel_loop_run_record(
     )
     .bind(run_id)
     .bind(&request.reason)
-    .execute(pool)
+    .execute(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
-    append_loop_trace(
-        pool,
+    append_loop_trace_tx(
+        tx,
         run_id,
         "cancel",
         "Cancel requested",
-        json!({ "reason": request.reason }),
+        json!({ "run_id": run_id, "reason_supplied": request.reason.is_some() }),
         false,
     )
     .await?;
-    Ok(LoopRunResponse {
-        run: fetch_loop_run_detail(pool, run_id).await?,
-    })
+    Ok(())
 }
 
 async fn fetch_loop_traces(pool: &PgPool, run_id: Uuid) -> Result<Vec<LoopTraceRecord>, ApiError> {
@@ -4873,9 +4888,70 @@ async fn resolve_loop_approval_decision(
     status: LoopApprovalStatus,
     request: &LoopApprovalDecisionRequest,
 ) -> Result<LoopApprovalDecisionResponse, ApiError> {
+    resolve_loop_approval_as(
+        pool,
+        approval_id,
+        status,
+        request,
+        &mem_store::events::MutationContext::internal("loop-approval"),
+    )
+    .await
+}
+
+async fn resolve_loop_approval_as(
+    pool: &PgPool,
+    approval_id: Uuid,
+    status: LoopApprovalStatus,
+    request: &LoopApprovalDecisionRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<LoopApprovalDecisionResponse, ApiError> {
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let result = resolve_loop_approval_tx(&mut tx, approval_id, status, request, context).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(result)
+}
+
+async fn resolve_loop_approval_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    approval_id: Uuid,
+    status: LoopApprovalStatus,
+    request: &LoopApprovalDecisionRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<LoopApprovalDecisionResponse, ApiError> {
     if status == LoopApprovalStatus::Edited && request.edited_action.is_none() {
         return Err(ApiError::validation(ValidationError::new(
             "edited_action is required",
+        )));
+    }
+    if status == LoopApprovalStatus::Pending {
+        return Err(ApiError::validation(ValidationError::new(
+            "a resolved decision is required",
+        )));
+    }
+    let (run_id, project_id): (Option<Uuid>, Option<Uuid>) =
+        sqlx::query_as("SELECT run_id,project_id FROM approval_requests WHERE id=$1")
+            .bind(approval_id)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(ApiError::sql)?
+            .ok_or_else(|| ApiError::not_found("loop approval not found"))?;
+    // Run first, then approval/proposal, matching proposal and trace writers.
+    if let Some(run_id) = run_id {
+        sqlx::query("SELECT id FROM loop_runs WHERE id=$1 FOR UPDATE")
+            .bind(run_id)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(ApiError::sql)?;
+    }
+    let current: String =
+        sqlx::query_scalar("SELECT status FROM approval_requests WHERE id=$1 FOR UPDATE")
+            .bind(approval_id)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(ApiError::sql)?;
+    if !matches!(current.as_str(), "pending" | "edited") {
+        return Err(ApiError::validation(ValidationError::new(
+            "approval is already resolved",
         )));
     }
     let row = sqlx::query(
@@ -4898,43 +4974,55 @@ async fn resolve_loop_approval_decision(
     .bind(&request.reviewer)
     .bind(&request.reason)
     .bind(&request.edited_action)
-    .fetch_optional(pool)
+    .fetch_optional(&mut **tx)
     .await
     .map_err(ApiError::sql)?
     .ok_or_else(|| ApiError::not_found("loop approval not found"))?;
     let approval = row_to_loop_approval(row)?;
-    persist_approval_side_effects(pool, &approval, &status, request).await?;
+    persist_approval_side_effects(tx, &approval, &status, request, project_id).await?;
+    insert_loop_setting_audit(&mut **tx, Some(&approval.loop_id), None,
+        "approval_decision", Some(&context.actor_id), None,
+        json!({"approval_id":approval.id,"project_id":project_id,"run_id":run_id,"status":status.as_str()})).await?;
     Ok(LoopApprovalDecisionResponse { approval })
 }
 
 async fn persist_approval_side_effects(
-    pool: &PgPool,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     approval: &LoopApprovalRequestRecord,
     status: &LoopApprovalStatus,
     request: &LoopApprovalDecisionRequest,
+    project_id: Option<Uuid>,
 ) -> Result<(), ApiError> {
     if let Some(proposal_id) = approval_proposal_id(&approval.proposed_action) {
-        sqlx::query(
+        let changed = sqlx::query(
             r#"
             UPDATE memory_proposals
             SET status = $2,
                 resolved_at = now()
-            WHERE id = $1
+            WHERE id = $1 AND project_id IS NOT DISTINCT FROM $3 AND run_id IS NOT DISTINCT FROM $4
+              AND status IN ('pending','edited')
             "#,
         )
         .bind(proposal_id)
         .bind(status.as_str())
-        .execute(pool)
+        .bind(project_id)
+        .bind(approval.run_id)
+        .execute(&mut **tx)
         .await
         .map_err(ApiError::sql)?;
+        if changed.rows_affected() != 1 {
+            return Err(ApiError::validation(ValidationError::new(
+                "approval proposal is resolved or outside the owning run/project",
+            )));
+        }
     }
 
     if let Some(run_id) = approval.run_id {
         if *status == LoopApprovalStatus::Rejected {
-            block_run_for_rejected_approval(pool, run_id, approval, request).await?;
+            block_run_for_rejected_approval(tx, run_id, approval, request).await?;
         }
-        append_loop_trace(
-            pool,
+        append_loop_trace_tx(
+            tx,
             run_id,
             "approval",
             approval_trace_title(status),
@@ -4942,11 +5030,7 @@ async fn persist_approval_side_effects(
                 "approval_id": approval.id,
                 "action_type": approval.action_type,
                 "status": status.as_str(),
-                "reviewer": request.reviewer,
-                "reason": request.reason,
-                "risk_reason": approval.risk_reason,
-                "proposed_action": approval.proposed_action,
-                "edited_action": request.edited_action
+                "edited": request.edited_action.is_some()
             }),
             false,
         )
@@ -4957,7 +5041,7 @@ async fn persist_approval_side_effects(
 }
 
 async fn block_run_for_rejected_approval(
-    pool: &PgPool,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     run_id: Uuid,
     approval: &LoopApprovalRequestRecord,
     request: &LoopApprovalDecisionRequest,
@@ -4989,7 +5073,7 @@ async fn block_run_for_rejected_approval(
     .bind(approval.id)
     .bind(&approval.action_type)
     .bind(&request.reason)
-    .execute(pool)
+    .execute(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
     Ok(())

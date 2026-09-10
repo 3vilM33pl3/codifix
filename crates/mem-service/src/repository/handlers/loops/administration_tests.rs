@@ -3,6 +3,119 @@
 use super::*;
 
 #[tokio::test]
+async fn cancellation_and_approval_are_atomic_with_the_run_journal() {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let project = Uuid::new_v4();
+    let run = Uuid::new_v4();
+    let approval = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,'R1 admin','/synthetic')",
+    )
+    .bind(project)
+    .bind(project.to_string())
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO loop_runs(id,loop_id,definition_version,project_id,scope_type,scope_id,mode,status) VALUES($1,'test',1,$2,'project',$3,'manual','running')")
+        .bind(run).bind(project).bind(project.to_string()).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO approval_requests(id,project_id,run_id,loop_id,action_type,proposed_action_json,risk_reason,status) VALUES($1,$2,$3,'test','write_memory_proposal','{}','Review required','pending')")
+        .bind(approval).bind(project).bind(run).execute(&pool).await.unwrap();
+    let request: LoopApprovalDecisionRequest =
+        serde_json::from_value(json!({"reviewer":"client-reported-author"})).unwrap();
+    let mut bad_context = mem_store::events::MutationContext::internal("admin-test");
+    bad_context.actor_id = "late\0failure".into();
+    let mut tx = pool.begin().await.unwrap();
+    assert!(
+        resolve_loop_approval_tx(
+            &mut tx,
+            approval,
+            LoopApprovalStatus::Rejected,
+            &request,
+            &bad_context
+        )
+        .await
+        .is_err()
+    );
+    tx.rollback().await.unwrap();
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT status FROM approval_requests WHERE id=$1")
+            .bind(approval)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        "pending"
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT status FROM loop_runs WHERE id=$1")
+            .bind(run)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        "running"
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM run_traces WHERE run_id=$1")
+            .bind(run)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query("CREATE TEMP TABLE run_traces (LIKE public.run_traces INCLUDING DEFAULTS, CHECK(FALSE)) ON COMMIT DROP").execute(&mut *tx).await.unwrap();
+    let cancel = LoopCancelRequest {
+        reason: Some("synthetic secret should not enter trace".into()),
+    };
+    assert!(cancel_loop_run_tx(&mut tx, run, &cancel).await.is_err());
+    tx.rollback().await.unwrap();
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT status FROM loop_runs WHERE id=$1")
+            .bind(run)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        "running"
+    );
+    let context = mem_store::events::MutationContext::internal("admin-test");
+    resolve_loop_approval_as(
+        &pool,
+        approval,
+        LoopApprovalStatus::Rejected,
+        &request,
+        &context,
+    )
+    .await
+    .unwrap();
+    assert!(
+        resolve_loop_approval_as(
+            &pool,
+            approval,
+            LoopApprovalStatus::Approved,
+            &request,
+            &context
+        )
+        .await
+        .is_err()
+    );
+    let payload: serde_json::Value =
+        sqlx::query_scalar("SELECT payload_json FROM run_traces WHERE run_id=$1")
+            .bind(run)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(payload.get("proposed_action").is_none());
+    assert!(payload.get("reviewer").is_none());
+    sqlx::query("DELETE FROM projects WHERE id=$1")
+        .bind(project)
+        .execute(&pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn setting_and_global_switch_roll_back_with_their_audits() {
     let Some(pool) = mem_test_support::migrated_pool().await else {
         return;
@@ -26,7 +139,7 @@ async fn setting_and_global_switch_roll_back_with_their_audits() {
     bad_context.actor_name = "fail\0event".into();
     let mut tx = pool.begin().await.unwrap();
     assert!(
-        store_loop_setting_tx(&mut tx, &definition.loop_id, &scope, &request, &bad_context)
+        store_loop_setting_tx(&mut tx, definition.loop_id, &scope, &request, &bad_context)
             .await
             .is_err()
     );
@@ -51,7 +164,7 @@ async fn setting_and_global_switch_roll_back_with_their_audits() {
     let mut tx = pool.begin().await.unwrap();
     let (_, receipt) = store_loop_setting_tx(
         &mut tx,
-        &definition.loop_id,
+        definition.loop_id,
         &scope,
         &request,
         &mem_store::events::MutationContext::internal("test-settings"),
