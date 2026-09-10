@@ -144,6 +144,8 @@ fn capability(value: &str) -> Option<SpaceCapability> {
         "publish" => Some(SpaceCapability::Publish),
         "pull" => Some(SpaceCapability::Pull),
         "manage_membership" => Some(SpaceCapability::ManageMembership),
+        "ask_expertise" => Some(SpaceCapability::AskExpertise),
+        "answer_expertise" => Some(SpaceCapability::AnswerExpertise),
         _ => panic!("invalid fixture capability"),
     }
 }
@@ -196,7 +198,7 @@ impl Command {
         }
         if !matches!(
             kind,
-            "memory" | "state" | "evidence" | "proposal" | "relation"
+            "memory" | "state" | "evidence" | "proposal" | "relation" | "expertise"
         ) {
             assert_eq!((self.origin, self.canonical), (0, 0));
         }
@@ -206,10 +208,10 @@ impl Command {
         if !matches!(kind, "memory" | "resolve") {
             assert_eq!(self.local, 0);
         }
-        if !matches!(kind, "state" | "relation") {
+        if !matches!(kind, "state" | "relation" | "expertise") {
             assert_eq!(self.revision, 0);
         }
-        if !matches!(kind, "memory" | "proposal" | "evidence") {
+        if !matches!(kind, "memory" | "proposal" | "evidence" | "expertise") {
             assert_eq!(self.text, knowledge());
         }
         if kind != "state" {
@@ -230,10 +232,31 @@ impl Command {
                 (0, 0, 0)
             );
             assert_eq!(self.relation_type, related_to());
-            assert!(self.active);
+            if kind != "expertise" {
+                assert!(self.active);
+            }
         }
         let confidence = ConfidencePpm::try_from(800_000).expect("valid fixture confidence");
         let record = match self.kind.as_str() {
+            "expertise" => {
+                PublicationRecord::Expertise(mem_federation::expertise::CapabilityAdvertisement {
+                    owner: instance(self.origin),
+                    collection: record_id(self.canonical),
+                    revision: StateRevision::new(self.revision)
+                        .expect("positive expertise revision"),
+                    collection_digest: CanonicalJsonCodec::digest(&self.text)
+                        .expect("fixture digest"),
+                    name: self.text.clone(),
+                    description: String::new(),
+                    topics: vec![],
+                    modes: vec![mem_federation::expertise::AnswerMode::Deterministic],
+                    requesters: vec![instance(3)],
+                    model_destinations: vec![],
+                    output_destinations: vec!["local_human".into()],
+                    active: self.active,
+                    limits: Default::default(),
+                })
+            }
             "grant" => PublicationRecord::Membership {
                 member: instance(self.subject),
                 capability: capability(&self.capability).expect("grant requires a capability"),
@@ -306,7 +329,15 @@ impl Command {
             AuthoritySequence::new(self.sequence).expect("positive accepted order"),
             RecordLocator::new(format!("record:{}", self.id)).expect("valid fixture locator"),
             PublicationEnvelope {
-                schema_version: PUBLICATION_SCHEMA_VERSION,
+                schema_version: if kind == "expertise"
+                    || matches!(
+                        self.capability.as_str(),
+                        "ask_expertise" | "answer_expertise"
+                    ) {
+                    3
+                } else {
+                    PUBLICATION_SCHEMA_VERSION
+                },
                 space: space(),
                 publisher: instance(self.publisher),
                 record_id: record_id(self.id),
@@ -330,6 +361,7 @@ fn publication_rust_lean_traces_use_real_reducer() {
             "../../../fixtures/federation/publication-traces/relations-and-causation.json"
         ),
         include_str!("../../../fixtures/federation/publication-traces/capabilities.json"),
+        include_str!("../../../fixtures/federation/publication-traces/expertise.json"),
     ] {
         let fixture: Fixture = serde_json::from_str(raw).expect("valid shared fixture JSON");
         let mut state = PublicationState::new(space(), instance(1));

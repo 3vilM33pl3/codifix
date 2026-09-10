@@ -6,6 +6,7 @@
 mod codec;
 mod digest;
 mod error;
+pub mod expertise;
 mod projection;
 pub mod publication;
 mod record;

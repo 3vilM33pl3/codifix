@@ -9,6 +9,8 @@ Memory Layer is exploring a federation proof that must stay offline, non-product
 
 This document defines the spike contract. The completed evidence report is in
 [`docs/future-development/federation-protocol-spike.md`](../../future-development/federation-protocol-spike.md).
+The standing protocol choice and rationale are recorded in
+[ADR 0011: Adopt AT Protocol as a federation adapter](0011-atproto-federation-adapter.md).
 
 ## Contract
 

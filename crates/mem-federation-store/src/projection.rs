@@ -36,13 +36,15 @@ pub(crate) fn snapshot(state: &PublicationState) -> Value {
                 streams.insert(proposal.target);
             }
             PublicationRecord::ResolveProposal { .. } => {}
+            PublicationRecord::Expertise(_) => {}
         }
     }
-    json!({
+    let mut value = json!({
         "sequence": state.sequence(),
         "memberships": members.into_iter().map(|member| json!({
             "member": member,
-            "capabilities": ([SpaceCapability::Pull, SpaceCapability::Publish, SpaceCapability::ManageMembership]
+            "capabilities": ([SpaceCapability::Pull, SpaceCapability::Publish, SpaceCapability::ManageMembership,
+                SpaceCapability::AskExpertise, SpaceCapability::AnswerExpertise]
                 .into_iter().filter(|cap| state.has_capability(member, *cap)).collect::<Vec<_>>())
         })).collect::<Vec<_>>(),
         "streams": streams.into_iter().map(|stream| json!({
@@ -63,5 +65,11 @@ pub(crate) fn snapshot(state: &PublicationState) -> Value {
                 ProposalResolution::Rejected {by} => json!({"status":"rejected", "by": by}),
             }
         }))).collect::<Vec<_>>()
-    })
+    });
+    // Do not change persisted v2 snapshots merely by upgrading the executable.
+    let expertise = state.expertise_catalog().collect::<Vec<_>>();
+    if !expertise.is_empty() {
+        value["expertise"] = json!(expertise);
+    }
+    value
 }

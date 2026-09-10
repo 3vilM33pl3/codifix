@@ -10,7 +10,7 @@ open Lean
 namespace MemoryFederation.Publication
 
 inductive Kind where
-  | grant | revoke | memory | state | evidence | proposal | resolve | relation
+  | grant | revoke | memory | state | evidence | proposal | resolve | relation | expertise
   deriving Repr, DecidableEq, BEq, ReflBEq, LawfulBEq, FromJson
 
 structure Key where
@@ -87,6 +87,8 @@ structure State where
   publishers : List Nat := [1]
   pullers : List Nat := [1]
   managers : List Nat := [1]
+  askers : List Nat := []
+  answerers : List Nat := []
   versions : List Command := []
   -- Newest first; every accepted command is kept verbatim.
   accepted : List Command := []
@@ -186,6 +188,13 @@ def relationDecision (s : State) (r : Command) : String :=
        old.targetCanonical ≠ r.targetCanonical ∨ old.relationType ≠ r.relationType then "relation_conflict"
     else counterDecision old.revision r.revision "revision_gap"
 
+def expertiseDecision (s : State) (r : Command) : String :=
+  if r.publisher ∉ s.publishers then "unauthorized"
+  else if r.publisher ≠ r.origin then "not_origin"
+  else if r.active ∧ r.publisher ∉ s.answerers then "unauthorized"
+  else counterDecision (((latest s .expertise r.origin r.canonical).map (·.revision)).getD 0)
+    r.revision "revision_gap"
+
 def transitionDecision (s : State) (r : Command) : String :=
   match r.kind with
   | .grant | .revoke =>
@@ -199,6 +208,7 @@ def transitionDecision (s : State) (r : Command) : String :=
   | .proposal => proposalDecision s r
   | .resolve => resolveDecision s r
   | .relation => relationDecision s r
+  | .expertise => expertiseDecision s r
 
 def decision (s : State) (r : Command) : String :=
   if r.authenticated ≠ r.publisher then "forged_publisher"
@@ -243,6 +253,8 @@ def accept (s : State) (r : Command) : State :=
     publishers := changeMembers s.publishers "publish" r,
     pullers := changeMembers s.pullers "pull" r,
     managers := changeMembers s.managers "manage_membership" r,
+    askers := changeMembers s.askers "ask_expertise" r,
+    answerers := changeMembers s.answerers "answer_expertise" r,
     versions := nextVersions s r }
 
 def apply (s : State) (r : Command) : State × String :=

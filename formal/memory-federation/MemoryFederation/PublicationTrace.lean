@@ -66,7 +66,7 @@ def summarize (s : State) (expected : Summary) : Summary :=
 
 def runPublicationFixtures : IO Unit := do
   for name in ["lifecycle.json", "order-and-ownership.json", "evidence-and-proposals.json",
-      "relations-and-causation.json", "capabilities.json"] do
+      "relations-and-causation.json", "capabilities.json", "expertise.json"] do
     let raw ← IO.FS.readFile (System.FilePath.mk "../../fixtures/federation/publication-traces" / name)
     let json ← IO.ofExcept (Json.parse raw)
     let fixture : Fixture ← IO.ofExcept (fromJson? json)

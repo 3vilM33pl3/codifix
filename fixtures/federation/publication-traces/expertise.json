@@ -1,0 +1,25 @@
+{
+  "name": "expertise ownership revisions withdrawal and revocation",
+  "records": [
+    {"sequence":1,"id":1,"publisher":1,"authenticated":1,"kind":"grant","subject":2},
+    {"sequence":2,"id":20,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":1},
+    {"sequence":2,"id":2,"publisher":1,"authenticated":1,"kind":"grant","subject":2,"capability":"answer_expertise"},
+    {"sequence":3,"id":20,"publisher":2,"authenticated":1,"kind":"expertise","origin":2,"canonical":99,"revision":1},
+    {"sequence":3,"id":20,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":1},
+    {"sequence":3,"id":20,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":1},
+    {"sequence":3,"id":20,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":1,"text":"altered"},
+    {"sequence":4,"id":21,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":3},
+    {"sequence":4,"id":21,"publisher":2,"authenticated":2,"kind":"expertise","origin":3,"canonical":99,"revision":1},
+    {"sequence":4,"id":21,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":2,"active":false},
+    {"sequence":5,"id":22,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":3},
+    {"sequence":6,"id":3,"publisher":1,"authenticated":1,"kind":"revoke","subject":2,"capability":"answer_expertise"},
+    {"sequence":7,"id":23,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":4},
+    {"sequence":7,"id":23,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":4,"active":false},
+    {"sequence":8,"id":4,"publisher":1,"authenticated":1,"kind":"grant","subject":3,"capability":"ask_expertise"},
+    {"sequence":9,"id":5,"publisher":1,"authenticated":1,"kind":"revoke","subject":3,"capability":"ask_expertise"},
+    {"sequence":3,"id":20,"publisher":2,"authenticated":2,"kind":"expertise","origin":2,"canonical":99,"revision":1}
+  ],
+  "outcomes": ["applied","unauthorized","applied","forged_publisher","applied","duplicate","equivocation","revision_gap","not_origin","applied","applied","applied","unauthorized","applied","applied","applied","duplicate"],
+  "sequence":9,"publishers":[1,2],"pullers":[1],"managers":[1],
+  "streams":[],"evidence":[],"proposals":[],"relations":[]
+}

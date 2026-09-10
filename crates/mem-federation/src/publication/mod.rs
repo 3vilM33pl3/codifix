@@ -279,6 +279,7 @@ pub struct CorrectionProposal {
     deny_unknown_fields
 )]
 pub enum PublicationRecord {
+    Expertise(crate::expertise::CapabilityAdvertisement),
     Membership {
         member: InstanceId,
         capability: SpaceCapability,
@@ -319,6 +320,26 @@ pub struct PublicationEnvelope {
     pub record: PublicationRecord,
 }
 impl PublicationEnvelope {
+    /// V2 bytes retain their original meaning. New capabilities and semantic
+    /// kinds are valid only under the explicit V3 contract.
+    pub fn supported_schema(&self) -> bool {
+        let expertise = matches!(
+            &self.record,
+            PublicationRecord::Expertise(_)
+                | PublicationRecord::Membership {
+                    capability: SpaceCapability::AskExpertise | SpaceCapability::AnswerExpertise,
+                    ..
+                }
+                | PublicationRecord::Revocation {
+                    capability: Some(
+                        SpaceCapability::AskExpertise | SpaceCapability::AnswerExpertise
+                    ),
+                    ..
+                }
+        );
+        self.schema_version == crate::expertise::EXPERTISE_SCHEMA_VERSION
+            || (self.schema_version == PUBLICATION_SCHEMA_VERSION && !expertise)
+    }
     pub fn key(&self) -> RecordKey {
         RecordKey {
             publisher: self.publisher,

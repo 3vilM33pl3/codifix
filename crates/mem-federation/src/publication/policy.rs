@@ -74,6 +74,15 @@ impl PublicationState {
         let capability = if membership {
             SpaceCapability::ManageMembership
         } else {
+            if matches!(&envelope.record, PublicationRecord::Expertise(ad) if ad.active) {
+                self.authorize_local(
+                    local,
+                    grant,
+                    envelope.publisher,
+                    SpaceCapability::AnswerExpertise,
+                    true,
+                )?;
+            }
             SpaceCapability::Publish
         };
         self.authorize_local(local, grant, envelope.publisher, capability, true)?;

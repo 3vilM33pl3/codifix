@@ -84,6 +84,8 @@ pub enum SpaceCapability {
     Pull,
     Publish,
     ManageMembership,
+    AskExpertise,
+    AnswerExpertise,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -247,6 +249,14 @@ impl FederationRecord {
         match self {
             Self::MemoryVersion(record) => record.validate(),
             Self::CanonicalState(record) => record.validate(),
+            Self::Membership(MembershipRecord {
+                capability: SpaceCapability::AskExpertise | SpaceCapability::AnswerExpertise,
+                ..
+            })
+            | Self::Revocation(RevocationRecord {
+                capability: Some(SpaceCapability::AskExpertise | SpaceCapability::AnswerExpertise),
+                ..
+            }) => Err(FederationError::UnsupportedCapability),
             Self::Evidence(_) | Self::Relation(_) | Self::Membership(_) | Self::Revocation(_) => {
                 Ok(())
             }

@@ -26,7 +26,7 @@ pub async fn queue_intent(
         .authorize_publication(access, grant, &intent.envelope)
         .map_err(StoreError::LocalPolicy)?;
     let e = &intent.envelope;
-    if e.schema_version != PUBLICATION_SCHEMA_VERSION {
+    if !e.supported_schema() {
         return Err(StoreError::Binding);
     }
     // A MemoryVersion may select/redact source content, but cannot invent its

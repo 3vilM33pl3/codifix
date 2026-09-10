@@ -4,3 +4,4 @@ import MemoryFederation.Trace
 import MemoryFederation.Publication
 import MemoryFederation.PublicationInvariants
 import MemoryFederation.PublicationTrace
+import MemoryFederation.Expertise

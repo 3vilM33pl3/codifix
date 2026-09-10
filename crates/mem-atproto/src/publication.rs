@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Schema-v2 private-profile records. This collection is UNPUBLISHED; it does
+//! Schema-v2/v3 private-profile records. This collection is UNPUBLISHED; it does
 //! not reinterpret the six legacy spike Lexicons or claim native Spaces support.
 use atrium_api::types::{Unknown, string::AtIdentifier};
 use mem_federation::{CanonicalJsonCodec, publication::PublicationDelivery};
@@ -75,7 +75,7 @@ impl PublicationWire {
             .ok_or_else(|| MemAtprotoError::message("missing delivery"))?;
         prune(wire, "delivery")?;
         let delivery: PublicationDelivery = serde_json::from_value(wire.clone())?;
-        if delivery.envelope.schema_version != 2
+        if !delivery.envelope.supported_schema()
             || CanonicalJsonCodec::digest(&delivery.envelope)
                 .map_err(|e| MemAtprotoError::message(e.to_string()))?
                 != delivery.digest
@@ -198,6 +198,28 @@ fn prune(value: &mut Value, shape: &str) -> Result<(), MemAtprotoError> {
             ("evidence", "keys"),
         ],
         "resolve_proposal" => &[("proposal", "key"), ("source", "source")],
+        "expertise" => &[
+            ("owner", ""),
+            ("collection", ""),
+            ("revision", ""),
+            ("collection_digest", "digest"),
+            ("name", ""),
+            ("description", ""),
+            ("topics", ""),
+            ("modes", ""),
+            ("requesters", ""),
+            ("model_destinations", ""),
+            ("output_destinations", ""),
+            ("active", ""),
+            ("limits", "expertise_limits"),
+        ],
+        "expertise_limits" => &[
+            ("question_bytes", ""),
+            ("context_bytes", ""),
+            ("answer_bytes", ""),
+            ("citations", ""),
+            ("deadline_seconds", ""),
+        ],
         "keys" => {
             let values = value
                 .as_array_mut()
@@ -221,6 +243,7 @@ fn prune(value: &mut Value, shape: &str) -> Result<(), MemAtprotoError> {
                 "relation",
                 "proposal",
                 "resolve_proposal",
+                "expertise",
             ]
             .contains(&kind.as_str())
             {

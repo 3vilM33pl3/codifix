@@ -71,7 +71,7 @@ This task delivers **software and a disposable rehearsal**, not activation on ex
 
 Implement in small committed slices:
 
-- [ ] Checkpoint this approved internal-use contract and update F1’s conditional roadmap status.
+- [x] Checkpoint this approved internal-use contract and update F1’s conditional roadmap status.
 - [ ] Add neutral contracts, schema compatibility, advertisements and Rust/Lean conformance.
 - [ ] Add collection review, immutable snapshots and authorization.
 - [ ] Add gateway mailbox, restricted answering and recovery.
@@ -96,3 +96,20 @@ Use synthetic data, temporary credentials and fake providers only. Keep existing
 **Completion means:** two disposable project instances discover and answer through the private gateway with verified disclosure controls, citations and recovery; third-instance enrollment is demonstrated; deployment instructions are ready. Real homelab activation, paid model calls, customer readiness, R3 completion and F2 remain separate work.
 
 Implementation begins only after the approved-plan checkpoint succeeds through the working dev Memory connection. The currently failing MCP credential is not permission to rotate credentials or bypass that checkpoint.
+
+## Execution evidence — 2026-09-10
+
+The dev CLI checkpoint succeeded without credential changes: thread
+`f1-private-expertise`, plan memory `212111f9-4bdf-4308-821f-acebd5ab8f27`.
+The installed MCP connection's earlier failure was not bypassed or repaired.
+
+Domain increment: neutral collection/question/answer contracts, explicit v3
+expertise permissions and origin-owned advertisement revisions, v2 semantic
+rejection and unchanged v2 projections, adapter unknown-field retention and
+default-deny gateway v3 ingress. Six expertise tests (including repeated-delivery
+property testing), the extended adapter tests and all prior focused tests pass.
+The six publication traces plus nine legacy traces pass in Rust and Lean;
+scoped Lean expertise ownership/revision/revocation proofs build without `sorry`.
+Focused federation/adapter/store/runtime Clippy passes. This is not a working
+remote question service: collection persistence, mailbox, client workflows and
+disposable end-to-end evidence are still pending.

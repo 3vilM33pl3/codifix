@@ -24,6 +24,7 @@ pub enum PublicationReject {
     AuthorityRevocation,
     InvalidCausation,
     RelationConflict,
+    InvalidExpertise,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +90,7 @@ pub struct PublicationState {
     states: BTreeMap<StreamId, Vec<(RecordKey, StatePublication)>>,
     relations: BTreeMap<RecordKey, Vec<RelationPublication>>,
     proposals: BTreeMap<RecordKey, StoredProposal>,
+    expertise: BTreeMap<RecordKey, crate::expertise::CapabilityAdvertisement>,
 }
 
 type Transition = Result<(), PublicationOutcome>;
@@ -121,6 +123,7 @@ impl PublicationState {
             states: BTreeMap::new(),
             relations: BTreeMap::new(),
             proposals: BTreeMap::new(),
+            expertise: BTreeMap::new(),
         }
     }
     pub fn space(&self) -> SpaceId {
@@ -163,6 +166,14 @@ impl PublicationState {
     pub fn proposal(&self, key: RecordKey) -> Option<&StoredProposal> {
         self.proposals.get(&key)
     }
+    pub fn expertise(&self, key: RecordKey) -> Option<&crate::expertise::CapabilityAdvertisement> {
+        self.expertise.get(&key)
+    }
+    pub fn expertise_catalog(
+        &self,
+    ) -> impl Iterator<Item = &crate::expertise::CapabilityAdvertisement> {
+        self.expertise.values()
+    }
     pub fn content_version(&self, stream: StreamId) -> u32 {
         self.history(stream)
             .last()
@@ -185,7 +196,7 @@ impl PublicationState {
         if authenticated_publisher != e.publisher {
             return PublicationOutcome::Rejected(PublicationReject::ForgedPublisher);
         }
-        if e.schema_version != PUBLICATION_SCHEMA_VERSION {
+        if !e.supported_schema() {
             return PublicationOutcome::Rejected(PublicationReject::UnsupportedSchema);
         }
         if e.space != self.space {
@@ -350,6 +361,25 @@ impl PublicationState {
     fn transition_data(&mut self, e: &PublicationEnvelope) -> Transition {
         use PublicationRecord::*;
         match &e.record {
+            Expertise(ad) => {
+                if ad.owner != e.publisher {
+                    return reject(PublicationReject::NotOrigin);
+                }
+                if ad.validate().is_err() {
+                    return reject(PublicationReject::InvalidExpertise);
+                }
+                // Withdrawal is still possible after answering is revoked.
+                if ad.active && !self.has_capability(e.publisher, SpaceCapability::AnswerExpertise)
+                {
+                    return reject(PublicationReject::Unauthorized);
+                }
+                check_counter(
+                    self.expertise(ad.key()).map_or(0, |old| old.revision.get()),
+                    ad.revision.get(),
+                    PublicationQuarantine::RevisionGap,
+                )?;
+                self.expertise.insert(ad.key(), ad.clone());
+            }
             Evidence(evidence) => {
                 let snapshot = evidence.snapshot();
                 Self::require_origin(e.publisher, snapshot.stream)?;

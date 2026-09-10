@@ -4,6 +4,8 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum FederationError {
+    #[error("expertise capabilities require publication schema v3")]
+    UnsupportedCapability,
     #[error("{field} must be non-empty")]
     EmptyIdentifier { field: &'static str },
     #[error("{field} must not contain whitespace or control characters: {value}")]

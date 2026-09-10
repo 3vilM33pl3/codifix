@@ -22,6 +22,9 @@ pub struct GatewayServer {
     fence: WriterFence,
     credentials: Vec<([u8; 32], InstanceId)>,
     security: GatewaySecurity,
+    // New semantics stay unreachable through the existing deployment profile.
+    // F1 activation must establish fleet compatibility before enabling them.
+    expertise_enabled: bool,
 }
 impl GatewayServer {
     pub async fn new(
@@ -56,6 +59,7 @@ impl GatewayServer {
             fence,
             credentials,
             security,
+            expertise_enabled: false,
         })
     }
     pub fn router(&self) -> Router {
@@ -150,6 +154,11 @@ async fn accept(
     Json(intent): Json<PublicationIntent>,
 ) -> std::result::Result<Json<Acceptance>, StatusCode> {
     let publisher = server.authenticate(&headers)?;
+    if intent.envelope.schema_version == mem_federation::expertise::EXPERTISE_SCHEMA_VERSION
+        && !server.expertise_enabled
+    {
+        return Err(StatusCode::FORBIDDEN);
+    }
     let delivery = PublicationDelivery::new(
         AuthoritySequence::new(u32::MAX).map_err(|_| StatusCode::BAD_REQUEST)?,
         intent.locator.clone(),

@@ -54,6 +54,50 @@ fn samples() -> Vec<PublicationDelivery> {
     }).collect()
 }
 
+#[test]
+fn expertise_v3_retains_extensions_without_changing_v2_or_accepting_downgrades() {
+    use mem_federation::expertise::*;
+    let mut delivery = samples().remove(0);
+    delivery.envelope.schema_version = 3;
+    delivery.envelope.record = PublicationRecord::Expertise(CapabilityAdvertisement {
+        owner: delivery.envelope.publisher,
+        collection: delivery.envelope.record_id,
+        revision: StateRevision::new(1).unwrap(),
+        collection_digest: CanonicalJsonCodec::digest(&"private snapshot").unwrap(),
+        name: "Memory architecture".into(),
+        description: "Reviewed internal expertise".into(),
+        topics: vec!["rust".into()],
+        modes: vec![AnswerMode::Deterministic],
+        requesters: vec![InstanceId::new(Uuid::from_u128(2)).unwrap()],
+        model_destinations: vec![],
+        output_destinations: vec!["local_human".into()],
+        active: true,
+        limits: ExpertiseLimits::default(),
+    });
+    delivery.digest = CanonicalJsonCodec::digest(&delivery.envelope).unwrap();
+    let original = PublicationWire::encode(delivery.clone()).unwrap();
+    let mut extended = serde_json::to_value(original.raw()).unwrap();
+    extend(&mut extended);
+    let decoded =
+        PublicationWire::decode(serde_json::from_value(extended.clone()).unwrap()).unwrap();
+    assert_eq!(decoded.delivery(), &delivery);
+    assert_eq!(serde_json::to_value(decoded.raw()).unwrap(), extended);
+    assert_ne!(decoded.cid().unwrap(), original.cid().unwrap());
+    delivery.envelope.schema_version = 2;
+    delivery.digest = CanonicalJsonCodec::digest(&delivery.envelope).unwrap();
+    assert!(PublicationWire::encode(delivery).is_err());
+    for mut legacy in samples() {
+        let before = PublicationWire::encode(legacy.clone()).unwrap();
+        assert_eq!(
+            PublicationWire::decode(before.raw().clone()).unwrap(),
+            before
+        );
+        legacy.envelope.schema_version = 4;
+        legacy.digest = CanonicalJsonCodec::digest(&legacy.envelope).unwrap();
+        assert!(PublicationWire::encode(legacy).is_err());
+    }
+}
+
 // Extend every object, including nested evidence references and review digests.
 fn extend(value: &mut Value) {
     match value {

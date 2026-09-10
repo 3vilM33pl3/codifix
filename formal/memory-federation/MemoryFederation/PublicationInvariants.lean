@@ -36,7 +36,7 @@ theorem applied_data_requires_publishing (s : State) (r : Command)
   · exact present
   · cases kind : r.kind <;>
       simp_all [transitionDecision, memoryDecision, stateDecision, evidenceDecision,
-        proposalDecision, resolveDecision, relationDecision]
+        proposalDecision, resolveDecision, relationDecision, expertiseDecision]
 
 theorem applied_evidence_owned_and_space_bound (s : State) (r : Command)
     (kind : r.kind = .evidence) (h : (apply s r).2 = "applied") :
