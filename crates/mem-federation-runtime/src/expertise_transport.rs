@@ -4,7 +4,9 @@
 use crate::{GatewayClient, Result, RuntimeError};
 use chrono::{DateTime, Utc};
 use mem_federation::{CanonicalJsonCodec, ContentDigest, expertise::*, publication::*};
-use mem_federation_store::{QuestionLease, QuestionResult};
+use mem_federation_store::{
+    AnswerDeliveryAuthorization, AnswerDeliveryLease, QuestionLease, QuestionResult,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -22,6 +24,10 @@ pub enum ExpertiseOperation {
         request_id: Uuid,
     },
     Claim,
+    ClaimDelivery,
+    AuthorizeDelivery {
+        authorization: AnswerDeliveryAuthorization,
+    },
     Renew {
         lease: QuestionLease,
     },
@@ -37,6 +43,8 @@ impl ExpertiseOperation {
             Self::Submit { .. } => "memory-expertise-submit-v1",
             Self::Result { .. } => "memory-expertise-result-v1",
             Self::Claim => "memory-expertise-claim-v1",
+            Self::ClaimDelivery => "memory-expertise-delivery-claim-v1",
+            Self::AuthorizeDelivery { .. } => "memory-expertise-delivery-release-v1",
             Self::Renew { .. } => "memory-expertise-renew-v1",
             Self::Complete { .. } => "memory-expertise-complete-v1",
         }
@@ -67,6 +75,7 @@ pub enum ExpertiseReply {
     Capabilities(Vec<CapabilityAdvertisement>),
     Question(Box<QuestionResult>),
     Lease(Option<Box<QuestionLease>>),
+    DeliveryLease(Option<Box<AnswerDeliveryLease>>),
     Renewed(DateTime<Utc>),
     Completed,
 }
@@ -161,9 +170,31 @@ impl GatewayClient {
                     return Err(RuntimeError::InvalidResponse);
                 }
             }
+            (ExpertiseOperation::ClaimDelivery, ExpertiseReply::DeliveryLease(lease)) => {
+                if let Some(lease) = lease
+                    && (lease.question.capability.publisher != instance
+                        || lease.question.space != self.space
+                        || lease.nonce.is_nil()
+                        || lease.lease_token.is_nil()
+                        || lease.expires_at <= Utc::now()
+                        || lease.answer.request_digest
+                            != lease
+                                .question
+                                .digest()
+                                .map_err(|_| RuntimeError::InvalidResponse)?
+                        || lease.answer_digest
+                            != CanonicalJsonCodec::digest(&lease.answer)
+                                .map_err(|_| RuntimeError::InvalidResponse)?)
+                {
+                    return Err(RuntimeError::InvalidResponse);
+                }
+            }
             (ExpertiseOperation::Renew { lease }, ExpertiseReply::Renewed(until))
                 if *until > Utc::now() && *until <= lease.question.expires_at => {}
-            (ExpertiseOperation::Complete { .. }, ExpertiseReply::Completed) => {}
+            (
+                ExpertiseOperation::Complete { .. } | ExpertiseOperation::AuthorizeDelivery { .. },
+                ExpertiseReply::Completed,
+            ) => {}
             _ => return Err(RuntimeError::InvalidResponse),
         }
         Ok(reply)

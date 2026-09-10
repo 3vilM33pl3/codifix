@@ -4,7 +4,9 @@
 
 mod audit;
 mod expertise_collections;
+mod expertise_delivery;
 mod expertise_mailbox;
+pub use expertise_delivery::*;
 mod gateway;
 pub use audit::*;
 pub use expertise_collections::*;

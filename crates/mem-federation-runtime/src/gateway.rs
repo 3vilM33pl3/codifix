@@ -22,8 +22,9 @@ use std::sync::Arc;
 /// They do not confer capabilities: current DB membership is rechecked on use.
 #[derive(Clone)]
 pub struct GatewayServer {
-    store: GatewayStore,
-    fence: WriterFence,
+    pub(crate) store: GatewayStore,
+    pub(crate) fence: WriterFence,
+    pub(crate) delivery_waiters: crate::expertise_delivery::DeliveryWaiters,
     credentials: Vec<([u8; 32], InstanceId)>,
     security: GatewaySecurity,
     // New semantics stay unreachable through the existing deployment profile.
@@ -66,6 +67,7 @@ impl GatewayServer {
             credentials,
             security,
             expertise_enabled: false,
+            delivery_waiters: Default::default(),
             space,
             authority,
         })
@@ -248,11 +250,21 @@ async fn expertise(
             ))
         }
         ExpertiseOperation::Result { request_id } => ExpertiseReply::Question(Box::new(
-            store
-                .question_result(fence, actor, *request_id)
-                .await
-                .map_err(expertise_error)?,
+            server
+                .receive_answer(actor, *request_id, request.nonce)
+                .await?,
         )),
+        ExpertiseOperation::ClaimDelivery => ExpertiseReply::DeliveryLease(
+            store
+                .claim_answer_delivery(fence, actor)
+                .await
+                .map_err(expertise_error)?
+                .map(Box::new),
+        ),
+        ExpertiseOperation::AuthorizeDelivery { authorization } => {
+            server.release_answer(actor, authorization).await?;
+            ExpertiseReply::Completed
+        }
         ExpertiseOperation::Claim => ExpertiseReply::Lease(
             store
                 .claim_question(fence, actor)
@@ -280,7 +292,7 @@ async fn expertise(
         .map(Json)
         .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)
 }
-fn expertise_error(error: mem_federation_store::StoreError) -> StatusCode {
+pub(crate) fn expertise_error(error: mem_federation_store::StoreError) -> StatusCode {
     use mem_federation_store::StoreError;
     match error {
         StoreError::Expertise(_) | StoreError::Binding => StatusCode::FORBIDDEN,

@@ -10,6 +10,19 @@ struct Origin {
     publication: PublicationIntent,
 }
 impl Origin {
+    async fn release(
+        &self,
+        responder_client: &GatewayClient,
+    ) -> mem_federation_runtime::Result<()> {
+        let responder = self.draft.snapshot.owner;
+        let lease = delivery_claim(responder_client, responder).await;
+        let mut tx = self.db.pool.begin().await.unwrap();
+        let result = responder_client
+            .authorize_held_delivery(&mut tx, &self.worker, responder, &lease)
+            .await;
+        tx.rollback().await.unwrap();
+        result
+    }
     async fn prepare(
         owner: InstanceId,
         requester: InstanceId,
@@ -350,19 +363,47 @@ async fn two_origin_databases_exchange_only_reviewed_cited_excerpts() {
             )
             .await
             .unwrap();
-        let ExpertiseReply::Question(result) = requester_client
-            .expertise(
+        let (received, released) = tokio::join!(
+            requester_client.expertise(
                 requester,
                 ExpertiseOperation::Result {
                     request_id: question.request_id,
                 },
-            )
-            .await
-            .unwrap()
-        else {
+            ),
+            origin.release(responder_client)
+        );
+        released.unwrap();
+        let ExpertiseReply::Question(result) = received.unwrap() else {
             panic!("result");
         };
         assert_eq!(result.answer.unwrap(), answer);
+        // A local-only service grant revocation must block cached bytes too,
+        // without waiting for an advertisement to reach the gateway.
+        sqlx::query(
+            "UPDATE federation_expertise_collection_grants SET enabled=FALSE WHERE principal_id=$1",
+        )
+        .bind(origin.worker.principal)
+        .execute(&origin.db.pool)
+        .await
+        .unwrap();
+        let (denied, released) = tokio::join!(
+            requester_client.expertise(
+                requester,
+                ExpertiseOperation::Result {
+                    request_id: question.request_id,
+                }
+            ),
+            origin.release(responder_client)
+        );
+        assert!(denied.is_err());
+        assert!(released.is_err());
+        sqlx::query(
+            "UPDATE federation_expertise_collection_grants SET enabled=TRUE WHERE principal_id=$1",
+        )
+        .bind(origin.worker.principal)
+        .execute(&origin.db.pool)
+        .await
+        .unwrap();
         // Exact source updates do not silently become approved context.
         insert_source(
             &origin.db.pool,
@@ -373,6 +414,19 @@ async fn two_origin_databases_exchange_only_reviewed_cited_excerpts() {
         )
         .await;
         let new_answer = origin.answer(&origin.question(requester)).await;
+        // The old stored answer is no longer readable after a local-only
+        // source update, even though its gateway advertisement is unchanged.
+        let (received, released) = tokio::join!(
+            requester_client.expertise(
+                requester,
+                ExpertiseOperation::Result {
+                    request_id: question.request_id
+                }
+            ),
+            origin.release(responder_client)
+        );
+        assert!(received.is_err());
+        assert!(released.is_err());
         assert_eq!(new_answer.status, ExpertiseStatus::Refused);
         assert!(new_answer.citations.is_empty());
         assert!(

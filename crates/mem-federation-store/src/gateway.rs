@@ -75,6 +75,8 @@ impl GatewayStore {
             .bind(old.space.as_uuid()).execute(&mut *tx).await?;
         sqlx::query("UPDATE federation_expertise_mailbox SET lease_until=clock_timestamp() WHERE space=$1 AND status='running'")
             .bind(old.space.as_uuid()).execute(&mut *tx).await?;
+        sqlx::query("UPDATE federation_expertise_deliveries SET status='expired',lease_token=NULL WHERE space=$1 AND status IN ('pending','claimed')")
+            .bind(old.space.as_uuid()).execute(&mut *tx).await?;
         tx.commit().await?;
         Ok(WriterFence {
             space: old.space,

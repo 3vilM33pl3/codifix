@@ -4,6 +4,7 @@
 mod config;
 mod context;
 mod expertise_answer;
+mod expertise_delivery;
 mod expertise_transport;
 pub use expertise_answer::*;
 mod gateway;

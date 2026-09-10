@@ -70,6 +70,23 @@ async fn listen(server: &GatewayServer) -> (Endpoint, tokio::task::JoinHandle<()
     )
 }
 
+async fn delivery_claim(client: &GatewayClient, responder: InstanceId) -> AnswerDeliveryLease {
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if let ExpertiseReply::DeliveryLease(Some(lease)) = client
+                .expertise(responder, ExpertiseOperation::ClaimDelivery)
+                .await
+                .unwrap()
+            {
+                return *lease;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap()
+}
+
 #[tokio::test]
 async fn private_http_exchange_is_explicit_addressed_signed_and_recoverable() {
     let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
@@ -273,11 +290,50 @@ async fn private_http_exchange_is_explicit_addressed_signed_and_recoverable() {
             .await
             .unwrap();
     }
-    let ExpertiseReply::Question(result) = requester.expertise(homelab, result()).await.unwrap()
-    else {
+    // A release after its live challenge expires cannot deliver retained bytes.
+    // A subsequent read needs a new nonce and a new origin authorization.
+    let (expired, denied) = tokio::join!(requester.expertise(homelab, result()), async {
+        let lease = delivery_claim(&responder, memory).await;
+        sqlx::query("UPDATE federation_expertise_deliveries SET expires_at=clock_timestamp()-interval '1 second' WHERE nonce=$1")
+            .bind(lease.nonce).execute(&db.pool).await.unwrap();
+        responder
+            .expertise(
+                memory,
+                ExpertiseOperation::AuthorizeDelivery {
+                    authorization: lease.authorization(true).unwrap(),
+                },
+            )
+            .await
+    });
+    assert!(expired.is_err());
+    assert!(denied.is_err());
+    let (received, authorization) = tokio::join!(requester.expertise(homelab, result()), async {
+        let lease = delivery_claim(&responder, memory).await;
+        let authorization = lease.authorization(true).unwrap();
+        responder
+            .expertise(
+                memory,
+                ExpertiseOperation::AuthorizeDelivery {
+                    authorization: authorization.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        authorization
+    });
+    let ExpertiseReply::Question(result) = received.unwrap() else {
         panic!("result");
     };
     assert_eq!(result.answer.unwrap(), answer);
+    assert!(
+        responder
+            .expertise(
+                memory,
+                ExpertiseOperation::AuthorizeDelivery { authorization }
+            )
+            .await
+            .is_err()
+    );
     let leaked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM federation_accepted WHERE delivery::text LIKE '%Private Q&A%')")
         .fetch_one(&db.pool).await.unwrap();
     assert!(!leaked);

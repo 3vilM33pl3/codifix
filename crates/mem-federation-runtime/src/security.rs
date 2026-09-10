@@ -145,6 +145,7 @@ impl GatewaySecurity {
         let now = Utc::now();
         let expires_at = match &reply {
             ExpertiseReply::Lease(Some(lease)) => lease.lease_until,
+            ExpertiseReply::DeliveryLease(Some(lease)) => lease.expires_at,
             ExpertiseReply::Renewed(until) => *until,
             ExpertiseReply::Question(result) if result.answer.is_some() => result.payload_until,
             _ => now + chrono::Duration::seconds(30),

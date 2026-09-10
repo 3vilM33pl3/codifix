@@ -180,6 +180,229 @@ fn refusal(q: &ExpertiseQuestion) -> ExpertiseAnswer {
 }
 
 #[tokio::test]
+async fn retained_delivery_is_single_use_bound_fenced_and_metadata_only() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let q = f.question();
+    f.store
+        .submit_question(f.fence, f.requester, &q)
+        .await
+        .unwrap();
+    let execution = f.claim().await;
+    let answer = refusal(&q);
+    f.store
+        .complete_question(f.fence, f.responder, &execution, &answer)
+        .await
+        .unwrap();
+    assert!(
+        f.store
+            .submit_question(f.fence, f.requester, &q)
+            .await
+            .unwrap()
+            .answer
+            .is_none()
+    );
+    let nonce = Uuid::new_v4();
+    assert!(
+        f.store
+            .request_answer_delivery(f.fence, f.requester, q.request_id, nonce)
+            .await
+            .unwrap()
+    );
+    assert!(
+        f.store
+            .request_answer_delivery(f.fence, f.requester, q.request_id, nonce)
+            .await
+            .is_err()
+    );
+    let lease = f
+        .store
+        .claim_answer_delivery(f.fence, f.responder)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        f.store
+            .claim_answer_delivery(f.fence, f.responder)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let permit = lease.authorization(true).unwrap();
+    let mut forged = permit.clone();
+    forged.request_id = Uuid::new_v4();
+    assert!(
+        f.store
+            .finish_answer_delivery(f.fence, f.responder, &forged)
+            .await
+            .is_err()
+    );
+    forged = permit.clone();
+    forged.answer_digest = CanonicalJsonCodec::digest(&"forged").unwrap();
+    assert!(
+        f.store
+            .finish_answer_delivery(f.fence, f.responder, &forged)
+            .await
+            .is_err()
+    );
+    assert!(
+        f.store
+            .finish_answer_delivery(f.fence, f.requester, &permit)
+            .await
+            .is_err()
+    );
+    let released = f
+        .store
+        .finish_answer_delivery(f.fence, f.responder, &permit)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(released.answer, Some(answer));
+    assert!(
+        f.store
+            .finish_answer_delivery(f.fence, f.responder, &permit)
+            .await
+            .is_err()
+    );
+    assert!(
+        f.store
+            .question_result(f.fence, f.requester, q.request_id)
+            .await
+            .unwrap()
+            .answer
+            .is_none()
+    );
+    let metadata: serde_json::Value = sqlx::query_scalar(
+        "SELECT to_jsonb(d) FROM federation_expertise_deliveries d WHERE nonce=$1",
+    )
+    .bind(nonce)
+    .fetch_one(&f.db.pool)
+    .await
+    .unwrap();
+    let serialized = serde_json::to_string(&metadata).unwrap();
+    assert!(!serialized.contains(&q.question));
+    assert!(!serialized.contains("Insufficient reviewed evidence"));
+    assert!(
+        !serde_json::to_string(&permit)
+            .unwrap()
+            .contains(&q.question)
+    );
+    f.store
+        .request_answer_delivery(f.fence, f.requester, q.request_id, Uuid::new_v4())
+        .await
+        .unwrap();
+    let lease = f
+        .store
+        .claim_answer_delivery(f.fence, f.responder)
+        .await
+        .unwrap()
+        .unwrap();
+    let new_fence = f.store.rotate_writer(f.fence).await.unwrap();
+    assert!(
+        f.store
+            .finish_answer_delivery(new_fence, f.responder, &lease.authorization(true).unwrap())
+            .await
+            .is_err()
+    );
+    assert!(
+        f.store
+            .claim_answer_delivery(new_fence, f.responder)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    f.db.cleanup().await.unwrap();
+}
+
+#[tokio::test]
+async fn delivery_limits_expiry_policy_and_journal_failure_fail_closed() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let q = f.question();
+    f.store
+        .submit_question(f.fence, f.requester, &q)
+        .await
+        .unwrap();
+    let lease = f.claim().await;
+    f.store
+        .complete_question(f.fence, f.responder, &lease, &refusal(&q))
+        .await
+        .unwrap();
+    sqlx::raw_sql("CREATE FUNCTION fail_delivery_journal() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='delivery_requested' THEN RAISE EXCEPTION 'fixture'; END IF; RETURN NEW; END $$; CREATE TRIGGER fail_delivery BEFORE INSERT ON federation_expertise_attempts FOR EACH ROW EXECUTE FUNCTION fail_delivery_journal();")
+        .execute(&f.db.pool).await.unwrap();
+    assert!(
+        f.store
+            .request_answer_delivery(f.fence, f.requester, q.request_id, Uuid::new_v4())
+            .await
+            .is_err()
+    );
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM federation_expertise_deliveries")
+        .fetch_one(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+    sqlx::query("DROP TRIGGER fail_delivery ON federation_expertise_attempts")
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    for _ in 0..32 {
+        f.store
+            .request_answer_delivery(f.fence, f.requester, q.request_id, Uuid::new_v4())
+            .await
+            .unwrap();
+    }
+    assert!(matches!(
+        f.store
+            .request_answer_delivery(f.fence, f.requester, q.request_id, Uuid::new_v4())
+            .await,
+        Err(StoreError::Limits)
+    ));
+    let lease = f
+        .store
+        .claim_answer_delivery(f.fence, f.responder)
+        .await
+        .unwrap()
+        .unwrap();
+    sqlx::query("UPDATE federation_expertise_deliveries SET expires_at=clock_timestamp()-interval '1 second'").execute(&f.db.pool).await.unwrap();
+    assert!(
+        f.store
+            .finish_answer_delivery(f.fence, f.responder, &lease.authorization(true).unwrap())
+            .await
+            .is_err()
+    );
+    assert!(
+        f.store
+            .claim_answer_delivery(f.fence, f.responder)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    f.store
+        .request_answer_delivery(f.fence, f.requester, q.request_id, Uuid::new_v4())
+        .await
+        .unwrap();
+    let lease = f
+        .store
+        .claim_answer_delivery(f.fence, f.responder)
+        .await
+        .unwrap()
+        .unwrap();
+    sqlx::query("UPDATE federation_security SET policy='{}'::jsonb")
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    assert!(
+        f.store
+            .finish_answer_delivery(f.fence, f.responder, &lease.authorization(true).unwrap())
+            .await
+            .is_err()
+    );
+    f.db.cleanup().await.unwrap();
+}
+
+#[tokio::test]
 async fn exact_retries_scoped_reads_single_claim_and_idempotent_result() {
     let Some(f) = Fixture::new().await else {
         return;
@@ -242,7 +465,7 @@ async fn exact_retries_scoped_reads_single_claim_and_idempotent_result() {
             .await
             .unwrap()
             .answer,
-        Some(answer)
+        None // Only a fresh origin authorization may release retained bytes.
     );
     let rows: Vec<serde_json::Value> =
         sqlx::query_scalar("SELECT to_jsonb(t) FROM federation_expertise_attempts t")

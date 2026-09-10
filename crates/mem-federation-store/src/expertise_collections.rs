@@ -566,6 +566,28 @@ pub async fn eligible_question_collection(
     owner: InstanceId,
     question: &ExpertiseQuestion,
 ) -> Result<(CollectionSnapshot, CapabilityAdvertisement)> {
+    collection_for_question(tx, access, owner, question, false).await
+}
+
+/// Only for a gateway-authenticated, retained-answer delivery lease. Retention
+/// and the delivery deadline are enforced at the gateway; local collection,
+/// source, consent and permissions are still checked NOW under row locks.
+pub async fn eligible_answer_collection(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    owner: InstanceId,
+    question: &ExpertiseQuestion,
+) -> Result<(CollectionSnapshot, CapabilityAdvertisement)> {
+    collection_for_question(tx, access, owner, question, true).await
+}
+
+async fn collection_for_question(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    owner: InstanceId,
+    question: &ExpertiseQuestion,
+    completed: bool,
+) -> Result<(CollectionSnapshot, CapabilityAdvertisement)> {
     if question.capability.publisher != owner {
         return Err(StoreError::Binding);
     }
@@ -584,6 +606,6 @@ pub async fn eligible_question_collection(
     let now = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&mut **tx)
         .await?;
-    ad.authorize_question(question, now)?;
+    ad.authorize_question(question, if completed { question.created_at } else { now })?;
     Ok((snapshot, ad.0))
 }

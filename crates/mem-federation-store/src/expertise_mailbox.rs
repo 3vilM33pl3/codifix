@@ -96,7 +96,7 @@ fn status_name(status: ExpertiseStatus) -> &'static str {
         ExpertiseStatus::Uncertain => "uncertain",
     }
 }
-fn result(row: &PgRow) -> Result<QuestionResult> {
+pub(super) fn result(row: &PgRow) -> Result<QuestionResult> {
     Ok(QuestionResult {
         binding: row.try_get::<Json<QuestionBinding>, _>("binding")?.0,
         request_digest: row.try_get::<Json<ContentDigest>, _>("request_digest")?.0,
@@ -108,12 +108,12 @@ fn result(row: &PgRow) -> Result<QuestionResult> {
             .map(|j| j.0),
     })
 }
-async fn now(tx: &mut Transaction<'_, Postgres>) -> Result<DateTime<Utc>> {
+pub(super) async fn now(tx: &mut Transaction<'_, Postgres>) -> Result<DateTime<Utc>> {
     Ok(sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&mut **tx)
         .await?)
 }
-async fn journal(
+pub(super) async fn journal(
     tx: &mut Transaction<'_, Postgres>,
     q: &ExpertiseQuestion,
     action: &str,
@@ -206,7 +206,7 @@ impl GatewayStore {
         Ok(())
     }
 
-    async fn question_policy(
+    pub(super) async fn question_policy(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         fence: WriterFence,
@@ -321,6 +321,9 @@ impl GatewayStore {
             set_status(&mut tx, &q, status_name(value.status)).await?;
         }
         tx.commit().await?;
+        // A status/read or submit retry is never authorization to disclose a
+        // retained payload. Only the fresh origin delivery path may do that.
+        value.answer = None;
         Ok(value)
     }
     pub async fn claim_question(
@@ -530,6 +533,8 @@ impl GatewayStore {
             return Ok(());
         }
         sqlx::query("UPDATE federation_expertise_mailbox SET question=NULL,answer=NULL,status=CASE WHEN status IN ('queued','running') THEN CASE WHEN provider_started THEN 'uncertain' ELSE 'expired' END ELSE status END,lease_token=NULL,lease_until=NULL WHERE space=$1 AND payload_until<=clock_timestamp()")
+            .bind(fence.space.as_uuid()).execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM federation_expertise_deliveries WHERE space=$1 AND metadata_until<=clock_timestamp()")
             .bind(fence.space.as_uuid()).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM federation_expertise_mailbox WHERE space=$1 AND metadata_until<=clock_timestamp()")
             .bind(fence.space.as_uuid()).execute(&mut *tx).await?;

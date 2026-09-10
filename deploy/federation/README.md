@@ -53,9 +53,9 @@ fixture utility with the gateway.
 Create a distinct non-owner `gateway_runtime` login and adapt the database name
 in `gateway-grants.sql`. Grant only the listed federation tables, never application
 tables, role membership, schema ownership, TRUNCATE or migration rights. After
-migrations 0048–0049, reapply the reviewed grants: private Q&A storage is needed
+migrations 0048–0050, reapply the reviewed grants: private Q&A storage is needed
 for recovery fencing even while F1 routes remain disabled. DELETE is limited to
-the expiring mailbox and its metadata journal; publication/audit history cannot
+the expiring mailbox, delivery challenges and metadata journal; publication/audit history cannot
 be deleted. Collection snapshots, consent and service grants remain origin-only.
 The executable rejects superuser/create-role/create-database/replication/bypass-RLS
 roles, database ownership and read access to local memories/principals. The source

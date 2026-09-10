@@ -39,6 +39,11 @@ async fn deployment_role_cannot_read_origin_collections_or_erase_publication_his
         ),
         ("federation_expertise_daily_budget", "DELETE", false),
         (
+            "federation_expertise_deliveries",
+            "SELECT,INSERT,UPDATE,DELETE",
+            true,
+        ),
+        (
             "federation_expertise_reviews",
             "SELECT,INSERT,UPDATE,DELETE",
             false,

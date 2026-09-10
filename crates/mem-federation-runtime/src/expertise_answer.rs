@@ -15,8 +15,19 @@ pub fn deterministic_expertise_answer(
     advertisement: &CapabilityAdvertisement,
     eligible: &CollectionSnapshot,
 ) -> std::result::Result<ExpertiseAnswer, ExpertiseReject> {
+    answer_at(question, advertisement, eligible, chrono::Utc::now())
+}
+
+/// Private helper: delivery validates a previously completed answer after its
+/// execution deadline. There is no caller-supplied time override on any RPC.
+fn answer_at(
+    question: &ExpertiseQuestion,
+    advertisement: &CapabilityAdvertisement,
+    eligible: &CollectionSnapshot,
+    at: chrono::DateTime<chrono::Utc>,
+) -> std::result::Result<ExpertiseAnswer, ExpertiseReject> {
     advertisement.validate()?;
-    advertisement.authorize_question(question, chrono::Utc::now())?;
+    advertisement.authorize_question(question, at)?;
     if question.mode != AnswerMode::Deterministic
         || eligible.space != question.space
         || eligible.owner != advertisement.owner
@@ -108,6 +119,21 @@ pub fn deterministic_expertise_answer(
         return Err(ExpertiseReject::Limits);
     }
     Ok(answer)
+}
+
+/// Re-derive the exact deterministic result from currently eligible rows. No
+/// substituted source, altered quotation or stale evidence may be released.
+/// Model results remain disabled, including on the retained-delivery path.
+pub fn validate_expertise_delivery(
+    question: &ExpertiseQuestion,
+    advertisement: &CapabilityAdvertisement,
+    eligible: &CollectionSnapshot,
+    answer: &ExpertiseAnswer,
+) -> std::result::Result<(), ExpertiseReject> {
+    if answer_at(question, advertisement, eligible, question.created_at)? != *answer {
+        return Err(ExpertiseReject::InvalidCitation);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
