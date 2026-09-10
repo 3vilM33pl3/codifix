@@ -179,9 +179,11 @@ pub(crate) fn local_owner_id() -> Uuid {
 pub(crate) async fn ensure_local_owner_principal(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
-        INSERT INTO auth_principals (id, kind, display_name, groups_json, global_role)
+        WITH created AS (INSERT INTO auth_principals (id, kind, display_name, groups_json, global_role)
         VALUES ($1, 'internal', 'local owner', '[]'::jsonb, 'admin')
-        ON CONFLICT (id) DO NOTHING
+        ON CONFLICT (id) DO NOTHING RETURNING id)
+        INSERT INTO auth_audit_events (id, actor_principal_id, target_principal_id, event_type, outcome, metadata_json, recorded_at)
+        SELECT gen_random_uuid(), id, id, 'principal.bootstrap', 'success', '{}'::jsonb, now() FROM created
         "#,
     )
     .bind(local_owner_id())
@@ -297,7 +299,9 @@ async fn load_service_token_principal(
     principal.credential_source = CredentialSource::ServiceToken;
     principal.token_id = Some(token_id);
     if should_touch_last_used(token_id) {
-        sqlx::query("UPDATE auth_service_tokens SET last_used_at = now() WHERE id = $1")
+        sqlx::query("WITH touched AS (UPDATE auth_service_tokens SET last_used_at = now() WHERE id = $1 RETURNING id,principal_id)
+            INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,target_token_id,event_type,outcome,metadata_json,recorded_at)
+            SELECT gen_random_uuid(),principal_id,principal_id,id,'service_token.seen','success','{}'::jsonb,now() FROM touched")
             .bind(token_id)
             .execute(pool)
             .await
@@ -335,7 +339,9 @@ async fn load_session_principal(
     principal.session_id = Some(session_id);
     principal.session_csrf_hash = Some(csrf_hash);
     if should_touch_last_used(session_id) {
-        sqlx::query("UPDATE auth_web_sessions SET last_seen_at = now() WHERE id = $1")
+        sqlx::query("WITH touched AS (UPDATE auth_web_sessions SET last_seen_at = now() WHERE id = $1 RETURNING id,principal_id)
+            INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,event_type,outcome,metadata_json,recorded_at)
+            SELECT gen_random_uuid(),principal_id,principal_id,'session.seen','success',jsonb_build_object('session_id',id),now() FROM touched")
             .bind(session_id)
             .execute(pool)
             .await

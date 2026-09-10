@@ -88,7 +88,9 @@ pub(crate) async fn auth_logout(
     Extension(principal): Extension<AuthenticatedPrincipal>,
 ) -> Result<Response, ApiError> {
     if let Some(session_id) = principal.session_id {
-        sqlx::query("UPDATE auth_web_sessions SET revoked_at = now() WHERE id = $1")
+        sqlx::query("WITH revoked AS (UPDATE auth_web_sessions SET revoked_at = COALESCE(revoked_at,now()) WHERE id = $1 RETURNING id,principal_id)
+            INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,event_type,outcome,metadata_json,recorded_at)
+            SELECT gen_random_uuid(),principal_id,principal_id,'session.revoke','success',jsonb_build_object('session_id',id),now() FROM revoked")
             .bind(session_id)
             .execute(&state.pool()?)
             .await

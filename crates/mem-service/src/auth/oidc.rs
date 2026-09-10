@@ -67,15 +67,20 @@ pub(crate) async fn auth_login(
     }
     let (authorization_url, csrf_state, nonce) = authorization.url();
     let pool = state.pool()?;
-    sqlx::query("DELETE FROM auth_oidc_flows WHERE expires_at <= now()")
-        .execute(&pool)
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    sqlx::query("WITH expired AS (DELETE FROM auth_oidc_flows WHERE expires_at <= now() RETURNING id)
+        INSERT INTO auth_audit_events(id,event_type,outcome,metadata_json,recorded_at)
+        SELECT gen_random_uuid(),'oidc.flow.expired','success',jsonb_build_object('count',count(*)),now() FROM expired HAVING count(*)>0")
+        .execute(&mut *tx)
         .await
         .map_err(ApiError::sql)?;
     sqlx::query(
         r#"
-        INSERT INTO auth_oidc_flows
+        WITH created AS (INSERT INTO auth_oidc_flows
             (id, state_hash, nonce, pkce_verifier, return_to, created_at, expires_at)
-        VALUES ($1, $2, $3, $4, $5, now(), $6)
+        VALUES ($1, $2, $3, $4, $5, now(), $6) RETURNING id, expires_at)
+        INSERT INTO auth_audit_events(id,event_type,outcome,metadata_json,recorded_at)
+        SELECT gen_random_uuid(),'oidc.flow.created','success',jsonb_build_object('flow_id',id,'expires_at',expires_at),now() FROM created
         "#,
     )
     .bind(Uuid::new_v4())
@@ -84,10 +89,11 @@ pub(crate) async fn auth_login(
     .bind(pkce_verifier.secret())
     .bind(return_to)
     .bind(Utc::now() + OIDC_FLOW_TTL)
-    .execute(&pool)
+    .execute(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
 
+    tx.commit().await.map_err(ApiError::sql)?;
     Ok(Redirect::temporary(authorization_url.as_str()).into_response())
 }
 
@@ -117,9 +123,12 @@ pub(crate) async fn auth_callback(
     let pool = state.pool()?;
     let flow = sqlx::query(
         r#"
-        DELETE FROM auth_oidc_flows
+        WITH consumed AS (DELETE FROM auth_oidc_flows
         WHERE state_hash = $1 AND expires_at > now()
-        RETURNING nonce, pkce_verifier, return_to
+        RETURNING id, nonce, pkce_verifier, return_to),
+        audited AS (INSERT INTO auth_audit_events(id,event_type,outcome,metadata_json,recorded_at)
+            SELECT gen_random_uuid(),'oidc.flow.consumed','success',jsonb_build_object('flow_id',id),now() FROM consumed)
+        SELECT id,nonce,pkce_verifier,return_to FROM consumed
         "#,
     )
     .bind(hash_secret(&returned_state))
@@ -130,6 +139,7 @@ pub(crate) async fn auth_callback(
         ApiError::status_message(StatusCode::BAD_REQUEST, "invalid or expired OIDC state")
     })?;
     let nonce: String = flow.try_get("nonce").map_err(ApiError::sql)?;
+    let flow_id: Uuid = flow.try_get("id").map_err(ApiError::sql)?;
     let pkce_verifier: String = flow.try_get("pkce_verifier").map_err(ApiError::sql)?;
     let return_to: Option<String> = flow.try_get("return_to").map_err(ApiError::sql)?;
 
@@ -175,8 +185,9 @@ pub(crate) async fn auth_callback(
         .unwrap_or_else(|| subject.clone());
     let groups = groups_from_id_token(&id_token.to_string(), &state.config.auth.oidc.groups_claim)?;
     let issuer = state.config.auth.oidc.issuer_url.trim_end_matches('/');
-    let principal_id = upsert_human_principal(
-        &pool,
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let principal_id = upsert_human_principal_tx(
+        &mut tx,
         issuer,
         &subject,
         &display_name,
@@ -185,21 +196,24 @@ pub(crate) async fn auth_callback(
     )
     .await?;
 
-    let (session_secret, csrf_secret) = mint_web_session(&state, &pool, principal_id).await?;
+    let (session_secret, csrf_secret) =
+        mint_web_session_tx(&mut tx, principal_id, state.config.auth.session_ttl).await?;
     sqlx::query(
         r#"
         INSERT INTO auth_audit_events
             (id, actor_principal_id, event_type, outcome, target_principal_id,
              metadata_json, recorded_at)
-        VALUES ($1, $2, 'oidc.login', 'success', $2, '{}'::jsonb, now())
+        VALUES ($1, $2, 'oidc.login', 'success', $2, jsonb_build_object('flow_id',$3::uuid), now())
         "#,
     )
     .bind(Uuid::new_v4())
     .bind(principal_id)
-    .execute(&pool)
+    .bind(flow_id)
+    .execute(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
 
+    tx.commit().await.map_err(ApiError::sql)?;
     let target = validate_return_to(return_to.as_deref())?;
     let secure = state
         .config
@@ -240,16 +254,29 @@ pub(crate) async fn mint_web_session(
     pool: &sqlx::PgPool,
     principal_id: Uuid,
 ) -> Result<(String, String), ApiError> {
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let secrets = mint_web_session_tx(&mut tx, principal_id, state.config.auth.session_ttl).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(secrets)
+}
+
+async fn mint_web_session_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    principal_id: Uuid,
+    session_ttl: std::time::Duration,
+) -> Result<(String, String), ApiError> {
     let session_secret = format!("mls_{}", random_secret(32));
     let csrf_secret = format!("mlc_{}", random_secret(24));
     let expires_at = Utc::now()
-        + Duration::from_std(state.config.auth.session_ttl)
+        + Duration::from_std(session_ttl)
             .map_err(|_| ApiError::internal("auth session ttl is too large"))?;
     sqlx::query(
         r#"
-        INSERT INTO auth_web_sessions
+        WITH created AS (INSERT INTO auth_web_sessions
             (id, principal_id, session_hash, csrf_hash, created_at, expires_at, last_seen_at)
-        VALUES ($1, $2, $3, $4, now(), $5, now())
+        VALUES ($1, $2, $3, $4, now(), $5, now()) RETURNING id,principal_id)
+        INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,event_type,outcome,metadata_json,recorded_at)
+        SELECT gen_random_uuid(),principal_id,principal_id,'session.create','success',jsonb_build_object('session_id',id),now() FROM created
         "#,
     )
     .bind(Uuid::new_v4())
@@ -257,7 +284,7 @@ pub(crate) async fn mint_web_session(
     .bind(hash_secret(&session_secret))
     .bind(hash_secret(&csrf_secret))
     .bind(expires_at)
-    .execute(pool)
+    .execute(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
     Ok((session_secret, csrf_secret))
@@ -387,8 +414,8 @@ fn additional_oidc_scopes(configured: &[String]) -> Vec<String> {
         .collect()
 }
 
-async fn upsert_human_principal(
-    pool: &sqlx::PgPool,
+async fn upsert_human_principal_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     issuer: &str,
     subject: &str,
     display_name: &str,
@@ -415,7 +442,7 @@ async fn upsert_human_principal(
     .bind(display_name)
     .bind(email)
     .bind(serde_json::json!(groups))
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
     row.try_get("id").map_err(ApiError::sql)
@@ -448,6 +475,74 @@ pub(crate) fn append_cookie(
 mod tests {
     use super::*;
     use axum::{Json, Router, response::Redirect, routing::get};
+
+    #[tokio::test]
+    async fn identity_and_session_rollback_if_protected_audit_is_unavailable() {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let subject = Uuid::new_v4().to_string();
+        let issuer = "https://synthetic.invalid";
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("CREATE TEMP TABLE auth_audit_events (LIKE public.auth_audit_events INCLUDING DEFAULTS) ON COMMIT DROP")
+            .execute(&mut *tx).await.unwrap();
+        sqlx::query("ALTER TABLE pg_temp.auth_audit_events ADD CHECK (false)")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let principal =
+            upsert_human_principal_tx(&mut tx, issuer, &subject, "Test operator", None, &[])
+                .await
+                .unwrap();
+        assert!(
+            mint_web_session_tx(&mut tx, principal, std::time::Duration::from_secs(60))
+                .await
+                .is_err()
+        );
+        tx.rollback().await.unwrap();
+        let count: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM auth_principals WHERE issuer=$1 AND subject=$2",
+        )
+        .bind(issuer)
+        .bind(&subject)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(count, 0);
+        let mut tx = pool.begin().await.unwrap();
+        let principal =
+            upsert_human_principal_tx(&mut tx, issuer, &subject, "Test operator", None, &[])
+                .await
+                .unwrap();
+        let (session, csrf) =
+            mint_web_session_tx(&mut tx, principal, std::time::Duration::from_secs(60))
+                .await
+                .unwrap();
+        tx.commit().await.unwrap();
+        let persisted: (Vec<u8>, Vec<u8>) = sqlx::query_as(
+            "SELECT session_hash,csrf_hash FROM auth_web_sessions WHERE principal_id=$1",
+        )
+        .bind(principal)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(persisted, (hash_secret(&session), hash_secret(&csrf)));
+        let audits: Vec<serde_json::Value> = sqlx::query_scalar(
+            "SELECT metadata_json FROM auth_audit_events WHERE target_principal_id=$1",
+        )
+        .bind(principal)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(audits.len(), 1);
+        assert!(!audits[0].to_string().contains(&session));
+        assert!(!audits[0].to_string().contains(&csrf));
+        sqlx::query("DELETE FROM auth_principals WHERE id=$1")
+            .bind(principal)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
 
     #[test]
     fn return_target_rejects_external_redirects() {
