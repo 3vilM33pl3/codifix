@@ -64,6 +64,27 @@ outputs. Restarting the supervisor does not repeat the completed provider or
 proposal. This preserves the existing synthesis prompts and citation guard; it
 does not alter clustering or retrieval algorithms.
 
+## Real process crashes and competing services
+
+`node scripts/r1-process-smoke.mjs` passed against the built binary. The script
+creates its own pinned pgvector container, fake provider and independent service
+processes, then removes its exact container and stops its owned children.
+
+- Killing the process after curation commits but before any claim preserves the
+  queue. A fresh process completes the embedding stage on its first attempt.
+- A second service does not duplicate a live owner's provider request. Killing
+  that owner during the request leads to lease recovery, an uncertain
+  `lease_lost` attempt and one new request. This deliberately demonstrates the
+  repeat-billing window rather than claiming exactly-once provider execution.
+- A database trigger delays only the final job acknowledgement. After the
+  worker's applied-version marker and vector commit, killing its process and
+  starting another produces one chunk/vector and no second provider request.
+
+The harness waits for the committed applied-version marker, not text-chunk
+existence: curation itself creates unembedded chunks. It also waits for TCP
+PostgreSQL readiness, avoiding the image's temporary initialization server.
+CI's required-database bucket now runs the entire workspace and this process
+smoke. No remote CI run is claimed by the local result.
+
 Still required by the full gate: remaining mutation/external-operation inventory,
-process-level crash and competing-service evidence, final workspace/Web/lean-CLI
-validation and the coordinated writer-stop rollout procedure.
+final validation and the coordinated writer-stop rollout procedure.

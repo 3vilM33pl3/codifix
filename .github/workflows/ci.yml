@@ -50,6 +50,12 @@ jobs:
               - "crates/mem-search/**"
               - "crates/mem-service/**"
               - "crates/mem-test-support/**"
+              - "crates/mem-store/**"
+              - "crates/mem-platform/**"
+              - "crates/mem-loops/**"
+              - "crates/mem-cli/**"
+              - "scripts/r1-process-smoke.mjs"
+              - ".github/workflows/ci.yml"
               - "crates/mem-federation/**"
               - "crates/mem-federation-store/**"
               - "crates/mem-federation-runtime/**"
@@ -235,7 +241,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test -p mem-test-support -p mem-federation-store -p mem-federation-runtime -p mem-graph -p mem-curate -p mem-reinforce -p mem-search -p mem-service --locked
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: cargo test --workspace --all-targets --locked
+      - run: cargo build -p mem-cli --bin memory --locked
+      - run: node scripts/r1-process-smoke.mjs
 
 
   feature-matrix:
