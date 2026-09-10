@@ -26,6 +26,17 @@ Use this map to find the right PR boundary before opening the large files.
 
 - `formal/memory-federation`: Lean 4.33.1 reducer proofs and executable shared-trace conformance, kept separate from the Rust runtime crates.
 
+F1 is an incomplete, explicitly internal-use increment. Expertise contracts and
+v3 advertisements are in `mem-federation/src/expertise.rs`; origin-only reviews
+and the private gateway mailbox are separate modules in `mem-federation-store`.
+`mem-federation-runtime/src/expertise_transport.rs` provides signed rehearsal RPC,
+and `expertise_answer.rs` accepts only an already eligible collection subset.
+Pure lexical/snippet helpers shared with existing local retrieval live in
+`mem-record/src/text.rs`. No gateway dependency on `mem-search` was introduced.
+Normal gateway configuration still cannot enable F1. See the
+[F1 execution status](../../reviews/federation-first/f1-execution.md) for missing
+origin workers, fresh delivery authorization, optional models and user workflows.
+
 ## Frontends
 
 - `crates/mem-cli/src/tui.rs`: TUI orchestration and tab rendering. Pure helpers are being split under `crates/mem-cli/src/tui/`.

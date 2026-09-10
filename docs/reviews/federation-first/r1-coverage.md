@@ -36,6 +36,8 @@ participate in the caller's transaction and never broadcast before commit.
 | Background stages and explicit retry | mem-store jobs/post_curation and service background: immutable inputs, leases, attempts, caches, budgets, child IDs and fenced results | Store/worker fault suites, independent-process crashes and actual Web/CLI/PTY workflow | yes |
 | Explicit old-enrichment repair | post_curation::request_repair and privileged example: fresh event + selected-version jobs, no historic runs/versions | Late failure rolls back jobs, duplicate operation retains four stages/one event, changed actor conflicts | yes |
 | Federation | Existing source/outbox/accepted-order/inbox/projection/cursor/audit transactions retained | Store durability, runtime C/D, HTTP verification, service E two-instance required-DB tests | yes |
+| F1 origin collection persistence (component only) | `mem-federation-store::expertise_collections`: reviewed snapshots, explicit service grants, metadata-only review journal and publication outbox in caller transaction | Required-DB activation rollback, immutable retry, changed-source and current-grant tests | yes, storage boundary only |
+| F1 gateway private mailbox (component only) | Request/digest, claim/result and bounded budget reservations commit with private metadata attempt journal; not project timeline or PDS | Required-DB journal fault, competing claims, stale lease, uncertain reservation, TTL and hold tests | yes, storage boundary only |
 
 ## Operational boundaries and limits
 

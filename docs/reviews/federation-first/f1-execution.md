@@ -12,7 +12,7 @@ This task delivers **software and a disposable rehearsal**, not activation on ex
 
 ## 1. Approved collections and capability discovery
 
-- [ ] Add transport-neutral expertise contracts in `mem-federation`: capability advertisements, immutable collection revisions, question envelopes, answer envelopes, citations and sanitized outcomes. Runtime, SQL and ATProto types remain outside the neutral core.
+- [x] Add transport-neutral expertise contracts in `mem-federation`: capability advertisements, immutable collection revisions, question envelopes, answer envelopes, citations and sanitized outcomes. Runtime, SQL and ATProto types remain outside the neutral core.
 - [ ] A capability advertises its owner, reviewed name/description/topics, supported answer modes, collection revision/digest and input/output limits. It contains no endpoint, credentials, source contents or local paths.
 - [ ] Collection preparation selects exact curated memory versions and explicitly selected evidence. Review displays every potentially disclosed field and its digest before activation.
 - [ ] Activation grants standing permission to answer eligible requests from that frozen collection. Collection contents remain on the answering instance; discovery does not replicate them.
@@ -128,3 +128,70 @@ The complete federation/store/runtime regression suite and workspace Clippy
 passed for the collection increment; mailbox-specific store tests pass. There
 are still no enabled F1 service routes, workers or end-user workflows, and the
 two-service/PDS rehearsal remains pending. No existing service was reconfigured.
+
+Transport and excerpt increment: loopback HTTP tests use real gateway receipt
+signatures, a disposable gateway PostgreSQL database and two additional isolated
+origin databases. Homelab and Memory discover the permitted capability and obtain
+reviewed excerpts with exact source/author/evidence attribution in both
+directions. An independently granted internal principal answers at each origin;
+the requester identity is not reused. The tests verify exclusion of unselected
+and cross-project rows, local root metadata, changed unreviewed versions and
+fabricated citations. Separate transport tests cover exact/altered retries,
+addressed reads, competing claims, restart, explicit game enrollment/allowlisting
+and rejecting mixed schema inventories. Receipt tests reject wrong purposes,
+nonces, audiences, keys, scopes, altered responses and invalid expiry windows.
+
+**These are component tests, not the completion rehearsal.** Publication receipt
+tests simulate the PDS outcome; the existing C/D suite separately exercises the
+fake signed-PDS path. No Web/CLI/TUI/MCP F1 workflow exists yet. Optional models
+remain rejected and release-mode gateways cannot enable the rehearsal RPC.
+
+### Remaining implementation boundaries
+
+1. Add durable requester preparation/consent and origin result persistence,
+   automatic service-identity workers and lifecycle/reconnection handling.
+2. Implement fresh origin eligibility authorization for **each delivery of a
+   retained answer**, not just generation. Current mailbox reads recheck gateway
+   membership, advertisement revision and policy, but cannot observe a local
+   source update on their own. The component harness checks origin eligibility
+   while generating; it does not close this later-delivery race. Production
+   enablement must remain unavailable until this boundary is implemented/tested.
+3. Integrate restricted models, configured call/token budgets, uncertain outcomes
+   and metadata-only provider auditing. No paid invocation is authorized.
+4. Add project-scoped review/consent/result endpoints and matching Web/CLI/TUI/MCP
+   workflows, including operator-bound MCP onward destinations and fresh local
+   permission resolution. Existing ordinary queries stay unchanged.
+5. Complete the actual independently running service/PDS/game rehearsal, protocol
+   operational documentation and the outstanding release-gate verification.
+
+The first full workspace verification attempt failed because the filesystem was
+full, not a failed assertion. Cargo cleanup removed 28.1 GiB of rebuildable dev
+artifacts for five affected library crates only; source, project data and running
+service executables were preserved. A lower-concurrency retry follows. The
+focused six-crate required-DB suite passed before cleanup; Lean build and all 15
+shared traces pass (pre-existing Lean linter warnings remain).
+
+### Verification result for this increment
+
+- Required-database workspace tests pass **serially**: 824 tests in 49 test
+  binaries, zero failures/ignored tests, using the disposable PostgreSQL fixture.
+  The normal parallel retry failed in `dev_init_writes_service_overlay` when its
+  expected temporary XDG config resolved to the host config directory, then
+  poisoned the shared test lock (nine follow-on failures). The successful serial
+  retry is consistent with shared test-environment interference;
+  the parallel run is not recorded as passed and no unrelated test was changed.
+- Workspace all-target Clippy with `-D warnings`, formatting and boundary checks
+  pass. The gateway still has no dependency on local search or model execution.
+- Web: 76 tests across 22 files and production build pass. Existing bundle-size
+  warnings remain. These are regression checks, not evidence of F1 UI coverage.
+- Lean build/test: all 15 shared traces pass with the scoped reducer proofs.
+- Lean CLI: `cargo build -p mem-cli --bin memory --no-default-features --features
+  tui --locked` passes with debug information disabled in a separate temporary
+  target directory; the resulting binary reports `memory 2.0.0`. This does not
+  add or demonstrate the still-missing F1 commands.
+- Actual pinned-PDS F1 rehearsal, browser/PTY/MCP user workflows, model execution
+  and production activation remain **not implemented/not verified**.
+
+The disposable PostgreSQL container was stopped/removed after verification;
+its synthetic fixture data is regenerable from the tests. A resumable partial
+checkpoint was recorded at `398cd01`. The approved plan was not marked complete.
