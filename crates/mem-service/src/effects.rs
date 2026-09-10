@@ -273,6 +273,9 @@ fn atomic_replace(path: &Path, bytes: &[u8], id: Uuid) -> std::io::Result<()> {
 /// provider/restart outcomes without receipts remain explicitly uncertain.
 pub(crate) async fn reconcile(host: &str, pool: &sqlx::PgPool) -> anyhow::Result<()> {
     mem_reinforce::validate::reconcile_interrupted(pool).await?;
+    crate::repository::handlers::loops::run_persistence::reconcile_interrupted_runs(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.message))?;
     for intent in effects::pending(pool, host, 100).await? {
         let (status, reason) = if intent.kind == EffectKind::FileReplace {
             match bounded_read(Path::new(&intent.resource)) {

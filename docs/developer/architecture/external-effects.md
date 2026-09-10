@@ -95,3 +95,11 @@ Disconnected runs become failed with a cooldown and an interruption event;
 recovery neither invokes the provider nor erases prior evidence. Tests cover
 future cancellation and loss of the owner connection while a fake provider is
 still answering. The stale answer cannot write evidence or a successful result.
+
+Loop runs now use the same ownership mechanism. Committed phases remain visible
+after interruption, and unfinished runs become failed rather than indefinitely
+running. Cancelled/blocked states are preserved. Recovery appends one sanitized
+trace and timeline event; it does not recreate proposals, worktrees or commands.
+Result phases and new proposals reject a disconnected executor. Human feedback
+is still allowed after completion. Existing, pre-cutover rows are not assigned
+invented owners or automatically replayed.

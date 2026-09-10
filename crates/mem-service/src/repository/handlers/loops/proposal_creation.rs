@@ -101,6 +101,9 @@ pub(crate) async fn prepare_tx(
         });
     }
     if let Some(run) = request.run_id {
+        super::run_persistence::fence_run_execution_tx(tx, run, true)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.message))?;
         let run_project: Option<Uuid> =
             sqlx::query_scalar("SELECT project_id FROM loop_runs WHERE id=$1 FOR UPDATE")
                 .bind(run)

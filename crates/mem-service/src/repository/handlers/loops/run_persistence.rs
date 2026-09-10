@@ -8,6 +8,71 @@ use mem_store::{
     jobs::{self, NewJob},
 };
 
+/// Legacy rows have no invented ownership. A finished run may receive an
+/// explicitly submitted follow-up proposal, but a disconnected executor may not.
+pub(crate) async fn fence_run_execution_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    run: Uuid,
+    allow_finished: bool,
+) -> Result<bool, ApiError> {
+    let status: Option<String> =
+        sqlx::query_scalar("SELECT status FROM foreground_executions WHERE id=$1")
+            .bind(run)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(ApiError::sql)?;
+    if status.is_none() || (allow_finished && status.as_deref() == Some("finished")) {
+        return Ok(false);
+    }
+    mem_store::executions::fence(tx, run).await.map_err(|_| {
+        ApiError::service_unavailable(
+            "loop executor no longer owns this run; inspect its recovery status",
+        )
+    })?;
+    let cancelled:bool = sqlx::query_scalar("SELECT cancel_requested_at IS NOT NULL OR status IN ('cancelled','failed') FROM loop_runs WHERE id=$1 FOR UPDATE")
+        .bind(run).fetch_one(&mut **tx).await.map_err(ApiError::sql)?;
+    if cancelled {
+        return Err(ApiError::status_message(
+            axum::http::StatusCode::CONFLICT,
+            "loop run was cancelled or failed",
+        ));
+    }
+    Ok(true)
+}
+
+pub(crate) async fn reconcile_interrupted_runs(pool: &PgPool) -> Result<(), ApiError> {
+    let ids = mem_store::executions::pending(pool, mem_store::executions::Kind::Loop, 100)
+        .await
+        .map_err(|e| ApiError::io(e.into()))?;
+    for run in ids {
+        let Some(mut repair) = mem_store::executions::recover(pool, run)
+            .await
+            .map_err(|e| ApiError::io(e.into()))?
+        else {
+            continue;
+        };
+        let project = repair.project_id;
+        let tx = repair.transaction();
+        let status:String = sqlx::query_scalar("UPDATE loop_runs SET status=CASE WHEN status IN ('queued','running') THEN 'failed' ELSE status END,finished_at=COALESCE(finished_at,now()),updated_at=now(),output_json=output_json || jsonb_build_object('interrupted',true,'external_effects_may_be_uncertain',true) WHERE id=$1 RETURNING status")
+            .bind(run).fetch_one(&mut **tx).await.map_err(ApiError::sql)?;
+        append_loop_trace_tx(tx,run,"interrupted","Executor disconnected; inspect committed phases before retry",json!({"status":status,"external_effects_may_be_uncertain":true,"actor_id":"system:loop-recovery"}),false).await?;
+        append_run_event(
+            tx,
+            project,
+            run,
+            if status == "failed" {
+                ActivityKind::LoopRunFailed
+            } else {
+                ActivityKind::LoopRunFinished
+            },
+            &MutationContext::internal("loop-recovery"),
+        )
+        .await?;
+        repair.commit().await.map_err(|e| ApiError::io(e.into()))?;
+    }
+    Ok(())
+}
+
 /// Protect current loop policy (including newly inserted overrides) through the
 /// worker's result commit. Use the run lock before any proposal/canonical locks.
 pub(crate) async fn job_run_allowed_tx(
@@ -87,6 +152,7 @@ pub(super) async fn store_run_phase(
     blocked: Option<&str>,
 ) -> Result<(), ApiError> {
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    fence_run_execution_tx(&mut tx, run, false).await?;
     sqlx::query("UPDATE loop_runs SET output_summary=$2,
         output_json=output_json || jsonb_build_object($3::text,$4::jsonb),
         status=CASE WHEN cancel_requested_at IS NULL AND $5 IS DISTINCT FROM 'succeeded' THEN COALESCE($5,status) ELSE status END,
@@ -126,6 +192,7 @@ pub(super) async fn finish_run_tx(
     manual: bool,
     execution: &LoopExecution,
 ) -> Result<(), ApiError> {
+    let owned = fence_run_execution_tx(tx, run, false).await?;
     let status: String = sqlx::query_scalar("UPDATE loop_runs SET
         status=CASE WHEN status IN ('queued','running') AND cancel_requested_at IS NULL THEN 'succeeded' ELSE status END,
         finished_at=COALESCE(finished_at,now()),updated_at=now() WHERE id=$1 RETURNING status")
@@ -164,6 +231,11 @@ pub(super) async fn finish_run_tx(
         false,
     )
     .await?;
+    if owned {
+        mem_store::executions::finish_tx(tx, run)
+            .await
+            .map_err(|e| ApiError::io(e.into()))?;
+    }
     append_run_event(
         tx,
         project,

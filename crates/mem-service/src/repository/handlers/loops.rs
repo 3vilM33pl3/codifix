@@ -1565,7 +1565,14 @@ async fn create_control_plane_loop_run_with_trigger(
         .or_else(|| request.project.clone())
         .unwrap_or_else(|| "default".to_string());
     let run_id = Uuid::new_v4();
+    let owner = mem_store::executions::Execution::acquire(pool, run_id)
+        .await
+        .map_err(|e| ApiError::io(e.into()))?;
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    owner
+        .register(&mut tx, mem_store::executions::Kind::Loop, project_id)
+        .await
+        .map_err(|e| ApiError::io(e.into()))?;
     sqlx::query(
         r#"
         INSERT INTO loop_runs (
@@ -1653,6 +1660,7 @@ async fn create_control_plane_loop_run_with_trigger(
             build_loop_context_pack_response(pool, &definition.loop_id, &context_pack_request)
                 .await?;
         let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+        fence_run_execution_tx(&mut tx, run_id, false).await?;
         append_loop_trace_tx(
             &mut tx,
             run_id,
@@ -4782,6 +4790,9 @@ async fn append_loop_trace(
     redacted: bool,
 ) -> Result<LoopTraceRecord, ApiError> {
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    if trace_type != "feedback" {
+        fence_run_execution_tx(&mut tx, run_id, false).await?;
+    }
     let trace = append_loop_trace_tx(&mut tx, run_id, trace_type, title, payload, redacted).await?;
     tx.commit().await.map_err(ApiError::sql)?;
     Ok(trace)
