@@ -69,23 +69,26 @@ pub(crate) async fn project_graph_extract(
     // The path segment is authoritative for authorization; ignore any
     // project the client put in the body.
     request.project = slug;
-    let report = if request.dry_run {
-        mem_graph::build_extraction_preview(&request)
-    } else {
-        mem_graph::PostgresGraphRepository::new(state.pool()?.clone())
-            .extract(request)
-            .await
-            .map_err(ApiError::io)?
+    if request.dry_run {
+        return Ok(Json(mem_graph::build_extraction_preview(&request)));
+    }
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "graph-extract".into(),
+        occurred_at: None,
     };
-    if !report.dry_run {
-        let activity = mem_graph::activity_request(&report);
-        let context = mem_store::events::MutationContext {
-            actor_id: principal.id.to_string(),
-            actor_name: principal.display_name,
-            source: "graph-extract".into(),
-            occurred_at: None,
-        };
-        crate::handlers::activity::record_graph_activity(&state, activity, &context).await?;
+    let (report, receipt) = mem_graph::PostgresGraphRepository::new(state.pool()?.clone())
+        .extract_as(request, &context)
+        .await
+        .map_err(ApiError::io)?;
+    if let Some((event, sequence)) = receipt {
+        crate::repository::events::broadcast_committed(
+            &state,
+            report.project.clone(),
+            event,
+            sequence,
+        );
     }
     Ok(Json(report))
 }

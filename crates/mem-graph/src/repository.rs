@@ -18,29 +18,111 @@ pub struct PostgresGraphRepository {
     pool: PgPool,
 }
 
+async fn append_extraction_event(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project: Uuid,
+    report: &GraphExtractionReport,
+    context: &mem_store::events::MutationContext,
+) -> Result<(mem_store::events::TimelineEvent, i64)> {
+    let mut event = mem_store::events::TimelineEvent::new(
+        project,
+        mem_record::ActivityKind::GraphExtract,
+        format!(
+            "{} code graph: {} symbols, {} references, {} graph edges",
+            if report.reused_existing_run {
+                "Reused"
+            } else {
+                "Extracted"
+            },
+            report.symbol_count,
+            report.reference_count,
+            report.graph_edge_count
+        ),
+    );
+    event.operation_id = report.extraction_run_id.map(|id| id.to_string());
+    event.details = Some(mem_record::ActivityDetails::GraphExtract {
+        repo_root: report.repo_root.clone(),
+        git_head: report.git_head.clone(),
+        since: report.since.clone(),
+        extraction_run_id: report.extraction_run_id,
+        dry_run: false,
+        reused_existing_run: report.reused_existing_run,
+        index_reused: report.index_reused,
+        analyzer_version: report.analyzer_version.clone(),
+        strategy_version: report.strategy_version.clone(),
+        symbol_count: report.symbol_count,
+        reference_count: report.reference_count,
+        resolved_reference_count: report.resolved_reference_count,
+        unresolved_reference_count: report.unresolved_reference_count,
+        ambiguous_reference_count: report.ambiguous_reference_count,
+        graph_node_count: report.graph_node_count,
+        graph_edge_count: report.graph_edge_count,
+        evidence_count: report.evidence_count,
+    });
+    context.stamp(&mut event);
+    let seq = mem_store::events::append(tx, &event).await?;
+    Ok((event, seq))
+}
+
 impl PostgresGraphRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     pub async fn extract(&self, request: GraphExtractionRequest) -> Result<GraphExtractionReport> {
+        Ok(self
+            .extract_as(
+                request,
+                &mem_store::events::MutationContext::internal("graph-extract"),
+            )
+            .await?
+            .0)
+    }
+
+    pub async fn extract_as(
+        &self,
+        request: GraphExtractionRequest,
+        context: &mem_store::events::MutationContext,
+    ) -> Result<(
+        GraphExtractionReport,
+        Option<(mem_store::events::TimelineEvent, i64)>,
+    )> {
+        if request.dry_run {
+            return Ok((build_extraction_preview(&request), None));
+        }
+        let mut tx = self.pool.begin().await.context("begin graph transaction")?;
+        let result = self.extract_tx(&mut tx, request, context).await?;
+        tx.commit().await.context("commit graph transaction")?;
+        Ok(result)
+    }
+
+    pub async fn extract_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        request: GraphExtractionRequest,
+        context: &mem_store::events::MutationContext,
+    ) -> Result<(
+        GraphExtractionReport,
+        Option<(mem_store::events::TimelineEvent, i64)>,
+    )> {
         let resolved = resolve_analysis(&request.analysis);
         if request.dry_run {
-            return Ok(report_from_resolved(&request, &resolved, None, false));
+            return Ok((report_from_resolved(&request, &resolved, None, false), None));
         }
 
-        let project_id = upsert_project(&self.pool, &request.project, &request.repo_root).await?;
+        let project_id = upsert_project(&mut **tx, &request.project, &request.repo_root).await?;
         if !request.force
             && let Some(existing_run_id) = find_existing_completed_run(
-                &self.pool,
+                &mut **tx,
                 project_id,
                 &request,
                 &resolved.resolution_strategy_version,
+                &resolved.analyzer_version,
             )
             .await?
         {
             let mut report = self
-                .status_for_run(&request.project, existing_run_id)
+                .status_for_run(&mut **tx, &request.project, existing_run_id)
                 .await?
                 .map(|status| GraphExtractionReport {
                     project: status.project,
@@ -65,11 +147,11 @@ impl PostgresGraphRepository {
                 })
                 .context("existing graph extraction run disappeared")?;
             report.sample_unresolved_references = unresolved_previews(&resolved);
-            return Ok(report);
+            let receipt = append_extraction_event(tx, project_id, &report, context).await?;
+            return Ok((report, Some(receipt)));
         }
 
         let run_id = Uuid::new_v4();
-        let mut tx = self.pool.begin().await.context("begin graph transaction")?;
         sqlx::query(
             r#"
             INSERT INTO graph_extraction_runs
@@ -85,7 +167,7 @@ impl PostgresGraphRepository {
         .bind(&request.since)
         .bind(&resolved.analyzer_version)
         .bind(&resolved.resolution_strategy_version)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .context("insert graph extraction run")?;
 
@@ -112,7 +194,7 @@ impl PostgresGraphRepository {
                 "qualified_name": symbol.qualified_name,
                 "fact_id": symbol.fact_id,
             }))
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .context("insert graph node")?;
 
@@ -144,12 +226,12 @@ impl PostgresGraphRepository {
             .bind(symbol.span.end_line as i64)
             .bind(&symbol.display)
             .bind(&symbol.source_hash)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .context("insert code symbol")?;
 
             insert_evidence(
-                &mut tx,
+                tx,
                 EvidenceInput {
                     project_id,
                     run_id,
@@ -202,11 +284,11 @@ impl PostgresGraphRepository {
                             "fact_id": reference.fact_id,
                             "target_text": reference.target_text,
                         }))
-                        .execute(&mut *tx)
+                        .execute(&mut **tx)
                         .await
                         .context("insert graph edge")?;
                         insert_evidence(
-                            &mut tx,
+                            tx,
                             EvidenceInput {
                                 project_id,
                                 run_id,
@@ -258,7 +340,7 @@ impl PostgresGraphRepository {
             .bind(reference.span.end_byte as i64)
             .bind(reference.span.start_line as i64)
             .bind(reference.span.end_line as i64)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .context("insert code reference")?;
         }
@@ -279,7 +361,7 @@ impl PostgresGraphRepository {
             "graph_edge_count": edge_count,
             "evidence_count": report.graph_node_count + edge_count,
         }))
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .context("complete graph extraction run")?;
         // Superseded runs only slow retrieval down: only the latest completed
@@ -294,16 +376,16 @@ impl PostgresGraphRepository {
         )
         .bind(project_id)
         .bind(run_id)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .context("prune superseded graph extraction runs")?;
-        tx.commit().await.context("commit graph transaction")?;
-
-        Ok(GraphExtractionReport {
+        let report = GraphExtractionReport {
             graph_edge_count: edge_count,
             evidence_count: report.graph_node_count + edge_count,
             ..report
-        })
+        };
+        let receipt = append_extraction_event(tx, project_id, &report, context).await?;
+        Ok((report, Some(receipt)))
     }
 
     pub async fn latest_status(&self, project: &str) -> Result<Option<GraphStatusReport>> {
@@ -325,7 +407,7 @@ impl PostgresGraphRepository {
             return Ok(None);
         };
         let run_id: Uuid = row.try_get("id")?;
-        self.status_for_run(project, run_id).await
+        self.status_for_run(&self.pool, project, run_id).await
     }
 
     pub async fn status_response(&self, project: &str) -> Result<CodeGraphStatusResponse> {
@@ -342,7 +424,7 @@ impl PostgresGraphRepository {
         mut filters: CodeGraphViewFilters,
     ) -> Result<CodeGraphResponse> {
         let status = if let Some(run_id) = filters.run_id {
-            self.status_for_run(project, run_id).await?
+            self.status_for_run(&self.pool, project, run_id).await?
         } else {
             self.latest_status(project).await?
         };
@@ -458,8 +540,9 @@ impl PostgresGraphRepository {
         })
     }
 
-    async fn status_for_run(
+    async fn status_for_run<'e, E: sqlx::PgExecutor<'e>>(
         &self,
+        executor: E,
         project: &str,
         run_id: Uuid,
     ) -> Result<Option<GraphStatusReport>> {
@@ -484,7 +567,7 @@ impl PostgresGraphRepository {
         )
         .bind(project)
         .bind(run_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(executor)
         .await
         .context("read graph extraction status")?;
         row.map(row_to_status).transpose()
@@ -731,7 +814,11 @@ impl GraphRepository for PostgresGraphRepository {
     }
 }
 
-async fn upsert_project(pool: &PgPool, slug: &str, repo_root: &str) -> Result<Uuid> {
+async fn upsert_project<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    slug: &str,
+    repo_root: &str,
+) -> Result<Uuid> {
     let row = sqlx::query(
         r#"
         INSERT INTO projects (id, slug, name, root_path)
@@ -744,17 +831,18 @@ async fn upsert_project(pool: &PgPool, slug: &str, repo_root: &str) -> Result<Uu
     .bind(Uuid::new_v4())
     .bind(slug)
     .bind(repo_root)
-    .fetch_one(pool)
+    .fetch_one(executor)
     .await
     .context("upsert graph project")?;
     row.try_get("id").context("read project id")
 }
 
-async fn find_existing_completed_run(
-    pool: &PgPool,
+async fn find_existing_completed_run<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     project_id: Uuid,
     request: &GraphExtractionRequest,
     strategy_version: &str,
+    analyzer_version: &str,
 ) -> Result<Option<Uuid>> {
     let row = sqlx::query(
         r#"
@@ -775,9 +863,9 @@ async fn find_existing_completed_run(
     .bind(&request.repo_root)
     .bind(&request.git_head)
     .bind(&request.since)
-    .bind(&request.analysis.analyzer_version)
+    .bind(analyzer_version)
     .bind(strategy_version)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await
     .context("find existing graph extraction run")?;
     row.map(|row| row.try_get("id"))

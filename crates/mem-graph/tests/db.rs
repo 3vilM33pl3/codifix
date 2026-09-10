@@ -9,6 +9,58 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[tokio::test]
+async fn graph_event_failure_rolls_back_project_and_preserves_previous_graph() {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let project = mem_test_support::unique_project_slug("graph-atomic");
+    let repo = PostgresGraphRepository::new(pool.clone());
+    let request = || GraphExtractionRequest {
+        project: project.clone(),
+        repo_root: "/synthetic/graph".into(),
+        git_head: Some("abc123".into()),
+        since: None,
+        force: true,
+        dry_run: false,
+        index_reused: false,
+        analysis: analysis_report(),
+    };
+    let mut context = mem_store::events::MutationContext::internal("graph-test");
+    context.actor_name = "bad\0actor".into();
+    assert!(repo.extract_as(request(), &context).await.is_err());
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM projects WHERE slug = $1")
+        .bind(&project)
+        .fetch_one(&pool)
+        .await
+        .expect("project count");
+    assert_eq!(count, 0);
+    let original = repo.extract(request()).await.expect("original");
+    assert!(repo.extract_as(request(), &context).await.is_err());
+    let latest = repo
+        .latest_status(&project)
+        .await
+        .expect("status")
+        .expect("graph");
+    assert_eq!(Some(latest.extraction_run_id), original.extraction_run_id);
+    assert_eq!(latest.graph_node_count, 2);
+    context.actor_name = "Operator".into();
+    let mut reuse = request();
+    reuse.force = false;
+    let (reused, event) = repo.extract_as(reuse, &context).await.expect("reuse");
+    assert!(reused.reused_existing_run);
+    assert_eq!(
+        event.expect("committed event").0.actor_name.as_deref(),
+        Some("Operator")
+    );
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM memory_timeline_events e JOIN projects p ON p.id = e.project_id WHERE p.slug = $1")
+        .bind(&project).fetch_one(&pool).await.expect("events");
+    assert_eq!(count, 2);
+    mem_test_support::cleanup_project(&pool, &project)
+        .await
+        .expect("cleanup");
+}
+
+#[tokio::test]
 async fn graph_extract_persists_status_and_edges() {
     let Some(pool) = mem_test_support::migrated_pool().await else {
         return;

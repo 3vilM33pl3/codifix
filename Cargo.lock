@@ -2984,6 +2984,7 @@ dependencies = [
  "chrono",
  "mem-analyze",
  "mem-record",
+ "mem-store",
  "mem-test-support",
  "serde",
  "serde_json",
