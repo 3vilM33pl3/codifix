@@ -556,3 +556,34 @@ pub async fn eligible_collection(
     // new reviewed revision. Never recompute an advertised digest from it.
     Ok(snapshot)
 }
+
+/// Origin consent and exact-project service authority are checked independently
+/// from the signed gateway lease. The caller keeps this transaction open while
+/// accepting a derived result; source-version/review locks fence concurrent edits.
+pub async fn eligible_question_collection(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    owner: InstanceId,
+    question: &ExpertiseQuestion,
+) -> Result<(CollectionSnapshot, CapabilityAdvertisement)> {
+    if question.capability.publisher != owner {
+        return Err(StoreError::Binding);
+    }
+    let snapshot = eligible_collection(
+        tx,
+        access,
+        question.space,
+        owner,
+        question.capability.id,
+        question.revision,
+    )
+    .await?;
+    let ad: Json<CapabilityAdvertisement> = sqlx::query_scalar("SELECT advertisement FROM federation_expertise_reviews WHERE space=$1 AND owner=$2 AND project_id=$3 AND collection=$4 AND revision=$5")
+        .bind(question.space.as_uuid()).bind(owner.as_uuid()).bind(access.project).bind(question.capability.id.as_uuid())
+        .bind(i64::from(question.revision.get())).fetch_one(&mut **tx).await?;
+    let now = sqlx::query_scalar("SELECT clock_timestamp()")
+        .fetch_one(&mut **tx)
+        .await?;
+    ad.authorize_question(question, now)?;
+    Ok((snapshot, ad.0))
+}

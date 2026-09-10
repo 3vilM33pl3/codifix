@@ -12,6 +12,9 @@ use std::{
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use mem_config::{EmbeddingBackendConfig, EmbeddingsConfig, ProvenanceConfig};
+use mem_record::text::{
+    extract_lexical_terms, is_stopword, lexical_overlap_ratio, summarize_snippet,
+};
 use mem_record::{
     DiagnosticInfo, DiagnosticSeverity, GlobalQueryRequest, MemoryRelationType, MemoryType,
     QueryAnswerCitation, QueryAnswerGeneration, QueryAnswerMethod, QueryDiagnostics, QueryFilters,
@@ -1354,19 +1357,6 @@ struct QueryAnswerSynthesis {
     answer_citations: Vec<QueryAnswerCitation>,
 }
 
-/// Tokens that carry no topical content: articles, copulas, prepositions,
-/// and the question words natural-language queries are built from.
-const STOPWORDS: &[&str] = &[
-    "the", "a", "an", "is", "are", "was", "were", "be", "for", "of", "on", "in", "to", "and", "or",
-    "as", "at", "by", "with", "since", "after", "before", "it", "its", "that", "this", "not", "no",
-    "how", "what", "when", "where", "why", "who", "which", "do", "does", "did", "can", "could",
-    "should", "would", "will", "we", "you", "your", "our", "my", "me",
-];
-
-fn is_stopword(term: &str) -> bool {
-    STOPWORDS.contains(&term)
-}
-
 /// Content-bearing tokens of a summary, for topic comparison between results.
 fn topic_tokens(text: &str) -> HashSet<String> {
     text.to_lowercase()
@@ -1560,32 +1550,6 @@ fn extract_quoted_phrases(query: &str) -> Vec<String> {
     phrases
 }
 
-fn extract_lexical_terms(query: &str) -> Vec<String> {
-    let mut seen = HashSet::new();
-    query
-        .split(|ch: char| !(ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-')))
-        .filter_map(|raw| {
-            let term = raw.trim().to_lowercase();
-            if term.len() < 2 || !seen.insert(term.clone()) {
-                None
-            } else {
-                Some(term)
-            }
-        })
-        .collect()
-}
-
-fn lexical_overlap_ratio(text: &str, terms: &[String]) -> f64 {
-    if terms.is_empty() {
-        return 0.0;
-    }
-    let matched = terms
-        .iter()
-        .filter(|term| text.contains(term.as_str()))
-        .count();
-    matched as f64 / terms.len() as f64
-}
-
 fn lexical_match(text: &str, terms: &[String]) -> bool {
     if terms.is_empty() {
         return false;
@@ -1596,39 +1560,6 @@ fn lexical_match(text: &str, terms: &[String]) -> bool {
 
 fn is_path_like(term: &str) -> bool {
     term.contains('/') || term.contains('.') || term.contains('_') || term.contains('-')
-}
-
-fn summarize_snippet(text: &str, lexical_terms: &[String], phrases: &[String]) -> String {
-    let trimmed = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if trimmed.len() <= 240 {
-        return trimmed;
-    }
-
-    let lowered = trimmed.to_lowercase();
-    let target = phrases
-        .iter()
-        .map(|value| value.to_lowercase())
-        .chain(lexical_terms.iter().cloned())
-        .find_map(|needle| lowered.find(&needle));
-
-    if let Some(index) = target {
-        let start = floor_char_boundary(&trimmed, index.saturating_sub(80));
-        let end = floor_char_boundary(&trimmed, (start + 240).min(trimmed.len()));
-        let prefix = if start > 0 { "..." } else { "" };
-        let suffix = if end < trimmed.len() { "..." } else { "" };
-        return format!("{prefix}{}{suffix}", &trimmed[start..end]);
-    }
-
-    let end = floor_char_boundary(&trimmed, 240);
-    format!("{}...", &trimmed[..end])
-}
-
-fn floor_char_boundary(text: &str, mut index: usize) -> usize {
-    index = index.min(text.len());
-    while index > 0 && !text.is_char_boundary(index) {
-        index -= 1;
-    }
-    index
 }
 
 pub fn split_search_chunks(summary: &str, canonical_text: &str) -> Vec<String> {

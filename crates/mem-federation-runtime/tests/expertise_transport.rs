@@ -5,6 +5,8 @@ use mem_federation::{expertise::*, publication::*, *};
 use mem_federation_runtime::*;
 use mem_federation_store::*;
 use uuid::Uuid;
+#[path = "support/f1_collections.rs"]
+mod f1_collections;
 
 fn instance() -> InstanceId {
     InstanceId::new(Uuid::new_v4()).unwrap()

@@ -115,6 +115,49 @@ fn distinct<T: PartialEq>(values: &[T], max: usize) -> bool {
             .all(|(i, v)| !values[..i].contains(v))
 }
 impl CapabilityAdvertisement {
+    /// Collection consent only. Current instance membership and local service
+    /// permissions must be checked separately by the gateway and origin.
+    pub fn authorize_question(
+        &self,
+        question: &ExpertiseQuestion,
+        now: DateTime<Utc>,
+    ) -> Result<(), ExpertiseReject> {
+        question.validate()?;
+        if now >= question.expires_at || question.created_at > now {
+            return Err(ExpertiseReject::Expired);
+        }
+        if !self.active
+            || self.key() != question.capability
+            || !self.requesters.contains(&question.requester)
+        {
+            return Err(ExpertiseReject::Unauthorized);
+        }
+        if self.revision != question.revision
+            || self.collection_digest != question.collection_digest
+        {
+            return Err(ExpertiseReject::StaleCollection);
+        }
+        if !self.modes.contains(&question.mode)
+            || !self
+                .output_destinations
+                .contains(&question.output_destination)
+            || question
+                .model_destination
+                .as_ref()
+                .is_some_and(|id| !self.model_destinations.contains(id))
+        {
+            return Err(ExpertiseReject::DestinationDenied);
+        }
+        if question.question.len() > self.limits.question_bytes as usize
+            || question
+                .expires_at
+                .signed_duration_since(question.created_at)
+                > chrono::Duration::seconds(i64::from(self.limits.deadline_seconds))
+        {
+            return Err(ExpertiseReject::Limits);
+        }
+        Ok(())
+    }
     pub fn key(&self) -> RecordKey {
         RecordKey {
             publisher: self.owner,
@@ -356,37 +399,10 @@ impl PublicationState {
         {
             return Err(ExpertiseReject::Unauthorized);
         }
-        if now >= question.expires_at || question.created_at > now {
-            return Err(ExpertiseReject::Expired);
-        }
         let ad = self
             .expertise(question.capability)
             .ok_or(ExpertiseReject::Unauthorized)?;
-        if !ad.active || !ad.requesters.contains(&authenticated) {
-            return Err(ExpertiseReject::Unauthorized);
-        }
-        if ad.revision != question.revision || ad.collection_digest != question.collection_digest {
-            return Err(ExpertiseReject::StaleCollection);
-        }
-        if !ad.modes.contains(&question.mode)
-            || !ad
-                .output_destinations
-                .contains(&question.output_destination)
-            || question
-                .model_destination
-                .as_ref()
-                .is_some_and(|id| !ad.model_destinations.contains(id))
-        {
-            return Err(ExpertiseReject::DestinationDenied);
-        }
-        if question.question.len() > ad.limits.question_bytes as usize
-            || question
-                .expires_at
-                .signed_duration_since(question.created_at)
-                > chrono::Duration::seconds(i64::from(ad.limits.deadline_seconds))
-        {
-            return Err(ExpertiseReject::Limits);
-        }
+        ad.authorize_question(question, now)?;
         Ok(ad)
     }
 }

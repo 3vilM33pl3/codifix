@@ -16,6 +16,7 @@ pub mod memory;
 pub mod principal;
 pub mod query;
 pub mod session;
+pub mod text;
 pub mod validation;
 pub mod watcher;
 
