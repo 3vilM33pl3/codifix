@@ -40,6 +40,9 @@ pub struct TelemetryConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    /// Operator-only measurement settings, never accepted in a query request.
+    #[serde(default)]
+    pub evaluation: EvaluationConfig,
     #[serde(default)]
     pub background_work: crate::pipeline::BackgroundWorkConfig,
     pub service: ServiceConfig,
@@ -87,6 +90,21 @@ pub struct AppConfig {
     /// Path of the dev overlay if one was applied.
     #[serde(skip)]
     pub resolved_dev_overlay_path: Option<PathBuf>,
+}
+
+/// Setting a semantic timestamp opts a dedicated service into measurement mode.
+/// Learning and background workers are then disabled, independently of ranking.
+/// The database must be provisioned separately and sealed by the harness.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluationConfig {
+    pub semantic_time: Option<DateTime<Utc>>,
+}
+
+impl EvaluationConfig {
+    pub fn active(&self) -> bool {
+        self.semantic_time.is_some()
+    }
 }
 
 impl AppConfig {

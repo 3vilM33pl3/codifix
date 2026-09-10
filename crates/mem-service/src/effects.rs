@@ -311,6 +311,9 @@ impl Drop for Recovery {
     }
 }
 pub(crate) fn start(state: AppState) -> Option<Recovery> {
+    if state.config.evaluation.active() {
+        return None;
+    }
     if !state.is_primary() || state.config.service.read_only {
         return None;
     }

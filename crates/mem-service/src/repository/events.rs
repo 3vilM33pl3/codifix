@@ -257,6 +257,10 @@ pub(crate) fn notify_project_changed_with_metadata(
     model: Option<String>,
     token_usage: Option<TokenUsage>,
 ) {
+    if state.config.evaluation.active() {
+        // Measurement activity must never become future retrieval context.
+        return;
+    }
     let event = ServiceEvent {
         id: Uuid::new_v4(),
         seq: None,

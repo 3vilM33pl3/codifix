@@ -792,6 +792,7 @@ pub(super) async fn fetch_reinforcement_rank_map(
     pool: &PgPool,
     candidate_ids: &[Uuid],
     half_life_secs: f64,
+    semantic_time: Option<DateTime<Utc>>,
 ) -> Result<HashMap<Uuid, ReinforcementRankSignal>, sqlx::Error> {
     if candidate_ids.is_empty() {
         return Ok(HashMap::new());
@@ -801,7 +802,7 @@ pub(super) async fn fetch_reinforcement_rank_map(
         SELECT me.id AS memory_id,
                (s.activation * power(
                    0.5,
-                   GREATEST(EXTRACT(EPOCH FROM (now() - s.last_decay_at)), 0) / $2
+                   GREATEST(EXTRACT(EPOCH FROM ($3::timestamptz - s.last_decay_at)), 0) / $2
                ))::float8 AS activation,
                s.needs_review
         FROM memory_entries me
@@ -811,6 +812,7 @@ pub(super) async fn fetch_reinforcement_rank_map(
     )
     .bind(candidate_ids)
     .bind(half_life_secs.max(1.0))
+    .bind(semantic_time.unwrap_or_else(Utc::now))
     .fetch_all(pool)
     .await?;
 

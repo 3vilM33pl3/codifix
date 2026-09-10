@@ -51,6 +51,10 @@ pub async fn run_loop(
     writer_id: String,
     writer_name: Option<String>,
 ) -> Result<()> {
+    anyhow::ensure!(
+        !config.evaluation.active(),
+        "evaluation prohibits watcher execution"
+    );
     let repo_root = resolve_repo_root(&config, args.repo_root)?;
     let project = resolve_project(args.project, &repo_root)?;
     let client = Client::new();

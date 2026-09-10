@@ -633,6 +633,10 @@ pub async fn run_once(
     writer_id: &str,
     writer_name: Option<&str>,
 ) -> Result<()> {
+    anyhow::ensure!(
+        !config.evaluation.active(),
+        "evaluation prohibits watcher execution"
+    );
     let mut state = load_state(project, repo_root, &config.automation).await?;
     let changed = detect_changed_files(repo_root, &config.automation.ignored_paths)?;
     update_session_from_repo(&mut state, changed, &config.automation);
@@ -1058,6 +1062,7 @@ mod tests {
 
     fn test_app_config() -> AppConfig {
         AppConfig {
+            evaluation: Default::default(),
             background_work: Default::default(),
             service: mem_config::ServiceConfig {
                 bind_addr: "127.0.0.1:4040".to_string(),

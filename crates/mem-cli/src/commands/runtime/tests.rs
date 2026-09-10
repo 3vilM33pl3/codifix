@@ -2706,6 +2706,7 @@ fn write_file_if_changed_skips_identical_content() {
 
 fn test_app_config() -> AppConfig {
     AppConfig {
+        evaluation: Default::default(),
         background_work: Default::default(),
         service: mem_config::ServiceConfig {
             bind_addr: "127.0.0.1:4040".to_string(),

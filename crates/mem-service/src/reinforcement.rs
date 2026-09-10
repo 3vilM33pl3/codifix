@@ -149,6 +149,9 @@ async fn reward_cited_loop_producers(
 /// Records the memories a query returned (retrieval) and the subset the
 /// synthesized answer actually cited (citation, which subsumes retrieval).
 pub(crate) fn record_query_access(state: &AppState, response: &QueryResponse) {
+    if state.config.evaluation.active() {
+        return;
+    }
     let Some(runtime) = &state.reinforcement else {
         return;
     };

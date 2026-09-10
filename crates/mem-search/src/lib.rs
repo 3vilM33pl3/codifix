@@ -365,6 +365,10 @@ async fn query_memory_execution(
     reinforcement: &ReinforcementRankParams,
 ) -> Result<QueryResponse> {
     let total_started = Instant::now();
+    // Capture once so SQL decay and every candidate use the same semantic time.
+    let mut reinforcement = reinforcement.clone();
+    reinforcement.semantic_time.get_or_insert_with(Utc::now);
+    let reinforcement = &reinforcement;
     let normalized = QueryIntent::from_query(request.query);
     let candidate_limit = (request.top_k * 8).clamp(request.top_k, MAX_CANDIDATES);
     let retrieval_mode = request.retrieval_mode.unwrap_or_default();
@@ -499,6 +503,7 @@ async fn query_memory_execution(
             pool,
             &candidates.keys().copied().collect::<Vec<_>>(),
             reinforcement.half_life_secs,
+            reinforcement.semantic_time,
         )
         .await
         .context("fetch reinforcement rank map")?
@@ -938,12 +943,17 @@ pub(crate) struct ReinforcementRankSignal {
 /// boosts results and how hard flagged memories are penalized.
 #[derive(Debug, Clone)]
 pub struct ReinforcementRankParams {
+    /// Optional operator-selected semantic clock. Not an authorization clock.
+    pub semantic_time: Option<DateTime<Utc>>,
     pub enabled: bool,
     pub weight: f64,
     pub cap: f64,
     pub needs_review_penalty: f64,
     pub half_life_secs: f64,
 }
+
+#[cfg(test)]
+mod evaluation_tests;
 
 impl Default for ReinforcementRankParams {
     fn default() -> Self {
@@ -954,6 +964,7 @@ impl Default for ReinforcementRankParams {
 impl From<&mem_config::ReinforcementConfig> for ReinforcementRankParams {
     fn from(config: &mem_config::ReinforcementConfig) -> Self {
         Self {
+            semantic_time: None,
             enabled: config.enabled,
             weight: config.activation_rank_weight,
             cap: config.activation_rank_cap,
@@ -964,6 +975,11 @@ impl From<&mem_config::ReinforcementConfig> for ReinforcementRankParams {
 }
 
 impl ReinforcementRankParams {
+    pub fn at_time(mut self, semantic_time: Option<DateTime<Utc>>) -> Self {
+        self.semantic_time = semantic_time;
+        self
+    }
+
     fn active(&self) -> bool {
         self.enabled && self.weight > 0.0
     }
@@ -1105,7 +1121,9 @@ fn rank_candidate(
         .filter(|path| lexical_match(path, &intent.path_terms))
         .count();
 
-    let age_days = (Utc::now() - candidate.updated_at).num_days().max(0) as f64;
+    let age_days = (reinforcement.semantic_time.unwrap_or_else(Utc::now) - candidate.updated_at)
+        .num_days()
+        .max(0) as f64;
     let recency_boost = 1.0 / (1.0 + (age_days / 14.0));
     let relation_boost = relation_map
         .get(&candidate.memory_id)

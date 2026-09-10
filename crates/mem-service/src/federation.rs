@@ -85,6 +85,13 @@ pub(crate) async fn start(
     state: AppState,
     path: Option<PathBuf>,
 ) -> anyhow::Result<FederationTasks> {
+    if state.config.evaluation.active() {
+        anyhow::ensure!(
+            path.is_none(),
+            "evaluation prohibits federation configuration"
+        );
+        return Ok(FederationTasks(Vec::new(), None));
+    }
     let Some(path) = path else {
         return Ok(FederationTasks(Vec::new(), None));
     };

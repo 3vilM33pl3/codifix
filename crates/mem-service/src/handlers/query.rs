@@ -17,7 +17,8 @@ pub(crate) async fn query(
         &request,
         embedders.active(),
         &state.config.provenance,
-        &mem_search::ReinforcementRankParams::from(&state.config.reinforcement),
+        &mem_search::ReinforcementRankParams::from(&state.config.reinforcement)
+            .at_time(state.config.evaluation.semantic_time),
     )
     .await
     {
@@ -88,7 +89,8 @@ pub(crate) async fn query_global(
     request.validate().map_err(ApiError::validation)?;
     let pool = &state.pool()?;
     let embedders = state.embedders.read().await;
-    let reinforcement = mem_search::ReinforcementRankParams::from(&state.config.reinforcement);
+    let reinforcement = mem_search::ReinforcementRankParams::from(&state.config.reinforcement)
+        .at_time(state.config.evaluation.semantic_time);
     let allowed_projects = principal.projects_with(mem_record::Permission::MemoryRead);
     let result = if principal.has_global(mem_record::Permission::MemoryRead) {
         mem_search::query_memory_global_with_configs(

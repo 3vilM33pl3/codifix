@@ -5,6 +5,56 @@ use crate::*;
 
 const HTTP_SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(2);
 
+#[cfg(test)]
+mod evaluation_tests {
+    use super::*;
+
+    fn config(read_only: bool) -> AppConfig {
+        serde_json::from_value(serde_json::json!({
+            "service": {"bind_addr":"127.0.0.1:0", "api_token":"synthetic", "read_only":read_only},
+            "database": {"url": std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap_or_default()},
+            "evaluation": {"semantic_time":"2026-01-01T00:00:00Z"},
+            "offline":{"enabled":false}, "cluster":{"enabled":false},
+            "reinforcement":{"enabled":true}
+        })).unwrap()
+    }
+
+    #[tokio::test]
+    async fn evaluation_rejects_writable_service_before_connecting() {
+        let result = build_state(config(false), Arc::new(Mutex::new(None))).await;
+        assert!(result.err().unwrap().to_string().contains("read_only"));
+    }
+
+    #[tokio::test]
+    async fn evaluation_keeps_scoring_but_has_no_learning_or_workers() {
+        let Some(_pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let state = build_state(config(true), Arc::new(Mutex::new(None)))
+            .await
+            .unwrap();
+        assert!(state.config.reinforcement.enabled);
+        assert!(state.reinforcement.is_none());
+        assert!(crate::background::start(state.clone()).is_none());
+        assert!(crate::effects::start(state.clone()).is_none());
+        assert!(start_cluster_tasks(state.clone()).await.unwrap().is_empty());
+        assert!(
+            crate::federation::start(state.clone(), Some(PathBuf::from("never-read")))
+                .await
+                .is_err()
+        );
+        notify_project_changed(
+            &state,
+            "evaluation-no-timeline".into(),
+            None,
+            ActivityKind::Query,
+            "not persisted".into(),
+            None,
+        );
+        assert!(state.recent_activity.lock().unwrap().is_empty());
+    }
+}
+
 pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::from_default_env())
@@ -147,6 +197,20 @@ pub(crate) async fn build_state(
     config: AppConfig,
     shutdown: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 ) -> Result<AppState> {
+    if config.evaluation.active() {
+        anyhow::ensure!(
+            config.service.read_only,
+            "evaluation requires service.read_only = true"
+        );
+        anyhow::ensure!(
+            !config.cluster.enabled,
+            "evaluation prohibits cluster operation"
+        );
+        anyhow::ensure!(
+            !config.offline.enabled,
+            "evaluation prohibits offline replay"
+        );
+    }
     config
         .background_work
         .validate()
@@ -183,7 +247,11 @@ pub(crate) async fn build_state(
     let automated_embedding_creation_enabled =
         Arc::new(AtomicBool::new(config.embeddings.create_enabled));
     let llm_audit = Arc::new(RwLock::new(config.llm_audit.clone()));
-    let reinforcement = crate::reinforcement::build_runtime(&config.reinforcement);
+    let reinforcement = if config.evaluation.active() {
+        None
+    } else {
+        crate::reinforcement::build_runtime(&config.reinforcement)
+    };
 
     let state = AppState {
         configuration_write: Arc::new(tokio::sync::Mutex::new(())),
@@ -227,6 +295,10 @@ pub(crate) async fn connect_primary_pool(config: &AppConfig) -> Result<PgPool> {
         .connect(&config.database.url)
         .await
         .context("connect postgres")?;
+    if config.evaluation.active() {
+        // No schema/loop/auth bootstrap writes against a prepared snapshot.
+        return Ok(pool);
+    }
     let mut migrator = compatible_migrator();
     if config.profile == mem_config::Profile::Dev {
         migrator.set_ignore_missing(true);
@@ -524,6 +596,9 @@ pub(crate) async fn bind_tcp_listener_with_addr_in_use_wait(
 
 pub(crate) async fn start_cluster_tasks(state: AppState) -> Result<Vec<JoinHandle<Result<()>>>> {
     let mut tasks = Vec::new();
+    if state.config.evaluation.active() {
+        return Ok(tasks);
+    }
     if state.is_primary() {
         tasks.push(tokio::spawn(run_watcher_watchdog(state.clone())));
         if state.config.provenance.reverify_enabled {

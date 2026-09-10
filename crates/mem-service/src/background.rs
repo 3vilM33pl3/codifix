@@ -44,6 +44,9 @@ impl Drop for Workers {
 }
 
 pub(crate) fn start(state: AppState) -> Option<Workers> {
+    if state.config.evaluation.active() {
+        return None;
+    }
     if !state.is_primary()
         || !state.config.background_work.enabled
         || state.config.service.read_only
