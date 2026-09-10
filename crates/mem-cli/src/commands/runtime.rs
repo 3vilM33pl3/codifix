@@ -2351,7 +2351,7 @@ pub(in crate::commands) struct EvalArgs {
 
 #[derive(Debug, Subcommand)]
 pub(in crate::commands) enum EvalCommand {
-    #[command(about = "Plan, execute or report an isolated R3 campaign.")]
+    #[command(about = "Plan, execute or report an isolated R3 campaign.", after_help = EVAL_CAMPAIGN_AFTER_HELP)]
     Campaign(EvalCampaignArgs),
     #[command(
         about = "Check whether an eval suite and environment are ready.",
@@ -2401,9 +2401,23 @@ pub(in crate::commands) struct EvalCampaignArgs {
     pub(crate) command: EvalCampaignCommand,
 }
 
+const EVAL_CAMPAIGN_AFTER_HELP: &str = "Agent notes:
+  R3 integration is in progress. Plan/report are file-based and never use ambient services.
+  Draft labels and offline artifacts are not product-quality evidence.
+  Run requires an audited hash-locked isolation driver and --allow-shell; paid runs remain disabled.
+  Never expose private benchmark labels or graders to execution agents.
+
+Examples:
+  memory eval campaign plan --manifest target/memory-evals/r3-review/campaign.json
+  memory eval campaign report --manifest campaign.json --artifact artifact.json
+
+See also:
+  evals/r3/README.md";
+
 #[derive(Debug, Subcommand)]
 pub(in crate::commands) enum EvalCampaignCommand {
     /// Verify hashes and print deterministic work order, without service calls.
+    #[command(after_help = EVAL_CAMPAIGN_AFTER_HELP)]
     Plan {
         #[arg(long)]
         manifest: PathBuf,
@@ -2411,6 +2425,7 @@ pub(in crate::commands) enum EvalCampaignCommand {
         split: String,
     },
     /// Run a reviewed, hash-locked isolation driver; never use the ambient service.
+    #[command(after_help = EVAL_CAMPAIGN_AFTER_HELP)]
     Run {
         #[arg(long)]
         manifest: PathBuf,
@@ -2431,6 +2446,7 @@ pub(in crate::commands) enum EvalCampaignCommand {
         approvals: Vec<PathBuf>,
     },
     /// Validate all evidence and report clustered paired outcomes.
+    #[command(after_help = EVAL_CAMPAIGN_AFTER_HELP)]
     Report {
         #[arg(long)]
         manifest: PathBuf,

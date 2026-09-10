@@ -76,3 +76,33 @@ The draft review generator prepares all 156 tasks. All 48 coding reference
 graders pass. The draft knowledge scorer still requires semantic/citation
 adjudication; coding difficulty is explicitly limited to small functions.
 See `evals/r3/README.md` for the remaining integration list. R3 stays unchecked.
+
+### Local verification
+
+- Required-database `cargo test --workspace --all-targets --locked -- --test-threads=8`:
+  passed against an owned, disposable PostgreSQL/pgvector container. This includes
+  existing federation regressions; no live PDS or customer dataset was used.
+- Workspace Clippy (`--all-targets --locked -- -D warnings`): passed.
+- `cargo fmt --check` and `scripts/check-boundaries.sh`: passed.
+- `cargo build -p mem-cli --no-default-features --locked`: passed with existing
+  lean-feature dead-code warnings; full-feature development binary rebuilt after.
+- `mem-eval`: 29 tests passed, including bootstrap, accounting, malformed evidence,
+  approval hashes, comparator bounds and schedule reproducibility.
+- CLI campaign tests: shell-consent and paid-dispatch denial happen before I/O;
+  receipt overwrite protection passed. Public command-help metadata is covered.
+- Draft reference graders: 48/48 passed. Campaign plan validates 660 development
+  and 1680 held-out work items; labels/model/budget remain unresolved.
+- Completion check (`finish-execution --dry-run`): correctly reports unfinished
+  plan items; no completion memory or plan archival occurred.
+
+Draft material is reproducible from `evals/r3/build-review-pack.mjs`;
+`target/memory-evals/r3-review-draft-2/REVIEW.md` is the local review copy.
+Manifest hash: `c5a35ffbe2cf4f40700c0bc9cdf74ca7e01e63c80f004ba53c8a2496cc914a3a`.
+The first draft was superseded after fixing the legacy suite tag to `eval_type`;
+use draft 2, not draft 1. CI now builds and checks fresh draft material without
+providers; that workflow edit has not yet run on remote CI.
+
+Next execution slice is the actual resettable service/agent/grader driver and
+per-request provider budget mediation. These are engineering work still to do,
+not work blocked on spending approval. No complete offline campaign or official
+benchmark has been executed, and no quality or ROI claim is supported yet.

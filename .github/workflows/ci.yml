@@ -279,6 +279,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Verify draft R3 review material without providers
+        run: |
+          r3_review_root=$(mktemp -d)
+          node evals/r3/build-review-pack.mjs "$r3_review_root/pack"
+          node evals/r3/verify-review-pack.mjs "$r3_review_root/pack"
+          cargo run --locked --bin memory -- eval campaign plan \
+            --manifest "$r3_review_root/pack/campaign.json" --split held-out
+        env:
+          MEMORY_LAYER_PROFILE: prod
       - run: |
           cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
           cargo run --locked --bin memory -- \
