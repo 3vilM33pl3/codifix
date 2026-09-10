@@ -408,11 +408,23 @@ pub(crate) async fn get_loop_run_context_pack(
 
 pub(crate) async fn cancel_loop_run(
     State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
     Path(run_id): Path<Uuid>,
     Json(request): Json<LoopCancelRequest>,
 ) -> Result<Json<LoopRunResponse>, ApiError> {
     Ok(Json(
-        cancel_loop_run_record(&state.pool()?, run_id, &request).await?,
+        cancel_loop_run_record(
+            &state.pool()?,
+            run_id,
+            &request,
+            &mem_store::events::MutationContext {
+                actor_id: principal.id.to_string(),
+                actor_name: principal.display_name,
+                source: "loop-cancel".into(),
+                occurred_at: None,
+            },
+        )
+        .await?,
     ))
 }
 
@@ -4699,9 +4711,10 @@ async fn cancel_loop_run_record(
     pool: &PgPool,
     run_id: Uuid,
     request: &LoopCancelRequest,
+    context: &mem_store::events::MutationContext,
 ) -> Result<LoopRunResponse, ApiError> {
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
-    cancel_loop_run_tx(&mut tx, run_id, request).await?;
+    cancel_loop_run_tx(&mut tx, run_id, request, context).await?;
     tx.commit().await.map_err(ApiError::sql)?;
     Ok(LoopRunResponse {
         run: fetch_loop_run_detail(pool, run_id).await?,
@@ -4712,6 +4725,7 @@ async fn cancel_loop_run_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     run_id: Uuid,
     request: &LoopCancelRequest,
+    context: &mem_store::events::MutationContext,
 ) -> Result<(), ApiError> {
     sqlx::query(
         r#"
@@ -4736,7 +4750,7 @@ async fn cancel_loop_run_tx(
         run_id,
         "cancel",
         "Cancel requested",
-        json!({ "run_id": run_id, "reason_supplied": request.reason.is_some() }),
+        json!({ "run_id": run_id, "reason_supplied": request.reason.is_some(), "actor_id": context.actor_id, "source": context.source }),
         false,
     )
     .await?;

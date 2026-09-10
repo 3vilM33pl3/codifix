@@ -163,7 +163,16 @@ async fn cancellation_and_approval_are_atomic_with_the_run_journal() {
     let cancel = LoopCancelRequest {
         reason: Some("synthetic secret should not enter trace".into()),
     };
-    assert!(cancel_loop_run_tx(&mut tx, run, &cancel).await.is_err());
+    assert!(
+        cancel_loop_run_tx(
+            &mut tx,
+            run,
+            &cancel,
+            &mem_store::events::MutationContext::internal("cancel-test")
+        )
+        .await
+        .is_err()
+    );
     tx.rollback().await.unwrap();
     assert_eq!(
         sqlx::query_scalar::<_, String>("SELECT status FROM loop_runs WHERE id=$1")
@@ -202,6 +211,18 @@ async fn cancellation_and_approval_are_atomic_with_the_run_journal() {
             .unwrap();
     assert!(payload.get("proposed_action").is_none());
     assert!(payload.get("reviewer").is_none());
+    cancel_loop_run_record(&pool, run, &cancel, &context)
+        .await
+        .unwrap();
+    let cancellation: serde_json::Value = sqlx::query_scalar(
+        "SELECT payload_json FROM run_traces WHERE run_id=$1 AND trace_type='cancel'",
+    )
+    .bind(run)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(cancellation["actor_id"], context.actor_id);
+    assert!(!cancellation.to_string().contains("synthetic secret"));
     sqlx::query("DELETE FROM projects WHERE id=$1")
         .bind(project)
         .execute(&pool)
