@@ -52,7 +52,7 @@ async fn graph_event_failure_rolls_back_project_and_preserves_previous_graph() {
         event.expect("committed event").0.actor_name.as_deref(),
         Some("Operator")
     );
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM memory_timeline_events e JOIN projects p ON p.id = e.project_id WHERE p.slug = $1")
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM project_timeline_events e JOIN projects p ON p.id = e.project_id WHERE p.slug = $1")
         .bind(&project).fetch_one(&pool).await.expect("events");
     assert_eq!(count, 2);
     mem_test_support::cleanup_project(&pool, &project)
