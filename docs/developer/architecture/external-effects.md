@@ -87,3 +87,11 @@ foreground execution; owners do not consume transaction-pool slots. Tests kill
 only an owned session on disposable PostgreSQL and prove stale-result rollback,
 live-owner exclusion and atomic recovery. Domain integration remains tracked
 in the R1 inventory until its own tests pass.
+
+Validation now registers ownership with its requested-run event and checks it
+before publishing evidence or score/version changes. Completion or ordinary
+failure closes ownership in the same transaction as the domain outcome.
+Disconnected runs become failed with a cooldown and an interruption event;
+recovery neither invokes the provider nor erases prior evidence. Tests cover
+future cancellation and loss of the owner connection while a fake provider is
+still answering. The stale answer cannot write evidence or a successful result.

@@ -272,6 +272,7 @@ fn atomic_replace(path: &Path, bytes: &[u8], id: Uuid) -> std::io::Result<()> {
 /// Recovery never repeats irreversible effects. File bytes can be checked;
 /// provider/restart outcomes without receipts remain explicitly uncertain.
 pub(crate) async fn reconcile(host: &str, pool: &sqlx::PgPool) -> anyhow::Result<()> {
+    mem_reinforce::validate::reconcile_interrupted(pool).await?;
     for intent in effects::pending(pool, host, 100).await? {
         let (status, reason) = if intent.kind == EffectKind::FileReplace {
             match bounded_read(Path::new(&intent.resource)) {

@@ -699,6 +699,149 @@ mod validation {
     }
 
     #[tokio::test]
+    async fn interrupted_validation_recovers_without_provider_replay_or_stale_results() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+        struct HeldProvider {
+            entered: Arc<tokio::sync::Notify>,
+            release: Arc<tokio::sync::Notify>,
+            calls: Arc<AtomicUsize>,
+        }
+        #[async_trait::async_trait]
+        impl VerdictProvider for HeldProvider {
+            async fn assess(
+                &self,
+                _context: &mem_reinforce::ValidationContext,
+            ) -> anyhow::Result<RawVerdict> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                self.entered.notify_one();
+                self.release.notified().await;
+                Ok(raw_verdict(Verdict::Valid, 0.95))
+            }
+            fn model_name(&self) -> Option<String> {
+                Some("held-fixture".into())
+            }
+        }
+        let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
+            return;
+        };
+        let pool = &database.pool;
+        for terminate_session in [false, true] {
+            let (slug, project, memory) = seed(pool, "interrupted-validation").await;
+            let entered = Arc::new(tokio::sync::Notify::new());
+            let release = Arc::new(tokio::sync::Notify::new());
+            let calls = Arc::new(AtomicUsize::new(0));
+            let provider = HeldProvider {
+                entered: entered.clone(),
+                release: release.clone(),
+                calls: calls.clone(),
+            };
+            let source = pool.clone();
+            let task = tokio::spawn(async move {
+                run_validation(
+                    &source,
+                    &candidate(memory, project),
+                    &provider,
+                    &policy(false, false),
+                    ValidationTrigger::Manual,
+                )
+                .await
+            });
+            tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified())
+                .await
+                .expect("provider entered");
+            let run: Uuid =
+                sqlx::query_scalar("SELECT id FROM memory_validation_runs WHERE project_id=$1")
+                    .bind(project)
+                    .fetch_one(pool)
+                    .await
+                    .expect("run");
+            assert_eq!(
+                mem_reinforce::validate::reconcile_interrupted(pool)
+                    .await
+                    .expect("live scan"),
+                0
+            );
+            if terminate_session {
+                let pid: i32 =
+                    sqlx::query_scalar("SELECT backend_pid FROM foreground_executions WHERE id=$1")
+                        .bind(run)
+                        .fetch_one(pool)
+                        .await
+                        .expect("owned session");
+                sqlx::query("SELECT pg_terminate_backend($1)")
+                    .bind(pid)
+                    .execute(pool)
+                    .await
+                    .expect("terminate only owned fixture session");
+                release.notify_one();
+                assert!(task.await.expect("worker joined").is_err());
+            } else {
+                task.abort();
+                assert!(matches!(task.await,Err(error) if error.is_cancelled()));
+            }
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                loop {
+                    if mem_reinforce::validate::reconcile_interrupted(pool)
+                        .await
+                        .expect("recovery")
+                        == 1
+                    {
+                        break;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                }
+            })
+            .await
+            .expect("disconnected run recovered");
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                sqlx::query_scalar::<_, String>(
+                    "SELECT status FROM memory_validation_runs WHERE id=$1"
+                )
+                .bind(run)
+                .fetch_one(pool)
+                .await
+                .expect("status"),
+                "failed"
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, i64>(
+                    "SELECT count(*) FROM memory_validation_evidence WHERE validation_run_id=$1"
+                )
+                .bind(run)
+                .fetch_one(pool)
+                .await
+                .expect("evidence count"),
+                0
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, i64>(
+                    "SELECT count(*) FROM project_timeline_events WHERE project_id=$1"
+                )
+                .bind(project)
+                .fetch_one(pool)
+                .await
+                .expect("events"),
+                2
+            );
+            assert_eq!(
+                mem_reinforce::validate::reconcile_interrupted(pool)
+                    .await
+                    .expect("repeat recovery"),
+                0
+            );
+            cleanup(pool, &slug, project).await;
+        }
+        database
+            .cleanup()
+            .await
+            .expect("cleanup disposable database");
+    }
+
+    #[tokio::test]
     async fn reviewed_revision_rolls_back_on_event_failure_and_serializes_approvals() {
         let Some(pool) = mem_test_support::migrated_pool().await else {
             return;

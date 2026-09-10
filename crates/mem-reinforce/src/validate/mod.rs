@@ -150,7 +150,14 @@ pub async fn run_validation_as(
         policy.dry_run,
     )
     .await?;
-
+    let owner = mem_store::executions::Execution::acquire(pool, run_id).await?;
+    owner
+        .register(
+            &mut tx,
+            mem_store::executions::Kind::Validation,
+            Some(candidate.project_id),
+        )
+        .await?;
     crate::repository::append_validation_activity_tx(
         &mut tx,
         candidate.project_id,
@@ -174,6 +181,7 @@ pub async fn run_validation_as(
     .await;
     if outcome.is_err() {
         let mut tx = pool.begin().await?;
+        mem_store::executions::fence(&mut tx, run_id).await?;
         // Provider failures may contain prompts, secrets or response bodies.
         fail_validation_run(
             &mut *tx,
@@ -187,6 +195,7 @@ pub async fn run_validation_as(
             Utc::now() + chrono::Duration::hours(FAILURE_COOLDOWN_HOURS),
         )
         .await?;
+        mem_store::executions::finish_tx(&mut tx, run_id).await?;
         crate::repository::append_validation_activity_tx(
             &mut tx,
             candidate.project_id,
@@ -200,6 +209,73 @@ pub async fn run_validation_as(
         tx.commit().await?;
     }
     outcome
+}
+
+/// Mark disconnected foreground runs failed without repeating a provider call.
+/// The owning session (not elapsed time) decides whether recovery is allowed.
+pub async fn reconcile_interrupted(pool: &PgPool) -> Result<usize> {
+    use sqlx::Row;
+    let mut recovered = 0;
+    for run_id in
+        mem_store::executions::pending(pool, mem_store::executions::Kind::Validation, 100).await?
+    {
+        let Some(mut repair) = mem_store::executions::recover(pool, run_id).await? else {
+            continue;
+        };
+        let tx = repair.transaction();
+        let row = sqlx::query(
+            "SELECT canonical_id,memory_id,project_id FROM memory_validation_runs WHERE id=$1",
+        )
+        .bind(run_id)
+        .fetch_one(&mut **tx)
+        .await?;
+        let canonical: Uuid = row.try_get("canonical_id")?;
+        let memory: Uuid = row.try_get("memory_id")?;
+        let project: Uuid = row.try_get("project_id")?;
+        // Match result/review lock order: execution, canonical, run, timeline.
+        sqlx::query(
+            "SELECT canonical_id FROM memory_canonical_state WHERE canonical_id=$1 FOR UPDATE",
+        )
+        .bind(canonical)
+        .fetch_optional(&mut **tx)
+        .await?;
+        let status: String =
+            sqlx::query_scalar("SELECT status FROM memory_validation_runs WHERE id=$1 FOR UPDATE")
+                .bind(run_id)
+                .fetch_one(&mut **tx)
+                .await?;
+        if status == "running" {
+            fail_validation_run(
+                &mut **tx,
+                run_id,
+                "Executor disconnected; provider outcome may be uncertain; review before retry",
+            )
+            .await?;
+            set_validation_cooldown(
+                &mut **tx,
+                canonical,
+                Utc::now() + chrono::Duration::hours(FAILURE_COOLDOWN_HOURS),
+            )
+            .await?;
+            let execution = ValidationExecution {
+                context: mem_store::events::MutationContext::internal("validation-recovery"),
+                ..Default::default()
+            };
+            crate::repository::append_validation_activity_tx(
+                tx,
+                project,
+                canonical,
+                memory,
+                run_id,
+                "Validation interrupted; review required",
+                &execution,
+            )
+            .await?;
+        }
+        repair.commit().await?;
+        recovered += 1;
+    }
+    Ok(recovered)
 }
 
 async fn execute_validation(
@@ -244,6 +320,7 @@ async fn execute_validation(
         })
         .collect();
     let mut tx = pool.begin().await?;
+    mem_store::executions::fence(&mut tx, run_id).await?;
     crate::repository::lock_validation_source_tx(
         &mut tx,
         candidate.canonical_id,
@@ -406,6 +483,7 @@ async fn execute_validation(
         execution,
     );
     pending_events.push(activity);
+    mem_store::executions::finish_tx(&mut tx, run_id).await?;
     let mut events = Vec::new();
     for event in pending_events {
         let seq = mem_store::events::append(&mut tx, &event).await?;
