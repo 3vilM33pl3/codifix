@@ -1568,6 +1568,15 @@ impl App {
             return Ok(false);
         }
 
+        if self.active_tab == TabKind::Jobs
+            && key.code == KeyCode::Char('r')
+            && !self.service.health_ok
+            && self.jobs.pending.is_none()
+        {
+            // The recovery screen promises r will retry the health check.
+            // A Jobs-only refresh cannot clear a failed backend health state.
+            self.request_refresh(api, RefreshMode::Full);
+        }
         if self.active_tab == TabKind::Jobs && self.jobs_key(key, api) {
             self.chrome.needs_redraw = true;
             return Ok(false);
