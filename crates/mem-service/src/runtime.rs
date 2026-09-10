@@ -27,12 +27,28 @@ mod evaluation_tests {
 
     #[tokio::test]
     async fn evaluation_keeps_scoring_but_has_no_learning_or_workers() {
-        let Some(_pool) = mem_test_support::migrated_pool().await else {
+        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
             return;
         };
-        let state = build_state(config(true), Arc::new(Mutex::new(None)))
-            .await
-            .unwrap();
+        assert!(verify_evaluation_seal(&db.pool).await.is_err());
+        let role = format!("r3_reader_{}", Uuid::new_v4().simple());
+        sqlx::raw_sql(&format!(
+            "CREATE ROLE {role} LOGIN PASSWORD 'disposable-only';
+            GRANT USAGE ON SCHEMA public TO {role};
+            GRANT SELECT ON ALL TABLES IN SCHEMA public TO {role};
+            GRANT INSERT,UPDATE ON external_effects,external_effect_outcomes,
+                foreground_executions,auth_audit_events TO {role};"
+        ))
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        let mut cfg = config(true);
+        let mut url = reqwest::Url::parse(&cfg.database.url).unwrap();
+        url.set_username(&role).unwrap();
+        url.set_password(Some("disposable-only")).unwrap();
+        url.set_path(db.pool.connect_options().get_database().unwrap());
+        cfg.database.url = url.to_string();
+        let state = build_state(cfg, Arc::new(Mutex::new(None))).await.unwrap();
         assert!(state.config.reinforcement.enabled);
         assert!(state.reinforcement.is_none());
         assert!(crate::background::start(state.clone()).is_none());
@@ -52,6 +68,30 @@ mod evaluation_tests {
             None,
         );
         assert!(state.recent_activity.lock().unwrap().is_empty());
+        let pool = state.pool().unwrap();
+        let error = sqlx::query("UPDATE memory_scores SET activation=0")
+            .execute(&pool)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.as_database_error().unwrap().code().as_deref(),
+            Some("42501")
+        );
+        let error = sqlx::query("DELETE FROM memory_entries")
+            .execute(&pool)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.as_database_error().unwrap().code().as_deref(),
+            Some("42501")
+        );
+        pool.close().await;
+        drop(state);
+        sqlx::raw_sql(&format!("DROP OWNED BY {role}; DROP ROLE {role};"))
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        db.cleanup().await.unwrap();
     }
 }
 
@@ -297,6 +337,7 @@ pub(crate) async fn connect_primary_pool(config: &AppConfig) -> Result<PgPool> {
         .context("connect postgres")?;
     if config.evaluation.active() {
         // No schema/loop/auth bootstrap writes against a prepared snapshot.
+        verify_evaluation_seal(&pool).await?;
         return Ok(pool);
     }
     let mut migrator = compatible_migrator();
@@ -314,6 +355,46 @@ pub(crate) async fn connect_primary_pool(config: &AppConfig) -> Result<PgPool> {
         .await
         .context("bootstrap local-owner principal")?;
     Ok(pool)
+}
+
+/// Defense in depth: measurement must use a non-owner role with no knowledge
+/// write privileges. Operational effect journals are the explicit exception.
+async fn verify_evaluation_seal(pool: &PgPool) -> Result<()> {
+    let privileged: bool = sqlx::query_scalar(
+        "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls
+         OR has_schema_privilege(current_user, 'public', 'CREATE')
+         OR EXISTS (SELECT 1 FROM pg_auth_members WHERE member = r.oid)
+         FROM pg_roles r WHERE rolname = current_user",
+    )
+    .fetch_one(pool)
+    .await?;
+    anyhow::ensure!(
+        !privileged,
+        "evaluation database role must be sealed and non-privileged"
+    );
+    let writable: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public'
+         AND tablename NOT IN ('external_effects','external_effect_outcomes',
+             'foreground_executions','auth_audit_events')
+         AND has_table_privilege(current_user, quote_ident(schemaname)||'.'||quote_ident(tablename),
+             'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER'))",
+    )
+    .fetch_one(pool)
+    .await?;
+    anyhow::ensure!(!writable, "evaluation database allows benchmark writes");
+    let unsafe_functions: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+         WHERE n.nspname='public' AND p.prosecdef AND has_function_privilege(current_user,p.oid,'EXECUTE'))",
+    ).fetch_one(pool).await?;
+    anyhow::ensure!(
+        !unsafe_functions,
+        "evaluation database exposes security-definer functions"
+    );
+    // Catch unprovisioned snapshots early instead of accepting a blank database.
+    sqlx::query("SELECT id FROM memory_entries LIMIT 0")
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 fn compatible_migrator() -> sqlx::migrate::Migrator {
