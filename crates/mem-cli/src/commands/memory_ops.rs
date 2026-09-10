@@ -160,13 +160,33 @@ pub(crate) async fn save_checkpoint_with_activity(
     repo_root: &Path,
     note: Option<String>,
 ) -> Result<(mem_record::ResumeCheckpoint, PathBuf)> {
-    let (checkpoint, path) = resume::save_checkpoint(project, repo_root, note)?;
+    let checkpoint = resume::build_checkpoint(project, repo_root, note);
+    let path = resume::checkpoint_store_location()?;
+    let journal = path
+        .parent()
+        .context("checkpoint path needs a parent")?
+        .join("operation-journal");
+    mem_platform::journal::reconcile(&journal, 100)?;
+    // Record the cross-system intent before replacing the local checkpoint.
+    // A lost HTTP reply cannot establish whether the timeline accepted it.
+    let operation = mem_platform::journal::Operation::begin(
+        &journal,
+        "checkpoint_sync",
+        &path,
+        &serde_json::to_vec(&checkpoint)?,
+    )?;
+    let (checkpoint, path) = resume::save_prepared_checkpoint(project, repo_root, checkpoint)?;
     let request = CheckpointActivityRequest {
         project: project.to_string(),
         checkpoint: checkpoint.clone(),
     };
-    if let Err(error) = api.log_checkpoint_activity(&request).await {
-        eprintln!("warning: failed to log checkpoint activity for `{project}`: {error}");
+    let logged = api.log_checkpoint_activity(&request).await;
+    operation.observed(logged.is_ok())?;
+    if let Err(error) = logged {
+        eprintln!(
+            "warning: checkpoint file saved but timeline outcome is uncertain for `{project}` (local operation {}): {error}; inspect before replay, the file was not rolled back",
+            operation.intent.id
+        );
     }
     Ok((checkpoint, path))
 }

@@ -2998,6 +2998,7 @@ name = "mem-loops"
 version = "2.0.0"
 dependencies = [
  "chrono",
+ "mem-platform",
  "mem-record",
  "serde",
  "serde_json",
@@ -3029,7 +3030,11 @@ name = "mem-platform"
 version = "2.0.0"
 dependencies = [
  "anyhow",
+ "serde",
+ "serde_json",
+ "sha2",
  "sysinfo",
+ "uuid",
 ]
 
 [[package]]

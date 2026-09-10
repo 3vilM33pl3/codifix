@@ -41,16 +41,6 @@ fn load_store() -> Result<StoredCheckpoints> {
     serde_json::from_str(&contents).context("parse checkpoint store")
 }
 
-fn save_store(store: &StoredCheckpoints) -> Result<PathBuf> {
-    let path = checkpoint_store_path()?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
-    }
-    fs::write(&path, serde_json::to_vec_pretty(store)?)
-        .with_context(|| format!("write {}", path.display()))?;
-    Ok(path)
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct StoredPlanThreads {
     #[serde(default)]
@@ -72,16 +62,6 @@ fn load_plan_threads() -> Result<StoredPlanThreads> {
     serde_json::from_str(&contents).context("parse plan thread store")
 }
 
-fn save_plan_threads(store: &StoredPlanThreads) -> Result<()> {
-    let path = plan_thread_store_path()?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
-    }
-    fs::write(&path, serde_json::to_vec_pretty(store)?)
-        .with_context(|| format!("write {}", path.display()))?;
-    Ok(())
-}
-
 /// Remember which plan thread `checkpoint start-execution` most recently
 /// started in this repo, so `finish-execution` can resolve it without an
 /// explicit --thread-key even when several plans are active.
@@ -90,11 +70,16 @@ pub(crate) fn save_active_plan_thread(
     repo_root: &Path,
     thread_key: &str,
 ) -> Result<()> {
-    let mut store = load_plan_threads()?;
-    store
-        .threads
-        .insert(scope_key(project, repo_root), thread_key.to_string());
-    save_plan_threads(&store)
+    mem_platform::journal::update_json::<StoredPlanThreads, _>(
+        &plan_thread_store_path()?,
+        |store| {
+            store
+                .threads
+                .insert(scope_key(project, repo_root), thread_key.to_string());
+            Ok(())
+        },
+    )
+    .context("persist active plan thread")
 }
 
 pub(crate) fn load_active_plan_thread(project: &str, repo_root: &Path) -> Option<String> {
@@ -104,15 +89,14 @@ pub(crate) fn load_active_plan_thread(project: &str, repo_root: &Path) -> Option
 }
 
 pub(crate) fn clear_active_plan_thread(project: &str, repo_root: &Path) -> Result<()> {
-    let mut store = load_plan_threads()?;
-    if store
-        .threads
-        .remove(&scope_key(project, repo_root))
-        .is_some()
-    {
-        save_plan_threads(&store)?;
-    }
-    Ok(())
+    mem_platform::journal::update_json::<StoredPlanThreads, _>(
+        &plan_thread_store_path()?,
+        |store| {
+            store.threads.remove(&scope_key(project, repo_root));
+            Ok(())
+        },
+    )
+    .context("clear active plan thread")
 }
 
 fn git_value(args: &[&str]) -> Option<String> {
@@ -133,17 +117,19 @@ pub(crate) fn load_checkpoint(project: &str, repo_root: &Path) -> Result<Option<
         .cloned())
 }
 
-pub(crate) fn save_checkpoint(
+pub(crate) fn save_prepared_checkpoint(
     project: &str,
     repo_root: &Path,
-    note: Option<String>,
+    checkpoint: ResumeCheckpoint,
 ) -> Result<(ResumeCheckpoint, PathBuf)> {
-    let mut store = load_store()?;
-    let checkpoint = build_checkpoint(project, repo_root, note);
-    store
-        .checkpoints
-        .insert(scope_key(project, repo_root), checkpoint.clone());
-    let path = save_store(&store)?;
+    let path = checkpoint_store_path()?;
+    mem_platform::journal::update_json::<StoredCheckpoints, _>(&path, |store| {
+        store
+            .checkpoints
+            .insert(scope_key(project, repo_root), checkpoint.clone());
+        Ok(())
+    })
+    .context("persist checkpoint")?;
     Ok((checkpoint, path))
 }
 

@@ -3,6 +3,8 @@
 // Tests may unwrap; production code must not (workspace lints deny it).
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+pub mod journal;
+
 use std::{
     env, fs,
     path::{Component, Path, PathBuf},

@@ -159,7 +159,14 @@ impl WorktreeSandboxManager {
         }
         let worktree_path = sandbox_root.join(spec.run_id.simple().to_string());
         let base_ref = spec.base_ref.as_deref().unwrap_or("HEAD");
-        run_git_checked_owned(
+        self.reconcile_operations(&repo_root)?;
+        let operation = mem_platform::journal::Operation::begin(
+            &sandbox_root.join("operation-journal"),
+            "workspace_create",
+            &worktree_path,
+            &serde_json::to_vec(spec).map_err(io::Error::other)?,
+        )?;
+        let created = run_git_checked_owned(
             &repo_root,
             &[
                 "worktree".to_string(),
@@ -169,7 +176,11 @@ impl WorktreeSandboxManager {
                 path_arg(&worktree_path),
                 base_ref.to_string(),
             ],
-        )?;
+        );
+        if let Err(error) = created {
+            operation.observed(false)?;
+            return Err(error);
+        }
         let workspace = SandboxWorkspace {
             project: spec.project.clone(),
             run_id: spec.run_id,
@@ -178,6 +189,7 @@ impl WorktreeSandboxManager {
             branch,
         };
         self.write_metadata(&workspace)?;
+        operation.observed(true)?;
         Ok(workspace)
     }
 
@@ -199,6 +211,15 @@ impl WorktreeSandboxManager {
             });
         }
 
+        self.reconcile_operations(&workspace.repo_root)?;
+        let operation = mem_platform::journal::Operation::begin(
+            &self
+                .sandbox_root(&workspace.repo_root)
+                .join("operation-journal"),
+            "sandbox_command",
+            &workspace.worktree_path,
+            &serde_json::to_vec(&(request, limits)).map_err(io::Error::other)?,
+        )?;
         let start = Instant::now();
         let mut child = Command::new(&request.program)
             .args(&request.args)
@@ -225,6 +246,9 @@ impl WorktreeSandboxManager {
         if timed_out {
             limit_violations.push("runtime_exceeded".to_string());
         }
+        // A received exit status is confirmed even when the command failed;
+        // it does not imply that filesystem changes were undone.
+        operation.observed(true)?;
         Ok(SandboxCommandLog {
             command: request.command_line(),
             exit_code: output.status.code().unwrap_or(-1),
@@ -270,6 +294,14 @@ impl WorktreeSandboxManager {
 
     pub fn cleanup_workspace(&self, workspace: &SandboxWorkspace) -> io::Result<()> {
         self.ensure_safe_workspace_path(&workspace.repo_root, &workspace.worktree_path)?;
+        let operation = mem_platform::journal::Operation::begin(
+            &self
+                .sandbox_root(&workspace.repo_root)
+                .join("operation-journal"),
+            "workspace_cleanup",
+            &workspace.worktree_path,
+            &serde_json::to_vec(workspace).map_err(io::Error::other)?,
+        )?;
         let _ = run_git_checked_owned(
             &workspace.repo_root,
             &[
@@ -284,9 +316,22 @@ impl WorktreeSandboxManager {
         }
         if workspace.branch.starts_with("memory/loops/") && !is_protected_branch(&workspace.branch)
         {
-            let _ = run_git_checked(&workspace.repo_root, &["branch", "-D", &workspace.branch]);
+            run_git_checked(&workspace.repo_root, &["branch", "-D", &workspace.branch])?;
         }
+        operation.observed(true)?;
         Ok(())
+    }
+
+    /// Returns interrupted operation identities for operator inspection. Never
+    /// recreate a workspace, rerun a command or delete files during recovery.
+    pub fn reconcile_operations(
+        &self,
+        repo_root: &Path,
+    ) -> io::Result<Vec<mem_platform::journal::Intent>> {
+        mem_platform::journal::reconcile(
+            &self.sandbox_root(repo_root).join("operation-journal"),
+            100,
+        )
     }
 
     pub fn cleanup_abandoned_workspaces(
@@ -609,7 +654,49 @@ mod tests {
 
         manager.cleanup_workspace(&workspace).unwrap();
         assert!(!workspace.worktree_path.exists());
+        let journal = manager.sandbox_root(&repo).join("operation-journal");
+        let operations: Vec<_> = fs::read_dir(&journal)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .collect();
+        assert_eq!(operations.len(), 3); // create, command and cleanup survive cleanup
+        for directory in operations {
+            let intent = fs::read_to_string(directory.join("intent.json")).unwrap();
+            assert!(!intent.contains("printf changed"));
+            assert!(!intent.contains("Add-Content"));
+            assert!(directory.join("observed.json").exists());
+        }
+        assert!(manager.reconcile_operations(&repo).unwrap().is_empty());
         let _ = fs::remove_dir_all(repo);
+    }
+
+    #[test]
+    fn unavailable_journal_prevents_sandbox_command_execution() {
+        let repo = init_repo("journal-failure");
+        let manager = WorktreeSandboxManager::default();
+        let workspace = manager
+            .create_workspace(&SandboxWorkspaceSpec {
+                project: "fixture".into(),
+                repo_root: repo.clone(),
+                run_id: Uuid::new_v4(),
+                base_ref: None,
+            })
+            .unwrap();
+        let invalid_root = repo.join("not-a-directory");
+        fs::write(&invalid_root, b"file").unwrap();
+        let unavailable = WorktreeSandboxManager::new(invalid_root);
+        let command = SandboxCommandRequest::new("git", ["status"]);
+        let limits = SandboxLimits {
+            allowed_commands: vec!["git".into()],
+            ..Default::default()
+        };
+        assert!(
+            unavailable
+                .run_command(&workspace, &command, &limits)
+                .is_err()
+        );
+        manager.cleanup_workspace(&workspace).unwrap();
+        fs::remove_dir_all(repo).unwrap();
     }
 
     #[test]

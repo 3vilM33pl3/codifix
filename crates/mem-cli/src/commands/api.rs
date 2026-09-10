@@ -624,6 +624,16 @@ impl ApiClient {
     }
 
     pub(crate) async fn log_plan_activity(&self, request: &PlanActivityRequest) -> Result<()> {
+        let root = mem_platform::preferred_user_state_dir()
+            .ok_or_else(|| anyhow::anyhow!("cannot determine private local journal directory"))?
+            .join("operation-journal");
+        mem_platform::journal::reconcile(&root, 100)?;
+        let operation = mem_platform::journal::Operation::begin(
+            &root,
+            "plan_activity",
+            std::path::Path::new(&request.project),
+            &serde_json::to_vec(request)?,
+        )?;
         let response = self
             .client
             .post(service_url(&self.config, "/v1/activity"))
@@ -633,8 +643,12 @@ impl ApiClient {
             .await?;
         let status = response.status();
         let body = response.text().await?;
+        operation.observed(status.is_success())?;
         if !status.is_success() {
-            anyhow::bail!("{status} {body}");
+            anyhow::bail!(
+                "plan activity {} is unconfirmed ({status}); inspect the timeline before replay: {body}",
+                operation.intent.id
+            );
         }
         Ok(())
     }

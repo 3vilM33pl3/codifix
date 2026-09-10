@@ -111,3 +111,43 @@ trace and timeline event; it does not recreate proposals, worktrees or commands.
 Result phases and new proposals reject a disconnected executor. Human feedback
 is still allowed after completion. Existing, pre-cutover rows are not assigned
 invented owners or automatically replayed.
+
+## Host-local CLI and sandbox receipts
+
+`mem-platform::journal` supplies owner-locked local intents and separately synced
+outcomes without adding a database to the CLI or loop sandbox library. Receipts
+contain a UUID, operation kind, local resource locator, time and input SHA-256;
+they do not contain command arguments, prompts, checkpoint notes or credentials.
+Operation directories are owner-only on Unix. Private data files remain separate.
+
+Checkpoint and active-plan-thread stores use a cross-process file lock and
+atomic JSON replacement, so concurrent writers cannot lose each other's updates.
+Checkpoint-plus-activity intent is recorded before the file change. A failed
+activity acknowledgement warns that the local checkpoint was saved but the
+timeline outcome is uncertain. Plan activity delivery also has a local receipt.
+These are observed cross-system boundaries, not a claim that HTTP and a local
+file commit atomically.
+
+The CLI journal is `operation-journal/` beneath its normal user-state directory.
+Sandbox receipts live in `operation-journal/` beneath the configured sandbox root
+(by default `.mem/runtime/loop-worktrees/`), outside each disposable worktree.
+Creation, permitted command execution and cleanup record their intent before
+the effect; cleanup does not erase its receipts. A command exit is an observed
+outcome even when nonzero, not proof that its filesystem effects were reversed.
+
+Subsequent state writes and sandbox operations reconcile disconnected owners;
+`WorktreeSandboxManager::reconcile_operations` also allows explicit inspection.
+Live locks are excluded. Missing outcomes become `interrupted.json` with an
+uncertain status. Recovery never runs a command or republishes activity.
+Inspect the exact UUID's receipt, current file and relevant timeline/run before
+choosing a fresh action. For checkpoint activity, compare the saved marked-at
+timestamp against the timeline first: an HTTP timeout can follow an accepted
+event. Do not fabricate a lost historical checkpoint or automatically replay a
+plan event. Keep receipts out of project exports and public logs.
+
+Tests cover eight concurrent state writers, rejected edits, owner loss, sanitized
+intents, immutable outcomes, and a failed acknowledgement after an external write.
+The sandbox tests cover intent-store failure before a command and receipt
+survival after cleanup. Unix files and directories are fsynced. Windows file
+contents are synced but the standard library does not offer equivalent portable
+directory fsync; Windows power-loss durability has **not** been demonstrated.
