@@ -17,6 +17,7 @@ replace the implementation and validation documents linked from each record.
 - [ADR 0008: Protocol-neutral federation spike contract](0008-protocol-neutral-federation-spike.md)
 - [ADR 0009: Private federation v1](0009-private-federation-v1.md)
 - [ADR 0010: DSPy as an offline LLM-program optimization layer](0010-dspy-offline-optimization.md)
+- [ADR 0011: Adopt AT Protocol as a federation adapter](0011-atproto-federation-adapter.md)
 
 Two records were historically assigned number 0007. Their filenames and
 contents are retained to avoid breaking references. The `0007a` and `0007b`
