@@ -18,88 +18,6 @@ pub struct MaintenanceResult {
     pub receipt: Option<(TimelineEvent, i64)>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::embedding_backend::EmbeddingBackend;
-    use std::sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    };
-
-    struct FailingBackend {
-        space: EmbeddingSpace,
-        calls: Arc<AtomicUsize>,
-    }
-    #[async_trait::async_trait]
-    impl EmbeddingBackend for FailingBackend {
-        fn space(&self) -> &EmbeddingSpace {
-            &self.space
-        }
-        async fn embed(&self, _: &[String], _: EmbeddingPurpose) -> Result<Vec<Vector>> {
-            self.calls.fetch_add(1, Ordering::SeqCst);
-            anyhow::bail!("synthetic unavailable provider")
-        }
-    }
-
-    #[tokio::test]
-    async fn late_provider_failure_leaves_all_spaces_and_missing_chunks_untouched() {
-        let Some(pool) = mem_test_support::migrated_pool().await else {
-            return;
-        };
-        let project = Uuid::new_v4();
-        let memory = Uuid::new_v4();
-        let slug = project.to_string();
-        sqlx::query(
-            "INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,'fixture','/synthetic')",
-        )
-        .bind(project)
-        .bind(&slug)
-        .execute(&pool)
-        .await
-        .unwrap();
-        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,summary,canonical_text,
-            memory_type,scope,importance,confidence,created_at,updated_at,search_document)
-            VALUES($1,$2,$1,1,false,'Summary','Source','implementation','project',3,0.9,now(),now(),to_tsvector('english','Source'))")
-            .bind(memory).bind(project).execute(&pool).await.unwrap();
-        let mut registry =
-            crate::test_support::static_embedding_registry(&[("first", 1.), ("failed", 2.)]);
-        let calls = Arc::new(AtomicUsize::new(0));
-        registry.entries[1].service.backend = Arc::new(FailingBackend {
-            space: EmbeddingSpace::new("fake", "local", "failed"),
-            calls: calls.clone(),
-        });
-        let context = MutationContext::internal("maintenance-test");
-        assert!(
-            reembed_project_chunks_as(&pool, &slug, &registry, None, &context)
-                .await
-                .is_err()
-        );
-        assert!(
-            rebuild_chunks_as(&pool, &slug, &registry, None, &context)
-                .await
-                .is_err()
-        );
-        assert_eq!(calls.load(Ordering::SeqCst), 2);
-        let count: i64 =
-            sqlx::query_scalar("SELECT count(*) FROM memory_chunks WHERE memory_entry_id=$1")
-                .bind(memory)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        let events: i64 =
-            sqlx::query_scalar("SELECT count(*) FROM project_timeline_events WHERE project_id=$1")
-                .bind(project)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!((count, events), (0, 0));
-        mem_test_support::cleanup_project(&pool, &slug)
-            .await
-            .unwrap();
-    }
-}
-
 async fn project_id(pool: &PgPool, slug: &str) -> Result<Option<Uuid>> {
     Ok(
         sqlx::query_scalar("SELECT id FROM projects WHERE slug = $1")
@@ -435,4 +353,86 @@ pub async fn prune_project_embeddings_tx(
         context,
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::embedding_backend::EmbeddingBackend;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    struct FailingBackend {
+        space: EmbeddingSpace,
+        calls: Arc<AtomicUsize>,
+    }
+    #[async_trait::async_trait]
+    impl EmbeddingBackend for FailingBackend {
+        fn space(&self) -> &EmbeddingSpace {
+            &self.space
+        }
+        async fn embed(&self, _: &[String], _: EmbeddingPurpose) -> Result<Vec<Vector>> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            anyhow::bail!("synthetic unavailable provider")
+        }
+    }
+
+    #[tokio::test]
+    async fn late_provider_failure_leaves_all_spaces_and_missing_chunks_untouched() {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let project = Uuid::new_v4();
+        let memory = Uuid::new_v4();
+        let slug = project.to_string();
+        sqlx::query(
+            "INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,'fixture','/synthetic')",
+        )
+        .bind(project)
+        .bind(&slug)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,summary,canonical_text,
+            memory_type,scope,importance,confidence,created_at,updated_at,search_document)
+            VALUES($1,$2,$1,1,false,'Summary','Source','implementation','project',3,0.9,now(),now(),to_tsvector('english','Source'))")
+            .bind(memory).bind(project).execute(&pool).await.unwrap();
+        let mut registry =
+            crate::test_support::static_embedding_registry(&[("first", 1.), ("failed", 2.)]);
+        let calls = Arc::new(AtomicUsize::new(0));
+        registry.entries[1].service.backend = Arc::new(FailingBackend {
+            space: EmbeddingSpace::new("fake", "local", "failed"),
+            calls: calls.clone(),
+        });
+        let context = MutationContext::internal("maintenance-test");
+        assert!(
+            reembed_project_chunks_as(&pool, &slug, &registry, None, &context)
+                .await
+                .is_err()
+        );
+        assert!(
+            rebuild_chunks_as(&pool, &slug, &registry, None, &context)
+                .await
+                .is_err()
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        let count: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM memory_chunks WHERE memory_entry_id=$1")
+                .bind(memory)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let events: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM project_timeline_events WHERE project_id=$1")
+                .bind(project)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((count, events), (0, 0));
+        mem_test_support::cleanup_project(&pool, &slug)
+            .await
+            .unwrap();
+    }
 }
