@@ -1,0 +1,236 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+use super::*;
+
+pub(super) fn fixture() -> Manifest {
+    let mut cases = Vec::new();
+    for (track, split, clusters, size) in [
+        (Track::Knowledge, Split::Development, 10, 4),
+        (Track::Knowledge, Split::HeldOut, 25, 4),
+        (Track::Coding, Split::Development, 4, 1),
+        (Track::Coding, Split::HeldOut, 12, 1),
+    ] {
+        for cluster in 0..clusters {
+            for item in 0..size {
+                let cluster = format!("{track:?}-{split:?}-{cluster}");
+                cases.push(Case {
+                    id: format!("{cluster}-{item}"),
+                    cluster,
+                    track,
+                    split,
+                    suite: "suite".into(),
+                    sources: vec!["source.md".into()],
+                });
+            }
+        }
+    }
+    Manifest {
+        version: 1,
+        name: "r3-test".into(),
+        semantic_time: "2026-01-01T00:00:00Z".parse().unwrap(),
+        seed: 77,
+        repeats: 3,
+        label_status: "reviewed".into(),
+        model: Model {
+            provider: "fake".into(),
+            resolved_id: "fake-v1".into(),
+            reasoning: "none".into(),
+            embedding_id: "fake-2d".into(),
+            max_input_tokens: 100,
+            max_output_tokens: 100,
+            input_microusd_per_million: 1,
+            output_microusd_per_million: 1,
+        },
+        limits: Limits {
+            requests: 10000,
+            tokens: 10000000,
+            microusd: 10000000,
+            task_seconds: 60,
+        },
+        reference_baseline: Some(Condition::Handover),
+        assets: vec![
+            ("source.md", AssetKind::Source),
+            ("labels.json", AssetKind::Labels),
+            ("fixture.rs", AssetKind::Fixture),
+            ("config.json", AssetKind::Configuration),
+        ]
+        .into_iter()
+        .map(|(p, k)| Asset {
+            path: p.into(),
+            sha256: digest(b"fixture"),
+            kind: k,
+        })
+        .collect(),
+        cases,
+    }
+}
+
+fn artifact(manifest: &Manifest) -> Artifact {
+    let plan = manifest.plan(Split::HeldOut).unwrap();
+    let approvals = [ApprovalPurpose::Labels, ApprovalPurpose::Official]
+        .into_iter()
+        .map(|purpose| Approval {
+            manifest_sha256: plan.manifest_sha256.clone(),
+            reviewer: "fixture-only".into(),
+            approved_at: manifest.semantic_time,
+            purpose,
+            maximum_microusd: manifest.limits.microusd,
+        })
+        .collect();
+    Artifact {
+        manifest_sha256: plan.manifest_sha256,
+        split: Split::HeldOut,
+        offline: false,
+        completed: true,
+        preparation_microusd: Some(1),
+        approvals,
+        observations: plan
+            .work
+            .into_iter()
+            .map(|work| {
+                let result = crate::EvalItemResult {
+                    item_id: work.case_id.clone(),
+                    eval_type: "grounded_answer".into(),
+                    condition: crate::EvalCondition::FullMemory,
+                    metadata: Default::default(),
+                    success: work.condition == Condition::FullMemory,
+                    skipped: false,
+                    scores: Default::default(),
+                    duration_ms: Some(10),
+                    token_usage: Some(mem_record::TokenUsage {
+                        input_tokens: 5,
+                        output_tokens: 5,
+                        total_tokens: 10,
+                        ..Default::default()
+                    }),
+                    answer: None,
+                    notes: vec![],
+                    sub_results: vec![],
+                };
+                Observation {
+                    model: manifest.model.clone(),
+                    work,
+                    result,
+                    execution_microusd: Some(10),
+                    provider_requests: 1,
+                    uncertain_charge: false,
+                    critical_failure: false,
+                    unresolved_rubric: false,
+                    isolation: Isolation {
+                        before_sha256: digest(b"snapshot"),
+                        after_sha256: digest(b"snapshot"),
+                        snapshot_sha256: digest(b"snapshot"),
+                        configuration_sha256: digest(b"fixture"),
+                        driver_sha256: digest(b"fixture"),
+                        service_build: "fixture-only".into(),
+                        semantic_time: manifest.semantic_time,
+                        sealed: true,
+                        restricted_network: true,
+                        hidden_tests_inaccessible: true,
+                    },
+                }
+            })
+            .collect(),
+    }
+}
+
+#[test]
+fn schedule_is_reproducible_complete_and_changes_with_seed() {
+    let mut m = fixture();
+    let a = m.plan(Split::HeldOut).unwrap();
+    assert_eq!(a.work.len(), (100 + 12) * 5 * 3);
+    assert_eq!(a.work, m.plan(Split::HeldOut).unwrap().work);
+    m.seed += 1;
+    assert_ne!(a.work, m.plan(Split::HeldOut).unwrap().work);
+    m.cases[0].cluster = m.cases.last().unwrap().cluster.clone();
+    assert!(m.validate().is_err());
+}
+
+#[test]
+fn parent_results_and_repeats_do_not_inflate_independence() {
+    let m = fixture();
+    let mut a = artifact(&m);
+    let report = report(&m, &a).unwrap();
+    assert!(report.quality_passed);
+    assert_eq!(report.execution_microusd, 16800);
+    assert_eq!(report.tracks[0].independent_clusters, 25);
+    assert_eq!(report.tracks[0].tasks, 100);
+    assert_eq!(report.tracks[1].independent_clusters, 12);
+    assert_eq!(report.tracks[1].total_executions, 36);
+    assert_eq!(report.tracks[0].comparisons[0].simultaneous_lower, 1.0);
+    a.offline = true;
+    let offline = super::report(&m, &a).unwrap();
+    assert!(offline.harness_valid);
+    assert!(!offline.official_evidence && !offline.quality_passed);
+}
+
+#[test]
+fn invalid_evidence_fails_closed() {
+    let m = fixture();
+    let original = artifact(&m);
+    let mut a = original.clone();
+    a.observations.pop();
+    assert!(!report(&m, &a).unwrap().harness_valid);
+    let mut a = original.clone();
+    a.observations[0].result.token_usage = None;
+    assert!(!report(&m, &a).unwrap().harness_valid);
+    let mut a = original.clone();
+    a.observations[0].isolation.after_sha256 = digest(b"changed");
+    assert!(!report(&m, &a).unwrap().harness_valid);
+    let mut a = original.clone();
+    a.observations[0].isolation.hidden_tests_inaccessible = false;
+    assert!(!report(&m, &a).unwrap().harness_valid);
+    let mut a = original.clone();
+    a.observations[0].uncertain_charge = true;
+    assert!(!report(&m, &a).unwrap().harness_valid);
+    let mut a = original.clone();
+    a.completed = false;
+    assert!(!report(&m, &a).unwrap().harness_valid);
+    let mut a = original.clone();
+    a.observations[0].critical_failure = true;
+    assert!(!report(&m, &a).unwrap().quality_passed);
+    let mut a = original;
+    a.approvals.clear();
+    assert!(!report(&m, &a).unwrap().official_evidence);
+}
+
+#[test]
+fn draft_labels_or_changed_manifest_cannot_be_authorized() {
+    let mut m = fixture();
+    let a = artifact(&m);
+    assert!(m.authorize(Split::HeldOut, &a.approvals).is_ok());
+    m.label_status = "draft".into();
+    assert!(m.authorize(Split::HeldOut, &a.approvals).is_err());
+    m.label_status = "reviewed".into();
+    m.seed += 1;
+    assert!(m.authorize(Split::HeldOut, &a.approvals).is_err());
+}
+
+#[test]
+fn reservation_is_atomic_bounded_and_conservative_on_uncertain_execution() {
+    let limits = Limits {
+        requests: 2,
+        tokens: 100,
+        microusd: 200,
+        task_seconds: 1,
+    };
+    let mut ledger = Ledger::default();
+    ledger.reserve(&limits, 60, 100).unwrap();
+    assert!(ledger.reserve(&limits, 60, 100).is_err());
+    assert_eq!(ledger.requests, 1);
+    assert_eq!(ledger.tokens, 60);
+    ledger.reserve(&limits, 40, 100).unwrap();
+    assert!(ledger.reserve(&limits, 0, 0).is_err());
+    assert_eq!(ledger.microusd, 200);
+}
+
+#[test]
+fn simultaneous_intervals_widen_for_correlated_cluster_uncertainty() {
+    let clusters: Vec<_> = (0..25)
+        .map(|i| if i < 13 { [1.0; 3] } else { [-1.0; 3] })
+        .collect();
+    let (mean, radius) = super::statistics::simultaneous_interval(&clusters, 77);
+    assert!((mean[0] - 0.04).abs() < 1e-9);
+    assert!(radius > 0.2 && radius < 0.7);
+    let again = super::statistics::simultaneous_interval(&clusters, 77);
+    assert_eq!((mean, radius), again);
+}

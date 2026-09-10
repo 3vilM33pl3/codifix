@@ -3,6 +3,8 @@
 // Tests may unwrap; production code must not (workspace lints deny it).
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+pub mod campaign;
+
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fs,
