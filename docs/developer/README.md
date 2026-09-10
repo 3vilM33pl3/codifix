@@ -26,6 +26,7 @@ For the full isolation contract, default ports, override flags, and troubleshoot
 
 ## Architecture
 
+- [Architecture Decision Records](adr/README.md)
 - [Dev Stack vs Installed Stack](dev-stack.md)
 - [Architecture Overview](architecture/overview.md)
 - [Protocol-Neutral Federation Spike Contract](adr/0008-protocol-neutral-federation-spike.md)
