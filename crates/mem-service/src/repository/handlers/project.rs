@@ -1474,6 +1474,43 @@ pub(crate) async fn summarize_resume_with_llm(
     operation: &str,
     deterministic: &str,
 ) -> Result<String> {
+    let attempt = crate::effects::Attempt::begin(
+        state,
+        Some(project),
+        mem_store::effects::EffectKind::ProviderRequest,
+        operation,
+        &serde_json::to_vec(&(
+            deterministic,
+            &state.config.llm.provider,
+            &state.config.llm.model,
+        ))?,
+        &mem_store::events::MutationContext::internal("resume-provider"),
+    )
+    .await?;
+    let outcome = summarize_resume_with_llm_inner(state, project, operation, deterministic).await;
+    attempt
+        .observe(
+            if outcome.is_ok() {
+                mem_store::effects::EffectStatus::Confirmed
+            } else {
+                mem_store::effects::EffectStatus::Uncertain
+            },
+            if outcome.is_ok() {
+                mem_store::effects::EffectReason::Observed
+            } else {
+                mem_store::effects::EffectReason::RemoteIo
+            },
+        )
+        .await?;
+    outcome
+}
+
+async fn summarize_resume_with_llm_inner(
+    state: &AppState,
+    project: &str,
+    operation: &str,
+    deterministic: &str,
+) -> Result<String> {
     if !is_supported_llm_provider(&state.config.llm.provider)
         || state.config.llm.model.trim().is_empty()
     {

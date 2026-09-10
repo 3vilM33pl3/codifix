@@ -71,6 +71,19 @@ async fn provider_intent_precedes_request_and_interrupted_execution_is_not_repla
     }
     fake.release.notify_one();
     assert_eq!(call.await.unwrap().content, "{}");
+    fake.release.notify_one();
+    assert_eq!(
+        crate::repository::handlers::project::summarize_resume_with_llm(
+            &state,
+            "synthetic-unregistered",
+            "resume-summary",
+            "private resume pack",
+        )
+        .await
+        .unwrap(),
+        "{}"
+    );
+    fake.received.notified().await;
     let source = state.clone();
     let task = tokio::spawn(async move {
         let request = crate::llm::LlmStrictJsonRequest {
@@ -119,7 +132,16 @@ async fn provider_intent_precedes_request_and_interrupted_execution_is_not_repla
             .fetch_all(&pool)
             .await
             .unwrap();
-    assert_eq!(rows.len(), 3);
+    assert_eq!(rows.len(), 4);
+    assert!(
+        rows.iter()
+            .any(|r| r["resource"] == "resume-summary" && r["status"] == "confirmed")
+    );
+    assert!(
+        !serde_json::to_string(&rows)
+            .unwrap()
+            .contains("private resume pack")
+    );
     assert!(
         rows.iter()
             .any(|r| r["kind"] == "watcher_restart" && r["status"] == "confirmed")

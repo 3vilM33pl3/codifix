@@ -285,7 +285,8 @@ async fn mutate_loop_setting(
     let scope = resolve_loop_scope(pool, &request, true).await?;
     if requires_explicit_approval && !request.explicit_user_approval {
         let approval =
-            create_loop_setting_approval(pool, &definition.loop_id, &scope, &request).await?;
+            create_loop_setting_approval(pool, &definition.loop_id, &scope, &request, &context)
+                .await?;
         let setting =
             fetch_or_synthetic_loop_setting(pool, &definition.loop_id, &scope, chrono::Utc::now())
                 .await?;
@@ -1002,7 +1003,9 @@ async fn create_loop_setting_approval(
     loop_id: &str,
     scope: &ResolvedLoopScope,
     request: &LoopSettingsUpdateRequest,
+    context: &mem_store::events::MutationContext,
 ) -> Result<LoopApprovalRequestRecord, ApiError> {
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
     let row = sqlx::query(
         r#"
         INSERT INTO approval_requests (
@@ -1029,10 +1032,21 @@ async fn create_loop_setting_approval(
         "request": request
     }))
     .bind(&request.updated_by)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
-    row_to_loop_approval(row)
+    let approval = row_to_loop_approval(row)?;
+    insert_loop_setting_audit(
+        &mut *tx,
+        Some(loop_id),
+        None,
+        "enable_approval_requested",
+        Some(&context.actor_id),
+        None,
+        json!({"approval_id":approval.id,"project_id":scope.project_id,"scope_type":scope.scope_type.as_str()}),
+    ).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(approval)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1221,7 +1235,7 @@ async fn route_loop_trigger_event_as(
         Some(project) => Some(require_project_id(pool, project).await?),
         None => None,
     };
-    let stored = store_trigger_event(pool, request, project_id).await?;
+    let stored = store_trigger_event(pool, request, project_id, &execution.context).await?;
     if stored.duplicate || stored.debounced {
         for decision in &mut decisions {
             if decision.eligible {
@@ -1299,6 +1313,7 @@ async fn store_trigger_event(
     pool: &PgPool,
     request: &LoopTriggerRouteRequest,
     project_id: Option<Uuid>,
+    context: &mem_store::events::MutationContext,
 ) -> Result<StoredTriggerEvent, ApiError> {
     let payload_hash =
         hex_sha256(&serde_json::to_vec(&request.payload).map_err(|error| {
@@ -1321,9 +1336,9 @@ async fn store_trigger_event(
         r#"
         INSERT INTO trigger_events (
             id, source, event_type, project_id, repo_root, payload_hash,
-            dedupe_key, trust_level, payload_json, received_at
+            dedupe_key, trust_level, payload_json, received_at, actor_id, actor_source
         )
-        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, now())
+        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, now(), $9, $10)
         ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
         RETURNING
             id, source, event_type,
@@ -1339,6 +1354,8 @@ async fn store_trigger_event(
     .bind(&request.dedupe_key)
     .bind(request.trust_level.as_str())
     .bind(&request.payload)
+    .bind(&context.actor_id)
+    .bind(&context.source)
     .fetch_optional(pool)
     .await
     .map_err(ApiError::sql)?;
@@ -1357,8 +1374,19 @@ async fn store_trigger_event(
             .dedupe_key
             .as_deref()
             .ok_or_else(|| ApiError::validation(ValidationError::new("dedupe_key is required")))?,
+        project_id,
     )
     .await?;
+    if event.payload_hash != payload_hash
+        || event.source != request.source
+        || event.event_type != request.event_type
+        || event.repo_root != request.repo_root
+        || event.trust_level != request.trust_level
+    {
+        return Err(ApiError::validation(ValidationError::new(
+            "dedupe_key identifies different trigger input",
+        )));
+    }
     Ok(StoredTriggerEvent {
         event,
         duplicate: true,
@@ -1405,6 +1433,7 @@ async fn fetch_debounced_trigger_event(
 async fn fetch_trigger_event_by_dedupe_key(
     pool: &PgPool,
     dedupe_key: &str,
+    project_id: Option<Uuid>,
 ) -> Result<LoopTriggerEventRecord, ApiError> {
     let row = sqlx::query(
         r#"
@@ -1413,14 +1442,15 @@ async fn fetch_trigger_event_by_dedupe_key(
             (SELECT slug FROM projects WHERE id = trigger_events.project_id) AS project,
             repo_root, payload_hash, dedupe_key, trust_level, payload_json, received_at
         FROM trigger_events
-        WHERE dedupe_key = $1
+        WHERE dedupe_key = $1 AND project_id IS NOT DISTINCT FROM $2
         "#,
     )
     .bind(dedupe_key)
+    .bind(project_id)
     .fetch_optional(pool)
     .await
     .map_err(ApiError::sql)?
-    .ok_or_else(|| ApiError::not_found("trigger event not found"))?;
+    .ok_or_else(|| ApiError::validation(ValidationError::new("dedupe_key is unavailable")))?;
     row_to_trigger_event(row)
 }
 
@@ -1484,7 +1514,11 @@ async fn create_control_plane_loop_run_as(
             reason: request.reason.clone(),
             candidate_loop_ids: vec![loop_id.to_string()],
         },
-        None,
+        match request.project.as_deref() {
+            Some(project) => Some(require_project_id(pool, project).await?),
+            None => None,
+        },
+        &execution.context,
     )
     .await?;
     create_control_plane_loop_run_with_trigger(

@@ -219,7 +219,7 @@ pub(super) async fn finish_run_tx(
         .await
         .map_err(|e| ApiError::io(e.into()))?;
         work_id = Some(id);
-        sqlx::query("UPDATE loop_runs SET output_json=output_json || jsonb_build_object('background_job_id',$2::uuid::text,'background_state','queued') WHERE id=$1")
+        sqlx::query("UPDATE loop_runs SET output_json=(output_json - 'background_state') || jsonb_build_object('background_job_id',$2::uuid::text) WHERE id=$1")
             .bind(run).bind(id).execute(&mut **tx).await.map_err(ApiError::sql)?;
     }
     append_loop_trace_tx(

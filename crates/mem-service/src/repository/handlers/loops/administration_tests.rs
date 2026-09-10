@@ -3,6 +3,115 @@
 use super::*;
 
 #[tokio::test]
+async fn trigger_intake_and_enable_requests_preserve_trusted_attribution_atomically() {
+    let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
+        return;
+    };
+    let pool = &database.pool;
+    register_builtin_loop_definitions(pool).await.unwrap();
+    let project = Uuid::new_v4();
+    sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,'intake','/synthetic')")
+        .bind(project)
+        .bind(project.to_string())
+        .execute(pool)
+        .await
+        .unwrap();
+    let request: LoopSettingsUpdateRequest = serde_json::from_value(json!({"project":project.to_string(),"enabled":true,"updated_by":"client-author","reason":"private reason"})).unwrap();
+    let scope = resolve_loop_scope(pool, &request, true).await.unwrap();
+    let mut actor = mem_store::events::MutationContext::internal("intake-test");
+    actor.actor_id = "fail\0audit".into();
+    assert!(
+        create_loop_setting_approval(
+            pool,
+            builtin_loop_definitions()[0].loop_id,
+            &scope,
+            &request,
+            &actor
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM approval_requests")
+            .fetch_one(pool)
+            .await
+            .unwrap(),
+        0
+    );
+    actor.actor_id = "trusted-principal".into();
+    let approval = create_loop_setting_approval(
+        pool,
+        builtin_loop_definitions()[0].loop_id,
+        &scope,
+        &request,
+        &actor,
+    )
+    .await
+    .unwrap();
+    let audit: (String, serde_json::Value) = sqlx::query_as("SELECT actor,payload_json FROM loop_setting_audit WHERE action='enable_approval_requested'").fetch_one(pool).await.unwrap();
+    assert_eq!(audit.0, "trusted-principal");
+    assert_eq!(audit.1["approval_id"], approval.id.to_string());
+    assert!(!audit.1.to_string().contains("private reason"));
+    let mut trigger = LoopTriggerRouteRequest {
+        source: "client-source".into(),
+        event_type: "fixture".into(),
+        project: Some(project.to_string()),
+        repo_root: None,
+        payload: json!({"private":"input"}),
+        dedupe_key: Some(Uuid::new_v4().to_string()),
+        trust_level: LoopTrustLevel::High,
+        debounce_seconds: None,
+        dry_run: false,
+        reason: None,
+        candidate_loop_ids: vec![],
+    };
+    actor.actor_id = "fail\0intake".into();
+    assert!(
+        store_trigger_event(pool, &trigger, Some(project), &actor)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM trigger_events")
+            .fetch_one(pool)
+            .await
+            .unwrap(),
+        0
+    );
+    actor.actor_id = "trusted-principal".into();
+    let intake = store_trigger_event(pool, &trigger, Some(project), &actor)
+        .await
+        .unwrap();
+    let attribution: (String, String) =
+        sqlx::query_as("SELECT source,actor_id FROM trigger_events WHERE id=$1")
+            .bind(intake.event.id)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        attribution,
+        ("client-source".into(), "trusted-principal".into())
+    );
+    assert!(
+        store_trigger_event(pool, &trigger, Some(project), &actor)
+            .await
+            .unwrap()
+            .duplicate
+    );
+    assert!(
+        store_trigger_event(pool, &trigger, None, &actor)
+            .await
+            .is_err()
+    );
+    trigger.payload = json!({"changed":true});
+    assert!(
+        store_trigger_event(pool, &trigger, Some(project), &actor)
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
 async fn interrupted_loop_preserves_committed_phases_and_rejects_stale_outputs() {
     let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
         return;
