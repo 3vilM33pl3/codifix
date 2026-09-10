@@ -104,11 +104,12 @@ deployment, customer SSO proof, or clearance of the remaining release gates.
 
 ## F. Conditional expansion after reliable knowledge federation
 
-- [ ] F1 After reliable paid knowledge federation, add capability discovery and policy-controlled remote questions/answers with permitted input/output contracts.
+- [ ] F1 Add capability discovery and policy-controlled remote questions/answers with permitted input/output contracts. Approved internal-use exception (2026-09-10): implement and rehearse with synthetic `homelab` and `memory` instances before paid pilots, with later game enrollment. See the [approved F1 contract and execution checklist](f1-execution.md). This does not approve deployment on existing services, paid calls, or customer release.
 - [ ] F2 Subsequently add durable work request/claim/result/failure/cancellation/approval lifecycles. Keep MCP local; add A2A only for an actual integration, and regional aggregation/views only for measured scale or residency needs.
 
-F1/F2 are conditional later roadmap stages, not permission to bypass E or the
-release gates. A private aggregation service needs its own authorization and
+F1 has the bounded internal-use exception above; F2 remains conditional. Neither
+is permission to bypass the customer release gates or claim R3 is complete.
+A private aggregation service needs its own authorization and
 retention contract; native Spaces is not the public relay topology.
 
 ## Core reliability, evaluation, retrieval and expert correction
