@@ -121,6 +121,32 @@ expired PDS credentials block work until an operator replaces the private token
 file, restarts the role and explicitly retries blocked work. Do not skip a blocked
 publication to make a later cursor appear healthy.
 
+### F1 delivery-validator rehearsal only
+
+F1 is not enabled by the production gateway configuration. In a disposable debug
+rehearsal, an instance configuration may additionally set `expertise_principal`
+to a **separate**, internal, project-scoped principal. It must have current project
+read/export permissions, the local space's `AnswerExpertise` grant and an explicit
+grant for the reviewed collection. Global roles, global permissions and group
+identities are rejected. Merely naming a principal does not grant access.
+
+This optional worker validates retained-answer delivery only; it does not yet
+execute queued questions, invoke models or provide end-user F1 commands. It polls
+every two seconds and stops with the federation worker lifecycle. Each read needs
+a fresh gateway challenge, valid for at most 15 seconds. The origin locks current
+permissions and source eligibility while checking the exact stored excerpt and
+authorizing its release. Offline origins therefore cannot authorize new delivery;
+status reads and exact submission retries never return cached answer bodies.
+
+Approvals contain identifiers/digests, not repeated private payloads. They are
+single-use and bound to a live addressed request; gateway restart, expiry and
+replay cannot create reusable access. The gateway commit authorizes release, not
+proof of physical delivery. An already-authorized in-flight transfer cannot be
+recalled, and the two databases do not form one atomic transaction. Existing
+24-hour payload expiry still applies; holds do not extend ordinary read access.
+This remains component-tested rehearsal software, not homelab activation or
+customer-release readiness.
+
 ## Observe and recover
 
 The storage APIs expose separate `DeliveryStatus` observations:

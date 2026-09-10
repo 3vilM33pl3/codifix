@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Explicit publication/review repository APIs and opt-in worker lifecycle.
 //! Local workflow handlers share only the administrator-enrolled instance.
+mod expertise;
 pub mod workflow;
 use crate::AppState;
 use mem_federation::publication::{InstanceId, SpaceId};
@@ -25,6 +26,8 @@ enum WorkerConfig {
         instance: InstanceId,
         project: Uuid,
         principal: Uuid,
+        #[serde(default)]
+        expertise_principal: Option<Uuid>,
         gateway: String,
         #[serde(default)]
         gateway_ca_file: Option<PathBuf>,
@@ -104,6 +107,7 @@ pub(crate) async fn start(
             instance,
             project,
             principal,
+            expertise_principal,
             gateway,
             gateway_ca_file,
             token_file,
@@ -113,6 +117,14 @@ pub(crate) async fn start(
             anyhow::ensure!(
                 !disposable_test_mode || cfg!(debug_assertions),
                 "cleartext fixture mode is prohibited in release builds"
+            );
+            anyhow::ensure!(
+                expertise_principal.is_none() || (disposable_test_mode && cfg!(debug_assertions)),
+                "expertise workers remain restricted to disposable rehearsal"
+            );
+            anyhow::ensure!(
+                expertise_principal != Some(principal),
+                "expertise requires a separate project-scoped service identity"
             );
             let ca = gateway_ca_file
                 .as_deref()
@@ -146,6 +158,14 @@ pub(crate) async fn start(
                     authority,
                     sync: sync.clone(),
                 }));
+            }
+            if let Some(expertise_principal) = expertise_principal {
+                tasks.push(expertise::start(
+                    state.clone(),
+                    sync.clone(),
+                    expertise_principal,
+                    project,
+                ));
             }
             let worker_state = state.clone();
             tasks.push(tokio::spawn(async move {
@@ -369,6 +389,29 @@ mod tests {
         })
         .await
         .unwrap();
+        let mut fixture: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&config).unwrap()).unwrap();
+        fixture["expertise_principal"] = serde_json::json!(principal);
+        std::fs::write(&config, serde_json::to_vec(&fixture).unwrap()).unwrap();
+        assert!(start(state.clone(), Some(config.clone())).await.is_err());
+        fixture["expertise_principal"] = serde_json::json!(Uuid::new_v4());
+        fixture["disposable_test_mode"] = serde_json::json!(false);
+        std::fs::write(&config, serde_json::to_vec(&fixture).unwrap()).unwrap();
+        assert!(start(state.clone(), Some(config.clone())).await.is_err());
+        fixture["disposable_test_mode"] = serde_json::json!(true);
+        std::fs::write(&config, serde_json::to_vec(&fixture).unwrap()).unwrap();
+        let tasks = start(state.clone(), Some(config.clone())).await.unwrap();
+        assert_eq!(tasks.0.len(), 2);
+        let handles: Vec<_> = tasks.0.iter().map(|t| t.abort_handle()).collect();
+        drop(tasks);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while handles.iter().any(|h| !h.is_finished()) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(state.federation.read().unwrap().is_none());
         std::fs::remove_file(token).unwrap();
         std::fs::remove_file(config).unwrap();
         std::fs::remove_dir(dir).unwrap();

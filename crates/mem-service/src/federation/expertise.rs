@@ -1,0 +1,168 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Internal rehearsal delivery validator. This is not a generic agent/task
+//! worker. There is no provider invocation, query capture or recursive RPC.
+use crate::AppState;
+use mem_federation::publication::LocalProjectAccess;
+use mem_federation_runtime::InstanceSync;
+use mem_record::Permission;
+use sqlx::{Postgres, Transaction};
+use std::time::Duration;
+use uuid::Uuid;
+
+pub(super) fn start(
+    state: AppState,
+    sync: InstanceSync,
+    principal: Uuid,
+    project: Uuid,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            if !matches!(
+                tokio::time::timeout(
+                    Duration::from_secs(12),
+                    cycle(&state, &sync, principal, project)
+                )
+                .await,
+                Ok(Ok(()))
+            ) {
+                // No question, evidence, provider body or unbounded error text.
+                tracing::warn!("expertise delivery validation paused or denied");
+            }
+            // DB state is authoritative. Lost polls/leases resume with a fresh
+            // reader challenge; an old approval is never automatically reused.
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    })
+}
+async fn cycle(
+    state: &AppState,
+    sync: &InstanceSync,
+    principal: Uuid,
+    project: Uuid,
+) -> anyhow::Result<()> {
+    let pool = state
+        .pool()
+        .map_err(|_| anyhow::anyhow!("database unavailable"))?;
+    let mut tx = pool.begin().await?;
+    sqlx::query("SET LOCAL lock_timeout='2s'")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SET LOCAL statement_timeout='3s'")
+        .execute(&mut *tx)
+        .await?;
+    let access = access(state, &mut tx, principal, project).await?;
+    if let Some(lease) = sync.claim_expertise_delivery().await? {
+        sync.authorize_expertise_delivery(&mut tx, &access, &lease)
+            .await?;
+    }
+    tx.rollback().await?;
+    Ok(())
+}
+async fn access(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    principal: Uuid,
+    project: Uuid,
+) -> anyhow::Result<LocalProjectAccess> {
+    // A departed requester, human session, global administrator or group-based
+    // identity cannot become this worker implicitly. Current per-project auth
+    // is read under the same lock held through result-release authorization.
+    let scoped: Option<bool> = sqlx::query_scalar("SELECT kind='internal' AND global_role IS NULL AND (global_permissions_json IS NULL OR global_permissions_json='[]'::jsonb) AND groups_json='[]'::jsonb FROM auth_principals WHERE id=$1 AND disabled_at IS NULL FOR SHARE")
+        .bind(principal).fetch_optional(&mut **tx).await?;
+    anyhow::ensure!(
+        scoped == Some(true),
+        "expertise service identity must be project-scoped and internal"
+    );
+    let permissions = crate::auth::background_permissions(
+        state,
+        tx,
+        &mem_store::jobs::JobActor::Principal(principal),
+        project,
+    )
+    .await
+    .map_err(|_| anyhow::anyhow!("expertise current execution authority denied"))?;
+    anyhow::ensure!(
+        permissions.contains(Permission::MemoryRead)
+            && permissions.contains(Permission::BundleExport),
+        "expertise project permissions denied"
+    );
+    Ok(LocalProjectAccess {
+        project,
+        principal,
+        permissions,
+        read_only: state.config.service.read_only,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    #[tokio::test]
+    async fn worker_authority_is_current_project_scoped_and_locked_through_release() {
+        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
+            return;
+        };
+        // This test only uses the state for frozen configuration/policy, never
+        // the host's configuration or model providers.
+        let config = serde_json::from_value(serde_json::json!({"service":{"bind_addr":"127.0.0.1:0","api_token":"synthetic"},
+            "database":{"url":std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()},"offline":{"enabled":false},"cluster":{"enabled":false},"reinforcement":{"enabled":false}})).unwrap();
+        let state = crate::runtime::build_state(config, Arc::new(Mutex::new(None)))
+            .await
+            .unwrap();
+        let principal = Uuid::new_v4();
+        let project = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,'fixture','/synthetic')",
+        )
+        .bind(project)
+        .bind(project.to_string())
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO auth_principals(id,kind,display_name) VALUES($1,'internal','fixture')",
+        )
+        .bind(principal)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        assert!(access(&state, &mut tx, principal, project).await.is_err());
+        tx.rollback().await.unwrap();
+        sqlx::query("INSERT INTO auth_project_memberships(id,principal_id,project_id,role,source) VALUES($1,$2,$3,'operator','direct')")
+            .bind(Uuid::new_v4()).bind(principal).bind(project).execute(&db.pool).await.unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        access(&state, &mut tx, principal, project).await.unwrap();
+        let pool = db.pool.clone();
+        let mut revoked = tokio::spawn(async move {
+            sqlx::query(
+                "DELETE FROM auth_project_memberships WHERE principal_id=$1 AND project_id=$2",
+            )
+            .bind(principal)
+            .bind(project)
+            .execute(&pool)
+            .await
+            .unwrap();
+        });
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), &mut revoked)
+                .await
+                .is_err()
+        );
+        tx.rollback().await.unwrap();
+        revoked.await.unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        assert!(access(&state, &mut tx, principal, project).await.is_err());
+        tx.rollback().await.unwrap();
+        sqlx::query("UPDATE auth_principals SET global_role='admin' WHERE id=$1")
+            .bind(principal)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        assert!(access(&state, &mut tx, principal, project).await.is_err());
+        tx.rollback().await.unwrap();
+        db.cleanup().await.unwrap();
+    }
+}
