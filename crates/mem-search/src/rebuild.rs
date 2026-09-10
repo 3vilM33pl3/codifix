@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Provider preparation has no writes. Applying prepared output uses only the
+//! Provider preparation writes only private external-operation receipts, never
+//! searchable projections. Applying prepared output uses only the
 //! caller's transaction, including when borrowed from a durable job fence.
 //! Prepared output is private operational data, NOT an HTTP request contract.
 
 use crate::{EmbeddingPurpose, EmbeddingRegistry, EmbeddingService, Vector, split_search_chunks};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
 
@@ -62,6 +64,52 @@ pub async fn prepare_automatic(
     prepare_selected(pool, project, memory, &selected).await
 }
 
+pub(super) async fn embed_with_receipt(
+    pool: &PgPool,
+    project: Uuid,
+    memory: Uuid,
+    service: &EmbeddingService,
+    chunks: &[String],
+) -> Result<crate::EmbeddingBatch> {
+    let id = Uuid::new_v4();
+    let input = serde_json::to_vec(&(memory, service.embedding_space_key(), &chunks))?;
+    mem_store::effects::begin(
+        pool,
+        &mem_store::effects::EffectIntent {
+            id,
+            project_id: Some(project),
+            kind: mem_store::effects::EffectKind::ProviderRequest,
+            host_id: mem_store::effects::SHARED_PROVIDER_OWNER.into(),
+            resource: memory.to_string(),
+            input_fingerprint: format!("{:x}", Sha256::digest(input)),
+            actor_id: "system:embedding-preparation".into(),
+            source: "embedding-preparation".into(),
+        },
+    )
+    .await?;
+    let batch = service
+        .embed_texts(chunks, EmbeddingPurpose::Document)
+        .await;
+    mem_store::effects::conclude(
+        pool,
+        id,
+        Uuid::new_v5(&id, b"observed"),
+        if batch.is_ok() {
+            mem_store::effects::EffectStatus::Confirmed
+        } else {
+            mem_store::effects::EffectStatus::Uncertain
+        },
+        if batch.is_ok() {
+            mem_store::effects::EffectReason::Observed
+        } else {
+            mem_store::effects::EffectReason::RemoteIo
+        },
+    )
+    .await
+    .context("embedding provider receipt failed; external request was not rolled back")?;
+    batch.context("embed prepared chunks")
+}
+
 pub(super) async fn prepare_selected(
     pool: &PgPool,
     project: &str,
@@ -75,10 +123,8 @@ pub(super) async fn prepare_selected(
     let chunks = split_search_chunks(&summary, &canonical_text);
     let mut embeddings = Vec::with_capacity(selected.len());
     for (_, service) in selected {
-        let batch = service
-            .embed_texts(&chunks, EmbeddingPurpose::Document)
-            .await
-            .context("embed prepared chunks")?;
+        let batch =
+            embed_with_receipt(pool, row.try_get("project_id")?, memory, service, &chunks).await?;
         ensure!(
             batch.vectors.len() == chunks.len(),
             "embedding provider returned wrong vector count"
@@ -181,6 +227,7 @@ mod tests {
     struct Fake {
         space: EmbeddingSpace,
         mode: u8,
+        journal: Option<(PgPool, Uuid)>,
     }
     #[async_trait::async_trait]
     impl EmbeddingBackend for Fake {
@@ -188,6 +235,14 @@ mod tests {
             &self.space
         }
         async fn embed(&self, input: &[String], _: EmbeddingPurpose) -> Result<Vec<Vector>> {
+            if let Some((pool, memory)) = &self.journal {
+                let pending:i64 = sqlx::query_scalar("SELECT count(*) FROM external_effects WHERE resource=$1 AND source='embedding-preparation' AND status='pending'")
+                    .bind(memory.to_string()).fetch_one(pool).await?;
+                ensure!(
+                    pending == 1,
+                    "provider did not see exactly one committed intent"
+                );
+            }
             match self.mode {
                 1 => anyhow::bail!("synthetic provider unavailable"),
                 2 => Ok(vec![]),
@@ -204,6 +259,7 @@ mod tests {
             backend: Arc::new(Fake {
                 space: EmbeddingSpace::new("fake", "local", "fixture"),
                 mode,
+                journal: None,
             }),
             batch_size: 8,
         }
@@ -234,6 +290,43 @@ mod tests {
         .fetch_all(pool)
         .await
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn direct_library_provider_calls_have_private_intent_and_observed_receipts() {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let (slug, _, memory) = fixture(&pool).await;
+        let service = EmbeddingService {
+            backend: Arc::new(Fake {
+                space: EmbeddingSpace::new("fake", "local", "fixture"),
+                mode: 0,
+                journal: Some((pool.clone(), memory)),
+            }),
+            batch_size: 8,
+        };
+        prepare_selected(&pool, &slug, memory, &[("fake", &service)])
+            .await
+            .unwrap();
+        let receipt:serde_json::Value = sqlx::query_scalar("SELECT to_jsonb(e) FROM external_effects e WHERE resource=$1 AND source='embedding-preparation'").bind(memory.to_string()).fetch_one(&pool).await.unwrap();
+        assert_eq!(receipt["status"], "confirmed");
+        assert_eq!(
+            receipt["host_id"],
+            mem_store::effects::SHARED_PROVIDER_OWNER
+        );
+        assert!(!receipt.to_string().contains("Known source"));
+        assert_eq!(receipt["input_fingerprint"].as_str().unwrap().len(), 64);
+        assert_eq!(chunks(&pool, memory).await[0].1, "previous searchable text");
+        sqlx::query("DELETE FROM external_effect_outcomes WHERE effect_id IN (SELECT id FROM external_effects WHERE resource=$1)").bind(memory.to_string()).execute(&pool).await.unwrap();
+        sqlx::query("DELETE FROM external_effects WHERE resource=$1")
+            .bind(memory.to_string())
+            .execute(&pool)
+            .await
+            .unwrap();
+        mem_test_support::cleanup_project(&pool, &slug)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

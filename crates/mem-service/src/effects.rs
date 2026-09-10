@@ -276,7 +276,11 @@ pub(crate) async fn reconcile(host: &str, pool: &sqlx::PgPool) -> anyhow::Result
     crate::repository::handlers::loops::run_persistence::reconcile_interrupted_runs(pool)
         .await
         .map_err(|e| anyhow::anyhow!(e.message))?;
-    for intent in effects::pending(pool, host, 100).await? {
+    let mut pending = effects::pending(pool, host, 100).await?;
+    if host != effects::SHARED_PROVIDER_OWNER {
+        pending.extend(effects::pending(pool, effects::SHARED_PROVIDER_OWNER, 100).await?);
+    }
+    for intent in pending {
         let (status, reason) = if intent.kind == EffectKind::FileReplace {
             match bounded_read(Path::new(&intent.resource)) {
                 Ok(bytes) if fingerprint(&bytes) == intent.input_fingerprint => {

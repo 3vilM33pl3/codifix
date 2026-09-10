@@ -46,6 +46,14 @@ demonstrates cancellation followed by reconciliation without another request.
 Watcher health stays stale after an ambiguous restart. Subsequent watchdog
 policy decisions are new attempts, not replay of an old journal entry.
 
+Direct embedding rebuild and targeted re-embedding preparation also record
+private request fingerprints before calling providers. They do not mutate the
+search index until the separately fenced result transaction. The shared-provider
+recovery scope has no host-local files: any primary on that database can mark a
+missing receipt uncertain, but cannot replay it. Background embedding attempts
+remain uncertain until reusable output is durably acknowledged; revocation
+after a provider call cannot turn missing output into successful enrichment.
+
 ## Recovery and operator inspection
 
 A primary, writable service scans its own host's pending intents every 30

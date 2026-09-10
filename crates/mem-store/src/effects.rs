@@ -8,6 +8,11 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Row, Transaction};
 use uuid::Uuid;
 
+/// Provider outcomes have no host-local filesystem to inspect. Any recovery
+/// process on the owning database may mark overdue shared-provider intents
+/// uncertain, but must never repeat the provider call.
+pub const SHARED_PROVIDER_OWNER: &str = "shared-provider";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EffectKind {

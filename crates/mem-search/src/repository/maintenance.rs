@@ -3,10 +3,7 @@
 //! Maintenance prepares provider output before opening its result transaction.
 //! A failed provider, stale input or failed event leaves the prior index intact.
 
-use crate::{
-    EmbeddingPurpose, EmbeddingRegistry, EmbeddingService, EmbeddingSpace, Vector,
-    split_search_chunks,
-};
+use crate::{EmbeddingRegistry, EmbeddingService, EmbeddingSpace, Vector, split_search_chunks};
 use anyhow::{Result, ensure};
 use mem_record::{ActivityDetails, ActivityKind};
 use mem_store::events::{MutationContext, TimelineEvent};
@@ -231,9 +228,9 @@ pub async fn reembed_project_chunks_as(
         let missing: Vec<_> = chunks.iter().filter(|c| !present.contains(&c.id)).collect();
         for batch in missing.chunks(service.batch_size()) {
             let texts: Vec<String> = batch.iter().map(|c| c.search.clone()).collect();
-            let embedded = service
-                .embed_texts(&texts, EmbeddingPurpose::Document)
-                .await?;
+            let embedded =
+                crate::rebuild::embed_with_receipt(pool, project_id, project_id, service, &texts)
+                    .await?;
             ensure!(
                 embedded.vectors.len() == batch.len() && embedded.dimension > 0,
                 "invalid embedding batch shape"
@@ -358,6 +355,7 @@ pub async fn prune_project_embeddings_tx(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::EmbeddingPurpose;
     use crate::embedding_backend::EmbeddingBackend;
     use std::sync::{
         Arc,

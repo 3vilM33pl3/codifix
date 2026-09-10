@@ -247,6 +247,10 @@ async fn revoked_authority_during_provider_execution_fences_every_output() {
             .await
             .unwrap();
     assert_eq!(count, 0);
+    assert!(
+        done.history[0].uncertain,
+        "revocation prevented an output receipt after the provider accepted work"
+    );
     let count: i64 = sqlx::query_scalar("SELECT count(*) FROM memory_chunks WHERE memory_entry_id IN (SELECT id FROM memory_entries WHERE project_id=$1)")
         .bind(f.project)
         .fetch_one(&f.pool)

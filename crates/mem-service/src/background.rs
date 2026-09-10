@@ -420,11 +420,21 @@ async fn embedding(
         {
             output
         } else {
+            let mut intent = authorized(state, pool, lease).await?;
+            sqlx::query("UPDATE background_job_attempts SET uncertain=true WHERE token=$1")
+                .bind(lease.token)
+                .execute(&mut **intent.transaction())
+                .await?;
+            jobs::checkpoint_result(intent).await?;
             let output =
                 mem_search::rebuild::prepare_automatic(pool, project, *version, &registry, true)
                     .await?;
             let mut result = authorized(state, pool, lease).await?;
             cache(&mut result, lease, &key, &config, &output).await?;
+            sqlx::query("UPDATE background_job_attempts SET uncertain=false WHERE token=$1")
+                .bind(lease.token)
+                .execute(&mut **result.transaction())
+                .await?;
             jobs::checkpoint_result(result).await?;
             output
         };
