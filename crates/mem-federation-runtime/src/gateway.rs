@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-use crate::{GatewaySecurity, PdsPublisher, Result, RuntimeError, SignedPage};
+use crate::{
+    ExpertiseOperation, ExpertiseReply, ExpertiseRpc, GatewaySecurity, PdsPublisher, Result,
+    RuntimeError, SignedExpertiseReply, SignedPage,
+};
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Query, State},
@@ -12,6 +15,7 @@ use mem_federation_store::{
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 /// Gateway tokens identify enrolled INSTANCES, never original authors/users.
@@ -25,6 +29,8 @@ pub struct GatewayServer {
     // New semantics stay unreachable through the existing deployment profile.
     // F1 activation must establish fleet compatibility before enabling them.
     expertise_enabled: bool,
+    space: SpaceId,
+    authority: InstanceId,
 }
 impl GatewayServer {
     pub async fn new(
@@ -60,15 +66,46 @@ impl GatewayServer {
             credentials,
             security,
             expertise_enabled: false,
+            space,
+            authority,
         })
     }
     pub fn router(&self) -> Router {
-        Router::new()
+        let mut router = Router::new()
             .route("/v1/accept", post(accept))
             .route("/v1/pull", get(pull))
-            .route("/v1/retention", post(retention))
+            .route("/v1/retention", post(retention));
+        if self.expertise_enabled {
+            router = router.route("/v1/expertise", post(expertise));
+        }
+        router
             .layer(DefaultBodyLimit::max(96 * 1024))
             .with_state(Arc::new(self.clone()))
+    }
+    /// Temporary rehearsal entrypoint while origin workers/UI are incomplete.
+    /// Production configuration intentionally cannot enable these routes yet.
+    /// Require an explicit schema inventory for ALL configured participants;
+    /// no inferred capability, dynamic discovery or mixed-version downgrade.
+    pub async fn enable_expertise_rehearsal(
+        mut self,
+        participants: &[(InstanceId, u32)],
+    ) -> Result<Self> {
+        let configured: BTreeSet<_> = self.credentials.iter().map(|(_, id)| *id).collect();
+        let compatible: BTreeSet<_> = participants.iter().map(|(id, _)| *id).collect();
+        if !cfg!(debug_assertions)
+            || compatible.len() != participants.len()
+            || participants
+                .iter()
+                .any(|(_, schema)| *schema != mem_federation::expertise::EXPERTISE_SCHEMA_VERSION)
+            || configured != compatible
+        {
+            return Err(RuntimeError::Configuration);
+        }
+        self.store
+            .require_expertise_fleet(self.fence, &compatible)
+            .await?;
+        self.expertise_enabled = true;
+        Ok(self)
     }
     pub async fn publish_one(&self, pds: &PdsPublisher) -> Result<WorkerOutcome> {
         if self
@@ -154,6 +191,12 @@ async fn accept(
     Json(intent): Json<PublicationIntent>,
 ) -> std::result::Result<Json<Acceptance>, StatusCode> {
     let publisher = server.authenticate(&headers)?;
+    if server.expertise_enabled
+        && let PublicationRecord::Membership { member, .. } = &intent.envelope.record
+        && !server.credentials.iter().any(|(_, id)| id == member)
+    {
+        return Err(StatusCode::FORBIDDEN);
+    }
     if intent.envelope.schema_version == mem_federation::expertise::EXPERTISE_SCHEMA_VERSION
         && !server.expertise_enabled
     {
@@ -173,6 +216,78 @@ async fn accept(
         .await
         .map(Json)
         .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)
+}
+
+async fn expertise(
+    State(server): State<Arc<GatewayServer>>,
+    headers: HeaderMap,
+    Json(request): Json<ExpertiseRpc>,
+) -> std::result::Result<Json<SignedExpertiseReply>, StatusCode> {
+    let actor = server.authenticate(&headers)?;
+    request.digest().map_err(|_| StatusCode::BAD_REQUEST)?;
+    let store = &server.store;
+    let fence = server.fence;
+    let reply = match &request.operation {
+        ExpertiseOperation::Discover { after, limit } => ExpertiseReply::Capabilities(
+            store
+                .expertise_capabilities(fence, actor, *after, *limit)
+                .await
+                .map_err(expertise_error)?,
+        ),
+        ExpertiseOperation::Submit { question } => {
+            // Optional synthesis remains disabled until the origin restricted
+            // model path and operator-bound budgets are integrated and tested.
+            if question.mode != mem_federation::expertise::AnswerMode::Deterministic {
+                return Err(StatusCode::FORBIDDEN);
+            }
+            ExpertiseReply::Question(Box::new(
+                store
+                    .submit_question(fence, actor, question)
+                    .await
+                    .map_err(expertise_error)?,
+            ))
+        }
+        ExpertiseOperation::Result { request_id } => ExpertiseReply::Question(Box::new(
+            store
+                .question_result(fence, actor, *request_id)
+                .await
+                .map_err(expertise_error)?,
+        )),
+        ExpertiseOperation::Claim => ExpertiseReply::Lease(
+            store
+                .claim_question(fence, actor)
+                .await
+                .map_err(expertise_error)?
+                .map(Box::new),
+        ),
+        ExpertiseOperation::Renew { lease } => ExpertiseReply::Renewed(
+            store
+                .renew_question(fence, actor, lease)
+                .await
+                .map_err(expertise_error)?,
+        ),
+        ExpertiseOperation::Complete { lease, answer } => {
+            store
+                .complete_question(fence, actor, lease, answer)
+                .await
+                .map_err(expertise_error)?;
+            ExpertiseReply::Completed
+        }
+    };
+    server
+        .security
+        .sign_expertise(&request, actor, server.space, server.authority, reply)
+        .map(Json)
+        .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)
+}
+fn expertise_error(error: mem_federation_store::StoreError) -> StatusCode {
+    use mem_federation_store::StoreError;
+    match error {
+        StoreError::Expertise(_) | StoreError::Binding => StatusCode::FORBIDDEN,
+        StoreError::Limits => StatusCode::TOO_MANY_REQUESTS,
+        StoreError::LostLease => StatusCode::CONFLICT,
+        _ => StatusCode::SERVICE_UNAVAILABLE,
+    }
 }
 #[derive(Deserialize)]
 struct PullQuery {

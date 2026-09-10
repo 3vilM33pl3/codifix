@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-use crate::{Result, RuntimeError};
+use crate::{
+    ExpertiseClaims, ExpertiseReply, ExpertiseRpc, Result, RuntimeError, SignedExpertiseReply,
+};
+use chrono::Utc;
 use mem_atproto_verify::{DetachedSigner, DetachedVerifier};
 use mem_federation::{CanonicalJsonCodec, publication::*};
 use mem_federation_store::{
@@ -16,6 +19,37 @@ pub struct ReceiptTrust {
     verifiers: Vec<DetachedVerifier>,
 }
 impl ReceiptTrust {
+    pub(crate) fn verify_expertise(
+        &self,
+        signed: SignedExpertiseReply,
+        request: &ExpertiseRpc,
+        audience: InstanceId,
+        space: SpaceId,
+        authority: InstanceId,
+    ) -> Result<ExpertiseReply> {
+        let c = &signed.claims;
+        let now = Utc::now();
+        if c.purpose != request.operation.purpose()
+            || c.nonce != request.nonce
+            || c.operation_digest != request.digest()?
+            || c.audience != audience
+            || c.space != space
+            || c.authority != authority
+            || c.key_generation != self.keys.len() as u32
+            || c.issued_at > now
+            || c.expires_at <= now
+            || c.expires_at <= c.issued_at
+            || c.expires_at > c.issued_at + chrono::Duration::seconds(30)
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        self.verifiers
+            .last()
+            .ok_or(RuntimeError::Configuration)?
+            .verify(&canonical(c)?, &signed.signature)
+            .map_err(|_| RuntimeError::InvalidResponse)?;
+        Ok(signed.claims.reply)
+    }
     pub fn new(keys: Vec<ReceiptKey>) -> Result<Self> {
         validate_key_schedule(&keys)?;
         let verifiers = keys
@@ -100,6 +134,43 @@ pub struct GatewaySecurity {
     policy: SpacePolicy,
 }
 impl GatewaySecurity {
+    pub(crate) fn sign_expertise(
+        &self,
+        request: &ExpertiseRpc,
+        audience: InstanceId,
+        space: SpaceId,
+        authority: InstanceId,
+        reply: ExpertiseReply,
+    ) -> Result<SignedExpertiseReply> {
+        let now = Utc::now();
+        let expires_at = match &reply {
+            ExpertiseReply::Lease(Some(lease)) => lease.lease_until,
+            ExpertiseReply::Renewed(until) => *until,
+            ExpertiseReply::Question(result) if result.answer.is_some() => result.payload_until,
+            _ => now + chrono::Duration::seconds(30),
+        }
+        .min(now + chrono::Duration::seconds(30));
+        if expires_at <= now {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        let claims = ExpertiseClaims {
+            purpose: request.operation.purpose().into(),
+            nonce: request.nonce,
+            operation_digest: request.digest()?,
+            audience,
+            space,
+            authority,
+            key_generation: self.generation(),
+            issued_at: now,
+            expires_at,
+            reply,
+        };
+        let signature = self
+            .signer
+            .sign(&canonical(&claims)?)
+            .map_err(|_| RuntimeError::InvalidResponse)?;
+        Ok(SignedExpertiseReply { claims, signature })
+    }
     /// Explicit fresh-space bootstrap helper; never used to learn a remote key.
     pub fn initial(secret: &[u8], policy: SpacePolicy) -> Result<Self> {
         let key = DetachedSigner::from_secret(secret)
@@ -194,6 +265,106 @@ pub struct SignedPage {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    #[test]
+    fn private_replies_bind_operation_audience_nonce_and_expiry() {
+        use crate::{ExpertiseOperation, ExpertiseReply, ExpertiseRpc};
+        let security = GatewaySecurity::initial(&[9; 32], SpacePolicy::default()).unwrap();
+        let trust = security.trust();
+        let space = SpaceId::new(Uuid::new_v4()).unwrap();
+        let authority = InstanceId::new(Uuid::new_v4()).unwrap();
+        let audience = InstanceId::new(Uuid::new_v4()).unwrap();
+        let request = ExpertiseRpc {
+            nonce: Uuid::new_v4(),
+            operation: ExpertiseOperation::Claim,
+        };
+        let signed = || {
+            security
+                .sign_expertise(
+                    &request,
+                    audience,
+                    space,
+                    authority,
+                    ExpertiseReply::Lease(None),
+                )
+                .unwrap()
+        };
+        trust
+            .verify_expertise(signed(), &request, audience, space, authority)
+            .unwrap();
+        let mut replay = request.clone();
+        replay.nonce = Uuid::new_v4();
+        assert!(
+            trust
+                .verify_expertise(signed(), &replay, audience, space, authority)
+                .is_err()
+        );
+        let mut operation = request.clone();
+        operation.operation = ExpertiseOperation::Result {
+            request_id: Uuid::new_v4(),
+        };
+        assert!(
+            trust
+                .verify_expertise(signed(), &operation, audience, space, authority)
+                .is_err()
+        );
+        assert!(
+            trust
+                .verify_expertise(signed(), &request, authority, space, authority)
+                .is_err()
+        );
+        assert!(
+            trust
+                .verify_expertise(signed(), &request, audience, space, audience)
+                .is_err()
+        );
+        assert!(
+            trust
+                .verify_expertise(
+                    signed(),
+                    &request,
+                    audience,
+                    SpaceId::new(Uuid::new_v4()).unwrap(),
+                    authority
+                )
+                .is_err()
+        );
+        // Even correctly signed responses cannot authorize stale, future-dated,
+        // overlong, cross-purpose or old-key replies.
+        for mutate in [
+            (|c: &mut ExpertiseClaims| c.purpose = "memory-pull-page-v1".into())
+                as fn(&mut ExpertiseClaims),
+            |c| c.expires_at = Utc::now() - chrono::Duration::seconds(1),
+            |c| c.issued_at = Utc::now() + chrono::Duration::seconds(1),
+            |c| c.expires_at = c.issued_at + chrono::Duration::seconds(31),
+            |c| c.key_generation = 0,
+        ] {
+            let mut bad = signed();
+            mutate(&mut bad.claims);
+            bad.signature = security
+                .signer
+                .sign(&canonical(&bad.claims).unwrap())
+                .unwrap();
+            assert!(
+                trust
+                    .verify_expertise(bad, &request, audience, space, authority)
+                    .is_err()
+            );
+        }
+        let mut changed = signed();
+        changed.claims.reply = ExpertiseReply::Completed;
+        assert!(
+            trust
+                .verify_expertise(changed, &request, audience, space, authority)
+                .is_err()
+        );
+        let wrong_key = GatewaySecurity::initial(&[10; 32], SpacePolicy::default()).unwrap();
+        assert!(
+            wrong_key
+                .trust()
+                .verify_expertise(signed(), &request, audience, space, authority)
+                .is_err()
+        );
+    }
     #[test]
     fn fresh_pages_cannot_be_replayed_rebound_or_modified() {
         let security = GatewaySecurity::initial(&[3; 32], SpacePolicy::default()).unwrap();

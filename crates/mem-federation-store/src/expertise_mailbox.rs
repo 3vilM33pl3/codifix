@@ -2,7 +2,9 @@
 //! In-process addressed Q&A storage, not authentication or a public router.
 use crate::{GatewayStore, Result, SpacePolicy, StoreError, WriterFence};
 use chrono::{DateTime, Utc};
-use mem_federation::{CanonicalJsonCodec, ContentDigest, expertise::*, publication::*};
+use mem_federation::{
+    CanonicalJsonCodec, ContentDigest, SpaceCapability, expertise::*, publication::*,
+};
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Row, Transaction, postgres::PgRow, types::Json};
 use uuid::Uuid;
@@ -140,6 +142,70 @@ async fn set_status(
     .await
 }
 impl GatewayStore {
+    /// Only metadata authorized for this requester; current revocations and
+    /// unpublished advertisement changes hide a capability immediately.
+    pub async fn expertise_capabilities(
+        &self,
+        fence: WriterFence,
+        authenticated: InstanceId,
+        after: Option<RecordKey>,
+        limit: u32,
+    ) -> Result<Vec<CapabilityAdvertisement>> {
+        if !(1..=32).contains(&limit) {
+            return Err(StoreError::Limits);
+        }
+        let mut tx = self.pool.begin().await?;
+        let authority = self.lock(&mut tx, fence).await?;
+        let state = self.load(&mut tx, fence.space, authority).await?;
+        if !state.has_capability(authenticated, SpaceCapability::Pull)
+            || !state.has_capability(authenticated, SpaceCapability::AskExpertise)
+        {
+            return Err(StoreError::Expertise(ExpertiseReject::Unauthorized));
+        }
+        let published: i64 = sqlx::query_scalar(
+            "SELECT published_sequence FROM federation_gateway_spaces WHERE space=$1",
+        )
+        .bind(fence.space.as_uuid())
+        .fetch_one(&mut *tx)
+        .await?;
+        let mut ads: Vec<_> = state.expertise_catalog().filter(|ad| {
+            ad.active && ad.requesters.contains(&authenticated)
+                && after.is_none_or(|after| ad.key() > after)
+                && state.has_capability(ad.owner, SpaceCapability::Pull)
+                && state.has_capability(ad.owner, SpaceCapability::AnswerExpertise)
+                && state.accepted().iter().rev().find(|d| {
+                    matches!(&d.envelope.record, PublicationRecord::Expertise(a) if a.key()==ad.key())
+                }).is_some_and(|d| i64::from(d.sequence.get()) <= published)
+        }).cloned().collect();
+        ads.sort_by_key(CapabilityAdvertisement::key);
+        ads.truncate(limit as usize);
+        tx.commit().await?;
+        Ok(ads)
+    }
+
+    /// Administrator supplied compatibility inventory, never remote discovery.
+    /// Every current publisher/member (including the authority) must be pinned.
+    pub async fn require_expertise_fleet(
+        &self,
+        fence: WriterFence,
+        compatible: &std::collections::BTreeSet<InstanceId>,
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        let authority = self.lock(&mut tx, fence).await?;
+        let state = self.load(&mut tx, fence.space, authority).await?;
+        if !compatible.contains(&authority)
+            || state.accepted().iter().any(|d| {
+                !compatible.contains(&d.envelope.publisher)
+                    || matches!(&d.envelope.record, PublicationRecord::Membership { member, .. }
+                    if !compatible.contains(member))
+            })
+        {
+            return Err(StoreError::Binding);
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
     async fn question_policy(
         &self,
         tx: &mut Transaction<'_, Postgres>,

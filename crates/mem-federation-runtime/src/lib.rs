@@ -3,9 +3,11 @@
 //! automatic enrollment. Configure independently operated nodes explicitly.
 mod config;
 mod context;
+mod expertise_transport;
 mod gateway;
 pub use config::*;
 pub use context::*;
+pub use expertise_transport::*;
 mod http;
 mod pds;
 mod security;

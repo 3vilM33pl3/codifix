@@ -9,8 +9,8 @@ use sqlx::{PgPool, Row, types::Json};
 
 #[derive(Clone)]
 pub struct GatewayClient {
-    endpoint: Endpoint,
-    token: String,
+    pub(crate) endpoint: Endpoint,
+    pub(crate) token: String,
     pub(crate) space: SpaceId,
     pub(crate) authority: InstanceId,
     pub(crate) trust: ReceiptTrust,
@@ -150,7 +150,7 @@ impl GatewayClient {
             .await?)
     }
 }
-fn check_status(status: reqwest::StatusCode) -> Result<()> {
+pub(crate) fn check_status(status: reqwest::StatusCode) -> Result<()> {
     if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
         Err(RuntimeError::Unauthorized)
     } else if status.is_success() {
