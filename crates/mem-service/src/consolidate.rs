@@ -41,17 +41,8 @@ struct ThemesResponse {
     themes: Vec<String>,
 }
 
-/// Two-step synthesis (extract themes, then synthesize) with an
-/// anti-hallucination guard: the returned `cited_member_ids` are intersected
-/// with the ids actually shown, and a synthesis that cites none of them is
-/// rejected.
-pub(crate) async fn synthesize_consolidation(
-    state: &AppState,
-    project: &str,
-    members: &[ClusterMember],
-) -> Result<ConsolidationSynthesis> {
-    let shown: Vec<Uuid> = members.iter().map(|m| m.canonical_id).collect();
-    let member_block = members
+fn member_block(members: &[ClusterMember]) -> String {
+    members
         .iter()
         .map(|m| {
             format!(
@@ -62,8 +53,17 @@ pub(crate) async fn synthesize_consolidation(
             )
         })
         .collect::<Vec<_>>()
-        .join("\n\n");
+        .join("\n\n")
+}
 
+/// A separately cacheable provider step. The durable worker owns the cache
+/// and rechecks policy/source versions before requesting the second step.
+pub(crate) async fn extract_consolidation_themes(
+    state: &AppState,
+    project: &str,
+    members: &[ClusterMember],
+) -> Result<Vec<String>> {
+    let member_block = member_block(members);
     let themes = call_llm_strict_json(
         state,
         &LlmStrictJsonRequest {
@@ -78,10 +78,23 @@ pub(crate) async fn synthesize_consolidation(
     .await?;
     let themes: ThemesResponse =
         serde_json::from_str(&themes.content).unwrap_or(ThemesResponse { themes: Vec::new() });
-    let theme_hint = if themes.themes.is_empty() {
+    Ok(themes.themes)
+}
+
+/// Anti-hallucination guard is unchanged: intersect returned citations with
+/// shown member IDs and reject synthesis that cites none of them.
+async fn synthesize_consolidation(
+    state: &AppState,
+    project: &str,
+    members: &[ClusterMember],
+    themes: &[String],
+) -> Result<ConsolidationSynthesis> {
+    let shown: Vec<Uuid> = members.iter().map(|m| m.canonical_id).collect();
+    let member_block = member_block(members);
+    let theme_hint = if themes.is_empty() {
         String::new()
     } else {
-        format!("Candidate themes: {}\n\n", themes.themes.join("; "))
+        format!("Candidate themes: {}\n\n", themes.join("; "))
     };
 
     let subject = format!("Consolidate {} memories", members.len());
@@ -131,15 +144,16 @@ pub(crate) async fn synthesize_consolidation(
 
 /// Provider work is separate from proposal persistence. The LLM helper still
 /// records provider-attempt audits; it does not publish a derived proposal.
-/// A future durable worker must pin/revalidate source versions and current
-/// policy, then use proposal_creation::create_tx inside its result fence.
+/// The durable worker pins/revalidates source versions and current policy,
+/// then uses proposal_creation::create_tx inside its result fence.
 pub(crate) async fn prepare_consolidation_proposal(
     state: &AppState,
     project: &str,
     run_id: Option<Uuid>,
     cluster: &AcceptedCluster,
+    themes: &[String],
 ) -> Result<LoopMemoryProposalCreateRequest> {
-    let synthesis = synthesize_consolidation(state, project, &cluster.members).await?;
+    let synthesis = synthesize_consolidation(state, project, &cluster.members, themes).await?;
 
     // Tensions, gaps, and refactors are folded into the stored text so they
     // surface on retrieval, and duplicated in tags for filtering.

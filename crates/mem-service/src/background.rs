@@ -745,6 +745,43 @@ async fn synthesis(state: &AppState, pool: &PgPool, lease: &JobLease, project: &
             .execute(&mut **result.transaction())
             .await?;
         jobs::checkpoint_result(result).await?;
+        let themes: Vec<String> = if let Some(themes) =
+            cached(pool, lease, "themes", &config).await?
+        {
+            themes
+        } else {
+            let themes =
+                crate::consolidate::extract_consolidation_themes(state, project, &cluster.members)
+                    .await?;
+            let mut result = authorized(state, pool, lease).await?;
+            revalidate(&mut result, lease, &cluster).await?;
+            cache(&mut result, lease, "themes", &config, &themes).await?;
+            sqlx::query("UPDATE background_job_attempts SET uncertain=false WHERE token=$1")
+                .bind(lease.token)
+                .execute(&mut **result.transaction())
+                .await?;
+            jobs::checkpoint_result(result).await?;
+            themes
+        };
+        // The first successful provider output survives a failure in the
+        // second call; no locks are held over either external request.
+        let mut result = authorized(state, pool, lease).await?;
+        revalidate(&mut result, lease, &cluster).await?;
+        if utility_suppressed_tx(
+            result.transaction(),
+            lease.job.project_id,
+            &state.config.procedural,
+        )
+        .await?
+        {
+            drop(result);
+            return skip(state, pool, lease, JobReason::UtilityFloor).await;
+        }
+        sqlx::query("UPDATE background_job_attempts SET uncertain=true WHERE token=$1")
+            .bind(lease.token)
+            .execute(&mut **result.transaction())
+            .await?;
+        jobs::checkpoint_result(result).await?;
         let request = crate::consolidate::prepare_consolidation_proposal(
             state,
             project,
@@ -754,12 +791,17 @@ async fn synthesis(state: &AppState, pool: &PgPool, lease: &JobLease, project: &
                 .and_then(Value::as_str)
                 .and_then(|id| Uuid::parse_str(id).ok()),
             &cluster,
+            &themes,
         )
         .await
         .context("prepare durable synthesis")?;
         let mut result = authorized(state, pool, lease).await?;
         revalidate(&mut result, lease, &cluster).await?;
         cache(&mut result, lease, "synthesis", &config, &request).await?;
+        sqlx::query("UPDATE background_job_attempts SET uncertain=false WHERE token=$1")
+            .bind(lease.token)
+            .execute(&mut **result.transaction())
+            .await?;
         jobs::checkpoint_result(result).await?;
         request
     };

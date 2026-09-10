@@ -29,6 +29,34 @@ async fn embed(State(fake): State<Fake>, Json(body): Json<Value>) -> (StatusCode
     )
 }
 
+async fn chat(State(fake): State<Fake>, Json(body): Json<Value>) -> (StatusCode, Json<Value>) {
+    let call = fake.calls.fetch_add(1, Ordering::SeqCst);
+    if fake.mode == 5 && call == 0 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    if fake.mode == 4 && call == 1 {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"error":"synthetic second step failure"})),
+        );
+    }
+    let system = body["messages"][0]["content"].as_str().unwrap();
+    let content = if system.contains("extract") || system.contains("find what unifies") {
+        serde_json::json!({"themes":["durable work"]})
+    } else {
+        let input = body["messages"][1]["content"].as_str().unwrap();
+        let id = input
+            .lines()
+            .find_map(|line| line.strip_prefix("id: "))
+            .unwrap();
+        serde_json::json!({"theme":"durable work","meta_summary":"Synthetic consolidation","meta_text":"Synthetic grounded consolidation.","cited_member_ids":[id]})
+    };
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"choices":[{"message":{"content":content.to_string()}}]})),
+    )
+}
+
 struct Fixture {
     admin: PgPool,
     database: String,
@@ -69,6 +97,7 @@ impl Fixture {
         };
         let app = Router::new()
             .route("/v1/embeddings", post(embed))
+            .route("/v1/chat/completions", post(chat))
             .with_state(fake.clone());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -78,8 +107,9 @@ impl Fixture {
         let config=serde_json::from_value(serde_json::json!({
             "service":{"bind_addr":"127.0.0.1:0","api_token":"fixture-only"},
             "database":{"url":database_url.as_str()},
-            "offline":{"enabled":false},"cluster":{"enabled":false},"reinforcement":{"enabled":false},"consolidation":{"enabled":false},
+            "offline":{"enabled":false},"cluster":{"enabled":false,"service_id":"background-test"},"reinforcement":{"enabled":false},"consolidation":{"enabled":false},
             "embeddings":{"create_enabled":true,"backends":[{"name":"fixture","provider":"ollama","base_url":format!("http://{addr}/v1"),"model":"fixture","create_enabled":true}]},
+            "llm":{"provider":"ollama","base_url":format!("http://{addr}/v1"),"model":"fixture"},
             "background_work":{"poll_seconds":1,"lease_seconds":4,"renewal_seconds":1,"initial_delay_seconds":1,"max_delay_seconds":2,"max_attempts":2},
             "mcp":{"enabled":false}
         })).unwrap();
@@ -112,6 +142,54 @@ impl Fixture {
         .unwrap();
         tx.commit().await.unwrap();
         work.job_ids[0]
+    }
+    async fn enqueue_synthesis(&mut self) -> Uuid {
+        self.state.config.consolidation.enabled = true;
+        self.state.config.consolidation.auto_trigger = true;
+        self.state.config.consolidation.dry_run = false;
+        self.state.config.consolidation.daily_cap = 5;
+        let id = Uuid::new_v4();
+        let cluster = AcceptedCluster {
+            members: vec![crate::repository::handlers::consolidation::ClusterMember {
+                version_id: self.versions[0],
+                canonical_id: self.versions[0],
+                summary: "Durable input".into(),
+                canonical_text: "Durable input.".into(),
+                memory_type: "implementation".into(),
+                activation: 0.5,
+            }],
+            size: 1,
+            intra_density: 1.0,
+            coaccess_mass: 0.0,
+            activation_mass: 0.5,
+            trigger: "fixture".into(),
+        };
+        let mut tx = self.pool.begin().await.unwrap();
+        jobs::enqueue(
+            &mut tx,
+            &NewJob {
+                id,
+                project_id: self.project,
+                operation_id: self.operation,
+                kind: JobKind::ConsolidationSynthesis,
+                work_key: id.to_string(),
+                actor: JobActor::System("local-curation".into()),
+                input: serde_json::json!({"version":1}),
+                dependencies: vec![],
+            },
+        )
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO background_synthesis_inputs(job_id,cluster_snapshot) VALUES($1,$2)",
+        )
+        .bind(id)
+        .bind(serde_json::to_value(cluster).unwrap())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        id
     }
     async fn wait(&self, id: Uuid, status: JobStatus) -> mem_record::JobDetail {
         tokio::time::timeout(Duration::from_secs(20), async {
@@ -178,6 +256,125 @@ async fn worker_retries_provider_failure_and_completes_independent_stages() {
             .unwrap();
     assert_eq!(count, 2); // reusable output and atomic version-completed marker
     drop(workers);
+    f.cleanup().await;
+}
+
+#[tokio::test]
+async fn synthesis_reuses_completed_theme_step_and_atomically_deduplicates_proposal() {
+    let Some(mut f) = Fixture::new(4).await else {
+        return;
+    };
+    let id = f.enqueue_synthesis().await;
+    let workers = start(f.state.clone()).unwrap();
+    let done = f.wait(id, JobStatus::Succeeded).await;
+    assert_eq!(done.job.attempts, 2);
+    assert_eq!(
+        f.fake.calls.load(Ordering::SeqCst),
+        3,
+        "themes must not be billed twice after synthesis fails"
+    );
+    assert!(
+        done.history
+            .iter()
+            .any(|a| a.failure == Some(Code::Transient) && a.uncertain)
+    );
+    assert!(
+        done.history
+            .iter()
+            .any(|a| a.outcome.as_deref() == Some("succeeded") && !a.uncertain)
+    );
+    let count: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM proposal_creation_receipts WHERE operation_id=$1")
+            .bind(id)
+            .fetch_one(&f.pool)
+            .await
+            .unwrap();
+    assert_eq!(count, 1);
+    let outputs: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM background_job_outputs WHERE job_id=$1")
+            .bind(id)
+            .fetch_one(&f.pool)
+            .await
+            .unwrap();
+    assert_eq!(outputs, 2);
+    drop(workers);
+    // Restarting after commit does not replay either provider or proposal.
+    let replacement = start(f.state.clone()).unwrap();
+    tokio::time::sleep(Duration::from_millis(1100)).await;
+    assert_eq!(f.fake.calls.load(Ordering::SeqCst), 3);
+    assert!(
+        jobs::claim(&f.pool, policy(&f.state))
+            .await
+            .unwrap()
+            .is_none()
+    );
+    drop(replacement);
+    f.cleanup().await;
+}
+
+#[tokio::test]
+async fn synthesis_rechecks_source_after_provider_and_retry_cannot_bypass_quota() {
+    let Some(mut f) = Fixture::new(5).await else {
+        return;
+    };
+    let id = f.enqueue_synthesis().await;
+    let workers = start(f.state.clone()).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while f.fake.calls.load(Ordering::SeqCst) == 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    sqlx::query("UPDATE memory_canonical_state SET status='archived' WHERE canonical_id=$1")
+        .bind(f.versions[0])
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    let done = f.wait(id, JobStatus::Blocked).await;
+    assert_eq!(done.job.last_failure, Some(Code::StaleInput));
+    assert_eq!(f.fake.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM background_job_outputs WHERE job_id=$1")
+            .bind(id)
+            .fetch_one(&f.pool)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM proposal_creation_receipts WHERE operation_id=$1"
+        )
+        .bind(id)
+        .fetch_one(&f.pool)
+        .await
+        .unwrap(),
+        0
+    );
+    drop(workers);
+    sqlx::query("UPDATE memory_canonical_state SET status='active' WHERE canonical_id=$1")
+        .bind(f.versions[0])
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    f.state.config.consolidation.daily_cap = 1; // first call consumed the day's budget
+    jobs::retry(
+        &f.pool,
+        f.project,
+        id,
+        Uuid::new_v4(),
+        &JobActor::System("local-curation".into()),
+    )
+    .await
+    .unwrap();
+    let replacement = start(f.state.clone()).unwrap();
+    let blocked = f.wait(id, JobStatus::Blocked).await;
+    assert_eq!(blocked.job.generation, 2);
+    assert_eq!(blocked.job.last_failure, Some(Code::Quota));
+    assert_eq!(f.fake.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(blocked.history.len(), 2);
+    drop(replacement);
     f.cleanup().await;
 }
 
