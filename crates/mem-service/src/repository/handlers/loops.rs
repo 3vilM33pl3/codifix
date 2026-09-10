@@ -14,6 +14,8 @@ use mem_record::{EffectiveLoopSettings, LoopActionKind};
 use serde_json::json;
 use std::path::PathBuf;
 
+#[cfg(test)]
+mod administration_tests;
 pub mod proposal_creation;
 pub mod proposal_decisions;
 
@@ -59,8 +61,14 @@ pub(crate) struct LoopContextPackQuery {
 }
 
 pub async fn register_builtin_loop_definitions(pool: &PgPool) -> Result<()> {
-    for definition in builtin_loop_definitions() {
-        validate_definition(&definition).map_err(|message| anyhow::anyhow!(message))?;
+    let definitions = builtin_loop_definitions();
+    let mut tx = pool.begin().await?;
+    // Serialize concurrent service startup registrations, including absent rows.
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('loop-definitions',0))")
+        .execute(&mut *tx)
+        .await?;
+    for definition in &definitions {
+        validate_definition(definition).map_err(|message| anyhow::anyhow!(message))?;
         let record = definition.to_record(chrono::Utc::now());
         sqlx::query(
             r#"
@@ -71,7 +79,7 @@ pub async fn register_builtin_loop_definitions(pool: &PgPool) -> Result<()> {
         )
         .bind(&record.loop_id)
         .bind(record.version)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .context("mark old loop definitions inactive")?;
 
@@ -106,10 +114,22 @@ pub async fn register_builtin_loop_definitions(pool: &PgPool) -> Result<()> {
         .bind(&record.policy_spec)
         .bind(&record.output_spec)
         .bind(record.created_at)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .context("upsert builtin loop definition")?;
     }
+    insert_loop_setting_audit(
+        &mut *tx,
+        None,
+        None,
+        "definitions_registered",
+        Some("internal:loop-registry"),
+        None,
+        json!({"count":definitions.len()}),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!(e.message))?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -237,7 +257,13 @@ pub(crate) async fn update_loop_settings(
             false
         }
     };
-    mutate_loop_setting(state, loop_id, request, requires_explicit_approval).await
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name,
+        source: "loop-setting".into(),
+        occurred_at: None,
+    };
+    mutate_loop_setting(state, loop_id, request, requires_explicit_approval, context).await
 }
 
 async fn mutate_loop_setting(
@@ -245,6 +271,7 @@ async fn mutate_loop_setting(
     loop_id: String,
     request: LoopSettingsUpdateRequest,
     requires_explicit_approval: bool,
+    context: mem_store::events::MutationContext,
 ) -> Result<Json<LoopSettingResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
 
@@ -272,32 +299,15 @@ async fn mutate_loop_setting(
         }));
     }
 
-    let setting = upsert_loop_setting(pool, &definition.loop_id, &scope, &request).await?;
-    if let Some(project) = setting.project.clone() {
-        notify_project_changed(
-            &state,
-            project,
-            None,
-            ActivityKind::LoopSettingChanged,
-            format!(
-                "Loop {} setting changed by {}",
-                definition.loop_id,
-                request.updated_by.as_deref().unwrap_or("unknown")
-            ),
-            None,
-        );
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let (setting, receipt) =
+        store_loop_setting_tx(&mut tx, &definition.loop_id, &scope, &request, &context).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    if let Some((event, sequence)) = receipt
+        && let Some(project) = setting.project.clone()
+    {
+        crate::repository::events::broadcast_committed(&state, project, event, sequence);
     }
-    insert_loop_setting_audit(
-        pool,
-        Some(&definition.loop_id),
-        Some(&setting),
-        "setting_update",
-        request.updated_by.as_deref(),
-        request.reason.as_deref(),
-        serde_json::to_value(&setting)
-            .map_err(|error| ApiError::io(anyhow::anyhow!("serialize loop setting: {error}")))?,
-    )
-    .await?;
     let effective_settings = load_effective_loop_settings(
         pool,
         &definition,
@@ -744,6 +754,16 @@ async fn store_loop_global_state(
     pool: &PgPool,
     request: &LoopGlobalStateUpdateRequest,
 ) -> Result<LoopGlobalStateResponse, ApiError> {
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let result = store_loop_global_state_tx(&mut tx, request).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(result)
+}
+
+async fn store_loop_global_state_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    request: &LoopGlobalStateUpdateRequest,
+) -> Result<LoopGlobalStateResponse, ApiError> {
     let row = sqlx::query(
         r#"
         UPDATE loop_global_state
@@ -758,7 +778,7 @@ async fn store_loop_global_state(
     .bind(request.kill_switch_enabled)
     .bind(&request.updated_by)
     .bind(&request.reason)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
     let response = LoopGlobalStateResponse {
@@ -768,7 +788,7 @@ async fn store_loop_global_state(
         updated_at: row.try_get("updated_at").map_err(ApiError::sql)?,
     };
     insert_loop_setting_audit(
-        pool,
+        &mut **tx,
         None,
         None,
         "global_kill_switch_update",
@@ -788,6 +808,48 @@ struct ResolvedLoopScope {
     project: Option<String>,
     project_id: Option<Uuid>,
     repo_root: Option<String>,
+}
+
+async fn store_loop_setting_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    loop_id: &str,
+    scope: &ResolvedLoopScope,
+    request: &LoopSettingsUpdateRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<
+    (
+        LoopSettingRecord,
+        Option<(mem_store::events::TimelineEvent, i64)>,
+    ),
+    ApiError,
+> {
+    let setting = upsert_loop_setting(&mut **tx, loop_id, scope, request).await?;
+    insert_loop_setting_audit(
+        &mut **tx,
+        Some(loop_id),
+        Some(&setting),
+        "setting_update",
+        Some(&context.actor_id),
+        request.reason.as_deref(),
+        json!({"setting_id":setting.id,"enabled":setting.enabled,"mode":setting.mode}),
+    )
+    .await?;
+    let receipt = if let Some(project_id) = scope.project_id {
+        let mut event = mem_store::events::TimelineEvent::new(
+            project_id,
+            ActivityKind::LoopSettingChanged,
+            format!("Loop {loop_id} setting changed"),
+        );
+        event.operation_id = Some(setting.id.to_string());
+        context.stamp(&mut event);
+        let seq = mem_store::events::append(tx, &event)
+            .await
+            .map_err(|e| ApiError::io(e.into()))?;
+        Some((event, seq))
+    } else {
+        None
+    };
+    Ok((setting, receipt))
 }
 
 async fn resolve_loop_scope(
@@ -824,8 +886,8 @@ async fn resolve_loop_scope(
     })
 }
 
-async fn upsert_loop_setting(
-    pool: &PgPool,
+async fn upsert_loop_setting<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     loop_id: &str,
     scope: &ResolvedLoopScope,
     request: &LoopSettingsUpdateRequest,
@@ -873,7 +935,7 @@ async fn upsert_loop_setting(
     .bind(request.snoozed_until)
     .bind(&request.updated_by)
     .bind(&request.reason)
-    .fetch_one(pool)
+    .fetch_one(executor)
     .await
     .map_err(ApiError::sql)?;
     row_to_loop_setting(row)
@@ -1003,8 +1065,8 @@ async fn create_loop_run_approval(
     row_to_loop_approval(row)
 }
 
-async fn insert_loop_setting_audit(
-    pool: &PgPool,
+async fn insert_loop_setting_audit<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     loop_id: Option<&str>,
     setting: Option<&LoopSettingRecord>,
     action: &str,
@@ -1030,7 +1092,7 @@ async fn insert_loop_setting_audit(
     .bind(actor)
     .bind(reason)
     .bind(payload)
-    .execute(pool)
+    .execute(executor)
     .await
     .map_err(ApiError::sql)?;
     Ok(())
