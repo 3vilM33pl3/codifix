@@ -80,7 +80,9 @@ pub(crate) async fn list(
         page,
         stats,
         worker: JobWorkerHealth {
-            enabled: state.config.background_work.enabled && !state.config.service.read_only,
+            enabled: state.is_primary()
+                && state.config.background_work.enabled
+                && !state.config.service.read_only,
             last_poll_at: (last > 0).then_some(last),
         },
     }))

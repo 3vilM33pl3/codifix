@@ -65,22 +65,36 @@ pub(crate) fn start(state: AppState) -> Option<Workers> {
             let Ok(pool) = state.pool() else {
                 continue;
             };
+            // A live supervisor is not evidence that database recovery works.
+            // When full, probe storage; otherwise only successful claims count.
+            let mut healthy = if active.len() >= state.config.background_work.concurrent_projects {
+                sqlx::query("SELECT 1").execute(&pool).await.is_ok()
+            } else {
+                false
+            };
             while active.len() < state.config.background_work.concurrent_projects {
                 match jobs::claim(&pool, policy(&state)).await {
                     Ok(Some(lease)) => {
+                        healthy = true;
                         active.spawn(run_lease(state.clone(), pool.clone(), lease));
                     }
-                    Ok(None) => break,
+                    Ok(None) => {
+                        healthy = true;
+                        break;
+                    }
                     Err(_) => {
+                        healthy = false;
                         tracing::warn!("background claim unavailable; polling will recover");
                         break;
                     }
                 }
             }
-            state
-                .background
-                .last_poll
-                .store(chrono::Utc::now().timestamp(), Ordering::Relaxed);
+            if healthy {
+                state
+                    .background
+                    .last_poll
+                    .store(chrono::Utc::now().timestamp(), Ordering::Relaxed);
+            }
         }
     })))
 }
@@ -397,6 +411,10 @@ async fn embedding(
         }
         jobs::checkpoint_result(authorized(state, pool, lease).await?).await?;
         let key = version.to_string();
+        let applied_key = format!("applied:{key}");
+        if cached::<bool>(pool, lease, &applied_key, &config).await? == Some(true) {
+            continue;
+        }
         let output = if let Some(output) =
             cached::<mem_search::rebuild::PreparedMemoryChunks>(pool, lease, &key, &config).await?
         {
@@ -418,6 +436,7 @@ async fn embedding(
             return Err(fail(Code::Configuration));
         }
         mem_search::rebuild::apply(result.transaction(), &output).await?;
+        cache(&mut result, lease, &applied_key, &config, &true).await?;
         event(
             &mut result,
             lease,
@@ -648,6 +667,27 @@ async fn revalidate(
     Ok(())
 }
 
+async fn utility_suppressed_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project: Uuid,
+    config: &mem_config::ProceduralConfig,
+) -> Result<bool> {
+    if !config.enabled || !config.utility_floor_enabled {
+        return Ok(false);
+    }
+    // Same key as the reward writer, including an absent row. Keep this shared
+    // policy lock through result commit; a new reward cannot invalidate a check.
+    sqlx::query("SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))")
+        .bind(format!(
+            "utility:{project}:loop:{}",
+            mem_loops::LOOP_MEMORY_CONSOLIDATION
+        ))
+        .execute(&mut **tx)
+        .await?;
+    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM procedural_utility WHERE project_id=$1 AND producer_kind='loop' AND producer_id=$2 AND update_count >= $3 AND utility < $4)")
+        .bind(project).bind(mem_loops::LOOP_MEMORY_CONSOLIDATION).bind(config.min_samples).bind(config.utility_floor).fetch_one(&mut **tx).await?)
+}
+
 async fn synthesis(state: &AppState, pool: &PgPool, lease: &JobLease, project: &str) -> Result<()> {
     let cfg = &state.config.consolidation;
     let manual = lease.input.get("manual").and_then(Value::as_bool) == Some(true);
@@ -675,14 +715,15 @@ async fn synthesis(state: &AppState, pool: &PgPool, lease: &JobLease, project: &
     } else {
         let mut result = authorized(state, pool, lease).await?;
         revalidate(&mut result, lease, &cluster).await?;
-        let procedural = &state.config.procedural;
-        if procedural.enabled && procedural.utility_floor_enabled {
-            let suppressed:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM procedural_utility WHERE project_id=$1 AND producer_id=$2 AND update_count >= $3 AND utility < $4)")
-                .bind(lease.job.project_id).bind(mem_loops::LOOP_MEMORY_CONSOLIDATION).bind(procedural.min_samples).bind(procedural.utility_floor).fetch_one(&mut **result.transaction()).await?;
-            if suppressed {
-                drop(result);
-                return skip(state, pool, lease, JobReason::UtilityFloor).await;
-            }
+        if utility_suppressed_tx(
+            result.transaction(),
+            lease.job.project_id,
+            &state.config.procedural,
+        )
+        .await?
+        {
+            drop(result);
+            return skip(state, pool, lease, JobReason::UtilityFloor).await;
         }
         let reserved:Option<i32>=sqlx::query_scalar("INSERT INTO background_daily_budget(project_id,day,attempts) SELECT $1,(clock_timestamp() AT TIME ZONE 'UTC')::date,1 WHERE $2>0 ON CONFLICT(project_id,day) DO UPDATE SET attempts=background_daily_budget.attempts+1 WHERE background_daily_budget.attempts<$2 RETURNING attempts")
             .bind(lease.job.project_id).bind(i32::try_from(cfg.daily_cap).map_err(|_|fail(Code::Configuration))?).fetch_optional(&mut **result.transaction()).await?;
@@ -714,14 +755,15 @@ async fn synthesis(state: &AppState, pool: &PgPool, lease: &JobLease, project: &
     };
     let mut result = authorized(state, pool, lease).await?;
     revalidate(&mut result, lease, &cluster).await?;
-    let procedural = &state.config.procedural;
-    if procedural.enabled && procedural.utility_floor_enabled {
-        let suppressed: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM procedural_utility WHERE project_id=$1 AND producer_id=$2 AND update_count >= $3 AND utility < $4)")
-            .bind(lease.job.project_id).bind(mem_loops::LOOP_MEMORY_CONSOLIDATION).bind(procedural.min_samples).bind(procedural.utility_floor).fetch_one(&mut **result.transaction()).await?;
-        if suppressed {
-            drop(result);
-            return skip(state, pool, lease, JobReason::UtilityFloor).await;
-        }
+    if utility_suppressed_tx(
+        result.transaction(),
+        lease.job.project_id,
+        &state.config.procedural,
+    )
+    .await?
+    {
+        drop(result);
+        return skip(state, pool, lease, JobReason::UtilityFloor).await;
     }
     sqlx::query("UPDATE background_job_attempts SET uncertain=false WHERE token=$1")
         .bind(lease.token)
