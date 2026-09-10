@@ -85,7 +85,10 @@ items and no remaining items for the explicit R1 thread and local contract.
 Verification was read-only (`--dry-run`); it did not archive the wider roadmap
 or invoke dev-service curation. That service has paid embedding creation enabled,
 so automatic completion curation was deliberately not invoked. Repository
-evidence and the completion checkpoint remain the source of truth.
+evidence and the completion checkpoint remain the source of truth. A capture-only
+implementation record was saved in dev Memory as
+`2be6467e-6346-4b1a-b8c9-40b4b8d7ee16`; curation and archival of the old scoped
+plan memory remain pending, not silently reported as completed bookkeeping.
 
 R1 completes engineering, not customer DR, rollout approval, held-out answer
 quality or F eligibility. Native Spaces, signatures/identity recovery,
