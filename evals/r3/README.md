@@ -1,7 +1,14 @@
 # R3 engineering evaluation — implementation in progress
 
-This directory contains **draft** synthetic benchmark material, not results and
-not an approved held-out suite. No provider credentials are needed to build it.
+The existing generator produces **smoke tests**, not the official benchmark.
+They check the machinery, not Memory's product value. Generated manifests set
+`smoke_only = true`; older manifests without this field also default to smoke-only.
+Changing labels to reviewed cannot make them official evidence. No provider
+credentials are needed to build them.
+
+The replacement benchmark is being designed around
+[representative incident and repository workflows](representative-benchmark.md).
+Those designs are drafts, not implemented or approved fixtures.
 
 ```sh
 node evals/r3/build-review-pack.mjs target/memory-evals/r3-review

@@ -102,11 +102,18 @@ pub struct Manifest {
     pub seed: u64,
     pub repeats: usize,
     pub label_status: String,
+    /// Legacy and small diagnostic packs cannot establish product quality.
+    #[serde(default = "default_smoke_only")]
+    pub smoke_only: bool,
     pub model: Model,
     pub limits: Limits,
     pub reference_baseline: Option<Condition>,
     pub assets: Vec<Asset>,
     pub cases: Vec<Case>,
+}
+
+fn default_smoke_only() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -345,6 +352,9 @@ impl Manifest {
             digest(format!("{}:{}:{:?}:{}", self.seed, w.case_id, w.condition, w.repeat).as_bytes())
         });
         let mut readiness_errors = Vec::new();
+        if self.smoke_only {
+            readiness_errors.push("smoke-only dataset cannot be official product evidence".into());
+        }
         if self.label_status != "reviewed" {
             readiness_errors.push("labels require Olivier's approval".into());
         }

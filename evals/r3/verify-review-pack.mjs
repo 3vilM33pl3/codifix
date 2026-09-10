@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 const root = path.resolve(process.argv[2]);
 const manifest = JSON.parse(fs.readFileSync(path.join(root,'campaign.json'),'utf8'));
 assert.equal(manifest.label_status,'draft');
+assert.equal(manifest.smoke_only,true);
 for (const [track,split,count,clusters] of [['knowledge','development',40,10],['knowledge','held_out',100,25],['coding','development',4,4],['coding','held_out',12,12]]) {
   const rows = manifest.cases.filter(c=>c.track===track && c.split===split);
   assert.equal(rows.length,count); assert.equal(new Set(rows.map(c=>c.cluster)).size,clusters);

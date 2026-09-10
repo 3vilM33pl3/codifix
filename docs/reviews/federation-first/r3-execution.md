@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## Approved benchmark refinement
+
+The small original cases are now smoke-only, not proposed official evidence.
+The manifest defaults missing `smoke_only` to true so old draft packs also fail
+official authorization. New generator output explicitly sets it true. Merely
+approving labels cannot promote a smoke pack to product evidence.
+
+Replacement design: `evals/r3/representative-benchmark.md`. It specifies multi-
+document incident reasoning and multi-file repository maintenance, with positive
+and negative graders, distributed provenance and three-step regression tests.
+These are draft designs; complete replacement fixtures, labels and execution
+remain unfinished. Original counts and approval/spend gates are unchanged.
+Revised plan checkpoint: `d1934e30-d011-4dac-b5be-9055a832578a`.
+
 Status: implementation in progress; label approval and paid runs not authorized.
 Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
 `201e0e95-7691-4abc-924a-0cbe55ccc53b` (2026-09-10).

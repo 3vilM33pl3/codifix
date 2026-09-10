@@ -30,6 +30,7 @@ pub(super) fn fixture() -> Manifest {
         seed: 77,
         repeats: 3,
         label_status: "reviewed".into(),
+        smoke_only: false,
         model: Model {
             provider: "fake".into(),
             resolved_id: "fake-v1".into(),
@@ -203,6 +204,19 @@ fn draft_labels_or_changed_manifest_cannot_be_authorized() {
     m.label_status = "reviewed".into();
     m.seed += 1;
     assert!(m.authorize(Split::HeldOut, &a.approvals).is_err());
+}
+
+#[test]
+fn smoke_and_legacy_manifests_cannot_be_promoted_by_label_approval() {
+    let mut m = fixture();
+    m.smoke_only = true;
+    let a = artifact(&m);
+    assert!(m.authorize(Split::HeldOut, &a.approvals).is_err());
+    assert!(!report(&m, &a).unwrap().official_evidence);
+    let mut legacy = serde_json::to_value(fixture()).unwrap();
+    legacy.as_object_mut().unwrap().remove("smoke_only");
+    let legacy: Manifest = serde_json::from_value(legacy).unwrap();
+    assert!(legacy.smoke_only);
 }
 
 #[test]

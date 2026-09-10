@@ -102,7 +102,7 @@ write('configuration.json', { version: 1, semantic_time: semanticTime, service_r
   reinforcement_ranking: true, learning: false, source_chunk_characters: 1024,
   context_bytes: 32768, top_k: 8, warmup: 'identical preparation outside timing',
   labels: 'draft', driver_status: 'integration pending; no paid execution authorized' }, 'configuration');
-const manifest = { version: 1, name: 'r3-engineering-v1', semantic_time: semanticTime,
+const manifest = { version: 1, name: 'r3-engineering-smoke-v1', smoke_only: true, semantic_time: semanticTime,
   seed: 20260910, repeats: 3, label_status: 'draft',
   model: { provider: 'pending', resolved_id: 'pending', reasoning: 'pending', embedding_id: 'pending',
     max_input_tokens: 32768, max_output_tokens: 8192,
@@ -110,7 +110,7 @@ const manifest = { version: 1, name: 'r3-engineering-v1', semantic_time: semanti
   limits: { requests: 10000, tokens: 100000000, microusd: 0, task_seconds: 600 },
   reference_baseline: null, assets, cases };
 write('campaign.json', manifest);
-write('REVIEW.md', `# R3 draft benchmark review\n\nNOT APPROVED. No official or paid runs authorized.\n\n` +
+write('REVIEW.md', `# R3 smoke-test pack\n\nSMOKE ONLY. These cases test the harness, not Memory product value. No official or paid runs authorized.\n\n` +
   `Review public/sources for factual sufficiency, private/labels.json for expected facts, alternative wording and citation/refusal policy, and private/graders for coding acceptance tests.\n\n` +
   `Counts: 40 development + 100 held-out knowledge questions; 4 development + 12 held-out coding sequences, three steps each. Source scenarios and repository identities do not cross splits.\n\n` +
   `The benchmark creator necessarily sees labels. Execution agents must never receive private/. Further development must use development cases only.\n\n` +
