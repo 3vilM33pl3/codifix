@@ -70,3 +70,20 @@ cleanup command or treat it as the authoritative configuration.
 Other external-effect producers and interrupted loop/provider recovery remain
 tracked in the [R1 inventory](../../reviews/federation-first/r1-coverage.md).
 This slice is not the completed R1 gate or a disaster-recovery demonstration.
+
+## Foreground ownership primitive
+
+Migration 0046 and `mem_store::executions` distinguish a disconnected foreground
+executor from one still running in another process. A dedicated PostgreSQL
+session holds an advisory lock; short result transactions check that ownership.
+Recovery acquires the same lock and commits interruption with domain failure
+state and its journal. It does not rerun a provider or command. Registration
+must commit with the domain run's start record; pre-cutover runs have no fabricated
+ownership records.
+
+This requires direct or session-pooled PostgreSQL connections, not a
+transaction-pooling proxy. Budget one additional connection per active
+foreground execution; owners do not consume transaction-pool slots. Tests kill
+only an owned session on disposable PostgreSQL and prove stale-result rollback,
+live-owner exclusion and atomic recovery. Domain integration remains tracked
+in the R1 inventory until its own tests pass.
