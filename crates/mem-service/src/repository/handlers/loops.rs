@@ -1045,7 +1045,10 @@ async fn create_loop_run_approval(
     proposed_action: serde_json::Value,
     risk_reason: &str,
     requester: Option<&str>,
+    context: &mem_store::events::MutationContext,
 ) -> Result<LoopApprovalRequestRecord, ApiError> {
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    run_persistence::fence_run_execution_tx(&mut tx, run_id, false).await?;
     let row = sqlx::query(
         r#"
         INSERT INTO approval_requests (
@@ -1069,10 +1072,13 @@ async fn create_loop_run_approval(
     .bind(proposed_action)
     .bind(risk_reason)
     .bind(requester)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
-    row_to_loop_approval(row)
+    let approval = row_to_loop_approval(row)?;
+    append_loop_trace_tx(&mut tx,run_id,"approval_requested","Approval requested",json!({"approval_id":approval.id,"action":action_type.as_str(),"actor_id":context.actor_id}),false).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(approval)
 }
 
 async fn insert_loop_setting_audit<'e, E: sqlx::PgExecutor<'e>>(
@@ -1773,6 +1779,7 @@ async fn create_control_plane_loop_run_with_trigger(
                 &definition.loop_id,
                 &effective.mode,
                 &context_pack,
+                &execution.context,
             )
             .await?;
             store_run_phase(
@@ -3934,6 +3941,7 @@ async fn emit_draft_pr_loop_report(
     loop_id: &str,
     mode: &LoopMode,
     context_pack: &LoopContextPackResponse,
+    context: &mem_store::events::MutationContext,
 ) -> Result<DraftPrResult, ApiError> {
     let project = request
         .project
@@ -3982,6 +3990,7 @@ async fn emit_draft_pr_loop_report(
             }),
             "Draft PR loop can write repo changes and requires approved low-risk issue scope.",
             request.reason.as_deref(),
+            context,
         )
         .await?;
         let output = json!({
@@ -4017,6 +4026,9 @@ async fn emit_draft_pr_loop_report(
         .as_deref()
         .ok_or_else(|| ApiError::validation(ValidationError::new("repo_root is required")))?;
     let manager = WorktreeSandboxManager::default();
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    run_persistence::fence_run_execution_tx(&mut tx, run_id, false).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
     let workspace = manager
         .create_workspace(&mem_loops::SandboxWorkspaceSpec {
             project: project.to_string(),
@@ -4057,7 +4069,14 @@ async fn emit_draft_pr_loop_report(
             mode: mode.clone(),
         },
     );
-    let checks = run_draft_pr_checks(&manager, &workspace, request.trigger_payload.as_ref())?;
+    let checks = run_draft_pr_checks(
+        pool,
+        run_id,
+        &manager,
+        &workspace,
+        request.trigger_payload.as_ref(),
+    )
+    .await?;
     let output = json!({
         "gate": {
             "agent_ready": true,
@@ -4149,7 +4168,9 @@ fn draft_pr_allowed_commands(payload: Option<&serde_json::Value>) -> Vec<String>
         .unwrap_or_else(|| vec!["cargo".to_string(), "npm".to_string(), "sh".to_string()])
 }
 
-fn run_draft_pr_checks(
+async fn run_draft_pr_checks(
+    pool: &PgPool,
+    run_id: Uuid,
     manager: &WorktreeSandboxManager,
     workspace: &mem_loops::SandboxWorkspace,
     payload: Option<&serde_json::Value>,
@@ -4169,22 +4190,24 @@ fn run_draft_pr_checks(
         allowed_commands: draft_pr_allowed_commands(payload),
         ..mem_loops::SandboxLimits::default()
     };
-    checks
-        .iter()
-        .map(|check| {
-            let request = sandbox_command_from_check(check)?;
-            let log = manager
-                .run_command(workspace, &request, &limits)
-                .map_err(|error| ApiError::io(anyhow::anyhow!("run draft PR check: {error}")))?;
-            Ok(json!({
-                "command": log.command,
-                "exit_code": log.exit_code,
-                "timed_out": log.timed_out,
-                "limit_violations": log.limit_violations,
-                "status": if log.exit_code == 0 && !log.timed_out { "passed" } else { "failed" }
-            }))
-        })
-        .collect()
+    let mut outcomes = Vec::with_capacity(checks.len());
+    for check in &checks {
+        let request = sandbox_command_from_check(check)?;
+        let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+        run_persistence::fence_run_execution_tx(&mut tx, run_id, false).await?;
+        tx.commit().await.map_err(ApiError::sql)?;
+        let log = manager
+            .run_command(workspace, &request, &limits)
+            .map_err(|error| ApiError::io(anyhow::anyhow!("run draft PR check: {error}")))?;
+        outcomes.push(json!({
+            "command": log.command,
+            "exit_code": log.exit_code,
+            "timed_out": log.timed_out,
+            "limit_violations": log.limit_violations,
+            "status": if log.exit_code == 0 && !log.timed_out { "passed" } else { "failed" }
+        }));
+    }
+    Ok(outcomes)
 }
 
 fn sandbox_command_from_check(

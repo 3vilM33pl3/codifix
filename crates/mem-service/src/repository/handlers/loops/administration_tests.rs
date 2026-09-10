@@ -48,6 +48,54 @@ async fn interrupted_loop_preserves_committed_phases_and_rejects_stale_outputs()
             .unwrap(),
         "running"
     );
+    let mut actor = mem_store::events::MutationContext::internal("approval-test");
+    actor.actor_id = "fail\0trace".into();
+    assert!(
+        create_loop_run_approval(
+            pool,
+            Some(project),
+            run,
+            "fixture",
+            LoopActionKind::WriteRepo,
+            json!({"private_payload":"not in trace"}),
+            "approval required",
+            None,
+            &actor
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM approval_requests WHERE run_id=$1")
+            .bind(run)
+            .fetch_one(pool)
+            .await
+            .unwrap(),
+        0
+    );
+    actor.actor_id = "trusted-actor".into();
+    create_loop_run_approval(
+        pool,
+        Some(project),
+        run,
+        "fixture",
+        LoopActionKind::WriteRepo,
+        json!({"private_payload":"not in trace"}),
+        "approval required",
+        None,
+        &actor,
+    )
+    .await
+    .unwrap();
+    let receipt: serde_json::Value = sqlx::query_scalar(
+        "SELECT payload_json FROM run_traces WHERE run_id=$1 AND trace_type='approval_requested'",
+    )
+    .bind(run)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(receipt["actor_id"], "trusted-actor");
+    assert!(!receipt.to_string().contains("private_payload"));
     let pid: i32 = sqlx::query_scalar("SELECT backend_pid FROM foreground_executions WHERE id=$1")
         .bind(run)
         .fetch_one(pool)
@@ -59,6 +107,29 @@ async fn interrupted_loop_preserves_committed_phases_and_rejects_stale_outputs()
         .await
         .unwrap();
     drop(owner);
+    assert!(
+        create_loop_run_approval(
+            pool,
+            Some(project),
+            run,
+            "fixture",
+            LoopActionKind::WriteRepo,
+            json!({}),
+            "approval required",
+            None,
+            &actor
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM approval_requests WHERE run_id=$1")
+            .bind(run)
+            .fetch_one(pool)
+            .await
+            .unwrap(),
+        1
+    );
     assert!(
         store_run_phase(
             pool,
