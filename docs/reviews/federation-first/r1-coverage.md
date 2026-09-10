@@ -12,13 +12,13 @@ write-path references before the R1 gate can close.
 | Archive/delete/retention | service memory repository `mutations`/`retention` transaction APIs | state/tombstone/pruning + surviving subject or operation event; direct callers, late-event rollback, concurrent tombstones, scoped retention and dry run tested | [x] |
 | Provenance checks | service provenance repository prepared checks + transaction apply; mem-reinforce volatility transaction | source checks + serialized status transitions + volatility audit + attributed operation event; failed event rolls all changes back; dry runs stay read-only | [x] |
 | Bundle import/export | service bundle repository | import project/receipt/versions/sources/relations/chunks + enrichment intents + event atomic and replay tested; export/external intent still open | [ ] |
-| Graph/index/embedding batches | mem-graph, service embedding repository | batch result + operation event | [ ] |
+| Graph/index/embedding batches | mem-graph extraction and mem-search maintenance transaction APIs | prepare provider work before atomic graph/chunk/vector batch and operation event; provider failure, stale input and late-event rollback tested; settings files tracked separately | [x] |
 | Reinforcement and procedural learning | mem-reinforce, service loops | access batches, score transitions, volatility, compaction and retention coupled to dedicated journals; validation request/result/review boundaries implemented; procedural callers and interrupted external validation reconciliation remain under audit | [ ] |
 | Project/commit/checkpoint/plan activity | service project/activity repositories | mutation + event | [ ] |
 | Agent workspaces | service agents repository `_tx` APIs and pool wrappers | start/heartbeat/finish + attributed event; implicit project creation and late-event failure rollback tested; only committed HTTP broadcasts | [x] |
 | Loop settings/runs/proposals | mem-loops, service loops | proposal creation + receipt + trace + event coupled; other lifecycle/state transitions still open | [ ] |
 | Token creation/revocation, membership grant/revoke | service auth store | state + protected audit; audit failure rolls back revocation | [x] |
-| Other auth administration/session/token bookkeeping | service auth store/oidc | state + protected audit or explicit operational journal; remaining inventory | [ ] |
+| Other auth administration/session/token bookkeeping | service auth store/oidc | bootstrap, last-used touches, OIDC flow consumption, login identity/session creation and logout coupled to protected audits; injected audit failure rolls back login/session | [x] |
 | New offline captures | service offline DuckDB `QueuedCapture`/`sync_capture` | compound local intent, atomic PostgreSQL replay/attribution, retry before ack | [x] |
 | Legacy offline and other activity operations | service offline/activity | audit remaining paths; old separate capture/activity rows have no R1 atomic-intent guarantee | [ ] |
 | Filesystem/external effects | settings/export/watch/provider boundaries | durable intent + reconciled outcome | [ ] |

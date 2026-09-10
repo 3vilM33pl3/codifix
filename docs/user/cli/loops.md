@@ -179,6 +179,15 @@ memory loops reject-memory-proposal <proposal-id> --reviewer olivier --reason "E
 Loop memory proposals are pending durable memory changes produced by loops. They
 support `add`, `update`, `deprecate`, `merge`, `link`, and `consolidate`.
 
+Manual consolidation records its deterministic report and a durable background
+job reference (`run.output.background_job_id`). A successful control-plane run
+does not mean synthesis finished. Inspect `memory jobs --project PROJECT` for
+execution, retries and failures. Explicit manual synthesis does not require
+automatic triggering to be enabled, but still observes current permissions,
+loop settings, cancellation, dry-run, provider, utility-floor and daily-cap
+policies. Approval of a consolidation proposal rechecks its pinned source
+versions; legacy proposals without pins must be regenerated.
+
 Proposal creation commits the proposal, its linked run trace (if any), and its
 project timeline event together. An event-storage failure fails creation without
 leaving an unaudited proposal. The timeline records the authenticated creator for

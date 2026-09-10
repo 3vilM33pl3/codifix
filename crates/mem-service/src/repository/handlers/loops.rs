@@ -18,6 +18,8 @@ use std::path::PathBuf;
 mod administration_tests;
 pub mod proposal_creation;
 pub mod proposal_decisions;
+pub(crate) mod run_persistence;
+use run_persistence::*;
 
 #[derive(Debug, SerdeDeserialize)]
 pub(crate) struct LoopDefinitionQuery {
@@ -63,6 +65,9 @@ pub(crate) struct LoopContextPackQuery {
 pub async fn register_builtin_loop_definitions(pool: &PgPool) -> Result<()> {
     let definitions = builtin_loop_definitions();
     let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('loop-policy',0))")
+        .execute(&mut *tx)
+        .await?;
     // Serialize concurrent service startup registrations, including absent rows.
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('loop-definitions',0))")
         .execute(&mut *tx)
@@ -325,68 +330,35 @@ async fn mutate_loop_setting(
 
 pub(crate) async fn run_loop(
     State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
     Path(loop_id): Path<String>,
     Json(request): Json<LoopRunRequest>,
 ) -> Result<Json<LoopRunResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
-    let response = create_control_plane_loop_run(&state.pool()?, &loop_id, &request).await?;
-    if let Some(project) = request.project.clone() {
-        let kind = match response.run.summary.status {
-            mem_record::LoopRunStatus::Failed => ActivityKind::LoopRunFailed,
-            mem_record::LoopRunStatus::Running | mem_record::LoopRunStatus::Queued => {
-                ActivityKind::LoopRunStarted
-            }
-            _ => ActivityKind::LoopRunFinished,
-        };
-        notify_project_changed(
-            &state,
-            project,
-            None,
-            kind,
-            format!("Loop {loop_id} run {:?}", response.run.summary.status),
-            None,
-        );
-    }
-    // Consolidation is the one LLM-backed loop: after the deterministic report
-    // is stored, synthesize insight proposals when enabled and not dry-run.
-    // Runs where the LLM or a cluster fails are logged, never fatal. The work
-    // is spawned so a client disconnect (axum drops the handler future) cannot
-    // cancel synthesis mid-flight; the await keeps the success path synchronous
-    // so proposals are queued before the response returns.
-    if loop_id == mem_loops::LOOP_MEMORY_CONSOLIDATION
-        && state.config.consolidation.enabled
-        && !state.config.consolidation.dry_run
-        && !request.dry_run
-        && let Some(project) = request.project.as_deref()
-    {
-        let run_id = Some(response.run.summary.id);
-        let spawn_state = state.clone();
-        let spawn_project = project.to_string();
-        let emission = tokio::spawn(async move {
-            if let Err(error) = crate::consolidate::emit_consolidation_proposals(
-                &spawn_state,
-                &spawn_project,
-                run_id,
-            )
-            .await
-            {
-                tracing::warn!(error = %error, "consolidation proposal emission failed");
-            }
-        });
-        if let Err(error) = emission.await {
-            tracing::warn!(error = %error, "consolidation proposal emission task failed");
-        }
-    }
+    let response = create_control_plane_loop_run_as(
+        &state.pool()?,
+        &loop_id,
+        &request,
+        &LoopExecution::authenticated(&principal),
+    )
+    .await?;
+    state.background.notify.notify_one();
     Ok(Json(response))
 }
 
 pub(crate) async fn route_loop_trigger(
     State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
     Json(request): Json<LoopTriggerRouteRequest>,
 ) -> Result<Json<LoopTriggerRouteResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
     Ok(Json(
-        route_loop_trigger_event_inner(&state.pool()?, &request).await?,
+        route_loop_trigger_event_as(
+            &state.pool()?,
+            &request,
+            &LoopExecution::authenticated(&principal),
+        )
+        .await?,
     ))
 }
 
@@ -782,6 +754,10 @@ async fn store_loop_global_state_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     request: &LoopGlobalStateUpdateRequest,
 ) -> Result<LoopGlobalStateResponse, ApiError> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('loop-policy',0))")
+        .execute(&mut **tx)
+        .await
+        .map_err(ApiError::sql)?;
     let row = sqlx::query(
         r#"
         UPDATE loop_global_state
@@ -841,6 +817,10 @@ async fn store_loop_setting_tx(
     ),
     ApiError,
 > {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('loop-policy',0))")
+        .execute(&mut **tx)
+        .await
+        .map_err(ApiError::sql)?;
     let setting = upsert_loop_setting(&mut **tx, loop_id, scope, request).await?;
     insert_loop_setting_audit(
         &mut **tx,
@@ -1178,6 +1158,14 @@ async fn route_loop_trigger_event_inner(
     pool: &PgPool,
     request: &LoopTriggerRouteRequest,
 ) -> Result<LoopTriggerRouteResponse, ApiError> {
+    route_loop_trigger_event_as(pool, request, &LoopExecution::internal()).await
+}
+
+async fn route_loop_trigger_event_as(
+    pool: &PgPool,
+    request: &LoopTriggerRouteRequest,
+    execution: &LoopExecution,
+) -> Result<LoopTriggerRouteResponse, ApiError> {
     let definitions = fetch_route_candidate_definitions(pool, request).await?;
     let mut candidates = Vec::with_capacity(definitions.len());
     for definition in &definitions {
@@ -1258,6 +1246,7 @@ async fn route_loop_trigger_event_inner(
             &run_request,
             stored.event.id,
             false,
+            execution,
         )
         .await?
         .run;
@@ -1422,6 +1411,45 @@ async fn create_control_plane_loop_run(
     loop_id: &str,
     request: &LoopRunRequest,
 ) -> Result<LoopRunResponse, ApiError> {
+    create_control_plane_loop_run_as(pool, loop_id, request, &LoopExecution::internal()).await
+}
+
+struct LoopExecution {
+    context: mem_store::events::MutationContext,
+    actor: mem_store::jobs::JobActor,
+}
+
+impl LoopExecution {
+    fn internal() -> Self {
+        Self {
+            context: mem_store::events::MutationContext::internal("loop-runtime"),
+            actor: mem_store::jobs::JobActor::System("local-curation".into()),
+        }
+    }
+
+    fn authenticated(principal: &AuthenticatedPrincipal) -> Self {
+        Self {
+            context: mem_store::events::MutationContext {
+                actor_id: principal.id.to_string(),
+                actor_name: principal.display_name.clone(),
+                source: "http".into(),
+                occurred_at: None,
+            },
+            actor: mem_store::jobs::JobActor::Credential {
+                principal: principal.id,
+                token: principal.token_id,
+                session: principal.session_id,
+            },
+        }
+    }
+}
+
+async fn create_control_plane_loop_run_as(
+    pool: &PgPool,
+    loop_id: &str,
+    request: &LoopRunRequest,
+    execution: &LoopExecution,
+) -> Result<LoopRunResponse, ApiError> {
     let trigger_payload = request.trigger_payload.clone().unwrap_or_else(|| json!({}));
     let trigger_record = store_trigger_event(
         pool,
@@ -1447,6 +1475,7 @@ async fn create_control_plane_loop_run(
         request,
         trigger_record.event.id,
         true,
+        execution,
     )
     .await
 }
@@ -1474,6 +1503,7 @@ async fn create_control_plane_loop_run_with_trigger(
     request: &LoopRunRequest,
     trigger_event_id: Uuid,
     manual_run: bool,
+    execution: &LoopExecution,
 ) -> Result<LoopRunResponse, ApiError> {
     let definition = fetch_loop_definition(pool, loop_id).await?;
     let project_id = match request.project.as_deref() {
@@ -1499,12 +1529,12 @@ async fn create_control_plane_loop_run_with_trigger(
     let status = if blocked {
         LoopRunStatus::Blocked
     } else {
-        LoopRunStatus::Succeeded
+        LoopRunStatus::Running
     };
     let output_summary = if blocked {
         "Loop run blocked by policy or settings."
     } else {
-        "Control-plane loop run recorded; real loop execution is not implemented in this slice."
+        "Loop run recorded; execution pending."
     };
 
     let scope_type = request.scope_type.clone().unwrap_or_else(|| {
@@ -1523,6 +1553,7 @@ async fn create_control_plane_loop_run_with_trigger(
         .or_else(|| request.project.clone())
         .unwrap_or_else(|| "default".to_string());
     let run_id = Uuid::new_v4();
+    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
     sqlx::query(
         r#"
         INSERT INTO loop_runs (
@@ -1534,7 +1565,7 @@ async fn create_control_plane_loop_run_with_trigger(
         )
         VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-            now(), now(), '{}'::jsonb, $13, $14, $15, $16, $17, 0, now(), now()
+            now(), CASE WHEN $11='blocked' THEN now() ELSE NULL END, '{}'::jsonb, $13, $14, $15, $16, $17, 0, now(), now()
         )
         "#,
     )
@@ -1567,12 +1598,12 @@ async fn create_control_plane_loop_run_with_trigger(
         })?,
     )
     .bind(json!(effective.blocked_reasons))
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
 
-    append_loop_trace(
-        pool,
+    append_loop_trace_tx(
+        &mut tx,
         run_id,
         "policy",
         "Policy evaluation",
@@ -1580,8 +1611,8 @@ async fn create_control_plane_loop_run_with_trigger(
         false,
     )
     .await?;
-    append_loop_trace(
-        pool,
+    append_loop_trace_tx(
+        &mut tx,
         run_id,
         "result",
         "Control-plane result",
@@ -1589,6 +1620,15 @@ async fn create_control_plane_loop_run_with_trigger(
         false,
     )
     .await?;
+    append_run_event(
+        &mut tx,
+        project_id,
+        run_id,
+        ActivityKind::LoopRunStarted,
+        &execution.context,
+    )
+    .await?;
+    tx.commit().await.map_err(ApiError::sql)?;
     let context_pack_request = LoopContextPackRequest {
         project: request.project.clone(),
         repo_root: request.repo_root.clone(),
@@ -1600,8 +1640,9 @@ async fn create_control_plane_loop_run_with_trigger(
         let context_pack =
             build_loop_context_pack_response(pool, &definition.loop_id, &context_pack_request)
                 .await?;
-        append_loop_trace(
-            pool,
+        let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+        append_loop_trace_tx(
+            &mut tx,
             run_id,
             "context_pack",
             "Context pack",
@@ -1627,9 +1668,10 @@ async fn create_control_plane_loop_run_with_trigger(
         .bind(context_pack.pack.id)
         .bind(context_pack.pack.estimated_tokens as i32)
         .bind(context_pack.pack.memories.len() as i32)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .map_err(ApiError::sql)?;
+        tx.commit().await.map_err(ApiError::sql)?;
 
         if definition.loop_id == mem_loops::LOOP_CONTEXT_PACK_REFRESH && !blocked {
             let refresh = emit_context_pack_refresh_proposals(
@@ -1640,39 +1682,29 @@ async fn create_control_plane_loop_run_with_trigger(
                 &context_pack,
             )
             .await?;
-            sqlx::query(
-                r#"
-                UPDATE loop_runs
-                SET output_summary = $2,
-                    output_json = output_json || jsonb_build_object('context_refresh', $3::jsonb),
-                    updated_at = now()
-                WHERE id = $1
-                "#,
+            store_run_phase(
+                pool,
+                run_id,
+                "context_refresh",
+                &refresh.summary,
+                &refresh.output,
+                None,
+                None,
             )
-            .bind(run_id)
-            .bind(&refresh.summary)
-            .bind(&refresh.output)
-            .execute(pool)
-            .await
-            .map_err(ApiError::sql)?;
+            .await?;
         } else if definition.loop_id == mem_loops::LOOP_MEMORY_HYGIENE && !blocked {
             let hygiene =
                 emit_memory_hygiene_proposals(pool, run_id, request, &definition.loop_id).await?;
-            sqlx::query(
-                r#"
-                UPDATE loop_runs
-                SET output_summary = $2,
-                    output_json = output_json || jsonb_build_object('memory_hygiene', $3::jsonb),
-                    updated_at = now()
-                WHERE id = $1
-                "#,
+            store_run_phase(
+                pool,
+                run_id,
+                "memory_hygiene",
+                &hygiene.summary,
+                &hygiene.output,
+                None,
+                None,
             )
-            .bind(run_id)
-            .bind(&hygiene.summary)
-            .bind(&hygiene.output)
-            .execute(pool)
-            .await
-            .map_err(ApiError::sql)?;
+            .await?;
         } else if definition.loop_id == mem_loops::LOOP_CI_FAILURE_TRIAGE && !blocked {
             let triage = emit_ci_failure_triage_report(
                 pool,
@@ -1683,21 +1715,16 @@ async fn create_control_plane_loop_run_with_trigger(
                 &context_pack,
             )
             .await?;
-            sqlx::query(
-                r#"
-                UPDATE loop_runs
-                SET output_summary = $2,
-                    output_json = output_json || jsonb_build_object('ci_triage', $3::jsonb),
-                    updated_at = now()
-                WHERE id = $1
-                "#,
+            store_run_phase(
+                pool,
+                run_id,
+                "ci_triage",
+                &triage.summary,
+                &triage.output,
+                None,
+                None,
             )
-            .bind(run_id)
-            .bind(&triage.summary)
-            .bind(&triage.output)
-            .execute(pool)
-            .await
-            .map_err(ApiError::sql)?;
+            .await?;
         } else if definition.loop_id == mem_loops::LOOP_AGENT_READY_ISSUE_TRIAGE && !blocked {
             let issue_triage = emit_agent_ready_issue_triage_report(
                 pool,
@@ -1708,21 +1735,16 @@ async fn create_control_plane_loop_run_with_trigger(
                 &context_pack,
             )
             .await?;
-            sqlx::query(
-                r#"
-                UPDATE loop_runs
-                SET output_summary = $2,
-                    output_json = output_json || jsonb_build_object('issue_triage', $3::jsonb),
-                    updated_at = now()
-                WHERE id = $1
-                "#,
+            store_run_phase(
+                pool,
+                run_id,
+                "issue_triage",
+                &issue_triage.summary,
+                &issue_triage.output,
+                None,
+                None,
             )
-            .bind(run_id)
-            .bind(&issue_triage.summary)
-            .bind(&issue_triage.output)
-            .execute(pool)
-            .await
-            .map_err(ApiError::sql)?;
+            .await?;
         } else if definition.loop_id == mem_loops::LOOP_DRAFT_PR && !blocked {
             let draft_pr = emit_draft_pr_loop_report(
                 pool,
@@ -1733,29 +1755,16 @@ async fn create_control_plane_loop_run_with_trigger(
                 &context_pack,
             )
             .await?;
-            sqlx::query(
-                r#"
-                UPDATE loop_runs
-                SET status = $2,
-                    output_summary = $3,
-                    output_json = output_json || jsonb_build_object('draft_pr', $4::jsonb),
-                    blocked_reasons_json = CASE
-                        WHEN $5::text IS NULL THEN blocked_reasons_json
-                        WHEN COALESCE(blocked_reasons_json, '[]'::jsonb) ? $5::text THEN blocked_reasons_json
-                        ELSE COALESCE(blocked_reasons_json, '[]'::jsonb) || jsonb_build_array($5::text)
-                    END,
-                    updated_at = now()
-                WHERE id = $1
-                "#,
+            store_run_phase(
+                pool,
+                run_id,
+                "draft_pr",
+                &draft_pr.summary,
+                &draft_pr.output,
+                Some(draft_pr.status.as_str()),
+                draft_pr.blocked_reason.as_deref(),
             )
-            .bind(run_id)
-            .bind(draft_pr.status.as_str())
-            .bind(&draft_pr.summary)
-            .bind(&draft_pr.output)
-            .bind(&draft_pr.blocked_reason)
-            .execute(pool)
-            .await
-            .map_err(ApiError::sql)?;
+            .await?;
         } else if definition.loop_id == mem_loops::LOOP_REVIEWER_DRIFT_DETECTION && !blocked {
             let review = emit_reviewer_drift_report(
                 pool,
@@ -1765,56 +1774,41 @@ async fn create_control_plane_loop_run_with_trigger(
                 &context_pack,
             )
             .await?;
-            sqlx::query(
-                r#"
-                UPDATE loop_runs
-                SET output_summary = $2,
-                    output_json = output_json || jsonb_build_object('reviewer_drift', $3::jsonb),
-                    updated_at = now()
-                WHERE id = $1
-                "#,
+            store_run_phase(
+                pool,
+                run_id,
+                "reviewer_drift",
+                &review.summary,
+                &review.output,
+                None,
+                None,
             )
-            .bind(run_id)
-            .bind(&review.summary)
-            .bind(&review.output)
-            .execute(pool)
-            .await
-            .map_err(ApiError::sql)?;
+            .await?;
         } else if definition.loop_id == mem_loops::LOOP_SKILL_MINING && !blocked {
             let skill =
                 emit_skill_mining_report(pool, run_id, request, &definition.loop_id).await?;
-            sqlx::query(
-                r#"
-                UPDATE loop_runs
-                SET output_summary = $2,
-                    output_json = output_json || jsonb_build_object('skill_mining', $3::jsonb),
-                    updated_at = now()
-                WHERE id = $1
-                "#,
+            store_run_phase(
+                pool,
+                run_id,
+                "skill_mining",
+                &skill.summary,
+                &skill.output,
+                None,
+                None,
             )
-            .bind(run_id)
-            .bind(&skill.summary)
-            .bind(&skill.output)
-            .execute(pool)
-            .await
-            .map_err(ApiError::sql)?;
+            .await?;
         } else if definition.loop_id == mem_loops::LOOP_MEMORY_EVAL && !blocked {
             let eval = emit_memory_eval_report(pool, run_id, request, &context_pack).await?;
-            sqlx::query(
-                r#"
-                UPDATE loop_runs
-                SET output_summary = $2,
-                    output_json = output_json || jsonb_build_object('memory_eval', $3::jsonb),
-                    updated_at = now()
-                WHERE id = $1
-                "#,
+            store_run_phase(
+                pool,
+                run_id,
+                "memory_eval",
+                &eval.summary,
+                &eval.output,
+                None,
+                None,
             )
-            .bind(run_id)
-            .bind(&eval.summary)
-            .bind(&eval.output)
-            .execute(pool)
-            .await
-            .map_err(ApiError::sql)?;
+            .await?;
         } else if definition.loop_id == mem_loops::LOOP_MEMORY_CONSOLIDATION && !blocked {
             // Deterministic clustering always runs and is stored as a report.
             // LLM synthesis + proposal emission happens separately where an
@@ -1832,23 +1826,22 @@ async fn create_control_plane_loop_run_with_trigger(
             let output = serde_json::to_value(&report).map_err(|error| {
                 ApiError::io(anyhow::anyhow!("serialize consolidation report: {error}"))
             })?;
-            sqlx::query(
-                r#"
-                UPDATE loop_runs
-                SET output_summary = $2,
-                    output_json = output_json || jsonb_build_object('consolidation', $3::jsonb),
-                    updated_at = now()
-                WHERE id = $1
-                "#,
+            store_run_phase(
+                pool,
+                run_id,
+                "consolidation",
+                &report.summary(),
+                &output,
+                None,
+                None,
             )
-            .bind(run_id)
-            .bind(report.summary())
-            .bind(&output)
-            .execute(pool)
-            .await
-            .map_err(ApiError::sql)?;
+            .await?;
         }
     }
+    finish_run(
+        pool, project_id, run_id, loop_id, request, manual_run, execution,
+    )
+    .await?;
     Ok(LoopRunResponse {
         run: fetch_loop_run_detail(pool, run_id).await?,
     })

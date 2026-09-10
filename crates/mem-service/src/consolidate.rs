@@ -13,9 +13,7 @@ use uuid::Uuid;
 
 use crate::llm::{LlmStrictJsonRequest, call_llm_strict_json};
 use crate::repository::events::emit_llm_audit_activity;
-use crate::repository::handlers::consolidation::{
-    AcceptedCluster, ClusterMember, run_memory_consolidation,
-};
+use crate::repository::handlers::consolidation::{AcceptedCluster, ClusterMember};
 use crate::state::AppState;
 
 const THEMES_SYSTEM_PROMPT: &str = "You are analyzing a cluster of related project memories to find what unifies them. Return strict JSON: {\"themes\": [string]} with 1-3 short high-level themes or questions the cluster collectively answers. No prose outside the JSON.";
@@ -129,52 +127,6 @@ pub(crate) async fn synthesize_consolidation(
         anyhow::bail!("consolidation synthesis returned empty meta memory");
     }
     Ok(synthesis)
-}
-
-/// Runs the real-config clustering scan and emits one human-gated
-/// `consolidate` proposal per accepted, novel cluster (bounded by the daily
-/// cap). Returns the number of proposals queued. Called from the manual loop
-/// entry point and the auto-trigger worker, both of which hold an `AppState`.
-pub(crate) async fn emit_consolidation_proposals(
-    state: &AppState,
-    project: &str,
-    run_id: Option<Uuid>,
-) -> Result<usize> {
-    let cfg = &state.config.consolidation;
-    if !cfg.enabled {
-        return Ok(0);
-    }
-    let pool = state
-        .pool()
-        .map_err(|error| anyhow::anyhow!(error.message))?;
-    let half_life_secs = state.config.reinforcement.half_life.as_secs_f64().max(1.0);
-    let report = run_memory_consolidation(&pool, project, cfg, half_life_secs)
-        .await
-        .map_err(|error| anyhow::anyhow!(error.message))?;
-
-    let mut queued = 0usize;
-    for cluster in report.accepted.iter().take(cfg.daily_cap as usize) {
-        match synthesize_and_queue(state, &pool, project, run_id, cluster).await {
-            Ok(true) => queued += 1,
-            Ok(false) => {}
-            Err(error) => {
-                tracing::warn!(error = %error, "consolidation synthesis failed for a cluster");
-            }
-        }
-    }
-    Ok(queued)
-}
-
-async fn synthesize_and_queue(
-    state: &AppState,
-    pool: &sqlx::PgPool,
-    project: &str,
-    run_id: Option<Uuid>,
-    cluster: &AcceptedCluster,
-) -> Result<bool> {
-    let request = prepare_consolidation_proposal(state, project, run_id, cluster).await?;
-    crate::repository::handlers::loops::create_memory_proposal_record(pool, &request).await?;
-    Ok(true)
 }
 
 /// Provider work is separate from proposal persistence. The LLM helper still

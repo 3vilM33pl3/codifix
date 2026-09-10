@@ -544,14 +544,19 @@ async fn loop_repository_registers_definitions_and_records_run() {
             .blocked_reasons
             .contains(&"loop_not_enabled".to_string())
     );
-    assert_eq!(run.traces.len(), 3);
+    assert_eq!(run.traces.len(), 4);
+    assert!(
+        run.traces
+            .iter()
+            .any(|trace| trace.trace_type == "completed")
+    );
 
     let loaded =
         mem_service::repository::handlers::loops::read_loop_run_detail(&pool, run.summary.id)
             .await
             .expect("read loop run");
     assert_eq!(loaded.summary.id, run.summary.id);
-    assert_eq!(loaded.summary.trace_count, 3);
+    assert_eq!(loaded.summary.trace_count, 4);
     assert_eq!(
         loaded.run_reason.as_deref(),
         Some("db repository integration test")

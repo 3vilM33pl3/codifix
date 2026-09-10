@@ -211,6 +211,24 @@ async fn authorized<'a>(
     {
         return Err(fail(Code::Authorization));
     }
+    if let Some(run) = lease.input.get("run_id").filter(|v| !v.is_null()) {
+        let run = run
+            .as_str()
+            .and_then(|id| Uuid::parse_str(id).ok())
+            .ok_or_else(|| fail(Code::InvalidInput))?;
+        let manual = lease.input.get("manual").and_then(Value::as_bool) == Some(true);
+        if !crate::repository::handlers::loops::run_persistence::job_run_allowed_tx(
+            result.transaction(),
+            lease.job.project_id,
+            run,
+            manual,
+        )
+        .await
+        .map_err(|_| fail(Code::Transient))?
+        {
+            return Err(fail(Code::Authorization));
+        }
+    }
     Ok(result)
 }
 
@@ -514,12 +532,16 @@ async fn consolidation(
     project: &str,
 ) -> Result<()> {
     let cfg = &state.config.consolidation;
+    if lease.input.get("dry_run").and_then(Value::as_bool) == Some(true) {
+        return skip(state, pool, lease, JobReason::DryRun).await;
+    }
+    let manual = lease.input.get("manual").and_then(Value::as_bool) == Some(true);
     if !cfg.enabled {
         return skip(state, pool, lease, JobReason::Disabled).await;
     }
     let newer_ready:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM background_jobs j WHERE j.project_id=$1 AND j.kind='consolidation' AND j.status='queued' AND (j.created_at,j.id)>($2,$3) AND NOT EXISTS(SELECT 1 FROM background_job_dependencies d JOIN background_jobs p ON p.id=d.depends_on WHERE d.job_id=j.id AND p.status NOT IN ('succeeded','skipped')))")
         .bind(lease.job.project_id).bind(lease.job.created_at).bind(lease.job.id).fetch_one(pool).await?;
-    if newer_ready {
+    if newer_ready && !manual {
         return skip(state, pool, lease, JobReason::Coalesced).await;
     }
     let config = fingerprint(cfg)?;
@@ -538,7 +560,7 @@ async fn consolidation(
         };
     let mut result = authorized(state, pool, lease).await?;
     cache(&mut result, lease, "scan", &config, &report).await?;
-    if cfg.auto_trigger && !cfg.dry_run {
+    if (cfg.auto_trigger || manual) && !cfg.dry_run {
         for cluster in report.accepted.iter().take(cfg.daily_cap as usize) {
             let mut ids: Vec<_> = cluster.members.iter().map(|m| m.version_id).collect();
             ids.sort();
@@ -564,7 +586,7 @@ async fn consolidation(
                     kind: JobKind::ConsolidationSynthesis,
                     work_key: format!("synthesis:{seed}"),
                     actor: lease.actor.clone(),
-                    input: serde_json::json!({"version":1,"source_fingerprint":seed}),
+                    input: serde_json::json!({"version":1,"source_fingerprint":seed,"manual":manual,"run_id":lease.input.get("run_id")}),
                     dependencies: vec![lease.job.id],
                 },
             )
@@ -628,7 +650,8 @@ async fn revalidate(
 
 async fn synthesis(state: &AppState, pool: &PgPool, lease: &JobLease, project: &str) -> Result<()> {
     let cfg = &state.config.consolidation;
-    if !cfg.enabled || !cfg.auto_trigger {
+    let manual = lease.input.get("manual").and_then(Value::as_bool) == Some(true);
+    if !cfg.enabled || (!cfg.auto_trigger && !manual) {
         return skip(state, pool, lease, JobReason::Disabled).await;
     }
     if cfg.dry_run {
@@ -671,10 +694,18 @@ async fn synthesis(state: &AppState, pool: &PgPool, lease: &JobLease, project: &
             .execute(&mut **result.transaction())
             .await?;
         jobs::checkpoint_result(result).await?;
-        let request =
-            crate::consolidate::prepare_consolidation_proposal(state, project, None, &cluster)
-                .await
-                .context("prepare durable synthesis")?;
+        let request = crate::consolidate::prepare_consolidation_proposal(
+            state,
+            project,
+            lease
+                .input
+                .get("run_id")
+                .and_then(Value::as_str)
+                .and_then(|id| Uuid::parse_str(id).ok()),
+            &cluster,
+        )
+        .await
+        .context("prepare durable synthesis")?;
         let mut result = authorized(state, pool, lease).await?;
         revalidate(&mut result, lease, &cluster).await?;
         cache(&mut result, lease, "synthesis", &config, &request).await?;

@@ -182,6 +182,73 @@ async fn worker_retries_provider_failure_and_completes_independent_stages() {
 }
 
 #[tokio::test]
+async fn queued_manual_consolidation_rechecks_run_cancellation_and_current_settings() {
+    let Some(mut f) = Fixture::new(0).await else {
+        return;
+    };
+    crate::repository::handlers::loops::register_builtin_loop_definitions(&f.pool)
+        .await
+        .unwrap();
+    f.state.config.consolidation.enabled = true;
+    f.state.config.consolidation.auto_trigger = false;
+    let run = Uuid::new_v4();
+    let job = Uuid::new_v4();
+    sqlx::query("INSERT INTO loop_runs(id,loop_id,definition_version,project_id,scope_type,scope_id,mode,status) VALUES($1,$2,1,$3,'project',$4,'manual','succeeded')")
+        .bind(run).bind(mem_loops::LOOP_MEMORY_CONSOLIDATION).bind(f.project).bind(&f.slug).execute(&f.pool).await.unwrap();
+    sqlx::query("INSERT INTO loop_settings(id,loop_id,scope_type,scope_id,project_id,enabled,mode) VALUES($1,$2,'project',$3,$4,true,'suggest_only')")
+        .bind(Uuid::new_v4()).bind(mem_loops::LOOP_MEMORY_CONSOLIDATION).bind(&f.slug).bind(f.project).execute(&f.pool).await.unwrap();
+    let mut tx = f.pool.begin().await.unwrap();
+    jobs::enqueue(
+        &mut tx,
+        &NewJob {
+            id: job,
+            project_id: f.project,
+            operation_id: run,
+            kind: JobKind::Consolidation,
+            work_key: format!("manual:{run}"),
+            actor: JobActor::System("local-curation".into()),
+            input: serde_json::json!({"version":1,"run_id":run,"manual":true,"dry_run":true}),
+            dependencies: vec![],
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let lease = jobs::claim(&f.pool, policy(&f.state))
+        .await
+        .unwrap()
+        .unwrap();
+    jobs::checkpoint_result(authorized(&f.state, &f.pool, &lease).await.unwrap())
+        .await
+        .unwrap();
+    sqlx::query("UPDATE loop_settings SET enabled=false WHERE project_id=$1")
+        .bind(f.project)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        classify(&authorized(&f.state, &f.pool, &lease).await.err().unwrap()),
+        Code::Authorization
+    );
+    sqlx::query("UPDATE loop_settings SET enabled=true WHERE project_id=$1")
+        .bind(f.project)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE loop_runs SET cancel_requested_at=now() WHERE id=$1")
+        .bind(run)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        classify(&authorized(&f.state, &f.pool, &lease).await.err().unwrap()),
+        Code::Authorization
+    );
+    assert_eq!(f.fake.calls.load(Ordering::SeqCst), 0);
+    f.cleanup().await;
+}
+
+#[tokio::test]
 async fn shutdown_cancels_owned_work_and_a_new_worker_recovers_lease() {
     let Some(f) = Fixture::new(2).await else {
         return;
