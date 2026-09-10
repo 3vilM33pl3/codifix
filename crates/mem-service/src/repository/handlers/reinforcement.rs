@@ -289,9 +289,23 @@ pub(crate) async fn memory_scores(
 
 pub(crate) async fn validate_memory(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
     Json(request): Json<mem_record::ValidateMemoryRequest>,
 ) -> Result<Json<mem_record::ValidationRunInfo>, ApiError> {
+    let execution = mem_reinforce::validate::ValidationExecution {
+        context: mem_store::events::MutationContext {
+            actor_id: principal.id.to_string(),
+            actor_name: principal.display_name,
+            source: "memory-validation".into(),
+            occurred_at: None,
+        },
+        actor: mem_store::jobs::JobActor::Credential {
+            principal: principal.id,
+            token: principal.token_id,
+            session: principal.session_id,
+        },
+    };
     if !state.is_primary() {
         return Err(ApiError::service_unavailable(
             "memory validation runs only on the primary node",
@@ -357,31 +371,27 @@ pub(crate) async fn validate_memory(
     let provider = crate::reinforcement::ServiceVerdictProvider {
         state: state.clone(),
     };
-    let outcome = mem_reinforce::run_validation_with_scope(
+    let outcome = mem_reinforce::validate::run_validation_as(
         &pool,
         &candidate,
         &provider,
         &policy,
         mem_reinforce::ValidationTrigger::Manual,
         proof_scope,
+        &execution,
     )
     .await
     .map_err(ApiError::io)?;
 
-    notify_project_changed(
-        &state,
-        snapshot.project_slug.clone(),
-        Some(snapshot.memory_id),
-        ActivityKind::MemoryValidation,
-        format!(
-            "Validated memory \"{}\": {} ({}{})",
-            snapshot.summary.chars().take(80).collect::<String>(),
-            outcome.verdict.as_str(),
-            outcome.action.as_str(outcome.dry_run),
-            if outcome.dry_run { ", dry run" } else { "" },
-        ),
-        None,
-    );
+    for (event, sequence) in outcome.events {
+        crate::repository::events::broadcast_committed(
+            &state,
+            snapshot.project_slug.clone(),
+            event,
+            sequence,
+        );
+    }
+    state.background.notify.notify_one();
 
     let run = mem_reinforce::repository::fetch_validation_run(&pool, outcome.run_id)
         .await
@@ -427,9 +437,23 @@ pub(crate) async fn validation_runs(
 
 pub(crate) async fn review_validation_run(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(run_id): Path<Uuid>,
     Json(request): Json<mem_record::ReviewValidationRequest>,
 ) -> Result<Json<mem_record::ReviewValidationResponse>, ApiError> {
+    let execution = mem_reinforce::validate::ValidationExecution {
+        context: mem_store::events::MutationContext {
+            actor_id: principal.id.to_string(),
+            actor_name: principal.display_name,
+            source: "memory-validation".into(),
+            occurred_at: None,
+        },
+        actor: mem_store::jobs::JobActor::Credential {
+            principal: principal.id,
+            token: principal.token_id,
+            session: principal.session_id,
+        },
+    };
     if !state.is_primary() {
         return Err(ApiError::service_unavailable(
             "validation review runs only on the primary node",
@@ -440,21 +464,19 @@ pub(crate) async fn review_validation_run(
         "reject" => false,
         "apply_preview" => {
             let pool = state.pool()?;
-            let resolution = mem_reinforce::apply_preview(&pool, run_id)
+            let resolution = mem_reinforce::validate::apply_preview_as(&pool, run_id, &execution)
                 .await
                 .map_err(ApiError::io)?;
             if let Some(slug) = project_slug_for_id(&pool, resolution.project_id).await? {
-                notify_project_changed(
-                    &state,
-                    slug,
-                    resolution
-                        .new_memory_id
-                        .or(Some(Uuid::nil()))
-                        .filter(|id| !id.is_nil()),
-                    ActivityKind::MemoryValidation,
-                    "Validation preview applied".to_string(),
-                    None,
-                );
+                for (event, sequence) in resolution.events {
+                    crate::repository::events::broadcast_committed(
+                        &state,
+                        slug.clone(),
+                        event,
+                        sequence,
+                    );
+                }
+                state.background.notify.notify_one();
             }
             return Ok(Json(mem_record::ReviewValidationResponse {
                 run_id,
@@ -472,21 +494,14 @@ pub(crate) async fn review_validation_run(
         }
     };
     let pool = state.pool()?;
-    let resolution = mem_reinforce::resolve_review(&pool, run_id, approve)
+    let resolution = mem_reinforce::validate::resolve_review_as(&pool, run_id, approve, &execution)
         .await
         .map_err(ApiError::io)?;
     if let Some(slug) = project_slug_for_id(&pool, resolution.project_id).await? {
-        notify_project_changed(
-            &state,
-            slug,
-            Some(resolution.new_memory_id.unwrap_or_default()).filter(|id| !id.is_nil()),
-            ActivityKind::MemoryValidation,
-            format!(
-                "Validation correction {}",
-                if approve { "applied" } else { "rejected" }
-            ),
-            None,
-        );
+        for (event, sequence) in resolution.events {
+            crate::repository::events::broadcast_committed(&state, slug.clone(), event, sequence);
+        }
+        state.background.notify.notify_one();
     }
     Ok(Json(mem_record::ReviewValidationResponse {
         run_id,

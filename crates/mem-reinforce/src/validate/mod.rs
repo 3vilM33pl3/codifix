@@ -17,8 +17,8 @@ use uuid::Uuid;
 
 use crate::repository::{
     EvidenceRow, ValidationRunCompletion, complete_validation_run, fail_validation_run,
-    insert_score_audit, insert_validation_evidence, insert_validation_run, mark_correction_pending,
-    mark_needs_review, mark_validated, set_validation_cooldown,
+    insert_score_audit, insert_validation_evidence_tx, insert_validation_run,
+    mark_correction_pending, mark_needs_review, mark_validated, set_validation_cooldown,
 };
 use crate::selection::ValidationCandidate;
 pub use apply::{Decision, ValidationAction, ValidationPolicy, decide};
@@ -67,6 +67,23 @@ pub struct ValidationOutcome {
     pub dry_run: bool,
     /// New memory version id when rewording was auto-applied.
     pub new_memory_id: Option<Uuid>,
+    /// Committed activity receipts; callers may broadcast but must not append again.
+    pub events: Vec<(mem_store::events::TimelineEvent, i64)>,
+}
+
+/// Authenticated execution identity is independent of the memory's original author.
+#[derive(Debug, Clone)]
+pub struct ValidationExecution {
+    pub context: mem_store::events::MutationContext,
+    pub actor: mem_store::jobs::JobActor,
+}
+impl Default for ValidationExecution {
+    fn default() -> Self {
+        Self {
+            context: mem_store::events::MutationContext::internal("memory-validation"),
+            actor: mem_store::jobs::JobActor::System("local-curation".into()),
+        }
+    }
 }
 
 /// Cooldown after a failed run: short, so transient provider errors are
@@ -102,8 +119,30 @@ pub async fn run_validation_with_scope(
     trigger: ValidationTrigger,
     proof_scope: mem_record::ValidationProofScope,
 ) -> Result<ValidationOutcome> {
-    let run_id = insert_validation_run(
+    run_validation_as(
         pool,
+        candidate,
+        provider,
+        policy,
+        trigger,
+        proof_scope,
+        &ValidationExecution::default(),
+    )
+    .await
+}
+
+pub async fn run_validation_as(
+    pool: &PgPool,
+    candidate: &ValidationCandidate,
+    provider: &dyn VerdictProvider,
+    policy: &ValidationPolicy,
+    trigger: ValidationTrigger,
+    proof_scope: mem_record::ValidationProofScope,
+    execution: &ValidationExecution,
+) -> Result<ValidationOutcome> {
+    let mut tx = pool.begin().await?;
+    let run_id = insert_validation_run(
+        &mut *tx,
         candidate.canonical_id,
         candidate.memory_id,
         candidate.project_id,
@@ -112,15 +151,53 @@ pub async fn run_validation_with_scope(
     )
     .await?;
 
-    let outcome = execute_validation(pool, candidate, provider, policy, run_id, proof_scope).await;
-    if let Err(error) = &outcome {
-        fail_validation_run(pool, run_id, &format!("{error:#}")).await?;
+    crate::repository::append_validation_activity_tx(
+        &mut tx,
+        candidate.project_id,
+        candidate.canonical_id,
+        candidate.memory_id,
+        run_id,
+        "Validation requested",
+        execution,
+    )
+    .await?;
+    tx.commit().await?;
+    let outcome = execute_validation(
+        pool,
+        candidate,
+        provider,
+        policy,
+        run_id,
+        proof_scope,
+        execution,
+    )
+    .await;
+    if outcome.is_err() {
+        let mut tx = pool.begin().await?;
+        // Provider failures may contain prompts, secrets or response bodies.
+        fail_validation_run(
+            &mut *tx,
+            run_id,
+            "Validation did not complete; provider outcome may be uncertain",
+        )
+        .await?;
         set_validation_cooldown(
-            pool,
+            &mut *tx,
             candidate.canonical_id,
             Utc::now() + chrono::Duration::hours(FAILURE_COOLDOWN_HOURS),
         )
         .await?;
+        crate::repository::append_validation_activity_tx(
+            &mut tx,
+            candidate.project_id,
+            candidate.canonical_id,
+            candidate.memory_id,
+            run_id,
+            "Validation failed; review required",
+            execution,
+        )
+        .await?;
+        tx.commit().await?;
     }
     outcome
 }
@@ -132,6 +209,7 @@ async fn execute_validation(
     policy: &ValidationPolicy,
     run_id: Uuid,
     proof_scope: mem_record::ValidationProofScope,
+    execution: &ValidationExecution,
 ) -> Result<ValidationOutcome> {
     let started = std::time::Instant::now();
     let mut context = gather_context(pool, candidate.memory_id, proof_scope, false).await?;
@@ -165,7 +243,17 @@ async fn execute_validation(
             excerpt: item.excerpt.clone(),
         })
         .collect();
-    insert_validation_evidence(pool, run_id, &evidence_rows).await?;
+    let mut tx = pool.begin().await?;
+    crate::repository::lock_validation_source_tx(
+        &mut tx,
+        candidate.canonical_id,
+        candidate.memory_id,
+        candidate.project_id,
+    )
+    .await?;
+    crate::repository::lock_validation_run_tx(&mut tx, run_id).await?;
+    insert_validation_evidence_tx(&mut tx, run_id, &evidence_rows).await?;
+    let mut pending_events = Vec::new();
 
     let proposed_candidate_json = if decision.store_proposal {
         Some(serde_json::json!({
@@ -185,12 +273,12 @@ async fn execute_validation(
     let mut new_memory_id = None;
     let mut review_status: Option<&'static str> = None;
     if policy.dry_run {
-        set_validation_cooldown(pool, candidate.canonical_id, cooldown_until).await?;
+        set_validation_cooldown(&mut *tx, candidate.canonical_id, cooldown_until).await?;
     } else {
         match decision.action {
             ValidationAction::Revalidated => {
                 mark_validated(
-                    pool,
+                    &mut *tx,
                     candidate.canonical_id,
                     verdict.confidence,
                     run_id,
@@ -207,17 +295,20 @@ async fn execute_validation(
                     .proposed_text
                     .clone()
                     .unwrap_or_else(|| context.memory.canonical_text.clone());
-                let applied = mem_curate::apply_validation_revision(
-                    pool,
+                let applied = mem_curate::prepare_validation_revision_tx(
+                    &mut tx,
                     candidate.memory_id,
                     &summary,
                     &text,
+                    &execution.context,
+                    &execution.actor,
                 )
                 .await
                 .context("apply validated rewording")?;
-                new_memory_id = Some(applied);
+                new_memory_id = Some(applied.0);
+                pending_events.push(applied.1);
                 mark_validated(
-                    pool,
+                    &mut *tx,
                     candidate.canonical_id,
                     verdict.confidence,
                     run_id,
@@ -228,7 +319,7 @@ async fn execute_validation(
             ValidationAction::CorrectionPending => {
                 review_status = Some("pending");
                 mark_correction_pending(
-                    pool,
+                    &mut *tx,
                     candidate.canonical_id,
                     run_id,
                     cooldown_until,
@@ -242,7 +333,7 @@ async fn execute_validation(
                     .clone()
                     .unwrap_or_else(|| "weak or contradictory evidence".to_string());
                 mark_needs_review(
-                    pool,
+                    &mut *tx,
                     candidate.canonical_id,
                     &reason,
                     run_id,
@@ -250,7 +341,7 @@ async fn execute_validation(
                 )
                 .await?;
                 insert_score_audit(
-                    pool,
+                    &mut *tx,
                     candidate.canonical_id,
                     candidate.project_id,
                     "needs_review_set",
@@ -264,7 +355,7 @@ async fn execute_validation(
     }
 
     complete_validation_run(
-        pool,
+        &mut *tx,
         run_id,
         &ValidationRunCompletion {
             verdict: verdict.verdict.as_str(),
@@ -290,7 +381,7 @@ async fn execute_validation(
     .await?;
 
     insert_score_audit(
-        pool,
+        &mut *tx,
         candidate.canonical_id,
         candidate.project_id,
         "validation_completed",
@@ -306,6 +397,21 @@ async fn execute_validation(
     )
     .await?;
 
+    let activity = crate::repository::prepare_validation_activity(
+        candidate.project_id,
+        candidate.canonical_id,
+        new_memory_id.unwrap_or(candidate.memory_id),
+        run_id,
+        "Validation completed",
+        execution,
+    );
+    pending_events.push(activity);
+    let mut events = Vec::new();
+    for event in pending_events {
+        let seq = mem_store::events::append(&mut tx, &event).await?;
+        events.push((event, seq));
+    }
+    tx.commit().await?;
     Ok(ValidationOutcome {
         run_id,
         verdict: verdict.verdict,
@@ -313,6 +419,7 @@ async fn execute_validation(
         action: decision.action,
         dry_run: policy.dry_run,
         new_memory_id,
+        events,
     })
 }
 
@@ -325,6 +432,7 @@ pub struct ReviewResolution {
     pub project_id: Uuid,
     /// New memory version created when the correction was applied.
     pub new_memory_id: Option<Uuid>,
+    pub events: Vec<(mem_store::events::TimelineEvent, i64)>,
 }
 
 /// Applies or rejects a pending validation correction. Applying writes the
@@ -336,13 +444,46 @@ pub async fn resolve_review(
     run_id: Uuid,
     approve: bool,
 ) -> Result<ReviewResolution> {
+    resolve_review_as(pool, run_id, approve, &ValidationExecution::default()).await
+}
+
+pub async fn resolve_review_as(
+    pool: &PgPool,
+    run_id: Uuid,
+    approve: bool,
+    execution: &ValidationExecution,
+) -> Result<ReviewResolution> {
+    let mut tx = pool.begin().await?;
+    let result = resolve_review_tx(&mut tx, run_id, approve, execution).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+pub async fn resolve_review_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    run_id: Uuid,
+    approve: bool,
+    execution: &ValidationExecution,
+) -> Result<ReviewResolution> {
     use crate::repository::{
         clear_needs_review, fetch_memory_snapshot, fetch_validation_run, set_review_status,
     };
 
-    let run = fetch_validation_run(pool, run_id)
+    let run = fetch_validation_run(&mut **tx, run_id)
         .await?
         .with_context(|| format!("validation run {run_id} not found"))?;
+    crate::repository::lock_validation_source_tx(
+        tx,
+        run.canonical_id,
+        run.memory_id,
+        run.project_id,
+    )
+    .await?;
+    crate::repository::lock_validation_run_tx(tx, run_id).await?;
+    let run = fetch_validation_run(&mut **tx, run_id)
+        .await?
+        .context("validation run vanished")?;
+    let mut pending_events = Vec::new();
     if run.review_status.as_deref() != Some("pending") {
         anyhow::bail!(
             "validation run {run_id} is not pending review (status: {})",
@@ -361,7 +502,11 @@ pub async fn resolve_review(
             .and_then(|value| value.as_str())
             .and_then(|value| value.parse().ok())
             .unwrap_or(run.memory_id);
-        let current = fetch_memory_snapshot(pool, previous_memory_id)
+        anyhow::ensure!(
+            previous_memory_id == run.memory_id,
+            "review input does not match its run"
+        );
+        let current = fetch_memory_snapshot(&mut **tx, previous_memory_id)
             .await?
             .with_context(|| format!("memory {previous_memory_id} not found"))?;
         let summary = proposal
@@ -372,14 +517,21 @@ pub async fn resolve_review(
             .get("proposed_text")
             .and_then(|value| value.as_str())
             .unwrap_or(&current.canonical_text);
-        let applied =
-            mem_curate::apply_validation_revision(pool, previous_memory_id, summary, text)
-                .await
-                .context("apply reviewed correction")?;
-        new_memory_id = Some(applied);
-        set_review_status(pool, run_id, "applied").await?;
+        let applied = mem_curate::prepare_validation_revision_tx(
+            tx,
+            previous_memory_id,
+            summary,
+            text,
+            &execution.context,
+            &execution.actor,
+        )
+        .await
+        .context("apply reviewed correction")?;
+        new_memory_id = Some(applied.0);
+        pending_events.push(applied.1);
+        set_review_status(&mut **tx, run_id, "applied").await?;
         mark_validated(
-            pool,
+            &mut **tx,
             run.canonical_id,
             run.confidence.unwrap_or(1.0),
             run_id,
@@ -387,12 +539,12 @@ pub async fn resolve_review(
         )
         .await?;
     } else {
-        set_review_status(pool, run_id, "rejected").await?;
+        set_review_status(&mut **tx, run_id, "rejected").await?;
     }
 
-    if clear_needs_review(pool, run.canonical_id).await? {
+    if clear_needs_review(&mut **tx, run.canonical_id).await? {
         insert_score_audit(
-            pool,
+            &mut **tx,
             run.canonical_id,
             run.project_id,
             "needs_review_resolved",
@@ -403,7 +555,7 @@ pub async fn resolve_review(
         .await?;
     }
     insert_score_audit(
-        pool,
+        &mut **tx,
         run.canonical_id,
         run.project_id,
         "validation_completed",
@@ -417,25 +569,70 @@ pub async fn resolve_review(
     )
     .await?;
 
+    pending_events.push(crate::repository::prepare_validation_activity(
+        run.project_id,
+        run.canonical_id,
+        new_memory_id.unwrap_or(run.memory_id),
+        run_id,
+        "Validation review resolved",
+        execution,
+    ));
+    let mut events = Vec::new();
+    for event in pending_events {
+        let sequence = mem_store::events::append(tx, &event).await?;
+        events.push((event, sequence));
+    }
     Ok(ReviewResolution {
         run_id,
         applied: approve,
         canonical_id: run.canonical_id,
         project_id: run.project_id,
         new_memory_id,
+        events,
     })
 }
 
 /// Applies the exact result of a completed dry-run validation preview without
 /// rerunning the verdict provider.
 pub async fn apply_preview(pool: &PgPool, run_id: Uuid) -> Result<ReviewResolution> {
+    apply_preview_as(pool, run_id, &ValidationExecution::default()).await
+}
+
+pub async fn apply_preview_as(
+    pool: &PgPool,
+    run_id: Uuid,
+    execution: &ValidationExecution,
+) -> Result<ReviewResolution> {
+    let mut tx = pool.begin().await?;
+    let result = apply_preview_tx(&mut tx, run_id, execution).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+pub async fn apply_preview_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    run_id: Uuid,
+    execution: &ValidationExecution,
+) -> Result<ReviewResolution> {
     use crate::repository::{
         fetch_memory_snapshot, fetch_validation_run, mark_needs_review, set_review_status,
     };
 
-    let run = fetch_validation_run(pool, run_id)
+    let run = fetch_validation_run(&mut **tx, run_id)
         .await?
         .with_context(|| format!("validation run {run_id} not found"))?;
+    crate::repository::lock_validation_source_tx(
+        tx,
+        run.canonical_id,
+        run.memory_id,
+        run.project_id,
+    )
+    .await?;
+    crate::repository::lock_validation_run_tx(tx, run_id).await?;
+    let run = fetch_validation_run(&mut **tx, run_id)
+        .await?
+        .context("validation run vanished")?;
+    let mut pending_events = Vec::new();
     if run.status != "completed" {
         anyhow::bail!("validation run {run_id} is not completed");
     }
@@ -452,7 +649,7 @@ pub async fn apply_preview(pool: &PgPool, run_id: Uuid) -> Result<ReviewResoluti
     match action {
         "would_revalidate" => {
             mark_validated(
-                pool,
+                &mut **tx,
                 run.canonical_id,
                 run.confidence.unwrap_or(1.0),
                 run_id,
@@ -470,7 +667,11 @@ pub async fn apply_preview(pool: &PgPool, run_id: Uuid) -> Result<ReviewResoluti
                 .and_then(|value| value.as_str())
                 .and_then(|value| value.parse().ok())
                 .unwrap_or(run.memory_id);
-            let current = fetch_memory_snapshot(pool, previous_memory_id)
+            anyhow::ensure!(
+                previous_memory_id == run.memory_id,
+                "review input does not match its run"
+            );
+            let current = fetch_memory_snapshot(&mut **tx, previous_memory_id)
                 .await?
                 .with_context(|| format!("memory {previous_memory_id} not found"))?;
             let summary = proposal
@@ -481,13 +682,20 @@ pub async fn apply_preview(pool: &PgPool, run_id: Uuid) -> Result<ReviewResoluti
                 .get("proposed_text")
                 .and_then(|value| value.as_str())
                 .unwrap_or(&current.canonical_text);
-            let applied =
-                mem_curate::apply_validation_revision(pool, previous_memory_id, summary, text)
-                    .await
-                    .context("apply previewed validation correction")?;
-            new_memory_id = Some(applied);
+            let applied = mem_curate::prepare_validation_revision_tx(
+                tx,
+                previous_memory_id,
+                summary,
+                text,
+                &execution.context,
+                &execution.actor,
+            )
+            .await
+            .context("apply previewed validation correction")?;
+            new_memory_id = Some(applied.0);
+            pending_events.push(applied.1);
             mark_validated(
-                pool,
+                &mut **tx,
                 run.canonical_id,
                 run.confidence.unwrap_or(1.0),
                 run_id,
@@ -501,13 +709,13 @@ pub async fn apply_preview(pool: &PgPool, run_id: Uuid) -> Result<ReviewResoluti
                 .as_array()
                 .and_then(|values| values.iter().find_map(|value| value.as_str()))
                 .unwrap_or("weak or contradictory evidence");
-            mark_needs_review(pool, run.canonical_id, reason, run_id, cooldown_until).await?;
+            mark_needs_review(&mut **tx, run.canonical_id, reason, run_id, cooldown_until).await?;
         }
         other => anyhow::bail!("validation run action `{other}` cannot be applied from preview"),
     }
-    set_review_status(pool, run_id, "applied_preview").await?;
+    set_review_status(&mut **tx, run_id, "applied_preview").await?;
     insert_score_audit(
-        pool,
+        &mut **tx,
         run.canonical_id,
         run.project_id,
         "validation_completed",
@@ -521,12 +729,26 @@ pub async fn apply_preview(pool: &PgPool, run_id: Uuid) -> Result<ReviewResoluti
     )
     .await?;
 
+    pending_events.push(crate::repository::prepare_validation_activity(
+        run.project_id,
+        run.canonical_id,
+        new_memory_id.unwrap_or(run.memory_id),
+        run_id,
+        "Validation preview applied",
+        execution,
+    ));
+    let mut events = Vec::new();
+    for event in pending_events {
+        let sequence = mem_store::events::append(tx, &event).await?;
+        events.push((event, sequence));
+    }
     Ok(ReviewResolution {
         run_id,
         applied: true,
         canonical_id: run.canonical_id,
         project_id: run.project_id,
         new_memory_id,
+        events,
     })
 }
 

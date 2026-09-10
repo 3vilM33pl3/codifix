@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::propagation::propagation_increments;
 use crate::repository::{
-    AccessEventRow, ScoreCounters, ScoreUpdate, apply_score_boost, fetch_canonical_edges,
+    AccessEventRow, ScoreCounters, ScoreUpdate, apply_score_boost_tx, fetch_canonical_edges,
     insert_access_events, insert_score_audit, resolve_canonicals, resolve_project_ids,
 };
 use crate::scoring::{AccessKind, ScoreParams};
@@ -46,12 +46,25 @@ pub async fn record_access_batch(
     params: &ScoreParams,
     validation_threshold: f64,
 ) -> Result<Vec<ThresholdCrossing>> {
+    let mut tx = pool.begin().await?;
+    let crossings = record_access_batch_tx(&mut tx, batch, params, validation_threshold).await?;
+    tx.commit().await?;
+    Ok(crossings)
+}
+
+/// Scores, compact access journal and threshold audit commit together.
+pub async fn record_access_batch_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    batch: &AccessBatch,
+    params: &ScoreParams,
+    validation_threshold: f64,
+) -> Result<Vec<ThresholdCrossing>> {
     if batch.events.is_empty() {
         return Ok(Vec::new());
     }
 
     let memory_ids: Vec<Uuid> = batch.events.iter().map(|(id, _)| *id).collect();
-    let canonicals = resolve_canonicals(pool, &memory_ids).await?;
+    let canonicals = resolve_canonicals(&mut **tx, &memory_ids).await?;
 
     // Strongest signal per canonical: a memory can appear as both a plain
     // retrieval and a citation in one batch (or via several versions).
@@ -74,7 +87,7 @@ pub async fn record_access_batch(
     }
 
     let seeds: Vec<Uuid> = direct.keys().copied().collect();
-    let edges = fetch_canonical_edges(pool, &seeds, params.max_hops).await?;
+    let edges = fetch_canonical_edges(&mut **tx, &seeds, params.max_hops).await?;
 
     // Propagated increments from every seed; a directly accessed memory
     // never also receives a propagated increment in the same batch, and
@@ -101,10 +114,19 @@ pub async fn record_access_batch(
     // Propagated targets may have no score row yet and are not in
     // `direct`, so resolve their project ids from memory_entries.
     let propagated_ids: Vec<Uuid> = propagated.keys().copied().collect();
-    let propagated_projects = resolve_project_ids(pool, &propagated_ids).await?;
+    let propagated_projects = resolve_project_ids(&mut **tx, &propagated_ids).await?;
 
     let mut updates: Vec<(ScoreUpdate, AccessEventRow)> = Vec::new();
-    for (&canonical_id, &(project_id, kind)) in &direct {
+    let mut ordered_direct: Vec<_> = direct.iter().collect();
+    ordered_direct.sort_by_key(|(id, _)| **id);
+    let mut ordered_propagated: Vec<_> = propagated.iter().collect();
+    ordered_propagated.sort_by_key(|(id, _)| **id);
+    // Lock the union in canonical order before any score write.
+    let mut all_ids: Vec<Uuid> = direct.keys().chain(propagated.keys()).copied().collect();
+    all_ids.sort_unstable();
+    all_ids.dedup();
+    crate::repository::lock_score_inputs_tx(tx, &all_ids).await?;
+    for (&canonical_id, &(project_id, kind)) in ordered_direct {
         let boost = kind.boost(params);
         let counters = ScoreCounters {
             access: 1,
@@ -112,7 +134,7 @@ pub async fn record_access_batch(
             propagated: 0,
         };
         let update =
-            apply_score_boost(pool, canonical_id, project_id, boost, counters, params).await?;
+            apply_score_boost_tx(tx, canonical_id, project_id, boost, counters, params).await?;
         updates.push((
             update,
             AccessEventRow {
@@ -125,7 +147,7 @@ pub async fn record_access_batch(
             },
         ));
     }
-    for (&canonical_id, &(increment, hop)) in &propagated {
+    for (&canonical_id, &(increment, hop)) in ordered_propagated {
         let Some(&project_id) = propagated_projects.get(&canonical_id) else {
             continue;
         };
@@ -135,7 +157,7 @@ pub async fn record_access_batch(
             propagated: 1,
         };
         let update =
-            apply_score_boost(pool, canonical_id, project_id, increment, counters, params).await?;
+            apply_score_boost_tx(tx, canonical_id, project_id, increment, counters, params).await?;
         updates.push((
             update,
             AccessEventRow {
@@ -150,13 +172,13 @@ pub async fn record_access_batch(
     }
 
     let event_rows: Vec<AccessEventRow> = updates.iter().map(|(_, row)| row.clone()).collect();
-    insert_access_events(pool, &event_rows).await?;
+    insert_access_events(&mut **tx, &event_rows).await?;
 
     let mut crossings = Vec::new();
     for (update, _) in &updates {
         if update.crossed(validation_threshold) {
             insert_score_audit(
-                pool,
+                &mut **tx,
                 update.canonical_id,
                 update.project_id,
                 "threshold_crossed",

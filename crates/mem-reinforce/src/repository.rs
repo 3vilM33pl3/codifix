@@ -17,6 +17,90 @@ use crate::scoring::ScoreParams;
 /// cannot make access recording expensive.
 pub const EDGE_FETCH_LIMIT: i64 = 500;
 
+/// Reject provider results/reviews prepared against a superseded, archived or deleted input.
+pub async fn lock_validation_source_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    canonical: Uuid,
+    memory: Uuid,
+    project: Uuid,
+) -> Result<()> {
+    let state: Option<String> = sqlx::query_scalar(
+        "SELECT status FROM memory_canonical_state
+        WHERE canonical_id = $1 AND project_id = $2 FOR UPDATE",
+    )
+    .bind(canonical)
+    .bind(project)
+    .fetch_optional(&mut **tx)
+    .await?;
+    anyhow::ensure!(
+        state.as_deref() == Some("active"),
+        "validation input is no longer active"
+    );
+    let latest: Option<(Uuid, bool)> = sqlx::query_as("SELECT id, COALESCE(is_tombstone,false)
+        FROM memory_entries WHERE canonical_id = $1 AND project_id = $2 ORDER BY version_no DESC LIMIT 1")
+        .bind(canonical).bind(project).fetch_optional(&mut **tx).await?;
+    anyhow::ensure!(
+        latest == Some((memory, false)),
+        "validation input version changed; validate again"
+    );
+    Ok(())
+}
+
+pub async fn lock_validation_run_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    run: Uuid,
+) -> Result<()> {
+    sqlx::query("SELECT id FROM memory_validation_runs WHERE id = $1 FOR UPDATE")
+        .bind(run)
+        .fetch_one(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+pub fn prepare_validation_activity(
+    project: Uuid,
+    canonical: Uuid,
+    memory: Uuid,
+    run: Uuid,
+    summary: &str,
+    execution: &crate::validate::ValidationExecution,
+) -> mem_store::events::TimelineEvent {
+    let mut event = mem_store::events::TimelineEvent::new(
+        project,
+        mem_record::ActivityKind::MemoryValidation,
+        summary.into(),
+    );
+    event.canonical_id = Some(canonical);
+    event.memory_id = Some(memory);
+    event.operation_id = Some(run.to_string());
+    execution.context.stamp(&mut event);
+    event
+}
+
+pub async fn append_validation_activity_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project: Uuid,
+    canonical: Uuid,
+    memory: Uuid,
+    run: Uuid,
+    summary: &str,
+    execution: &crate::validate::ValidationExecution,
+) -> Result<(mem_store::events::TimelineEvent, i64)> {
+    let event = prepare_validation_activity(project, canonical, memory, run, summary, execution);
+    let seq = mem_store::events::append(tx, &event).await?;
+    Ok((event, seq))
+}
+
+/// Serialize both existing and not-yet-created score rows in canonical order.
+pub async fn lock_score_inputs_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ids: &[Uuid],
+) -> Result<()> {
+    sqlx::query("SELECT canonical_id FROM memory_canonical_state WHERE canonical_id = ANY($1) ORDER BY canonical_id FOR UPDATE")
+        .bind(ids).fetch_all(&mut **tx).await?;
+    Ok(())
+}
+
 /// What a score update did to one canonical memory.
 #[derive(Debug, Clone, Copy)]
 pub struct ScoreUpdate {
@@ -68,8 +152,8 @@ pub async fn resolve_canonicals<'e, E: sqlx::PgExecutor<'e>>(
 /// Fetches undirected canonical-level relation edges reachable from `seeds`
 /// within `max_hops`, excluding `supersedes` (version lineage, not semantic
 /// association). Bounded by [`EDGE_FETCH_LIMIT`].
-pub async fn fetch_canonical_edges(
-    pool: &PgPool,
+pub async fn fetch_canonical_edges<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     seeds: &[Uuid],
     max_hops: u8,
 ) -> Result<Vec<CanonicalEdge>> {
@@ -106,7 +190,7 @@ pub async fn fetch_canonical_edges(
     .bind(seeds)
     .bind(i32::from(max_hops))
     .bind(EDGE_FETCH_LIMIT)
-    .fetch_all(pool)
+    .fetch_all(executor)
     .await
     .context("fetch canonical relation edges")?;
     Ok(rows
@@ -116,8 +200,8 @@ pub async fn fetch_canonical_edges(
 }
 
 /// Maps canonical ids to their project id.
-pub async fn resolve_project_ids(
-    pool: &PgPool,
+pub async fn resolve_project_ids<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     canonical_ids: &[Uuid],
 ) -> Result<HashMap<Uuid, Uuid>> {
     if canonical_ids.is_empty() {
@@ -131,7 +215,7 @@ pub async fn resolve_project_ids(
         "#,
     )
     .bind(canonical_ids)
-    .fetch_all(pool)
+    .fetch_all(executor)
     .await
     .context("resolve project ids for canonical memories")?;
     Ok(rows.into_iter().collect())
@@ -142,6 +226,26 @@ pub async fn resolve_project_ids(
 /// read-modify-write cycle. Returns the pre- and post-update activation.
 pub async fn apply_score_boost(
     pool: &PgPool,
+    canonical_id: Uuid,
+    project_id: Uuid,
+    boost: f64,
+    counters: ScoreCounters,
+    params: &ScoreParams,
+) -> Result<ScoreUpdate> {
+    let mut tx = pool.begin().await?;
+    let update =
+        apply_score_boost_tx(&mut tx, canonical_id, project_id, boost, counters, params).await?;
+    insert_score_audit(&mut *tx, canonical_id, project_id, "score_boost",
+        Some(update.old_activation), Some(update.new_activation), serde_json::json!({
+            "access": counters.access, "citation": counters.citation, "propagated": counters.propagated
+        })).await?;
+    tx.commit().await?;
+    Ok(update)
+}
+
+/// Low-level write; the owning transaction must also append its access/audit journal.
+pub async fn apply_score_boost_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     canonical_id: Uuid,
     project_id: Uuid,
     boost: f64,
@@ -194,7 +298,7 @@ pub async fn apply_score_boost(
     .bind(counters.citation)
     .bind(counters.propagated)
     .bind(half_life_secs)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await
     .context("apply reinforcement score boost")?;
     Ok(ScoreUpdate {
@@ -216,7 +320,10 @@ pub struct AccessEventRow {
     pub operation_id: Option<String>,
 }
 
-pub async fn insert_access_events(pool: &PgPool, rows: &[AccessEventRow]) -> Result<()> {
+pub async fn insert_access_events<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    rows: &[AccessEventRow],
+) -> Result<()> {
     if rows.is_empty() {
         return Ok(());
     }
@@ -242,7 +349,7 @@ pub async fn insert_access_events(pool: &PgPool, rows: &[AccessEventRow]) -> Res
     .bind(&boosts)
     .bind(&hops)
     .bind(&operation_ids)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("insert memory access events")?;
     Ok(())
@@ -461,12 +568,36 @@ pub async fn loop_producers_for_memories(
 }
 
 pub async fn prune_access_events(pool: &PgPool, older_than: DateTime<Utc>) -> Result<u64> {
-    let result = sqlx::query("DELETE FROM memory_access_events WHERE accessed_at < $1")
-        .bind(older_than)
-        .execute(pool)
-        .await
-        .context("prune memory access events")?;
-    Ok(result.rows_affected())
+    let mut tx = pool.begin().await?;
+    let count = prune_access_events_tx(&mut tx, older_than).await?;
+    tx.commit().await?;
+    Ok(count)
+}
+
+pub async fn prune_access_events_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    older_than: DateTime<Utc>,
+) -> Result<u64> {
+    // Operational journal survives pruning; no timeline or recursive job.
+    let rows: Vec<(Uuid, i64)> = sqlx::query_as(
+        "WITH deleted AS (DELETE FROM memory_access_events WHERE accessed_at < $1 RETURNING project_id)
+         SELECT project_id, count(*) FROM deleted GROUP BY project_id ORDER BY project_id")
+        .bind(older_than).fetch_all(&mut **tx).await?;
+    let mut count = 0;
+    for (project, removed) in rows {
+        insert_score_audit(
+            &mut **tx,
+            Uuid::nil(),
+            project,
+            "access_retention",
+            None,
+            None,
+            serde_json::json!({"removed": removed, "before": older_than}),
+        )
+        .await?;
+        count += u64::try_from(removed)?;
+    }
+    Ok(count)
 }
 
 /// Parameters for the due-for-validation scan, mirrored from
@@ -612,6 +743,16 @@ pub struct CompactionSummary {
 /// exists. Writes one `decay_compaction` audit row when anything was
 /// removed (canonical_id is nil for sweep-level entries).
 pub async fn compact_scores(pool: &PgPool, half_life_secs: f64) -> Result<CompactionSummary> {
+    let mut tx = pool.begin().await?;
+    let summary = compact_scores_tx(&mut tx, half_life_secs).await?;
+    tx.commit().await?;
+    Ok(summary)
+}
+
+pub async fn compact_scores_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    half_life_secs: f64,
+) -> Result<CompactionSummary> {
     let cold = sqlx::query(
         r#"
         DELETE FROM memory_scores
@@ -624,7 +765,7 @@ pub async fn compact_scores(pool: &PgPool, half_life_secs: f64) -> Result<Compac
         "#,
     )
     .bind(half_life_secs.max(1.0))
-    .execute(pool)
+    .execute(&mut **tx)
     .await
     .context("compact cold score rows")?;
     let orphans = sqlx::query(
@@ -635,7 +776,7 @@ pub async fn compact_scores(pool: &PgPool, half_life_secs: f64) -> Result<Compac
         )
         "#,
     )
-    .execute(pool)
+    .execute(&mut **tx)
     .await
     .context("compact orphaned score rows")?;
     let summary = CompactionSummary {
@@ -656,7 +797,7 @@ pub async fn compact_scores(pool: &PgPool, half_life_secs: f64) -> Result<Compac
             "cold_rows_deleted": summary.cold_rows_deleted,
             "orphan_rows_deleted": summary.orphan_rows_deleted,
         }))
-        .execute(pool)
+        .execute(&mut **tx)
         .await
         .context("insert compaction audit row")?;
     }
@@ -767,8 +908,8 @@ pub struct MemorySnapshot {
     pub updated_at: DateTime<Utc>,
 }
 
-pub async fn fetch_memory_snapshot(
-    pool: &PgPool,
+pub async fn fetch_memory_snapshot<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     memory_id: Uuid,
 ) -> Result<Option<MemorySnapshot>> {
     sqlx::query_as::<_, MemorySnapshot>(
@@ -785,7 +926,7 @@ pub async fn fetch_memory_snapshot(
         "#,
     )
     .bind(memory_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await
     .context("fetch memory snapshot for validation")
 }
@@ -896,8 +1037,8 @@ pub async fn fetch_prior_validation_runs(
 }
 
 /// Inserts a validation run in `running` state and returns its id.
-pub async fn insert_validation_run(
-    pool: &PgPool,
+pub async fn insert_validation_run<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     canonical_id: Uuid,
     memory_id: Uuid,
     project_id: Uuid,
@@ -918,7 +1059,7 @@ pub async fn insert_validation_run(
     .bind(project_id)
     .bind(trigger)
     .bind(dry_run)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("insert validation run")?;
     Ok(run_id)
@@ -937,19 +1078,19 @@ pub struct ValidationRunCompletion {
     pub details: serde_json::Value,
 }
 
-pub async fn complete_validation_run(
-    pool: &PgPool,
+pub async fn complete_validation_run<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     run_id: Uuid,
     completion: &ValidationRunCompletion,
 ) -> Result<()> {
     sqlx::query(
-        r#"
-        UPDATE memory_validation_runs SET
+        r#"WITH changed AS (UPDATE memory_validation_runs SET
             status = 'completed', verdict = $2, confidence = $3, action = $4,
             reasons_json = $5, proposed_candidate_json = $6, review_status = $7,
             model = $8, details_json = $9, finished_at = now()
-        WHERE id = $1
-        "#,
+        WHERE id = $1 RETURNING id, status, review_status, canonical_id, project_id)
+        INSERT INTO memory_score_audit (id, canonical_id, project_id, reason, details_json)
+        SELECT gen_random_uuid(), canonical_id, project_id, 'validation_run_completed', jsonb_build_object('run_id', id, 'status', status) FROM changed"#,
     )
     .bind(run_id)
     .bind(completion.verdict)
@@ -960,19 +1101,25 @@ pub async fn complete_validation_run(
     .bind(completion.review_status)
     .bind(&completion.model)
     .bind(&completion.details)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("complete validation run")?;
     Ok(())
 }
 
-pub async fn fail_validation_run(pool: &PgPool, run_id: Uuid, error: &str) -> Result<()> {
+pub async fn fail_validation_run<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    run_id: Uuid,
+    error: &str,
+) -> Result<()> {
     sqlx::query(
-        "UPDATE memory_validation_runs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1",
+        "WITH changed AS (UPDATE memory_validation_runs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1 RETURNING id, status, review_status, canonical_id, project_id)
+        INSERT INTO memory_score_audit (id, canonical_id, project_id, reason, details_json)
+        SELECT gen_random_uuid(), canonical_id, project_id, 'validation_run_failed', jsonb_build_object('run_id', id, 'status', status) FROM changed",
     )
     .bind(run_id)
     .bind(error)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("mark validation run failed")?;
     Ok(())
@@ -992,6 +1139,17 @@ pub async fn insert_validation_evidence(
     run_id: Uuid,
     rows: &[EvidenceRow],
 ) -> Result<()> {
+    let mut tx = pool.begin().await?;
+    insert_validation_evidence_tx(&mut tx, run_id, rows).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn insert_validation_evidence_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    run_id: Uuid,
+    rows: &[EvidenceRow],
+) -> Result<()> {
     for row in rows {
         sqlx::query(
             r#"
@@ -1006,7 +1164,7 @@ pub async fn insert_validation_evidence(
         .bind(&row.evidence_ref)
         .bind(&row.stance)
         .bind(&row.excerpt)
-        .execute(pool)
+        .execute(&mut **tx)
         .await
         .context("insert validation evidence row")?;
     }
@@ -1014,54 +1172,54 @@ pub async fn insert_validation_evidence(
 }
 
 /// Marks a memory revalidated: fresh validation metadata plus cooldown.
-pub async fn mark_validated(
-    pool: &PgPool,
+pub async fn mark_validated<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     canonical_id: Uuid,
     confidence: f32,
     run_id: Uuid,
     cooldown_until: DateTime<Utc>,
 ) -> Result<()> {
     sqlx::query(
-        r#"
-        UPDATE memory_scores SET
+        r#"WITH changed AS (UPDATE memory_scores SET
             validated_at = now(), validation_confidence = $2,
             last_validation_id = $3, validation_cooldown_until = $4,
             needs_review = FALSE, needs_review_reason = NULL, updated_at = now()
-        WHERE canonical_id = $1
-        "#,
+        WHERE canonical_id = $1 RETURNING canonical_id, project_id)
+        INSERT INTO memory_score_audit (id, canonical_id, project_id, reason, details_json)
+        SELECT gen_random_uuid(), canonical_id, project_id, 'validated', jsonb_build_object('run_id', $3) FROM changed"#,
     )
     .bind(canonical_id)
     .bind(confidence)
     .bind(run_id)
     .bind(cooldown_until)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("mark memory validated")?;
     Ok(())
 }
 
 /// Flags a memory for human review; content is never touched.
-pub async fn mark_needs_review(
-    pool: &PgPool,
+pub async fn mark_needs_review<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     canonical_id: Uuid,
     reason: &str,
     run_id: Uuid,
     cooldown_until: DateTime<Utc>,
 ) -> Result<()> {
     sqlx::query(
-        r#"
-        UPDATE memory_scores SET
+        r#"WITH changed AS (UPDATE memory_scores SET
             needs_review = TRUE, needs_review_reason = $2,
             last_validation_id = $3, validation_cooldown_until = $4,
             updated_at = now()
-        WHERE canonical_id = $1
-        "#,
+        WHERE canonical_id = $1 RETURNING canonical_id, project_id)
+        INSERT INTO memory_score_audit (id, canonical_id, project_id, reason, details_json)
+        SELECT gen_random_uuid(), canonical_id, project_id, 'needs_review_set', jsonb_build_object('run_id', $3) FROM changed"#,
     )
     .bind(canonical_id)
     .bind(reason)
     .bind(run_id)
     .bind(cooldown_until)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("mark memory needs_review")?;
     Ok(())
@@ -1070,44 +1228,46 @@ pub async fn mark_needs_review(
 /// Records that a correction is pending review; optionally stamps
 /// `last_invalidated_at` when the verdict found the content no longer
 /// accurate.
-pub async fn mark_correction_pending(
-    pool: &PgPool,
+pub async fn mark_correction_pending<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     canonical_id: Uuid,
     run_id: Uuid,
     cooldown_until: DateTime<Utc>,
     invalidated: bool,
 ) -> Result<()> {
     sqlx::query(
-        r#"
-        UPDATE memory_scores SET
+        r#"WITH changed AS (UPDATE memory_scores SET
             last_validation_id = $2, validation_cooldown_until = $3,
             last_invalidated_at = CASE WHEN $4 THEN now() ELSE last_invalidated_at END,
             updated_at = now()
-        WHERE canonical_id = $1
-        "#,
+        WHERE canonical_id = $1 RETURNING canonical_id, project_id)
+        INSERT INTO memory_score_audit (id, canonical_id, project_id, reason, details_json)
+        SELECT gen_random_uuid(), canonical_id, project_id, 'correction_pending', jsonb_build_object('run_id', $2) FROM changed"#,
     )
     .bind(canonical_id)
     .bind(run_id)
     .bind(cooldown_until)
     .bind(invalidated)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("mark memory correction pending")?;
     Ok(())
 }
 
 /// Failure-path cooldown so a broken provider cannot retry-loop a memory.
-pub async fn set_validation_cooldown(
-    pool: &PgPool,
+pub async fn set_validation_cooldown<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
     canonical_id: Uuid,
     cooldown_until: DateTime<Utc>,
 ) -> Result<()> {
     sqlx::query(
-        "UPDATE memory_scores SET validation_cooldown_until = $2, updated_at = now() WHERE canonical_id = $1",
+        "WITH changed AS (UPDATE memory_scores SET validation_cooldown_until = $2, updated_at = now() WHERE canonical_id = $1 RETURNING canonical_id, project_id)
+        INSERT INTO memory_score_audit (id, canonical_id, project_id, reason, details_json)
+        SELECT gen_random_uuid(), canonical_id, project_id, 'validation_cooldown', '{}'::jsonb FROM changed",
     )
     .bind(canonical_id)
     .bind(cooldown_until)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("set validation cooldown")?;
     Ok(())
@@ -1229,12 +1389,15 @@ pub async fn list_validation_runs(
         .context("list validation runs")
 }
 
-pub async fn fetch_validation_run(pool: &PgPool, run_id: Uuid) -> Result<Option<ValidationRunRow>> {
+pub async fn fetch_validation_run<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    run_id: Uuid,
+) -> Result<Option<ValidationRunRow>> {
     let sql =
         format!("SELECT {VALIDATION_RUN_COLUMNS} FROM memory_validation_runs r WHERE r.id = $1");
     sqlx::query_as::<_, ValidationRunRow>(&sql)
         .bind(run_id)
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await
         .context("fetch validation run")
 }
@@ -1264,27 +1427,36 @@ pub async fn fetch_validation_evidence(pool: &PgPool, run_id: Uuid) -> Result<Ve
     })
 }
 
-pub async fn set_review_status(pool: &PgPool, run_id: Uuid, review_status: &str) -> Result<()> {
-    sqlx::query("UPDATE memory_validation_runs SET review_status = $2 WHERE id = $1")
+pub async fn set_review_status<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    run_id: Uuid,
+    review_status: &str,
+) -> Result<()> {
+    sqlx::query("WITH changed AS (UPDATE memory_validation_runs SET review_status = $2 WHERE id = $1 RETURNING id, status, review_status, canonical_id, project_id)
+        INSERT INTO memory_score_audit (id, canonical_id, project_id, reason, details_json)
+        SELECT gen_random_uuid(), canonical_id, project_id, 'review_status', jsonb_build_object('run_id', id, 'review_status', review_status) FROM changed")
         .bind(run_id)
         .bind(review_status)
-        .execute(pool)
+        .execute(executor)
         .await
         .context("set validation run review status")?;
     Ok(())
 }
 
 /// Clears a needs_review flag after a human resolved it.
-pub async fn clear_needs_review(pool: &PgPool, canonical_id: Uuid) -> Result<bool> {
+pub async fn clear_needs_review<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    canonical_id: Uuid,
+) -> Result<bool> {
     let result = sqlx::query(
-        r#"
-        UPDATE memory_scores SET
+        r#"WITH changed AS (UPDATE memory_scores SET
             needs_review = FALSE, needs_review_reason = NULL, updated_at = now()
-        WHERE canonical_id = $1 AND needs_review
-        "#,
+        WHERE canonical_id = $1 AND needs_review RETURNING canonical_id, project_id)
+        INSERT INTO memory_score_audit (id, canonical_id, project_id, reason, details_json)
+        SELECT gen_random_uuid(), canonical_id, project_id, 'needs_review_resolved', '{}'::jsonb FROM changed"#,
     )
     .bind(canonical_id)
-    .execute(pool)
+    .execute(executor)
     .await
     .context("clear needs_review flag")?;
     Ok(result.rows_affected() > 0)

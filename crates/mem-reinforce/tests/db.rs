@@ -75,6 +75,58 @@ fn test_params() -> ScoreParams {
 }
 
 #[tokio::test]
+async fn failed_access_journal_rolls_back_every_score_in_the_batch() {
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let slug = mem_test_support::unique_project_slug("access-atomic");
+    let project = Uuid::new_v4();
+    let first = Uuid::new_v4();
+    let second = Uuid::new_v4();
+    insert_project(&pool, &slug, project).await;
+    insert_memory(&pool, project, first, "first").await;
+    insert_memory(&pool, project, second, "second").await;
+    let mut batch = AccessBatch {
+        operation_id: Some("late\0journal failure".into()),
+        events: vec![
+            (first, AccessKind::Citation),
+            (second, AccessKind::Citation),
+        ],
+    };
+    assert!(
+        record_access_batch(&pool, &batch, &test_params(), 1.0)
+            .await
+            .is_err()
+    );
+    for table in [
+        "memory_scores",
+        "memory_access_events",
+        "memory_score_audit",
+    ] {
+        let count: i64 = sqlx::query_scalar(&format!(
+            "SELECT count(*) FROM {table} WHERE project_id = $1"
+        ))
+        .bind(project)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(count, 0, "{table} must roll back");
+    }
+    batch.operation_id = Some("committed".into());
+    record_access_batch(&pool, &batch, &test_params(), 1.0)
+        .await
+        .unwrap();
+    let count: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM memory_access_events WHERE project_id = $1")
+            .bind(project)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(count, 2);
+    cleanup(&pool, &slug, project).await;
+}
+
+#[tokio::test]
 async fn access_batch_scores_direct_and_propagated_memories() {
     let Some(pool) = mem_test_support::migrated_pool().await else {
         return;
@@ -570,6 +622,138 @@ mod validation {
         }
     }
 
+    #[tokio::test]
+    async fn reviewed_revision_rolls_back_on_event_failure_and_serializes_approvals() {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let (slug, project, memory) = seed(&pool, "review-atomic").await;
+        let mut verdict = raw_verdict(Verdict::Outdated, 0.9);
+        verdict.proposed_text = Some("Reviewed correction".into());
+        verdict.evidence.push(RawEvidence {
+            kind: EvidenceKind::Memory,
+            evidence_ref: memory.to_string(),
+            stance: EvidenceStance::Contradicts,
+            excerpt: Some("evidence".into()),
+        });
+        let outcome = run_validation(
+            &pool,
+            &candidate(memory, project),
+            &FakeProvider { verdict },
+            &policy(false, false),
+            ValidationTrigger::Manual,
+        )
+        .await
+        .unwrap();
+        let mut execution = mem_reinforce::validate::ValidationExecution::default();
+        execution.context.actor_name = "bad\0actor".into();
+        assert!(
+            mem_reinforce::validate::resolve_review_as(&pool, outcome.run_id, true, &execution)
+                .await
+                .is_err()
+        );
+        let count: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM memory_entries WHERE canonical_id = $1")
+                .bind(memory)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 1);
+        let jobs: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM background_jobs WHERE project_id = $1")
+                .bind(project)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(jobs, 0);
+        let run = mem_reinforce::repository::fetch_validation_run(&pool, outcome.run_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(run.review_status.as_deref(), Some("pending"));
+        assert!(score_row(&pool, memory).await.validated_at.is_none());
+        execution.context.actor_id = Uuid::new_v4().to_string();
+        execution.context.actor_name = "Reviewer".into();
+        let (first, second) = tokio::join!(
+            mem_reinforce::validate::resolve_review_as(&pool, outcome.run_id, true, &execution),
+            mem_reinforce::validate::resolve_review_as(&pool, outcome.run_id, true, &execution),
+        );
+        assert_ne!(
+            first.is_ok(),
+            second.is_ok(),
+            "only one approval may commit"
+        );
+        let applied = first.or(second).unwrap();
+        assert_eq!(applied.events.len(), 2);
+        assert!(
+            applied
+                .events
+                .iter()
+                .all(|(event, _)| event.actor_name.as_deref() == Some("Reviewer"))
+        );
+        let count: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM memory_entries WHERE canonical_id = $1")
+                .bind(memory)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let jobs: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM background_jobs WHERE project_id = $1")
+                .bind(project)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((count, jobs), (2, 4));
+        cleanup(&pool, &slug, project).await;
+    }
+
+    struct VersionChangingProvider {
+        pool: PgPool,
+        memory: Uuid,
+    }
+    #[async_trait::async_trait]
+    impl VerdictProvider for VersionChangingProvider {
+        async fn assess(&self, _: &mem_reinforce::ValidationContext) -> anyhow::Result<RawVerdict> {
+            mem_curate::apply_validation_revision(
+                &self.pool,
+                self.memory,
+                "Newer source",
+                "Newer source",
+            )
+            .await?;
+            Ok(raw_verdict(Verdict::Valid, 0.95))
+        }
+    }
+
+    #[tokio::test]
+    async fn provider_result_cannot_validate_a_version_that_changed_during_execution() {
+        let Some(pool) = mem_test_support::migrated_pool().await else {
+            return;
+        };
+        let (slug, project, memory) = seed(&pool, "validation-stale").await;
+        let result = run_validation(
+            &pool,
+            &candidate(memory, project),
+            &VersionChangingProvider {
+                pool: pool.clone(),
+                memory,
+            },
+            &policy(false, false),
+            ValidationTrigger::Manual,
+        )
+        .await;
+        assert!(result.unwrap_err().to_string().contains("version changed"));
+        assert!(score_row(&pool, memory).await.validated_at.is_none());
+        let status: String =
+            sqlx::query_scalar("SELECT status FROM memory_validation_runs WHERE project_id = $1")
+                .bind(project)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(status, "failed");
+        cleanup(&pool, &slug, project).await;
+    }
+
     async fn score_row(pool: &PgPool, canonical_id: Uuid) -> mem_reinforce::repository::ScoreRow {
         mem_reinforce::repository::fetch_scores(pool, &[canonical_id])
             .await
@@ -938,7 +1122,7 @@ mod validation {
         assert!(
             row.get::<Option<String>, _>("error")
                 .unwrap_or_default()
-                .contains("not present in gathered context")
+                .contains("Validation did not complete")
         );
 
         let score = score_row(&pool, memory_id).await;

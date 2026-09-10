@@ -817,6 +817,35 @@ pub async fn apply_validation_revision_tx(
     context: &mem_store::events::MutationContext,
     actor: &mem_store::jobs::JobActor,
 ) -> Result<ValidationRevisionMutation, sqlx::Error> {
+    let (memory_id, event) = prepare_validation_revision_tx(
+        tx,
+        previous_memory_id,
+        new_summary,
+        new_canonical_text,
+        context,
+        actor,
+    )
+    .await?;
+    let sequence = mem_store::events::append(tx, &event)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+    Ok(ValidationRevisionMutation {
+        memory_id,
+        event,
+        sequence,
+    })
+}
+
+/// Compose a revision with its owning review transaction. The caller MUST append
+/// the returned event after every other domain write and before committing.
+pub async fn prepare_validation_revision_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    previous_memory_id: Uuid,
+    new_summary: &str,
+    new_canonical_text: &str,
+    context: &mem_store::events::MutationContext,
+    actor: &mem_store::jobs::JobActor,
+) -> Result<(Uuid, mem_store::events::TimelineEvent), sqlx::Error> {
     // Fence the canonical stream before allocating its next version.
     let project: Uuid = sqlx::query_scalar("SELECT cs.project_id FROM memory_canonical_state cs JOIN memory_entries m ON m.canonical_id=cs.canonical_id WHERE m.id=$1 FOR UPDATE OF cs")
         .bind(previous_memory_id).fetch_one(&mut **tx).await?;
@@ -897,14 +926,7 @@ pub async fn apply_validation_revision_tx(
         .await
         .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
     event.operation_id = Some(event.id.to_string());
-    let sequence = mem_store::events::append(tx, &event)
-        .await
-        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
-    Ok(ValidationRevisionMutation {
-        memory_id: new_memory_id,
-        event,
-        sequence,
-    })
+    Ok((new_memory_id, event))
 }
 
 async fn insert_candidate_memory(

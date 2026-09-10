@@ -3054,6 +3054,7 @@ dependencies = [
  "mem-config",
  "mem-curate",
  "mem-record",
+ "mem-store",
  "mem-test-support",
  "serde",
  "serde_json",
