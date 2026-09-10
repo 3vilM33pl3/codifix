@@ -738,6 +738,27 @@ async fn jobs_http_inspection_retry_and_project_policy_are_real_and_sanitized() 
         .execute(&f.pool)
         .await
         .unwrap();
+    // Only independent validation remains ready. Once it finishes, children
+    // waiting for the blocked embedding must not inflate oldest-ready age.
+    let validation = Uuid::new_v5(&f.operation, b"validation_due");
+    sqlx::query("UPDATE background_jobs SET status='skipped' WHERE id=$1")
+        .bind(validation)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    let waiting: Value = client
+        .get(&url)
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(waiting["stats"]["queued"], 2);
+    assert!(waiting["stats"]["oldest_ready_age_seconds"].is_null());
     let request = serde_json::json!({"request_id":Uuid::new_v4()});
     let (session, csrf) = crate::auth::mint_web_session(&f.state, &f.pool, principal)
         .await

@@ -59,7 +59,7 @@ pub(crate) async fn list(
     )
     .await
     .map_err(error)?;
-    let row=sqlx::query("SELECT count(*) FILTER(WHERE status='queued') AS queued,count(*) FILTER(WHERE status='running') AS running,count(*) FILTER(WHERE status='retry_wait') AS retry_wait,count(*) FILTER(WHERE status='blocked') AS blocked,count(*) FILTER(WHERE status='failed') AS failed,EXTRACT(EPOCH FROM clock_timestamp()-min(available_at) FILTER(WHERE status IN ('queued','retry_wait') AND available_at<=clock_timestamp()))::float8 AS oldest_ready_age_seconds FROM background_jobs WHERE project_id=$1")
+    let row=sqlx::query("SELECT count(*) FILTER(WHERE status='queued') AS queued,count(*) FILTER(WHERE status='running') AS running,count(*) FILTER(WHERE status='retry_wait') AS retry_wait,count(*) FILTER(WHERE status='blocked') AS blocked,count(*) FILTER(WHERE status='failed') AS failed,EXTRACT(EPOCH FROM clock_timestamp()-min(available_at) FILTER(WHERE status IN ('queued','retry_wait') AND available_at<=clock_timestamp() AND NOT EXISTS (SELECT 1 FROM background_job_dependencies d JOIN background_jobs parent ON parent.id=d.depends_on WHERE d.job_id=j.id AND parent.status NOT IN ('succeeded','skipped'))))::float8 AS oldest_ready_age_seconds FROM background_jobs j WHERE project_id=$1")
         .bind(project).fetch_one(&pool).await.map_err(|e|error(e.into()))?;
     let last = state
         .background
