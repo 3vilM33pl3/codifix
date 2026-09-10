@@ -84,55 +84,82 @@ pub(crate) async fn call_llm_strict_json(
         );
     };
 
-    let mut builder = state.http_client.post(url);
-    if let Some(api_key) = api_key {
-        builder = builder.bearer_auth(api_key);
-    }
-    let http_response = match builder.json(&request_body).send().await {
-        Ok(response) => response,
-        Err(error) => {
-            audit_error(&format!("send llm request: {error}"), None, &request_body);
-            return Err(error).context("send llm request");
-        }
-    };
-    let status = http_response.status();
-    let body = match http_response.text().await {
-        Ok(body) => body,
-        Err(error) => {
-            audit_error(&format!("read llm body: {error}"), None, &request_body);
-            return Err(error).context("read llm body");
-        }
-    };
-    let token_usage = token_usage_from_chat_body(&body);
-    if !status.is_success() {
-        let error = format!("llm call failed: {status} {body}");
-        audit_error(&error, token_usage.clone(), &request_body);
-        anyhow::bail!(error);
-    }
-    let content = match chat_content_from_body(&body) {
-        Ok(content) => content,
-        Err(error) => {
-            audit_error(&error.to_string(), token_usage.clone(), &request_body);
-            return Err(error);
-        }
-    };
-    emit_llm_audit_activity(
+    let attempt = crate::effects::Attempt::begin(
         state,
-        request.project,
+        Some(request.project),
+        mem_store::effects::EffectKind::ProviderRequest,
         request.purpose,
-        request.subject.clone(),
-        &request_body,
-        "success",
-        None,
-        Some(started.elapsed().as_millis() as u64),
-        token_usage.clone(),
-    );
-    Ok(LlmCallOutcome {
-        content,
-        token_usage,
-        request_body,
-        started,
-    })
+        &serde_json::to_vec(&request_body)?,
+        &mem_store::events::MutationContext::internal("llm-provider"),
+    )
+    .await?;
+    let outcome: Result<LlmCallOutcome> = async {
+        let mut builder = state.http_client.post(url);
+        if let Some(api_key) = api_key {
+            builder = builder.bearer_auth(api_key);
+        }
+        let http_response = match builder.json(&request_body).send().await {
+            Ok(response) => response,
+            Err(error) => {
+                audit_error(&format!("send llm request: {error}"), None, &request_body);
+                return Err(error).context("send llm request");
+            }
+        };
+        let status = http_response.status();
+        let body = match http_response.text().await {
+            Ok(body) => body,
+            Err(error) => {
+                audit_error(&format!("read llm body: {error}"), None, &request_body);
+                return Err(error).context("read llm body");
+            }
+        };
+        let token_usage = token_usage_from_chat_body(&body);
+        if !status.is_success() {
+            let error = format!("llm call failed: {status} {body}");
+            audit_error(&error, token_usage.clone(), &request_body);
+            anyhow::bail!(error);
+        }
+        let content = match chat_content_from_body(&body) {
+            Ok(content) => content,
+            Err(error) => {
+                audit_error(&error.to_string(), token_usage.clone(), &request_body);
+                return Err(error);
+            }
+        };
+        emit_llm_audit_activity(
+            state,
+            request.project,
+            request.purpose,
+            request.subject.clone(),
+            &request_body,
+            "success",
+            None,
+            Some(started.elapsed().as_millis() as u64),
+            token_usage.clone(),
+        );
+        Ok(LlmCallOutcome {
+            content,
+            token_usage,
+            request_body,
+            started,
+        })
+    }
+    .await;
+    attempt
+        .observe(
+            if outcome.is_ok() {
+                mem_store::effects::EffectStatus::Confirmed
+            } else {
+                mem_store::effects::EffectStatus::Uncertain
+            },
+            if outcome.is_ok() {
+                mem_store::effects::EffectReason::Observed
+            } else {
+                mem_store::effects::EffectReason::RemoteIo
+            },
+        )
+        .await?;
+    outcome
 }
 
 /// Extracts the first choice's trimmed message content from a

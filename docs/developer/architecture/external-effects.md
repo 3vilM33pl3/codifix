@@ -28,6 +28,19 @@ policy-file symlink outside that root. The journal does not turn untrusted
 filesystem owners into a security boundary: administrators with host access
 can still modify files outside the service.
 
+## Provider requests and watcher restarts
+
+Strict-JSON LLM calls and local/remote watcher restart requests record an intent
+before sending the request. Successful responses confirm that operation; errors
+or cancellation leave an uncertain outcome, not a claim that the remote action
+was undone. The journal stores a request fingerprint, purpose or watcher ID and
+service identity, never the prompt, credentials or remote response body.
+
+The fake-service test observes the committed intent before responding and
+demonstrates cancellation followed by reconciliation without another request.
+Watcher health stays stale after an ambiguous restart. Subsequent watchdog
+policy decisions are new attempts, not replay of an old journal entry.
+
 ## Recovery and operator inspection
 
 A primary, writable service scans its own host's pending intents every 30

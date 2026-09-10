@@ -101,6 +101,7 @@ pub(crate) async fn watcher_unregister(
 
 pub(crate) async fn watcher_restart_local(
     State(state): State<AppState>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(request): Json<WatcherRestartRequest>,
 ) -> Result<Json<WatcherRestartResponse>, ApiError> {
     request.validate().map_err(ApiError::validation)?;
@@ -111,7 +112,10 @@ pub(crate) async fn watcher_restart_local(
         ));
     }
 
-    restart_local_watcher_service_name(&local_watcher_restart_service_name(&request))
+    let mut context = crate::effects::actor(&principal);
+    context.source = "watcher-restart".into();
+    dispatch_watcher_restart_as(&state, &request, &context)
+        .await
         .map_err(ApiError::io)?;
     update_local_watcher_restart_state(&state.watchers, &request.watcher_id);
     notify_project_refreshed(&state, request.project.clone());
@@ -906,11 +910,13 @@ pub(crate) async fn run_watcher_watchdog(state: AppState) -> Result<()> {
                     .lock()
                     .expect("watcher registry mutex poisoned");
                 if let Some(watcher) = registry.get_mut(&request.watcher_id) {
-                    watcher.health = WatcherHealth::Failed;
+                    // A lost remote/database acknowledgement does not prove
+                    // the restart failed. A fresh heartbeat resolves health.
+                    watcher.health = WatcherHealth::Stale;
                     let details = ActivityDetails::WatcherHealth {
                         watcher_id: watcher.watcher_id.clone(),
                         hostname: watcher.hostname.clone(),
-                        health: WatcherHealth::Failed,
+                        health: WatcherHealth::Stale,
                         managed_by_service: watcher.managed_by_service,
                         restart_attempt_count: watcher.restart_attempt_count,
                         agent_cli: watcher.agent_cli.clone(),
@@ -918,7 +924,7 @@ pub(crate) async fn run_watcher_watchdog(state: AppState) -> Result<()> {
                         agent_pid: watcher.agent_pid,
                         previous_health: Some(WatcherHealth::Restarting),
                         recovered_after_restart_attempts: None,
-                        message: Some(format!("restart request failed: {error}")),
+                        message: Some(format!("restart outcome unavailable: {error}")),
                     };
                     let project = watcher.project.clone();
                     drop(registry);
@@ -928,7 +934,7 @@ pub(crate) async fn run_watcher_watchdog(state: AppState) -> Result<()> {
                         project,
                         None,
                         ActivityKind::WatcherHealth,
-                        format!("Watcher {} restart failed", request.watcher_id),
+                        format!("Watcher {} restart outcome unavailable", request.watcher_id),
                         Some(details),
                     );
                 }
@@ -941,6 +947,47 @@ pub(crate) async fn dispatch_watcher_restart(
     state: &AppState,
     request: &WatcherRestartRequest,
 ) -> Result<()> {
+    dispatch_watcher_restart_as(
+        state,
+        request,
+        &mem_store::events::MutationContext::internal("watcher-manager"),
+    )
+    .await
+}
+
+async fn dispatch_watcher_restart_as(
+    state: &AppState,
+    request: &WatcherRestartRequest,
+    context: &mem_store::events::MutationContext,
+) -> Result<()> {
+    let attempt = crate::effects::Attempt::begin(
+        state,
+        Some(&request.project),
+        mem_store::effects::EffectKind::WatcherRestart,
+        &request.watcher_id,
+        &serde_json::to_vec(request)?,
+        context,
+    )
+    .await?;
+    let outcome = perform_watcher_restart(state, request).await;
+    attempt
+        .observe(
+            if outcome.is_ok() {
+                mem_store::effects::EffectStatus::Confirmed
+            } else {
+                mem_store::effects::EffectStatus::Uncertain
+            },
+            if outcome.is_ok() {
+                mem_store::effects::EffectReason::Observed
+            } else {
+                mem_store::effects::EffectReason::RemoteIo
+            },
+        )
+        .await?;
+    outcome
+}
+
+async fn perform_watcher_restart(state: &AppState, request: &WatcherRestartRequest) -> Result<()> {
     if request.host_service_id == state.config.cluster.service_id {
         restart_local_watcher_service_name(&local_watcher_restart_service_name(request))?;
         return Ok(());
@@ -961,8 +1008,7 @@ pub(crate) async fn dispatch_watcher_restart(
         .context("send remote watcher restart request")?;
     if !response.status().is_success() {
         let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        anyhow::bail!("remote restart failed with {status}: {body}");
+        anyhow::bail!("remote restart outcome unavailable ({status})");
     }
     Ok(())
 }

@@ -56,6 +56,59 @@ pub(crate) fn fingerprint(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+/// Handle for one external attempt. Dropping it leaves a recoverable pending
+/// intent rather than inventing a failure or re-executing the effect.
+pub(crate) struct Attempt {
+    pool: sqlx::PgPool,
+    id: Uuid,
+}
+impl Attempt {
+    pub(crate) async fn begin(
+        state: &AppState,
+        project: Option<&str>,
+        kind: EffectKind,
+        resource: &str,
+        input: &[u8],
+        context: &MutationContext,
+    ) -> anyhow::Result<Self> {
+        let pool = state.pool().map_err(|_| {
+            anyhow::anyhow!("external intent store unavailable; operation was not started")
+        })?;
+        let project_id = if let Some(project) = project {
+            sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+                .bind(project)
+                .fetch_optional(&pool)
+                .await?
+        } else {
+            None
+        };
+        let id = Uuid::new_v4();
+        effects::begin(
+            &pool,
+            &EffectIntent {
+                id,
+                project_id,
+                kind,
+                host_id: state.config.cluster.service_id.clone(),
+                resource: resource.into(),
+                input_fingerprint: fingerprint(input),
+                actor_id: context.actor_id.clone(),
+                source: context.source.clone(),
+            },
+        )
+        .await?;
+        Ok(Self { pool, id })
+    }
+    pub(crate) async fn observe(
+        &self,
+        status: EffectStatus,
+        reason: EffectReason,
+    ) -> anyhow::Result<()> {
+        effects::conclude(&self.pool,self.id,Uuid::new_v5(&self.id,b"observed"),status,reason).await
+            .map_err(|error|anyhow::anyhow!("external operation {} outcome acknowledgement failed ({error}); the external effect was not rolled back",self.id))
+    }
+}
+
 /// Caller supplies a pure edit, performed after taking the path's writer lock.
 /// The dedicated connection closes on cancellation so no pooled session retains
 /// an advisory lock. No transaction spans the external write.

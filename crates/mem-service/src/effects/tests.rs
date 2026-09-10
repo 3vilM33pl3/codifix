@@ -1,6 +1,146 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use super::*;
 
+#[tokio::test]
+async fn provider_intent_precedes_request_and_interrupted_execution_is_not_replayed() {
+    use axum::{Json, Router, extract::State, routing::post};
+    use std::sync::{Arc, Mutex};
+    #[derive(Clone)]
+    struct Fake {
+        pool: sqlx::PgPool,
+        host: String,
+        received: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    }
+    async fn respond(State(fake): State<Fake>) -> Json<serde_json::Value> {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM external_effects WHERE host_id=$1 AND status='pending'",
+        )
+        .bind(&fake.host)
+        .fetch_one(&fake.pool)
+        .await
+        .unwrap();
+        assert_eq!(count, 1, "provider must observe the committed intent first");
+        fake.received.notify_one();
+        fake.release.notified().await;
+        Json(serde_json::json!({"choices":[{"message":{"content":"{}"}}]}))
+    }
+    let Some(pool) = mem_test_support::migrated_pool().await else {
+        return;
+    };
+    let host = Uuid::new_v4().to_string();
+    let fake = Fake {
+        pool: pool.clone(),
+        host: host.clone(),
+        received: Arc::new(tokio::sync::Notify::new()),
+        release: Arc::new(tokio::sync::Notify::new()),
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let url = format!("http://{address}/v1");
+    let router = Router::new()
+        .route("/v1/chat/completions", post(respond))
+        .route("/v1/watchers/restart-local", post(respond))
+        .with_state(fake.clone());
+    let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+    let config = serde_json::from_value(serde_json::json!({
+        "service":{"bind_addr":"127.0.0.1:0","api_token":"fixture"},
+        "database":{"url":std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()},
+        "offline":{"enabled":false},"cluster":{"enabled":false,"service_id":host},
+        "reinforcement":{"enabled":false},"llm_audit":{"enabled":false},
+        "llm":{"provider":"ollama","base_url":url,"model":"fixture"},"mcp":{"enabled":false}
+    }))
+    .unwrap();
+    let state = crate::runtime::build_state(config, Arc::new(Mutex::new(None)))
+        .await
+        .unwrap();
+    let request = crate::llm::LlmStrictJsonRequest {
+        project: "synthetic-unregistered",
+        purpose: "provider-test",
+        subject: "synthetic subject".into(),
+        system_prompt: "private prompt must not enter operational journal",
+        user_prompt: "private source must not enter operational journal".into(),
+        max_output_tokens_cap: 10,
+    };
+    let call = crate::llm::call_llm_strict_json(&state, &request);
+    tokio::pin!(call);
+    tokio::select! {
+        _=fake.received.notified()=>{},
+        result=&mut call=>panic!("provider completed before release: {:?}",result.err()),
+        _=tokio::time::sleep(std::time::Duration::from_secs(5))=>panic!("provider not reached"),
+    }
+    fake.release.notify_one();
+    assert_eq!(call.await.unwrap().content, "{}");
+    let source = state.clone();
+    let task = tokio::spawn(async move {
+        let request = crate::llm::LlmStrictJsonRequest {
+            project: "synthetic-unregistered",
+            purpose: "interrupted-provider",
+            subject: "fixture".into(),
+            system_prompt: "fixture",
+            user_prompt: "fixture".into(),
+            max_output_tokens_cap: 10,
+        };
+        crate::llm::call_llm_strict_json(&source, &request).await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), fake.received.notified())
+        .await
+        .unwrap();
+    task.abort();
+    assert!(matches!(task.await,Err(error) if error.is_cancelled()));
+    sqlx::query("UPDATE external_effects SET reconcile_after=now()-interval '1 second' WHERE host_id=$1 AND status='pending'").bind(&host).execute(&pool).await.unwrap();
+    reconcile(&host, &pool).await.unwrap();
+    fake.release.notify_waiters();
+    state.cluster.peers.lock().unwrap().insert(
+        "remote-fixture".into(),
+        crate::state::ClusterPeer {
+            service_id: "remote-fixture".into(),
+            advertise_addr: address,
+            version: "fixture".into(),
+            priority: 0,
+            last_seen: chrono::Utc::now(),
+        },
+    );
+    fake.release.notify_one();
+    crate::repository::events::dispatch_watcher_restart(
+        &state,
+        &mem_record::WatcherRestartRequest {
+            project: "synthetic-unregistered".into(),
+            watcher_id: "synthetic-watcher".into(),
+            host_service_id: "remote-fixture".into(),
+            agent_session_id: None,
+        },
+    )
+    .await
+    .unwrap();
+    let rows: Vec<serde_json::Value> =
+        sqlx::query_scalar("SELECT to_jsonb(e) FROM external_effects e WHERE host_id=$1")
+            .bind(&host)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(rows.len(), 3);
+    assert!(
+        rows.iter()
+            .any(|r| r["kind"] == "watcher_restart" && r["status"] == "confirmed")
+    );
+    assert!(rows.iter().any(|r| r["status"] == "confirmed"));
+    assert!(rows.iter().any(|r| r["status"] == "uncertain"));
+    assert!(
+        !serde_json::to_string(&rows)
+            .unwrap()
+            .contains("private prompt")
+    );
+    server.abort();
+    state.pool().unwrap().close().await;
+    sqlx::query("DELETE FROM external_effect_outcomes WHERE effect_id IN (SELECT id FROM external_effects WHERE host_id=$1)").bind(&host).execute(&pool).await.unwrap();
+    sqlx::query("DELETE FROM external_effects WHERE host_id=$1")
+        .bind(host)
+        .execute(&pool)
+        .await
+        .unwrap();
+}
+
 #[test]
 fn project_policy_cannot_write_another_root_or_follow_an_escaping_symlink() {
     let root = std::env::temp_dir().join(format!("memory-policy-roots-{}", Uuid::new_v4()));
