@@ -28,16 +28,19 @@ export function useActivityController({
   const [llmAuditToggling, setLlmAuditToggling] = useState(false);
 
   useEffect(() => {
+    let disposed = false;
     setActivities([]);
     setSelectedActivityIndex(0);
     void getActivities(project, 100)
-      .then((response) =>
-        setActivities((current) => mergeActivityEventLists(response.items, current).slice(0, 200)),
-      )
+      .then((response) => {
+        if (!disposed) setActivities((current) => mergeActivityEventLists(response.items, current).slice(0, 200));
+      })
       .catch((error: Error) => {
+        if (disposed) return;
         setStatusMessage(error.message);
         recordLocalDiagnostic("activity", "load", error.message);
       });
+    return () => { disposed = true; };
   }, [project, recordLocalDiagnostic, setStatusMessage]);
 
   useEffect(() => {

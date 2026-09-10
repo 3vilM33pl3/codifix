@@ -1059,6 +1059,12 @@ export interface ActivityListResponse {
   project: string;
   total_returned: number;
   items: ActivityEvent[];
+  cursor?: {
+    next_after: number;
+    has_more: boolean;
+    retention_gap: boolean;
+    deleted_through: number;
+  } | null;
 }
 
 export interface TokenUsageSummary {

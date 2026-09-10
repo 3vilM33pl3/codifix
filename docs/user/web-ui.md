@@ -4,6 +4,13 @@
 and attempt history, queue statistics and explicit retry confirmation. See
 [Background jobs](cli/jobs.md). Enrichment is separate from curation success.
 
+Activity recovery polls bounded sequence-based pages every five seconds, even
+when live notifications are unavailable. The WebSocket reconnects automatically.
+Sequence numbers are global, so gaps within one project do not imply data loss;
+the server explicitly reports history removed by retention. Recovery does not
+reconstruct deleted history, and late responses from a previously selected
+project are discarded.
+
 The **More → federation** workspace exposes the configured private space, local
 grants, authority enrollment, reviewed publication, shared citations, correction
 proposals, approval/rejection, subscriptions and sync controls. Mutations display

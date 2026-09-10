@@ -278,6 +278,15 @@ export async function getActivities(
   );
 }
 
+export async function getActivityPage(
+  project: string,
+  after: number,
+  signal?: AbortSignal,
+): Promise<ActivityListResponse> {
+  const params = new URLSearchParams({ after_seq: String(after), limit: "200", include_details: "true" });
+  return parseJson(await apiFetch(`/v1/projects/${encodeURIComponent(project)}/activities?${params}`, { signal }));
+}
+
 export async function getRuntimeStatus(
   project: string,
   repoRoot?: string | null,

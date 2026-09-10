@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { ActivityEvent, MemoryEntryResponse, ProjectMemoriesResponse, ProjectOverviewResponse, StreamRequest, StreamResponse } from "../types";
 import { websocketUrl } from "../utils/network";
+import { useTimelineRecovery } from "./useTimelineRecovery";
 
 interface ProjectStreamOptions {
   project: string;
@@ -30,6 +31,8 @@ export function useProjectStream({
   addActivityEvent,
   recordLocalDiagnostic,
 }: ProjectStreamOptions) {
+  const [generation, setGeneration] = useState(0);
+  const reconnectDelay = useRef(1000);
   const callbacks = useRef({
     setOverview,
     setProjectMemories,
@@ -50,24 +53,37 @@ export function useProjectStream({
     };
   }, [addActivityEvent, recordLocalDiagnostic, setOverview, setProjectMemories, setSelectedMemory, setStatusMessage]);
 
-  const lastSeq = useRef<number | null>(null);
+  const recover = useTimelineRecovery({
+    project, addActivityEvent, setStatusMessage, recordLocalDiagnostic,
+    changed: () => sendStream({ type: "resync", project }),
+  });
 
   useEffect(() => {
+    let disposed = false;
+    let reconnect: ReturnType<typeof setTimeout> | undefined;
     const socket = new WebSocket(websocketUrl());
     wsRef.current = socket;
     setConnectionState("connecting");
-    lastSeq.current = null;
 
     socket.addEventListener("open", () => {
+      if (disposed) return;
+      reconnectDelay.current = 1000;
       setConnectionState("live");
       sendStream({ type: "subscribe_project", project }, socket);
+      recover();
       if (selectedMemoryId) {
         sendStream({ type: "subscribe_memory", memory_id: selectedMemoryId }, socket);
       }
     });
 
     socket.addEventListener("message", (event) => {
-      const payload = JSON.parse(String(event.data)) as StreamResponse;
+      if (disposed) return;
+      let payload: StreamResponse;
+      try { payload = JSON.parse(String(event.data)) as StreamResponse; }
+      catch {
+        callbacks.current.recordLocalDiagnostic("websocket", "message", "Invalid stream message ignored.");
+        return;
+      }
       if (payload.type === "project_snapshot" || payload.type === "project_changed") {
         callbacks.current.setOverview(payload.overview);
         callbacks.current.setProjectMemories(payload.memories);
@@ -88,15 +104,8 @@ export function useProjectStream({
       } else if (payload.type === "memory_snapshot" || payload.type === "memory_changed") {
         callbacks.current.setSelectedMemory(payload.detail);
       } else if (payload.type === "activity") {
-        const seq = payload.event.seq ?? null;
-        if (seq !== null) {
-          if (lastSeq.current !== null && seq > lastSeq.current + 1) {
-            // Missed events: pull a full snapshot to re-anchor.
-            sendStream({ type: "resync", project }, socket);
-          }
-          lastSeq.current = Math.max(lastSeq.current ?? 0, seq);
-        }
         callbacks.current.addActivityEvent(payload.event);
+        recover();
       } else if (payload.type === "error") {
         callbacks.current.setStatusMessage(payload.message);
         callbacks.current.recordLocalDiagnostic("websocket", "stream", payload.message);
@@ -104,19 +113,25 @@ export function useProjectStream({
     });
 
     socket.addEventListener("close", () => {
+      if (disposed) return;
       setConnectionState("offline");
-      callbacks.current.setStatusMessage("Live connection lost. The page still works, but updates are no longer streaming.");
+      callbacks.current.setStatusMessage("Live connection lost. Timeline polling continues; reconnecting automatically.");
       callbacks.current.recordLocalDiagnostic("websocket", "close", "Live connection lost.");
+      reconnect = setTimeout(() => setGeneration((current) => current + 1), reconnectDelay.current);
+      reconnectDelay.current = Math.min(reconnectDelay.current * 2, 30000);
     });
 
     socket.addEventListener("error", () => {
+      if (disposed) return;
       setConnectionState("offline");
       callbacks.current.recordLocalDiagnostic("websocket", "error", "WebSocket connection failed.");
     });
 
     return () => {
+      disposed = true;
+      clearTimeout(reconnect);
       socket.close();
-      wsRef.current = null;
+      if (wsRef.current === socket) wsRef.current = null;
     };
-  }, [project, selectedMemoryId, sendStream, setConnectionState, wsRef]);
+  }, [project, selectedMemoryId, sendStream, setConnectionState, wsRef, recover, generation]);
 }
