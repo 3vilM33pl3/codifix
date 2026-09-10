@@ -57,9 +57,10 @@ async fn cleanup(pool: &sqlx::PgPool, project: Uuid) {
 
 #[tokio::test]
 async fn enqueue_is_atomic_immutable_and_idempotent() {
-    let Some(pool) = mem_test_support::migrated_pool().await else {
+    let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
         return;
     };
+    let pool = database.pool.clone();
     let mut job = setup(&pool).await;
     let mut tx = pool.begin().await.unwrap();
     enqueue(&mut tx, &job).await.unwrap();
@@ -94,13 +95,15 @@ async fn enqueue_is_atomic_immutable_and_idempotent() {
     ));
     tx.rollback().await.unwrap();
     cleanup(&pool, job.project_id).await;
+    database.cleanup().await.unwrap();
 }
 
 #[tokio::test]
 async fn concurrent_claims_dependencies_and_restart_recovery_are_fenced() {
-    let Some(pool) = mem_test_support::migrated_pool().await else {
+    let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
         return;
     };
+    let pool = database.pool.clone();
     let mut job = setup(&pool).await;
     put(&pool, &job).await;
     let parent = job.id;
@@ -154,13 +157,15 @@ async fn concurrent_claims_dependencies_and_restart_recovery_are_fenced() {
     .unwrap();
     assert!(claim(&pool, policy).await.unwrap().is_none());
     cleanup(&pool, job.project_id).await;
+    database.cleanup().await.unwrap();
 }
 
 #[tokio::test]
 async fn bounded_retries_blocking_and_manual_retry_preserve_history() {
-    let Some(pool) = mem_test_support::migrated_pool().await else {
+    let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
         return;
     };
+    let pool = database.pool.clone();
     let job = setup(&pool).await;
     put(&pool, &job).await;
     let policy = JobPolicy {
@@ -257,13 +262,15 @@ async fn bounded_retries_blocking_and_manual_retry_preserve_history() {
             .is_empty()
     );
     cleanup(&pool, job.project_id).await;
+    database.cleanup().await.unwrap();
 }
 
 #[tokio::test]
 async fn lease_expiring_during_result_rolls_back_every_output() {
-    let Some(pool) = mem_test_support::migrated_pool().await else {
+    let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
         return;
     };
+    let pool = database.pool.clone();
     let job = setup(&pool).await;
     put(&pool, &job).await;
     let policy = JobPolicy::default();
@@ -302,6 +309,7 @@ async fn lease_expiring_during_result_rolls_back_every_output() {
     .await
     .unwrap();
     cleanup(&pool, job.project_id).await;
+    database.cleanup().await.unwrap();
 }
 
 #[test]

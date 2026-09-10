@@ -324,9 +324,10 @@ mod tests {
     #[tokio::test]
     async fn expired_job_fence_rolls_back_real_embedding_outputs() {
         use mem_store::jobs::*;
-        let Some(pool) = mem_test_support::migrated_pool().await else {
+        let Some(database) = mem_test_support::IsolatedDatabase::new().await else {
             return;
         };
+        let pool = database.pool.clone();
         let (slug, project, memory) = fixture(&pool).await;
         let before = chunks(&pool, memory).await;
         let mut tx = pool.begin().await.unwrap();
@@ -378,5 +379,6 @@ mod tests {
         mem_test_support::cleanup_project(&pool, &slug)
             .await
             .unwrap();
+        database.cleanup().await.unwrap();
     }
 }
