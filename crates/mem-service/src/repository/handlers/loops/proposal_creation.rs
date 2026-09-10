@@ -122,10 +122,22 @@ pub(crate) async fn prepare_tx(
             "proposal target belongs to another project"
         );
     }
+    let candidate = if request.proposal_type == "consolidate" {
+        super::proposal_decisions::pin_consolidation_members_tx(
+            tx,
+            project,
+            &request.candidate,
+            false,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(e.message))?
+    } else {
+        request.candidate.clone()
+    };
     let id = Uuid::new_v5(&operation, b"memory-proposal-v1");
     let row = sqlx::query("INSERT INTO memory_proposals(id,run_id,project_id,loop_id,proposal_type,target_memory_id,candidate_json,evidence_json,confidence,risk_notes,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',now()) RETURNING *, (SELECT slug FROM projects WHERE id=memory_proposals.project_id) AS project")
         .bind(id).bind(request.run_id).bind(project).bind(&request.loop_id).bind(&request.proposal_type)
-        .bind(request.target_memory_id).bind(&request.candidate).bind(&request.evidence)
+        .bind(request.target_memory_id).bind(&candidate).bind(&request.evidence)
         .bind(request.confidence).bind(&request.risk_notes).fetch_one(&mut **tx).await?;
     let proposal = super::row_to_memory_proposal(row).map_err(|e| anyhow::anyhow!(e.message))?;
     sqlx::query("INSERT INTO proposal_creation_receipts(operation_id,project_id,proposal_id,input_digest) VALUES($1,$2,$3,$4)")

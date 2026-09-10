@@ -235,6 +235,9 @@ pub(crate) async fn prepare_consolidation_proposal(
             "confidence": 0.7,
             "tags": ["insight", "consolidation", cluster.trigger.clone()],
             "member_canonical_ids": member_ids,
+            "member_version_ids": cluster.members.iter()
+                .filter(|m| synthesis.cited_member_ids.contains(&m.canonical_id))
+                .map(|m| (m.canonical_id.to_string(), m.version_id)).collect::<std::collections::BTreeMap<_, _>>(),
             "theme": synthesis.theme,
         }),
         evidence: serde_json::Value::Array(evidence),

@@ -15,6 +15,7 @@ use serde_json::json;
 use std::path::PathBuf;
 
 pub mod proposal_creation;
+pub mod proposal_decisions;
 
 #[derive(Debug, SerdeDeserialize)]
 pub(crate) struct LoopDefinitionQuery {
@@ -556,25 +557,34 @@ pub(crate) async fn approve_loop_memory_proposal(
     Json(mut request): Json<LoopMemoryProposalDecisionRequest>,
 ) -> Result<Json<LoopMemoryProposalDecisionResponse>, ApiError> {
     stamp_actor(&principal, &mut request.reviewer);
-    let response = resolve_loop_memory_proposal_decision(
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name.clone(),
+        source: "loop-proposal-approved".into(),
+        occurred_at: None,
+    };
+    let actor = mem_store::jobs::JobActor::Credential {
+        principal: principal.id,
+        token: principal.token_id,
+        session: principal.session_id,
+    };
+    let mutation = proposal_decisions::decide(
         &state.pool()?,
         &state.config.procedural,
         proposal_id,
         "approved",
         &request,
+        &context,
+        &actor,
     )
     .await?;
-    if let Some(project) = response.proposal.project.clone() {
-        notify_project_changed(
-            &state,
-            project,
-            None,
-            ActivityKind::ProposalDecided,
-            format!("Proposal {proposal_id} approved"),
-            None,
-        );
+    if let Some((event, sequence)) = mutation.event
+        && let Some(project) = mutation.response.proposal.project.clone()
+    {
+        crate::repository::events::broadcast_committed(&state, project, event, sequence);
     }
-    Ok(Json(response))
+    state.background.notify.notify_one();
+    Ok(Json(mutation.response))
 }
 
 pub(crate) async fn reject_loop_memory_proposal(
@@ -584,25 +594,34 @@ pub(crate) async fn reject_loop_memory_proposal(
     Json(mut request): Json<LoopMemoryProposalDecisionRequest>,
 ) -> Result<Json<LoopMemoryProposalDecisionResponse>, ApiError> {
     stamp_actor(&principal, &mut request.reviewer);
-    let response = resolve_loop_memory_proposal_decision(
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name.clone(),
+        source: "loop-proposal-rejected".into(),
+        occurred_at: None,
+    };
+    let actor = mem_store::jobs::JobActor::Credential {
+        principal: principal.id,
+        token: principal.token_id,
+        session: principal.session_id,
+    };
+    let mutation = proposal_decisions::decide(
         &state.pool()?,
         &state.config.procedural,
         proposal_id,
         "rejected",
         &request,
+        &context,
+        &actor,
     )
     .await?;
-    if let Some(project) = response.proposal.project.clone() {
-        notify_project_changed(
-            &state,
-            project,
-            None,
-            ActivityKind::ProposalDecided,
-            format!("Proposal {proposal_id} rejected"),
-            None,
-        );
+    if let Some((event, sequence)) = mutation.event
+        && let Some(project) = mutation.response.proposal.project.clone()
+    {
+        crate::repository::events::broadcast_committed(&state, project, event, sequence);
     }
-    Ok(Json(response))
+    state.background.notify.notify_one();
+    Ok(Json(mutation.response))
 }
 
 pub(crate) async fn edit_loop_memory_proposal(
@@ -612,17 +631,21 @@ pub(crate) async fn edit_loop_memory_proposal(
     Json(mut request): Json<LoopMemoryProposalDecisionRequest>,
 ) -> Result<Json<LoopMemoryProposalDecisionResponse>, ApiError> {
     stamp_actor(&principal, &mut request.reviewer);
-    if request.edited_candidate.is_none()
-        && request.edited_evidence.is_none()
-        && request.edited_risk_notes.is_none()
+    let context = mem_store::events::MutationContext {
+        actor_id: principal.id.to_string(),
+        actor_name: principal.display_name.clone(),
+        source: "loop-proposal-edited".into(),
+        occurred_at: None,
+    };
+    let mutation =
+        proposal_decisions::edit(&state.pool()?, proposal_id, &request, &context).await?;
+    if let Some((event, sequence)) = mutation.event
+        && let Some(project) = mutation.response.proposal.project.clone()
     {
-        return Err(ApiError::validation(ValidationError::new(
-            "at least one edited proposal field is required",
-        )));
+        crate::repository::events::broadcast_committed(&state, project, event, sequence);
     }
-    Ok(Json(
-        edit_loop_memory_proposal_record(&state.pool()?, proposal_id, &request).await?,
-    ))
+    state.background.notify.notify_one();
+    Ok(Json(mutation.response))
 }
 
 /// Control-plane actor fields always carry the authenticated identity; a
@@ -2072,36 +2095,14 @@ async fn edit_loop_memory_proposal_record(
     proposal_id: Uuid,
     request: &LoopMemoryProposalDecisionRequest,
 ) -> Result<LoopMemoryProposalDecisionResponse, ApiError> {
-    let row = sqlx::query(
-        r#"
-        UPDATE memory_proposals
-        SET candidate_json = COALESCE($2, candidate_json),
-            evidence_json = COALESCE($3, evidence_json),
-            risk_notes = COALESCE($4, risk_notes),
-            status = 'pending',
-            resolved_at = NULL,
-            was_edited = TRUE
-        WHERE id = $1
-        RETURNING
-            id, run_id, (SELECT slug FROM projects WHERE id = memory_proposals.project_id) AS project,
-            loop_id, proposal_type, target_memory_id, candidate_json, evidence_json,
-            confidence, risk_notes, status, created_at, resolved_at
-        "#,
+    Ok(proposal_decisions::edit(
+        pool,
+        proposal_id,
+        request,
+        &mem_store::events::MutationContext::internal("loop-proposal-edit"),
     )
-    .bind(proposal_id)
-    .bind(&request.edited_candidate)
-    .bind(&request.edited_evidence)
-    .bind(&request.edited_risk_notes)
-    .fetch_optional(pool)
-    .await
-    .map_err(ApiError::sql)?
-    .ok_or_else(|| ApiError::not_found("loop memory proposal not found"))?;
-    let proposal = row_to_memory_proposal(row)?;
-    append_memory_proposal_trace(pool, &proposal, "edited", request.reason.as_deref()).await?;
-    Ok(LoopMemoryProposalDecisionResponse {
-        proposal,
-        memory_id: None,
-    })
+    .await?
+    .response)
 }
 
 async fn resolve_loop_memory_proposal_decision(
@@ -2111,95 +2112,17 @@ async fn resolve_loop_memory_proposal_decision(
     status: &str,
     request: &LoopMemoryProposalDecisionRequest,
 ) -> Result<LoopMemoryProposalDecisionResponse, ApiError> {
-    validate_memory_proposal_status(status)?;
-    if status == "rejected" {
-        // One transaction covers the status write, the procedural-utility
-        // reward, and its audit row, so learning can never diverge from the
-        // recorded decision.
-        let mut tx = pool.begin().await.map_err(ApiError::sql)?;
-        let locked = lock_memory_proposal(&mut tx, proposal_id).await?;
-        let undecided = locked.record.status == "pending" || locked.record.status == "edited";
-        let row = sqlx::query(
-            r#"
-            UPDATE memory_proposals
-            SET status = 'rejected',
-                resolved_at = now()
-            WHERE id = $1
-            RETURNING
-                id, run_id, (SELECT slug FROM projects WHERE id = memory_proposals.project_id) AS project,
-                loop_id, proposal_type, target_memory_id, candidate_json, evidence_json,
-                confidence, risk_notes, status, created_at, resolved_at
-            "#,
-        )
-        .bind(proposal_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(ApiError::sql)?;
-        // Reward only the first terminal decision — re-rejecting an already
-        // resolved proposal must not double-penalize the loop.
-        if undecided {
-            emit_proposal_reward(
-                &mut tx,
-                procedural,
-                &locked,
-                mem_reinforce::RewardEvent::ProposalRejected,
-            )
-            .await?;
-        }
-        tx.commit().await.map_err(ApiError::sql)?;
-        let proposal = row_to_memory_proposal(row)?;
-        append_memory_proposal_trace(pool, &proposal, "rejected", request.reason.as_deref())
-            .await?;
-        return Ok(LoopMemoryProposalDecisionResponse {
-            proposal,
-            memory_id: None,
-        });
-    }
-    if status != "approved" {
-        return Err(ApiError::validation(ValidationError::new(
-            "proposal decision must be approved or rejected",
-        )));
-    }
-
-    let mut tx = pool.begin().await.map_err(ApiError::sql)?;
-    let proposal = lock_memory_proposal(&mut tx, proposal_id).await?;
-    if proposal.record.status != "pending" && proposal.record.status != "edited" {
-        return Err(ApiError::validation(ValidationError::new(format!(
-            "memory proposal is already {}",
-            proposal.record.status
-        ))));
-    }
-    let memory_id = apply_memory_proposal(&mut tx, &proposal).await?;
-    let row = sqlx::query(
-        r#"
-        UPDATE memory_proposals
-        SET status = 'approved',
-            resolved_at = now()
-        WHERE id = $1
-        RETURNING
-            id, run_id, (SELECT slug FROM projects WHERE id = memory_proposals.project_id) AS project,
-            loop_id, proposal_type, target_memory_id, candidate_json, evidence_json,
-            confidence, risk_notes, status, created_at, resolved_at
-        "#,
+    Ok(proposal_decisions::decide(
+        pool,
+        procedural,
+        proposal_id,
+        status,
+        request,
+        &mem_store::events::MutationContext::internal("loop-proposal-decision"),
+        &mem_store::jobs::JobActor::System("local-curation".into()),
     )
-    .bind(proposal_id)
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(ApiError::sql)?;
-    let event = if proposal.was_edited {
-        mem_reinforce::RewardEvent::ProposalEditedApproved
-    } else {
-        mem_reinforce::RewardEvent::ProposalApproved
-    };
-    emit_proposal_reward(&mut tx, procedural, &proposal, event).await?;
-    tx.commit().await.map_err(ApiError::sql)?;
-
-    let proposal = row_to_memory_proposal(row)?;
-    append_memory_proposal_trace(pool, &proposal, "approved", request.reason.as_deref()).await?;
-    Ok(LoopMemoryProposalDecisionResponse {
-        proposal,
-        memory_id,
-    })
+    .await?
+    .response)
 }
 
 /// Applies the ACT-R delta-rule utility update + audit for one proposal
@@ -2258,6 +2181,20 @@ async fn lock_memory_proposal(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     proposal_id: Uuid,
 ) -> Result<LockedMemoryProposal, ApiError> {
+    // Run before proposal: matches creation and trace append lock ordering.
+    let run: Option<Uuid> = sqlx::query_scalar("SELECT run_id FROM memory_proposals WHERE id=$1")
+        .bind(proposal_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(ApiError::sql)?
+        .ok_or_else(|| ApiError::not_found("loop memory proposal not found"))?;
+    if let Some(run) = run {
+        sqlx::query("SELECT id FROM loop_runs WHERE id=$1 FOR UPDATE")
+            .bind(run)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(ApiError::sql)?;
+    }
     let row = sqlx::query(
         r#"
         SELECT
@@ -2314,6 +2251,13 @@ async fn apply_consolidation_proposal(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     proposal: &LockedMemoryProposal,
 ) -> Result<Uuid, ApiError> {
+    proposal_decisions::pin_consolidation_members_tx(
+        tx,
+        proposal.project_id,
+        &proposal.record.candidate,
+        true,
+    )
+    .await?;
     let meta_id = insert_memory_from_proposal(tx, proposal, None).await?;
     let members = proposal
         .record
@@ -2374,6 +2318,9 @@ async fn insert_memory_update_from_proposal(
     let target_id = proposal.record.target_memory_id.ok_or_else(|| {
         ApiError::validation(ValidationError::new("target_memory_id is required"))
     })?;
+    sqlx::query("SELECT cs.canonical_id FROM memory_canonical_state cs JOIN memory_entries m ON m.canonical_id=cs.canonical_id
+        WHERE m.id=$1 AND m.project_id=$2 FOR UPDATE OF cs").bind(target_id).bind(proposal.project_id)
+        .fetch_one(&mut **tx).await.map_err(ApiError::sql)?;
     let row = sqlx::query(
         r#"
         SELECT latest.id, latest.canonical_id, latest.version_no, latest.canonical_text,
@@ -2453,7 +2400,12 @@ async fn insert_memory_from_proposal(
     let (canonical_id, version_no) = if let Some(row) = &previous {
         (
             row.try_get("canonical_id").map_err(ApiError::sql)?,
-            row.try_get::<i32, _>("version_no").map_err(ApiError::sql)? + 1,
+            row.try_get::<i32, _>("version_no")
+                .map_err(ApiError::sql)?
+                .checked_add(1)
+                .ok_or_else(|| {
+                    ApiError::validation(ValidationError::new("memory version exhausted"))
+                })?,
         )
     } else {
         (memory_id, 1)
@@ -2698,36 +2650,6 @@ fn evidence_source_items(
         return vec![object];
     }
     Vec::new()
-}
-
-async fn append_memory_proposal_trace(
-    pool: &PgPool,
-    proposal: &LoopMemoryProposalRecord,
-    action: &str,
-    reason: Option<&str>,
-) -> Result<(), ApiError> {
-    if let Some(run_id) = proposal.run_id {
-        append_loop_trace(
-            pool,
-            run_id,
-            "memory_proposal",
-            &format!("Memory proposal {action}"),
-            json!({
-                "proposal_id": proposal.id,
-                "proposal_type": proposal.proposal_type,
-                "status": proposal.status,
-                "target_memory_id": proposal.target_memory_id,
-                "candidate": proposal.candidate,
-                "evidence": proposal.evidence,
-                "confidence": proposal.confidence,
-                "risk_notes": proposal.risk_notes,
-                "reason": reason,
-            }),
-            false,
-        )
-        .await?;
-    }
-    Ok(())
 }
 
 fn validate_memory_proposal_status(value: &str) -> Result<(), ApiError> {
@@ -4776,17 +4698,30 @@ async fn append_loop_trace(
     redacted: bool,
 ) -> Result<LoopTraceRecord, ApiError> {
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let trace = append_loop_trace_tx(&mut tx, run_id, trace_type, title, payload, redacted).await?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(trace)
+}
+
+async fn append_loop_trace_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    run_id: Uuid,
+    trace_type: &str,
+    title: &str,
+    payload: serde_json::Value,
+    redacted: bool,
+) -> Result<LoopTraceRecord, ApiError> {
     // All appenders take the owning run lock before allocating a sequence.
     sqlx::query("SELECT id FROM loop_runs WHERE id=$1 FOR UPDATE")
         .bind(run_id)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await
         .map_err(ApiError::sql)?;
     let sequence: i32 = sqlx::query_scalar(
         "SELECT COALESCE(MAX(sequence), 0) + 1 FROM run_traces WHERE run_id = $1",
     )
     .bind(run_id)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
     let row = sqlx::query(
@@ -4802,18 +4737,17 @@ async fn append_loop_trace(
     .bind(title)
     .bind(&payload)
     .bind(redacted)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
     sqlx::query(
         "UPDATE loop_runs SET trace_count = trace_count + 1, updated_at = now() WHERE id = $1",
     )
     .bind(run_id)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
     let trace = row_to_loop_trace(row)?;
-    tx.commit().await.map_err(ApiError::sql)?;
     Ok(trace)
 }
 
