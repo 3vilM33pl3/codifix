@@ -106,3 +106,11 @@ Next execution slice is the actual resettable service/agent/grader driver and
 per-request provider budget mediation. These are engineering work still to do,
 not work blocked on spending approval. No complete offline campaign or official
 benchmark has been executed, and no quality or ROI claim is supported yet.
+
+Progress capture (without curation/enrichment):
+`8e4311a9-6144-4e0a-b70c-53a565ab0ff4`. The R3 plan remains active; this is not
+a completion record. The owned disposable PostgreSQL container was removed
+after verification; its synthetic test data can be recreated, not recovered.
+The user's running dev service and generated draft review directories were left
+untouched. Final workspace Clippy and boundary checks passed after moving CLI
+tests into a dedicated module.
