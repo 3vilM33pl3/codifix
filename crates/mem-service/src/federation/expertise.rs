@@ -131,7 +131,7 @@ async fn cycle(
     tx.rollback().await?;
     Ok(())
 }
-async fn access(
+pub(super) async fn access(
     state: &AppState,
     tx: &mut Transaction<'_, Postgres>,
     principal: Uuid,

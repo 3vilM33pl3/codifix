@@ -19,6 +19,30 @@ async function prepare() {
 describe("Collection review workflow", () => {
   afterEach(cleanup);
   beforeEach(() => vi.mocked(federationRequest).mockReset());
+  it("requires admin-reviewed service grants and drops uncertain policy changes instead of replaying them", async () => {
+    vi.mocked(federationRequest).mockImplementation(async (_p, _s, path) => {
+      if (path?.includes("/grants?")) return { principal: "service", enabled: true };
+      if (path?.endsWith("/grants")) throw new Error("503 uncertain policy change; recheck policy");
+      return path?.startsWith("/collections?") ? { collections: [ad], next_after: null } : draft;
+    });
+    render(<CollectionsPanel project="a" discovery={{ ...discovery, permissions: [...discovery.permissions, "auth_manage"] }} />);
+    fireEvent.click(screen.getByText("Browse collections"));
+    fireEvent.click(await screen.findByText("Inspect collection Recovery"));
+    await screen.findByText("Review service grant");
+    fireEvent.change(screen.getByLabelText("Answering service principal UUID"), { target: { value: "service" } });
+    fireEvent.click(screen.getByText("Review service grant"));
+    expect(screen.getByText("Confirm collection action")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(consent));
+    fireEvent.click(screen.getByText("Confirm collection action"));
+    await screen.findByRole("alert");
+    expect(screen.queryByText("Confirm collection action")).toBeNull();
+    const call = vi.mocked(federationRequest).mock.calls.find(c => c[2]?.endsWith("/grants"));
+    expect(call?.[2]).toBe("/collections/collection/grants");
+    expect(call?.[3]).toEqual({ principal: "service", enabled: true, confirmed: true });
+    fireEvent.click(screen.getByText("Inspect service grant"));
+    await screen.findByText(/Stored grant for service: enabled/);
+    expect(vi.mocked(federationRequest).mock.calls.filter(c => c[2]?.endsWith("/grants"))).toHaveLength(1);
+  });
   it("requires all-byte confirmation and preserves exact requests after uncertain activation", async () => {
     let attempts = 0;
     vi.mocked(federationRequest).mockImplementation(async (_p, _s, path) => {

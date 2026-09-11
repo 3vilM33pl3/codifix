@@ -1298,6 +1298,29 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             .expect("unique federation route policy");
     }
     table
+        .insert(
+            "/v1/projects/{slug}/federation/{space}/collections/{collection}/grants".to_owned(),
+            vec![
+                (
+                    Method::GET,
+                    RoutePolicy {
+                        permission: Permission::AuthManage,
+                        scope: ProjectScope::PathProject,
+                        semantic_read: true,
+                    },
+                ),
+                (
+                    Method::POST,
+                    RoutePolicy {
+                        permission: Permission::AuthManage,
+                        scope: ProjectScope::PathProject,
+                        semantic_read: false,
+                    },
+                ),
+            ],
+        )
+        .expect("unique collection grant route policy");
+    table
 }
 
 fn policy_table() -> &'static matchit::Router<Vec<(Method, RoutePolicy)>> {

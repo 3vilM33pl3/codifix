@@ -22,6 +22,8 @@ function CollectionsWorkspace({ project, discovery }: { project: string; discove
   const [requesters, setRequesters] = useState("");
   const [memories, setMemories] = useState("");
   const [evidence, setEvidence] = useState("{}");
+  const [servicePrincipal, setServicePrincipal] = useState("");
+  const [grantState, setGrantState] = useState<{ principal: string; enabled: boolean | null } | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -35,7 +37,11 @@ function CollectionsWorkspace({ project, discovery }: { project: string; discove
   async function run(work: () => Promise<void>) {
     if (running.current || disabled) return;
     running.current = true; setBusy(true); setError(""); setMessage("");
-    try { await work(); } catch (e) { if (!lifetime.current?.signal.aborted) setError(String(e)); }
+    try { await work(); } catch (e) { if (!lifetime.current?.signal.aborted) {
+      setError(String(e));
+      // Grant changes are current policy, not replayable publication intents.
+      if (pending?.path.endsWith("/grants")) { setPending(null); setConfirmed(false); }
+    } }
     finally { running.current = false; if (!lifetime.current?.signal.aborted) setBusy(false); }
   }
   async function browse(after?: string) {
@@ -47,17 +53,31 @@ function CollectionsWorkspace({ project, discovery }: { project: string; discove
     <p>Disposable rehearsal. Collections stay local; only reviewed advertisements are published. Activation grants standing permission to answer from the frozen collection, subject to current permissions. No model destinations are enabled here.</p>
     <p>Stored active consent does not prove current source eligibility or gateway publication. Withdrawal cannot recall delivered or already authorized in-flight bytes.</p>
     {disabled ? <p>Collection controls require a writable service and curate/export permissions.</p> : null}
-    {error ? <p role="alert">Collection operation failed or was denied: {error}. Preserve an uncertain action and retry its exact bytes; do not assume rollback.</p> : null}
+    {error ? <p role="alert">Collection operation failed or was denied: {error}. Publication intents may be retried exactly; uncertain grant changes require fresh policy inspection and review. Do not assume rollback.</p> : null}
     {message ? <p role="status">{message}</p> : null}
     <fieldset disabled={disabled || busy || pending !== null}><legend>Stored local reviews</legend>
       <button onClick={() => void run(() => browse())}>Browse collections</button>
       {page ? <>{!page.collections.length ? <p>No stored collections on this page.</p> : <ul>{page.collections.map(ad => <li key={ad.collection}>{ad.name}: {ad.active ? "stored active consent" : "withdrawn"}, revision {ad.revision} ({ad.collection}) <button onClick={() => void run(async () => {
-        setDetail(null); const d = await call<Detail>(`/collections/${encodeURIComponent(ad.collection)}`);
+        setDetail(null); setGrantState(null); const d = await call<Detail>(`/collections/${encodeURIComponent(ad.collection)}`);
         if (!lifetime.current?.signal.aborted) setDetail(d);
       })}>Inspect collection {ad.name}</button></li>)}</ul>}
       <button disabled={!page.next_after} onClick={() => void run(() => browse(page.next_after ?? undefined))}>Next collection page</button></> : null}
       {detail ? <><h4>Stored review — not current answer authorization</h4><pre className="federation-json">{JSON.stringify(detail, null, 2)}</pre>
         <button disabled={!detail.advertisement.active} onClick={() => { setConfirmed(false); setPending({ path: "/collections/withdraw", label: "Withdraw standing collection consent", body: { request_id: crypto.randomUUID(), collection: detail.advertisement.collection, expected_revision: detail.advertisement.revision, confirmed: true } }); }}>Review collection withdrawal</button>
+        <fieldset disabled={!discovery.permissions.includes("auth_manage")}><legend>Answering service collection grant</legend>
+          <p>This changes only local collection access. The target must be an operator-configured internal identity with current project permissions; worker configuration and local/remote AnswerExpertise grants remain separate. No credentials are created.</p>
+          <label>Answering service principal UUID<input value={servicePrincipal} onChange={e => { setServicePrincipal(e.target.value); setGrantState(null); }} /></label>
+          <button disabled={!servicePrincipal.trim()} onClick={() => void run(async () => {
+            setGrantState(null);
+            const value = await call<{ principal: string; enabled: boolean | null }>(`/collections/${encodeURIComponent(detail.advertisement.collection)}/grants?principal=${encodeURIComponent(servicePrincipal.trim())}`);
+            if (!lifetime.current?.signal.aborted) setGrantState(value);
+          })}>Inspect service grant</button>
+          {grantState ? <p>Stored grant for {grantState.principal}: {grantState.enabled === null ? "not configured" : grantState.enabled ? "enabled" : "disabled"}. This is not current execution authorization.</p> : null}
+          {[true, false].map(enabled => <button key={String(enabled)} disabled={!servicePrincipal.trim()} onClick={() => {
+            setGrantState(null); setConfirmed(false); setPending({ path: `/collections/${encodeURIComponent(detail.advertisement.collection)}/grants`, label: enabled ? "Allow service collection access" : "Revoke service collection access", body: { principal: servicePrincipal.trim(), enabled, confirmed: true } });
+          }}>{enabled ? "Review service grant" : "Review service grant revocation"}</button>)}
+          <p>After an uncertain grant change, inspect current policy and prepare a new deliberate change; do not replay an old grant over newer policy.</p>
+        </fieldset>
       </> : null}
     </fieldset>
     <fieldset disabled={disabled || busy || pending !== null}><legend>Prepare a new collection revision</legend>
@@ -89,10 +109,10 @@ function CollectionsWorkspace({ project, discovery }: { project: string; discove
         await call(pending.path, pending.body);
         if (lifetime.current?.signal.aborted) return;
         setPending(null); setConfirmed(false); setPage(null); setDetail(null);
-        setMessage("Collection action queued locally—not yet gateway accepted, published or replicated. Browse again to inspect local consent.");
+        setMessage(pending.path.endsWith("/grants") ? "Service collection grant updated locally. Worker configuration, current permissions and space capabilities are still required." : "Collection action queued locally—not yet gateway accepted, published or replicated. Browse again to inspect local consent.");
       })}>Confirm collection action</button>
       <button onClick={() => { setPending(null); setConfirmed(false); }}>Close collection review</button>
-      <p>After an uncertain response, retry this same confirmation. Closing does not undo a committed action.</p>
+      <p>{pending.path.endsWith("/grants") ? "This updates current policy, not a replayable publication. After uncertainty, recheck policy before a new change." : "After an uncertain response, retry this same confirmation."} Closing does not undo a committed action.</p>
     </fieldset> : null}
   </section>;
 }

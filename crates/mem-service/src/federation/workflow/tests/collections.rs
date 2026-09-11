@@ -261,6 +261,88 @@ async fn collection_http_requires_exact_review_and_queues_metadata_only() {
             .0,
         StatusCode::FORBIDDEN
     );
+    // A collection grant is separate from publication and answering authority.
+    let grant_path = format!("{detail_path}/grants");
+    assert_eq!(
+        post(
+            &grant_path,
+            json!({"principal":f.writer_id,"enabled":true,"confirmed":true})
+        )
+        .await
+        .unwrap()
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+    f.grant(f.root_id, true).await;
+    let admin_session = format!("admin-{}", Uuid::new_v4());
+    sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,expires_at) VALUES($1,$2,$3,$4,now()+interval '1 hour')")
+        .bind(Uuid::new_v4()).bind(f.root_id).bind(crate::auth::hash_secret(&admin_session)).bind(crate::auth::hash_secret(&csrf)).execute(&f.pool).await.unwrap();
+    let admin_cookie = format!("memory_session={admin_session}; memory_csrf={csrf}");
+    let grant = |target: Uuid, enabled: bool, confirmed: bool| {
+        client
+            .post(f.path(&grant_path))
+            .header("cookie", &admin_cookie)
+            .header("origin", "https://local.example.test")
+            .header("x-csrf-token", &csrf)
+            .json(&json!({"principal":target,"enabled":enabled,"confirmed":confirmed}))
+            .send()
+    };
+    // Existing root is not a project-scoped service identity.
+    assert_eq!(
+        grant(f.root_id, true, true).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    let service = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_principals(id,kind,display_name) VALUES($1,'internal','synthetic answerer')").bind(service).execute(&f.pool).await.unwrap();
+    assert_eq!(
+        grant(service, true, true).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    sqlx::query("INSERT INTO auth_project_memberships(id,principal_id,project_id,role) VALUES($1,$2,$3,'operator')")
+        .bind(Uuid::new_v4()).bind(service).bind(f.runtime.project).execute(&f.pool).await.unwrap();
+    assert_eq!(
+        grant(service, true, false).await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        grant(service, true, true).await.unwrap().status(),
+        StatusCode::OK
+    );
+    let enabled:bool=sqlx::query_scalar("SELECT enabled FROM federation_expertise_collection_grants WHERE space=$1 AND collection=$2 AND principal_id=$3")
+        .bind(f.runtime.space.as_uuid()).bind(blueprint["collection"].as_str().unwrap().parse::<Uuid>().unwrap()).bind(service).fetch_one(&f.pool).await.unwrap();
+    assert!(enabled);
+    sqlx::query("UPDATE auth_principals SET disabled_at=clock_timestamp() WHERE id=$1")
+        .bind(service)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        grant(service, true, true).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        grant(service, false, true).await.unwrap().status(),
+        StatusCode::OK
+    );
+    let enabled:bool=sqlx::query_scalar("SELECT enabled FROM federation_expertise_collection_grants WHERE space=$1 AND collection=$2 AND principal_id=$3")
+        .bind(f.runtime.space.as_uuid()).bind(blueprint["collection"].as_str().unwrap().parse::<Uuid>().unwrap()).bind(service).fetch_one(&f.pool).await.unwrap();
+    assert!(!enabled, "disabled identities must remain revocable");
+    let inspected = client
+        .get(f.path(&format!("{grant_path}?principal={service}")))
+        .header("cookie", &admin_cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(inspected.status(), StatusCode::OK);
+    assert_eq!(inspected.headers()["cache-control"], "no-store");
+    assert_eq!(inspected.json::<Value>().await.unwrap()["enabled"], false);
+    assert_eq!(
+        get(&format!("{grant_path}?principal={service}"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
     f.grant(f.writer_id, false).await;
     assert!(!get(&detail_path).await.unwrap().status().is_success());
     assert!(!get("/collections").await.unwrap().status().is_success());

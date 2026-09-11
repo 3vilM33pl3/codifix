@@ -1565,6 +1565,45 @@ paths:
         "403": { description: Browser or current project permission denied. }
         "404": { description: Collection unavailable in this configured project and space. }
         "409": { description: Local grant unavailable. }
+  /v1/projects/{slug}/federation/{space}/collections/{collection}/grants:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+      - { name: collection, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: inspectExpertiseCollectionServiceGrant
+      summary: Inspect one origin-local collection grant, not execution authority.
+      description: Same browser, current read/AuthManage and local space grant checks as mutation. No target identity details or source contents are returned. Null enabled means no matching grant in this configured project/space/collection; disabled targets remain inspectable. Conservative read-only denial applies.
+      tags: [Federation]
+      x-stability: experimental
+      parameters:
+        - { name: principal, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: No-store principal and enabled boolean or null. }
+        "403": { description: Current administrator or browser policy denied. }
+    post:
+      operationId: setExpertiseCollectionServiceGrant
+      summary: Explicitly allow or revoke a local service identity's collection access.
+      description: Disposable browser-only policy, CSRF, current project read/AuthManage and local space grant required. Enabling requires a currently active internal target without global/group authority and with current read/export access to this project, checked under transaction locks using the worker policy. Revocation remains allowed for disabled targets. Does not create identities, credentials, workers, remote memberships or AnswerExpertise space grants. Grant state and sanitized audit commit together. This sets current local policy, not a replayable publication intent; after uncertainty inspect and review policy again before a new change.
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [principal, enabled, confirmed]
+              additionalProperties: false
+              properties:
+                principal: { type: string, format: uuid }
+                enabled: { type: boolean }
+                confirmed: { type: boolean, const: true }
+      responses:
+        "200": { description: No-store confirmed grant state; not permission to answer without remaining checks. }
+        "400": { description: Explicit confirmation missing. }
+        "403": { description: Current administrator or service identity policy denied. }
+        "404": { description: Collection unavailable in this configured project. }
   /v1/projects/{slug}/federation/{space}/collections/draft:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }

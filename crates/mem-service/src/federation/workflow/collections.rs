@@ -18,6 +18,109 @@ pub(crate) struct CollectionPath {
     collection: RecordId,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CollectionGrantRequest {
+    pub principal: Uuid,
+    pub enabled: bool,
+    pub confirmed: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct GrantQuery {
+    principal: Uuid,
+}
+#[derive(Serialize)]
+pub struct CollectionGrantState {
+    pub principal: Uuid,
+    pub enabled: Option<bool>,
+}
+pub(crate) async fn collection_grant_state(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<CollectionPath>,
+    Query(query): Query<GrantQuery>,
+) -> Result<Json<CollectionGrantState>, ApiError> {
+    let (runtime, local) = binding(&state, &principal, &path.slug, path.space).await?;
+    requester::browser(&runtime, &principal)?;
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let current = requester::current_access_for(
+        &state,
+        &mut tx,
+        &principal,
+        &local,
+        &[Permission::MemoryRead, Permission::AuthManage],
+    )
+    .await?;
+    let enabled = mem_federation_store::collection_grant_state(
+        &mut tx,
+        &current,
+        runtime.space,
+        runtime.instance,
+        path.collection,
+        query.principal,
+    )
+    .await
+    .map_err(store_error)?;
+    tx.rollback().await.map_err(|_| unavailable())?;
+    Ok(Json(CollectionGrantState {
+        principal: query.principal,
+        enabled,
+    }))
+}
+
+/// Does not create an identity, configure a worker, or confer remote authority.
+pub(crate) async fn collection_grant(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<CollectionPath>,
+    Json(request): Json<CollectionGrantRequest>,
+) -> Result<Json<CollectionGrantRequest>, ApiError> {
+    let (runtime, local) = binding(&state, &principal, &path.slug, path.space).await?;
+    requester::browser(&runtime, &principal)?;
+    if !request.confirmed || request.principal.is_nil() {
+        return Err(bad_request(
+            "explicit collection grant confirmation required",
+        ));
+    }
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let current = requester::current_access_for(
+        &state,
+        &mut tx,
+        &principal,
+        &local,
+        &[Permission::MemoryRead, Permission::AuthManage],
+    )
+    .await?;
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM federation_expertise_collections WHERE space=$1 AND owner=$2 AND project_id=$3 AND collection=$4)")
+        .bind(runtime.space.as_uuid()).bind(runtime.instance.as_uuid()).bind(runtime.project).bind(path.collection.as_uuid())
+        .fetch_one(&mut *tx).await.map_err(|_| unavailable())?;
+    if !exists {
+        return Err(ApiError::not_found("collection unavailable"));
+    }
+    if request.enabled {
+        super::super::expertise::access(&state, &mut tx, request.principal, runtime.project)
+            .await
+            .map_err(|_| {
+                ApiError::forbidden("active internal expertise service authority required")
+            })?;
+    }
+    mem_federation_store::set_collection_grant(
+        &mut tx,
+        &current,
+        runtime.space,
+        runtime.instance,
+        path.collection,
+        request.principal,
+        request.enabled,
+    )
+    .await
+    .map_err(store_error)?;
+    tx.commit().await.map_err(|_| unavailable())?;
+    Ok(Json(request))
+}
+
 pub(crate) async fn collections(
     State(state): State<AppState>,
     Extension(principal): Extension<AuthenticatedPrincipal>,

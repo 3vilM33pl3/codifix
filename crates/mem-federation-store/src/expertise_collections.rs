@@ -451,6 +451,24 @@ async fn collection_audit(
     Ok(())
 }
 
+pub async fn collection_grant_state(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    space: SpaceId,
+    owner: InstanceId,
+    collection: RecordId,
+    principal: Uuid,
+) -> Result<Option<bool>> {
+    permission(
+        access,
+        &[Permission::MemoryRead, Permission::AuthManage],
+        false,
+    )?;
+    load_grant(tx, access, space, owner).await?;
+    Ok(sqlx::query_scalar("SELECT enabled FROM federation_expertise_collection_grants WHERE space=$1 AND owner=$2 AND project_id=$3 AND collection=$4 AND principal_id=$5")
+        .bind(space.as_uuid()).bind(owner.as_uuid()).bind(access.project).bind(collection.as_uuid()).bind(principal).fetch_optional(&mut **tx).await?)
+}
+
 pub async fn set_collection_grant(
     tx: &mut Transaction<'_, Postgres>,
     access: &LocalProjectAccess,
@@ -466,13 +484,14 @@ pub async fn set_collection_grant(
         true,
     )?;
     load_grant(tx, access, space, owner).await?;
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM auth_principals WHERE id=$1 AND disabled_at IS NULL)",
+    let exists: Option<bool> = sqlx::query_scalar(
+        "SELECT (NOT $2 OR disabled_at IS NULL) FROM auth_principals WHERE id=$1 FOR SHARE",
     )
     .bind(principal)
-    .fetch_one(&mut **tx)
+    .bind(enabled)
+    .fetch_optional(&mut **tx)
     .await?;
-    if !exists {
+    if exists != Some(true) {
         return Err(StoreError::Binding);
     }
     sqlx::query("INSERT INTO federation_expertise_collection_grants(space,owner,project_id,collection,principal_id,enabled) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(space,owner,project_id,collection,principal_id) DO UPDATE SET enabled=EXCLUDED.enabled")
