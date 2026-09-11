@@ -18,7 +18,8 @@ interfaces. Browser-session HTTP preparation/submission, capability browsing and
 original-requester result reads are implemented and tested at component level.
 Collection draft/activate/withdraw and local browsing/detail HTTP are implemented;
 The Web requester panel has component-tested discovery, confirmation and result reads;
-Web collection management and service-grant controls also have component coverage;
+Web collection management and service-grant controls also have component coverage
+and a real-browser HTTP/SQL rehearsal through confirmed queued questions;
 CLI/TUI/MCP remain pending, followed by the full disposable
 automatic-worker rehearsal. Open checkboxes are end-to-end completion gates;
 the dated evidence below records individual implementation increments.
@@ -550,3 +551,52 @@ Final grant verification: corrected required-database serial workspace run passe
 Lean/lean-CLI and full container/PDS/browser rehearsal were not rerun. The
 disposable database was removed and a partial Memory checkpoint saved at
 `5f852d4`. Existing services and credentials were unchanged.
+
+### Real-browser collection and queued-question rehearsal — 2026-09-11
+
+Commit `ac63fe3` adds the opt-in
+`f1_browser_collection_grants_and_queued_question` test, which launches the
+built Web app against disposable PostgreSQL and a real loopback HTTP service.
+Playwright drives collection preparation with all-byte confirmation, activation,
+service grant inspection/enablement/revocation, withdrawal, signed capability
+discovery and confirmed question submission/status. Browser API responses are
+not intercepted. Synthetic session credentials are passed on stdin, not logged.
+The fixture uses synthetic signed gateway history and transport receipts; it is
+not a live PDS or an independently administered two-origin answering test.
+
+This uncovered and fixed the local grant endpoint's obsolete three-capability
+limit. All five capabilities are now accepted; duplicate capabilities remain
+invalid, with a required-database regression test. Schema compatibility and
+remote membership authorization still apply independently.
+
+Run against an explicitly disposable test database after installing Web
+dependencies, building Web and installing Playwright Chromium:
+
+```bash
+/usr/bin/env -u MEMORY_LAYER_CLIENT_TOKEN \
+  MEMORY_FEDERATION_F1_BROWSER=1 MEMORY_LAYER_TEST_REQUIRE_DB=1 \
+  cargo test -p mem-service f1_browser_collection --lib --locked -- --nocapture
+```
+
+Set `MEMORY_LAYER_TEST_DATABASE_URL` to that disposable database first. Optional
+`MEMORY_FEDERATION_F1_SCREENSHOTS` selects an evidence directory. The federation
+CI job explicitly enables this gate after its Web build and Chromium install.
+Ordinary test runs do not execute the browser without the opt-in flag.
+
+Local evidence: the focused browser test passes; the workflow module reports
+11 passing tests with required PostgreSQL and browser enabled. The existing
+external-PDS test in that module returns early without its separate PDS opt-in;
+that count does not establish a PDS rerun. Desktop (1360px) and mobile (390px)
+screenshots were inspected, with no page errors, error overlay or horizontal
+overflow. Logs: `/tmp/f1-browser-test.log`,
+`/tmp/f1-browser-workflow-tests.log`; screenshots:
+`/tmp/f1-browser-evidence/f1-{desktop,mobile}.png`.
+Service all-target Clippy with warnings denied, Rust formatting, boundary checks
+and diff whitespace checks pass. Logs: `/tmp/f1-browser-clippy.log` and
+`/tmp/f1-browser-boundaries.log`. No frontend production code changed; the
+existing production Web build was used for this rehearsal.
+
+This is partial evidence only: no completed answer, automatic-answerer recovery,
+third-instance enrollment, CLI/TUI/MCP or live-PDS claim. The required full
+workspace, Lean and independent-instance release gates remain open. Existing
+services, project data and credentials are unchanged. F1 is not complete.
