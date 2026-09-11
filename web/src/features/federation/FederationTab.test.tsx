@@ -10,6 +10,22 @@ const draft = { request: { request_id: "stable-review", canonical: "memory", exp
 describe("Federation workspace", () => {
   afterEach(cleanup);
   beforeEach(() => { vi.mocked(federationRequest).mockReset(); });
+  it.each(["ask_expertise", "answer_expertise"])("reviews %s enrollment and revocation explicitly", async capability => {
+    vi.mocked(federationRequest).mockImplementation(async (_project, space) => !space ? discover : { submission: "queued" });
+    render(<FederationTab project="a" />);
+    await screen.findByText("Local actor", { exact: false });
+    fireEvent.change(screen.getByLabelText("Remote instance UUID"), { target: { value: "remote" } });
+    fireEvent.change(screen.getByLabelText("Remote capability"), { target: { value: capability } });
+    for (const [button, enabled] of [["Review enrollment", true], ["Review capability revocation", false]] as const) {
+      fireEvent.click(screen.getByText(button));
+      expect(screen.getByText("Confirm and submit")).toBeDisabled();
+      fireEvent.click(screen.getByLabelText("I reviewed these exact bytes and understand the sharing and offline-copy limits."));
+      fireEvent.click(screen.getByText("Confirm and submit"));
+      await waitFor(() => expect(screen.queryByText("Confirm and submit")).toBeNull());
+      const calls = vi.mocked(federationRequest).mock.calls.filter(c => c[2] === "/actions");
+      expect(calls.at(-1)?.[3]).toEqual({ request_id: expect.any(String), action: { kind: "membership", member: "remote", capability, enabled } });
+    }
+  });
   it("requires explicit confirmation and retries identical reviewed bytes after uncertain delivery", async () => {
     let attempts = 0;
     vi.mocked(federationRequest).mockImplementation(async (_project, space, path) => {

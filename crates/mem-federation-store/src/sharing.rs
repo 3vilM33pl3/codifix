@@ -254,11 +254,24 @@ pub(crate) fn intent(
     record: PublicationRecord,
 ) -> Result<PublicationIntent> {
     let record_id = RecordId::new(Uuid::new_v4())?;
+    // Preserve legacy publication bytes; only F1 semantics select schema v3.
+    let schema_version = match &record {
+        PublicationRecord::Expertise(_)
+        | PublicationRecord::Membership {
+            capability: SpaceCapability::AskExpertise | SpaceCapability::AnswerExpertise,
+            ..
+        }
+        | PublicationRecord::Revocation {
+            capability: Some(SpaceCapability::AskExpertise | SpaceCapability::AnswerExpertise),
+            ..
+        } => mem_federation::expertise::EXPERTISE_SCHEMA_VERSION,
+        _ => PUBLICATION_SCHEMA_VERSION,
+    };
     Ok(PublicationIntent {
         locator: RecordLocator::new(format!("publication:{}", record_id.as_uuid()))
             .map_err(PublicationError::from)?,
         envelope: PublicationEnvelope {
-            schema_version: 2,
+            schema_version,
             space,
             publisher,
             record_id,

@@ -1,4 +1,4 @@
-export type Capability = "pull" | "publish" | "manage_membership";
+export type Capability = "pull" | "publish" | "manage_membership" | "ask_expertise" | "answer_expertise";
 export type RecordKey = { publisher: string; id: string };
 export type Stream = { origin: string; canonical: string };
 export type Content = { text: string; summary: string; memory_type: string; confidence: number; importance: number; tags: string[] };

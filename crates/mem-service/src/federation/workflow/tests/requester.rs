@@ -84,6 +84,15 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
     }
     f.publish_fixture_receipts().await;
     f.runtime.sync.catch_up().await.unwrap();
+    f.grant(f.root_id, true).await;
+    let (status, body) = f
+        .request(&f.root, reqwest::Method::GET, "", Value::Null)
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["observed_capabilities"],
+        json!(["pull", "publish", "ask_expertise", "answer_expertise"])
+    );
     let (status,body)=f.request(&f.root,reqwest::Method::POST,"/grants",json!({"principal":f.writer_id,"capabilities":[SpaceCapability::AskExpertise],"enabled":true})).await;
     assert!(status.is_success(), "{body}");
     let session = format!("session-{}", Uuid::new_v4());

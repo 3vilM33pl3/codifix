@@ -173,6 +173,8 @@ pub(crate) async fn status(
             SpaceCapability::Pull,
             SpaceCapability::Publish,
             SpaceCapability::ManageMembership,
+            SpaceCapability::AskExpertise,
+            SpaceCapability::AnswerExpertise,
         ]
         .into_iter()
         .filter(|c| known.has_capability(runtime.instance, *c))

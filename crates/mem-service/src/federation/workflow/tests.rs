@@ -11,6 +11,7 @@ use sqlx::PgPool;
 use std::sync::Mutex;
 mod browser;
 mod collections;
+mod enrollment;
 mod requester;
 mod two_instance;
 
