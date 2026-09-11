@@ -130,6 +130,21 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
     let catalog: Value = catalog.json().await.unwrap();
     assert_eq!(catalog["capabilities"][0]["name"], ad.name);
     assert_eq!(catalog["next_after"], json!(ad.key()));
+    let detail_path = format!(
+        "/capabilities/{}/{}",
+        ad.owner.as_uuid(),
+        ad.collection.as_uuid()
+    );
+    let detail = get(&detail_path).await.unwrap();
+    assert_eq!(detail.status(), StatusCode::OK);
+    assert_eq!(detail.headers()["cache-control"], "no-store");
+    assert_eq!(detail.json::<Value>().await.unwrap(), json!(ad));
+    assert_eq!(
+        f.request(&f.reader, reqwest::Method::GET, &detail_path, Value::Null)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
     let next = get(&format!(
         "/capabilities?limit=1&after_publisher={}&after_record={}",
         ad.owner.as_uuid(),

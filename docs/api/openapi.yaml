@@ -1538,7 +1538,7 @@ paths:
     get:
       operationId: listLocalExpertiseCollections
       summary: Inspect bounded metadata for local collection heads, including withdrawals.
-      description: Disposable browser-only policy with current read/curate/export permissions and local space grant. Does not contact the gateway or disclose collection contents. Active means stored local consent, not source eligibility or accepted/published status. Keyset pages are not a frozen multi-page snapshot. Read-only mode is currently denied.
+      description: Disposable local-human output policy (enabled browser or exact operator-bound token), current read/curate/export permissions and local space grant. Does not contact the gateway or disclose collection contents. Active means stored local consent, not source eligibility or accepted/published status. Keyset pages are not a frozen multi-page snapshot. Read-only mode is denied; cloud-output callers cannot administer collections.
       tags: [Federation]
       x-stability: experimental
       parameters:
@@ -1557,7 +1557,7 @@ paths:
     get:
       operationId: getLocalExpertiseCollection
       summary: Inspect the exact stored head review of a local collection.
-      description: Same conservative browser permissions as listing. Returns the frozen snapshot, advertisement, reviewer and request ID; does not refresh versions, authorize answering or produce a reusable activation request. Includes withdrawn or now-ineligible source content for local review only. A new revision requires explicit drafting and activation. No gateway request is made.
+      description: Same local-human output and current project permissions as listing. Returns the frozen snapshot, advertisement, reviewer and request ID; does not refresh versions, authorize answering or produce a reusable activation request. Includes withdrawn or now-ineligible source content for local review only. A new revision requires explicit drafting and activation. No gateway request is made.
       tags: [Federation]
       x-stability: experimental
       responses:
@@ -1573,7 +1573,7 @@ paths:
     get:
       operationId: inspectExpertiseCollectionServiceGrant
       summary: Inspect one origin-local collection grant, not execution authority.
-      description: Same browser, current read/AuthManage and local space grant checks as mutation. No target identity details or source contents are returned. Null enabled means no matching grant in this configured project/space/collection; disabled targets remain inspectable. Conservative read-only denial applies.
+      description: Same local-human output, current read/AuthManage and local space grant checks as mutation. No target identity details or source contents are returned. Null enabled means no matching grant in this configured project/space/collection; disabled targets remain inspectable. Conservative read-only denial applies.
       tags: [Federation]
       x-stability: experimental
       parameters:
@@ -1584,7 +1584,7 @@ paths:
     post:
       operationId: setExpertiseCollectionServiceGrant
       summary: Explicitly allow or revoke a local service identity's collection access.
-      description: Disposable browser-only policy, CSRF, current project read/AuthManage and local space grant required. Enabling requires a currently active internal target without global/group authority and with current read/export access to this project, checked under transaction locks using the worker policy. Revocation remains allowed for disabled targets. Does not create identities, credentials, workers, remote memberships or AnswerExpertise space grants. Grant state and sanitized audit commit together. This sets current local policy, not a replayable publication intent; after uncertainty inspect and review policy again before a new change.
+      description: Disposable local-human output policy, current project read/AuthManage and local space grant required; browser mutations require CSRF. Enabling requires a currently active internal target without global/group authority and with current read/export access to this project, checked under transaction locks using the worker policy. Revocation remains allowed for disabled targets. Does not create identities, credentials, workers, remote memberships or AnswerExpertise space grants. Grant state and sanitized audit commit together. This sets current local policy, not a replayable publication intent; after uncertainty inspect and review policy again before a new change.
       tags: [Federation]
       x-stability: experimental
       requestBody:
@@ -1611,7 +1611,7 @@ paths:
     post:
       operationId: draftExpertiseCollection
       summary: Preview exact local collection contents and advertisement for review.
-      description: Disposable browser-only policy. Requires current read, curate and export permissions, local space grant and CSRF. Deterministic local_human destinations only. No persistence or publication; review all returned fields before activation. Body bounded to 2 MiB; collection domain bounds also apply.
+      description: Requires local-human caller output, current read/curate/export permissions and local space grant; browser mutations require CSRF. Model and onward-output IDs must be operator-configured. No persistence or publication; review every returned field and disclosure permission before activation. Body bounded to 2 MiB; collection domain bounds also apply.
       tags: [Federation]
       x-stability: experimental
       requestBody:
@@ -1630,7 +1630,7 @@ paths:
     post:
       operationId: activateExpertiseCollection
       summary: Confirm an exact collection review and queue its advertisement atomically.
-      description: Requires browser session, CSRF, current read/curate/export and publication grant. Revalidates source versions and reviewer identity. Local consent, audit and publication intent commit together; queued does not mean gateway accepted or published. Exact retries preserve the original intent. No service grant is created.
+      description: Requires local-human caller output, current read/curate/export and publication grant; browser mutations require CSRF. Revalidates source versions, reviewer identity and configured model/output destinations. Local consent, audit and publication intent commit together; queued does not mean gateway accepted or published. Exact retries preserve the original intent. No service grant is created.
       tags: [Federation]
       x-stability: experimental
       requestBody:
@@ -1656,7 +1656,7 @@ paths:
     post:
       operationId: withdrawExpertiseCollection
       summary: Disable local collection consent and queue withdrawal.
-      description: Same browser and current publication permissions as activation. Requires exact expected revision and explicit confirmation. Previously delivered or already authorized in-flight bytes cannot be recalled.
+      description: Same local-human output and current publication permissions as activation. Requires exact expected revision and explicit confirmation. Previously delivered or already authorized in-flight bytes cannot be recalled.
       tags: [Federation]
       x-stability: experimental
       requestBody:
@@ -1682,8 +1682,8 @@ paths:
       - { $ref: '#/components/parameters/FederationSpace' }
     post:
       operationId: prepareExpertiseQuestion
-      summary: Prepare an unconfirmed deterministic question for local-human browser review.
-      description: Opt-in disposable rehearsal only. Requires a current browser session, CSRF, exact project read/export and local AskExpertise grant. No question is transmitted. Revision comes from verified retained history; synchronize first.
+      summary: Prepare an unconfirmed question with operator-bound onward output and explicit synthesis consent.
+      description: Opt-in disposable rehearsal only. Requires an enabled browser session or an exact operator-bound service token, current project read/export and local AskExpertise grant. Browser mutations require CSRF. No question is transmitted. Revision comes from verified retained history; synchronize first. Omitting model_destination selects deterministic excerpts; specifying it requires separate operator model permission. MCP cannot use local_human output or authorize its own destination.
       tags: [Federation]
       x-stability: experimental
       requestBody:
@@ -1704,6 +1704,7 @@ paths:
                     publisher: { type: string, format: uuid }
                     id: { type: string, format: uuid }
                 question: { type: string, description: Nonempty, at most 4096 UTF-8 bytes. }
+                model_destination: { type: string, nullable: true, description: Optional operator-allowed synthesis provider ID, not a URL or onward-output override. }
       responses:
         "200": { description: No-store exact QuestionReview including server-bound identity, revision, destination, expiry and digest; not permission to send. }
         "403": { description: Browser policy, CSRF or current authority denied. }
@@ -1715,7 +1716,7 @@ paths:
     get:
       operationId: listExpertiseCapabilities
       summary: Browse a bounded signed gateway page of permitted expertise advertisements.
-      description: Opt-in local-human browser policy only. Requires current project read/export and local AskExpertise grant. Filters out advertisements without deterministic local_human support. Metadata only, never collection contents. Both cursor identifiers must be supplied together; an empty filtered page can still have a next cursor. No automatic fan-out or question is sent.
+      description: Requires enabled browser or operator-bound token policy, current project read/export and local AskExpertise grant. Filters advertisements against the caller's bound output and configured answer modes. Metadata only, never collection contents. Both cursor identifiers must be supplied together; an empty filtered page can still have a next cursor. No automatic fan-out or question is sent.
       tags: [Federation]
       x-stability: experimental
       parameters:
@@ -1727,6 +1728,22 @@ paths:
         "400": { description: Invalid limit or incomplete cursor. }
         "403": { description: Browser or current project/gateway authority denied. }
         "503": { description: Gateway unavailable or signed response invalid. }
+  /v1/projects/{slug}/federation/{space}/capabilities/{publisher}/{record}:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+      - { name: publisher, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: record, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getExpertiseCapability
+      summary: Read one currently permitted capability advertisement, never collection contents.
+      description: Bounded signed gateway discovery with current project read/export, local AskExpertise and operator-bound caller/output policy. Unknown or unpermitted capabilities fail closed. Browsing does not grant permission to ask or disclose an answer.
+      tags: [Federation]
+      x-stability: experimental
+      responses:
+        "200": { description: No-store complete CapabilityAdvertisement with revision, digest, modes, destinations and limits. }
+        "403": { description: Caller, scope, capability or disclosure policy denied. }
+        "503": { description: Gateway unavailable or signed response invalid. }
   /v1/projects/{slug}/federation/{space}/questions/{id}:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }
@@ -1735,7 +1752,7 @@ paths:
     get:
       operationId: getExpertiseQuestionResult
       summary: Read an original requester's private status or freshly authorized retained answer.
-      description: Requires original local consent, current browser session/project/AskExpertise permissions, unchanged advertisement and local_human destination. Does not submit, restart or reexecute a question. Completed answers may outlive the 120-second execution deadline, within the 24-hour payload window. A live answering-origin check is required for every retained answer and may take up to 15 seconds; offline origins cannot authorize fresh delivery. Consent TTL and requester authority are rechecked after waiting. Holds do not extend access.
+      description: Requires original local consent, current operator-bound caller/project/AskExpertise permissions, unchanged advertisement and still-permitted synthesis/output destinations. Does not submit, restart or reexecute a question. Completed answers may outlive the 120-second execution deadline within the 24-hour payload window. A live answering-origin check is required for every retained answer and may take up to 15 seconds; offline origins cannot authorize fresh delivery. Consent TTL and requester authority are rechecked after waiting. Holds do not extend access.
       tags: [Federation]
       x-stability: experimental
       responses:
@@ -1749,8 +1766,8 @@ paths:
       - { $ref: '#/components/parameters/FederationSpace' }
     post:
       operationId: submitExpertiseQuestion
-      summary: Commit exact browser consent then submit its immutable question to the gateway.
-      description: Opt-in rehearsal only. Post the complete prepared review and its confirmed_digest. Only deterministic local_human output is allowed; tokens and MCP callers are denied. Network failure does not roll back committed consent; retry the same review and ID before expiry. Requires CSRF and fresh project authority. No answer body is returned.
+      summary: Commit exact reviewed consent then submit its immutable question to the gateway.
+      description: Opt-in rehearsal only. Post the complete prepared review and its confirmed_digest. Operator-bound caller/output policy and current synthesis permissions are rechecked. MCP submission requires writable MCP configuration and non-local output policy. Network failure does not roll back committed consent; retry the same review and ID before expiry. Requires fresh project authority and CSRF for browser mutations. No answer body is returned.
       tags: [Federation]
       x-stability: experimental
       requestBody:

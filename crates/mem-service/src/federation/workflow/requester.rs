@@ -23,6 +23,52 @@ pub(crate) struct ExpertiseResultPath {
     space: SpaceId,
     id: Uuid,
 }
+#[derive(Deserialize)]
+pub(crate) struct ExpertiseCapabilityPath {
+    slug: String,
+    space: SpaceId,
+    publisher: InstanceId,
+    record: RecordId,
+}
+pub(crate) async fn expertise_capability(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<ExpertiseCapabilityPath>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<CapabilityAdvertisement>, ApiError> {
+    let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
+    let destination = caller_destination(&runtime, &principal, &headers)?;
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let current = current_access(&state, &mut tx, &principal, &access).await?;
+    mem_federation_store::authorize_expertise_browse(
+        &mut tx,
+        &current,
+        runtime.space,
+        runtime.instance,
+    )
+    .await
+    .map_err(store_error)?;
+    let ad = advertisement(
+        &runtime,
+        RecordKey {
+            publisher: path.publisher,
+            id: path.record,
+        },
+    )
+    .await?;
+    if !ad.output_destinations.iter().any(|d| d == destination)
+        || (!ad.modes.contains(&AnswerMode::Deterministic)
+            && !ad
+                .model_destinations
+                .iter()
+                .any(|d| runtime.expertise_model_destinations.contains(d)))
+    {
+        return Err(ApiError::forbidden("capability destination denied"));
+    }
+    current_access(&state, &mut tx, &principal, &access).await?;
+    tx.rollback().await.map_err(|_| unavailable())?;
+    Ok(Json(ad))
+}
 
 pub(crate) async fn expertise_capabilities(
     State(state): State<AppState>,

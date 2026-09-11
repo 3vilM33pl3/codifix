@@ -272,6 +272,10 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
             get(crate::federation::workflow::expertise_capabilities),
         )
         .route(
+            "/v1/projects/{slug}/federation/{space}/capabilities/{publisher}/{record}",
+            get(crate::federation::workflow::expertise_capability),
+        )
+        .route(
             "/v1/projects/{slug}/federation/{space}/questions/{id}",
             get(crate::federation::workflow::expertise_result),
         )
