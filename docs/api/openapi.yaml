@@ -1531,6 +1531,64 @@ paths:
         "403": { description: Exact project permission or explicit local/gateway capability denied. }
         "409": { description: Stale review, pending source work or conflicting idempotency key. }
         "503": { description: Configured peer unavailable or retained verification failed. }
+  /v1/projects/{slug}/federation/{space}/questions/prepare:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: prepareExpertiseQuestion
+      summary: Prepare an unconfirmed deterministic question for local-human browser review.
+      description: Opt-in disposable rehearsal only. Requires a current browser session, CSRF, exact project read/export and local AskExpertise grant. No question is transmitted. Revision comes from verified retained history; synchronize first.
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [request_id, capability, question]
+              properties:
+                request_id: { type: string, format: uuid }
+                capability:
+                  type: object
+                  additionalProperties: false
+                  required: [publisher, id]
+                  properties:
+                    publisher: { type: string, format: uuid }
+                    id: { type: string, format: uuid }
+                question: { type: string, description: Nonempty, at most 4096 UTF-8 bytes. }
+      responses:
+        "200": { description: No-store exact QuestionReview including server-bound identity, revision, destination, expiry and digest; not permission to send. }
+        "403": { description: Browser policy, CSRF or current authority denied. }
+        "404": { description: Space or retained capability unavailable. }
+  /v1/projects/{slug}/federation/{space}/questions/submit:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: submitExpertiseQuestion
+      summary: Commit exact browser consent then submit its immutable question to the gateway.
+      description: Opt-in rehearsal only. Post the complete prepared review and its confirmed_digest. Only deterministic local_human output is allowed; tokens and MCP callers are denied. Network failure does not roll back committed consent; retry the same review and ID before expiry. Requires CSRF and fresh project authority. No answer body is returned.
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [review, confirmed_digest]
+              properties:
+                review: { type: object, description: Exact QuestionReview returned by prepare, including project/question/advertisement_digest/digest. }
+                confirmed_digest: { type: object, description: Exact digest from the reviewed QuestionReview. }
+      responses:
+        "200": { description: No-store signed gateway status, metadata only; not proof of answering or delivery. }
+        "403": { description: Session, scope, destination, CSRF or current authority denied. }
+        "409": { description: Changed consent or conflicting request identity. }
+        "503": { description: Gateway unavailable; consent may already have committed. }
   /v1/projects/{slug}/federation/{space}/actions:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }

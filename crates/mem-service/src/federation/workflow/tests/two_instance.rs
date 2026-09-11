@@ -174,6 +174,7 @@ async fn app(db: &Database, n: &Network, instance: InstanceId, token: String) ->
     .await
     .unwrap();
     let runtime = Arc::new(ConfiguredInstance {
+        expertise_browser: false,
         project,
         space: n.space,
         instance,

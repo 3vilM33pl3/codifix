@@ -181,6 +181,23 @@ impl GatewayClient {
 }
 
 impl crate::InstanceSync {
+    /// Trusted local workflow only: commit exact consent before calling.
+    pub async fn submit_expertise_question(
+        &self,
+        question: mem_federation::expertise::ExpertiseQuestion,
+    ) -> crate::Result<mem_federation_store::QuestionResult> {
+        if question.requester != self.instance {
+            return Err(RuntimeError::Unauthorized);
+        }
+        match self
+            .client
+            .expertise(self.instance, ExpertiseOperation::Submit { question })
+            .await?
+        {
+            ExpertiseReply::Question(result) if result.answer.is_none() => Ok(*result),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
     pub async fn renew_expertise_question(
         &self,
         lease: &mem_federation_store::QuestionLease,

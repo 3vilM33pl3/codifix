@@ -21,7 +21,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 mod operations;
+mod requester;
 pub(crate) use operations::*;
+pub(crate) use requester::*;
 
 #[derive(Deserialize)]
 pub(crate) struct SpacePath {
@@ -312,6 +314,19 @@ fn unavailable() -> ApiError {
 }
 fn store_error(error: StoreError) -> ApiError {
     match error {
+        StoreError::Expertise(
+            mem_federation::expertise::ExpertiseReject::Unauthorized
+            | mem_federation::expertise::ExpertiseReject::DestinationDenied,
+        ) => ApiError::forbidden("expertise authority or destination denied"),
+        StoreError::Expertise(
+            mem_federation::expertise::ExpertiseReject::Expired
+            | mem_federation::expertise::ExpertiseReject::StaleCollection
+            | mem_federation::expertise::ExpertiseReject::Binding,
+        ) => ApiError::status_message(
+            StatusCode::CONFLICT,
+            "expertise review expired or changed; prepare again",
+        ),
+        StoreError::Expertise(_) => bad_request("invalid expertise input or evidence"),
         StoreError::LocalPolicy(_) => {
             ApiError::forbidden("local sharing grant or publication permission denied")
         }

@@ -9,6 +9,7 @@ use mem_federation_store::{Claim, GatewayStore, PublicationIntent, RetryPolicy};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use std::sync::Mutex;
+mod requester;
 mod two_instance;
 
 struct Fixture {
@@ -344,6 +345,9 @@ fn intent(space: SpaceId, publisher: InstanceId, record: PublicationRecord) -> P
 }
 impl Fixture {
     async fn new() -> Option<Self> {
+        Self::with_expertise(false).await
+    }
+    async fn with_expertise(expertise_browser: bool) -> Option<Self> {
         let pool = mem_test_support::migrated_pool().await?;
         let project = Uuid::new_v4();
         let slug = project.to_string();
@@ -374,12 +378,27 @@ impl Fixture {
             gateway.clone(),
             space,
             authority,
-            vec![(gateway_token.clone(), instance)],
+            if expertise_browser {
+                vec![
+                    (gateway_token.clone(), instance),
+                    ("synthetic-authority-credential".repeat(2), authority),
+                ]
+            } else {
+                vec![(gateway_token.clone(), instance)]
+            },
             security.clone(),
         )
         .await
         .unwrap();
         let fence = gateway.initialize(space, authority).await.unwrap();
+        let server = if expertise_browser {
+            server
+                .enable_expertise_rehearsal(&[(instance, 3), (authority, 3)])
+                .await
+                .unwrap()
+        } else {
+            server
+        };
         for capability in [SpaceCapability::Pull, SpaceCapability::Publish] {
             assert_eq!(
                 gateway
@@ -401,7 +420,15 @@ impl Fixture {
                 PublicationOutcome::Applied
             );
         }
-        let (gateway_url, gateway_task) = serve(server.router()).await;
+        let router = if expertise_browser {
+            server.router().layer(axum::middleware::from_fn_with_state(
+                pool.clone(),
+                requester::require_committed_consent,
+            ))
+        } else {
+            server.router()
+        };
+        let (gateway_url, gateway_task) = serve(router).await;
         let sync = InstanceSync::new(
             pool.clone(),
             GatewayClient::new(
@@ -417,6 +444,7 @@ impl Fixture {
         .await
         .unwrap();
         let runtime = Arc::new(ConfiguredInstance {
+            expertise_browser,
             project,
             space,
             instance,

@@ -28,6 +28,8 @@ enum WorkerConfig {
         principal: Uuid,
         #[serde(default)]
         expertise_principal: Option<Uuid>,
+        #[serde(default)]
+        expertise_browser: bool,
         gateway: String,
         #[serde(default)]
         gateway_ca_file: Option<PathBuf>,
@@ -47,6 +49,7 @@ pub(crate) struct ConfiguredInstance {
     instance: InstanceId,
     authority: InstanceId,
     sync: InstanceSync,
+    expertise_browser: bool,
 }
 
 pub(crate) struct FederationTasks(Vec<tokio::task::JoinHandle<()>>, Option<Registry>);
@@ -108,6 +111,7 @@ pub(crate) async fn start(
             project,
             principal,
             expertise_principal,
+            expertise_browser,
             gateway,
             gateway_ca_file,
             token_file,
@@ -121,6 +125,10 @@ pub(crate) async fn start(
             anyhow::ensure!(
                 expertise_principal.is_none() || (disposable_test_mode && cfg!(debug_assertions)),
                 "expertise workers remain restricted to disposable rehearsal"
+            );
+            anyhow::ensure!(
+                !expertise_browser || (disposable_test_mode && cfg!(debug_assertions)),
+                "expertise browser access is rehearsal-only"
             );
             anyhow::ensure!(
                 expertise_principal != Some(principal),
@@ -157,6 +165,7 @@ pub(crate) async fn start(
                     instance,
                     authority,
                     sync: sync.clone(),
+                    expertise_browser,
                 }));
             }
             if let Some(expertise_principal) = expertise_principal {
