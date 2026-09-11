@@ -44,7 +44,7 @@ After an uncertain submission, **Retry exact question** reuses the same reviewed
 bytes and request ID. Closing the review does not cancel delivery. A new question
 is a new request and may repeat work; expired reviews require fresh preparation.
 Read-only mode and missing export permission disable the panel; the server still
-enforces all current permissions. Service-identity grant controls, CLI/TUI/MCP
+enforces all current permissions. CLI/TUI/MCP
 parity and the complete live rehearsal remain unfinished.
 
 ### Expertise collection management
@@ -78,8 +78,20 @@ The UI preserves a failed/uncertain action for exact retry and reports successfu
 submission as queued, not published. Closing a review does not roll back a
 committed action. Project/identity/permission changes clear local state and abort
 pending requests; review contents are not saved in browser storage. Server-side
-permissions remain authoritative. Service-identity grant controls, CLI/TUI/MCP
-parity and a real-service browser rehearsal remain open.
+permissions remain authoritative. CLI/TUI/MCP parity and a real-service browser
+rehearsal remain open.
+
+After inspecting a collection, administrators can enter an **Answering service
+principal UUID**, inspect its stored grant and review a grant or revocation.
+This does not create an identity or credentials, start a worker, enroll a peer,
+or confer local/remote `AnswerExpertise` capabilities. Enabling requires an active
+internal identity with no global/group authority and current read/export access
+to the project. Revocation remains possible after the target identity is disabled.
+
+Grant changes update local policy rather than queueing a publication. After an
+uncertain response, the confirmation is discarded: inspect current grant state
+and deliberately review a new change. Do not replay an old grant over newer
+policy. Stored enabled state alone is not current execution authorization.
 
 The web UI is the web companion to the TUI. It is served by `mem-service` and uses the same backend APIs for memories, query, code graph inspection, activities, watchers, embeddings, resume briefings, and curation review.
 

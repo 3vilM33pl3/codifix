@@ -18,7 +18,7 @@ interfaces. Browser-session HTTP preparation/submission, capability browsing and
 original-requester result reads are implemented and tested at component level.
 Collection draft/activate/withdraw and local browsing/detail HTTP are implemented;
 The Web requester panel has component-tested discovery, confirmation and result reads;
-Web collection management also has component coverage; service-grant controls and
+Web collection management and service-grant controls also have component coverage;
 CLI/TUI/MCP remain pending, followed by the full disposable
 automatic-worker rehearsal. Open checkboxes are end-to-end completion gates;
 the dated evidence below records individual implementation increments.
@@ -515,3 +515,38 @@ real-service browser rehearsal. Rust/database, Lean, lean CLI and container/PDS
 regressions were not rerun for this frontend-only increment. No existing service
 or credentials changed. Service-grant controls, CLI/TUI/MCP, optional models and
 the full disposable rehearsal remain open; F1 is not complete.
+
+### Service identity collection grants — 2026-09-11
+
+Commit `5f852d4` adds browser GET/POST collection grant inspection and reviewed
+policy changes, plus Web controls after collection inspection. Current actor
+read/AuthManage and local space grant checks run under transaction locks. Enabling
+reuses the worker's active internal identity check, rejecting global/group
+authority and missing current project read/export access. It does not create an
+identity, credentials, worker configuration, enrollment or AnswerExpertise space
+grants. The target is rechecked again by the worker at execution time.
+
+Revocation now works for disabled target identities. State changes and sanitized
+audit commit together. GET exposes only the selected target's stored boolean or
+null, not execution eligibility or identity details. An uncertain grant response
+clears the Web confirmation; inspection and a new deliberate review are required,
+unlike exact-retry publication intents. The React checklist guided confirmation,
+stale-policy handling and labelled inspection controls.
+
+Tests cover non-admin denial, missing confirmation, unsuitable/missing-scope
+targets, enablement, disabled-target denial and revocation, and scoped grant reads.
+The new GET/POST pair initially exposed a unique-path policy registration conflict;
+registering both methods together fixed it, with the focused HTTP test passing.
+Web tests cover explicit confirmation and inspection after an uncertain write
+without replaying old policy. Real-browser verification, CLI/TUI/MCP, optional
+models and the full disposable rehearsal remain open. F1 is not complete.
+
+Final grant verification: corrected required-database serial workspace run passes
+832 tests across 50 binaries (zero failed/ignored). Web passes 86 tests across
+24 files and the production build (existing chunk warning). Workspace Clippy
+(`-D warnings`), formatting, boundaries and OpenAPI inventory pass. Logs:
+`/tmp/f1-grants-workspace-final.log`, `/tmp/f1-grants-fixed-focused.log`,
+`/tmp/f1-grants-{web,web-build,clippy-final,openapi,boundaries}.log`.
+Lean/lean-CLI and full container/PDS/browser rehearsal were not rerun. The
+disposable database was removed and a partial Memory checkpoint saved at
+`5f852d4`. Existing services and credentials were unchanged.

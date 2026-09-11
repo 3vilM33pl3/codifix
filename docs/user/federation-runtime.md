@@ -229,7 +229,18 @@ Withdraw accepts `request_id`, `collection`, `expected_revision` and
 `confirmed: true`. It disables local standing consent while atomically queuing
 the withdrawal advertisement. Exact retries retain the same intent. It cannot
 recall already delivered or already authorized in-flight bytes. All responses
-are no-store. The service-grant UI remains pending.
+are no-store. Browser service-grant inspection and reviewed changes are available
+after collection inspection; full real-service browser rehearsal remains pending.
+
+`GET collections/{collection}/grants?principal=<UUID>` reads a stored local grant
+(`enabled: null` means no matching grant). `POST` to the same path accepts
+`principal`, `enabled` and `confirmed: true`. Current browser read/AuthManage
+permissions and a local space grant are required; mutations require CSRF.
+Enabling requires an active internal target with no global/group authority and
+current project read/export access. Revocation remains possible for a disabled
+target. These operations do not configure workers or confer space capabilities.
+After an uncertain change, inspect and review current policy again; grants are not
+replayable publication intents. All responses are no-store.
 
 `GET collections?limit=32` inspects local collection metadata, including withdrawn
 heads. Follow `next_after` with `after=<collection UUID>`; limits are 1–32 and

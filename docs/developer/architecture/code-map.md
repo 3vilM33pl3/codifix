@@ -51,7 +51,8 @@ these are stored-review inspection, not answer authorization. Web/CLI/TUI/MCP
 parity remains pending. `web/src/features/federation/ExpertisePanel.tsx` implements
 explicit discovery, exact-question confirmation and manual result reads; collection
 management uses `CollectionsPanel.tsx` for browsing, exact review and withdrawal.
-Service-grant controls and full real-service rehearsal remain open.
+Service-grant controls use the same collection handler and worker identity policy;
+full real-service rehearsal remains open.
 
 ## Frontends
 
