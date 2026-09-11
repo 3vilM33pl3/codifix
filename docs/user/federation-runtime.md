@@ -121,18 +121,18 @@ expired PDS credentials block work until an operator replaces the private token
 file, restarts the role and explicitly retries blocked work. Do not skip a blocked
 publication to make a later cursor appear healthy.
 
-### F1 deterministic-answer rehearsal only
+### F1 private expertise opt-in
 
-F1 is not enabled by the production gateway configuration. In a disposable debug
-rehearsal, an instance configuration may additionally set `expertise_principal`
+F1 stays disabled unless the gateway explicitly configures a compatible
+`expertise_fleet`. An instance may separately set `expertise_principal`
 to a **separate**, internal, project-scoped principal. It must have current project
 read/export permissions, the local space's `AnswerExpertise` grant and an explicit
 grant for the reviewed collection. Global roles, global permissions and group
 identities are rejected. Merely naming a principal does not grant access.
 
-The optional worker answers queued deterministic questions and validates retained
-answer delivery in independent loops. It never invokes models or ordinary query
-retrieval, and does not yet provide end-user F1 commands. Both loops poll every
+The optional worker answers queued questions and validates retained answer
+delivery in independent loops. Ordinary query retrieval is never used; model
+synthesis is separately disabled unless explicitly configured below. Both loops poll every
 two seconds and stop with the federation worker lifecycle. Answer work has a
 12-second cycle limit within the gateway's 30-second lease, with renewal at ten
 seconds if still active. Failed/expired attempts remain recoverable through the
@@ -148,32 +148,32 @@ replay cannot create reusable access. The gateway commit authorizes release, not
 proof of physical delivery. An already-authorized in-flight transfer cannot be
 recalled, and the two databases do not form one atomic transaction. Existing
 24-hour payload expiry still applies; holds do not extend ordinary read access.
-This remains component-tested rehearsal software, not homelab activation or
-customer-release readiness.
+This does not activate existing homelab services or establish customer readiness.
+Use TLS and leave `disposable_test_mode` false for any later approved internal
+installation. Cleartext fixture mode remains prohibited in release builds.
 
 Migration 0052 adds origin-private immutable result storage. The result commits
 before gateway completion; a new transaction rechecks service authority, reviewed
 sources and exact citations before sending. Recovery may recompute deterministic
 excerpts, but cannot replace an already stored result with different bytes or
 silently substitute newer source versions. No exactly-once provider claim is
-made: this path has no provider invocation. Stored results retain 24-hour payloads
-and 30-day metadata; holds do not extend read access. The project-scoped cleanup
-helper is implemented, but automatic retention maintenance and full process-crash
-rehearsal are still pending. Adding this option does not create consent, grants
-or enrollment.
+made: uncertain provider attempts cannot be automatically reinvoked. Stored
+results retain 24-hour payloads and 30-day metadata; holds do not extend read
+access. Owning runtimes perform retention maintenance every minute. Adding this
+option does not create consent, grants or enrollment.
 
-### Rehearsal browser discovery and questions
+### Browser discovery and questions
 
 `expertise_browser: true` separately enables project/space capability listing,
-question preparation/submission and result reads, only with debug disposable
-mode. The production gateway remains disabled for F1. A current browser session,
+question preparation/submission and result reads. A current browser session,
 project read/export permission and explicit local `AskExpertise` grant are
 required; mutations additionally require CSRF and Origin headers. Read-only mode
 currently denies these remote operations. CLI/TUI and MCP require explicit
 operator bindings described below; ordinary bearer tokens remain denied.
 
-Prepare accepts `request_id`, `capability` (`publisher` and `id` UUIDs), and the
-question (at most 4 KiB UTF-8). Synchronize first so the capability is in verified
+Prepare accepts `request_id`, `capability` (`publisher` and `id` UUIDs), the
+question (at most 4 KiB UTF-8), and an optional explicitly approved synthesis
+`model_destination`. Synchronize first so the capability is in verified
 retained history. It returns the exact `QuestionReview`, including authenticated
 identity, instance, revision, digest, destination and 120-second expiry. Inspect
 all fields before confirming. Preparation itself neither persists consent nor
@@ -184,8 +184,10 @@ retry that same review/ID before expiry, never silently replace it with a new
 question. Stale reviews require deliberate preparation and review again.
 
 Submission returns gateway status metadata only, not an answer or proof of
-completed execution. `GET capabilities` lists permitted deterministic,
-`local_human` advertisements with a limit of 1–32. Follow `next_after` using both
+completed execution. `GET capabilities` lists advertisements permitted for the
+operator-bound caller's output and answer modes with a limit of 1–32.
+`GET capabilities/{publisher}/{record}` returns one complete, currently permitted
+advertisement using the same checks. Follow `next_after` using both
 `after_publisher` and `after_record`; a filtered empty page can still have a cursor.
 
 `GET questions/{id}` returns status and, when authorized, the retained answer.
@@ -197,19 +199,20 @@ question. Each answer read requires fresh origin approval and current local and
 gateway authorization; an unavailable origin cannot release a cached answer.
 Reads can wait for that approval, and all responses are no-store.
 
-The Web/CLI/TUI/MCP interfaces are implemented for deterministic rehearsal;
-complete client and release verification is still pending. See the experimental
+Web/CLI/TUI/MCP support explicit review and private question/result operations.
+See the experimental
 [OpenAPI contract](../../docs/api/openapi.yaml) for paths and request shapes.
 
-### Rehearsal collection review and withdrawal
+### Collection review and withdrawal
 
-The same disposable browser opt-in exposes `POST collections/draft`,
+The same explicit browser opt-in exposes `POST collections/draft`,
 `POST collections/activate` and `POST collections/withdraw`. These require
 current project read, curate and export permissions, browser CSRF protection and
 an explicit local space grant. Activation additionally requires local and observed
 gateway `Publish` and `AnswerExpertise` capabilities; withdrawal requires `Publish`.
 They do not enroll instances or create the answering service identity's separate
-collection grant. Model mode is unavailable through this path.
+collection grant. Optional synthesis requires explicit reviewed model destinations
+and the separate operator configuration described below.
 
 The same operations accept an explicitly bound local-human service token.
 `expertise_callers` in the instance's operator-owned federation JSON is an array
@@ -237,16 +240,19 @@ but cannot authorize a destination. Ordinary `memory_query` is unchanged.
 
 The dedicated gateway JSON accepts an optional `expertise_fleet` array of
 `["INSTANCE-UUID", 3]` pairs for every enrolled credential, including authority.
-It validates fleet/history compatibility before enabling expertise. This option
-is restricted to debug builds with `disposable_test_mode: true`; absence keeps
-expertise disabled. There is no production activation implied by this setting.
+It validates fleet/history compatibility before enabling expertise; absence
+keeps expertise disabled. It does not grant membership or collection access.
+For an approved TLS installation, expose only the exact `/v1/expertise` path
+through the fixed-upstream gateway edge in addition to the existing routes;
+never expose the PDS, raw repository or database interfaces. Customer release
+gates remain separate from this default-off internal-use configuration.
 The owning gateway runtime cleans expired mailbox payloads/receipts every minute;
 instance runtimes clean project-private question/result payloads on the same
 interval. Holds are respected; reads enforce TTL independently of cleanup.
 
 Draft accepts a `CollectionBlueprint`: collection UUID, reviewed name, description
-and topics, explicit requesting instance IDs, `modes: ["deterministic"]`, empty
-`model_destinations`, explicitly reviewed `output_destinations` (default
+and topics, explicit requesting instance IDs, `modes: ["deterministic"]` by default,
+empty `model_destinations` by default, explicitly reviewed `output_destinations` (default
 `["local_human"]`, limited by operator policy) and selected canonical
 IDs with explicitly selected evidence. The returned draft displays the exact
 current memory versions, evidence, authorship, disclosure policy and digest.
@@ -265,7 +271,8 @@ Withdraw accepts `request_id`, `collection`, `expected_revision` and
 the withdrawal advertisement. Exact retries retain the same intent. It cannot
 recall already delivered or already authorized in-flight bytes. All responses
 are no-store. Browser service-grant inspection and reviewed changes are available
-after collection inspection; full real-service browser rehearsal remains pending.
+after collection inspection. The disposable real-service browser rehearsal covers
+these controls; it does not activate an existing installation.
 
 `GET collections/{collection}/grants?principal=<UUID>` reads a stored local grant
 (`enabled: null` means no matching grant). `POST` to the same path accepts
@@ -294,7 +301,7 @@ new explicit review to change the collection.
 
 ## Observe and recover
 
-### Optional F1 synthesis (disposable rehearsal)
+### Optional F1 synthesis
 
 Deterministic excerpts remain the default. Synthesis is a separate tool-free
 path; it never uses ordinary query context, source paths or the full-content LLM
@@ -324,7 +331,8 @@ conservative reservation; unknown usage is never credited back. The serialized
 request body plus output-token allowance must fit that reservation. An
 eight-second provider timeout stays within the origin execution lease; the
 question deadline remains 120 seconds. Redirects are forbidden and provider
-responses are bounded at 64 KiB. No tools or fallback providers are offered.
+responses are bounded at 64 KiB. Environment proxies are disabled for this
+restricted path. No tools or fallback providers are offered.
 Transport ambiguity becomes `uncertain`, not an automatic retry. Another question
 can incur repeat billing.
 

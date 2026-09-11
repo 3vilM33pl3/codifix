@@ -65,7 +65,7 @@ Queued, gateway accepted, and publication/replication observed locally are
 different states. Status cannot assert another peer's cursor. Recipients and
 infrastructure administrators can read plaintext; revocation cannot recall bytes.
 
-### Expertise enrollment (incomplete F1 rehearsal)
+### Expertise enrollment
 
 CLI capability names are `pull`, `publish`, `manage-membership`,
 `ask-expertise` and `answer-expertise`. For example, after inspecting the exact
@@ -89,7 +89,11 @@ The expertise commands below additionally require an explicit operator binding
 for the exact service-token ID, principal and output destination. No destination
 is inferred from a CLI token, and a client cannot choose a destination flag.
 
-## Explicit expertise workflow (disposable F1 rehearsal)
+## Explicit expertise workflow
+
+F1 is default-off internal-use software. Follow the
+[installation and operations checklist](../f1-internal-expertise.md) for a
+separately approved activation; the disposable rehearsal changes no deployment.
 
 `collections list [--after UUID] [--limit 1..32]` and
 `collections inspect --collection UUID` inspect stored local reviews. Prepare a

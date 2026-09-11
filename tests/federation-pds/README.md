@@ -1,5 +1,39 @@
 # Private PDS prerequisite probe
 
+## F1 expertise gate
+
+`--runtime` also runs `f1_independent_instances_answer_and_enroll_game`
+with four separate, independently credentialed databases (gateway, homelab,
+Memory and game). F1 uses real HTTP service applications and automatic origin
+workers in one test process; Stage E additionally starts separate service
+executables. Both publish through the pinned PDS. Set
+`MEMORY_FEDERATION_E_CLIENTS=1` to enable the F1 real-browser, CLI, tmux PTY and
+MCP stdio workflows too. This is an intentional shared full-client gate, not a
+separate optional CI check. Set `MEMORY_FEDERATION_F1_SCREENSHOTS` to retain
+synthetic browser screenshots.
+
+F1 checks bidirectional cited answers, exact retries, stopped/restarted answering
+workers, explicit game enrollment followed by separate collection consent,
+withdrawal, and fake-provider synthesis (invalid citations, uncertain requests
+without reinvocation and budget exhaustion). The upstream verifier accepts both
+unchanged v2 history and v3 advertisements, verifies the signed CAR, and asserts
+that private question/answer/evidence sentinels never enter PDS records.
+
+Run with the inherited developer token unset, an explicitly disposable database,
+and the client prerequisites below:
+
+```bash
+/usr/bin/env -u MEMORY_LAYER_CLIENT_TOKEN \
+  MEMORY_LAYER_TEST_REQUIRE_DB=1 MEMORY_FEDERATION_E_CLIENTS=1 \
+  node tests/federation-pds/run.mjs --runtime
+```
+
+The normal required-database workspace run alone does not enable this external
+PDS/client gate. The separate TLS isolation gate explicitly enables F1 without
+cleartext fixture mode and checks signed discovery, unauthorized and cross-space
+denial, fixed edge routes and the restricted gateway SQL role. Neither gate is
+customer disaster-recovery evidence or authorization to deploy homelab services.
+
 ## Stage E application and client gate
 
 `--runtime` now also runs the three-database Memory HTTP workflow against the

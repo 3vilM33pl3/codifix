@@ -52,7 +52,7 @@ function CollectionsWorkspace({ project, discovery }: { project: string; discove
     if (!lifetime.current?.signal.aborted) setPage(response);
   }
   return <section aria-label="Expertise collection management"><h3>Approved expertise collections</h3>
-    <p>Disposable rehearsal. Collections stay local; only reviewed advertisements are published. Activation grants standing permission to answer from the frozen collection, subject to current permissions. Model synthesis requires separate operator configuration and explicit consent.</p>
+    <p>Experimental internal expertise exchange. Collections stay local; only reviewed advertisements are published. Activation grants standing permission to answer from the frozen collection, subject to current permissions. Model synthesis requires separate operator configuration and explicit consent.</p>
     <p>Stored active consent does not prove current source eligibility or gateway publication. Withdrawal cannot recall delivered or already authorized in-flight bytes.</p>
     {disabled ? <p>Collection controls require a writable service and curate/export permissions.</p> : null}
     {error ? <p role="alert">Collection operation failed or was denied: {error}. Publication intents may be retried exactly; uncertain grant changes require fresh policy inspection and review. Do not assume rollback.</p> : null}

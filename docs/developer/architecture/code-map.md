@@ -26,16 +26,17 @@ Use this map to find the right PR boundary before opening the large files.
 
 - `formal/memory-federation`: Lean 4.33.1 reducer proofs and executable shared-trace conformance, kept separate from the Rust runtime crates.
 
-F1 is an incomplete, explicitly internal-use increment. Expertise contracts and
+F1 is an opt-in, explicitly internal-use increment. Expertise contracts and
 v3 advertisements are in `mem-federation/src/expertise.rs`; origin-only reviews
 and the private gateway mailbox are separate modules in `mem-federation-store`.
-`mem-federation-runtime/src/expertise_transport.rs` provides signed rehearsal RPC,
+`mem-federation-runtime/src/expertise_transport.rs` provides signed private RPC,
 and `expertise_answer.rs` accepts only an already eligible collection subset.
 Pure lexical/snippet helpers shared with existing local retrieval live in
 `mem-record/src/text.rs`. No gateway dependency on `mem-search` was introduced.
-Normal gateway configuration still cannot enable F1. See the
-[F1 execution status](../../reviews/federation-first/f1-execution.md) for missing
-full service rehearsal, optional models and user workflows. Fresh per-read
+Gateway configuration requires an explicit compatible `expertise_fleet`; default
+configuration keeps F1 disabled. See the
+[F1 execution status](../../reviews/federation-first/f1-execution.md) for evidence
+and the [internal-use runbook](../../user/f1-internal-expertise.md). Fresh per-read
 origin authorization lives in `expertise_delivery.rs`; its optional service
 validator and bounded deterministic answering loops are in
 `mem-service/src/federation/expertise.rs`. Immutable private results are in
@@ -47,12 +48,17 @@ handlers, capability browsing and original-requester result reads are in
 activation and withdrawal handlers are in `workflow/collections.rs`; the preview
 uses a caller-owned transaction to retain current authentication locks.
 Local collection listing/detail uses `mem-federation-store/src/expertise_catalog.rs`;
-these are stored-review inspection, not answer authorization. Web/CLI/TUI/MCP
-parity remains pending. `web/src/features/federation/ExpertisePanel.tsx` implements
+these are stored-review inspection, not answer authorization.
+`web/src/features/federation/ExpertisePanel.tsx` implements
 explicit discovery, exact-question confirmation and manual result reads; collection
 management uses `CollectionsPanel.tsx` for browsing, exact review and withdrawal.
-Service-grant controls use the same collection handler and worker identity policy;
-full real-service rehearsal remains open.
+Service-grant controls use the same collection handler and worker identity policy.
+CLI/TUI live under `mem-cli/src/commands/federation`, including `terminal.rs`;
+dedicated MCP tools use `mem-mcp`. Caller/output bindings are operator-owned.
+`mem-service/src/federation/expertise/model.rs` is the isolated tool-free synthesis
+path, using configured LLM settings without the ordinary query prompt or content
+audit. The real-client, independent-database fake-model/game rehearsal is
+`workflow/tests/f1_instances.rs`, also exercised against the pinned PDS gate.
 
 ## Frontends
 

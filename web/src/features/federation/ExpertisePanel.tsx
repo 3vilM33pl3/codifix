@@ -47,7 +47,7 @@ function ExpertiseWorkspace({ project, discovery }: { project: string; discovery
   }
   return <section aria-label="Private expertise exchange">
     <h3>Ask another instance</h3>
-    <p>Disposable F1 rehearsal only; the operator must enable browser expertise and grant access. Ordinary queries stay local. Only this question is sent—no conversation history, files or local search results.</p>
+    <p>Experimental internal expertise exchange; the operator must enable browser expertise and grant access. Ordinary queries stay local. Only this question is sent—no conversation history, files or local search results.</p>
     <p>Default: deterministic excerpts. Output destination: local human browser. Optional synthesis discloses reviewed context to the selected, separately authorized provider. Revocation cannot recall delivered bytes.</p>
     {disabled ? <p>Expertise is unavailable in read-only mode or without export permission.</p> : null}
     {error ? <p role="alert">Expertise unavailable or denied: {error}. An uncertain submission may already be queued; preserve its request ID and retry only the exact review.</p> : null}
