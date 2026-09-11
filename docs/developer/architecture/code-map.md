@@ -50,7 +50,8 @@ Local collection listing/detail uses `mem-federation-store/src/expertise_catalog
 these are stored-review inspection, not answer authorization. Web/CLI/TUI/MCP
 parity remains pending. `web/src/features/federation/ExpertisePanel.tsx` implements
 explicit discovery, exact-question confirmation and manual result reads; collection
-management screens and full real-service rehearsal remain open.
+management uses `CollectionsPanel.tsx` for browsing, exact review and withdrawal.
+Service-grant controls and full real-service rehearsal remain open.
 
 ## Frontends
 

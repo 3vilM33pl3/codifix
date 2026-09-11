@@ -44,8 +44,42 @@ After an uncertain submission, **Retry exact question** reuses the same reviewed
 bytes and request ID. Closing the review does not cancel delivery. A new question
 is a new request and may repeat work; expired reviews require fresh preparation.
 Read-only mode and missing export permission disable the panel; the server still
-enforces all current permissions. Collection-management screens, CLI/TUI/MCP
+enforces all current permissions. Service-identity grant controls, CLI/TUI/MCP
 parity and the complete live rehearsal remain unfinished.
+
+### Expertise collection management
+
+The Federation workspace also has **Approved expertise collections**. Choose
+**Browse collections**, then inspect an existing collection to see the stored
+review, including withdrawn consent. This is not a current eligibility or
+publication check. Pagination uses collection UUIDs, not gateway ordering.
+
+To prepare a collection, provide its reviewed name, description, topics, allowed
+requesting instance UUIDs and canonical memory UUIDs. Leave the collection UUID
+blank for a new collection, or supply an existing UUID for a new revision. The
+server selects exact current versions for review. Omitted entries and evidence
+are not carried forward into a new revision.
+
+No evidence is attached by default. The advanced evidence field accepts an object
+mapping selected canonical UUIDs to `EvidenceSelection` arrays, each containing
+`snapshot` and `snapshot_digest`. The backend checks evidence validity; the UI
+rejects keys for unselected memories. This technical editor is not an automatic
+source picker. Raw captures, paths and files are never attached automatically.
+
+**Prepare collection review** returns all exact snapshot and advertisement bytes.
+Read every field before checking the consent box and confirming activation.
+Activation grants standing consent for deterministic local-human answers; it does
+not enroll an instance or grant the answering service identity access. To withdraw,
+inspect the stored collection and choose **Review collection withdrawal**; confirm
+the collection UUID and revision. Withdrawal cannot recall previously delivered
+or already authorized in-flight bytes.
+
+The UI preserves a failed/uncertain action for exact retry and reports successful
+submission as queued, not published. Closing a review does not roll back a
+committed action. Project/identity/permission changes clear local state and abort
+pending requests; review contents are not saved in browser storage. Server-side
+permissions remain authoritative. Service-identity grant controls, CLI/TUI/MCP
+parity and a real-service browser rehearsal remain open.
 
 The web UI is the web companion to the TUI. It is served by `mem-service` and uses the same backend APIs for memories, query, code graph inspection, activities, watchers, embeddings, resume briefings, and curation review.
 

@@ -18,7 +18,8 @@ interfaces. Browser-session HTTP preparation/submission, capability browsing and
 original-requester result reads are implemented and tested at component level.
 Collection draft/activate/withdraw and local browsing/detail HTTP are implemented;
 The Web requester panel has component-tested discovery, confirmation and result reads;
-collection-management screens and CLI/TUI/MCP remain pending, followed by the full disposable
+Web collection management also has component coverage; service-grant controls and
+CLI/TUI/MCP remain pending, followed by the full disposable
 automatic-worker rehearsal. Open checkboxes are end-to-end completion gates;
 the dated evidence below records individual implementation increments.
 
@@ -487,3 +488,30 @@ responses, not a real-browser/two-origin rehearsal. Rust/database, Lean, lean CL
 and container/PDS regressions were not rerun for this frontend-only increment.
 No existing service or credentials changed. Collection management screens,
 CLI/TUI/MCP, optional models and full rehearsal remain open; F1 is not complete.
+
+### Web collection management increment — 2026-09-11
+
+Commit `6c9fb99` adds origin-local collection browsing/detail, new/revised
+collection preparation, full-byte activation confirmation and revision-bound
+withdrawal confirmation. No browsing or publication happens automatically.
+Preparation selects canonical IDs and an explicit requester allowlist, fixes the
+mode to deterministic local-human output, and attaches no evidence by default.
+An advanced JSON evidence selector accepts arrays only for selected canonical
+IDs; backend validation and complete review still apply. It is not a graphical
+source picker. Revisions deliberately do not carry forward omitted evidence.
+
+Uncertain actions retain their exact request and confirmation payload for retry.
+Success is labelled queued, not accepted or published. Closing review does not
+undo committed work. Project/identity/permission changes clear state and abort
+requests. The React checklist guided labelled controls, action serialization,
+lifecycle cleanup and escaped text rendering. No private review is persisted in
+browser storage; authorization remains server-owned.
+
+Verification: all 85 Web tests across 24 files pass, including four new collection
+workflow tests. The production build passes with its existing large-chunk warning.
+Logs are `/tmp/f1-collections-ui-tests.log` and
+`/tmp/f1-collections-ui-build.log`. These are mocked component tests, not the
+real-service browser rehearsal. Rust/database, Lean, lean CLI and container/PDS
+regressions were not rerun for this frontend-only increment. No existing service
+or credentials changed. Service-grant controls, CLI/TUI/MCP, optional models and
+the full disposable rehearsal remain open; F1 is not complete.
