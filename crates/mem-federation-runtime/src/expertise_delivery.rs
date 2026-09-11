@@ -181,6 +181,69 @@ impl GatewayClient {
 }
 
 impl crate::InstanceSync {
+    pub async fn renew_expertise_question(
+        &self,
+        lease: &mem_federation_store::QuestionLease,
+    ) -> crate::Result<()> {
+        match self
+            .client
+            .expertise(
+                self.instance,
+                ExpertiseOperation::Renew {
+                    lease: lease.clone(),
+                },
+            )
+            .await?
+        {
+            ExpertiseReply::Renewed(_) => Ok(()),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+    pub async fn claim_expertise_question(
+        &self,
+    ) -> crate::Result<Option<mem_federation_store::QuestionLease>> {
+        match self
+            .client
+            .expertise(self.instance, ExpertiseOperation::Claim)
+            .await?
+        {
+            ExpertiseReply::Lease(lease) => Ok(lease.map(|l| *l)),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+    /// Recheck exact evidence under current caller-held authority locks.
+    /// The private result MUST commit before this transfer is attempted.
+    pub async fn complete_expertise_question(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        access: &mem_federation::publication::LocalProjectAccess,
+        lease: &mem_federation_store::QuestionLease,
+        answer: &mem_federation::expertise::ExpertiseAnswer,
+    ) -> crate::Result<()> {
+        let (snapshot, ad) = mem_federation_store::eligible_question_collection(
+            tx,
+            access,
+            self.instance,
+            &lease.question,
+        )
+        .await?;
+        crate::validate_expertise_delivery(&lease.question, &ad, &snapshot, answer)
+            .map_err(|_| RuntimeError::Unauthorized)?;
+        match self
+            .client
+            .expertise(
+                self.instance,
+                ExpertiseOperation::Complete {
+                    lease: lease.clone(),
+                    answer: answer.clone(),
+                },
+            )
+            .await?
+        {
+            ExpertiseReply::Completed => Ok(()),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
     pub async fn claim_expertise_delivery(&self) -> crate::Result<Option<AnswerDeliveryLease>> {
         match self
             .client

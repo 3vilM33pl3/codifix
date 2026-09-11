@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Internal rehearsal delivery validator. This is not a generic agent/task
+//! Internal rehearsal deterministic answering and delivery. Not a generic agent/task
 //! worker. There is no provider invocation, query capture or recursive RPC.
 use crate::AppState;
 use mem_federation::publication::LocalProjectAccess;
@@ -16,23 +16,96 @@ pub(super) fn start(
     project: Uuid,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        loop {
-            if !matches!(
-                tokio::time::timeout(
-                    Duration::from_secs(12),
-                    cycle(&state, &sync, principal, project)
-                )
-                .await,
-                Ok(Ok(()))
-            ) {
-                // No question, evidence, provider body or unbounded error text.
-                tracing::warn!("expertise delivery validation paused or denied");
-            }
-            // DB state is authoritative. Lost polls/leases resume with a fresh
-            // reader challenge; an old approval is never automatically reused.
-            tokio::time::sleep(Duration::from_secs(2)).await;
-        }
+        // Both loops belong to this task: abort/drop cancels both without
+        // detached work. A slow answer cannot starve a live delivery challenge.
+        tokio::join!(
+            run(&state, &sync, principal, project, false),
+            run(&state, &sync, principal, project, true)
+        );
     })
+}
+async fn run(state: &AppState, sync: &InstanceSync, principal: Uuid, project: Uuid, answer: bool) {
+    loop {
+        let work = async {
+            if answer {
+                answer_cycle(state, sync, principal, project).await
+            } else {
+                cycle(state, sync, principal, project).await
+            }
+        };
+        if !matches!(
+            tokio::time::timeout(Duration::from_secs(12), work).await,
+            Ok(Ok(()))
+        ) {
+            tracing::warn!(answer_stage = answer, "expertise work paused or denied");
+        }
+        // DB state is authoritative. Lost polls/leases resume with a fresh
+        // reader challenge; an old approval is never automatically reused.
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+}
+async fn answer_cycle(
+    state: &AppState,
+    sync: &InstanceSync,
+    principal: Uuid,
+    project: Uuid,
+) -> anyhow::Result<()> {
+    let pool = state
+        .pool()
+        .map_err(|_| anyhow::anyhow!("database unavailable"))?;
+    let mut tx = pool.begin().await?;
+    sqlx::query("SET LOCAL lock_timeout='2s'")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SET LOCAL statement_timeout='3s'")
+        .execute(&mut *tx)
+        .await?;
+    let current = access(state, &mut tx, principal, project).await?;
+    let Some(lease) = sync.claim_expertise_question().await? else {
+        tx.rollback().await?;
+        return Ok(());
+    };
+    let work = async {
+        let (snapshot, ad) = mem_federation_store::eligible_question_collection(
+            &mut tx,
+            &current,
+            lease.question.capability.publisher,
+            &lease.question,
+        )
+        .await?;
+        let answer = mem_federation_runtime::deterministic_expertise_answer(
+            &lease.question,
+            &ad,
+            &snapshot,
+        )?;
+        let answer =
+            mem_federation_store::persist_expertise_answer(&mut tx, project, &lease, &answer)
+                .await?;
+        tx.commit().await?;
+        // Result survives a crash here. Recovered delivery still needs fresh policy.
+        let mut tx = pool.begin().await?;
+        sqlx::query("SET LOCAL lock_timeout='2s'")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("SET LOCAL statement_timeout='3s'")
+            .execute(&mut *tx)
+            .await?;
+        let current = access(state, &mut tx, principal, project).await?;
+        sync.complete_expertise_question(&mut tx, &current, &lease, &answer)
+            .await?;
+        tx.rollback().await?;
+        Ok::<(), anyhow::Error>(())
+    };
+    tokio::pin!(work);
+    tokio::select! {
+        result=&mut work=>result,
+        _=tokio::time::sleep(Duration::from_secs(10))=>{
+            sync.renew_expertise_question(&lease).await?;
+            // The encompassing 12-second deadline bounds this deterministic
+            // stage below its original 30-second lease even after renewal.
+            work.await
+        }
+    }
 }
 async fn cycle(
     state: &AppState,

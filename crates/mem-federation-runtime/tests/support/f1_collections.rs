@@ -353,16 +353,21 @@ async fn two_origin_databases_exchange_only_reviewed_cited_excerpts() {
         let mut fabricated = answer.clone();
         fabricated.citations[0].author = AuthorIdentity::new("forged-author").unwrap();
         assert!(fabricated.validate(&question, &answer.citations).is_err());
-        responder_client
-            .expertise(
-                responder,
-                ExpertiseOperation::Complete {
-                    lease: *lease,
-                    answer: answer.clone(),
-                },
-            )
+        let mut tx = origin.db.pool.begin().await.unwrap();
+        persist_expertise_answer(&mut tx, origin.worker.project, &lease, &answer)
             .await
             .unwrap();
+        tx.commit().await.unwrap();
+        let sync = InstanceSync::new(origin.db.pool.clone(), responder_client.clone(), responder)
+            .await
+            .unwrap();
+        // Completion now follows committed origin persistence and rechecks
+        // eligibility while holding the new transaction's source/grant locks.
+        let mut tx = origin.db.pool.begin().await.unwrap();
+        sync.complete_expertise_question(&mut tx, &origin.worker, &lease, &answer)
+            .await
+            .unwrap();
+        tx.rollback().await.unwrap();
         let (received, released) = tokio::join!(
             requester_client.expertise(
                 requester,
