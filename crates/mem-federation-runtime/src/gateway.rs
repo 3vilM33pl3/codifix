@@ -91,18 +91,14 @@ impl GatewayServer {
             .layer(DefaultBodyLimit::max(96 * 1024))
             .with_state(Arc::new(self.clone()))
     }
-    /// Temporary rehearsal entrypoint while origin workers/UI are incomplete.
-    /// Production configuration intentionally cannot enable these routes yet.
+    /// Explicit private expertise opt-in. Customer release remains a separate
+    /// operational gate; this never enrolls a member or grants collection access.
     /// Require an explicit schema inventory for ALL configured participants;
     /// no inferred capability, dynamic discovery or mixed-version downgrade.
-    pub async fn enable_expertise_rehearsal(
-        mut self,
-        participants: &[(InstanceId, u32)],
-    ) -> Result<Self> {
+    pub async fn enable_expertise(mut self, participants: &[(InstanceId, u32)]) -> Result<Self> {
         let configured: BTreeSet<_> = self.credentials.iter().map(|(_, id)| *id).collect();
         let compatible: BTreeSet<_> = participants.iter().map(|(id, _)| *id).collect();
-        if !cfg!(debug_assertions)
-            || compatible.len() != participants.len()
+        if compatible.len() != participants.len()
             || participants
                 .iter()
                 .any(|(_, schema)| *schema != mem_federation::expertise::EXPERTISE_SCHEMA_VERSION)
@@ -115,6 +111,16 @@ impl GatewayServer {
             .await?;
         self.expertise_enabled = true;
         Ok(self)
+    }
+    /// Compatibility helper for existing disposable fixtures, never a TLS bypass.
+    pub async fn enable_expertise_rehearsal(
+        self,
+        participants: &[(InstanceId, u32)],
+    ) -> Result<Self> {
+        if !cfg!(debug_assertions) {
+            return Err(RuntimeError::Configuration);
+        }
+        self.enable_expertise(participants).await
     }
     pub async fn publish_one(&self, pds: &PdsPublisher) -> Result<WorkerOutcome> {
         if self

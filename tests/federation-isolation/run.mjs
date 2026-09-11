@@ -68,7 +68,7 @@ try {
       'gateway/audit-key':secret(),'gateway/pds-token':secret(),'gateway/member-token':m.memberToken,'gateway/root-token':m.rootToken,'member/token':m.memberToken})) await save(join(dir,file),value);
     await copyFile(ca,join(dir,'member/ca.pem'));await copyFile(ca,join(dir,'gateway/ca.pem'));
     for(const sub of ['edge','pds-tls']) {await copyFile(cert,join(dir,sub,'cert.pem'));await copyFile(key,join(dir,sub,'key.pem'));}
-    await save(join(dir,'edge/Caddyfile'),tlsProxy(`gateway-${id}.federation.example.com`,`gateway_${id}:8081`,['/v1/accept','/v1/pull','/v1/retention']));
+    await save(join(dir,'edge/Caddyfile'),tlsProxy(`gateway-${id}.federation.example.com`,`gateway_${id}:8081`,['/v1/accept','/v1/pull','/v1/retention','/v1/expertise']));
     await save(join(dir,'pds-tls/Caddyfile'),tlsProxy(`pds-tls-${id}.federation.example.com`,`pds_${id}:2583`,['/xrpc/com.atproto.repo.getRecord','/xrpc/com.atproto.repo.createRecord','/xrpc/com.atproto.sync.getRepo']));
     const pdsKey=createECDH('secp256k1');pdsKey.generateKeys();
     await save(join(dir,'pds.env'),Object.entries({PDS_PORT:'2583',PDS_HOSTNAME:`pds-${id}.federation.example.com`,PDS_DATA_DIRECTORY:'/pds',PDS_BLOBSTORE_DISK_LOCATION:'/pds/blobs',
@@ -88,7 +88,7 @@ try {
     const publicKeys=JSON.parse(run(join(repo,'target/debug/examples/isolation-admin'),[dir],{env:{...process.env,MEMORY_FEDERATION_ISOLATION_DISPOSABLE:'1'}}));
     await save(join(dir,'gateway/database-url'),`postgres://gateway_runtime:${m.gatewayPassword}@gateway_db_${id}:5432/memory_isolation`);
     await save(join(dir,'gateway/gateway.json'),{space:m.space,authority:m.authority,listen:'0.0.0.0:8081',database_url_file:'/config/database-url',pds:`https://pds-tls-${id}.federation.example.com:8443`,pds_ca_file:'/config/ca.pem',repository:`did:web:space-${id}.federation.example.com`,signing_key:publicKeys.pds_signing_key,
-      token_file:'/config/pds-token',audit_key_file:'/config/audit-key',receipt_keys:publicKeys.receipt_keys,policy:{external_models:[]},credentials:[{instance:m.member,token_file:'/config/member-token'},{instance:m.authority,token_file:'/config/root-token'}]});
+      token_file:'/config/pds-token',audit_key_file:'/config/audit-key',receipt_keys:publicKeys.receipt_keys,policy:{external_models:[]},expertise_fleet:[[m.member,3],[m.authority,3]],credentials:[{instance:m.member,token_file:'/config/member-token'},{instance:m.authority,token_file:'/config/root-token'}]});
   }
   run('docker',[...compose,'up','-d','gateway_a','gateway_b','edge_a','edge_b']);
   for(const id of ['a','b']) {

@@ -219,18 +219,28 @@ async function runtime() {
   const collection = 'dev.memory-layer.unspecced.publication';
   const schemas = new Lexicons(readdirSync('/gate/publication-lexicons').map(file =>
     JSON.parse(readFileSync(`/gate/publication-lexicons/${file}`, 'utf8'))));
-  const records = await rpc('com.atproto.repo.listRecords', { base,
-    query: { repo: state.did, collection, limit: 100 } });
-  assert.ok(records.records.length > 32, 'Rust workflow must publish a multi-page history');
-  for (const record of records.records) {
+  const records = []; let cursor;
+  do {
+    const page = await rpc('com.atproto.repo.listRecords', { base,
+      query: { repo: state.did, collection, limit: 100, ...(cursor ? { cursor } : {}) } });
+    records.push(...page.records); cursor = page.cursor;
+    assert.ok(records.length <= 1000, 'bounded synthetic publication history');
+  } while (cursor);
+  assert.ok(records.length > 32, 'Rust workflow must publish a multi-page history');
+  const versions = new Set();
+  for (const record of records) {
     schemas.assertValidRecord(collection, record.value);
-    assert.equal(record.value.delivery.envelope.schema_version, 2);
-    assert.ok(!JSON.stringify(record.value).includes('NEVER_SHARE'));
+    const version = record.value.delivery.envelope.schema_version;
+    assert.ok(version === 2 || version === 3); versions.add(version);
+    for (const privateText of ['NEVER_SHARE', 'Reviewed synthetic evidence only', 'PRIVATE_PROVIDER_ERROR_SENTINEL', 'What is the reviewed incident diagnosis?', 'Synthetic reviewed incident answer.']) {
+      assert.ok(!JSON.stringify(record.value).includes(privateText), 'private expertise payload entered PDS');
+    }
   }
+  assert.ok(versions.has(2) && versions.has(3), 'legacy and expertise schema histories both present');
   const bytes = await rpc('com.atproto.sync.getRepo', { base, query: { did: state.did } });
   await verifyRepoCar(bytes, state.did, state.signingKey);
   await assert.rejects(verifyRepoCar(bytes, state.did, state.wrongKey));
-  console.log('PASS Rust v2 publications in real PDS, independent Lexicon and signed CAR verification, wrong-key rejection');
+  console.log('PASS Rust v2/v3 publications in real PDS, no private expertise payloads, independent Lexicon and signed CAR verification, wrong-key rejection');
 }
 
 (process.env.GATE_PHASE === 'restore' ? restore()

@@ -29,7 +29,7 @@ pub struct GatewayConfig {
     pub credentials: Vec<InstanceCredential>,
     #[serde(default)]
     pub disposable_test_mode: bool,
-    /// Explicit schema declarations for every enrolled rehearsal credential.
+    /// Explicit schema declarations for every configured private-space credential.
     /// None keeps all expertise routes disabled.
     #[serde(default)]
     pub expertise_fleet: Option<Vec<(InstanceId, u32)>>,
@@ -93,10 +93,6 @@ impl GatewayConfig {
         if self.disposable_test_mode && !cfg!(debug_assertions) {
             return Err(RuntimeError::Configuration);
         }
-        if self.expertise_fleet.is_some() && !(self.disposable_test_mode && cfg!(debug_assertions))
-        {
-            return Err(RuntimeError::Configuration);
-        }
         let security = GatewaySecurity::new(
             &private_key(&self.audit_key_file)?,
             self.receipt_keys,
@@ -154,7 +150,7 @@ impl GatewayConfig {
         )
         .await?;
         let server = if let Some(fleet) = self.expertise_fleet {
-            server.enable_expertise_rehearsal(&fleet).await?
+            server.enable_expertise(&fleet).await?
         } else {
             server
         };

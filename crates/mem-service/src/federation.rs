@@ -169,18 +169,6 @@ pub(crate) async fn start(
                 !disposable_test_mode || cfg!(debug_assertions),
                 "cleartext fixture mode is prohibited in release builds"
             );
-            anyhow::ensure!(
-                expertise_principal.is_none() || (disposable_test_mode && cfg!(debug_assertions)),
-                "expertise workers remain restricted to disposable rehearsal"
-            );
-            anyhow::ensure!(
-                !expertise_browser || (disposable_test_mode && cfg!(debug_assertions)),
-                "expertise browser access is rehearsal-only"
-            );
-            anyhow::ensure!(
-                expertise_callers.is_empty() || (disposable_test_mode && cfg!(debug_assertions)),
-                "expertise caller access is rehearsal-only"
-            );
             validate_expertise_callers(&expertise_callers)?;
             anyhow::ensure!(
                 expertise_model_destinations.len() <= 16
@@ -192,10 +180,6 @@ pub(crate) async fn start(
             if let Some(model) = &expertise_model {
                 model.validate()?;
             }
-            anyhow::ensure!(
-                expertise_model.is_none() || (disposable_test_mode && cfg!(debug_assertions)),
-                "expertise model execution is rehearsal-only"
-            );
             anyhow::ensure!(
                 !expertise_output_destinations.is_empty()
                     && expertise_output_destinations.len() <= 16

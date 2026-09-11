@@ -51,7 +51,7 @@ try:
     key("F5")
     wait_for("Review every disclosed byte and destination before F6")
     key("F6")
-    wait_for("queued")
+    wait_for('"submission": "queued"')
     key("Escape")
     print("PTY federation context and confirmed correction passed")
 finally:

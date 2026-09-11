@@ -115,6 +115,16 @@ async function runtimeTest() {
     const code = await new Promise((resolve, reject) => { app.once('error', reject); app.once('exit', resolve); });
     if (code !== 0) throw new Error('Two-instance Memory application workflow failed');
   } finally { clearTimeout(appTimer); }
+  const expertiseEnv = { ...testEnv, MEMORY_FEDERATION_F1_INSTANCES: '1' };
+  if (testEnv.MEMORY_FEDERATION_E_CLIENTS === '1') expertiseEnv.MEMORY_FEDERATION_F1_CLIENTS = '1';
+  delete expertiseEnv.MEMORY_FEDERATION_E_CLIENTS;
+  const expertise = spawn('cargo', ['test', '-p', 'mem-service', 'f1_independent_instances', '--locked', '--', '--test-threads=1', '--nocapture'],
+    { cwd: join(directory, '../..'), env: expertiseEnv, stdio: 'inherit' });
+  const expertiseTimer = setTimeout(() => expertise.kill('SIGTERM'), 540_000);
+  try {
+    const code = await new Promise((resolve, reject) => { expertise.once('error', reject); expertise.once('exit', resolve); });
+    if (code !== 0) throw new Error('F1 expertise separate-database workflow failed');
+  } finally { clearTimeout(expertiseTimer); }
   await writeFile(join(stateDirectory, 'runtime-finished'), 'complete', { mode: 0o600 });
   const probeId = spawnSync('docker', [...compose, 'ps', '-aq', 'probe'], { env: runtimeEnv, encoding: 'utf8' });
   const completed = spawnSync('docker', ['wait', probeId.stdout.trim()], { encoding: 'utf8', timeout: 60_000 });

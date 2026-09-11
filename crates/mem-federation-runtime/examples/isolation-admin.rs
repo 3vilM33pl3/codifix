@@ -73,14 +73,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let member = serde_json::from_value(meta["member"].clone())?;
     let store = mem_federation_store::GatewayStore::new(pool.clone());
     let fence = store.initialize(space, authority).await?;
-    store
+    for capability in [
+        mem_federation::SpaceCapability::Pull,
+        mem_federation::SpaceCapability::AskExpertise,
+    ] {
+        store
         .accept(
             fence,
             authority,
             &mem_federation_store::PublicationIntent {
-                locator: mem_federation::RecordLocator::new("fixture:bootstrap")?,
+                locator: mem_federation::RecordLocator::new(format!("fixture:{capability:?}"))?,
                 envelope: mem_federation::publication::PublicationEnvelope {
-                    schema_version: 2,
+                    schema_version: if capability==mem_federation::SpaceCapability::AskExpertise {3}else{2},
                     space,
                     publisher: authority,
                     record_id: mem_federation::publication::RecordId::new(uuid::Uuid::new_v4())?,
@@ -89,12 +93,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     causation: None,
                     record: mem_federation::publication::PublicationRecord::Membership {
                         member,
-                        capability: mem_federation::SpaceCapability::Pull,
+                        capability,
                     },
                 },
             },
         )
         .await?;
+    }
     // Only public enrolled keys on stdout. All secrets remain in private files.
     println!(
         "{}",

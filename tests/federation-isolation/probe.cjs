@@ -5,12 +5,12 @@ const https=require('node:https');const net=require('node:net');const assert=req
 const config=JSON.parse(readFileSync('/member/probe.json'));
 const token=readFileSync('/member/token','utf8');
 const ca=readFileSync('/member/ca.pem');
-async function request(host,path,auth=token,trust=ca) {
+async function request(host,path,auth=token,trust=ca,body=null) {
   return new Promise((resolve,reject)=>{
-    const req=https.get({hostname:host,port:8443,path,ca:trust,headers:{authorization:`Bearer ${auth}`},timeout:2500},res=>{
+    const req=https.request({hostname:host,port:8443,path,ca:trust,method:body?'POST':'GET',headers:{authorization:`Bearer ${auth}`,'content-type':'application/json'},timeout:2500},res=>{
       let data='';res.on('data',chunk=>{data+=chunk;if(data.length>1024*1024) req.destroy(new Error('too large'));});
       res.on('end',()=>resolve({status:res.statusCode,data}));
-    });req.on('error',reject);req.on('timeout',()=>req.destroy(new Error('timeout')));
+    });req.on('error',reject);req.on('timeout',()=>req.destroy(new Error('timeout')));req.end(body?JSON.stringify(body):undefined);
   });
 }
 async function tcp(host,port) {
@@ -31,6 +31,14 @@ async function tcp(host,port) {
   const signed=JSON.parse(result.data);assert.equal(signed.claims.nonce,nonce);assert.equal(signed.claims.page.space,config.space);assert.equal(signed.signature.length,64);
   assert.equal((await request(config.gateway,path,'wrong-token')).status,401);
   assert.equal((await request(config.otherGateway,path)).status,401);
+  const expertise = {nonce:randomUUID(),operation:{operation:'discover',after:null,limit:1}};
+  const discovered=await request(config.gateway,'/v1/expertise',token,ca,expertise);
+  assert.equal(discovered.status,200);
+  const reply=JSON.parse(discovered.data);
+  assert.equal(reply.claims.nonce,expertise.nonce);
+  assert.equal(reply.claims.purpose,'memory-expertise-discover-v1');
+  assert.equal((await request(config.gateway,'/v1/expertise','wrong-token',ca,expertise)).status,401);
+  assert.equal((await request(config.otherGateway,'/v1/expertise',token,ca,expertise)).status,401);
   await assert.rejects(()=>request(config.gateway,path,token,null));
   for(const raw of ['/xrpc/com.atproto.sync.getRepo','/xrpc/com.atproto.sync.subscribeRepos','/xrpc/com.atproto.repo.listRecords','/mcp','/api/memories','/v1/pull/../export']) {
     assert.equal((await request(config.gateway,raw)).status,404);

@@ -77,7 +77,7 @@ try {
     assert.equal((await cli(side, 'discover')).space, side.space);
   }
   const left = await pageFor(fixture.left), right = await pageFor(fixture.right);
-  await left.getByLabel('Canonical memory UUID').fill(fixture.canonical);
+  await left.getByLabel('Canonical memory UUID', { exact: true }).fill(fixture.canonical);
   await left.getByLabel('Public evidence label').fill('Approved incident excerpt');
   await left.getByLabel('Selected evidence text (optional)').fill('Reviewed evidence: <script>do not execute</script>.');
   await left.getByRole('button', { name: 'Prepare review', exact: true }).click();

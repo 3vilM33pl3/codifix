@@ -11,9 +11,14 @@ are introduced. Container/host administrators remain trusted plaintext operators
 - Each space has a dedicated gateway database, PDS volume, audit key, repository
   binding and instance-token allowlist. Only its gateway joins all three private
   API/repository/database networks.
-- A fixed-upstream TLS edge exposes only `/v1/accept`, `/v1/pull`, `/v1/retention`.
+- A fixed-upstream TLS edge exposes only `/v1/accept`, `/v1/pull`, `/v1/retention`
+  and, for explicitly enabled private expertise, `/v1/expertise`.
   Its API network does not include the PDS or database. There is no arbitrary
   forwarding, CAR endpoint or event stream on the edge.
+  F1 requires the gateway's complete `expertise_fleet` schema inventory and
+  independent local/membership/collection grants; routing this path alone grants
+  no authority. The isolation fixture tests authenticated F1 discovery, wrong
+  tokens and cross-space denial without enabling cleartext fixture mode.
 - The PDS is on a separate internal network behind a fixed-upstream TLS proxy;
   the gateway is its only member-facing client. No participant receives its token,
   key, raw volume, repository interface or Docker socket.
