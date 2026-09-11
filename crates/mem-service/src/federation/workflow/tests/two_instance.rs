@@ -24,15 +24,15 @@ impl Drop for ServiceProcess {
     }
 }
 
-struct Database {
-    pool: PgPool,
+pub(super) struct Database {
+    pub(super) pool: PgPool,
     admin: PgPool,
     url: String,
     name: String,
     role: String,
 }
 impl Database {
-    async fn new(admin: &PgPool) -> Self {
+    pub(super) async fn new(admin: &PgPool) -> Self {
         let name = format!("federation_e_{}", Uuid::new_v4().simple());
         let role = format!("{name}_app");
         let password = Uuid::new_v4().simple().to_string();
@@ -85,7 +85,7 @@ impl Database {
             role,
         }
     }
-    async fn cleanup(self, admin: &PgPool) {
+    pub(super) async fn cleanup(self, admin: &PgPool) {
         self.pool.close().await;
         self.admin.close().await;
         sqlx::query(&format!("DROP DATABASE {} WITH (FORCE)", self.name))
@@ -98,16 +98,16 @@ impl Database {
             .unwrap();
     }
 }
-struct Network {
-    space: SpaceId,
-    authority: InstanceId,
-    gateway: GatewayStore,
-    server: GatewayServer,
-    security: GatewaySecurity,
-    url: String,
+pub(super) struct Network {
+    pub(super) space: SpaceId,
+    pub(super) authority: InstanceId,
+    pub(super) gateway: GatewayStore,
+    pub(super) server: GatewayServer,
+    pub(super) security: GatewaySecurity,
+    pub(super) url: String,
 }
 impl Network {
-    async fn publish(&self, pds: Option<&PdsPublisher>) {
+    pub(super) async fn publish(&self, pds: Option<&PdsPublisher>) {
         let fence = self
             .gateway
             .initialize(self.space, self.authority)
@@ -144,7 +144,12 @@ impl Network {
         panic!("unbounded publication");
     }
 }
-async fn app(db: &Database, n: &Network, instance: InstanceId, token: String) -> Fixture {
+pub(super) async fn app(
+    db: &Database,
+    n: &Network,
+    instance: InstanceId,
+    token: String,
+) -> Fixture {
     let project = Uuid::new_v4();
     let slug = project.to_string();
     sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,'Two-instance fixture','/DO_NOT_SHARE')").bind(project).bind(&slug).execute(&db.pool).await.unwrap();
@@ -176,6 +181,9 @@ async fn app(db: &Database, n: &Network, instance: InstanceId, token: String) ->
     let runtime = Arc::new(ConfiguredInstance {
         expertise_browser: false,
         expertise_callers: vec![],
+        expertise_output_destinations: crate::federation::local_output(),
+        expertise_model_destinations: vec![],
+        expertise_model: None,
         project,
         space: n.space,
         instance,
@@ -264,7 +272,7 @@ async fn app(db: &Database, n: &Network, instance: InstanceId, token: String) ->
         security: n.security.clone(),
     }
 }
-async fn pump(n: &Network, pds: Option<&PdsPublisher>, apps: &[&Fixture]) {
+pub(super) async fn pump(n: &Network, pds: Option<&PdsPublisher>, apps: &[&Fixture]) {
     for f in apps {
         for principal in [f.root_id, f.writer_id] {
             let access =

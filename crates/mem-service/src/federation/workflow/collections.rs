@@ -186,13 +186,25 @@ pub struct CollectionSubmission {
 }
 
 fn destinations(
+    runtime: &ConfiguredInstance,
     modes: &[AnswerMode],
     models: &[String],
     outputs: &[String],
 ) -> Result<(), ApiError> {
-    if modes != [AnswerMode::Deterministic] || !models.is_empty() || outputs != ["local_human"] {
+    if (modes.contains(&AnswerMode::Model) && runtime.expertise_model.is_none())
+        || models.iter().any(|d| {
+            runtime
+                .expertise_model
+                .as_ref()
+                .is_none_or(|c| c.provider != *d)
+        })
+        || outputs.is_empty()
+        || outputs
+            .iter()
+            .any(|d| !runtime.expertise_output_destinations.contains(d))
+    {
         return Err(ApiError::forbidden(
-            "collection browser policy permits deterministic local_human answers only",
+            "collection policy permits only configured model and output destinations",
         ));
     }
     Ok(())
@@ -227,6 +239,7 @@ pub(crate) async fn collection_draft(
     let (runtime, local) = binding(&state, &principal, &path.slug, path.space).await?;
     requester::browser(&runtime, &principal)?;
     destinations(
+        &runtime,
         &blueprint.modes,
         &blueprint.model_destinations,
         &blueprint.output_destinations,
@@ -256,7 +269,12 @@ pub(crate) async fn collection_activate(
     let (runtime, local) = binding(&state, &principal, &path.slug, path.space).await?;
     requester::browser(&runtime, &principal)?;
     let ad = &request.draft.advertisement;
-    destinations(&ad.modes, &ad.model_destinations, &ad.output_destinations)?;
+    destinations(
+        &runtime,
+        &ad.modes,
+        &ad.model_destinations,
+        &ad.output_destinations,
+    )?;
     if request.confirmed_digest != request.draft.review_digest {
         return Err(bad_request(
             "exact collection review digest confirmation required",

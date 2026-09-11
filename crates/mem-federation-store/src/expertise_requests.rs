@@ -34,12 +34,16 @@ async fn authorize(
     question: &ExpertiseQuestion,
     ad: &CapabilityAdvertisement,
     operator_destinations: &[String],
+    operator_models: &[String],
 ) -> Result<()> {
     if access.read_only
         || access.principal != question.principal
         || !access.permissions.contains(Permission::MemoryRead)
         || !access.permissions.contains(Permission::BundleExport)
-        || question.mode != AnswerMode::Deterministic
+        || question
+            .model_destination
+            .as_ref()
+            .is_some_and(|d| !operator_models.contains(d))
         || !operator_destinations.contains(&question.output_destination)
     {
         return Err(StoreError::Binding);
@@ -117,7 +121,26 @@ pub async fn prepare_expertise_question(
     ad: &CapabilityAdvertisement,
     operator_destinations: &[String],
 ) -> Result<QuestionReview> {
-    authorize(tx, access, question, ad, operator_destinations).await?;
+    prepare_expertise_question_with_models(tx, access, question, ad, operator_destinations, &[])
+        .await
+}
+pub async fn prepare_expertise_question_with_models(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    question: &ExpertiseQuestion,
+    ad: &CapabilityAdvertisement,
+    operator_destinations: &[String],
+    operator_models: &[String],
+) -> Result<QuestionReview> {
+    authorize(
+        tx,
+        access,
+        question,
+        ad,
+        operator_destinations,
+        operator_models,
+    )
+    .await?;
     let advertisement_digest = CanonicalJsonCodec::digest(ad).map_err(|_| StoreError::Binding)?;
     Ok(QuestionReview {
         project: access.project,
@@ -136,12 +159,33 @@ pub async fn confirm_expertise_question(
     operator_destinations: &[String],
     confirmed_digest: &ContentDigest,
 ) -> Result<()> {
-    let expected = prepare_expertise_question(
+    confirm_expertise_question_with_models(
+        tx,
+        access,
+        review,
+        current_ad,
+        operator_destinations,
+        &[],
+        confirmed_digest,
+    )
+    .await
+}
+pub async fn confirm_expertise_question_with_models(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    review: &QuestionReview,
+    current_ad: &CapabilityAdvertisement,
+    operator_destinations: &[String],
+    operator_models: &[String],
+    confirmed_digest: &ContentDigest,
+) -> Result<()> {
+    let expected = prepare_expertise_question_with_models(
         tx,
         access,
         &review.question,
         current_ad,
         operator_destinations,
+        operator_models,
     )
     .await?;
     if review.project != access.project
@@ -182,12 +226,38 @@ pub async fn consented_expertise_question(
     current_ad: &CapabilityAdvertisement,
     operator_destinations: &[String],
 ) -> Result<ExpertiseQuestion> {
+    consented_expertise_question_with_models(
+        tx,
+        access,
+        (space, requester, request_id),
+        current_ad,
+        operator_destinations,
+        &[],
+    )
+    .await
+}
+pub async fn consented_expertise_question_with_models(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    key: (SpaceId, InstanceId, Uuid),
+    current_ad: &CapabilityAdvertisement,
+    operator_destinations: &[String],
+    operator_models: &[String],
+) -> Result<ExpertiseQuestion> {
+    let (space, requester, request_id) = key;
     let row = sqlx::query("SELECT question,review_digest,advertisement_digest,request_digest FROM federation_expertise_requests WHERE project_id=$1 AND space=$2 AND requester=$3 AND request_id=$4 AND principal_id=$5 AND question IS NOT NULL AND payload_until>clock_timestamp() AND expires_at>clock_timestamp() FOR SHARE")
         .bind(access.project).bind(space.as_uuid()).bind(requester.as_uuid()).bind(request_id)
         .bind(access.principal).fetch_optional(&mut **tx).await?.ok_or(StoreError::Binding)?;
     let q = row.try_get::<Json<ExpertiseQuestion>, _>("question")?.0;
-    let expected =
-        prepare_expertise_question(tx, access, &q, current_ad, operator_destinations).await?;
+    let expected = prepare_expertise_question_with_models(
+        tx,
+        access,
+        &q,
+        current_ad,
+        operator_destinations,
+        operator_models,
+    )
+    .await?;
     if q.space != space
         || q.requester != requester
         || q.request_id != request_id

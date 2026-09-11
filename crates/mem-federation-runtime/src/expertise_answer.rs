@@ -15,6 +15,19 @@ pub fn deterministic_expertise_answer(
     advertisement: &CapabilityAdvertisement,
     eligible: &CollectionSnapshot,
 ) -> std::result::Result<ExpertiseAnswer, ExpertiseReject> {
+    if question.mode != AnswerMode::Deterministic {
+        return Err(ExpertiseReject::DestinationDenied);
+    }
+    answer_at(question, advertisement, eligible, chrono::Utc::now())
+}
+
+/// The same fixed lexical selection for a restricted synthesis request. Only
+/// eligible reviewed citations are exposed, never ordinary query context.
+pub fn expertise_selected_context(
+    question: &ExpertiseQuestion,
+    advertisement: &CapabilityAdvertisement,
+    eligible: &CollectionSnapshot,
+) -> std::result::Result<ExpertiseAnswer, ExpertiseReject> {
     answer_at(question, advertisement, eligible, chrono::Utc::now())
 }
 
@@ -28,8 +41,7 @@ fn answer_at(
 ) -> std::result::Result<ExpertiseAnswer, ExpertiseReject> {
     advertisement.validate()?;
     advertisement.authorize_question(question, at)?;
-    if question.mode != AnswerMode::Deterministic
-        || eligible.space != question.space
+    if eligible.space != question.space
         || eligible.owner != advertisement.owner
         || eligible.collection != advertisement.collection
         || eligible.revision != advertisement.revision
@@ -123,14 +135,26 @@ fn answer_at(
 
 /// Re-derive the exact deterministic result from currently eligible rows. No
 /// substituted source, altered quotation or stale evidence may be released.
-/// Model results remain disabled, including on the retained-delivery path.
+/// Model text is untrusted; every citation must match the selected reviewed data.
 pub fn validate_expertise_delivery(
     question: &ExpertiseQuestion,
     advertisement: &CapabilityAdvertisement,
     eligible: &CollectionSnapshot,
     answer: &ExpertiseAnswer,
 ) -> std::result::Result<(), ExpertiseReject> {
-    if answer_at(question, advertisement, eligible, question.created_at)? != *answer {
+    let selected = answer_at(question, advertisement, eligible, question.created_at)?;
+    if question.mode == AnswerMode::Model {
+        answer.validate(question, &selected.citations)?;
+        if CanonicalJsonCodec::encode(answer)
+            .map_err(|_| ExpertiseReject::Binding)?
+            .len()
+            > advertisement.limits.answer_bytes as usize
+        {
+            return Err(ExpertiseReject::Limits);
+        }
+        return Ok(());
+    }
+    if selected != *answer {
         return Err(ExpertiseReject::InvalidCitation);
     }
     Ok(())

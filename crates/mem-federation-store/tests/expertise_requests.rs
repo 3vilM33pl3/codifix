@@ -14,6 +14,89 @@ struct Fixture {
 }
 
 #[tokio::test]
+async fn model_consent_requires_separate_current_operator_permission() {
+    let Some(mut f) = Fixture::new().await else {
+        return;
+    };
+    f.q.mode = AnswerMode::Model;
+    f.q.model_destination = Some("fixture".into());
+    f.ad.modes.push(AnswerMode::Model);
+    f.ad.model_destinations.push("fixture".into());
+    let models = vec!["fixture".into()];
+    let mut tx = f.db.pool.begin().await.unwrap();
+    assert!(
+        prepare_expertise_question(&mut tx, &f.access, &f.q, &f.ad, &f.destinations)
+            .await
+            .is_err(),
+        "legacy callers remain model-disabled"
+    );
+    let review = prepare_expertise_question_with_models(
+        &mut tx,
+        &f.access,
+        &f.q,
+        &f.ad,
+        &f.destinations,
+        &models,
+    )
+    .await
+    .unwrap();
+    assert!(
+        confirm_expertise_question_with_models(
+            &mut tx,
+            &f.access,
+            &review,
+            &f.ad,
+            &f.destinations,
+            &[],
+            &review.digest
+        )
+        .await
+        .is_err()
+    );
+    confirm_expertise_question_with_models(
+        &mut tx,
+        &f.access,
+        &review,
+        &f.ad,
+        &f.destinations,
+        &models,
+        &review.digest,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let key = (f.q.space, f.q.requester, f.q.request_id);
+    let mut tx = f.db.pool.begin().await.unwrap();
+    assert!(
+        consented_expertise_question_with_models(
+            &mut tx,
+            &f.access,
+            key,
+            &f.ad,
+            &f.destinations,
+            &[]
+        )
+        .await
+        .is_err(),
+        "revoked synthesis consent blocks transmission"
+    );
+    assert_eq!(
+        consented_expertise_question_with_models(
+            &mut tx,
+            &f.access,
+            key,
+            &f.ad,
+            &f.destinations,
+            &models
+        )
+        .await
+        .unwrap(),
+        f.q
+    );
+    tx.rollback().await.unwrap();
+}
+
+#[tokio::test]
 async fn origin_results_are_immutable_scoped_recoverable_and_lease_bounded() {
     let Some(f) = Fixture::new().await else {
         return;

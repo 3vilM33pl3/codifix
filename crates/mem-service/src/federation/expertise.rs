@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Internal rehearsal deterministic answering and delivery. Not a generic agent/task
-//! worker. There is no provider invocation, query capture or recursive RPC.
+//! Internal rehearsal restricted answering and delivery. Not a generic agent/task
+//! worker. There is no query capture, tool execution or recursive RPC.
+mod model;
 use crate::AppState;
 use mem_federation::publication::LocalProjectAccess;
 use mem_federation_runtime::InstanceSync;
 use mem_record::Permission;
+pub(super) use model::ModelConfig;
 use sqlx::{Postgres, Transaction};
 use std::time::Duration;
 use uuid::Uuid;
@@ -33,10 +35,8 @@ async fn run(state: &AppState, sync: &InstanceSync, principal: Uuid, project: Uu
                 cycle(state, sync, principal, project).await
             }
         };
-        if !matches!(
-            tokio::time::timeout(Duration::from_secs(12), work).await,
-            Ok(Ok(()))
-        ) {
+        let outcome = tokio::time::timeout(Duration::from_secs(12), work).await;
+        if !matches!(outcome, Ok(Ok(()))) {
             tracing::warn!(answer_stage = answer, "expertise work paused or denied");
         }
         // DB state is authoritative. Lost polls/leases resume with a fresh
@@ -66,6 +66,7 @@ async fn answer_cycle(
         return Ok(());
     };
     let work = async {
+        output_policy(state, project, &lease.question)?;
         let (snapshot, ad) = mem_federation_store::eligible_question_collection(
             &mut tx,
             &current,
@@ -73,10 +74,22 @@ async fn answer_cycle(
             &lease.question,
         )
         .await?;
-        let answer = mem_federation_runtime::deterministic_expertise_answer(
+        let selected =
+            mem_federation_runtime::expertise_selected_context(&lease.question, &ad, &snapshot)?;
+        let answer = if lease.question.mode == mem_federation::expertise::AnswerMode::Model
+            && !selected.insufficient_evidence
+        {
+            model::answer(state, sync, project, &lease, selected).await?
+        } else {
+            selected
+        };
+        output_policy(state, project, &lease.question)?;
+        // Recompute eligible citations while source and authority locks are held.
+        mem_federation_runtime::validate_expertise_delivery(
             &lease.question,
             &ad,
             &snapshot,
+            &answer,
         )?;
         let answer =
             mem_federation_store::persist_expertise_answer(&mut tx, project, &lease, &answer)
@@ -91,6 +104,7 @@ async fn answer_cycle(
             .execute(&mut *tx)
             .await?;
         let current = access(state, &mut tx, principal, project).await?;
+        output_policy(state, project, &lease.question)?;
         sync.complete_expertise_question(&mut tx, &current, &lease, &answer)
             .await?;
         tx.rollback().await?;
@@ -125,10 +139,40 @@ async fn cycle(
         .await?;
     let access = access(state, &mut tx, principal, project).await?;
     if let Some(lease) = sync.claim_expertise_delivery().await? {
+        output_policy(state, project, &lease.question)?;
         sync.authorize_expertise_delivery(&mut tx, &access, &lease)
             .await?;
     }
     tx.rollback().await?;
+    Ok(())
+}
+fn output_policy(
+    state: &AppState,
+    project: Uuid,
+    q: &mem_federation::expertise::ExpertiseQuestion,
+) -> anyhow::Result<()> {
+    let registry = state
+        .federation
+        .read()
+        .expect("federation registry poisoned");
+    let runtime = registry
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("expertise policy unavailable"))?;
+    anyhow::ensure!(
+        runtime.project == project
+            && runtime.instance == q.capability.publisher
+            && runtime
+                .expertise_output_destinations
+                .contains(&q.output_destination),
+        "expertise output policy denied"
+    );
+    if q.mode == mem_federation::expertise::AnswerMode::Model {
+        let config = runtime
+            .expertise_model
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("expertise model disabled"))?;
+        config.validate_consent(q)?;
+    }
     Ok(())
 }
 pub(super) async fn access(

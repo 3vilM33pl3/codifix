@@ -29,6 +29,10 @@ pub struct GatewayConfig {
     pub credentials: Vec<InstanceCredential>,
     #[serde(default)]
     pub disposable_test_mode: bool,
+    /// Explicit schema declarations for every enrolled rehearsal credential.
+    /// None keeps all expertise routes disabled.
+    #[serde(default)]
+    pub expertise_fleet: Option<Vec<(InstanceId, u32)>>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -89,6 +93,10 @@ impl GatewayConfig {
         if self.disposable_test_mode && !cfg!(debug_assertions) {
             return Err(RuntimeError::Configuration);
         }
+        if self.expertise_fleet.is_some() && !(self.disposable_test_mode && cfg!(debug_assertions))
+        {
+            return Err(RuntimeError::Configuration);
+        }
         let security = GatewaySecurity::new(
             &private_key(&self.audit_key_file)?,
             self.receipt_keys,
@@ -145,6 +153,11 @@ impl GatewayConfig {
             security,
         )
         .await?;
+        let server = if let Some(fleet) = self.expertise_fleet {
+            server.enable_expertise_rehearsal(&fleet).await?
+        } else {
+            server
+        };
         let router = server.router();
         let worker = async {
             loop {
@@ -164,6 +177,14 @@ impl GatewayConfig {
         tokio::select! {
             result=axum::serve(listener,router)=>result.map_err(|_|RuntimeError::Unavailable),
             result=worker=>result,
+            result=async {
+                loop {
+                    server.maintain_expertise().await?;
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                }
+                #[allow(unreachable_code)]
+                Ok::<(),RuntimeError>(())
+            }=>result,
         }
     }
 }

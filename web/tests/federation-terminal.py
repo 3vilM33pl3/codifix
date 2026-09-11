@@ -49,7 +49,7 @@ try:
     key("C-u")
     text("Second terminal correction for rejection")
     key("F5")
-    wait_for("Review exact request before F6")
+    wait_for("Review every disclosed byte and destination before F6")
     key("F6")
     wait_for("queued")
     key("Escape")

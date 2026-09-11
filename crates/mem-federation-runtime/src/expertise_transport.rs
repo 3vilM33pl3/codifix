@@ -31,6 +31,12 @@ pub enum ExpertiseOperation {
     Renew {
         lease: QuestionLease,
     },
+    ReserveModel {
+        lease: QuestionLease,
+        daily_calls: u32,
+        daily_tokens: u32,
+        tokens: u32,
+    },
     Complete {
         lease: QuestionLease,
         answer: ExpertiseAnswer,
@@ -46,6 +52,7 @@ impl ExpertiseOperation {
             Self::ClaimDelivery => "memory-expertise-delivery-claim-v1",
             Self::AuthorizeDelivery { .. } => "memory-expertise-delivery-release-v1",
             Self::Renew { .. } => "memory-expertise-renew-v1",
+            Self::ReserveModel { .. } => "memory-expertise-model-reservation-v1",
             Self::Complete { .. } => "memory-expertise-complete-v1",
         }
     }
@@ -121,6 +128,11 @@ impl GatewayClient {
             .send()
             .await
             .map_err(|_| RuntimeError::Unavailable)?;
+        if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            return Err(RuntimeError::Store(
+                mem_federation_store::StoreError::Limits,
+            ));
+        }
         crate::sync::check_status(response.status())?;
         let signed = crate::http::json(response, 256 * 1024).await?;
         let reply =
@@ -192,7 +204,9 @@ impl GatewayClient {
             (ExpertiseOperation::Renew { lease }, ExpertiseReply::Renewed(until))
                 if *until > Utc::now() && *until <= lease.question.expires_at => {}
             (
-                ExpertiseOperation::Complete { .. } | ExpertiseOperation::AuthorizeDelivery { .. },
+                ExpertiseOperation::Complete { .. }
+                | ExpertiseOperation::AuthorizeDelivery { .. }
+                | ExpertiseOperation::ReserveModel { .. },
                 ExpertiseReply::Completed,
             ) => {}
             _ => return Err(RuntimeError::InvalidResponse),

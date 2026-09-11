@@ -13,11 +13,7 @@ pub async fn persist_expertise_answer(
     answer: &ExpertiseAnswer,
 ) -> Result<ExpertiseAnswer> {
     let q = &lease.question;
-    if project.is_nil()
-        || lease.lease_token.is_nil()
-        || q.mode != AnswerMode::Deterministic
-        || lease.lease_until > q.expires_at
-    {
+    if project.is_nil() || lease.lease_token.is_nil() || lease.lease_until > q.expires_at {
         return Err(StoreError::Binding);
     }
     // Structural validation only; runtime checks exact eligible sources.

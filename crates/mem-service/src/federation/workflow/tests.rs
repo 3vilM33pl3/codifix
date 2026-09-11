@@ -12,6 +12,7 @@ use std::sync::Mutex;
 mod browser;
 mod collections;
 mod enrollment;
+mod f1_instances;
 mod requester;
 mod two_instance;
 
@@ -449,6 +450,9 @@ impl Fixture {
         let runtime = Arc::new(ConfiguredInstance {
             expertise_browser,
             expertise_callers: vec![],
+            expertise_output_destinations: super::super::local_output(),
+            expertise_model_destinations: vec![],
+            expertise_model: None,
             project,
             space,
             instance,

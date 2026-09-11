@@ -19,6 +19,9 @@ use uuid::Uuid;
 
 #[derive(Deserialize)]
 #[serde(tag = "role", rename_all = "snake_case", deny_unknown_fields)]
+// Parsed once at startup, never carried in queues or per-request state. Keeping
+// the tagged shape flat preserves the existing operator configuration contract.
+#[allow(clippy::large_enum_variant)]
 enum WorkerConfig {
     Instance {
         space: SpaceId,
@@ -32,6 +35,12 @@ enum WorkerConfig {
         expertise_browser: bool,
         #[serde(default)]
         expertise_callers: Vec<ExpertiseCaller>,
+        #[serde(default = "local_output")]
+        expertise_output_destinations: Vec<String>,
+        #[serde(default)]
+        expertise_model_destinations: Vec<String>,
+        #[serde(default)]
+        expertise_model: Option<expertise::ModelConfig>,
         gateway: String,
         #[serde(default)]
         gateway_ca_file: Option<PathBuf>,
@@ -54,6 +63,12 @@ pub(crate) struct ConfiguredInstance {
     sync: InstanceSync,
     expertise_browser: bool,
     expertise_callers: Vec<ExpertiseCaller>,
+    expertise_output_destinations: Vec<String>,
+    expertise_model_destinations: Vec<String>,
+    expertise_model: Option<expertise::ModelConfig>,
+}
+fn local_output() -> Vec<String> {
+    vec!["local_human".into()]
 }
 
 /// Operator-owned bindings, never supplied by a requesting client. Token UUIDs
@@ -141,6 +156,9 @@ pub(crate) async fn start(
             expertise_principal,
             expertise_browser,
             expertise_callers,
+            expertise_output_destinations,
+            expertise_model_destinations,
+            expertise_model,
             gateway,
             gateway_ca_file,
             token_file,
@@ -165,6 +183,33 @@ pub(crate) async fn start(
             );
             validate_expertise_callers(&expertise_callers)?;
             anyhow::ensure!(
+                expertise_model_destinations.len() <= 16
+                    && expertise_model_destinations
+                        .iter()
+                        .all(|d| mem_federation::expertise::valid_destination(d)),
+                "invalid expertise model destination policy"
+            );
+            if let Some(model) = &expertise_model {
+                model.validate()?;
+            }
+            anyhow::ensure!(
+                expertise_model.is_none() || (disposable_test_mode && cfg!(debug_assertions)),
+                "expertise model execution is rehearsal-only"
+            );
+            anyhow::ensure!(
+                !expertise_output_destinations.is_empty()
+                    && expertise_output_destinations.len() <= 16
+                    && expertise_output_destinations
+                        .iter()
+                        .all(|d| mem_federation::expertise::valid_destination(d))
+                    && expertise_output_destinations
+                        .iter()
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        == expertise_output_destinations.len(),
+                "invalid expertise output destination policy"
+            );
+            anyhow::ensure!(
                 expertise_principal != Some(principal),
                 "expertise requires a separate project-scoped service identity"
             );
@@ -187,6 +232,8 @@ pub(crate) async fn start(
                 instance,
             )
             .await?;
+            let expertise_enabled =
+                expertise_browser || expertise_principal.is_some() || !expertise_callers.is_empty();
             {
                 let mut registry = state
                     .federation
@@ -201,6 +248,35 @@ pub(crate) async fn start(
                     sync: sync.clone(),
                     expertise_browser,
                     expertise_callers,
+                    expertise_output_destinations,
+                    expertise_model_destinations,
+                    expertise_model,
+                }));
+            }
+            if expertise_enabled {
+                let maintenance_state = state.clone();
+                tasks.push(tokio::spawn(async move {
+                    loop {
+                        let cleanup = async {
+                            let pool = maintenance_state
+                                .pool()
+                                .map_err(|_| anyhow::anyhow!("database unavailable"))?;
+                            let mut tx = pool.begin().await?;
+                            mem_federation_store::cleanup_expertise_requests(&mut tx, project)
+                                .await?;
+                            mem_federation_store::cleanup_expertise_results(&mut tx, project)
+                                .await?;
+                            tx.commit().await?;
+                            Ok::<(), anyhow::Error>(())
+                        };
+                        if !matches!(
+                            tokio::time::timeout(Duration::from_secs(10), cleanup).await,
+                            Ok(Ok(()))
+                        ) {
+                            tracing::warn!("expertise private payload maintenance unavailable");
+                        }
+                        tokio::time::sleep(Duration::from_secs(60)).await;
+                    }
                 }));
             }
             if let Some(expertise_principal) = expertise_principal {
@@ -460,7 +536,7 @@ mod tests {
         fixture["disposable_test_mode"] = serde_json::json!(true);
         std::fs::write(&config, serde_json::to_vec(&fixture).unwrap()).unwrap();
         let tasks = start(state.clone(), Some(config.clone())).await.unwrap();
-        assert_eq!(tasks.0.len(), 2);
+        assert_eq!(tasks.0.len(), 3); // publication, expertise and private-payload maintenance
         let handles: Vec<_> = tasks.0.iter().map(|t| t.abort_handle()).collect();
         drop(tasks);
         tokio::time::timeout(Duration::from_secs(1), async {

@@ -65,7 +65,11 @@ pub(crate) async fn expertise_capabilities(
     let capabilities = ads
         .into_iter()
         .filter(|ad| {
-            ad.modes.contains(&AnswerMode::Deterministic)
+            (ad.modes.contains(&AnswerMode::Deterministic)
+                || ad
+                    .model_destinations
+                    .iter()
+                    .any(|d| runtime.expertise_model_destinations.contains(d)))
                 && ad.output_destinations.iter().any(|d| d == destination)
         })
         .collect();
@@ -96,8 +100,9 @@ pub(crate) async fn expertise_result(
     .await
     .map_err(store_error)?;
     let q = &consent.question;
-    if q.mode != AnswerMode::Deterministic
-        || q.model_destination.is_some()
+    if q.model_destination
+        .as_ref()
+        .is_some_and(|d| !runtime.expertise_model_destinations.contains(d))
         || q.output_destination != destination
     {
         return Err(ApiError::forbidden("retained destination is not permitted"));
@@ -138,6 +143,8 @@ pub struct ExpertisePrepareRequest {
     pub request_id: Uuid,
     pub capability: RecordKey,
     pub question: String,
+    #[serde(default)]
+    pub model_destination: Option<String>,
 }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -272,6 +279,15 @@ pub(crate) async fn expertise_prepare(
     let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
     let destination = caller_destination(&runtime, &principal, &headers)?;
     let ad = advertisement(&runtime, request.capability).await?;
+    if request
+        .model_destination
+        .as_ref()
+        .is_some_and(|d| !runtime.expertise_model_destinations.contains(d))
+    {
+        return Err(ApiError::forbidden(
+            "model destination is not operator-authorized",
+        ));
+    }
     let now = chrono::Utc::now();
     let question = ExpertiseQuestion {
         request_id: request.request_id,
@@ -282,20 +298,25 @@ pub(crate) async fn expertise_prepare(
         revision: ad.revision,
         collection_digest: ad.collection_digest.clone(),
         question: request.question,
-        mode: AnswerMode::Deterministic,
-        model_destination: None,
+        mode: if request.model_destination.is_some() {
+            AnswerMode::Model
+        } else {
+            AnswerMode::Deterministic
+        },
+        model_destination: request.model_destination,
         output_destination: destination.into(),
         created_at: now,
         expires_at: now + chrono::Duration::seconds(120),
     };
     let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
     let current = current_access(&state, &mut tx, &principal, &access).await?;
-    let review = mem_federation_store::prepare_expertise_question(
+    let review = mem_federation_store::prepare_expertise_question_with_models(
         &mut tx,
         &current,
         &question,
         &ad,
         &[destination.into()],
+        &runtime.expertise_model_destinations,
     )
     .await
     .map_err(store_error)?;
@@ -315,8 +336,9 @@ pub(crate) async fn expertise_submit(
     if q.space != runtime.space
         || q.requester != runtime.instance
         || q.principal != principal.id
-        || q.mode != AnswerMode::Deterministic
-        || q.model_destination.is_some()
+        || q.model_destination
+            .as_ref()
+            .is_some_and(|d| !runtime.expertise_model_destinations.contains(d))
         || q.output_destination != destination
     {
         return Err(ApiError::forbidden(
@@ -326,12 +348,13 @@ pub(crate) async fn expertise_submit(
     let ad = advertisement(&runtime, q.capability).await?;
     let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
     let current = current_access(&state, &mut tx, &principal, &access).await?;
-    mem_federation_store::confirm_expertise_question(
+    mem_federation_store::confirm_expertise_question_with_models(
         &mut tx,
         &current,
         &request.review,
         &ad,
         &[destination.into()],
+        &runtime.expertise_model_destinations,
         &request.confirmed_digest,
     )
     .await
@@ -341,14 +364,13 @@ pub(crate) async fn expertise_submit(
     // recoverable; retrying reuses its ID rather than inventing a new question.
     let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
     let current = current_access(&state, &mut tx, &principal, &access).await?;
-    let question = mem_federation_store::consented_expertise_question(
+    let question = mem_federation_store::consented_expertise_question_with_models(
         &mut tx,
         &current,
-        runtime.space,
-        runtime.instance,
-        q.request_id,
+        (runtime.space, runtime.instance, q.request_id),
         &ad,
         &[destination.into()],
+        &runtime.expertise_model_destinations,
     )
     .await
     .map_err(store_error)?;

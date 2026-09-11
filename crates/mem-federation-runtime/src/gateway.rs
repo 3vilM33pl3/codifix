@@ -34,6 +34,13 @@ pub struct GatewayServer {
     authority: InstanceId,
 }
 impl GatewayServer {
+    /// Scheduled by the owning gateway runtime, with its normal writer fence.
+    pub async fn maintain_expertise(&self) -> Result<()> {
+        if self.expertise_enabled {
+            self.store.cleanup_questions(self.fence).await?;
+        }
+        Ok(())
+    }
     pub async fn new(
         store: GatewayStore,
         space: SpaceId,
@@ -236,19 +243,12 @@ async fn expertise(
                 .await
                 .map_err(expertise_error)?,
         ),
-        ExpertiseOperation::Submit { question } => {
-            // Optional synthesis remains disabled until the origin restricted
-            // model path and operator-bound budgets are integrated and tested.
-            if question.mode != mem_federation::expertise::AnswerMode::Deterministic {
-                return Err(StatusCode::FORBIDDEN);
-            }
-            ExpertiseReply::Question(Box::new(
-                store
-                    .submit_question(fence, actor, question)
-                    .await
-                    .map_err(expertise_error)?,
-            ))
-        }
+        ExpertiseOperation::Submit { question } => ExpertiseReply::Question(Box::new(
+            store
+                .submit_question(fence, actor, question)
+                .await
+                .map_err(expertise_error)?,
+        )),
         ExpertiseOperation::Result { request_id } => ExpertiseReply::Question(Box::new(
             server
                 .receive_answer(actor, *request_id, request.nonce)
@@ -278,6 +278,21 @@ async fn expertise(
                 .await
                 .map_err(expertise_error)?,
         ),
+        ExpertiseOperation::ReserveModel {
+            lease,
+            daily_calls,
+            daily_tokens,
+            tokens,
+        } => {
+            if *daily_calls > 20 || *daily_tokens > 800_000 || *tokens > 40_000 {
+                return Err(StatusCode::BAD_REQUEST);
+            }
+            store
+                .reserve_question_model(fence, actor, lease, *daily_calls, *daily_tokens, *tokens)
+                .await
+                .map_err(expertise_error)?;
+            ExpertiseReply::Completed
+        }
         ExpertiseOperation::Complete { lease, answer } => {
             store
                 .complete_question(fence, actor, lease, answer)

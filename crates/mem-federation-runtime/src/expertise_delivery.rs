@@ -304,6 +304,30 @@ impl crate::InstanceSync {
             _ => Err(RuntimeError::InvalidResponse),
         }
     }
+    pub async fn reserve_expertise_model(
+        &self,
+        lease: &mem_federation_store::QuestionLease,
+        daily_calls: u32,
+        daily_tokens: u32,
+        tokens: u32,
+    ) -> crate::Result<()> {
+        match self
+            .client
+            .expertise(
+                self.instance,
+                ExpertiseOperation::ReserveModel {
+                    lease: lease.clone(),
+                    daily_calls,
+                    daily_tokens,
+                    tokens,
+                },
+            )
+            .await?
+        {
+            ExpertiseReply::Completed => Ok(()),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
     pub async fn claim_expertise_delivery(&self) -> crate::Result<Option<AnswerDeliveryLease>> {
         match self
             .client
