@@ -1531,6 +1531,78 @@ paths:
         "403": { description: Exact project permission or explicit local/gateway capability denied. }
         "409": { description: Stale review, pending source work or conflicting idempotency key. }
         "503": { description: Configured peer unavailable or retained verification failed. }
+  /v1/projects/{slug}/federation/{space}/collections/draft:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: draftExpertiseCollection
+      summary: Preview exact local collection contents and advertisement for review.
+      description: Disposable browser-only policy. Requires current read, curate and export permissions, local space grant and CSRF. Deterministic local_human destinations only. No persistence or publication; review all returned fields before activation. Body bounded to 2 MiB; collection domain bounds also apply.
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: CollectionBlueprint with collection ID, reviewed metadata, explicit requester identities, modes/destinations and selected canonical IDs/evidence. }
+      responses:
+        "200": { description: No-store CollectionDraft with exact snapshot, advertisement and review_digest. }
+        "403": { description: Current permission, caller or destination policy denied. }
+        "409": { description: Source or grant unavailable. }
+  /v1/projects/{slug}/federation/{space}/collections/activate:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: activateExpertiseCollection
+      summary: Confirm an exact collection review and queue its advertisement atomically.
+      description: Requires browser session, CSRF, current read/curate/export and publication grant. Revalidates source versions and reviewer identity. Local consent, audit and publication intent commit together; queued does not mean gateway accepted or published. Exact retries preserve the original intent. No service grant is created.
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [draft, confirmed_digest]
+              additionalProperties: false
+              properties:
+                draft: { type: object, description: Exact returned CollectionDraft. }
+                confirmed_digest: { type: object, description: Exact draft review_digest. }
+      responses:
+        "202": { description: No-store request_id and submission queued; contents remain local. }
+        "400": { description: Invalid confirmation or record. }
+        "403": { description: Current permission or destination policy denied. }
+        "409": { description: Stale source, changed review or revision conflict. }
+  /v1/projects/{slug}/federation/{space}/collections/withdraw:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: withdrawExpertiseCollection
+      summary: Disable local collection consent and queue withdrawal.
+      description: Same browser and current publication permissions as activation. Requires exact expected revision and explicit confirmation. Previously delivered or already authorized in-flight bytes cannot be recalled.
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_id, collection, expected_revision, confirmed]
+              additionalProperties: false
+              properties:
+                request_id: { type: string, format: uuid }
+                collection: { type: string, format: uuid }
+                expected_revision: { type: integer, minimum: 1 }
+                confirmed: { type: boolean, const: true }
+      responses:
+        "202": { description: No-store request_id and submission queued. }
+        "403": { description: Current permission or browser policy denied. }
+        "409": { description: Missing confirmation or revision conflict. }
   /v1/projects/{slug}/federation/{space}/questions/prepare:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }

@@ -1193,6 +1193,24 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             true,
         ),
         (
+            "/v1/projects/{slug}/federation/{space}/collections/draft",
+            Method::POST,
+            Permission::MemoryCurate,
+            true,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/collections/activate",
+            Method::POST,
+            Permission::MemoryCurate,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/collections/withdraw",
+            Method::POST,
+            Permission::MemoryCurate,
+            false,
+        ),
+        (
             "/v1/projects/{slug}/federation/{space}/capabilities",
             Method::GET,
             Permission::BundleExport,

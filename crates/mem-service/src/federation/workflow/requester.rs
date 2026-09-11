@@ -143,7 +143,10 @@ pub struct ExpertiseSubmitRequest {
     pub review: QuestionReview,
     pub confirmed_digest: ContentDigest,
 }
-fn browser(runtime: &ConfiguredInstance, p: &AuthenticatedPrincipal) -> Result<(), ApiError> {
+pub(super) fn browser(
+    runtime: &ConfiguredInstance,
+    p: &AuthenticatedPrincipal,
+) -> Result<(), ApiError> {
     if !runtime.expertise_browser
         || p.credential_source != CredentialSource::BrowserSession
         || p.session_id.is_none()
@@ -159,6 +162,22 @@ async fn current_access(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     p: &AuthenticatedPrincipal,
     access: &LocalProjectAccess,
+) -> Result<LocalProjectAccess, ApiError> {
+    current_access_for(
+        state,
+        tx,
+        p,
+        access,
+        &[Permission::MemoryRead, Permission::BundleExport],
+    )
+    .await
+}
+pub(super) async fn current_access_for(
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    p: &AuthenticatedPrincipal,
+    access: &LocalProjectAccess,
+    required: &[Permission],
 ) -> Result<LocalProjectAccess, ApiError> {
     sqlx::query("SET LOCAL lock_timeout='2s'")
         .execute(&mut **tx)
@@ -179,18 +198,15 @@ async fn current_access(
         access.project,
     )
     .await?;
-    for permission in [Permission::MemoryRead, Permission::BundleExport] {
-        if !current.contains(permission) || !access.permissions.contains(permission) {
+    for permission in required {
+        if !current.contains(*permission) || !access.permissions.contains(*permission) {
             return Err(ApiError::forbidden(
-                "current project read/export permission required",
+                "required current project permissions are unavailable",
             ));
         }
     }
     Ok(LocalProjectAccess {
-        permissions: mem_record::PermissionSet::from_permissions(&[
-            Permission::MemoryRead,
-            Permission::BundleExport,
-        ]),
+        permissions: mem_record::PermissionSet::from_permissions(required),
         ..access.clone()
     })
 }

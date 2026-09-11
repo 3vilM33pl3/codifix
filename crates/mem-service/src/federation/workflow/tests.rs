@@ -9,6 +9,7 @@ use mem_federation_store::{Claim, GatewayStore, PublicationIntent, RetryPolicy};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use std::sync::Mutex;
+mod collections;
 mod requester;
 mod two_instance;
 

@@ -216,6 +216,20 @@ pub async fn preview_collection(
     owner: InstanceId,
     blueprint: &CollectionBlueprint,
 ) -> Result<CollectionDraft> {
+    let mut tx = pool.begin().await?;
+    let draft = preview_collection_in(&mut tx, access, space, owner, blueprint).await?;
+    tx.commit().await?;
+    Ok(draft)
+}
+
+/// Caller holds current authentication locks through the complete preview.
+pub async fn preview_collection_in(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    space: SpaceId,
+    owner: InstanceId,
+    blueprint: &CollectionBlueprint,
+) -> Result<CollectionDraft> {
     permission(
         access,
         &[
@@ -228,11 +242,9 @@ pub async fn preview_collection(
     if blueprint.entries.is_empty() || blueprint.entries.len() > MAX_COLLECTION_ENTRIES {
         return Err(StoreError::Limits);
     }
-    let mut tx = pool.begin().await?;
-    load_grant(&mut tx, access, space, owner).await?;
-    collection_lock(&mut tx, space, owner, access.project, blueprint.collection).await?;
-    let revision =
-        next_revision(&mut tx, space, owner, access.project, blueprint.collection).await?;
+    load_grant(tx, access, space, owner).await?;
+    collection_lock(tx, space, owner, access.project, blueprint.collection).await?;
+    let revision = next_revision(tx, space, owner, access.project, blueprint.collection).await?;
     let now = Utc::now();
     let mut snapshot = CollectionSnapshot {
         space,
@@ -247,7 +259,7 @@ pub async fn preview_collection(
         if item.evidence.len() > 16 {
             return Err(StoreError::Limits);
         }
-        let mut frozen = entry(&mut tx, access.project, item.canonical).await?;
+        let mut frozen = entry(tx, access.project, item.canonical).await?;
         for evidence in &item.evidence {
             frozen.evidence.push(ReviewedEvidence::new(
                 evidence.snapshot.clone(),
@@ -286,7 +298,6 @@ pub async fn preview_collection(
         review_digest: ContentDigest::sha256_bytes(b""),
     };
     draft.review_digest = draft.digest()?;
-    tx.commit().await?;
     Ok(draft)
 }
 

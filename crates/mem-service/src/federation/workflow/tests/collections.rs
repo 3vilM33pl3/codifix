@@ -1,0 +1,200 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+use super::*;
+
+#[tokio::test]
+async fn collection_http_requires_exact_review_and_queues_metadata_only() {
+    let Some(f) = Fixture::with_expertise(true).await else {
+        return;
+    };
+    f.grant(f.writer_id, true).await;
+    let fence = f
+        .gateway
+        .initialize(f.runtime.space, f.runtime.authority)
+        .await
+        .unwrap();
+    let mut membership = intent(
+        f.runtime.space,
+        f.runtime.authority,
+        PublicationRecord::Membership {
+            member: f.runtime.instance,
+            capability: SpaceCapability::AnswerExpertise,
+        },
+    );
+    membership.envelope.schema_version = 3;
+    assert_eq!(
+        f.gateway
+            .accept(fence, f.runtime.authority, &membership)
+            .await
+            .unwrap()
+            .outcome,
+        PublicationOutcome::Applied
+    );
+    f.publish_fixture_receipts().await;
+    f.runtime.sync.catch_up().await.unwrap();
+    assert!(f.request(&f.root, reqwest::Method::POST, "/grants", json!({"principal":f.writer_id,"enabled":true,"capabilities":["pull","publish","answer_expertise"]})).await.0.is_success());
+    let canonical = f.source().await;
+    let session = format!("session-{}", Uuid::new_v4());
+    let csrf = format!("csrf-{}", Uuid::new_v4());
+    sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,expires_at) VALUES($1,$2,$3,$4,now()+interval '1 hour')")
+        .bind(Uuid::new_v4()).bind(f.writer_id).bind(crate::auth::hash_secret(&session)).bind(crate::auth::hash_secret(&csrf)).execute(&f.pool).await.unwrap();
+    let client = reqwest::Client::new();
+    let cookie = format!("memory_session={session}; memory_csrf={csrf}");
+    let post = |path: &str, body: Value| {
+        client
+            .post(f.path(path))
+            .header("cookie", &cookie)
+            .header("origin", "https://local.example.test")
+            .header("x-csrf-token", &csrf)
+            .json(&body)
+            .send()
+    };
+    let blueprint = json!({"collection":Uuid::new_v4(),"name":"Incident expertise",
+        "description":"Reviewed incident knowledge","topics":["incident"],
+        "modes":["deterministic"],"requesters":[f.runtime.instance],
+        "model_destinations":[],"output_destinations":["local_human"],
+        "entries":[{"canonical":canonical,"evidence":[]}]});
+    assert_eq!(
+        f.request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/collections/draft",
+            blueprint.clone()
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        client
+            .post(f.path("/collections/draft"))
+            .header("cookie", &cookie)
+            .json(&blueprint)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    let response = post("/collections/draft", blueprint.clone()).await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "{}",
+        response.text().await.unwrap()
+    );
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    let draft: Value = response.json().await.unwrap();
+    assert!(!draft.to_string().contains("NEVER_SHARE"));
+    assert_eq!(
+        draft["snapshot"]["entries"][0]["content"]["text"],
+        "Reviewed incident diagnosis"
+    );
+    let n: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM federation_expertise_reviews WHERE project_id=$1")
+            .bind(f.runtime.project)
+            .fetch_one(&f.pool)
+            .await
+            .unwrap();
+    assert_eq!(n, 0, "preview must not activate standing consent");
+    let activate = json!({"draft":draft,"confirmed_digest":draft["review_digest"]});
+    let mut altered = activate.clone();
+    altered["draft"]["advertisement"]["name"] = json!("Unreviewed rename");
+    assert!(
+        !post("/collections/activate", altered)
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    let mut egress = blueprint.clone();
+    egress["output_destinations"] = json!(["cloud_model"]);
+    assert_eq!(
+        post("/collections/draft", egress).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    for _ in 0..2 {
+        let response = post("/collections/activate", activate.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::ACCEPTED,
+            "{}",
+            response.text().await.unwrap()
+        );
+        assert_eq!(
+            response.json::<Value>().await.unwrap()["submission"],
+            "queued"
+        );
+    }
+    let rows: Vec<sqlx::types::Json<PublicationIntent>> =
+        sqlx::query_scalar("SELECT intent FROM federation_expertise_reviews WHERE project_id=$1")
+            .bind(f.runtime.project)
+            .fetch_all(&f.pool)
+            .await
+            .unwrap();
+    assert_eq!(rows.len(), 1);
+    let wire = serde_json::to_string(&rows[0].0).unwrap();
+    assert!(!wire.contains("Reviewed incident diagnosis"));
+    assert!(!wire.contains("NEVER_SHARE"));
+    // Withdrawal disables local standing consent even before remote acceptance.
+    let withdrawal = json!({"request_id":Uuid::new_v4(),"collection":blueprint["collection"],"expected_revision":1,"confirmed":true});
+    for _ in 0..2 {
+        let response = post("/collections/withdraw", withdrawal.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::ACCEPTED,
+            "{}",
+            response.text().await.unwrap()
+        );
+    }
+    let active:bool=sqlx::query_scalar("SELECT r.active FROM federation_expertise_collections c JOIN federation_expertise_reviews r USING(space,owner,project_id,collection,revision) WHERE c.project_id=$1").bind(f.runtime.project).fetch_one(&f.pool).await.unwrap();
+    assert!(!active);
+    let mut readonly = f.state.clone();
+    readonly.config.service.read_only = true;
+    let (readonly_url, task) = serve(crate::routes::build_http_app(readonly)).await;
+    assert_eq!(
+        client
+            .post(
+                f.path("/collections/activate")
+                    .replace(&f.url, &readonly_url)
+            )
+            .header("cookie", &cookie)
+            .header("origin", "https://local.example.test")
+            .header("x-csrf-token", &csrf)
+            .json(&activate)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    task.abort();
+    let response = post("/collections/draft", blueprint.clone()).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let stale: Value = response.json().await.unwrap();
+    sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,search_document,created_at,updated_at) VALUES($1,$2,$3,28,FALSE,'Changed diagnosis','Incident','implementation','project',3,0.9,to_tsvector('english','incident'),now(),now())")
+        .bind(Uuid::new_v4()).bind(f.runtime.project).bind(canonical.as_uuid()).execute(&f.pool).await.unwrap();
+    assert!(
+        !post(
+            "/collections/activate",
+            json!({"draft":stale,"confirmed_digest":stale["review_digest"]})
+        )
+        .await
+        .unwrap()
+        .status()
+        .is_success()
+    );
+    let active:bool=sqlx::query_scalar("SELECT r.active FROM federation_expertise_collections c JOIN federation_expertise_reviews r USING(space,owner,project_id,collection,revision) WHERE c.project_id=$1").bind(f.runtime.project).fetch_one(&f.pool).await.unwrap();
+    assert!(!active, "stale activation must leave withdrawal intact");
+    f.grant(f.writer_id, false).await;
+    assert!(
+        !post("/collections/activate", activate)
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+}
