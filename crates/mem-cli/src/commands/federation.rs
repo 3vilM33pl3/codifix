@@ -12,6 +12,7 @@ use std::{
     time::Duration,
 };
 use uuid::Uuid;
+mod expertise;
 #[cfg(feature = "tui")]
 mod terminal;
 const HELP: &str = "Agent notes:\nUse the configured local service and explicit project. Mutations require review and confirmation. Preserve request IDs and exact bytes on retry. Queued is not accepted; retained copies cannot be recalled. See docs/user/cli/federation.md.";
@@ -72,6 +73,34 @@ impl SyncOperation {
 }
 #[derive(Debug, Subcommand)]
 enum FederationCommand {
+    /// Inspect, review and manage approved expertise collections.
+    #[command(after_help = HELP)]
+    Collections {
+        #[command(subcommand)]
+        command: expertise::CollectionCommand,
+    },
+    /// Discover permitted expertise metadata (explicit operator-bound token required).
+    #[command(after_help = HELP)]
+    Capabilities {
+        #[arg(long, requires = "after_record")]
+        after_publisher: Option<Uuid>,
+        #[arg(long, requires = "after_publisher")]
+        after_record: Option<Uuid>,
+        #[arg(long, default_value_t = 32, value_parser = clap::value_parser!(u32).range(1..=32))]
+        limit: u32,
+    },
+    /// Prepare or submit an explicitly reviewed remote question. No implicit context.
+    #[command(after_help = HELP)]
+    Ask {
+        #[command(subcommand)]
+        command: expertise::AskCommand,
+    },
+    /// Explicitly read a question's status/result under current disclosure policy.
+    #[command(after_help = HELP)]
+    Answer {
+        #[arg(long)]
+        request_id: Uuid,
+    },
     /// Discover configured identity and current local actor (does not grant Pull).
     #[command(after_help = HELP)]
     Discover,
@@ -277,6 +306,10 @@ pub(super) async fn handle(args: FederationArgs, client: Client, config: AppConf
     );
     api.base.push_str(&format!("/{configured}"));
     let response=match args.command {
+        FederationCommand::Collections{command}=>expertise::collection(&api,command).await?,
+        FederationCommand::Capabilities{after_publisher,after_record,limit}=>api.call(Method::GET,&expertise::capability_path(after_publisher,after_record,limit),None).await?,
+        FederationCommand::Ask{command}=>expertise::ask(&api,command).await?,
+        FederationCommand::Answer{request_id}=>api.call(Method::GET,&format!("/questions/{request_id}"),None).await?,
         FederationCommand::Discover=>unreachable!(),
         FederationCommand::Status=>api.call(Method::GET,"",None).await?,
         FederationCommand::Catalog{offset}=>api.call(Method::GET,&format!("/catalog?offset={offset}"),None).await?,

@@ -39,6 +39,32 @@ const OPERATIONS: &[(&str, &[&str])] = &[
     ("Resolve proposal", &["approve"]),
     ("Pause subscription", &["canonical"]),
     ("Synchronize", &["operation"]),
+    (
+        "Discover expertise",
+        &["after publisher (optional)", "after record (optional)"],
+    ),
+    (
+        "Prepare remote question",
+        &["publisher", "collection", "exact question"],
+    ),
+    ("Send reviewed question", &[]),
+    ("Expertise result", &["request ID"]),
+    (
+        "List expertise collections",
+        &["after collection (optional)"],
+    ),
+    ("Inspect expertise collection", &["collection"]),
+    ("Prepare collection review", &["blueprint JSON"]),
+    ("Activate reviewed collection", &[]),
+    ("Withdraw inspected collection", &[]),
+    (
+        "Inspect collection service grant",
+        &["collection", "principal"],
+    ),
+    (
+        "Change collection service grant",
+        &["collection", "principal", "enabled"],
+    ),
 ];
 struct Workspace {
     operation: usize,
@@ -51,6 +77,9 @@ struct Workspace {
     context: Option<Value>,
     proposal: Option<Value>,
     prepared: Option<(String, Value)>,
+    question_review: Option<Value>,
+    collection_review: Option<Value>,
+    collection_detail: Option<Value>,
 }
 impl Workspace {
     fn new(discovery: &Value) -> Self {
@@ -65,6 +94,9 @@ impl Workspace {
             context: None,
             proposal: None,
             prepared: None,
+            question_review: None,
+            collection_review: None,
+            collection_detail: None,
         }
     }
     fn select(&mut self, operation: usize) {
@@ -187,6 +219,123 @@ impl Workspace {
                 Some(json!({"operation":self.value(0)})),
                 true,
             )),
+            13 => {
+                let (p, r) = if self.value(0).is_empty() && self.value(1).is_empty() {
+                    (None, None)
+                } else {
+                    (Some(self.id(0)?), Some(self.id(1)?))
+                };
+                Ok((
+                    Method::GET,
+                    expertise::capability_path(p, r, 32),
+                    None,
+                    false,
+                ))
+            }
+            14 => {
+                ensure!(
+                    !self.value(2).is_empty() && self.value(2).len() <= 4096,
+                    "question must be 1 through 4096 UTF-8 bytes"
+                );
+                Ok((
+                    Method::POST,
+                    "/questions/prepare".into(),
+                    Some(
+                        json!({"request_id":self.request_id,"capability":{"publisher":self.id(0)?,"id":self.id(1)?},"question":self.value(2)}),
+                    ),
+                    false,
+                ))
+            }
+            15 => Ok((
+                Method::POST,
+                "/questions/submit".into(),
+                Some(expertise::confirmation(
+                    self.question_review
+                        .clone()
+                        .context("prepare and inspect a question first")?,
+                    "review",
+                    "digest",
+                    true,
+                )?),
+                true,
+            )),
+            16 => Ok((
+                Method::GET,
+                format!("/questions/{}", self.id(0)?),
+                None,
+                false,
+            )),
+            17 => Ok((
+                Method::GET,
+                format!(
+                    "/collections?limit=32{}",
+                    if self.value(0).is_empty() {
+                        String::new()
+                    } else {
+                        format!("&after={}", self.id(0)?)
+                    }
+                ),
+                None,
+                false,
+            )),
+            18 => Ok((
+                Method::GET,
+                format!("/collections/{}", self.id(0)?),
+                None,
+                false,
+            )),
+            19 => Ok((
+                Method::POST,
+                "/collections/draft".into(),
+                Some(
+                    serde_json::from_str(self.value(0))
+                        .context("enter a CollectionBlueprint JSON object")?,
+                ),
+                false,
+            )),
+            20 => Ok((
+                Method::POST,
+                "/collections/activate".into(),
+                Some(expertise::confirmation(
+                    self.collection_review
+                        .clone()
+                        .context("prepare and inspect a collection first")?,
+                    "draft",
+                    "review_digest",
+                    true,
+                )?),
+                true,
+            )),
+            21 => {
+                let ad = &self
+                    .collection_detail
+                    .as_ref()
+                    .context("inspect the collection first")?["advertisement"];
+                Ok((
+                    Method::POST,
+                    "/collections/withdraw".into(),
+                    Some(
+                        json!({"request_id":self.request_id,"collection":ad["collection"],"expected_revision":ad["revision"],"confirmed":true}),
+                    ),
+                    true,
+                ))
+            }
+            22 => Ok((
+                Method::GET,
+                format!(
+                    "/collections/{}/grants?principal={}",
+                    self.id(0)?,
+                    self.id(1)?
+                ),
+                None,
+                false,
+            )),
+            23 => Ok((
+                Method::POST,
+                format!("/collections/{}/grants", self.id(0)?),
+                Some(json!({"principal":self.id(1)?,"enabled":self.bool(2)?,"confirmed":true})),
+                true,
+            )),
             _ => unreachable!(),
         }
     }
@@ -199,6 +348,20 @@ impl Workspace {
         }
         if operation == 9 {
             self.proposal = Some(response.clone());
+        }
+        if operation == 14 {
+            self.question_review = Some(response.clone());
+        }
+        if operation == 19 {
+            self.collection_review = Some(response.clone());
+        }
+        if operation == 18 {
+            self.collection_detail = Some(response.clone());
+        }
+        // Policy mutations are not immutable outbox intents; never suggest
+        // replaying an old grant over a newer grant after an uncertain reply.
+        if operation == 23 {
+            self.prepared = None;
         }
         self.output = serde_json::to_string_pretty(&response)?;
         self.scroll = 0;
@@ -256,8 +419,16 @@ pub(super) async fn run(api: FederationClient, discovery: Value) -> Result<()> {
             match response {
                 Ok(value) => workspace.accept(op, value)?,
                 Err(e) => {
+                    if op == 23 {
+                        workspace.prepared = None;
+                    }
                     workspace.output = format!(
-                        "Request failed: {e:#}\nIf delivery is uncertain, retry the SAME prepared body and request ID."
+                        "Request failed: {e:#}\n{}",
+                        if op == 23 {
+                            "Inspect current service grant and deliberately prepare a new policy change."
+                        } else {
+                            "If delivery is uncertain, retry the SAME prepared body and request ID."
+                        }
                     )
                 }
             }
@@ -317,12 +488,24 @@ pub(super) async fn run(api: FederationClient, discovery: Value) -> Result<()> {
                             if confirm {
                                 let body = body.expect("mutation body");
                                 workspace.output = format!(
-                                    "Review exact request before F6. Approval pauses updates; publication enables future updates.\nPOST {path}\n{}",
+                                    "Review every disclosed byte and destination before F6. Remote questions may incur repeat work/billing; queued is not answered. Collection activation grants standing disclosure consent.\nPOST {path}\n{}",
                                     serde_json::to_string_pretty(&body)?
                                 );
                                 workspace.prepared = Some((path, body));
                                 workspace.scroll = 0;
                             } else {
+                                if workspace.operation == 16 {
+                                    workspace.output = "Fetching current expertise result; previous answer cleared.".into();
+                                }
+                                if workspace.operation == 14 {
+                                    workspace.question_review = None;
+                                }
+                                if workspace.operation == 19 {
+                                    workspace.collection_review = None;
+                                }
+                                if workspace.operation == 18 {
+                                    workspace.collection_detail = None;
+                                }
                                 let api = api.clone();
                                 let op = workspace.operation;
                                 pending = Some(tokio::spawn(async move {

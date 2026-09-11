@@ -34,6 +34,7 @@ use rmcp::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
+mod expertise;
 
 pub const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 
@@ -187,6 +188,7 @@ impl ServerHandler for MemoryMcpServer {
         let server = self.for_request_context(&context);
         let arguments = request.arguments.unwrap_or_default();
         match request.name.as_ref() {
+            name if expertise::is_tool(name) => expertise::call(&server, name, arguments).await,
             TOOL_MEMORY_QUERY => server.tool_query(arguments).await,
             TOOL_MEMORY_SEARCH_ALL => server.tool_search_all(arguments).await,
             TOOL_MEMORY_RESUME => server.tool_resume(arguments).await,
@@ -1955,7 +1957,7 @@ fn tool_definitions() -> Vec<Tool> {
                 optional_string("reason", "Reason for the change."),
             ]),
         ),
-    ]
+    ].into_iter().chain(expertise::definitions()).collect()
 }
 
 fn tool(name: &'static str, description: &'static str, schema: Map<String, Value>) -> Tool {
