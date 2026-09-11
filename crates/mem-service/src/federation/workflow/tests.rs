@@ -9,6 +9,7 @@ use mem_federation_store::{Claim, GatewayStore, PublicationIntent, RetryPolicy};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use std::sync::Mutex;
+mod browser;
 mod collections;
 mod requester;
 mod two_instance;
@@ -598,6 +599,53 @@ fn federation_route_policies_are_exact_project_and_fail_closed() {
         assert_eq!(policy.semantic_read, suffix == "/context");
     }
     assert!(policy_for(&Method::DELETE, &base).is_none());
+}
+
+#[tokio::test]
+async fn local_grants_accept_all_five_capabilities_but_reject_duplicates() {
+    let Some(f) = Fixture::with_expertise(true).await else {
+        return;
+    };
+    let capabilities = json!([
+        "pull",
+        "publish",
+        "manage_membership",
+        "ask_expertise",
+        "answer_expertise"
+    ]);
+    let (status, body) = f
+        .request(
+            &f.root,
+            reqwest::Method::POST,
+            "/grants",
+            json!({"principal":f.root_id,"enabled":true,"capabilities":capabilities}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["capabilities"], capabilities);
+    for invalid in [
+        json!(["ask_expertise", "ask_expertise"]),
+        json!([
+            "pull",
+            "publish",
+            "manage_membership",
+            "ask_expertise",
+            "answer_expertise",
+            "pull"
+        ]),
+    ] {
+        assert_eq!(
+            f.request(
+                &f.root,
+                reqwest::Method::POST,
+                "/grants",
+                json!({"principal":f.root_id,"enabled":true,"capabilities":invalid}),
+            )
+            .await
+            .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
 }
 
 #[tokio::test]

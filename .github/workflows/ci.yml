@@ -150,6 +150,10 @@ jobs:
       - run: npm --prefix web run build
       - run: npx playwright install chromium
         working-directory: web
+      - name: F1 browser collection and queued-question rehearsal
+        run: cargo test -p mem-service f1_browser_collection --lib --locked -- --nocapture
+        env:
+          MEMORY_FEDERATION_F1_BROWSER: "1"
       - run: node tests/federation-pds/run.mjs --runtime
         env:
           MEMORY_FEDERATION_E_CLIENTS: "1"

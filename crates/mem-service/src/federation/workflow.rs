@@ -190,7 +190,7 @@ pub(crate) async fn grant(
 ) -> Result<Json<LocalGrantRequest>, ApiError> {
     let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
     if request.principal.is_nil()
-        || request.capabilities.len() > 3
+        || request.capabilities.len() > 5
         || request
             .capabilities
             .iter()
