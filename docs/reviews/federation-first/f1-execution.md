@@ -17,7 +17,8 @@ deterministic answering and recovery; work has entered Section 3's public
 interfaces. Browser-session HTTP preparation/submission, capability browsing and
 original-requester result reads are implemented and tested at component level.
 Collection draft/activate/withdraw and local browsing/detail HTTP are implemented;
-Web/CLI/TUI/MCP workflows remain pending, followed by the full disposable
+The Web requester panel has component-tested discovery, confirmation and result reads;
+collection-management screens and CLI/TUI/MCP remain pending, followed by the full disposable
 automatic-worker rehearsal. Open checkboxes are end-to-end completion gates;
 the dated evidence below records individual implementation increments.
 
@@ -460,3 +461,29 @@ client-token variable was unset only for the test process. Workspace Clippy
 CLI and the full container/PDS isolation rehearsal were not rerun. The disposable
 database was removed; existing services and credentials were untouched. The Memory
 plan-execution workflow saved a partial checkpoint at `6ecf89a`, not completion.
+
+### Web requester increment — 2026-09-11
+
+Commit `bd97633` adds the explicit expertise requester panel to the existing
+Federation workspace. It makes no automatic expertise requests: discovery,
+preparation, exact disclosure confirmation, submission and result reads are user
+actions. Displayed consent includes destination, collection revision, question,
+principal, digest, deterministic mode and local-human output policy. An uncertain
+retry retains the complete review and request ID. Closing a review cannot cancel
+delivery. Result text is untrusted plain text; citations and request binding are
+inspectable. A refresh clears previously displayed answer bytes before fetching.
+
+Project/space/principal/read-only/permission changes remount the panel, clear local
+state and abort requests. No private question or answer is persisted to browser
+storage. UTF-8 byte limits, disabled read-only/export-denied controls, synchronous
+duplicate-click exclusion and filtered-page cursors have component coverage.
+The React review checklist guided lifecycle cancellation, accessibility and safe
+text rendering. Authorization remains server-owned, not inferred from UI controls.
+
+Verification: all 81 Web tests across 23 files pass, including five new requester
+tests; the production Web build passes with its existing large-chunk warning.
+Logs: `/tmp/f1-web-tests.log`, `/tmp/f1-web-build.log`. These use mocked service
+responses, not a real-browser/two-origin rehearsal. Rust/database, Lean, lean CLI
+and container/PDS regressions were not rerun for this frontend-only increment.
+No existing service or credentials changed. Collection management screens,
+CLI/TUI/MCP, optional models and full rehearsal remain open; F1 is not complete.

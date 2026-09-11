@@ -48,7 +48,9 @@ activation and withdrawal handlers are in `workflow/collections.rs`; the preview
 uses a caller-owned transaction to retain current authentication locks.
 Local collection listing/detail uses `mem-federation-store/src/expertise_catalog.rs`;
 these are stored-review inspection, not answer authorization. Web/CLI/TUI/MCP
-workflows remain pending.
+parity remains pending. `web/src/features/federation/ExpertisePanel.tsx` implements
+explicit discovery, exact-question confirmation and manual result reads; collection
+management screens and full real-service rehearsal remain open.
 
 ## Frontends
 

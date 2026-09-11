@@ -18,6 +18,35 @@ their exact request and require confirmation. Drafts are cleared on project
 changes; imported text is escaped and never forwarded to a model from this view.
 See [Federation workflow](federation-workflow.md) for consent and offline-copy limits.
 
+### Private expertise questions (disposable F1 rehearsal)
+
+In **More → federation → Ask another instance**, choose **Discover expertise**,
+select a permitted collection, enter a question and choose **Prepare remote
+question**. Review the exact destination, collection revision, question, identity,
+deadline and digest before checking the consent box and sending. Preparation does
+not send a question. No history, files or local search results are attached;
+ordinary queries remain local. The operator must enable the experimental browser
+policy and explicit grants described in [Federation runtime](federation-runtime.md).
+
+Only deterministic excerpts and `local_human` output are supported here. Remote
+content is displayed as untrusted text with its citation/attribution data, never
+as executable HTML. Model forwarding is not authorized. Queued status is not an
+answer or evidence of replication.
+
+Use **Fetch expertise result** to explicitly request current status or an answer.
+Completed answer reads require fresh origin approval. The previous displayed
+answer is cleared before a refresh, including a denied/offline refresh. Save the
+request ID if you need to return later: this panel does not persist questions or
+answers in browser storage. Switching projects or local identity clears the panel
+and aborts its requests.
+
+After an uncertain submission, **Retry exact question** reuses the same reviewed
+bytes and request ID. Closing the review does not cancel delivery. A new question
+is a new request and may repeat work; expired reviews require fresh preparation.
+Read-only mode and missing export permission disable the panel; the server still
+enforces all current permissions. Collection-management screens, CLI/TUI/MCP
+parity and the complete live rehearsal remain unfinished.
+
 The web UI is the web companion to the TUI. It is served by `mem-service` and uses the same backend APIs for memories, query, code graph inspection, activities, watchers, embeddings, resume briefings, and curation review.
 
 Open it while the service is running:
