@@ -103,6 +103,44 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
             .send()
     };
     let prepare = json!({"request_id":Uuid::new_v4(),"capability":ad.key(),"question":"How is recovery verified?"});
+    let get = |path: &str| client.get(f.path(path)).header("cookie", &cookies).send();
+    let catalog = get("/capabilities?limit=1").await.unwrap();
+    assert_eq!(catalog.status(), StatusCode::OK);
+    assert_eq!(catalog.headers()["cache-control"], "no-store");
+    let catalog: Value = catalog.json().await.unwrap();
+    assert_eq!(catalog["capabilities"][0]["name"], ad.name);
+    assert_eq!(catalog["next_after"], json!(ad.key()));
+    let next = get(&format!(
+        "/capabilities?limit=1&after_publisher={}&after_record={}",
+        ad.owner.as_uuid(),
+        ad.collection.as_uuid()
+    ))
+    .await
+    .unwrap();
+    assert_eq!(next.status(), StatusCode::OK);
+    let next: Value = next.json().await.unwrap();
+    assert_eq!(next["capabilities"], json!([]));
+    assert!(next["next_after"].is_null());
+    assert_eq!(
+        get("/capabilities?limit=0").await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(&format!(
+            "/capabilities?after_publisher={}",
+            f.runtime.instance.as_uuid()
+        ))
+        .await
+        .unwrap()
+        .status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::GET, "/capabilities", json!({}))
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
     assert_eq!(
         f.request(
             &f.writer,
@@ -200,6 +238,44 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
         assert!(body["answer"].is_null());
         assert_eq!(body["status"], "queued");
     }
+    let result_path = format!(
+        "/questions/{}",
+        submit["review"]["question"]["request_id"].as_str().unwrap()
+    );
+    let result = get(&result_path).await.unwrap();
+    assert_eq!(result.status(), StatusCode::OK);
+    assert_eq!(result.headers()["cache-control"], "no-store");
+    let result: Value = result.json().await.unwrap();
+    assert_eq!(result["status"], "queued");
+    assert!(result["answer"].is_null());
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::GET, &result_path, json!({}))
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    let (status,_)=f.request(&f.root,reqwest::Method::POST,"/grants",json!({"principal":f.root_id,"capabilities":[SpaceCapability::AskExpertise],"enabled":true})).await;
+    assert!(status.is_success());
+    let other_session = format!("session-{}", Uuid::new_v4());
+    sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,expires_at) VALUES($1,$2,$3,$4,now()+interval '1 hour')")
+        .bind(Uuid::new_v4()).bind(f.root_id).bind(crate::auth::hash_secret(&other_session)).bind(crate::auth::hash_secret("synthetic-other-csrf")).execute(&f.pool).await.unwrap();
+    assert_eq!(
+        client
+            .get(f.path(&result_path))
+            .header("cookie", format!("memory_session={other_session}"))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        get(&format!("/questions/{}", Uuid::new_v4()))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::CONFLICT
+    );
     let mut forged = submit.clone();
     forged["review"]["question"]["principal"] = json!(f.root_id);
     assert_eq!(
@@ -225,11 +301,19 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
             .status(),
         StatusCode::FORBIDDEN
     );
+    assert_eq!(
+        get(&result_path).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
     sqlx::query("UPDATE auth_web_sessions SET revoked_at=clock_timestamp() WHERE id=$1")
         .bind(session_id)
         .execute(&f.pool)
         .await
         .unwrap();
+    assert_eq!(
+        get(&result_path).await.unwrap().status(),
+        StatusCode::UNAUTHORIZED
+    );
     assert_eq!(
         post("/questions/submit", submit).await.unwrap().status(),
         StatusCode::UNAUTHORIZED

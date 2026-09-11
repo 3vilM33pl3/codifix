@@ -1,8 +1,134 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Opt-in local-human browser consent. Tokens/MCP cannot self-name destinations.
 use super::*;
+use axum::extract::Query;
 use mem_federation::{ContentDigest, expertise::*};
 use mem_federation_store::{QuestionResult, QuestionReview};
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ExpertiseBrowseQuery {
+    after_publisher: Option<InstanceId>,
+    after_record: Option<RecordId>,
+    limit: Option<u32>,
+}
+#[derive(Debug, Serialize)]
+pub struct ExpertiseCatalog {
+    pub capabilities: Vec<CapabilityAdvertisement>,
+    pub next_after: Option<RecordKey>,
+}
+#[derive(Deserialize)]
+pub(crate) struct ExpertiseResultPath {
+    slug: String,
+    space: SpaceId,
+    id: Uuid,
+}
+
+pub(crate) async fn expertise_capabilities(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<SpacePath>,
+    Query(query): Query<ExpertiseBrowseQuery>,
+) -> Result<Json<ExpertiseCatalog>, ApiError> {
+    let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
+    browser(&runtime, &principal)?;
+    let limit = query.limit.unwrap_or(32);
+    if !(1..=32).contains(&limit) {
+        return Err(bad_request("capability limit must be 1 through 32"));
+    }
+    let after = match (query.after_publisher, query.after_record) {
+        (None, None) => None,
+        (Some(publisher), Some(id)) => Some(RecordKey { publisher, id }),
+        _ => return Err(bad_request("both cursor identifiers are required")),
+    };
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let current = current_access(&state, &mut tx, &principal, &access).await?;
+    mem_federation_store::authorize_expertise_browse(
+        &mut tx,
+        &current,
+        runtime.space,
+        runtime.instance,
+    )
+    .await
+    .map_err(store_error)?;
+    let ads = runtime
+        .sync
+        .expertise_capabilities(after, limit)
+        .await
+        .map_err(runtime_error)?;
+    let next_after = if ads.len() == limit as usize {
+        ads.last().map(|ad| ad.key())
+    } else {
+        None
+    };
+    let capabilities = ads
+        .into_iter()
+        .filter(|ad| {
+            ad.modes.contains(&AnswerMode::Deterministic)
+                && ad.output_destinations.iter().any(|d| d == "local_human")
+        })
+        .collect();
+    current_access(&state, &mut tx, &principal, &access).await?;
+    tx.rollback().await.map_err(|_| unavailable())?;
+    Ok(Json(ExpertiseCatalog {
+        capabilities,
+        next_after,
+    }))
+}
+pub(crate) async fn expertise_result(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<ExpertiseResultPath>,
+) -> Result<Json<QuestionResult>, ApiError> {
+    let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
+    browser(&runtime, &principal)?;
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let current = current_access(&state, &mut tx, &principal, &access).await?;
+    let consent = mem_federation_store::retained_expertise_consent(
+        &mut tx,
+        &current,
+        runtime.space,
+        runtime.instance,
+        path.id,
+    )
+    .await
+    .map_err(store_error)?;
+    let q = &consent.question;
+    if q.mode != AnswerMode::Deterministic
+        || q.model_destination.is_some()
+        || q.output_destination != "local_human"
+    {
+        return Err(ApiError::forbidden("retained destination is not permitted"));
+    }
+    let ad = advertisement(&runtime, q.capability).await?;
+    if mem_federation::CanonicalJsonCodec::digest(&ad).map_err(|_| unavailable())?
+        != consent.advertisement_digest
+    {
+        return Err(ApiError::forbidden("retained capability review changed"));
+    }
+    // Execution expiry does not erase a completed result. Gateway payload TTL,
+    // current policy and fresh origin approval still govern every delivery.
+    ad.authorize_question(q, q.created_at)
+        .map_err(|_| ApiError::forbidden("retained capability consent denied"))?;
+    let result = runtime
+        .sync
+        .expertise_result(q)
+        .await
+        .map_err(runtime_error)?;
+    // TTL/session may expire while waiting for the answering origin.
+    let current = current_access(&state, &mut tx, &principal, &access).await?;
+    mem_federation_store::retained_expertise_consent(
+        &mut tx,
+        &current,
+        runtime.space,
+        runtime.instance,
+        path.id,
+    )
+    .await
+    .map_err(store_error)?;
+    tx.rollback().await.map_err(|_| unavailable())?;
+    Ok(Json(result))
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

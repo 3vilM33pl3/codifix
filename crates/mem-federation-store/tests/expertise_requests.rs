@@ -376,7 +376,23 @@ async fn fresh_policy_identity_scope_and_expiry_are_required_even_with_hold() {
     .await
     .unwrap();
     assert!(f.load(&f.access, &f.destinations).await.is_err());
+    let mut tx = f.db.pool.begin().await.unwrap();
+    assert_eq!(
+        retained_expertise_consent(&mut tx, &f.access, f.q.space, f.q.requester, f.q.request_id)
+            .await
+            .unwrap()
+            .question,
+        f.q
+    );
+    tx.rollback().await.unwrap();
     sqlx::query("UPDATE federation_expertise_requests SET hold=TRUE,payload_until=clock_timestamp()-interval '1 second',metadata_until=clock_timestamp()-interval '1 second'").execute(&f.db.pool).await.unwrap();
+    let mut tx = f.db.pool.begin().await.unwrap();
+    assert!(
+        retained_expertise_consent(&mut tx, &f.access, f.q.space, f.q.requester, f.q.request_id)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
     assert!(f.load(&f.access, &f.destinations).await.is_err());
     let mut tx = f.db.pool.begin().await.unwrap();
     cleanup_expertise_requests(&mut tx, f.access.project)

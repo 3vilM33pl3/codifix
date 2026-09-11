@@ -368,19 +368,20 @@ async fn two_origin_databases_exchange_only_reviewed_cited_excerpts() {
             .await
             .unwrap();
         tx.rollback().await.unwrap();
+        let requester_pool = if requester == memory {
+            memory_origin.db.pool.clone()
+        } else {
+            homelab_origin.db.pool.clone()
+        };
+        let requester_sync = InstanceSync::new(requester_pool, requester_client.clone(), requester)
+            .await
+            .unwrap();
         let (received, released) = tokio::join!(
-            requester_client.expertise(
-                requester,
-                ExpertiseOperation::Result {
-                    request_id: question.request_id,
-                },
-            ),
+            requester_sync.expertise_result(&question),
             origin.release(responder_client)
         );
         released.unwrap();
-        let ExpertiseReply::Question(result) = received.unwrap() else {
-            panic!("result");
-        };
+        let result = received.unwrap();
         assert_eq!(result.answer.unwrap(), answer);
         // A local-only service grant revocation must block cached bytes too,
         // without waiting for an advertisement to reach the gateway.

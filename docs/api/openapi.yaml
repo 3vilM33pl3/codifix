@@ -1563,6 +1563,41 @@ paths:
         "200": { description: No-store exact QuestionReview including server-bound identity, revision, destination, expiry and digest; not permission to send. }
         "403": { description: Browser policy, CSRF or current authority denied. }
         "404": { description: Space or retained capability unavailable. }
+  /v1/projects/{slug}/federation/{space}/capabilities:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    get:
+      operationId: listExpertiseCapabilities
+      summary: Browse a bounded signed gateway page of permitted expertise advertisements.
+      description: Opt-in local-human browser policy only. Requires current project read/export and local AskExpertise grant. Filters out advertisements without deterministic local_human support. Metadata only, never collection contents. Both cursor identifiers must be supplied together; an empty filtered page can still have a next cursor. No automatic fan-out or question is sent.
+      tags: [Federation]
+      x-stability: experimental
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 32, default: 32 } }
+        - { name: after_publisher, in: query, schema: { type: string, format: uuid } }
+        - { name: after_record, in: query, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: No-store object with capabilities and optional next_after (publisher/id). }
+        "400": { description: Invalid limit or incomplete cursor. }
+        "403": { description: Browser or current project/gateway authority denied. }
+        "503": { description: Gateway unavailable or signed response invalid. }
+  /v1/projects/{slug}/federation/{space}/questions/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getExpertiseQuestionResult
+      summary: Read an original requester's private status or freshly authorized retained answer.
+      description: Requires original local consent, current browser session/project/AskExpertise permissions, unchanged advertisement and local_human destination. Does not submit, restart or reexecute a question. Completed answers may outlive the 120-second execution deadline, within the 24-hour payload window. A live answering-origin check is required for every retained answer and may take up to 15 seconds; offline origins cannot authorize fresh delivery. Consent TTL and requester authority are rechecked after waiting. Holds do not extend access.
+      tags: [Federation]
+      x-stability: experimental
+      responses:
+        "200": { description: No-store QuestionResult with bound request metadata/status and optional untrusted cited answer. Attribution establishes origin, not truth. }
+        "403": { description: Current authority or destination denied. }
+        "409": { description: Original consent unavailable, expired or changed. }
+        "503": { description: Gateway/origin unavailable, delivery not authorized or receipt verification failed. }
   /v1/projects/{slug}/federation/{space}/questions/submit:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }

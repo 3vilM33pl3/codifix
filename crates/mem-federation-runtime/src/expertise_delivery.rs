@@ -181,6 +181,49 @@ impl GatewayClient {
 }
 
 impl crate::InstanceSync {
+    pub async fn expertise_capabilities(
+        &self,
+        after: Option<mem_federation::publication::RecordKey>,
+        limit: u32,
+    ) -> crate::Result<Vec<mem_federation::expertise::CapabilityAdvertisement>> {
+        match self
+            .client
+            .expertise(self.instance, ExpertiseOperation::Discover { after, limit })
+            .await?
+        {
+            ExpertiseReply::Capabilities(ads) => Ok(ads),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+    /// Result bytes still require a fresh live origin delivery authorization.
+    /// Caller holds current requester policy/consent locks through this read.
+    pub async fn expertise_result(
+        &self,
+        q: &mem_federation::expertise::ExpertiseQuestion,
+    ) -> crate::Result<mem_federation_store::QuestionResult> {
+        if q.requester != self.instance || q.space != self.client.space {
+            return Err(RuntimeError::Unauthorized);
+        }
+        let digest = q.digest().map_err(|_| RuntimeError::InvalidResponse)?;
+        match self
+            .client
+            .expertise(
+                self.instance,
+                ExpertiseOperation::Result {
+                    request_id: q.request_id,
+                },
+            )
+            .await?
+        {
+            ExpertiseReply::Question(result)
+                if result.request_digest == digest
+                    && result.binding == mem_federation_store::QuestionBinding::from(q) =>
+            {
+                Ok(*result)
+            }
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
     /// Trusted local workflow only: commit exact consent before calling.
     pub async fn submit_expertise_question(
         &self,

@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 /// Metadata survives payload expiry so current authorization can still be
 /// enforced. No question text, evidence, model prompt or answer is retained here.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct QuestionBinding {
     pub request_id: Uuid,

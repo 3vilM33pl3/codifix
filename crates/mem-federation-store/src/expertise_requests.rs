@@ -55,6 +55,59 @@ async fn authorize(
     ad.authorize_question(question, now)?;
     Ok(())
 }
+/// Current local authority for explicit remote discovery and retained reads.
+pub async fn authorize_expertise_browse(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    space: SpaceId,
+    instance: InstanceId,
+) -> Result<()> {
+    if access.read_only
+        || !access.permissions.contains(Permission::MemoryRead)
+        || !access.permissions.contains(Permission::BundleExport)
+    {
+        return Err(StoreError::Binding);
+    }
+    let grant = crate::sharing::load_grant(tx, access, space, instance).await?;
+    if !grant.capabilities.contains(&SpaceCapability::AskExpertise) {
+        return Err(StoreError::Binding);
+    }
+    Ok(())
+}
+/// Read-only consent for RETAINED results. Does not authorize resubmission or
+/// extend the original execution deadline. Caller checks current advertisement
+/// and operator destination before forwarding any gateway result.
+pub async fn retained_expertise_consent(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    space: SpaceId,
+    instance: InstanceId,
+    id: Uuid,
+) -> Result<QuestionReview> {
+    authorize_expertise_browse(tx, access, space, instance).await?;
+    let row=sqlx::query("SELECT question,review_digest,advertisement_digest,request_digest FROM federation_expertise_requests WHERE project_id=$1 AND space=$2 AND requester=$3 AND request_id=$4 AND principal_id=$5 AND question IS NOT NULL AND payload_until>clock_timestamp() FOR SHARE")
+        .bind(access.project).bind(space.as_uuid()).bind(instance.as_uuid()).bind(id).bind(access.principal).fetch_optional(&mut **tx).await?.ok_or(StoreError::Binding)?;
+    let q = row.try_get::<Json<ExpertiseQuestion>, _>("question")?.0;
+    let ad = row
+        .try_get::<Json<ContentDigest>, _>("advertisement_digest")?
+        .0;
+    let digest = row.try_get::<Json<ContentDigest>, _>("review_digest")?.0;
+    if q.space != space
+        || q.requester != instance
+        || q.request_id != id
+        || q.principal != access.principal
+        || q.digest()? != row.try_get::<Json<ContentDigest>, _>("request_digest")?.0
+        || review_digest(access.project, &q, &ad)? != digest
+    {
+        return Err(StoreError::Binding);
+    }
+    Ok(QuestionReview {
+        project: access.project,
+        question: q,
+        advertisement_digest: ad,
+        digest,
+    })
+}
 /// Review contains every transmitted field and binds the exact advertisement.
 /// Preparing is read-only and does not authorize transmission.
 pub async fn prepare_expertise_question(
