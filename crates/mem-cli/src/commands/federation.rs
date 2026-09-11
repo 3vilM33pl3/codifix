@@ -31,6 +31,8 @@ enum Capability {
     Pull,
     Publish,
     ManageMembership,
+    AskExpertise,
+    AnswerExpertise,
 }
 impl Capability {
     fn wire(self) -> &'static str {
@@ -38,8 +40,20 @@ impl Capability {
             Self::Pull => "pull",
             Self::Publish => "publish",
             Self::ManageMembership => "manage_membership",
+            Self::AskExpertise => "ask_expertise",
+            Self::AnswerExpertise => "answer_expertise",
         }
     }
+}
+#[cfg(feature = "tui")]
+fn terminal_capability(input: &str) -> Result<&'static str> {
+    Capability::from_str(&input.trim().replace('_', "-"), false)
+        .map(Capability::wire)
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "expected pull, publish, manage-membership, ask-expertise or answer-expertise"
+            )
+        })
 }
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum SyncOperation {
@@ -82,7 +96,7 @@ enum FederationCommand {
         #[arg(long)]
         confirm: bool,
     },
-    /// Enroll/revoke a remote capability (configured authority only).
+    /// Enroll/revoke a remote capability (configured authority only). Expertise requires a v3-compatible fleet.
     #[command(after_help = HELP)]
     Member {
         #[arg(long)]
@@ -294,6 +308,177 @@ pub(super) async fn handle(args: FederationArgs, client: Client, config: AppConf
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::Parser;
+
+    #[derive(Parser)]
+    struct TestCli {
+        #[command(flatten)]
+        args: FederationArgs,
+    }
+
+    #[test]
+    fn expertise_capabilities_parse_for_local_grants_and_remote_enrollment() {
+        let id = Uuid::new_v4().to_string();
+        for (name, wire) in [
+            ("ask-expertise", "ask_expertise"),
+            ("answer-expertise", "answer_expertise"),
+        ] {
+            for revoke in [false, true] {
+                let mut args = vec![
+                    "memory",
+                    "--project",
+                    "fixture",
+                    "member",
+                    "--member",
+                    &id,
+                    "--capability",
+                    name,
+                    "--request-id",
+                    &id,
+                    "--confirm",
+                ];
+                if revoke {
+                    args.push("--revoke");
+                }
+                let parsed = TestCli::try_parse_from(args).unwrap();
+                let FederationCommand::Member {
+                    capability,
+                    revoke: actual,
+                    confirm,
+                    ..
+                } = parsed.args.command
+                else {
+                    panic!("member command")
+                };
+                assert_eq!(capability.wire(), wire);
+                assert_eq!(actual, revoke);
+                assert!(confirm);
+            }
+        }
+        let parsed = TestCli::try_parse_from([
+            "memory",
+            "--project",
+            "fixture",
+            "grant",
+            "--principal",
+            &id,
+            "--capabilities",
+            "pull,publish,manage-membership,ask-expertise,answer-expertise",
+            "--confirm",
+        ])
+        .unwrap();
+        let FederationCommand::Grant { capabilities, .. } = parsed.args.command else {
+            panic!("grant command")
+        };
+        assert_eq!(
+            capabilities
+                .into_iter()
+                .map(Capability::wire)
+                .collect::<Vec<_>>(),
+            [
+                "pull",
+                "publish",
+                "manage_membership",
+                "ask_expertise",
+                "answer_expertise"
+            ]
+        );
+        assert!(
+            TestCli::try_parse_from([
+                "memory",
+                "--project",
+                "fixture",
+                "member",
+                "--member",
+                &id,
+                "--capability",
+                "unknown",
+                "--request-id",
+                &id
+            ])
+            .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn expertise_action_http_preserves_exact_retry_and_wire_capability() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!(
+            "http://{}/v1/projects/fixture/federation/fixture",
+            listener.local_addr().unwrap()
+        );
+        let server = tokio::spawn(async move {
+            let mut bodies = Vec::new();
+            for _ in 0..2 {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut bytes = Vec::new();
+                loop {
+                    let mut chunk = [0; 1024];
+                    let n = stream.read(&mut chunk).await.unwrap();
+                    assert!(n > 0 && bytes.len() < 8192);
+                    bytes.extend_from_slice(&chunk[..n]);
+                    if let Some(end) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
+                        let headers = std::str::from_utf8(&bytes[..end]).unwrap();
+                        assert!(headers.starts_with(
+                            "POST /v1/projects/fixture/federation/fixture/actions HTTP/1.1"
+                        ));
+                        let length: usize = headers
+                            .lines()
+                            .find_map(|line| {
+                                let (name, value) = line.split_once(':')?;
+                                name.eq_ignore_ascii_case("content-length")
+                                    .then(|| value.trim().parse().unwrap())
+                            })
+                            .unwrap();
+                        if bytes.len() >= end + 4 + length {
+                            bodies.push(
+                                serde_json::from_slice::<Value>(&bytes[end + 4..end + 4 + length])
+                                    .unwrap(),
+                            );
+                            break;
+                        }
+                    }
+                }
+                stream.write_all(b"HTTP/1.1 202 Accepted\r\nContent-Type: application/json\r\nContent-Length: 23\r\nConnection: close\r\n\r\n{\"submission\":\"queued\"}").await.unwrap();
+            }
+            bodies
+        });
+        let api = FederationClient {
+            client: Client::new(),
+            base,
+        };
+        let id = Uuid::new_v4();
+        let action = json!({"kind":"membership", "member":Uuid::new_v4(),
+            "capability":Capability::AnswerExpertise.wire(), "enabled":false});
+        for _ in 0..2 {
+            let response = api.action(id, action.clone(), true).await.unwrap();
+            assert_eq!(response["submission"], "queued");
+        }
+        let bodies = tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(bodies, vec![json!({"request_id":id,"action":action}); 2]);
+    }
+
+    #[tokio::test]
+    async fn expertise_action_requires_confirmation_before_network_access() {
+        let api = FederationClient {
+            client: Client::new(),
+            base: "invalid endpoint must never be used".into(),
+        };
+        let error = api
+            .action(
+                Uuid::new_v4(),
+                json!({"kind":"membership", "capability":"ask_expertise"}),
+                false,
+            )
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("--confirm"));
+    }
+
     #[test]
     fn confirmation_preserves_review_identity_and_exact_evidence() {
         let request = json!({"request_id":Uuid::new_v4(),"expected":{"content":"quoted untrusted input"},"evidence":[{"snapshot_digest":"unchanged"}],"confirm_future_updates":false});

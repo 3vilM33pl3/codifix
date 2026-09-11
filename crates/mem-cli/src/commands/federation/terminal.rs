@@ -126,12 +126,12 @@ impl Workspace {
                 Method::POST,
                 "/grants".into(),
                 Some(
-                    json!({"principal":self.id(0)?,"capabilities":self.value(1).split(',').map(str::trim).filter(|s|!s.is_empty()).collect::<Vec<_>>(),"enabled":self.bool(2)?}),
+                    json!({"principal":self.id(0)?,"capabilities":self.value(1).split(',').map(str::trim).filter(|s|!s.is_empty()).map(terminal_capability).collect::<Result<Vec<_>>>()?,"enabled":self.bool(2)?}),
                 ),
                 true,
             )),
             3 => action(
-                json!({"kind":"membership","member":self.id(0)?,"capability":self.value(1),"enabled":self.bool(2)?}),
+                json!({"kind":"membership","member":self.id(0)?,"capability":terminal_capability(self.value(1))?,"enabled":self.bool(2)?}),
             ),
             4 => action(json!({"kind":"revoke","member":self.id(0)?})),
             5 => Ok((
@@ -268,7 +268,11 @@ pub(super) async fn run(api: FederationClient, discovery: Value) -> Result<()> {
             let form=OPERATIONS[workspace.operation].1.iter().zip(&workspace.fields).enumerate().map(|(i,(name,value))|format!("{} {name}: {}",if i==workspace.field{"▶"}else{" "},value.escape_debug())).collect::<Vec<_>>().join("\n");
             frame.render_widget(Paragraph::new(form).wrap(Wrap{trim:false}).block(Block::bordered().title("Tab: next field • type to edit")),areas[1]);
             frame.render_widget(Paragraph::new(workspace.output.as_str()).wrap(Wrap{trim:false}).scroll((workspace.scroll,0)).block(Block::bordered().title(if pending.is_some(){"Waiting for local service"}else{"Response / exact confirmation preview • PgUp/PgDn"})),areas[2]);
-            frame.render_widget(Paragraph::new("F2/F3 operation • F5 read/prepare • F6 CONFIRM prepared mutation • Esc quit\nApproval pauses local updates. Publish consent enables future local updates.").wrap(Wrap{trim:false}),areas[3]);
+            frame.render_widget(Paragraph::new(if matches!(workspace.operation, 2 | 3) {
+                "Capabilities: pull, publish, manage-membership, ask-expertise, answer-expertise. Expertise needs v3; no collection consent is granted.\nF5 preview • F6 confirm • F2/F3 operation • Esc quit"
+            } else {
+                "F2/F3 operation • F5 read/prepare • F6 CONFIRM prepared mutation • Esc quit\nApproval pauses local updates. Publish consent enables future local updates."
+            }).wrap(Wrap{trim:false}),areas[3]);
         })?;
         if event::poll(Duration::from_millis(30))? {
             match event::read()? {
@@ -353,6 +357,45 @@ pub(super) async fn run(api: FederationClient, discovery: Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn expertise_forms_normalize_names_and_require_exact_confirmation() {
+        let mut state = Workspace::new(&json!({}));
+        let member = Uuid::new_v4().to_string();
+        for (input, wire) in [
+            ("ask-expertise", "ask_expertise"),
+            ("answer_expertise", "answer_expertise"),
+        ] {
+            for enabled in [true, false] {
+                state.select(3);
+                state.fields = vec![member.clone(), input.into(), enabled.to_string()];
+                let (method, path, body, confirm) = state.request().unwrap();
+                assert_eq!(method, Method::POST);
+                assert_eq!(path, "/actions");
+                assert!(confirm);
+                assert!(state.prepared.is_none()); // Building a request is not consent.
+                assert_eq!(
+                    body,
+                    Some(json!({"request_id":state.request_id,"action":{
+                    "kind":"membership","member":member,"capability":wire,"enabled":enabled}}))
+                );
+                assert_eq!(state.request().unwrap().2, body);
+            }
+        }
+        state.fields[1] = "invented".into();
+        assert!(state.request().is_err());
+        state.select(2);
+        state.fields = vec![
+            member,
+            "pull,ask-expertise,answer_expertise".into(),
+            "true".into(),
+        ];
+        let request = state.request().unwrap();
+        assert!(request.3);
+        assert_eq!(
+            request.2.unwrap()["capabilities"],
+            json!(["pull", "ask_expertise", "answer_expertise"])
+        );
+    }
     #[test]
     fn forms_require_selected_review_and_preserve_idempotency() {
         let mut state = Workspace::new(&json!({}));
