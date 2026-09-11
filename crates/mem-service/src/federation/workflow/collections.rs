@@ -1,8 +1,73 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Origin-local exact review; only advertisements enter the publication outbox.
 use super::*;
+use axum::extract::Query;
 use mem_federation::{ContentDigest, expertise::AnswerMode};
 use mem_federation_store::{CollectionBlueprint, CollectionDraft, CollectionWithdrawal};
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CollectionQuery {
+    after: Option<RecordId>,
+    limit: Option<u32>,
+}
+#[derive(Deserialize)]
+pub(crate) struct CollectionPath {
+    slug: String,
+    space: SpaceId,
+    collection: RecordId,
+}
+
+pub(crate) async fn collections(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<SpacePath>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<mem_federation_store::CollectionPage>, ApiError> {
+    let (runtime, local) = binding(&state, &principal, &path.slug, path.space).await?;
+    requester::browser(&runtime, &principal)?;
+    let limit = query.limit.unwrap_or(32);
+    if !(1..=32).contains(&limit) {
+        return Err(bad_request("collection limit must be 1 through 32"));
+    }
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let current = access(&state, &mut tx, &principal, &local).await?;
+    let page = mem_federation_store::collection_page(
+        &mut tx,
+        &current,
+        runtime.space,
+        runtime.instance,
+        query.after,
+        limit,
+    )
+    .await
+    .map_err(store_error)?;
+    tx.rollback().await.map_err(|_| unavailable())?;
+    Ok(Json(page))
+}
+
+pub(crate) async fn collection_detail(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<CollectionPath>,
+) -> Result<Json<mem_federation_store::CollectionDetail>, ApiError> {
+    let (runtime, local) = binding(&state, &principal, &path.slug, path.space).await?;
+    requester::browser(&runtime, &principal)?;
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let current = access(&state, &mut tx, &principal, &local).await?;
+    let detail = mem_federation_store::collection_detail(
+        &mut tx,
+        &current,
+        runtime.space,
+        runtime.instance,
+        path.collection,
+    )
+    .await
+    .map_err(store_error)?
+    .ok_or_else(|| ApiError::not_found("collection unavailable"))?;
+    tx.rollback().await.map_err(|_| unavailable())?;
+    Ok(Json(detail))
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

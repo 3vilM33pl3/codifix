@@ -1199,6 +1199,18 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             true,
         ),
         (
+            "/v1/projects/{slug}/federation/{space}/collections",
+            Method::GET,
+            Permission::MemoryCurate,
+            true,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/collections/{collection}",
+            Method::GET,
+            Permission::MemoryCurate,
+            true,
+        ),
+        (
             "/v1/projects/{slug}/federation/{space}/collections/activate",
             Method::POST,
             Permission::MemoryCurate,

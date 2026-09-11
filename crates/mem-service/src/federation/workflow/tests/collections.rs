@@ -189,7 +189,81 @@ async fn collection_http_requires_exact_review_and_queues_metadata_only() {
     );
     let active:bool=sqlx::query_scalar("SELECT r.active FROM federation_expertise_collections c JOIN federation_expertise_reviews r USING(space,owner,project_id,collection,revision) WHERE c.project_id=$1").bind(f.runtime.project).fetch_one(&f.pool).await.unwrap();
     assert!(!active, "stale activation must leave withdrawal intact");
+    let get = |path: &str| client.get(f.path(path)).header("cookie", &cookie).send();
+    let detail_path = format!("/collections/{}", blueprint["collection"].as_str().unwrap());
+    let detail = get(&detail_path).await.unwrap();
+    assert_eq!(detail.status(), StatusCode::OK);
+    assert_eq!(detail.headers()["cache-control"], "no-store");
+    let detail: Value = detail.json().await.unwrap();
+    assert_eq!(detail["advertisement"]["active"], false);
+    assert_eq!(
+        detail["snapshot"]["entries"][0]["content"]["text"], "Reviewed incident diagnosis",
+        "inspection must not silently substitute the new source version"
+    );
+    assert!(!detail.to_string().contains("NEVER_SHARE"));
+    assert_eq!(
+        get(&format!("/collections/{}", Uuid::new_v4()))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        get("/collections?limit=0").await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get("/collections?after=not-a-uuid").await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
+    let mut second = blueprint.clone();
+    second["collection"] = json!(Uuid::new_v4());
+    let review: Value = post("/collections/draft", second)
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        post(
+            "/collections/activate",
+            json!({"draft":review,"confirmed_digest":review["review_digest"]})
+        )
+        .await
+        .unwrap()
+        .status(),
+        StatusCode::ACCEPTED
+    );
+    let page = get("/collections?limit=1").await.unwrap();
+    assert_eq!(page.headers()["cache-control"], "no-store");
+    let page: Value = page.json().await.unwrap();
+    assert_eq!(page["collections"].as_array().unwrap().len(), 1);
+    assert!(
+        !page.to_string().contains("diagnosis"),
+        "listing must contain metadata only"
+    );
+    let cursor = page["next_after"].as_str().unwrap();
+    let next: Value = get(&format!("/collections?limit=1&after={cursor}"))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(next["collections"].as_array().unwrap().len(), 1);
+    assert_ne!(
+        page["collections"][0]["collection"],
+        next["collections"][0]["collection"]
+    );
+    assert!(next["next_after"].is_null());
+    assert_eq!(
+        f.request(&f.writer, reqwest::Method::GET, &detail_path, json!(null))
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
     f.grant(f.writer_id, false).await;
+    assert!(!get(&detail_path).await.unwrap().status().is_success());
+    assert!(!get("/collections").await.unwrap().status().is_success());
     assert!(
         !post("/collections/activate", activate)
             .await

@@ -1531,6 +1531,40 @@ paths:
         "403": { description: Exact project permission or explicit local/gateway capability denied. }
         "409": { description: Stale review, pending source work or conflicting idempotency key. }
         "503": { description: Configured peer unavailable or retained verification failed. }
+  /v1/projects/{slug}/federation/{space}/collections:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    get:
+      operationId: listLocalExpertiseCollections
+      summary: Inspect bounded metadata for local collection heads, including withdrawals.
+      description: Disposable browser-only policy with current read/curate/export permissions and local space grant. Does not contact the gateway or disclose collection contents. Active means stored local consent, not source eligibility or accepted/published status. Keyset pages are not a frozen multi-page snapshot. Read-only mode is currently denied.
+      tags: [Federation]
+      x-stability: experimental
+      parameters:
+        - { name: after, in: query, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 32, default: 32 } }
+      responses:
+        "200": { description: No-store collections metadata array and optional next_after collection UUID. }
+        "400": { description: Invalid cursor or limit. }
+        "403": { description: Browser or current project permission denied. }
+        "409": { description: Local grant unavailable. }
+  /v1/projects/{slug}/federation/{space}/collections/{collection}:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+      - { name: collection, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getLocalExpertiseCollection
+      summary: Inspect the exact stored head review of a local collection.
+      description: Same conservative browser permissions as listing. Returns the frozen snapshot, advertisement, reviewer and request ID; does not refresh versions, authorize answering or produce a reusable activation request. Includes withdrawn or now-ineligible source content for local review only. A new revision requires explicit drafting and activation. No gateway request is made.
+      tags: [Federation]
+      x-stability: experimental
+      responses:
+        "200": { description: No-store CollectionDetail with immutable snapshot and stored consent metadata. }
+        "403": { description: Browser or current project permission denied. }
+        "404": { description: Collection unavailable in this configured project and space. }
+        "409": { description: Local grant unavailable. }
   /v1/projects/{slug}/federation/{space}/collections/draft:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }

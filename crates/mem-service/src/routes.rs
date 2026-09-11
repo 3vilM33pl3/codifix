@@ -244,6 +244,14 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
                 .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024)),
         )
         .route(
+            "/v1/projects/{slug}/federation/{space}/collections",
+            get(crate::federation::workflow::collections),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/collections/{collection}",
+            get(crate::federation::workflow::collection_detail),
+        )
+        .route(
             "/v1/projects/{slug}/federation/{space}/collections/activate",
             post(crate::federation::workflow::collection_activate)
                 .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024)),

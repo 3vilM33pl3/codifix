@@ -3,7 +3,9 @@
 //! verification and automatic service scheduling are NOT provided by this crate.
 
 mod audit;
+mod expertise_catalog;
 mod expertise_collections;
+pub use expertise_catalog::*;
 mod expertise_delivery;
 mod expertise_mailbox;
 mod expertise_requests;
