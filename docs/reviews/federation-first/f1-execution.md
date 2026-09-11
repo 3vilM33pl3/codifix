@@ -635,3 +635,27 @@ Logs: `/tmp/f1-enrollment-{tests,web,web-build,clippy,boundaries}.log`.
 Full independent-instance answering/recovery, CLI/TUI/MCP parity, optional models
 and remaining release gates are still open. No existing deployment, customer
 data or credentials changed; F1 remains incomplete.
+
+### CLI/TUI expertise enrollment parity — 2026-09-11
+
+Commit `82ca7d6` makes the CLI accept `ask-expertise` and `answer-expertise` in local grants and
+authority membership actions, serializing the existing underscore wire names.
+The focused TUI supports both kebab-case and underscore names, validates unknown
+capabilities before sending and shows an expertise compatibility/consent warning.
+F5 still prepares exact bytes; F6 confirms only the prepared mutation. No
+collection grant, worker, credentials or output-destination authority is inferred.
+The service's browser-only expertise Q&A policy remains unchanged.
+
+Verification: all 228 CLI tests pass, including new argument/confirmation and
+TUI preview checks, plus a real loopback HTTP test proving repeated submissions
+preserve the exact request ID and wire body. CLI all-target Clippy with warnings
+denied, formatting, boundaries and diff checks pass. The no-default-features
+lean CLI build succeeds with eight existing dead-code warnings outside these
+changes; its actual `member --help` advertises both new options. Logs:
+`/tmp/f1-cli-enrollment-{all-tests,clippy,lean,help,boundaries}.log`.
+
+This is enrollment parity, not expertise Q&A parity. CLI/TUI collection review,
+discovery/questions/results, operator-bound token/MCP output policy, optional
+models and the full independent-instance rehearsal remain open. No new database,
+browser, live-PDS or real PTY rehearsal is claimed for this CLI-only increment.
+Existing services, project data and credentials remain untouched. F1 is incomplete.
