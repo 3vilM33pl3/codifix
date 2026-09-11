@@ -448,6 +448,7 @@ impl Fixture {
         .unwrap();
         let runtime = Arc::new(ConfiguredInstance {
             expertise_browser,
+            expertise_callers: vec![],
             project,
             space,
             instance,

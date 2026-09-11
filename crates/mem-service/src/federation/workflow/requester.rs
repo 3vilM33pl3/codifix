@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Opt-in local-human browser consent. Tokens/MCP cannot self-name destinations.
+//! Operator-bound caller consent. Tokens/MCP cannot self-name destinations.
 use super::*;
 use axum::extract::Query;
 use mem_federation::{ContentDigest, expertise::*};
@@ -29,9 +29,10 @@ pub(crate) async fn expertise_capabilities(
     Extension(principal): Extension<AuthenticatedPrincipal>,
     Path(path): Path<SpacePath>,
     Query(query): Query<ExpertiseBrowseQuery>,
+    headers: axum::http::HeaderMap,
 ) -> Result<Json<ExpertiseCatalog>, ApiError> {
     let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
-    browser(&runtime, &principal)?;
+    let destination = caller_destination(&runtime, &principal, &headers)?;
     let limit = query.limit.unwrap_or(32);
     if !(1..=32).contains(&limit) {
         return Err(bad_request("capability limit must be 1 through 32"));
@@ -65,7 +66,7 @@ pub(crate) async fn expertise_capabilities(
         .into_iter()
         .filter(|ad| {
             ad.modes.contains(&AnswerMode::Deterministic)
-                && ad.output_destinations.iter().any(|d| d == "local_human")
+                && ad.output_destinations.iter().any(|d| d == destination)
         })
         .collect();
     current_access(&state, &mut tx, &principal, &access).await?;
@@ -79,9 +80,10 @@ pub(crate) async fn expertise_result(
     State(state): State<AppState>,
     Extension(principal): Extension<AuthenticatedPrincipal>,
     Path(path): Path<ExpertiseResultPath>,
+    headers: axum::http::HeaderMap,
 ) -> Result<Json<QuestionResult>, ApiError> {
     let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
-    browser(&runtime, &principal)?;
+    let destination = caller_destination(&runtime, &principal, &headers)?;
     let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
     let current = current_access(&state, &mut tx, &principal, &access).await?;
     let consent = mem_federation_store::retained_expertise_consent(
@@ -96,7 +98,7 @@ pub(crate) async fn expertise_result(
     let q = &consent.question;
     if q.mode != AnswerMode::Deterministic
         || q.model_destination.is_some()
-        || q.output_destination != "local_human"
+        || q.output_destination != destination
     {
         return Err(ApiError::forbidden("retained destination is not permitted"));
     }
@@ -147,15 +149,50 @@ pub(super) fn browser(
     runtime: &ConfiguredInstance,
     p: &AuthenticatedPrincipal,
 ) -> Result<(), ApiError> {
-    if !runtime.expertise_browser
-        || p.credential_source != CredentialSource::BrowserSession
-        || p.session_id.is_none()
-    {
+    if output_destination(runtime, p)? != "local_human" {
         return Err(ApiError::forbidden(
-            "expertise requires enabled local-human browser policy",
+            "collection administration requires local-human output policy",
         ));
     }
     Ok(())
+}
+fn output_destination<'a>(
+    runtime: &'a ConfiguredInstance,
+    p: &AuthenticatedPrincipal,
+) -> Result<&'a str, ApiError> {
+    if runtime.expertise_browser
+        && p.credential_source == CredentialSource::BrowserSession
+        && p.session_id.is_some()
+    {
+        return Ok("local_human");
+    }
+    if p.credential_source == CredentialSource::ServiceToken
+        && p.session_id.is_none()
+        && let Some(caller) = runtime
+            .expertise_callers
+            .iter()
+            .find(|c| c.principal == p.id && Some(c.token) == p.token_id)
+    {
+        return Ok(&caller.output_destination);
+    }
+    Err(ApiError::forbidden(
+        "expertise caller has no operator-bound output policy",
+    ))
+}
+fn caller_destination<'a>(
+    runtime: &'a ConfiguredInstance,
+    p: &AuthenticatedPrincipal,
+    headers: &axum::http::HeaderMap,
+) -> Result<&'a str, ApiError> {
+    let destination = output_destination(runtime, p)?;
+    // The bridge declares onward model disclosure. This marker only restricts
+    // access; it cannot select a destination or grant any authority.
+    if headers.contains_key("x-memory-expertise-mcp") && destination == "local_human" {
+        return Err(ApiError::forbidden(
+            "MCP expertise requires an operator-bound model output destination",
+        ));
+    }
+    Ok(destination)
 }
 async fn current_access(
     state: &AppState,
@@ -192,7 +229,7 @@ pub(super) async fn current_access_for(
         tx,
         &mem_store::jobs::JobActor::Credential {
             principal: p.id,
-            token: None,
+            token: p.token_id,
             session: p.session_id,
         },
         access.project,
@@ -229,10 +266,11 @@ pub(crate) async fn expertise_prepare(
     State(state): State<AppState>,
     Extension(principal): Extension<AuthenticatedPrincipal>,
     Path(path): Path<SpacePath>,
+    headers: axum::http::HeaderMap,
     Json(request): Json<ExpertisePrepareRequest>,
 ) -> Result<Json<QuestionReview>, ApiError> {
     let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
-    browser(&runtime, &principal)?;
+    let destination = caller_destination(&runtime, &principal, &headers)?;
     let ad = advertisement(&runtime, request.capability).await?;
     let now = chrono::Utc::now();
     let question = ExpertiseQuestion {
@@ -246,7 +284,7 @@ pub(crate) async fn expertise_prepare(
         question: request.question,
         mode: AnswerMode::Deterministic,
         model_destination: None,
-        output_destination: "local_human".into(),
+        output_destination: destination.into(),
         created_at: now,
         expires_at: now + chrono::Duration::seconds(120),
     };
@@ -257,7 +295,7 @@ pub(crate) async fn expertise_prepare(
         &current,
         &question,
         &ad,
-        &["local_human".into()],
+        &[destination.into()],
     )
     .await
     .map_err(store_error)?;
@@ -268,17 +306,18 @@ pub(crate) async fn expertise_submit(
     State(state): State<AppState>,
     Extension(principal): Extension<AuthenticatedPrincipal>,
     Path(path): Path<SpacePath>,
+    headers: axum::http::HeaderMap,
     Json(request): Json<ExpertiseSubmitRequest>,
 ) -> Result<Json<QuestionResult>, ApiError> {
     let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
-    browser(&runtime, &principal)?;
+    let destination = caller_destination(&runtime, &principal, &headers)?;
     let q = &request.review.question;
     if q.space != runtime.space
         || q.requester != runtime.instance
         || q.principal != principal.id
         || q.mode != AnswerMode::Deterministic
         || q.model_destination.is_some()
-        || q.output_destination != "local_human"
+        || q.output_destination != destination
     {
         return Err(ApiError::forbidden(
             "question identity or destination does not match authenticated scope",
@@ -292,7 +331,7 @@ pub(crate) async fn expertise_submit(
         &current,
         &request.review,
         &ad,
-        &["local_human".into()],
+        &[destination.into()],
         &request.confirmed_digest,
     )
     .await
@@ -309,7 +348,7 @@ pub(crate) async fn expertise_submit(
         runtime.instance,
         q.request_id,
         &ad,
-        &["local_human".into()],
+        &[destination.into()],
     )
     .await
     .map_err(store_error)?;

@@ -30,6 +30,8 @@ enum WorkerConfig {
         expertise_principal: Option<Uuid>,
         #[serde(default)]
         expertise_browser: bool,
+        #[serde(default)]
+        expertise_callers: Vec<ExpertiseCaller>,
         gateway: String,
         #[serde(default)]
         gateway_ca_file: Option<PathBuf>,
@@ -43,6 +45,7 @@ enum WorkerConfig {
 
 pub(crate) type Registry = Arc<RwLock<Option<Arc<ConfiguredInstance>>>>;
 
+#[derive(Clone)]
 pub(crate) struct ConfiguredInstance {
     project: Uuid,
     space: SpaceId,
@@ -50,6 +53,31 @@ pub(crate) struct ConfiguredInstance {
     authority: InstanceId,
     sync: InstanceSync,
     expertise_browser: bool,
+    expertise_callers: Vec<ExpertiseCaller>,
+}
+
+/// Operator-owned bindings, never supplied by a requesting client. Token UUIDs
+/// are non-secret identifiers; token values do not belong in this configuration.
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExpertiseCaller {
+    principal: Uuid,
+    token: Uuid,
+    output_destination: String,
+}
+fn validate_expertise_callers(callers: &[ExpertiseCaller]) -> anyhow::Result<()> {
+    anyhow::ensure!(callers.len() <= 64, "too many expertise caller bindings");
+    let mut tokens = std::collections::BTreeSet::new();
+    for caller in callers {
+        anyhow::ensure!(
+            !caller.principal.is_nil()
+                && !caller.token.is_nil()
+                && tokens.insert(caller.token)
+                && mem_federation::expertise::valid_destination(&caller.output_destination),
+            "invalid or duplicate expertise caller binding"
+        );
+    }
+    Ok(())
 }
 
 pub(crate) struct FederationTasks(Vec<tokio::task::JoinHandle<()>>, Option<Registry>);
@@ -112,6 +140,7 @@ pub(crate) async fn start(
             principal,
             expertise_principal,
             expertise_browser,
+            expertise_callers,
             gateway,
             gateway_ca_file,
             token_file,
@@ -130,6 +159,11 @@ pub(crate) async fn start(
                 !expertise_browser || (disposable_test_mode && cfg!(debug_assertions)),
                 "expertise browser access is rehearsal-only"
             );
+            anyhow::ensure!(
+                expertise_callers.is_empty() || (disposable_test_mode && cfg!(debug_assertions)),
+                "expertise caller access is rehearsal-only"
+            );
+            validate_expertise_callers(&expertise_callers)?;
             anyhow::ensure!(
                 expertise_principal != Some(principal),
                 "expertise requires a separate project-scoped service identity"
@@ -166,6 +200,7 @@ pub(crate) async fn start(
                     authority,
                     sync: sync.clone(),
                     expertise_browser,
+                    expertise_callers,
                 }));
             }
             if let Some(expertise_principal) = expertise_principal {
@@ -234,6 +269,21 @@ mod tests {
 
     #[test]
     fn config_is_explicit_and_secret_files_are_private() {
+        let caller = ExpertiseCaller {
+            principal: Uuid::new_v4(),
+            token: Uuid::new_v4(),
+            output_destination: "synthetic_cloud".into(),
+        };
+        assert!(validate_expertise_callers(std::slice::from_ref(&caller)).is_ok());
+        assert!(validate_expertise_callers(&[caller.clone(), caller.clone()]).is_err());
+        for destination in ["", "https://untrusted.invalid", "../path"] {
+            let mut invalid = caller.clone();
+            invalid.output_destination = destination.into();
+            assert!(validate_expertise_callers(&[invalid]).is_err());
+        }
+        let mut invalid = caller;
+        invalid.token = Uuid::nil();
+        assert!(validate_expertise_callers(&[invalid]).is_err());
         assert!(serde_json::from_value::<WorkerConfig>(json!({"role":"automatic"})).is_err());
         let id = Uuid::new_v4();
         assert!(

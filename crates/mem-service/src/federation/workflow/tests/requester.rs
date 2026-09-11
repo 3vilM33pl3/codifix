@@ -51,7 +51,7 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
         modes: vec![AnswerMode::Deterministic],
         requesters: vec![f.runtime.instance],
         model_destinations: vec![],
-        output_destinations: vec!["local_human".into()],
+        output_destinations: vec!["local_human".into(), "synthetic_cloud".into()],
         active: true,
         limits: Default::default(),
     };
@@ -113,6 +113,17 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
     };
     let prepare = json!({"request_id":Uuid::new_v4(),"capability":ad.key(),"question":"How is recovery verified?"});
     let get = |path: &str| client.get(f.path(path)).header("cookie", &cookies).send();
+    assert_eq!(
+        client
+            .get(f.path("/capabilities"))
+            .header("cookie", &cookies)
+            .header("x-memory-expertise-mcp", "1")
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
     let catalog = get("/capabilities?limit=1").await.unwrap();
     assert_eq!(catalog.status(), StatusCode::OK);
     assert_eq!(catalog.headers()["cache-control"], "no-store");
@@ -170,6 +181,66 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
             .await
             .unwrap()
             .status(),
+        StatusCode::FORBIDDEN
+    );
+    let token_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM auth_service_tokens WHERE principal_id=$1")
+            .bind(f.writer_id)
+            .fetch_one(&f.pool)
+            .await
+            .unwrap();
+    let mut bound = (*f.runtime).clone();
+    bound.expertise_callers = vec![crate::federation::ExpertiseCaller {
+        principal: f.writer_id,
+        token: token_id,
+        output_destination: "synthetic_cloud".into(),
+    }];
+    *f.state.federation.write().unwrap() = Some(Arc::new(bound));
+    let (status, token_review) = f
+        .request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/questions/prepare",
+            prepare.clone(),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{token_review}");
+    assert_eq!(
+        token_review["question"]["output_destination"],
+        "synthetic_cloud"
+    );
+    let (status, _) = f
+        .request(&f.writer, reqwest::Method::GET, "/collections", Value::Null)
+        .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "cloud tokens must not receive local collection contents"
+    );
+    let mut self_authorized = prepare.clone();
+    self_authorized["output_destination"] = json!("local_human");
+    assert_eq!(
+        f.request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/questions/prepare",
+            self_authorized
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    *f.state.federation.write().unwrap() = Some(f.runtime.clone());
+    let token_submit = json!({"confirmed_digest":token_review["digest"],"review":token_review});
+    assert_eq!(
+        f.request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/questions/submit",
+            token_submit
+        )
+        .await
+        .0,
         StatusCode::FORBIDDEN
     );
     let response = post("/questions/prepare", prepare).await.unwrap();
