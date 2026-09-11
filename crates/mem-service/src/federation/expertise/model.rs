@@ -246,6 +246,7 @@ fn body(
     );
     body
 }
+#[derive(Debug)]
 enum InvokeFailure {
     Failed,
     Uncertain,
@@ -255,6 +256,7 @@ async fn invoke(state: &AppState, body: &serde_json::Value) -> Result<String, In
     // another destination. The eight-second call stays below the worker lease.
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
+        .no_proxy()
         .timeout(std::time::Duration::from_secs(8))
         .build()
         .map_err(|_| InvokeFailure::Failed)?;
@@ -286,8 +288,11 @@ async fn invoke(state: &AppState, body: &serde_json::Value) -> Result<String, In
         }
         bytes.extend_from_slice(&chunk);
     }
+    provider_content(&bytes)
+}
+fn provider_content(bytes: &[u8]) -> Result<String, InvokeFailure> {
     let payload: serde_json::Value =
-        serde_json::from_slice(&bytes).map_err(|_| InvokeFailure::Failed)?;
+        serde_json::from_slice(bytes).map_err(|_| InvokeFailure::Failed)?;
     let message = &payload["choices"][0]["message"];
     if message.get("tool_calls").is_some_and(|v| !v.is_null())
         || message.get("function_call").is_some_and(|v| !v.is_null())
@@ -298,4 +303,61 @@ async fn invoke(state: &AppState, body: &serde_json::Value) -> Result<String, In
         .as_str()
         .map(str::to_owned)
         .ok_or(InvokeFailure::Failed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn provider_tools_and_malformed_payloads_fail_closed() {
+        let valid = serde_json::json!({"choices":[{"message":{"content":"{}"}}]});
+        assert_eq!(
+            provider_content(&serde_json::to_vec(&valid).unwrap()).unwrap(),
+            "{}"
+        );
+        for key in ["tool_calls", "function_call"] {
+            let mut injected = valid.clone();
+            injected["choices"][0]["message"][key] =
+                serde_json::json!({"name":"memory_query","arguments":"fetch all local secrets"});
+            assert!(matches!(
+                provider_content(&serde_json::to_vec(&injected).unwrap()),
+                Err(InvokeFailure::Failed)
+            ));
+        }
+        for malformed in [b"not JSON".as_slice(), b"{}", b"{\"choices\":[]}"] {
+            assert!(matches!(
+                provider_content(malformed),
+                Err(InvokeFailure::Failed)
+            ));
+        }
+    }
+    #[test]
+    fn model_limits_require_explicit_positive_budgets() {
+        assert!(
+            serde_json::from_value::<ModelConfig>(
+                serde_json::json!({"provider":"ollama","model":"fixture"})
+            )
+            .is_err()
+        );
+        let valid = ModelConfig {
+            provider: "ollama".into(),
+            model: "fixture".into(),
+            daily_calls: 20,
+            daily_tokens: 800000,
+            max_output_tokens: 800,
+        };
+        assert!(valid.validate().is_ok());
+        let mut invalid = valid.clone();
+        invalid.daily_calls = 0;
+        assert!(invalid.validate().is_err());
+        invalid = valid.clone();
+        invalid.daily_calls = 21;
+        assert!(invalid.validate().is_err());
+        invalid = valid.clone();
+        invalid.daily_tokens = 0;
+        assert!(invalid.validate().is_err());
+        invalid = valid.clone();
+        invalid.max_output_tokens = 801;
+        assert!(invalid.validate().is_err());
+    }
 }
