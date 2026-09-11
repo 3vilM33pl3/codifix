@@ -744,3 +744,13 @@ Operator instructions are in [F1 internal expertise](../../user/f1-internal-expe
 explicit event-driven actions, stale-state clearing, safe text rendering and
 labelled confirmation controls. Real homelab activation, paid provider use,
 customer readiness, R3 evidence and F2 remain separate approvals/workstreams.
+
+Completion checkpoint: the dev Memory `finish-plan-execution` workflow succeeded
+on 2026-09-11, verified **53/53 items with zero remaining**, recorded the
+implementation and archived completed plan memory
+`58b6c8e2-ea79-4530-b4b6-5d747c490e64` (original thread
+`f1-private-expertise`). The owned disposable PostgreSQL container was stopped
+and automatically removed; its synthetic data is regenerable from fixtures.
+PDS/isolation runners removed their own temporary resources. The full CLI build
+was restored after the successful minimal CLI build. Existing services were not
+restarted. All changes are committed incrementally on `codex/federation-v1`.
