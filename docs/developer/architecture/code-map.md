@@ -46,7 +46,9 @@ handlers, capability browsing and original-requester result reads are in
 `mem-service/src/federation/workflow/requester.rs`. Browser collection draft,
 activation and withdrawal handlers are in `workflow/collections.rs`; the preview
 uses a caller-owned transaction to retain current authentication locks.
-Collection listing/detail and Web/CLI/TUI/MCP workflows remain pending.
+Local collection listing/detail uses `mem-federation-store/src/expertise_catalog.rs`;
+these are stored-review inspection, not answer authorization. Web/CLI/TUI/MCP
+workflows remain pending.
 
 ## Frontends
 

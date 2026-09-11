@@ -229,7 +229,22 @@ Withdraw accepts `request_id`, `collection`, `expected_revision` and
 `confirmed: true`. It disables local standing consent while atomically queuing
 the withdrawal advertisement. Exact retries retain the same intent. It cannot
 recall already delivered or already authorized in-flight bytes. All responses
-are no-store. Collection listing/detail and service-grant UI remain pending.
+are no-store. The service-grant UI remains pending.
+
+`GET collections?limit=32` inspects local collection metadata, including withdrawn
+heads. Follow `next_after` with `after=<collection UUID>`; limits are 1–32 and
+pages use UUID ordering, not publication ordering. Pages are not a frozen snapshot.
+`GET collections/{collection}` returns the exact stored head snapshot,
+advertisement, reviewer and request ID. Both reads use the same conservative
+browser, current read/curate/export and local-grant policy; read-only mode remains
+denied. They make no gateway request.
+
+These are local review tools, not retrieval or answer authorization. `active`
+means stored standing consent only: sources may since have changed, permissions
+may have been revoked, and publication may still be queued. Detail preserves the
+reviewed source bytes even after a newer source version exists or the collection
+was withdrawn. Do not use it to answer remote questions. Prepare and activate a
+new explicit review to change the collection.
 
 ## Observe and recover
 

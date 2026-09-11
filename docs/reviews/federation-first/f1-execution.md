@@ -16,7 +16,7 @@ This task delivers **software and a disposable rehearsal**, not activation on ex
 deterministic answering and recovery; work has entered Section 3's public
 interfaces. Browser-session HTTP preparation/submission, capability browsing and
 original-requester result reads are implemented and tested at component level.
-Collection draft/activate/withdraw HTTP is also implemented; collection browsing and
+Collection draft/activate/withdraw and local browsing/detail HTTP are implemented;
 Web/CLI/TUI/MCP workflows remain pending, followed by the full disposable
 automatic-worker rehearsal. Open checkboxes are end-to-end completion gates;
 the dated evidence below records individual implementation increments.
@@ -431,3 +431,32 @@ Logs are `/tmp/f1-collections-workspace-clean.log` and
 the full container/PDS isolation rehearsal were not rerun. The disposable
 database was removed, with existing services and credentials unchanged. A partial
 Memory checkpoint records `1eaf800`; the approved plan remains incomplete.
+
+### Local collection inspection increment — 2026-09-11
+
+Commit `6ecf89a` adds bounded origin-local collection listing and head-review
+detail HTTP. Keyset listing uses collection UUIDs with an explicit next cursor,
+not publication sequence order, and returns metadata only. Detail validates and
+returns the exact stored snapshot, advertisement, reviewer and request ID. These
+reads make no gateway request and neither change consent nor authorize answering.
+Withdrawn collections remain inspectable; newer source versions are not silently
+substituted. Stored `active` is not evidence of current eligibility or gateway
+acceptance. Multi-page browsing is not a frozen snapshot.
+
+The conservative disposable browser policy retains current read/curate/export,
+explicit local-grant, token rejection, read-only denial and no-store behavior.
+The HTTP fixture verifies bounded pagination, invalid cursor/limit rejection,
+metadata-only listing, unknown collection handling, unchanged reviewed contents
+after a source update, withdrawal visibility and denial after local grant removal.
+This completes another component of Section 3, not its full user workflow.
+Web/CLI/TUI/MCP, service-grant UI, optional model execution and full disposable
+automatic-worker rehearsal remain open.
+
+Verification for collection inspection: required-database serial workspace run
+passes 832 tests across 50 binaries with zero failures/ignored tests. The inherited
+client-token variable was unset only for the test process. Workspace Clippy
+(`-D warnings`), formatting, boundaries and OpenAPI inventory pass. Logs are
+`/tmp/f1-browse-{workspace,service,clippy,openapi,boundaries}.log`. Web, Lean, lean
+CLI and the full container/PDS isolation rehearsal were not rerun. The disposable
+database was removed; existing services and credentials were untouched. The Memory
+plan-execution workflow saved a partial checkpoint at `6ecf89a`, not completion.
