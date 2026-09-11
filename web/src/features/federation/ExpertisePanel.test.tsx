@@ -64,6 +64,24 @@ describe("Explicit private expertise", () => {
     await screen.findByRole("alert");
     expect(screen.queryByText("<script>steal()</script>")).toBeNull();
   });
+  it("defaults to excerpts and binds an explicitly selected synthesis provider into review", async () => {
+    const modelReview = { ...review, question: { ...review.question, mode: "model", model_destination: "fixture" } };
+    vi.mocked(federationRequest).mockImplementation(async (_p, _s, path) => path?.startsWith("/capabilities")
+      ? { capabilities: [{ ...ad, model_destinations: ["fixture"] }], next_after: null } : modelReview);
+    render(<ExpertisePanel project="a" discovery={discovery} />);
+    expect(screen.getByLabelText("Expertise answer mode")).toHaveValue("");
+    fireEvent.click(screen.getByText("Discover expertise"));
+    fireEvent.click(await screen.findByText("Select expertise Recovery"));
+    fireEvent.change(screen.getByLabelText("Expertise answer mode"), { target: { value: "fixture" } });
+    fireEvent.change(screen.getByLabelText("Remote question"), { target: { value: "How to recover?" } });
+    fireEvent.click(screen.getByText("Prepare remote question"));
+    await screen.findByText("Send approved question");
+    expect(vi.mocked(federationRequest).mock.calls[1][3]).toMatchObject({ model_destination: "fixture" });
+    expect(screen.getByLabelText(/and synthesis via fixture/)).not.toBeChecked();
+    expect(screen.getByText("Send approved question")).toBeDisabled();
+    expect(screen.getByLabelText("Expertise answer mode")).toBeDisabled();
+    expect(vi.mocked(federationRequest).mock.calls.some(c => c[2] === "/questions/submit")).toBe(false);
+  });
   it("clears consent and aborts requests on project or permission changes", async () => {
     const { rerender } = render(<ExpertisePanel project="a" discovery={discovery} />);
     await prepare();

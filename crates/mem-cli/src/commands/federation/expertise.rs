@@ -127,6 +127,9 @@ pub(super) enum AskCommand {
         request_id: Uuid,
         #[arg(long)]
         question_file: PathBuf,
+        /// Optional operator-allowed synthesis provider ID; omitted means excerpts.
+        #[arg(long)]
+        model_destination: Option<String>,
     },
     /// Send the exact inspected review. Retain the file/ID for uncertain retries.
     #[command(after_help = HELP)]
@@ -246,6 +249,7 @@ pub(super) async fn ask(api: &FederationClient, command: AskCommand) -> Result<V
             collection,
             request_id,
             question_file,
+            model_destination,
         } => {
             let mut bytes = Vec::new();
             std::fs::File::open(question_file)?
@@ -258,7 +262,7 @@ pub(super) async fn ask(api: &FederationClient, command: AskCommand) -> Result<V
             let question = String::from_utf8(bytes).context("question must be UTF-8")?;
             (
                 "/questions/prepare",
-                json!({"request_id":request_id,"capability":{"publisher":publisher,"id":collection},"question":question}),
+                json!({"request_id":request_id,"capability":{"publisher":publisher,"id":collection},"question":question,"model_destination":model_destination}),
             )
         }
         AskCommand::Submit { file, confirm } => {

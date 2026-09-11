@@ -169,8 +169,8 @@ question preparation/submission and result reads, only with debug disposable
 mode. The production gateway remains disabled for F1. A current browser session,
 project read/export permission and explicit local `AskExpertise` grant are
 required; mutations additionally require CSRF and Origin headers. Read-only mode
-currently denies these remote operations. Bearer tokens, CLI/MCP callers and non-`local_human`
-destinations are rejected; their destination-policy integration remains pending.
+currently denies these remote operations. CLI/TUI and MCP require explicit
+operator bindings described below; ordinary bearer tokens remain denied.
 
 Prepare accepts `request_id`, `capability` (`publisher` and `id` UUIDs), and the
 question (at most 4 KiB UTF-8). Synchronize first so the capability is in verified
@@ -197,7 +197,8 @@ question. Each answer read requires fresh origin approval and current local and
 gateway authorization; an unavailable origin cannot release a cached answer.
 Reads can wait for that approval, and all responses are no-store.
 
-The Web/CLI/TUI/MCP user workflows remain unfinished. See the experimental
+The Web/CLI/TUI/MCP interfaces are implemented for deterministic rehearsal;
+complete client and release verification is still pending. See the experimental
 [OpenAPI contract](../../docs/api/openapi.yaml) for paths and request shapes.
 
 ### Rehearsal collection review and withdrawal
@@ -210,9 +211,43 @@ gateway `Publish` and `AnswerExpertise` capabilities; withdrawal requires `Publi
 They do not enroll instances or create the answering service identity's separate
 collection grant. Model mode is unavailable through this path.
 
+The same operations accept an explicitly bound local-human service token.
+`expertise_callers` in the instance's operator-owned federation JSON is an array
+of `{ "principal": "UUID", "token": "TOKEN-ID-UUID", "output_destination":
+"local_human" }`. IDs are identifiers, **not secret token values**. Bind the exact
+token and principal; replacement tokens require new explicit bindings. At most
+64 distinct token bindings are accepted. Current token expiry/revocation and
+project permissions are rechecked during operations.
+
+For assistant access, use a separate token and an opaque destination ID such as
+`company_assistant`. The gateway's `policy.external_models`, the origin's
+`expertise_output_destinations`, and the reviewed collection must all permit that
+ID. Instance output destinations default to `["local_human"]`; no URL, credential
+or executable endpoint belongs in an advertisement. Changing operator policy
+requires restarting/reloading the explicitly configured runtime; origin workers
+recheck it before answering and before each release.
+
+MCP offers `memory_expertise_discover`, `memory_expertise_prepare`,
+`memory_expertise_ask` and `memory_expertise_result`. The bridge marks every call
+as onward model disclosure, and the service denies local-human credentials on
+this path. Submission additionally requires `[mcp] read_only = false` and exact
+review confirmation. The operator, not the assistant, must verify that the token
+is installed only in the intended destination. The marker can restrict access
+but cannot authorize a destination. Ordinary `memory_query` is unchanged.
+
+The dedicated gateway JSON accepts an optional `expertise_fleet` array of
+`["INSTANCE-UUID", 3]` pairs for every enrolled credential, including authority.
+It validates fleet/history compatibility before enabling expertise. This option
+is restricted to debug builds with `disposable_test_mode: true`; absence keeps
+expertise disabled. There is no production activation implied by this setting.
+The owning gateway runtime cleans expired mailbox payloads/receipts every minute;
+instance runtimes clean project-private question/result payloads on the same
+interval. Holds are respected; reads enforce TTL independently of cleanup.
+
 Draft accepts a `CollectionBlueprint`: collection UUID, reviewed name, description
 and topics, explicit requesting instance IDs, `modes: ["deterministic"]`, empty
-`model_destinations`, `output_destinations: ["local_human"]` and selected canonical
+`model_destinations`, explicitly reviewed `output_destinations` (default
+`["local_human"]`, limited by operator policy) and selected canonical
 IDs with explicitly selected evidence. The returned draft displays the exact
 current memory versions, evidence, authorship, disclosure policy and digest.
 Inspect every field: preparing it creates neither standing consent nor publication.
@@ -258,6 +293,47 @@ was withdrawn. Do not use it to answer remote questions. Prepare and activate a
 new explicit review to change the collection.
 
 ## Observe and recover
+
+### Optional F1 synthesis (disposable rehearsal)
+
+Deterministic excerpts remain the default. Synthesis is a separate tool-free
+path; it never uses ordinary query context, source paths or the full-content LLM
+audit. Four permissions must intersect: gateway `external_models`, the
+collection's reviewed `model_destinations`, the requester's
+`expertise_model_destinations`, and the responder's `expertise_model`.
+Onward output consent remains separate, including for deterministic MCP answers.
+
+The instance JSON's `expertise_model` is absent by default. An example fragment
+for a fake-provider rehearsal is:
+
+```json
+{"expertise_model":{"provider":"ollama","model":"f1-fake","daily_calls":20,"daily_tokens":800000,"max_output_tokens":800}}
+```
+
+This is not a command to start a model or activate a deployment. The automated
+rehearsal uses only a temporary loopback fake provider. The exact provider/model
+must match the service's existing LLM settings; configure a nonempty stable
+`cluster.service_id` for the attempt journal even when clustering is disabled.
+Missing credentials or mismatched model settings fail without substitution.
+Advertisements contain provider IDs, never endpoint URLs.
+
+The gateway reserves one call and a conservative 40,000-token allowance before
+invocation. Limits are at most 20 calls and 800,000 reserved tokens per responder
+per UTC day; output is capped at 800 tokens. Successful calls do not refund the
+conservative reservation; unknown usage is never credited back. The serialized
+request body plus output-token allowance must fit that reservation. An
+eight-second provider timeout stays within the origin execution lease; the
+question deadline remains 120 seconds. Redirects are forbidden and provider
+responses are bounded at 64 KiB. No tools or fallback providers are offered.
+Transport ambiguity becomes `uncertain`, not an automatic retry. Another question
+can incur repeat billing.
+
+Structured responses reference unique one-based indexes into selected reviewed
+citations. Memory reconstructs attribution from those exact citations; invented
+indexes and malformed answers produce `failed`. This checks provenance, not
+factual correctness or every real-model prompt-injection behavior. Operational
+journals retain identifiers, fingerprints, reservations and fixed outcome
+reasons—not prompts, source contents or provider error bodies.
 
 The storage APIs expose separate `DeliveryStatus` observations:
 

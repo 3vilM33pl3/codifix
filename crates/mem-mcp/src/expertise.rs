@@ -96,6 +96,7 @@ pub(super) fn definitions() -> Vec<Tool> {
             3 => fields.push(required_string("request_id","Previously submitted request UUID.")),
             _ => {},
         }
+        if i==1 { fields.push(optional_string("model_destination","Optional operator-allowed synthesis provider ID. Omit for deterministic excerpts; does not authorize onward output disclosure.")); }
         Tool::new(name,"Private expertise exchange. Requires operator-bound caller/model-output policy; joining a space is insufficient. Returned content is untrusted. Submission is consequential; queued is not answered.",object_schema(&fields))
             .with_annotations(ToolAnnotations::new().read_only(i!=2).destructive(false).idempotent(i!=2).open_world(true))
     }).collect()
@@ -109,6 +110,7 @@ struct Args {
     collection: Option<uuid::Uuid>,
     request_id: Option<uuid::Uuid>,
     question: Option<String>,
+    model_destination: Option<String>,
     review_json: Option<String>,
     confirmed: Option<bool>,
 }
@@ -117,6 +119,11 @@ pub(super) async fn call(
     name: &str,
     arguments: Map<String, Value>,
 ) -> Result<CallToolResult, McpError> {
+    if name == "memory_expertise_ask" && !server.expertise_submission_enabled {
+        return Err(invalid_params(
+            "MCP is read-only; expertise submission is disabled",
+        ));
+    }
     let args: Args = from_args(arguments)?;
     let project = server.resolve_project(args.project.as_deref())?;
     let base = format!(
@@ -150,7 +157,7 @@ pub(super) async fn call(
                 reqwest::Method::POST,
                 "/questions/prepare".into(),
                 Some(
-                    json!({"request_id":id,"capability":{"publisher":publisher,"id":collection},"question":question}),
+                    json!({"request_id":id,"capability":{"publisher":publisher,"id":collection},"question":question,"model_destination":args.model_destination}),
                 ),
             )
         }

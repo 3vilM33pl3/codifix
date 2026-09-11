@@ -20,6 +20,8 @@ function CollectionsWorkspace({ project, discovery }: { project: string; discove
   const [description, setDescription] = useState("");
   const [topics, setTopics] = useState("");
   const [requesters, setRequesters] = useState("");
+  const [outputs, setOutputs] = useState("local_human");
+  const [models, setModels] = useState("");
   const [memories, setMemories] = useState("");
   const [evidence, setEvidence] = useState("{}");
   const [servicePrincipal, setServicePrincipal] = useState("");
@@ -50,7 +52,7 @@ function CollectionsWorkspace({ project, discovery }: { project: string; discove
     if (!lifetime.current?.signal.aborted) setPage(response);
   }
   return <section aria-label="Expertise collection management"><h3>Approved expertise collections</h3>
-    <p>Disposable rehearsal. Collections stay local; only reviewed advertisements are published. Activation grants standing permission to answer from the frozen collection, subject to current permissions. No model destinations are enabled here.</p>
+    <p>Disposable rehearsal. Collections stay local; only reviewed advertisements are published. Activation grants standing permission to answer from the frozen collection, subject to current permissions. Model synthesis requires separate operator configuration and explicit consent.</p>
     <p>Stored active consent does not prove current source eligibility or gateway publication. Withdrawal cannot recall delivered or already authorized in-flight bytes.</p>
     {disabled ? <p>Collection controls require a writable service and curate/export permissions.</p> : null}
     {error ? <p role="alert">Collection operation failed or was denied: {error}. Publication intents may be retried exactly; uncertain grant changes require fresh policy inspection and review. Do not assume rollback.</p> : null}
@@ -86,17 +88,20 @@ function CollectionsWorkspace({ project, discovery }: { project: string; discove
       <label>Reviewed collection description<textarea value={description} onChange={e => setDescription(e.target.value)} /></label>
       <label>Collection topics (comma separated)<input value={topics} onChange={e => setTopics(e.target.value)} /></label>
       <label>Allowed requesting instance UUIDs<textarea value={requesters} onChange={e => setRequesters(e.target.value)} /></label>
+      <label>Reviewed output destination IDs (comma separated)<input value={outputs} onChange={e => setOutputs(e.target.value)} /></label>
+      <label>Reviewed synthesis provider IDs (blank disables models)<input value={models} onChange={e => setModels(e.target.value)} /></label>
+      <p>Non-local output permits disclosure to an assistant or model destination. The operator must separately allow each ID; typing a name does not authorize it.</p>
       <label>Selected canonical memory UUIDs<textarea value={memories} onChange={e => setMemories(e.target.value)} /></label>
       <details><summary>Advanced explicit evidence selection</summary><p>JSON object mapping a selected canonical UUID to its EvidenceSelection array (snapshot and snapshot_digest). Empty means no evidence is attached. No raw source, capture or path is selected automatically; server validation and the complete preview remain mandatory.</p>
         <label>Evidence selections JSON<textarea rows={5} value={evidence} onChange={e => setEvidence(e.target.value)} /></label></details>
-      <p>Mode: deterministic excerpts; output: local_human; models: none. Revisions replace the selected collection contents—omitted entries or evidence are not carried forward.</p>
+      <p>Deterministic excerpts remain available. Adding a synthesis provider permits reviewed context disclosure to that operator-configured provider. Revisions replace the selected collection contents—omitted entries or evidence are not carried forward.</p>
       <button disabled={!name.trim() || !description.trim() || !split(requesters).length || !split(memories).length} onClick={() => void run(async () => {
         const ids = split(memories);
         const selections: unknown = JSON.parse(evidence);
         if (!selections || typeof selections !== "object" || Array.isArray(selections)) throw new Error("Evidence selections must be an object");
         if (Object.keys(selections).some(id => !ids.includes(id)) || Object.values(selections).some(value => !Array.isArray(value))) throw new Error("Evidence must be arrays for selected memory UUIDs only");
         const entries = ids.map(canonical => ({ canonical, evidence: (selections as Record<string, unknown[]>)[canonical] ?? [] }));
-        const draft = await call<Draft>("/collections/draft", { collection: collection.trim() || crypto.randomUUID(), name, description, topics: topics.split(",").map(t => t.trim()).filter(Boolean), requesters: split(requesters), entries, modes: ["deterministic"], model_destinations: [], output_destinations: ["local_human"] });
+        const draft = await call<Draft>("/collections/draft", { collection: collection.trim() || crypto.randomUUID(), name, description, topics: topics.split(",").map(t => t.trim()).filter(Boolean), requesters: split(requesters), entries, modes: split(models).length ? ["deterministic", "model"] : ["deterministic"], model_destinations: split(models), output_destinations: outputs.split(",").map(t => t.trim()).filter(Boolean) });
         if (lifetime.current?.signal.aborted) return;
         setConfirmed(false); setPending({ path: "/collections/activate", label: "Activate reviewed collection", body: { draft, confirmed_digest: draft.review_digest } });
       })}>Prepare collection review</button>

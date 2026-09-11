@@ -45,7 +45,12 @@ const OPERATIONS: &[(&str, &[&str])] = &[
     ),
     (
         "Prepare remote question",
-        &["publisher", "collection", "exact question"],
+        &[
+            "publisher",
+            "collection",
+            "exact question",
+            "model provider ID (optional)",
+        ],
     ),
     ("Send reviewed question", &[]),
     ("Expertise result", &["request ID"]),
@@ -241,7 +246,7 @@ impl Workspace {
                     Method::POST,
                     "/questions/prepare".into(),
                     Some(
-                        json!({"request_id":self.request_id,"capability":{"publisher":self.id(0)?,"id":self.id(1)?},"question":self.value(2)}),
+                        json!({"request_id":self.request_id,"capability":{"publisher":self.id(0)?,"id":self.id(1)?},"question":self.value(2),"model_destination":if self.value(3).is_empty(){None}else{Some(self.value(3))}}),
                     ),
                     false,
                 ))
@@ -435,7 +440,7 @@ pub(super) async fn run(api: FederationClient, discovery: Value) -> Result<()> {
         }
         terminal.draw(|frame| {
             let areas=Layout::vertical([Constraint::Length(5),Constraint::Length((workspace.fields.len()+3) as u16),Constraint::Min(4),Constraint::Length(3)]).split(frame.area());
-            frame.render_widget(Paragraph::new(format!("Federation — {}\n{}\nUntrusted retained data. No model forwarding. Queued ≠ accepted ≠ published/replicated.\nPlaintext is readable by recipients/admins. Revocation cannot recall copies.",discovery["space"].as_str().unwrap_or_default(),OPERATIONS[workspace.operation].0)).block(Block::bordered()),areas[0]);
+            frame.render_widget(Paragraph::new(format!("Federation — {}\n{}\nUntrusted data. Review model/output consent. Queued ≠ answered ≠ replicated.\nPlaintext is readable by recipients/admins. Revocation cannot recall copies.",discovery["space"].as_str().unwrap_or_default(),OPERATIONS[workspace.operation].0)).block(Block::bordered()),areas[0]);
             let form=OPERATIONS[workspace.operation].1.iter().zip(&workspace.fields).enumerate().map(|(i,(name,value))|format!("{} {name}: {}",if i==workspace.field{"▶"}else{" "},value.escape_debug())).collect::<Vec<_>>().join("\n");
             frame.render_widget(Paragraph::new(form).wrap(Wrap{trim:false}).block(Block::bordered().title("Tab: next field • type to edit")),areas[1]);
             frame.render_widget(Paragraph::new(workspace.output.as_str()).wrap(Wrap{trim:false}).scroll((workspace.scroll,0)).block(Block::bordered().title(if pending.is_some(){"Waiting for local service"}else{"Response / exact confirmation preview • PgUp/PgDn"})),areas[2]);

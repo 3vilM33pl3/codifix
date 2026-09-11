@@ -84,6 +84,16 @@ describe("Collection review workflow", () => {
     await waitFor(() => expect(federationRequest).toHaveBeenCalledTimes(3));
     expect(vi.mocked(federationRequest).mock.calls[2][2]).toBe("/collections?limit=32&after=next");
   });
+  it("includes explicitly reviewed synthesis and onward-output IDs without activation", async () => {
+    vi.mocked(federationRequest).mockResolvedValue(draft);
+    render(<CollectionsPanel project="a" discovery={discovery} />);
+    fireEvent.change(screen.getByLabelText("Reviewed synthesis provider IDs (blank disables models)"), { target: { value: "fixture" } });
+    fireEvent.change(screen.getByLabelText("Reviewed output destination IDs (comma separated)"), { target: { value: "local_human, approved_cloud" } });
+    await prepare();
+    expect(federationRequest).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(federationRequest).mock.calls[0][3]).toMatchObject({ modes: ["deterministic", "model"], model_destinations: ["fixture"], output_destinations: ["local_human", "approved_cloud"] });
+    expect(screen.getByText("Confirm collection action")).toBeDisabled();
+  });
   it("clears previews on identity change and prevents read-only operations", async () => {
     vi.mocked(federationRequest).mockResolvedValue(draft);
     const { rerender } = render(<CollectionsPanel project="a" discovery={discovery} />);
