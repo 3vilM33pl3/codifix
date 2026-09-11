@@ -1,0 +1,87 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { federationRequest } from "../../api";
+import { CollectionsPanel } from "./CollectionsPanel";
+import type { Discovery } from "./types";
+vi.mock("../../api", () => ({ federationRequest: vi.fn() }));
+const discovery: Discovery = { space: "space", instance: "owner", authority: "authority", principal: "reviewer", permissions: ["memory_curate", "bundle_export"], read_only: false, profile: "private" };
+const ad = { collection: "collection", name: "Recovery", revision: 3, active: true };
+const draft = { advertisement: ad, reviewer: "reviewer", request_id: "stable", review_digest: { digest: "exact" }, snapshot: { entries: [{ text: "<script>untrusted()</script>", evidence: ["selected only"] }] } };
+const consent = "I reviewed every collection field, source version, evidence byte and disclosure permission.";
+async function prepare() {
+  fireEvent.change(screen.getByLabelText("Collection name"), { target: { value: "Recovery" } });
+  fireEvent.change(screen.getByLabelText("Reviewed collection description"), { target: { value: "Reviewed facts" } });
+  fireEvent.change(screen.getByLabelText("Allowed requesting instance UUIDs"), { target: { value: "remote" } });
+  fireEvent.change(screen.getByLabelText("Selected canonical memory UUIDs"), { target: { value: "memory" } });
+  fireEvent.click(screen.getByText("Prepare collection review"));
+  await screen.findByText("Confirm collection action");
+}
+describe("Collection review workflow", () => {
+  afterEach(cleanup);
+  beforeEach(() => vi.mocked(federationRequest).mockReset());
+  it("requires all-byte confirmation and preserves exact requests after uncertain activation", async () => {
+    let attempts = 0;
+    vi.mocked(federationRequest).mockImplementation(async (_p, _s, path) => {
+      if (path === "/collections/draft") return draft;
+      if (++attempts === 1) throw new Error("503 uncertain");
+      return { submission: "queued" };
+    });
+    render(<CollectionsPanel project="a" discovery={discovery} />);
+    expect(federationRequest).not.toHaveBeenCalled();
+    await prepare();
+    expect(document.querySelector("script")).toBeNull();
+    expect(screen.getByLabelText("Exact collection action bytes")).toHaveTextContent("selected only");
+    expect(screen.getByText("Confirm collection action")).toBeDisabled();
+    expect(screen.getByLabelText("Collection name")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(consent));
+    fireEvent.click(screen.getByText("Confirm collection action"));
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByText("Confirm collection action"));
+    await screen.findByRole("status");
+    const calls = vi.mocked(federationRequest).mock.calls;
+    expect(calls[0][3]).toMatchObject({ entries: [{ canonical: "memory", evidence: [] }], requesters: ["remote"], modes: ["deterministic"], model_destinations: [], output_destinations: ["local_human"] });
+    expect(calls[1][3]).toEqual({ draft, confirmed_digest: draft.review_digest });
+    expect(calls[2][3]).toEqual(calls[1][3]);
+    expect(screen.getByRole("status")).toHaveTextContent("not yet gateway accepted");
+  });
+  it("browses and inspects before preparing a revision-bound withdrawal", async () => {
+    vi.mocked(federationRequest).mockImplementation(async (_p, _s, path) => path?.startsWith("/collections?") ? { collections: [ad], next_after: "next" } : draft);
+    render(<CollectionsPanel project="a" discovery={discovery} />);
+    fireEvent.click(screen.getByText("Browse collections"));
+    fireEvent.click(await screen.findByText("Inspect collection Recovery"));
+    fireEvent.click(await screen.findByText("Review collection withdrawal"));
+    expect(federationRequest).toHaveBeenCalledTimes(2);
+    const bytes = JSON.parse(screen.getByLabelText("Exact collection action bytes").textContent!);
+    expect(bytes).toMatchObject({ collection: "collection", expected_revision: 3, confirmed: true });
+    expect(bytes.request_id).toBeTruthy();
+    expect(screen.getByText("Confirm collection action")).toBeDisabled();
+    fireEvent.click(screen.getByText("Close collection review"));
+    fireEvent.click(screen.getByText("Next collection page"));
+    await waitFor(() => expect(federationRequest).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(federationRequest).mock.calls[2][2]).toBe("/collections?limit=32&after=next");
+  });
+  it("clears previews on identity change and prevents read-only operations", async () => {
+    vi.mocked(federationRequest).mockResolvedValue(draft);
+    const { rerender } = render(<CollectionsPanel project="a" discovery={discovery} />);
+    await prepare();
+    const signal = vi.mocked(federationRequest).mock.calls[0][4];
+    rerender(<CollectionsPanel project="b" discovery={discovery} />);
+    expect(signal?.aborted).toBe(true);
+    expect(screen.queryByText("Confirm collection action")).toBeNull();
+    expect(screen.getByLabelText("Collection name")).toHaveValue("");
+    rerender(<CollectionsPanel project="b" discovery={{ ...discovery, read_only: true }} />);
+    expect(screen.getByText("Browse collections")).toBeDisabled();
+    expect(screen.getByText("Prepare collection review")).toBeDisabled();
+  });
+  it("rejects evidence for unselected memories before making a request", async () => {
+    render(<CollectionsPanel project="a" discovery={discovery} />);
+    fireEvent.change(screen.getByLabelText("Collection name"), { target: { value: "Recovery" } });
+    fireEvent.change(screen.getByLabelText("Reviewed collection description"), { target: { value: "Facts" } });
+    fireEvent.change(screen.getByLabelText("Allowed requesting instance UUIDs"), { target: { value: "remote" } });
+    fireEvent.change(screen.getByLabelText("Selected canonical memory UUIDs"), { target: { value: "memory" } });
+    fireEvent.change(screen.getByLabelText("Evidence selections JSON"), { target: { value: '{"unselected":[]}' } });
+    fireEvent.click(screen.getByText("Prepare collection review"));
+    await screen.findByRole("alert");
+    expect(federationRequest).not.toHaveBeenCalled();
+  });
+});

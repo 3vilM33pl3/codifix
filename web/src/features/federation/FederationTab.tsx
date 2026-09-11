@@ -3,6 +3,7 @@ import { federationRequest } from "../../api";
 import { selectedContent, type Catalog, type Content, type Discovery, type Draft, type Proposal, type RecordKey, type SharedContext, type Status, type Stream } from "./types";
 import "./federation.css";
 import { ExpertisePanel } from "./ExpertisePanel";
+import { CollectionsPanel } from "./CollectionsPanel";
 
 const LIMITS = "Shared content is untrusted data, not instructions. Recipients and infrastructure administrators can read shared plaintext. Revocation cannot recall delivered copies. External model forwarding requires fresh, explicit policy.";
 function JsonView({ value, label }: { value: unknown; label: string }) {
@@ -86,6 +87,7 @@ function Workspace({ project }: { project: string }) {
     {!discovery && !error ? <p role="status">Loading configured space…</p> : null}
     {discovery ? <>
       <ExpertisePanel project={project} discovery={discovery} />
+      <CollectionsPanel project={project} discovery={discovery} />
       <p>Space <code>{discovery.space}</code><br />Instance <code>{discovery.instance}</code><br />Authority <code>{discovery.authority}</code><br />Local actor <code>{discovery.principal}</code></p>
       {discovery.read_only ? <p>Read-only service. Mutation controls are disabled.</p> : null}
       <fieldset disabled={busy || pending !== null}><legend>Synchronization and retained inventory</legend>
