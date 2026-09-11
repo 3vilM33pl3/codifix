@@ -121,7 +121,7 @@ expired PDS credentials block work until an operator replaces the private token
 file, restarts the role and explicitly retries blocked work. Do not skip a blocked
 publication to make a later cursor appear healthy.
 
-### F1 delivery-validator rehearsal only
+### F1 deterministic-answer rehearsal only
 
 F1 is not enabled by the production gateway configuration. In a disposable debug
 rehearsal, an instance configuration may additionally set `expertise_principal`
@@ -130,9 +130,13 @@ read/export permissions, the local space's `AnswerExpertise` grant and an explic
 grant for the reviewed collection. Global roles, global permissions and group
 identities are rejected. Merely naming a principal does not grant access.
 
-This optional worker validates retained-answer delivery only; it does not yet
-execute queued questions, invoke models or provide end-user F1 commands. It polls
-every two seconds and stops with the federation worker lifecycle. Each read needs
+The optional worker answers queued deterministic questions and validates retained
+answer delivery in independent loops. It never invokes models or ordinary query
+retrieval, and does not yet provide end-user F1 commands. Both loops poll every
+two seconds and stop with the federation worker lifecycle. Answer work has a
+12-second cycle limit within the gateway's 30-second lease, with renewal at ten
+seconds if still active. Failed/expired attempts remain recoverable through the
+gateway, subject to the original question deadline. Each read needs
 a fresh gateway challenge, valid for at most 15 seconds. The origin locks current
 permissions and source eligibility while checking the exact stored excerpt and
 authorizing its release. Offline origins therefore cannot authorize new delivery;
@@ -146,6 +150,17 @@ recalled, and the two databases do not form one atomic transaction. Existing
 24-hour payload expiry still applies; holds do not extend ordinary read access.
 This remains component-tested rehearsal software, not homelab activation or
 customer-release readiness.
+
+Migration 0052 adds origin-private immutable result storage. The result commits
+before gateway completion; a new transaction rechecks service authority, reviewed
+sources and exact citations before sending. Recovery may recompute deterministic
+excerpts, but cannot replace an already stored result with different bytes or
+silently substitute newer source versions. No exactly-once provider claim is
+made: this path has no provider invocation. Stored results retain 24-hour payloads
+and 30-day metadata; holds do not extend read access. The project-scoped cleanup
+helper is implemented, but automatic retention maintenance and full process-crash
+rehearsal are still pending. Requester service/UI submission wiring also remains
+unfinished; adding this option does not create consent, grants or enrollment.
 
 ## Observe and recover
 

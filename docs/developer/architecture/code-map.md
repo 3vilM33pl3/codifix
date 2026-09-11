@@ -35,9 +35,11 @@ Pure lexical/snippet helpers shared with existing local retrieval live in
 `mem-record/src/text.rs`. No gateway dependency on `mem-search` was introduced.
 Normal gateway configuration still cannot enable F1. See the
 [F1 execution status](../../reviews/federation-first/f1-execution.md) for missing
-origin execution workers, optional models and user workflows. Fresh per-read
+full service rehearsal, optional models and user workflows. Fresh per-read
 origin authorization lives in `expertise_delivery.rs`; its optional service
-validator is in `mem-service/src/federation/expertise.rs`. Requester-private exact
+validator and bounded deterministic answering loops are in
+`mem-service/src/federation/expertise.rs`. Immutable private results are in
+`mem-federation-store/src/expertise_results.rs`. Requester-private exact
 question consent and metadata receipts live in
 `mem-federation-store/src/expertise_requests.rs`; service/UI submission wiring
 remains pending.

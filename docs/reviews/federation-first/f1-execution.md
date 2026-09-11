@@ -279,3 +279,42 @@ container/PDS isolation rehearsal were not rerun for this storage-only change.
 Temporary logs are under `/tmp/memory-f1-consent.BYrd9m/`. The disposable database
 was stopped/removed after verification. A partial dev Memory checkpoint records
 `91100f7`; the approved plan remains open.
+
+### Deterministic origin execution increment — 2026-09-11
+
+Commits `a114e75` and `7ffa5ef` add private immutable result persistence (migration
+0052) and automatic deterministic answering in the disposable-only service
+worker. Answer and delivery loops are independent but owned by one cancellable
+task. Each stage is bounded to 12 seconds, polls every two seconds and renews an
+active answer lease at ten seconds. No model, ordinary query prompt, external
+retriever, reinforcement writeback or detached task is introduced.
+
+Current project service authority and eligible source rows are locked during
+generation. A result and its digests commit locally before gateway completion;
+a new transaction rechecks authority, source eligibility and exact citations
+before transfer. Recovered deterministic work may recompute the same excerpt,
+but cannot overwrite the committed answer with different bytes. Gateway lease
+fencing and the previously implemented fresh per-read delivery check remain
+authoritative. Local persistence is not proof of gateway acceptance; a failed
+HTTP acknowledgement does not roll back a previously committed local result.
+
+The store tests cover rollback, duplicate recovery, changed-result and project
+rejection, expired leases, held payload expiry and cleanup. The gateway runtime
+SQL role cannot access the new result table. The two-origin signed-HTTP component
+test now commits local results and invokes the new guarded completion path in
+both directions. All ten federation service tests pass, including lifecycle and
+permission regressions. These tests do **not** establish the full automatically
+scheduled two-service/PDS workflow or every process-crash window. Automatic
+retention maintenance, requester HTTP/UI submission wiring and exact operational
+failure presentation still require integration. Optional models and all end-user
+F1 workflows remain unfinished. The approved plan is not complete.
+
+All 830 tests across 50 test binaries pass, with zero failures or ignored tests.
+Required-database workspace tests run serially with `--all-targets --locked`
+and `MEMORY_LAYER_TEST_REQUIRE_DB=1`; workspace Clippy (`-D warnings`), formatting
+and boundary checks pass. Temporary logs are in
+`/tmp/memory-f1-answer.BqxJVy/`. Web, Lean, lean CLI and the container-network/PDS
+isolation harness were not rerun for this increment. The disposable database was
+stopped/removed after verification; no existing service or credentials changed.
+The Memory skill saved a partial checkpoint at `7ffa5ef` without marking the plan
+complete.
