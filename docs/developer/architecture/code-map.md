@@ -41,8 +41,9 @@ validator and bounded deterministic answering loops are in
 `mem-service/src/federation/expertise.rs`. Immutable private results are in
 `mem-federation-store/src/expertise_results.rs`. Requester-private exact
 question consent and metadata receipts live in
-`mem-federation-store/src/expertise_requests.rs`; service/UI submission wiring
-remains pending.
+`mem-federation-store/src/expertise_requests.rs`; opt-in browser prepare/submit
+handlers are in `mem-service/src/federation/workflow/requester.rs`. Result reads,
+capability/collection HTTP browsing and Web/CLI/TUI/MCP workflows remain pending.
 
 ## Frontends
 

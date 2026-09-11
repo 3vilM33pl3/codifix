@@ -12,6 +12,14 @@ This task delivers **software and a disposable rehearsal**, not activation on ex
 
 ## 1. Approved collections and capability discovery
 
+**Current focus (2026-09-11):** delivery slice 4 is component-implemented for
+deterministic answering and recovery; work has entered Section 3's public
+interfaces. Browser-session HTTP preparation/submission is implemented and
+tested. Capability browsing, result reads, collection management interfaces and
+Web/CLI/TUI/MCP workflows remain pending, followed by the full disposable
+automatic-worker rehearsal. Open checkboxes are end-to-end completion gates;
+the dated evidence below records individual implementation increments.
+
 - [x] Add transport-neutral expertise contracts in `mem-federation`: capability advertisements, immutable collection revisions, question envelopes, answer envelopes, citations and sanitized outcomes. Runtime, SQL and ATProto types remain outside the neutral core.
 - [ ] A capability advertises its owner, reviewed name/description/topics, supported answer modes, collection revision/digest and input/output limits. It contains no endpoint, credentials, source contents or local paths.
 - [ ] Collection preparation selects exact curated memory versions and explicitly selected evidence. Review displays every potentially disclosed field and its digest before activation.
@@ -318,3 +326,38 @@ isolation harness were not rerun for this increment. The disposable database was
 stopped/removed after verification; no existing service or credentials changed.
 The Memory skill saved a partial checkpoint at `7ffa5ef` without marking the plan
 complete.
+
+### Browser requester HTTP increment — 2026-09-11
+
+Commit `0e3edae` adds project-and-space-scoped `questions/prepare` and
+`questions/submit` routes connecting authenticated browser review to the private
+gateway. Opt-in `expertise_browser: true` is accepted only for disposable debug
+configuration; it does not enable the production gateway or create grants. This
+path is deterministic and `local_human` only: service tokens, legacy API tokens
+and MCP callers are denied until operator-bound destination policies exist.
+
+Preparation uses verified retained advertisements and returns all exact question
+fields and a digest without transmission. Submission binds the current session
+principal and configured project/instance, commits consent, opens a fresh
+transaction, rechecks session/project authority and local AskExpertise permission,
+then transmits. The gateway rechecks current membership/revision. Network failure
+cannot undo local consent; retries preserve the review and request ID. Responses
+are metadata-only and no-store. Central route policies, CSRF, body limits and
+sanitized errors apply; OpenAPI inventory is updated.
+
+The HTTP test's separate gateway connection observes the exact committed consent
+and receipt before submission handling. Tests cover preparation without sending,
+duplicates, forged identity, altered review, destination tampering, cross-project
+access even with both project grants, read-only mode, CSRF, token-caller rejection,
+membership removal and session revocation. This synthetic gateway fixture is not
+the final two-instance automatic-worker rehearsal. No frontend, CLI/TUI/MCP tool
+or result-read endpoint is claimed complete.
+
+Verification: 831 tests across 50 binaries pass with zero failures/ignored tests
+in the required-database serial workspace run (`--all-targets --locked`,
+`MEMORY_LAYER_TEST_REQUIRE_DB=1`). Workspace Clippy (`-D warnings`), formatting,
+boundary checks and OpenAPI inventory pass. Web/Lean/lean-CLI and the full
+container/PDS isolation rehearsal were not rerun for this increment. Temporary
+logs are at `/tmp/memory-f1-requester.JiEjn1/`. The disposable database was removed
+after verification; existing services and credentials were untouched. The Memory
+skill saved a partial checkpoint at `0e3edae` without completing the plan.

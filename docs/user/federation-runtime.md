@@ -159,8 +159,33 @@ silently substitute newer source versions. No exactly-once provider claim is
 made: this path has no provider invocation. Stored results retain 24-hour payloads
 and 30-day metadata; holds do not extend read access. The project-scoped cleanup
 helper is implemented, but automatic retention maintenance and full process-crash
-rehearsal are still pending. Requester service/UI submission wiring also remains
-unfinished; adding this option does not create consent, grants or enrollment.
+rehearsal are still pending. Adding this option does not create consent, grants
+or enrollment.
+
+### Rehearsal browser question preparation/submission
+
+`expertise_browser: true` separately enables the two project/space HTTP operations
+`questions/prepare` and `questions/submit`, only with debug disposable mode. The
+production gateway remains disabled for F1. A current browser session, CSRF and
+Origin headers, project read/export permission and explicit local `AskExpertise`
+grant are required. Bearer tokens, CLI/MCP callers and non-`local_human`
+destinations are rejected; their destination-policy integration remains pending.
+
+Prepare accepts `request_id`, `capability` (`publisher` and `id` UUIDs), and the
+question (at most 4 KiB UTF-8). Synchronize first so the capability is in verified
+retained history. It returns the exact `QuestionReview`, including authenticated
+identity, instance, revision, digest, destination and 120-second expiry. Inspect
+all fields before confirming. Preparation itself neither persists consent nor
+sends the question. Submit accepts `{ "review": <exact returned review>,
+"confirmed_digest": <review.digest> }`; consent commits before network I/O and
+current authority is checked again. Network failure may leave consent committed:
+retry that same review/ID before expiry, never silently replace it with a new
+question. Stale reviews require deliberate preparation and review again.
+
+Submission returns gateway status metadata only, not an answer or proof of
+completed execution. Result reads, capability/collection HTTP browsing and the
+Web/CLI/TUI/MCP user workflows remain unfinished. See the experimental
+[OpenAPI contract](../../docs/api/openapi.yaml) for paths and request shapes.
 
 ## Observe and recover
 
