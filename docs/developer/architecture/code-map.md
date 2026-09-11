@@ -43,8 +43,10 @@ validator and bounded deterministic answering loops are in
 question consent and metadata receipts live in
 `mem-federation-store/src/expertise_requests.rs`; opt-in browser prepare/submit
 handlers, capability browsing and original-requester result reads are in
-`mem-service/src/federation/workflow/requester.rs`. Collection management HTTP
-and Web/CLI/TUI/MCP workflows remain pending.
+`mem-service/src/federation/workflow/requester.rs`. Browser collection draft,
+activation and withdrawal handlers are in `workflow/collections.rs`; the preview
+uses a caller-owned transaction to retain current authentication locks.
+Collection listing/detail and Web/CLI/TUI/MCP workflows remain pending.
 
 ## Frontends
 

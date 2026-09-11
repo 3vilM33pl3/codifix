@@ -197,9 +197,39 @@ question. Each answer read requires fresh origin approval and current local and
 gateway authorization; an unavailable origin cannot release a cached answer.
 Reads can wait for that approval, and all responses are no-store.
 
-Collection management HTTP and the Web/CLI/TUI/MCP user workflows remain
-unfinished. See the experimental
+The Web/CLI/TUI/MCP user workflows remain unfinished. See the experimental
 [OpenAPI contract](../../docs/api/openapi.yaml) for paths and request shapes.
+
+### Rehearsal collection review and withdrawal
+
+The same disposable browser opt-in exposes `POST collections/draft`,
+`POST collections/activate` and `POST collections/withdraw`. These require
+current project read, curate and export permissions, browser CSRF protection and
+an explicit local space grant. Activation additionally requires local and observed
+gateway `Publish` and `AnswerExpertise` capabilities; withdrawal requires `Publish`.
+They do not enroll instances or create the answering service identity's separate
+collection grant. Model mode is unavailable through this path.
+
+Draft accepts a `CollectionBlueprint`: collection UUID, reviewed name, description
+and topics, explicit requesting instance IDs, `modes: ["deterministic"]`, empty
+`model_destinations`, `output_destinations: ["local_human"]` and selected canonical
+IDs with explicitly selected evidence. The returned draft displays the exact
+current memory versions, evidence, authorship, disclosure policy and digest.
+Inspect every field: preparing it creates neither standing consent nor publication.
+
+Activate accepts `{ "draft": <exact returned draft>, "confirmed_digest":
+<draft.review_digest> }`. Changed source versions or altered review bytes fail.
+Consent, its audit and the advertisement outbox intent commit together. A `202`
+with `submission: "queued"` is local acceptance only, not gateway acceptance or
+PDS publication. Retry the exact request after an ambiguous response; do not
+silently generate a new review. Only advertisement metadata enters the outbox;
+the collection snapshot stays in the origin database.
+
+Withdraw accepts `request_id`, `collection`, `expected_revision` and
+`confirmed: true`. It disables local standing consent while atomically queuing
+the withdrawal advertisement. Exact retries retain the same intent. It cannot
+recall already delivered or already authorized in-flight bytes. All responses
+are no-store. Collection listing/detail and service-grant UI remain pending.
 
 ## Observe and recover
 

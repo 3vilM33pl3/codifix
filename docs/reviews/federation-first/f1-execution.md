@@ -16,7 +16,7 @@ This task delivers **software and a disposable rehearsal**, not activation on ex
 deterministic answering and recovery; work has entered Section 3's public
 interfaces. Browser-session HTTP preparation/submission, capability browsing and
 original-requester result reads are implemented and tested at component level.
-Collection management interfaces and
+Collection draft/activate/withdraw HTTP is also implemented; collection browsing and
 Web/CLI/TUI/MCP workflows remain pending, followed by the full disposable
 automatic-worker rehearsal. Open checkboxes are end-to-end completion gates;
 the dated evidence below records individual implementation increments.
@@ -395,3 +395,39 @@ formatting, boundary checks and OpenAPI inventory. Logs are at
 `/tmp/memory-f1-reads.Od2eC0/`. Web, Lean, lean CLI and full container/PDS isolation
 rehearsals were not rerun in this increment. The disposable database was removed;
 existing services, project data and credentials were untouched.
+
+### Browser collection lifecycle increment — 2026-09-11
+
+Commit `1eaf800` connects existing collection storage to project/space-scoped
+browser draft, activate and withdraw routes. Drafting uses a caller-owned
+transaction so current authentication locks cover source inspection. It neither
+saves standing consent nor transmits a record. Activation requires the exact
+review digest, authenticated reviewer, unchanged source versions and explicit
+local/observed gateway Publish and AnswerExpertise capabilities. Snapshot,
+sanitized audit and advertisement intent commit together. Withdrawal disables
+local consent and queues the inactive advertisement atomically. Exact retries
+reuse the stored intent; queued is not accepted/published/replicated.
+
+The disposable browser path permits deterministic `local_human` collections only;
+it rejects model destinations and token/MCP callers. It does not create enrollment
+or answering-service collection grants. Current read/curate/export permissions,
+CSRF, read-only enforcement, bounded bodies and no-store responses apply. The
+OpenAPI and operator documentation describe the experimental contracts.
+
+The HTTP fixture covers preview without persistence, exact retry, altered review,
+source freshness, metadata-only publication, CSRF, token/destination denial,
+read-only mode and revoked local grants. This is not the full two-origin
+automatic-worker rehearsal or a completed frontend workflow. Collection browsing,
+Web/CLI/TUI/MCP, optional models and remaining rehearsal gates are still open.
+
+Verification: 832 tests across 50 binaries pass with required disposable
+PostgreSQL, serial workspace execution and `--all-targets --locked`; zero tests
+failed or were ignored. Two initial existing CLI fixture tests inherited the
+operator client-token environment variable; the passing run unsets that variable
+only in the test process. The initial assertion log was redacted. Workspace
+Clippy (`-D warnings`), formatting, boundaries and OpenAPI inventory pass.
+Logs are `/tmp/f1-collections-workspace-clean.log` and
+`/tmp/f1-collections-{clippy-final,openapi,boundaries}.log`. Web, Lean, lean CLI and
+the full container/PDS isolation rehearsal were not rerun. The disposable
+database was removed, with existing services and credentials unchanged. A partial
+Memory checkpoint records `1eaf800`; the approved plan remains incomplete.
