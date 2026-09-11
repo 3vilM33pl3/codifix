@@ -12,96 +12,91 @@ This task delivers **software and a disposable rehearsal**, not activation on ex
 
 ## 1. Approved collections and capability discovery
 
-**Current focus (2026-09-11):** delivery slice 4 is component-implemented for
-deterministic answering and recovery; work has entered Section 3's public
-interfaces. Browser-session HTTP preparation/submission, capability browsing and
-original-requester result reads are implemented and tested at component level.
-Collection draft/activate/withdraw and local browsing/detail HTTP are implemented;
-The Web requester panel has component-tested discovery, confirmation and result reads;
-Web collection management and service-grant controls also have component coverage
-and a real-browser HTTP/SQL rehearsal through confirmed queued questions;
-CLI/TUI/MCP remain pending, followed by the full disposable
-automatic-worker rehearsal. Open checkboxes are end-to-end completion gates;
-the dated evidence below records individual implementation increments.
+**Completion status (2026-09-11):** all scoped F1 software and disposable-rehearsal
+gates pass. Web/CLI/TUI/MCP, bidirectional cited answers, recovery, explicit game
+enrollment/collection consent, optional fake-provider synthesis, real PDS and TLS
+isolation are verified. The final coverage map and local test evidence below
+supersede the earlier incremental status notes. Existing homelab services were
+not activated; paid calls, customer readiness, R3 and F2 remain outside F1.
 
 - [x] Add transport-neutral expertise contracts in `mem-federation`: capability advertisements, immutable collection revisions, question envelopes, answer envelopes, citations and sanitized outcomes. Runtime, SQL and ATProto types remain outside the neutral core.
-- [ ] A capability advertises its owner, reviewed name/description/topics, supported answer modes, collection revision/digest and input/output limits. It contains no endpoint, credentials, source contents or local paths.
-- [ ] Collection preparation selects exact curated memory versions and explicitly selected evidence. Review displays every potentially disclosed field and its digest before activation.
-- [ ] Activation grants standing permission to answer eligible requests from that frozen collection. Collection contents remain on the answering instance; discovery does not replicate them.
-- [ ] New source versions require renewed review. Changed, tombstoned, withdrawn or unauthorized entries become ineligible immediately; never silently substitute newer content.
-- [ ] Each collection explicitly allows requesting instance identities and model/output destinations. Joining the space alone does not grant access. Adding the game requires enrollment and deliberate collection access grants.
-- [ ] Publish capability activation, revision and withdrawal through the existing ordered publication outbox and ATProto adapter. Reuse existing source-version, evidence-review and authenticated-attribution conventions.
+- [x] A capability advertises its owner, reviewed name/description/topics, supported answer modes, collection revision/digest and input/output limits. It contains no endpoint, credentials, source contents or local paths.
+- [x] Collection preparation selects exact curated memory versions and explicitly selected evidence. Review displays every potentially disclosed field and its digest before activation.
+- [x] Activation grants standing permission to answer eligible requests from that frozen collection. Collection contents remain on the answering instance; discovery does not replicate them.
+- [x] New source versions require renewed review. Changed, tombstoned, withdrawn or unauthorized entries become ineligible immediately; never silently substitute newer content.
+- [x] Each collection explicitly allows requesting instance identities and model/output destinations. Joining the space alone does not grant access. Adding the game requires enrollment and deliberate collection access grants.
+- [x] Publish capability activation, revision and withdrawal through the existing ordered publication outbox and ATProto adapter. Reuse existing source-version, evidence-review and authenticated-attribution conventions.
 
-- [ ] Compatibility: introduce an explicit schema-v3 extension for expertise advertisements and independent `AskExpertise` / `AnswerExpertise` capabilities. Preserve schema-v2 decoding, canonical bytes and history unchanged. Reject new semantics in old versions. Require compatible participants before enabling F1 in a space; no silent mixed-version downgrade. Keep Lexicons unpublished and retain current upstream pins.
+- [x] Compatibility: introduce an explicit schema-v3 extension for expertise advertisements and independent `AskExpertise` / `AnswerExpertise` capabilities. Preserve schema-v2 decoding, canonical bytes and history unchanged. Reject new semantics in old versions. Require compatible participants before enabling F1 in a space; no silent mixed-version downgrade. Keep Lexicons unpublished and retain current upstream pins.
 
 ## 2. Private question/answer transport and execution
 
 ### Gateway-mediated delivery
 
-- [ ] Use a **bounded request/reply mailbox** in the gateway’s PostgreSQL database. Participants contact only their configured gateway and poll for addressed requests; no peer URLs, inbound responder ports or direct database access are introduced.
-- [ ] Questions and answers are addressed to one requester and one responder. They never enter the PDS, shared publication log, general project timeline or retrieval corpus.
-- [ ] The requester records its authenticated principal, exact question, selected capability revision, answer mode and permitted onward destination before transmission. Do not attach conversation history, files or local search results.
-- [ ] Gateway authorization requires current memberships, explicit expertise capabilities and the advertised recipient policy.
-- [ ] The responder uses a dedicated locally configured service identity with exact-project permissions and an explicit collection grant. It does not inherit the requester’s local identity.
-- [ ] Recheck authority, collection eligibility and disclosure policy before model invocation, result acceptance and delivery. Revocation blocks future transfers; already transmitted bytes cannot be recalled.
-- [ ] Bind signed gateway responses to request ID/digest, requester, responder, capability/collection revision, policy revision and expiry. Reuse enrolled receipt-key trust with distinct signature purposes. Gateway attestation establishes attribution and integrity, not answer truth.
+- [x] Use a **bounded request/reply mailbox** in the gateway’s PostgreSQL database. Participants contact only their configured gateway and poll for addressed requests; no peer URLs, inbound responder ports or direct database access are introduced.
+- [x] Questions and answers are addressed to one requester and one responder. They never enter the PDS, shared publication log, general project timeline or retrieval corpus.
+- [x] The requester records its authenticated principal, exact question, selected capability revision, answer mode and permitted onward destination before transmission. Do not attach conversation history, files or local search results.
+- [x] Gateway authorization requires current memberships, explicit expertise capabilities and the advertised recipient policy.
+- [x] The responder uses a dedicated locally configured service identity with exact-project permissions and an explicit collection grant. It does not inherit the requester’s local identity.
+- [x] Recheck authority, collection eligibility and disclosure policy before model invocation, result acceptance and delivery. Revocation blocks future transfers; already transmitted bytes cannot be recalled.
+- [x] Bind signed gateway responses to request ID/digest, requester, responder, capability/collection revision, policy revision and expiry. Reuse enrolled receipt-key trust with distinct signature purposes. Gateway attestation establishes attribution and integrity, not answer truth.
 
 ### Recoverability without F2 expansion
 
-- [ ] Add append-only migrations after the current migration head. Persist request identities, payload digests, delivery state, execution leases and metadata-only attempt history.
-- [ ] Expose `queued`, `running`, `answered`, `refused`, `denied`, `expired`, `failed` and `uncertain`.
-- [ ] Exact retries reuse the original request ID; changed payloads under that ID fail.
-- [ ] Claims and result writes use lease tokens and compare-and-swap fencing. Duplicate delivery cannot start concurrent executions or overwrite a completed answer.
-- [ ] A provider call with an ambiguous outcome becomes `uncertain`; do not automatically invoke it again. Explicitly starting another question warns about possible repeat billing.
-- [ ] Reuse persisted completed results while retained. Expired requests cannot be restarted through replay.
-- [ ] Shutdown and restart preserve recoverable delivery state. This mailbox supports bounded Q&A only—not delegated tasks, tools, recursive calls, approval workflows or F2 work orchestration.
-- [ ] Defaults: two-second polling; 120-second question deadline; 30-second execution leases renewed every ten seconds; one active answer per responder; at most 32 outstanding requests per requester. Reject excess work with actionable status.
-- [ ] Retain private question/answer payloads for 24 hours and metadata/idempotency receipts for 30 days. Enforce expiry during reads, not just cleanup. Respect active holds; do not claim deletion from backups or recipients’ copies.
+- [x] Add append-only migrations after the current migration head. Persist request identities, payload digests, delivery state, execution leases and metadata-only attempt history.
+- [x] Expose `queued`, `running`, `answered`, `refused`, `denied`, `expired`, `failed` and `uncertain`.
+- [x] Exact retries reuse the original request ID; changed payloads under that ID fail.
+- [x] Claims and result writes use lease tokens and compare-and-swap fencing. Duplicate delivery cannot start concurrent executions or overwrite a completed answer.
+- [x] A provider call with an ambiguous outcome becomes `uncertain`; do not automatically invoke it again. Explicitly starting another question warns about possible repeat billing.
+- [x] Reuse persisted completed results while retained. Expired requests cannot be restarted through replay.
+- [x] Shutdown and restart preserve recoverable delivery state. This mailbox supports bounded Q&A only—not delegated tasks, tools, recursive calls, approval workflows or F2 work orchestration.
+- [x] Defaults: two-second polling; 120-second question deadline; 30-second execution leases renewed every ten seconds; one active answer per responder; at most 32 outstanding requests per requester. Reject excess work with actionable status.
+- [x] Retain private question/answer payloads for 24 hours and metadata/idempotency receipts for 30 days. Enforce expiry during reads, not just cleanup. Respect active holds; do not claim deletion from backups or recipients’ copies.
 
 ## 3. Restricted retrieval, models and user interfaces
 
 ### Answer generation
 
-- [ ] Search only eligible rows in the approved collection, applying collection/project restrictions **before ranking and limits**. Use existing lexical matching and deterministic citation helpers; do not introduce retrieval tuning, embeddings or reinforcement writeback.
-- [ ] Default to deterministic excerpts with citations and an explicit insufficient-evidence outcome. Maximum input question: 4 KiB; selected context: 32 KiB; eight citations; complete response: 64 KiB.
-- [ ] Include original author, authenticated answering instance, exact source version, collection revision, reviewed evidence labels and content digests. Do not invent AT-URIs for evidence that was never published.
-- [ ] Support optional synthesis through the existing configured model client, using a restricted execution path: tool-free, structured output, bounded responses and metadata-only auditing. Never reuse the ordinary query prompt builder, which includes local source paths.
-- [ ] Validate citations against the supplied evidence. Invalid citations, malformed answers or unavailable models produce explicit failures; no silent provider substitution.
-- [ ] Model execution requires the intersection of current gateway policy, collection consent, requester consent and responder configuration. Advertisements contain provider IDs, never URLs.
-- [ ] Model mode stays disabled until the operator configures allowed destinations and positive call/token budgets. Default enabled-mode limits are one invocation per question, 800 output tokens and 20 invocations per responder per day. Reserve limits transactionally and retain uncertain usage.
+- [x] Search only eligible rows in the approved collection, applying collection/project restrictions **before ranking and limits**. Use existing lexical matching and deterministic citation helpers; do not introduce retrieval tuning, embeddings or reinforcement writeback.
+- [x] Default to deterministic excerpts with citations and an explicit insufficient-evidence outcome. Maximum input question: 4 KiB; selected context: 32 KiB; eight citations; complete response: 64 KiB.
+- [x] Include original author, authenticated answering instance, exact source version, collection revision, reviewed evidence labels and content digests. Do not invent AT-URIs for evidence that was never published.
+- [x] Support optional synthesis through the existing configured model client, using a restricted execution path: tool-free, structured output, bounded responses and metadata-only auditing. Never reuse the ordinary query prompt builder, which includes local source paths.
+- [x] Validate citations against the supplied evidence. Invalid citations, malformed answers or unavailable models produce explicit failures; no silent provider substitution.
+- [x] Model execution requires the intersection of current gateway policy, collection consent, requester consent and responder configuration. Advertisements contain provider IDs, never URLs.
+- [x] Model mode stays disabled until the operator configures allowed destinations and positive call/token budgets. Default enabled-mode limits are one invocation per question, 800 output tokens and 20 invocations per responder per day. Reserve limits transactionally and retain uncertain usage.
 
 ### Public interfaces
 
-- [ ] Add shared client contracts for collection review/activation, capability discovery, question submission and question status/result.
-- [ ] Under the existing project-and-space federation API, add collection draft, review/activate and withdraw operations; bounded capability listing/detail; question preparation/submission and request-ID status/result reads.
-- [ ] Extend `memory federation` with `collections`, `capabilities`, `ask` and `answer` operations. Add equivalent Web and focused TUI workflows showing the exact destination, question, model mode and disclosure policy before confirmation.
-- [ ] Add dedicated local MCP discovery, prepare, ask and result tools. Submission is an externally consequential operation, not an automatically approved read-only lookup.
-- [ ] For MCP, require an operator-bound caller/output-destination policy: a cloud assistant receiving an answer is onward model disclosure. Unknown destinations fail closed; callers cannot self-authorize by naming an approved provider. Ordinary `memory_query` remains unchanged.
-- [ ] Central authorization, project scoping, CSRF protection and read-only restrictions apply consistently. Operational listings omit question bodies, evidence, prompts, outputs and provider error bodies.
+- [x] Add shared client contracts for collection review/activation, capability discovery, question submission and question status/result.
+- [x] Under the existing project-and-space federation API, add collection draft, review/activate and withdraw operations; bounded capability listing/detail; question preparation/submission and request-ID status/result reads.
+- [x] Extend `memory federation` with `collections`, `capabilities`, `ask` and `answer` operations. Add equivalent Web and focused TUI workflows showing the exact destination, question, model mode and disclosure policy before confirmation.
+- [x] Add dedicated local MCP discovery, prepare, ask and result tools. Submission is an externally consequential operation, not an automatically approved read-only lookup.
+- [x] For MCP, require an operator-bound caller/output-destination policy: a cloud assistant receiving an answer is onward model disclosure. Unknown destinations fail closed; callers cannot self-authorize by naming an approved provider. Ordinary `memory_query` remains unchanged.
+- [x] Central authorization, project scoping, CSRF protection and read-only restrictions apply consistently. Operational listings omit question bodies, evidence, prompts, outputs and provider error bodies.
 
 ## 4. Verification and delivery
 
 Implement in small committed slices:
 
 - [x] Checkpoint this approved internal-use contract and update F1’s conditional roadmap status.
-- [ ] Add neutral contracts, schema compatibility, advertisements and Rust/Lean conformance.
-- [ ] Add collection review, immutable snapshots and authorization.
-- [ ] Add gateway mailbox, restricted answering and recovery.
-- [ ] Add Web/CLI/TUI/MCP workflows and operator documentation.
-- [ ] Run the complete disposable rehearsal and record evidence.
+- [x] Add neutral contracts, schema compatibility, advertisements and Rust/Lean conformance.
+- [x] Add collection review, immutable snapshots and authorization.
+- [x] Add gateway mailbox, restricted answering and recovery.
+- [x] Add Web/CLI/TUI/MCP workflows and operator documentation.
+- [x] Run the complete disposable rehearsal and record evidence.
 
 Required tests:
 
-- [ ] Homelab discovers Memory expertise and obtains a cited answer; repeat in the opposite direction.
-- [ ] Unselected memories, raw captures, sessions, paths and another project’s data never enter responses or model inputs.
-- [ ] Source updates, tombstones, collection withdrawal and permission revocation invalidate pending disclosure appropriately.
-- [ ] Forged attribution, stale advertisements, replayed receipts, altered retries and invalid citations fail closed.
-- [ ] Competing workers, restarts, gateway disconnection, expired leases and uncertain provider calls preserve correct state.
-- [ ] A third synthetic game instance cannot ask until explicitly enrolled and allowed; afterward it works without code changes.
-- [ ] Unauthorized participants cannot read question payloads or results through mailbox, publication, export or operational interfaces.
-- [ ] Fake models verify permitted egress, prompt-injection containment, usage limits and sanitized auditing.
-- [ ] Extend shared Rust/Lean traces for modeled ownership, revisions, permission checks and replay properties; do not describe these as proofs of deployed authentication or model behavior.
-- [ ] Run required-database workspace tests, existing federation/PDS/isolation regressions, Rust formatting and Clippy, boundary checks, Lean build/tests, Web tests/build, the lean CLI build, and real browser/CLI/PTY/MCP rehearsal workflows.
+- [x] Homelab discovers Memory expertise and obtains a cited answer; repeat in the opposite direction.
+- [x] Unselected memories, raw captures, sessions, paths and another project’s data never enter responses or model inputs.
+- [x] Source updates, tombstones, collection withdrawal and permission revocation invalidate pending disclosure appropriately.
+- [x] Forged attribution, stale advertisements, replayed receipts, altered retries and invalid citations fail closed.
+- [x] Competing workers, restarts, gateway disconnection, expired leases and uncertain provider calls preserve correct state.
+- [x] A third synthetic game instance cannot ask until explicitly enrolled and allowed; afterward it works without code changes.
+- [x] Unauthorized participants cannot read question payloads or results through mailbox, publication, export or operational interfaces.
+- [x] Fake models verify permitted egress, prompt-injection containment, usage limits and sanitized auditing.
+- [x] Extend shared Rust/Lean traces for modeled ownership, revisions, permission checks and replay properties; do not describe these as proofs of deployed authentication or model behavior.
+- [x] Run required-database workspace tests, existing federation/PDS/isolation regressions, Rust formatting and Clippy, boundary checks, Lean build/tests, Web tests/build, the lean CLI build, and real browser/CLI/PTY/MCP rehearsal workflows.
 
 Use synthetic data, temporary credentials and fake providers only. Keep existing services, project data, DNS, secrets and unrelated working-tree changes untouched.
 
@@ -659,3 +654,93 @@ discovery/questions/results, operator-bound token/MCP output policy, optional
 models and the full independent-instance rehearsal remain open. No new database,
 browser, live-PDS or real PTY rehearsal is claimed for this CLI-only increment.
 Existing services, project data and credentials remain untouched. F1 is incomplete.
+
+### Final integration and verification — 2026-09-11
+
+The increments above are historical snapshots, not the final feature status.
+The implementation now includes operator-bound CLI/TUI/MCP callers, complete
+collection and question workflows, output/model consent, restricted synthesis,
+retention maintenance and default-off TLS gateway enablement. New capability
+detail uses the same current policy checks as paginated discovery. The gateway
+requires a complete compatible v3 fleet; ordinary configuration remains disabled.
+No deployment, credentials, DNS or real project data were changed.
+
+#### Coverage map
+
+| Contract | Executable evidence |
+| --- | --- |
+| Neutral v3 semantics, unchanged v2 history, ownership/revision/withdrawal | `mem-federation` and `mem-atproto` tests; shared Rust/Lean expertise trace; real-PDS v2/v3 signed-CAR verifier |
+| Frozen review, selected evidence, source changes, tombstones, explicit service identity | `mem-federation-store/tests/expertise_collections.rs`, `expertise_requests.rs`, service collection HTTP tests |
+| Addressed mailbox, exact retries, limits, leases, competing claims, uncertain execution, TTL/holds | `mem-federation-store/tests/expertise_mailbox.rs`, `expertise_requests.rs` |
+| Signed binding, replay/purpose/audience rejection, fresh origin permission before release | `mem-federation-runtime/tests/expertise_transport.rs`, receipt tests, mailbox delivery tests |
+| No cross-project/raw/PDS disclosure | `expertise_privileges.rs`, separate-database F1 fixture, PDS payload-sentinel assertions, two-space TLS/container isolation |
+| Web/CLI/TUI/MCP explicit consent and bound onward policy | service requester tests, Web component tests, `web/tests/f1-clients-live.mjs`, `f1-terminal.py`, MCP tool tests |
+| Two-way answers, answerer restart, game enrollment then separate consent, withdrawal | `mem-service/src/federation/workflow/tests/f1_instances.rs` |
+| Optional models, conservative transactional budgets, invalid citations, tool rejection, uncertain calls and sanitized errors | same F1 fixture with a loopback fake provider, `expertise/model.rs` tests, store model-budget tests |
+
+The F1 fixture creates four independent databases with distinct non-superuser
+runtime roles. Real HTTP service applications and their automatic workers run in
+one test process; the accompanying Stage E gate also starts separate service
+executables. This is not a claim of independent physical hosts or a homelab
+deployment. Real browser API traffic is not intercepted; the CLI, private tmux
+PTY and MCP stdio bridge call those services. Agent-browser was unavailable;
+the repository's Playwright Chromium runner was used instead. Desktop/mobile
+screenshots were inspected and the narrow viewport had no horizontal overflow.
+
+The same full client/F1 test passed with publication through the actual pinned
+PDS. Its independent upstream verifier checks both preserved v2 records and v3
+advertisements, signed CAR validity, wrong-key rejection and absence of private
+question/answer/evidence sentinels. The existing PDS fixture verifier initially
+assumed all records were v2; updating this test assertion was necessary for the
+explicit v3 extension. No upstream dependency or security bypass was introduced.
+
+The TLS isolation gate now enables F1 using the normal, default-off configuration,
+without cleartext fixture mode. It positively checks signed expertise discovery
+and negatively checks wrong tokens and cross-space access in addition to fixed
+edge routes, restricted SQL, PDS network isolation and private mounts. The cold
+PDS restore regression separately passes authenticated archive verification,
+wrong-key/corruption rejection, restore of account/token/key/record/blob state and
+a newly signed publication after restore. This remains synthetic prerequisite
+evidence, not customer offsite/PITR or federation disaster recovery.
+
+Local verification logs (temporary diagnostics, not required runtime artifacts):
+
+- `/tmp/f1-finish-workspace.log`: **848 passing tests across 50 result sections**,
+  required PostgreSQL, serial execution, zero failures. External opt-in tests can
+  return early here; separate gates below provide their actual evidence.
+- `/tmp/f1-pds-final4.log`: complete pinned-PDS C/E/F1 runtime and real-client gate,
+  including the independent upstream v2/v3 verification.
+- `/tmp/f1-isolation-enabled.log`: both private TLS spaces and restricted gateway
+  roles pass, including explicitly enabled expertise discovery and denials.
+- `/tmp/f1-backup-unit.log`, `/tmp/f1-cold-restore.log`: encrypted backup unit
+  tests and complete fresh-volume PDS recovery pass.
+- `/tmp/f1-finish-web.log`, `/tmp/f1-finish-web-build.log`: **90 tests / 24 files**
+  and production build pass. The existing large GraphTab bundle warning remains.
+- `/tmp/f1-final-lean.log`: Lean build and all **15 shared conformance traces**
+  pass. Existing proof-linter warnings remain. The proofs concern the modeled
+  reducer, not deployed authentication, cryptography or model behavior.
+- `/tmp/f1-final-boundaries.log`: boundaries pass; formatting and whitespace
+  checks pass as well.
+- `/tmp/f1-final-clippy.log`: final workspace/all-target Clippy passes with
+  warnings denied. `/tmp/f1-final-lean-cli.log`: the no-default-features CLI with
+  `tui` builds successfully; no installed service was restarted.
+- `/tmp/f1-final-hostile-clients2.log`, `/tmp/f1-final-model-unit.log`: the final
+  real-client/fake-provider rehearsal and model parser/budget tests pass after
+  disabling environment proxies. The unsupported hostile question is refused
+  without a provider call; model-supplied tool/function calls and malformed JSON
+  fail closed. An initial test incorrectly expected an answer to that unsupported
+  question; the corrected assertion tests refusal without changing retrieval.
+
+The CI definitions run the same explicit PDS/client and isolation gates; these
+are local results, not a claim that a remote CI run has completed. Optional model
+tests use only a fake provider, never paid calls. Successful fake calls reserve
+usage conservatively; unknown charges are not silently refunded. Hostile requests
+do not gain tools or access to other context, and structured citation validation
+does not establish factual truth or general immunity to prompt injection.
+
+Operator instructions are in [F1 internal expertise](../../user/f1-internal-expertise.md),
+[runtime configuration](../../user/federation-runtime.md) and
+[CLI/TUI operations](../../user/cli/federation.md). The React checklist informed
+explicit event-driven actions, stale-state clearing, safe text rendering and
+labelled confirmation controls. Real homelab activation, paid provider use,
+customer readiness, R3 evidence and F2 remain separate approvals/workstreams.

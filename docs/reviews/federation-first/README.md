@@ -104,7 +104,7 @@ deployment, customer SSO proof, or clearance of the remaining release gates.
 
 ## F. Conditional expansion after reliable knowledge federation
 
-- [ ] F1 Add capability discovery and policy-controlled remote questions/answers with permitted input/output contracts. Approved internal-use exception (2026-09-10): implement and rehearse with synthetic `homelab` and `memory` instances before paid pilots, with later game enrollment. See the [approved F1 contract and execution checklist](f1-execution.md). This does not approve deployment on existing services, paid calls, or customer release.
+- [x] F1 Add capability discovery and policy-controlled remote questions/answers with permitted input/output contracts. Approved internal-use exception (2026-09-10), software/rehearsal completed 2026-09-11: synthetic `homelab` and `memory` instances exchange cited answers, with deliberate game enrollment, real Web/CLI/TUI/MCP, pinned-PDS and TLS-isolation evidence. See the [approved F1 contract and execution checklist](f1-execution.md) and [operator runbook](../../user/f1-internal-expertise.md). This does not approve deployment on existing services, paid calls, customer release or R3/F2 completion.
 - [ ] F2 Subsequently add durable work request/claim/result/failure/cancellation/approval lifecycles. Keep MCP local; add A2A only for an actual integration, and regional aggregation/views only for measured scale or residency needs.
 
 F1 has the bounded internal-use exception above; F2 remains conditional. Neither
