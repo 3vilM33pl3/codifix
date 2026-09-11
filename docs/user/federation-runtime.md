@@ -162,13 +162,14 @@ helper is implemented, but automatic retention maintenance and full process-cras
 rehearsal are still pending. Adding this option does not create consent, grants
 or enrollment.
 
-### Rehearsal browser question preparation/submission
+### Rehearsal browser discovery and questions
 
-`expertise_browser: true` separately enables the two project/space HTTP operations
-`questions/prepare` and `questions/submit`, only with debug disposable mode. The
-production gateway remains disabled for F1. A current browser session, CSRF and
-Origin headers, project read/export permission and explicit local `AskExpertise`
-grant are required. Bearer tokens, CLI/MCP callers and non-`local_human`
+`expertise_browser: true` separately enables project/space capability listing,
+question preparation/submission and result reads, only with debug disposable
+mode. The production gateway remains disabled for F1. A current browser session,
+project read/export permission and explicit local `AskExpertise` grant are
+required; mutations additionally require CSRF and Origin headers. Read-only mode
+currently denies these remote operations. Bearer tokens, CLI/MCP callers and non-`local_human`
 destinations are rejected; their destination-policy integration remains pending.
 
 Prepare accepts `request_id`, `capability` (`publisher` and `id` UUIDs), and the
@@ -183,8 +184,21 @@ retry that same review/ID before expiry, never silently replace it with a new
 question. Stale reviews require deliberate preparation and review again.
 
 Submission returns gateway status metadata only, not an answer or proof of
-completed execution. Result reads, capability/collection HTTP browsing and the
-Web/CLI/TUI/MCP user workflows remain unfinished. See the experimental
+completed execution. `GET capabilities` lists permitted deterministic,
+`local_human` advertisements with a limit of 1–32. Follow `next_after` using both
+`after_publisher` and `after_record`; a filtered empty page can still have a cursor.
+
+`GET questions/{id}` returns status and, when authorized, the retained answer.
+Only the original consenting principal can read it, including when another
+principal is an administrator. The 120-second execution deadline does not remove
+a completed result: retained reads remain possible within the 24-hour payload
+window. Holds preserve storage, not access or permission to restart an expired
+question. Each answer read requires fresh origin approval and current local and
+gateway authorization; an unavailable origin cannot release a cached answer.
+Reads can wait for that approval, and all responses are no-store.
+
+Collection management HTTP and the Web/CLI/TUI/MCP user workflows remain
+unfinished. See the experimental
 [OpenAPI contract](../../docs/api/openapi.yaml) for paths and request shapes.
 
 ## Observe and recover

@@ -14,8 +14,9 @@ This task delivers **software and a disposable rehearsal**, not activation on ex
 
 **Current focus (2026-09-11):** delivery slice 4 is component-implemented for
 deterministic answering and recovery; work has entered Section 3's public
-interfaces. Browser-session HTTP preparation/submission is implemented and
-tested. Capability browsing, result reads, collection management interfaces and
+interfaces. Browser-session HTTP preparation/submission, capability browsing and
+original-requester result reads are implemented and tested at component level.
+Collection management interfaces and
 Web/CLI/TUI/MCP workflows remain pending, followed by the full disposable
 automatic-worker rehearsal. Open checkboxes are end-to-end completion gates;
 the dated evidence below records individual implementation increments.
@@ -361,3 +362,36 @@ container/PDS isolation rehearsal were not rerun for this increment. Temporary
 logs are at `/tmp/memory-f1-requester.JiEjn1/`. The disposable database was removed
 after verification; existing services and credentials were untouched. The Memory
 skill saved a partial checkpoint at `0e3edae` without completing the plan.
+
+### Browser discovery and retained result increment — 2026-09-11
+
+Commit `85892fe` adds bounded capability browsing and original-requester private
+status/result HTTP reads under the same disposable browser-only opt-in. Discovery
+uses signed gateway replies and filters for deterministic `local_human` support;
+pagination follows the underlying bounded page even when filtering removes rows.
+Retained reads require exact committed consent, current requester authority and
+unchanged advertisement consent. Runtime verification binds the entire returned
+question identity and digest. Completed answer delivery still requires fresh
+origin approval; no local cached-answer bypass was introduced.
+
+Execution expiry and retention are separate: completed results can be read after
+the execution deadline, but never after payload expiry, even under a hold.
+Submission remains deadline-bound. Session authority and consent retention are
+checked again after waiting for the origin. Another administrator cannot read the
+original requester's private result. Responses remain no-store; bearer/MCP callers
+and read-only mode remain denied by this conservative browser path.
+
+Tests cover bounded pagination, malformed cursors, token denial, queued HTTP
+status, original-principal ownership, membership/session revocation and retained
+consent expiry. The separate two-origin runtime fixture now exercises completed
+answer delivery through the new result wrapper and fresh origin approval. This
+is not a completed-answer browser/automatic-worker end-to-end rehearsal.
+Collection management HTTP, actual Web/CLI/TUI/MCP workflows, optional models and
+the full disposable rehearsal remain pending. No completion gate was checked off.
+
+Verification: required-database serial workspace tests pass (831 tests across
+50 binaries, zero failed or ignored), as do workspace Clippy (`-D warnings`),
+formatting, boundary checks and OpenAPI inventory. Logs are at
+`/tmp/memory-f1-reads.Od2eC0/`. Web, Lean, lean CLI and full container/PDS isolation
+rehearsals were not rerun in this increment. The disposable database was removed;
+existing services, project data and credentials were untouched.
