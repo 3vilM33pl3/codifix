@@ -20,6 +20,15 @@ See [Federation workflow](federation-workflow.md) for consent and offline-copy l
 
 ### Private expertise questions (disposable F1 rehearsal)
 
+Authority administrators can select **Ask expertise** or **Answer expertise** in
+**Local grants and authority enrollment → Remote capability**, then review and
+confirm enrollment or capability revocation. These actions require schema-v3
+gateway/participant compatibility; a queued action is not accepted enrollment.
+Local capabilities use the separate `ask_expertise` and `answer_expertise` names.
+Neither enrollment nor a local grant creates collection consent, credentials or
+an answering worker. **Refresh local status** includes both capabilities when
+observed in verified history, not as a live authorization guarantee.
+
 In **More → federation → Ask another instance**, choose **Discover expertise**,
 select a permitted collection, enter a question and choose **Prepare remote
 question**. Review the exact destination, collection revision, question, identity,
@@ -78,8 +87,9 @@ The UI preserves a failed/uncertain action for exact retry and reports successfu
 submission as queued, not published. Closing a review does not roll back a
 committed action. Project/identity/permission changes clear local state and abort
 pending requests; review contents are not saved in browser storage. Server-side
-permissions remain authoritative. CLI/TUI/MCP parity and a real-service browser
-rehearsal remain open.
+permissions remain authoritative. A real-browser HTTP/SQL rehearsal covers
+collection management and queued questions; CLI/TUI/MCP parity and the complete
+independent-instance answering rehearsal remain open.
 
 After inspecting a collection, administrators can enter an **Answering service
 principal UUID**, inspect its stored grant and review a grant or revocation.

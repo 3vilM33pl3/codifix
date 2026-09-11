@@ -600,3 +600,38 @@ This is partial evidence only: no completed answer, automatic-answerer recovery,
 third-instance enrollment, CLI/TUI/MCP or live-PDS claim. The required full
 workspace, Lean and independent-instance release gates remain open. Existing
 services, project data and credentials are unchanged. F1 is not complete.
+
+### Expertise enrollment integration — 2026-09-11
+
+Commit `7a1bbee` fixes the existing action outbox constructor, which previously
+assigned schema v2 to AskExpertise/AnswerExpertise membership and revocation
+records. Only expertise semantics now select v3; existing membership/revocation
+records retain v2. No stored history or migrations changed. The gateway's
+explicit compatible-fleet rehearsal gate remains unchanged; local queueing is
+not accepted enrollment, production activation or a compatibility assertion.
+
+Web authority controls now offer both expertise capabilities for reviewed
+enrollment/revocation. Local status includes their observed membership in the
+verified prefix. Neither grants collection consent nor provisions credentials,
+service identities or answering workers. The React checklist guided explicit
+event-driven confirmation and labelled controls without new automatic calls.
+
+The database regression checks all five capabilities' grant/revoke versions,
+reducer application, exact retries, changed-payload rejection and authority
+denial without extra outbox records. The requester HTTP regression checks
+observed expertise capability reporting. Two Web tests exercise explicit
+enrollment and revocation confirmation for the new options.
+
+Verification: required-database serial all-target tests for `mem-service`,
+`mem-federation-store` and `mem-federation-runtime` report 184 passes across
+15 binaries. The F1 real-browser opt-in was enabled against the rebuilt Web app;
+separate external-PDS/container gates were not enabled and may return early.
+This is not a full workspace or live-PDS result. Web passes all 88 tests across
+24 files and its production build (existing large GraphTab chunk warning).
+All-target Clippy for these three crates with warnings denied, formatting,
+boundary checks, diff checks and the included OpenAPI inventory test pass.
+Logs: `/tmp/f1-enrollment-{tests,web,web-build,clippy,boundaries}.log`.
+
+Full independent-instance answering/recovery, CLI/TUI/MCP parity, optional models
+and remaining release gates are still open. No existing deployment, customer
+data or credentials changed; F1 remains incomplete.
