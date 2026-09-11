@@ -55,6 +55,11 @@ async fn deployment_role_cannot_read_origin_collections_or_erase_publication_his
         ),
         ("federation_accepted", "DELETE,TRUNCATE", false),
         (
+            "federation_expertise_origin_results",
+            "SELECT,INSERT,UPDATE,DELETE",
+            false,
+        ),
+        (
             "federation_expertise_requests",
             "SELECT,INSERT,UPDATE,DELETE",
             false,

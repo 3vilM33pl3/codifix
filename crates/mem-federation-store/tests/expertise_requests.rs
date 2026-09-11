@@ -12,6 +12,108 @@ struct Fixture {
     ad: CapabilityAdvertisement,
     destinations: Vec<String>,
 }
+
+#[tokio::test]
+async fn origin_results_are_immutable_scoped_recoverable_and_lease_bounded() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let mut lease = QuestionLease {
+        question: f.q.clone(),
+        lease_token: Uuid::new_v4(),
+        lease_until: chrono::Utc::now() + chrono::Duration::seconds(30),
+        policy_digest: CanonicalJsonCodec::digest(&"policy").unwrap(),
+    };
+    let answer = ExpertiseAnswer {
+        request_digest: f.q.digest().unwrap(),
+        status: ExpertiseStatus::Refused,
+        text: "Insufficient reviewed evidence".into(),
+        citations: vec![],
+        insufficient_evidence: true,
+        reason: None,
+        untrusted: true,
+    };
+    let mut tx = f.db.pool.begin().await.unwrap();
+    persist_expertise_answer(&mut tx, f.access.project, &lease, &answer)
+        .await
+        .unwrap();
+    tx.rollback().await.unwrap();
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM federation_expertise_origin_results")
+        .fetch_one(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+    for _ in 0..2 {
+        let mut tx = f.db.pool.begin().await.unwrap();
+        assert_eq!(
+            persist_expertise_answer(&mut tx, f.access.project, &lease, &answer)
+                .await
+                .unwrap(),
+            answer
+        );
+        tx.commit().await.unwrap();
+        lease.lease_token = Uuid::new_v4(); // recovered, authenticated gateway claim
+    }
+    let mut changed = answer.clone();
+    changed.text.push('!');
+    let mut tx = f.db.pool.begin().await.unwrap();
+    assert!(
+        persist_expertise_answer(&mut tx, f.access.project, &lease, &changed)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    let mut tx = f.db.pool.begin().await.unwrap();
+    assert!(
+        persist_expertise_answer(&mut tx, Uuid::new_v4(), &lease, &answer)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    lease.lease_until = chrono::Utc::now() - chrono::Duration::seconds(1);
+    let mut tx = f.db.pool.begin().await.unwrap();
+    assert!(
+        persist_expertise_answer(&mut tx, f.access.project, &lease, &answer)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    sqlx::query("UPDATE federation_expertise_origin_results SET hold=TRUE,payload_until=clock_timestamp()-interval '1 second',metadata_until=clock_timestamp()-interval '1 second'").execute(&f.db.pool).await.unwrap();
+    let mut tx = f.db.pool.begin().await.unwrap();
+    cleanup_expertise_results(&mut tx, f.access.project)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let kept: bool =
+        sqlx::query_scalar("SELECT answer IS NOT NULL FROM federation_expertise_origin_results")
+            .fetch_one(&f.db.pool)
+            .await
+            .unwrap();
+    assert!(kept);
+    lease.lease_until = chrono::Utc::now() + chrono::Duration::seconds(30);
+    let mut tx = f.db.pool.begin().await.unwrap();
+    assert!(
+        persist_expertise_answer(&mut tx, f.access.project, &lease, &answer)
+            .await
+            .is_err()
+    );
+    tx.rollback().await.unwrap();
+    sqlx::query("UPDATE federation_expertise_origin_results SET hold=FALSE")
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    let mut tx = f.db.pool.begin().await.unwrap();
+    cleanup_expertise_results(&mut tx, f.access.project)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM federation_expertise_origin_results")
+        .fetch_one(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+    f.db.cleanup().await.unwrap();
+}
 impl Fixture {
     async fn new() -> Option<Self> {
         let db = mem_test_support::IsolatedDatabase::new().await?;
