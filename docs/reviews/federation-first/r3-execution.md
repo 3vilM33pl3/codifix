@@ -128,3 +128,35 @@ after verification; its synthetic test data can be recreated, not recovered.
 The user's running dev service and generated draft review directories were left
 untouched. Final workspace Clippy and boundary checks passed after moving CLI
 tests into a dedicated module.
+
+## 2026-09-12 runner-boundary increment
+
+Resumed the existing approved R3 plan through the dev Memory workflow. No labels,
+models, spending approvals, service configuration or existing data were changed.
+
+The CLI runner now reloads and validates the locked manifest and its assets both
+before and after each successful driver process, including the final work item.
+Changing an asset or rewriting the manifest cannot be hidden by completing the
+last task. The original expected manifest identity remains authoritative.
+
+Per-task evidence is checked before another task starts: model identity, result
+identity, non-skipped status, recorded duration, known/consistent input and output
+usage within individual bounds, resolved rubric, no uncertain charge, valid
+snapshot/clock controls and unchanged configuration/driver/build. A valid wrong
+answer remains measurable rather than being treated as invalid execution.
+Reservations and the driver's raw observation/log files remain available when
+execution stops. This is not a container isolation mechanism or a provider proxy.
+
+Verification: all 232 CLI tests pass serially with the inherited developer token
+unset; all 30 evaluator tests pass. The runner tests include actual local shell
+subprocesses changing a source, corrupting the manifest and changing its seed
+while retaining valid JSON, plus invalid evidence and paid-dispatch denial.
+The fixture uses new temporary directories and synthetic files only. CLI/evaluator
+all-target Clippy with warnings denied, formatting and boundary checks pass.
+Logs: `/tmp/r3-runner-cli-all.log`, `/tmp/r3-runner-eval-tests.log`,
+`/tmp/r3-runner-clippy-final.log`, `/tmp/r3-runner-boundaries-final.log`.
+
+No database, Web, federation/PDS or full workspace regression rerun is claimed for
+this CLI-only change. No complete offline campaign was run. The remaining
+container/service/grader driver, representative fixtures, per-request provider
+mediation and official approval gates remain open. **R3 is still incomplete.**

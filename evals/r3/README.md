@@ -34,6 +34,10 @@ reference solutions, seed input and suite/hidden-test definitions. Never mount
   `mem-eval::campaign::baselines`. Embeddings are supplied by the caller; no
   provider or Memory ranking is silently substituted for a baseline.
 - Campaign identity/order/approval contracts and fail-closed statistical reports.
+- Dispatch-boundary checks reject changed manifests/assets after the final task
+  as well as between tasks. Invalid model, usage, timing, rubric and isolation
+  evidence stops the runner before it starts another task; valid negative quality
+  results remain measurable. This does not supply the missing isolation driver.
 - `campaign plan` and `campaign report`. `campaign run --offline --allow-shell`
   can dispatch a separately reviewed, hash-locked isolation driver and retain
   reservation/observation artifacts. **No complete driver is shipped yet.**

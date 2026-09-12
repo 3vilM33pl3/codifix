@@ -29,6 +29,11 @@ whose bytes are a locked configuration asset. No complete driver is shipped yet;
 paid execution is disabled pending per-request mediation and isolation tests.
 It does not use the CLI's ambient service or provider credentials. Output paths
 must be new; interrupted evidence is retained, never overwritten or blindly retried.
+The runner revalidates the locked manifest and assets after every driver exit,
+including the final task. Changed inputs, model/build mismatches, skipped or
+unresolved results, inconsistent token usage and uncertain charges stop further
+dispatch. A valid incorrect answer remains a measurable result, not an execution
+error. This validation is not a substitute for container/network isolation.
 
 See [R3 draft material and remaining integration](../../../evals/r3/README.md).
 
