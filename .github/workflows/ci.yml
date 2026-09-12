@@ -301,7 +301,7 @@ jobs:
           docker pull "$r3_fixture_image"
           r3_container_image=$(docker image inspect --format '{{.Id}}' "$r3_fixture_image")
           MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_REQUIRE_CONTAINER=1 \
-            node --test evals/r3/isolation/container.test.mjs
+            node --test evals/r3/isolation/*.test.mjs
       - run: |
           cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
           cargo run --locked --bin memory -- \

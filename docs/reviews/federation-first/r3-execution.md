@@ -193,3 +193,33 @@ PostgreSQL snapshot reset, full retrieval adapters, hidden grader execution and
 campaign-driver integration remain unfinished. No delivery checkbox for complete
 isolation is closed. See [component contract](../../../evals/r3/isolation/README.md).
 **R3 remains incomplete; labels and paid execution remain unapproved.**
+
+## 2026-09-12 independent sequence-grading increment
+
+Added `evals/r3/isolation/sequence.mjs`: exactly three agent/private-grader pairs,
+with complete contract validation before dispatch and a frozen copy of that
+contract throughout execution. The agent sees only public inputs and allowlisted
+prior submission files. The separate grader receives selected submissions and
+hidden checks in disjoint namespaces. Neither grader output nor grader-modified
+files can contaminate the next step. Deleted source files remain deleted until
+explicitly recreated; later repair cannot erase an earlier failed step.
+
+All five Node component tests pass with real containers explicitly required and
+zero skips. The sequence fixture exercises successful work, a confident no-op
+that fails hidden checks, injected fake grader/feedback files, changed public
+context, caller mutation after dispatch, private feedback exclusion, sequence
+reset and deletion/recovery. These are trusted Node graders over inert synthetic
+JSON, not representative Rust tasks or proof against malicious compiled-code
+attacks on graders. Whole-sequence timing and per-step diagnostics stay distinct;
+all results explicitly remain offline smoke evidence.
+
+Verification log: `/tmp/r3-sequence-final-tests.log`. Node syntax, whitespace and
+boundary checks pass (`/tmp/r3-sequence-boundaries.log`). CI now requires all
+container and sequence tests; remote CI is not claimed. All owned containers and
+staging data were removed. No existing service, database or provider was used by
+the fixture. No Rust/database/Web/full-workspace regression rerun is claimed.
+
+The actual campaign driver integration, sealed service snapshots, retrieval
+adapters, Rust build/grader execution, crash reconciliation and provider mediation
+remain open. Representative fixtures and label/spend approvals remain pending.
+**R3 is not complete.**

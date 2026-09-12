@@ -50,6 +50,12 @@ boundary/reset/timeout test. It is not yet wired to the campaign driver, service
 snapshots, retrieval adapters or independent graders. Full R3 isolation remains
 an open gate.
 
+The same component now executes three-step agent/private-grader handoffs with
+explicit source-only carryover and no grader feedback returned to agents.
+Positive, negative, deleted-file recovery and fresh-reset tests run in real
+containers using inert JSON submissions. This is not yet the Rust coding grader,
+existing suite-runner integration or an official campaign result.
+
 - Implement and verify disposable snapshot preparation/reset and per-condition
   service/agent/grader containers with denied cross-condition/hidden-test access.
 - Wire baseline adapters and the existing suite runner into that driver, including

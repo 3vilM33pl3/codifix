@@ -3,7 +3,7 @@
 This is a reusable execution component for the existing campaign driver, **not a
 complete driver or evidence that R3 is finished**. It executes explicitly supplied
 synthetic commands without network or provider access. It does not select context,
-prepare PostgreSQL snapshots, run Memory retrieval, grade answers, authorize labels
+prepare PostgreSQL snapshots, run Memory retrieval, authorize labels
 or mediate paid calls. The earlier shared Docker eval stacks remain unsuitable
 for R3 isolation and are not modified by this component.
 
@@ -73,4 +73,48 @@ availability, explicit sequence transfer, clean independent resets, symlink
 rejection, output flooding and timeout cleanup. Pure tests reject traversal,
 conflicting paths, mutable images, excessive inputs and forged output metadata.
 These tests do not prove service snapshot sealing, cross-condition retrieval,
-hidden-grader execution or provider-budget mediation. Those R3 gates remain open.
+production coding-grader execution or provider-budget mediation. Those R3 gates remain open.
+
+## Three-step agent/grader handoff
+
+`runOfflineSequence` in `sequence.mjs` validates an explicit three-step contract
+before dispatch. Inputs are `image`, `initialFiles`, `submissionPaths`, three
+`steps` (`id`, agent `argv`, and private `grader: { argv, files }`), and optional
+`timeoutMs`. All submission paths must be declared in the initial fixture. It
+clones the contract before its first asynchronous operation, so later caller
+mutation cannot replace a grader or subsequent command mid-run.
+
+Each step launches one agent container and, after it exits, a different grader
+container. The agent receives public files and the selected submission from the
+previous step, never grader files or feedback. The grader receives only selected
+agent bytes under `submission/` and trusted checks under `grader/`. These separate
+namespaces prevent an agent-written fake grader from replacing the real checks.
+Only selected agent files advance; modifications made by the grader are discarded.
+Non-submission public inputs are restored from the original fixture every step.
+A deleted selected file stays missing until the agent deliberately recreates it.
+
+Results contain per-step exit codes, diagnostic timings and input/submission
+hashes, plus the final selected submission and whole-sequence elapsed time. They
+contain no grader output/feedback. Whole-sequence success requires all three
+steps, including required-file presence; a later repair does not erase an earlier
+failure. A nonzero grading result is valid negative evidence, not an infrastructure
+error. Container failures still fail closed. These records explicitly say
+`kind: offline-sequence-smoke` and `officialEvidence: false`; they are **not**
+complete `mem-eval` observations or approved benchmark evidence. Steps must not be
+counted as independent campaign samples.
+
+The live test uses trusted Node checks over inert JSON submissions. It proves
+the handoff, hidden-feedback exclusion, fake-grader exclusion, positive/negative
+controls, deleted-file carryover and fresh sequence reset. It does not yet grade
+untrusted compiled Rust programs or claim resistance to attacks on such graders.
+Reviewed Rust toolchain images, source export/build scratch limits, existing suite
+runner integration and artifact mapping remain unfinished. No new representative
+benchmark labels or paid execution are enabled.
+
+Run all component tests with the same explicitly required image configuration:
+
+```bash
+MEMORY_R3_REQUIRE_CONTAINER=1 \
+MEMORY_R3_TEST_IMAGE=sha256:ae7d65bc9a8e0747b9d1a2e8aa8da051e1bb65dda859064657307c355e3dbdc7 \
+node --test evals/r3/isolation/*.test.mjs
+```
