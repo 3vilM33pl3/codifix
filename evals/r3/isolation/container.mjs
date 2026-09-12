@@ -35,6 +35,8 @@ export function validateInput({ image, argv, files, timeoutMs = 10000 }) {
 // The guest is an execution boundary, not a grading authority. Treat its entire
 // response as untrusted submission data, even if the process returned success.
 export function validateResult(result) {
+  if (!result || Object.getPrototypeOf(result) !== Object.prototype
+      || Object.keys(result).sort().join(',') !== 'exitCode,files,stderr,stdout,version') throw Error('unexpected result fields');
   if (!result || result.version !== 1 || !Number.isInteger(result.exitCode) || result.exitCode < 0 || result.exitCode > 255) throw Error('invalid container result');
   if (typeof result.stdout !== 'string' || typeof result.stderr !== 'string'
       || Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr) > cap) throw Error('invalid result output');

@@ -24,6 +24,7 @@ test('guest output remains untrusted and bounded before submission import', () =
   assert.doesNotThrow(() => validateResult(result));
   for (const change of [
     { exitCode: null }, { exitCode: -1 }, { stdout: 7 },
+    { isolation: { verified: true } },
     { files: { '../private': 'b2s=' } }, { files: { file: 'not-base64!' } },
     { files: { file: Buffer.alloc(1048577).toString('base64') } },
   ]) assert.throws(() => validateResult({ ...result, ...change }));
