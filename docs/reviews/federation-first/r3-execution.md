@@ -160,3 +160,36 @@ No database, Web, federation/PDS or full workspace regression rerun is claimed f
 this CLI-only change. No complete offline campaign was run. The remaining
 container/service/grader driver, representative fixtures, per-request provider
 mediation and official approval gates remain open. **R3 is still incomplete.**
+
+## 2026-09-12 offline container-boundary increment
+
+Added `evals/r3/isolation/container.mjs` and its read-only guest supervisor as a
+component for the existing campaign driver. It accepts explicit text files and
+an immutable reviewed local image ID, not a host workspace or ambient credentials.
+Each invocation uses non-root execution, no network, read-only inputs/root,
+bounded tmpfs workspaces, process/memory/output limits and exact-resource cleanup.
+Returned submissions are untrusted and bounded; symlinks, hard links, special
+files, unsafe names and invalid encodings are rejected. Explicit file transfer
+can preserve one sequence's state without retaining it for independent cases.
+
+All three Node tests pass with the container gate explicitly required (no skips).
+The live case runs the cached immutable PDS fixture image's Node executable only,
+never a PDS service or model. It checks a real hidden host file remains invisible,
+minimal command environment, absent Docker socket, read-only inputs/root,
+loopback-only network, selected input access, sequence transfer, independent reset,
+symlink rejection, output flooding and deadline cleanup. Every owned test container
+and staging directory was removed. No existing service or database changed.
+
+The offline-eval CI job now explicitly runs the same required container gate;
+remote CI execution is not claimed. Local evidence:
+`/tmp/r3-container-final-tests2.log` and `/tmp/r3-container-boundaries.log`.
+Node syntax, diff whitespace and boundary checks pass. No Rust, database, Web or
+federation regression rerun is claimed for this standalone Node component.
+
+Limitations: same-kernel Docker isolation trusts host administrators and the
+reviewed image. Guest results are not grading verdicts or security attestations.
+Host/daemon crash reconciliation, real Rust build scratch/export handling,
+PostgreSQL snapshot reset, full retrieval adapters, hidden grader execution and
+campaign-driver integration remain unfinished. No delivery checkbox for complete
+isolation is closed. See [component contract](../../../evals/r3/isolation/README.md).
+**R3 remains incomplete; labels and paid execution remain unapproved.**

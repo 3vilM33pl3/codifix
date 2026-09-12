@@ -44,6 +44,12 @@ reference solutions, seed input and suite/hidden-test definitions. Never mount
 
 ## Remaining integration, not approval-dependent
 
+The [offline container component](isolation/README.md) now provides bounded,
+network-disabled execution of explicitly supplied files, with a real Docker
+boundary/reset/timeout test. It is not yet wired to the campaign driver, service
+snapshots, retrieval adapters or independent graders. Full R3 isolation remains
+an open gate.
+
 - Implement and verify disposable snapshot preparation/reset and per-condition
   service/agent/grader containers with denied cross-condition/hidden-test access.
 - Wire baseline adapters and the existing suite runner into that driver, including
