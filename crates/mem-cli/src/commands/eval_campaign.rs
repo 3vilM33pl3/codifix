@@ -155,7 +155,7 @@ async fn execute(
     artifact: &mut Artifact,
 ) -> Result<()> {
     for (index, work) in plan.work.iter().enumerate() {
-        manifest.verify_assets(manifest_path.parent().context("campaign root")?)?;
+        verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
         // Aggregate per-task token ceiling. Driver must enforce this across all
         // its provider requests; reservations remain charged after uncertain exit.
         let tokens = manifest
@@ -217,12 +217,16 @@ async fn execute(
             status.success(),
             "driver failed; inspect sanitized driver logs"
         );
+        // Check the last work item too, before accepting evidence or dispatching
+        // anything else. A driver cannot rewrite the manifest to bless new assets.
+        verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
         let observation_path = dir.join("observation.json");
         ensure!(
             std::fs::metadata(&observation_path)?.len() <= 16 * 1024 * 1024,
             "oversized observation"
         );
         let observation: Observation = serde_json::from_slice(&std::fs::read(&observation_path)?)?;
+        validate_task_evidence(manifest, work, &observation, artifact.observations.first())?;
         ensure!(observation.work == *work, "driver returned another task");
         observation.isolation.validate(manifest)?;
         ensure!(
@@ -257,6 +261,65 @@ async fn execute(
                 &std::fs::read(path).context("missing preparation receipt")?,
             )?);
         }
+    }
+    Ok(())
+}
+
+fn verify_campaign_inputs(path: &Path, expected_hash: &str) -> Result<()> {
+    let current = Manifest::load(path)?;
+    ensure!(
+        c::digest_value(&current)? == expected_hash,
+        "campaign manifest changed during execution"
+    );
+    Ok(())
+}
+
+/// Fail before another task starts, not only when the final report is built.
+/// Incorrect answers are valid observations; broken measurement is not.
+fn validate_task_evidence(
+    manifest: &Manifest,
+    work: &c::Work,
+    observation: &Observation,
+    first: Option<&Observation>,
+) -> Result<()> {
+    ensure!(observation.work == *work, "driver returned another task");
+    ensure!(
+        observation.model == manifest.model,
+        "driver model/configuration mismatch"
+    );
+    ensure!(
+        observation.result.item_id == work.case_id
+            && !observation.result.skipped
+            && observation.result.duration_ms.is_some()
+            && !observation.unresolved_rubric,
+        "missing or unresolved task evidence"
+    );
+    ensure!(
+        !observation.uncertain_charge,
+        "uncertain provider charge; stop campaign"
+    );
+    let usage = observation
+        .result
+        .token_usage
+        .as_ref()
+        .context("unknown task token usage")?;
+    ensure!(
+        usage
+            .input_tokens
+            .checked_add(usage.output_tokens)
+            .is_some_and(|sum| sum <= usage.total_tokens)
+            && usage.input_tokens <= manifest.model.max_input_tokens
+            && usage.output_tokens <= manifest.model.max_output_tokens,
+        "inconsistent or excessive task token usage"
+    );
+    observation.isolation.validate(manifest)?;
+    if let Some(first) = first {
+        ensure!(
+            observation.isolation.configuration_sha256 == first.isolation.configuration_sha256
+                && observation.isolation.driver_sha256 == first.isolation.driver_sha256
+                && observation.isolation.service_build == first.isolation.service_build,
+            "mixed configuration/driver/build"
+        );
     }
     Ok(())
 }
