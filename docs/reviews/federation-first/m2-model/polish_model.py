@@ -17,21 +17,38 @@ def build(region, manifest):
     fmt('Summary',32,33,1,2,'0.00%')
     fmt('Summary',63,64,1,2,'0.000000')
     fmt('Assumptions',108,109,4,5,'0.00%')
-    for start,end in [(3,5),(6,9),(11,14)]: fmt('Sensitivity',7,31,start,end,money)
-    fmt('Sensitivity',7,31,5,6,'0.0%;(0.0%);"–"')
-    fmt('Sensitivity',7,31,9,10,'0.00')
-    fmt('Sensitivity',7,31,10,11,'0')
+    for start,end in [(3,5),(6,9),(11,14),(17,24)]: fmt('Sensitivity',7,40,start,end,money)
+    fmt('Sensitivity',7,40,5,6,'0.0%;(0.0%);"–"')
+    fmt('Sensitivity',7,40,9,10,'0.00')
+    fmt('Sensitivity',7,40,10,11,'0')
+    fmt('Sensitivity',7,40,24,25,'0')
     for start,end,width in [(0,1,255),(1,2,180),(2,3,350)]:
         req.append({'updateDimensionProperties': {'range': {'sheetId': ids['Sensitivity'], 'dimension': 'COLUMNS', 'startIndex': start, 'endIndex': end}, 'properties': {'pixelSize': width}, 'fields': 'pixelSize'}})
-    req.append({'repeatCell': {'range': {'sheetId':ids['Sensitivity'],'startRowIndex':6,'endRowIndex':31,'startColumnIndex':0,'endColumnIndex':17},'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
-    req.append({'updateDimensionProperties': {'range': {'sheetId':ids['Sensitivity'],'dimension':'ROWS','startIndex':6,'endIndex':31},'properties':{'pixelSize':46},'fields':'pixelSize'}})
+    req.append({'repeatCell': {'range': {'sheetId':ids['Sensitivity'],'startRowIndex':6,'endRowIndex':40,'startColumnIndex':0,'endColumnIndex':25},'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
+    req.append({'updateDimensionProperties': {'range': {'sheetId':ids['Sensitivity'],'dimension':'ROWS','startIndex':6,'endIndex':40},'properties':{'pixelSize':46},'fields':'pixelSize'}})
+    teal={'red':0,'green':.42,'blue':.42}; white={'red':1,'green':1,'blue':1}
+    for sheet,r,c0,c1 in [('Summary',71,0,6),('Sensitivity',7,17,25),('Team',4,38,47)]:
+        ran={'sheetId':ids[sheet],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':c0,'endColumnIndex':c1}
+        req.append({'repeatCell':{'range':ran,'cell':{'userEnteredFormat':{'backgroundColor':teal,'textFormat':{'foregroundColor':white,'bold':True},'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat,userEnteredFormat.wrapStrategy'}})
+        if sheet=='Summary':req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
+    for sheet,rows,end in [('Summary',[86,87,88],6),('Team',[36,37,44],12),('Assumptions',[123],10),('Sensitivity',[43,44],10)]:
+        for r in rows:
+            ran={'sheetId':ids[sheet],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':1,'endColumnIndex':end}
+            req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
+            req.append({'repeatCell':{'range':ran,'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
+            req.append({'updateDimensionProperties':{'range':{'sheetId':ids[sheet],'dimension':'ROWS','startIndex':r-1,'endIndex':r},'properties':{'pixelSize':62},'fields':'pixelSize'}})
+    for sheet,r0,r1,c0,c1 in [('Summary',71,84,0,2),('Assumptions',117,121,0,10),('Employee AI',4,28,0,1),('Team',3,4,38,47)]:
+        req.append({'repeatCell':{'range':{'sheetId':ids[sheet],'startRowIndex':r0,'endRowIndex':r1,'startColumnIndex':c0,'endColumnIndex':c1},'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
+        req.append({'updateDimensionProperties':{'range':{'sheetId':ids[sheet],'dimension':'ROWS','startIndex':r0,'endIndex':r1},'properties':{'pixelSize':48},'fields':'pixelSize'}})
+    req.append({'updateDimensionProperties':{'range':{'sheetId':ids['Employee AI'],'dimension':'COLUMNS','startIndex':0,'endIndex':1},'properties':{'pixelSize':450},'fields':'pixelSize'}})
+    req.append({'updateDimensionProperties':{'range':{'sheetId':ids['Team'],'dimension':'COLUMNS','startIndex':42,'endIndex':47},'properties':{'pixelSize':145},'fields':'pixelSize'}})
     for i,(chart_id,sheet,row,title) in enumerate([
         (CHARTS[region][0],'Revenue',21,'Recurring ARR'),
         (CHARTS[region][1],'P&L & Cash',31,'Closing cash after modelled financing')]):
         def source(r): return {'sourceRange': {'sources': [{'sheetId':ids[sheet],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':2,'endColumnIndex':38}]}}
         spec={'title':f'{title} ({manifest["currency"]})','subtitle':'Selected live scenario · unvalidated planning assumptions','fontName':'Arial','basicChart':{'chartType':'LINE','legendPosition':'NO_LEGEND','headerCount':0,'axis':[{'position':'BOTTOM_AXIS','title':'Month'},{'position':'LEFT_AXIS','title':manifest['currency']}],'domains':[{'domain':source(3)}],'series':[{'series':source(row),'targetAxis':'LEFT_AXIS','colorStyle':{'rgbColor':{'red':0.0,'green':0.42,'blue':0.42}}}]}}
         req.append({'updateChartSpec':{'chartId':chart_id,'spec':spec}})
-        req.append({'updateEmbeddedObjectPosition':{'objectId':chart_id,'newPosition':{'overlayPosition':{'anchorCell':{'sheetId':ids['Summary'],'rowIndex':68,'columnIndex':0},'offsetXPixels':i*615,'offsetYPixels':0,'widthPixels':605,'heightPixels':340}},'fields':'*'}})
+        req.append({'updateEmbeddedObjectPosition':{'objectId':chart_id,'newPosition':{'overlayPosition':{'anchorCell':{'sheetId':ids['Summary'],'rowIndex':90,'columnIndex':0},'offsetXPixels':i*615,'offsetYPixels':0,'widthPixels':605,'heightPixels':340}},'fields':'*'}})
     return {'requests':req}
 
 if __name__ == '__main__':
