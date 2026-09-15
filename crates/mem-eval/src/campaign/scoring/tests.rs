@@ -135,7 +135,12 @@ fn blinded_packet_has_no_condition_model_repeat_or_automatic_score() {
 
 #[test]
 fn representative_rubrics_use_canonical_locked_bytes_and_all_dimensions() {
-    for family in ["supplier-handover", "turnover-recovery", "cache-partition"] {
+    for family in [
+        "supplier-handover",
+        "turnover-recovery",
+        "cache-partition",
+        "schema-transition",
+    ] {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
             "../../evals/r3/representative/development/{family}/private"
         ));

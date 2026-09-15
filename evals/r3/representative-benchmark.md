@@ -94,6 +94,22 @@ authorized positive cases. No signatures, real PDS or paid provider is required.
 
 ## Expansion and validation contract
 
+The remaining development knowledge families are allocated before materialization:
+
+| Family | Distinct engineering decision |
+| --- | --- |
+| schema-transition | Expand/backfill/contract compatibility and rollback limits |
+| capacity-pressure | Pool saturation versus database capacity and admission control |
+| timezone-window | Local business windows across daylight-saving transitions |
+| artifact-origin | Build identity, digest verification and unsigned release notes |
+| retention-hold | Data expiry versus active legal holds and retained backups |
+| quota-accounting | Reserved, settled and uncertain provider usage |
+| dns-cutover | Split-horizon records, resolver caches and observed propagation |
+
+Together with the three existing development scenarios these fill ten families.
+Do not reuse these mechanisms as renamed held-out scenarios. This allocation is
+not label approval; sources precede private questions and scoring rubrics.
+
 The cache-partition knowledge family is assigned to development before fixture
 implementation: distinguishing request authorization and signed provenance from
 the scope of a reused answer, with bounded incident evidence. Do not reuse that

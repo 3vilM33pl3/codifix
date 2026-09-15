@@ -1,5 +1,16 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 schema-transition knowledge family
+
+- Allocated the remaining seven development knowledge mechanisms before writing
+  their sources. Added the fourth family: five operational documents and four
+  draft rubrics covering mixed-version compatibility, exception handling,
+  rollback write shapes and unsupported performance guarantees.
+- Canonical rubric validation and both representative pack/real CLI tests pass;
+  no skips. The default pack now has sixteen knowledge questions and four coding
+  sequences. Source and review material remain separated. No label approval or
+  paid execution is implied; full benchmark and provider integration remain open.
+
 ## 2026-09-15 complete representative offline controller rehearsal
 
 - Added an offline bootstrap and host-only Unix-socket driver/controller for the
