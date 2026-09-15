@@ -58,6 +58,7 @@ test('representative tasks execute all knowledge conditions and real hidden Rust
     const coding = await execute({ case_id: 'durable-importer', condition: 'full-memory', repeat: 0 });
     assert(!coding.result.success, 'no-op agent must fail real hidden acceptance');
     assert.equal(coding.result.sub_results.length, 3);
+    assert(coding.result.sub_results.every(step => typeof step.id === 'string' && !Object.hasOwn(step, 'item_id')));
     assert(coding.result.sub_results.every(step => !step.success));
     assert.equal(coding.knowledge_review, null);
     assert.equal(coding.isolation.after_sha256, session.preparation.snapshot_sha256);

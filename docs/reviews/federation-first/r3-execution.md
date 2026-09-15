@@ -1,5 +1,34 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 complete representative offline controller rehearsal
+
+- Added an offline bootstrap and host-only Unix-socket driver/controller for the
+  existing campaign CLI. Actual modules and private executable copies are pinned;
+  one prepared snapshot supplies independently reset service instances for every
+  condition/task. Exact request replay reuses its receipt, altered/out-of-order
+  requests fail, and no paid execution or synthetic human approval is enabled.
+- The real 75-dispatch rehearsal completed: four knowledge questions and one
+  three-step repository, five conditions, three repeats. All fifteen no-op coding
+  executions fail real hidden checks. Sixty knowledge packets remain genuinely
+  pending. Execution validity is true; full harness/official/quality gates remain
+  false. Review export validates all bindings and accounting independently.
+- Integration found and fixed the child diagnostic's `id`/`item_id` mismatch.
+  A concurrent build then correctly triggered binary-change fencing. Bootstrap
+  now copies executable bytes privately before dispatch, retaining strict hashes.
+  The final required test deliberately replaces a test-owned upstream executable
+  after the first task; all 75 executions still complete using the frozen copy.
+- Final test: two passed, zero skips, 428 seconds. Evidence is retained at
+  `/data/tmp/memory-r3-rehearsal-cli-en49ld/pack/run/`; log:
+  `/tmp/r3-rehearse-e2e-build-replacement.log`. Earlier schema-failure artifacts
+  remain at `/data/tmp/memory-r3-integrated-f7Gdk2/pack/run/`. CI now requires the
+  complete rehearsal; remote CI execution is not claimed.
+- Required-database workspace tests and workspace Clippy passed during this
+  increment (`/tmp/r3-current-workspace.log`, `/tmp/r3-current-clippy.log`); later
+  report diagnostics have scoped evaluator regression evidence above. Formatting
+  and boundaries pass. No existing deployment, customer data or paid provider
+  was used. Timing includes setup/grading, fake vectors are not embedding parity,
+  and these synthetic agents cannot establish model quality or customer ROI.
+
 ## 2026-09-15 cache-partition knowledge family
 
 - Added a third development scenario: five source documents and four canonical

@@ -140,7 +140,11 @@ export async function createRehearsalExecutor(options) {
           'Rehearsal timing includes disposable service setup and hidden grading; not model/user latency.'], sub_results });
       return { work: selected, model: manifest.model,
         result: result(item.id, value.success, performance.now() - started, value.answer,
-          value.diagnostics.map(step => result(step.id, step.passed, step.agentElapsedMs + step.graderElapsedMs, null))),
+          value.diagnostics.map(step => ({ id: step.id, eval_type: 'agent_build_step',
+            metadata: { claim: 'offline-synthetic-not-quality', reasoning_mode: 'none' },
+            success: step.passed, skipped: false, scores: {},
+            duration_ms: Math.max(1, Math.ceil(step.agentElapsedMs + step.graderElapsedMs)), token_usage: zeroUsage(),
+            notes: [`Agent input SHA-256: ${step.agentInputSha256}`, `Private grader input SHA-256: ${step.graderInputSha256}`] }))),
         execution_microusd: 0, provider_requests: 0, uncertain_charge: false,
         critical_failure: value.critical_failure, unresolved_rubric: value.unresolved_rubric, knowledge_review: value.knowledge_review,
         isolation: { before_sha256: executed.beforeSha256, after_sha256: executed.afterSha256,

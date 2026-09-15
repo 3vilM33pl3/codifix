@@ -13,8 +13,10 @@ The fake vector function and excerpt/no-op agents are harness controls, not mode
 or ranking quality evidence. Rehearsal duration currently includes disposable
 service setup and hidden grading and is explicitly not model/user latency.
 Host-side service orchestration remains trusted; answering/coding containers have
-no network. The complete hash-locked controller/CLI driver, official preparation
-parity and paid provider mediation remain unfinished.
+no network. The hash-locked offline controller/CLI driver is now available through
+`../rehearse.mjs`; official preparation parity and paid provider mediation remain
+unfinished. The full rehearsal test replaces a test-owned upstream build output
+mid-run and verifies continued use of the privately copied executable.
 
 Sequence steps may supply `inputFiles` for the current prompt/context. They cannot
 overwrite fixture/submission paths. Inputs are validated for every stage before

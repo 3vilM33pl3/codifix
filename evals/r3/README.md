@@ -20,6 +20,11 @@ obsolete runbook, including refusal to claim a recovery objective or zero loss.
 Its four canonical rubric files are tested but remain draft; source/version and
 full campaign preparation still need integration.
 
+A third development knowledge pack, [cache partition](representative/development/cache-partition/review.md),
+separates request authorization, cache scope and signed origin attribution. Five
+documents and four draft rubrics require bounded conclusions from partial incident
+evidence, rather than assuming a valid signature grants access or proves truth.
+
 The first multi-file coding family is also executable:
 [durable importer](representative/development/durable-importer/review.md).
 Its three cumulative stages have ten private black-box probes. The reference
@@ -48,12 +53,51 @@ held-out repositories and complete campaign integration remain unimplemented.
 
 Materialize those representative development fixtures for the existing campaign
 CLI with `node evals/r3/build-representative-pack.mjs NEW_DIRECTORY`. This creates
-a hash-locked, private, **smoke-only partial rehearsal**: eight knowledge questions
+a hash-locked, private, **smoke-only partial rehearsal**: twelve knowledge questions
 and four coding sequences, no held-out data. `--one-family-per-track` creates a
 smaller four-question/one-sequence rehearsal. Neither changes the required
 official suite sizes or can be promoted by changing its label status. The CLI
-can plan these packs; complete driver dispatch remains unfinished. Placeholder
-suite commands are contracts, not installed agent/grader programs.
+can plan these packs; the controller below provides synthetic offline dispatch.
+Live provider-backed execution remains unfinished. Placeholder suite commands
+are contracts, not installed agent/grader programs.
+
+### Integrated offline rehearsal
+
+`node evals/r3/rehearse.mjs NEW_DIRECTORY --one-family-per-track` runs that small
+representative pack through the existing campaign CLI. Supply these explicit
+test-only environment settings (never a customer or existing dev database):
+
+- `MEMORY_LAYER_TEST_REQUIRE_DB=1` and `MEMORY_LAYER_TEST_DATABASE_URL` for a
+  disposable PostgreSQL administrator capable of creating temporary databases.
+- Absolute `MEMORY_R3_CLI_BIN`, `MEMORY_R3_SNAPSHOT_BIN`, `MEMORY_R3_SCORE_BIN`
+  and `MEMORY_R3_RETRIEVER_BIN` paths to the built Memory and example executables.
+- Reviewed immutable local `MEMORY_R3_TEST_IMAGE` and `MEMORY_R3_RUST_IMAGE`
+  IDs from the isolation instructions. There are no automatic registry pulls.
+
+The bootstrap creates a new private pack, copies/hash-locks the actual controller
+and driver modules, privately copies/pins executable bytes, prepares one snapshot and dispatches
+75 tasks using fresh service clones and isolated agents/graders. Dropping the
+selection flag includes all currently materialized development families. The
+controller's Unix socket is private to the host operator and is never mounted
+in an agent. Replayed identical requests reuse an in-process receipt; altered
+requests or out-of-order work fail. The existing CLI keeps durable dispatch
+reservations/results and refuses ambiguous automatic repeat execution.
+
+The agents are deterministic excerpts/no-op controls; vectors are fake. No
+provider credentials are inherited and no paid calls occur. A complete run keeps
+`run/artifact.json`, the CLI's report, and blank blinded packets in `run/review/`.
+Knowledge judgments remain pending, so the public report is deliberately **not
+valid quality evidence**. The controller may finish successfully while recording
+the CLI's nonzero pending-review status. It separately validates that no other
+evidence defect is being hidden by pending review. No approval is synthesized.
+
+Keep failed private artifacts and `private/run-diagnostic.txt`. Starting a new
+rehearsal is not resuming an uncertain old one. This controller does not recover
+an interrupted prepared snapshot after its process dies. Normal shutdown removes
+owned services, clones and IPC; forced termination can require exact-resource
+reconciliation. Existing services are not restarted or configured. Timing includes
+setup and hidden grading and is not customer/model latency. This remains an
+offline integration harness, not the complete approved/paid R3 experiment.
 
 ```sh
 node evals/r3/build-review-pack.mjs target/memory-evals/r3-review
@@ -85,10 +129,11 @@ reference solutions, seed input and suite/hidden-test definitions. Never mount
 - Dispatch-boundary checks reject changed manifests/assets after the final task
   as well as between tasks. Invalid model, usage, timing, rubric and isolation
   evidence stops the runner before it starts another task; valid negative quality
-  results remain measurable. This does not supply the missing isolation driver.
+  results remain measurable. Live provider-backed isolation remains unfinished.
 - `campaign plan` and `campaign report`. `campaign run --offline --allow-shell`
   can dispatch a separately reviewed, hash-locked isolation driver and retain
-  reservation/observation artifacts. **No complete driver is shipped yet.**
+  reservation/observation artifacts. The representative offline controller above
+  is implemented; **the official provider-backed driver remains unfinished**.
 
 ## Remaining integration, not approval-dependent
 
@@ -100,9 +145,9 @@ real model/provider execution, complete campaign dispatch or quality evidence.
 
 The [offline container component](isolation/README.md) now provides bounded,
 network-disabled execution of explicitly supplied files, with a real Docker
-boundary/reset/timeout test. It is not yet wired to the campaign driver, service
-snapshots, retrieval adapters or independent graders. Full R3 isolation remains
-an open gate.
+boundary/reset/timeout test. The representative offline controller now connects
+it to service snapshots, retrieval adapters and independent graders. Full
+provider-backed R3 isolation remains an open gate.
 
 The same component now executes three-step agent/private-grader handoffs with
 explicit source-only carryover and no grader feedback returned to agents.
@@ -117,8 +162,9 @@ provide tested prepared-database clones for service integration tests. The
 template refuses new connections; each clone uses a distinct restricted login.
 Tests verify unchanged seeded reinforcement state after reset, denied benchmark
 writes, denied cross-clone connections and acceptance by the service's seal
-checker. This is an integration-test primitive, not yet the campaign's snapshot
-orchestration, complete corpus fingerprinting or crash-recovery driver.
+checker. The offline controller now uses that preparation/reset mechanism and
+checks corpus fingerprints. It does not provide interrupted-controller snapshot
+recovery or the complete provider-backed driver.
 
 `mem_test_support::fingerprint::benchmark_fingerprint` now hashes all public
 benchmark tables and their column shapes from a single normalized, read-only
@@ -131,20 +177,22 @@ handler integration test, not HTTP authentication or a complete campaign.
 The fingerprint utility is bounded for small disposable fixtures, and does not
 prove permissions, indexes, functions, external evidence files or backup recovery.
 
-- Implement and verify disposable snapshot preparation/reset and per-condition
-  service/agent/grader containers with denied cross-condition/hidden-test access.
-- Wire baseline adapters and the existing suite runner into that driver, including
-  vector preparation and the actual full-Memory retrieval path.
+- Complete the official isolation profile beyond the current trusted-host
+  offline services and network-disabled agent/grader containers.
+- Complete real vector preparation and full-Memory configuration parity; the
+  integrated rehearsal deliberately uses fake vectors and a lexical snapshot.
 - Enforce request/token/spend limits at every provider dispatch in a budget
   mediator, including coding sequences and uncertain calls. The current runner
   reservation is only a conservative single-request foundation; paid dispatch is
   rejected unconditionally before any driver starts.
-- Connect the implemented evidence-bound adjudication utility to the complete
-  campaign driver and operator review flow. Existing substring scoring is
-  diagnostic only; official knowledge observations now require independent
-  review evidence, not just a driver's success boolean.
-- Run complete offline campaigns and crash/isolation fault tests. Reference
-  solution tests alone do not establish these properties.
+- Complete provider-backed campaign dispatch and genuine operator adjudication.
+  The offline controller already exports bound pending review packets; it does
+  not decide semantic correctness or approve labels.
+- Finish representative datasets and broader provider-mediated crash/isolation
+  fault tests. Interrupted campaigns must remain fail-closed with retained
+  evidence; automatic restoration of a killed controller's snapshot is not an
+  additional R3 completion requirement. A completed partial offline rehearsal is
+  not the full R3 benchmark or official evidence.
 
 ## Per-request reservation journal
 
