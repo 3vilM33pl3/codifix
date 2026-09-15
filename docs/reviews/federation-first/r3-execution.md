@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out cohort-assignment knowledge family
+
+- Added five sources and four draft rubrics for account-keyed assignment,
+  deliberate rollout expansion, retained actual exposures and account-level
+  measurement. Same-seed/session changes are not treated as valid account identity.
+- Canonical rubric and four pack/CLI tests pass without skips. Twenty-eight
+  held-out questions and seven coding repositories exist. The explicit held-out
+  fixture pack plans 525 executions; none is approved model-calibration evidence.
+
 ## 2026-09-15 complete development offline execution
 
 - The real controller/CLI completed all 660 representative development executions
