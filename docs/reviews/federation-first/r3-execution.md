@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out clocked circuit repository
+
+- Added five modules, two public tests and ten hidden probes for consecutive
+  failures, single half-open probes, stale completions, permit expiry and
+  backwards-time rejection. Explicit logical time replaces any real clock.
+- Public tests, required container reference/cumulative/negative controls and
+  four pack/CLI tests pass without skips. Nine of twelve held-out repositories
+  exist; all 140 knowledge questions remain draft. No external calls occurred.
+
 ## 2026-09-15 held-out sparse-sensor repository
 
 - Added five public modules, two public tests and ten hidden probes across

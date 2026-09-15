@@ -18,6 +18,7 @@ for (const [family, modules, replacements] of [
   ['snapshot-pages', ['main', 'command', 'record', 'snapshot', 'store'], ['snapshot']],
   ['notice-bundle', ['main', 'command', 'registry', 'policy', 'bundle'], ['bundle']],
   ['sensor-matrix', ['main', 'command', 'display', 'sparse', 'engine'], ['engine']],
+  ['circuit-window', ['main', 'command', 'policy', 'permit', 'breaker'], ['breaker']],
 ]) test(`held-out ${family}: reference, cumulative stages and broken controls`, { skip: !image, timeout: 180000 }, async () => {
   const root = new URL(`./representative/held-out/${family}/`, import.meta.url);
   const files = {};
