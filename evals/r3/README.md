@@ -45,7 +45,10 @@ missing issuers from expiry and cached-client success. The thirteenth,
 resource scope and membership checks after token issuance. The next two,
 [stream framing](representative/held-out/stream-framing/review.md) and
 [traffic draining](representative/held-out/traffic-drain/review.md), cover byte
-boundaries and accepted-work lifecycle respectively; ten families remain.
+boundaries and accepted-work lifecycle respectively. The next two,
+[group memory pressure](representative/held-out/cgroup-pressure/review.md) and
+[reduction order](representative/held-out/reproducible-order/review.md), distinguish
+whole-group budgets and deterministic folds from misleading proxies; eight remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:

@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out memory-budget and reduction-order families
+
+- Added ten synthetic sources and eight draft questions on disjoint group charges,
+  byte-based admission, finite-precision reduction order and invalid duplicate
+  contributions. No production memory or scoring algorithm changed.
+- Canonical rubric and four pack/CLI checks pass without skips. Sixty-eight
+  held-out questions and seven coding repositories are materialized; eight
+  knowledge families and five coding repositories remain. Labels remain draft.
+
 ## 2026-09-15 held-out stream and drain knowledge families
 
 - Added ten sources and eight draft questions for byte framing/UTF-8 boundaries,

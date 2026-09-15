@@ -161,6 +161,8 @@ fn representative_rubrics_use_canonical_locked_bytes_and_all_dimensions() {
         ("held-out", "token-audience"),
         ("held-out", "stream-framing"),
         ("held-out", "traffic-drain"),
+        ("held-out", "cgroup-pressure"),
+        ("held-out", "reproducible-order"),
     ] {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
             "../../evals/r3/representative/{split}/{family}/private"
