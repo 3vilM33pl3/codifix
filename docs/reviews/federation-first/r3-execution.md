@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out watcher-replacement knowledge family
+
+- Added five sources and four draft questions for stale file-object watches,
+  same-metadata content changes, invalid candidates, event loss and explicit
+  adoption/durability limits. No actual host configuration is read or changed.
+- Canonical rubric and four pack/CLI checks pass without skips. Forty held-out
+  questions and seven coding repositories are materialized; fifteen knowledge
+  families and five coding repositories remain. All labels remain draft.
+
 ## 2026-09-15 held-out quantization-error knowledge family
 
 - Added five source documents and four draft questions distinguishing per-reading
