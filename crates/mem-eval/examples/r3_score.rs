@@ -87,7 +87,7 @@ fn run() -> Result<()> {
         Some("score") => {
             let mut evidence: KnowledgeEvidence = read(Path::new(&args[1]))?;
             ensure!(
-                evidence.ballots.is_empty(),
+                evidence.ballots.is_empty() && evidence.history.is_empty(),
                 "use the original unadjudicated evidence; do not replace prior ballots"
             );
             let ballots: Vec<Ballot> = read(Path::new(&args[2]))?;

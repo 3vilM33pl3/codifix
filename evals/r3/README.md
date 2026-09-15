@@ -237,9 +237,34 @@ one trailing LF (`rubric_bytes`); their raw SHA-256 is locked in manifest assets
 The first supplier-handover family's four machine-readable rubrics are drafted
 under its `private/` directory. They remain unapproved, not frozen labels.
 
-This utility does not yet collect/reconcile reviews across an interrupted full
-campaign; that integration remains open. Test ballots are explicitly synthetic
-and confer no benchmark label approval or product-quality evidence.
+For a complete campaign execution, export and apply reviews with the CLI:
+
+```sh
+memory eval campaign review --manifest CAMPAIGN.json --artifact RUN/artifact.json --out REVIEW
+memory eval campaign review --manifest CAMPAIGN.json --artifact RUN/artifact.json --ballots BATCH.json --out ADJUDICATED
+```
+
+Give reviewers only `REVIEW/packets/` and `REVIEW/ballots/`. The trusted operator
+collects ballots in `REVIEW/batch-template.json`'s `updates` array; each entry has
+`ballot` and `replaces_sha256` (null for a new reviewer). Keep the batch's original
+`artifact_sha256`. Applying creates `ADJUDICATED/artifact.json` and `report.json`
+without touching the source or invoking a provider. Outputs must be new; private
+directories/files are created with modes 0700/0600 on Unix.
+
+For amendments, export from the latest adjudicated artifact and supply the exact
+canonical SHA-256 of the reviewer's previous ballot in `replaces_sha256`. This is
+the compact serialized `Ballot` contract, including sorted judgment keys. The
+old ballot is retained in `knowledge_review.history`, bound to its replacement;
+another reviewer's dissent cannot be removed. Retain all source artifacts and
+operator provenance. Model diagnoses must never be relabeled as human decisions.
+
+Pending human judgments no longer abort otherwise valid task execution. The run
+retains pending evidence and completes remaining work; its final report still
+fails closed until judgments are resolved. Campaign review validates all other
+execution evidence first and cannot repair an interrupted campaign, missing
+usage or failed isolation. Resume of interrupted execution remains separate.
+Test ballots are explicitly synthetic and confer no benchmark label approval
+or product-quality evidence.
 
 ### Campaign uncertainty
 

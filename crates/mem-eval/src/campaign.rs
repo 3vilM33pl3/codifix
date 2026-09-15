@@ -14,6 +14,7 @@ pub mod baselines;
 pub mod budget;
 pub mod provider_results;
 pub mod retriever;
+pub mod review;
 pub mod scoring;
 mod statistics;
 pub use statistics::{Comparison, Report, TrackReport, report};

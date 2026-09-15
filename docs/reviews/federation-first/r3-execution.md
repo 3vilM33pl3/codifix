@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 campaign-wide blinded review
+
+- Added CLI export/apply of evidence-bound review packets and human ballots.
+  Applying writes a new artifact without rerunning providers or changing measured
+  usage/timing. Amendments require the exact prior ballot and retain linked
+  history; dissent and model-only judgments cannot silently pass.
+- Valid pending review no longer aborts remaining execution. Ordinary reports
+  still fail closed until adjudication is resolved. Review rejects incomplete
+  execution, missing usage, isolation failures and altered artifact bindings.
+- Verification: 55 evaluator and 232 CLI tests passed; real campaign CLI and
+  scoring executable tests passed with synthetic ballots, zero skips. Scoped
+  Clippy, formatting and boundary checks passed. CI now requires the campaign
+  review workflow test. This is not label approval or paid evaluation evidence.
+
 ## 2026-09-15 representative evidence-publication repository
 
 - Added a second five-module development coding repository and three cumulative

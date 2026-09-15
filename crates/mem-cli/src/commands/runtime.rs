@@ -2453,6 +2453,20 @@ pub(in crate::commands) enum EvalCampaignCommand {
         #[arg(long)]
         artifact: PathBuf,
     },
+    /// Export blinded review packets, or apply a hash-bound human review batch.
+    #[command(after_help = EVAL_CAMPAIGN_AFTER_HELP)]
+    Review {
+        #[arg(long)]
+        manifest: PathBuf,
+        #[arg(long)]
+        artifact: PathBuf,
+        /// New private output directory; existing evidence is never overwritten.
+        #[arg(long)]
+        out: PathBuf,
+        /// Apply reviewer decisions instead of exporting packets. No provider calls.
+        #[arg(long)]
+        ballots: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Args)]

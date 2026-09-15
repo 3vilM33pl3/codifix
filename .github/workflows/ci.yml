@@ -318,6 +318,8 @@ jobs:
           cargo build -p mem-eval --example r3_score --locked
           MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_SCORE=1 \
             node --test evals/r3/scoring.test.mjs
+          MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_REVIEW=1 \
+            node --test evals/r3/review.test.mjs
       - run: |
           cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
           cargo run --locked --bin memory -- \

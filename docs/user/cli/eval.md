@@ -38,7 +38,7 @@ It does not use the CLI's ambient service or provider credentials. Output paths
 must be new; interrupted evidence is retained, never overwritten or blindly retried.
 The runner revalidates the locked manifest and assets after every driver exit,
 including the final task. Changed inputs, model/build mismatches, skipped or
-unresolved results, inconsistent token usage and uncertain charges stop further
+unbacked pending results, inconsistent token usage and uncertain charges stop further
 dispatch. A valid incorrect answer remains a measurable result, not an execution
 error. This validation is not a substitute for container/network isolation.
 
@@ -49,8 +49,22 @@ a driver's success flag or automated judge alone is insufficient. The trusted-ho
 `r3_score` utility prepares blinded packets and checks human ballots, exact-source
 citations and conflicting decisions. Missing or unresolved reviews invalidate
 official evidence. Older offline smoke artifacts remain readable. Preparation,
-review and privacy instructions are in the R3 README linked above; this is not
-yet a complete campaign review UI or an authorization to run paid evaluations.
+review and privacy instructions are in the R3 README linked above.
+
+`memory eval campaign review --manifest <campaign.json> --artifact <artifact.json>
+--out <new-directory>` exports blinded packets and blank ballots. Give reviewers
+only `packets/` and `ballots/`; keep the artifact and execution mapping private.
+Collect genuine decisions into the exported batch template, then add
+`--ballots <batch.json>` with a different new output directory to apply them.
+This writes a new artifact and report without changing the original or invoking
+providers. Changing an existing review requires its exact predecessor digest;
+the previous ballot remains in the evidence history. Dissent stays unresolved
+until explicitly reconciled by the reviewers. JSON does not authenticate people.
+
+Genuine pending review evidence allows execution to finish and be saved, but the
+campaign report remains invalid until adjudication is resolved. Review cannot
+repair missing usage, interrupted execution or isolation failures. None of these
+commands authorizes paid evaluations or approves benchmark labels.
 
 ## Suite Format
 

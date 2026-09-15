@@ -325,6 +325,114 @@ fn official_knowledge_scores_require_bound_independent_review() {
 }
 
 #[test]
+fn blinded_campaign_review_retains_execution_and_revision_history() {
+    let m = fixture();
+    let mut original = artifact(&m);
+    original.offline = true;
+    let index = original
+        .observations
+        .iter()
+        .position(|o| o.knowledge_review.is_some())
+        .unwrap();
+    let pending = &mut original.observations[index];
+    pending.knowledge_review.as_mut().unwrap().ballots.clear();
+    pending.unresolved_rubric = true;
+    pending.result.success = false;
+    assert!(!report(&m, &original).unwrap().harness_valid);
+    let packets = review::prepare(&m, &original).unwrap();
+    assert_eq!(packets.len(), 1500);
+    let packet = original.observations[index]
+        .knowledge_review
+        .as_ref()
+        .unwrap()
+        .packet
+        .clone();
+    let mut human = packet
+        .blank_ballot("synthetic-first-reviewer".into())
+        .unwrap();
+    for j in human.judgments.values_mut() {
+        j.decision = scoring::Decision::Pass;
+        j.reason = "Synthetic test decision".into();
+    }
+    let first_batch = review::ReviewBatch {
+        artifact_sha256: digest_value(&original).unwrap(),
+        updates: vec![review::BallotUpdate {
+            ballot: human.clone(),
+            replaces_sha256: None,
+        }],
+    };
+    let accepted = review::apply(&m, &original, &first_batch).unwrap();
+    assert!(report(&m, &accepted).unwrap().harness_valid);
+    assert_eq!(
+        accepted.observations[index].result.duration_ms,
+        original.observations[index].result.duration_ms
+    );
+    assert_eq!(
+        accepted.observations[index].execution_microusd,
+        original.observations[index].execution_microusd
+    );
+    assert_eq!(
+        digest_value(&accepted).unwrap(),
+        digest_value(&review::apply(&m, &original, &first_batch).unwrap()).unwrap()
+    );
+    assert!(review::apply(&m, &accepted, &first_batch).is_err());
+    let mut dissent = human.clone();
+    dissent.reviewer = "synthetic-second-reviewer".into();
+    dissent.judgments.values_mut().next().unwrap().decision = scoring::Decision::Fail;
+    let conflicting = review::apply(
+        &m,
+        &accepted,
+        &review::ReviewBatch {
+            artifact_sha256: digest_value(&accepted).unwrap(),
+            updates: vec![review::BallotUpdate {
+                ballot: dissent.clone(),
+                replaces_sha256: None,
+            }],
+        },
+    )
+    .unwrap();
+    assert!(conflicting.observations[index].unresolved_rubric);
+    assert!(!report(&m, &conflicting).unwrap().harness_valid);
+    let mut correction = dissent.clone();
+    for j in correction.judgments.values_mut() {
+        j.decision = scoring::Decision::Pass;
+        j.reason = "Synthetic reviewer revisited source evidence".into();
+    }
+    let mut resolution = review::ReviewBatch {
+        artifact_sha256: digest_value(&conflicting).unwrap(),
+        updates: vec![review::BallotUpdate {
+            ballot: correction,
+            replaces_sha256: None,
+        }],
+    };
+    assert!(review::apply(&m, &conflicting, &resolution).is_err());
+    resolution.updates[0].replaces_sha256 = Some(digest_value(&dissent).unwrap());
+    let resolved = review::apply(&m, &conflicting, &resolution).unwrap();
+    let evidence = resolved.observations[index]
+        .knowledge_review
+        .as_ref()
+        .unwrap();
+    assert_eq!(evidence.history.len(), 1);
+    assert_eq!(evidence.ballots.len(), 2);
+    assert_eq!(
+        digest_value(&evidence.history[0].ballot).unwrap(),
+        digest_value(&dissent).unwrap()
+    );
+    assert!(report(&m, &resolved).unwrap().harness_valid);
+    let mut tampered = resolved;
+    tampered.observations[index]
+        .knowledge_review
+        .as_mut()
+        .unwrap()
+        .history[0]
+        .replacement_sha256 = digest(b"forged");
+    assert!(!report(&m, &tampered).unwrap().harness_valid);
+    let mut broken = original;
+    broken.observations[index].result.token_usage = None;
+    assert!(review::prepare(&m, &broken).is_err());
+}
+
+#[test]
 fn draft_labels_or_changed_manifest_cannot_be_authorized() {
     let mut m = fixture();
     let a = artifact(&m);

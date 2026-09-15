@@ -16,7 +16,14 @@ fn split(value: &str) -> Result<Split> {
 }
 
 fn exclusive_json<T: serde::Serialize>(path: &Path, data: &T) -> Result<()> {
-    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
     file.write_all(&serde_json::to_vec_pretty(data)?)?;
     file.sync_all()?;
     Ok(())
@@ -27,6 +34,68 @@ mod tests;
 
 pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
     match command {
+        EvalCampaignCommand::Review {
+            manifest,
+            artifact,
+            out,
+            ballots,
+        } => {
+            let manifest = Manifest::load(&manifest)?;
+            let artifact: Artifact = bounded_json(&artifact)?;
+            let packets = c::review::prepare(&manifest, &artifact)?;
+            let updated = ballots
+                .as_ref()
+                .map(|path| {
+                    let batch: c::review::ReviewBatch = bounded_json(path)?;
+                    c::review::apply(&manifest, &artifact, &batch)
+                })
+                .transpose()?;
+            let mut builder = std::fs::DirBuilder::new();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                builder.mode(0o700);
+            }
+            builder
+                .create(&out)
+                .context("review output must be a new directory")?;
+            exclusive_json(
+                &out.join("source-artifact-sha256.json"),
+                &c::digest_value(&artifact)?,
+            )?;
+            if let Some(updated) = updated {
+                exclusive_json(&out.join("artifact.json"), &updated)?;
+                let report = c::report(&manifest, &updated)?;
+                exclusive_json(&out.join("report.json"), &report)?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                builder.create(out.join("packets"))?;
+                builder.create(out.join("ballots"))?;
+                for packet in &packets {
+                    exclusive_json(
+                        &out.join("packets")
+                            .join(format!("{}.json", packet.review_id)),
+                        packet,
+                    )?;
+                    exclusive_json(
+                        &out.join("ballots")
+                            .join(format!("{}.json", packet.review_id)),
+                        &packet.blank_ballot("pending-reviewer".into())?,
+                    )?;
+                }
+                exclusive_json(
+                    &out.join("batch-template.json"),
+                    &c::review::ReviewBatch {
+                        artifact_sha256: c::digest_value(&artifact)?,
+                        updates: vec![],
+                    },
+                )?;
+                println!(
+                    "Prepared {} blinded packets. Only packets/ and blank ballots/ belong with reviewers; no provider calls were made.",
+                    packets.len()
+                );
+            }
+        }
         EvalCampaignCommand::Plan {
             manifest,
             split: requested,
@@ -142,6 +211,19 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn bounded_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
+    use std::io::Read;
+    let mut bytes = vec![];
+    std::fs::File::open(path)?
+        .take(256 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)?;
+    ensure!(
+        bytes.len() <= 256 * 1024 * 1024,
+        "oversized campaign review input"
+    );
+    Ok(serde_json::from_slice(&bytes)?)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -341,7 +423,7 @@ fn validate_task_evidence(
     ensure!(observation.work == *work, "driver returned another task");
     // Supplied semantic evidence must agree with the locked sources/labels even
     // in offline mode; absence remains allowed only for diagnostic smoke runs.
-    c::scoring::validate_observation(manifest, observation, false)?;
+    c::scoring::validate_pending_observation(manifest, observation)?;
     ensure!(
         observation.model == manifest.model,
         "driver model/configuration mismatch"
@@ -349,8 +431,7 @@ fn validate_task_evidence(
     ensure!(
         observation.result.item_id == work.case_id
             && !observation.result.skipped
-            && observation.result.duration_ms.is_some()
-            && !observation.unresolved_rubric,
+            && observation.result.duration_ms.is_some(),
         "missing or unresolved task evidence"
     );
     ensure!(

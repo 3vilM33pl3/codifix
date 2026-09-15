@@ -124,6 +124,15 @@ pub struct KnowledgeEvidence {
     pub packet: ReviewPacket,
     pub execution_nonce: String,
     pub ballots: Vec<Ballot>,
+    #[serde(default)]
+    pub history: Vec<SupersededBallot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SupersededBallot {
+    pub ballot: Ballot,
+    pub replacement_sha256: String,
 }
 
 impl KnowledgeEvidence {
@@ -154,6 +163,7 @@ impl KnowledgeEvidence {
             packet,
             execution_nonce,
             ballots: vec![],
+            history: vec![],
         })
     }
 }
@@ -355,12 +365,30 @@ pub(super) fn validate_with_hash(
     observation: &Observation,
     official: bool,
 ) -> Result<()> {
+    validate_for_review_with_hash(manifest, manifest_hash, observation, official, false)
+}
+
+pub fn validate_pending_observation(manifest: &Manifest, observation: &Observation) -> Result<()> {
+    validate_for_review_with_hash(manifest, &digest_value(manifest)?, observation, false, true)
+}
+
+pub(super) fn validate_for_review_with_hash(
+    manifest: &Manifest,
+    manifest_hash: &str,
+    observation: &Observation,
+    official: bool,
+    allow_pending: bool,
+) -> Result<()> {
     let case = manifest
         .cases
         .iter()
         .find(|c| c.id == observation.work.case_id)
         .ok_or_else(|| anyhow::anyhow!("unknown scoring case"))?;
     let Some(evidence) = &observation.knowledge_review else {
+        ensure!(
+            !observation.unresolved_rubric,
+            "pending rubric without review evidence"
+        );
         ensure!(
             !official || case.track != Track::Knowledge,
             "missing independent knowledge review"
@@ -411,20 +439,53 @@ pub(super) fn validate_with_hash(
             "review source hash mismatch"
         );
     }
-    let result = assess(packet, &evidence.ballots)?;
+    let result = assess_evidence(evidence)?;
     ensure!(
-        !result.unresolved && !observation.unresolved_rubric,
+        result.unresolved == observation.unresolved_rubric && (allow_pending || !result.unresolved),
         "unresolved knowledge review"
     );
     ensure!(
         result.success == observation.result.success,
         "knowledge score mismatch"
     );
-    ensure!(
-        !result.critical_failure || observation.critical_failure,
-        "hidden critical scoring failure"
-    );
     Ok(())
+}
+
+pub(super) fn critical_failure(observation: &Observation) -> bool {
+    observation.critical_failure
+        || observation
+            .knowledge_review
+            .as_ref()
+            .is_some_and(|e| assess_evidence(e).map_or(true, |a| a.critical_failure))
+}
+
+pub fn assess_evidence(evidence: &KnowledgeEvidence) -> Result<Assessment> {
+    ensure!(evidence.history.len() <= 256, "too many review revisions");
+    let mut hashes = BTreeSet::new();
+    for (index, previous) in evidence.history.iter().enumerate() {
+        assess(&evidence.packet, std::slice::from_ref(&previous.ballot))?;
+        ensure!(
+            hashes.insert(digest_value(&previous.ballot)?),
+            "duplicate review revision"
+        );
+        let next = evidence.history[index + 1..]
+            .iter()
+            .map(|h| &h.ballot)
+            .chain(evidence.ballots.iter())
+            .find(|b| b.reviewer == previous.ballot.reviewer)
+            .ok_or_else(|| anyhow::anyhow!("review revision lost its successor"))?;
+        ensure!(
+            next.kind == previous.ballot.kind && digest_value(next)? == previous.replacement_sha256,
+            "invalid review revision chain"
+        );
+    }
+    for ballot in &evidence.ballots {
+        ensure!(
+            hashes.insert(digest_value(ballot)?),
+            "review revision cycle"
+        );
+    }
+    assess(&evidence.packet, &evidence.ballots)
 }
 
 #[cfg(test)]

@@ -86,6 +86,14 @@ fn ratio(a: f64, b: f64) -> Option<f64> {
 }
 
 pub fn report(manifest: &Manifest, artifact: &Artifact) -> Result<Report> {
+    report_inner(manifest, artifact, false)
+}
+
+pub(super) fn report_for_review(manifest: &Manifest, artifact: &Artifact) -> Result<Report> {
+    report_inner(manifest, artifact, true)
+}
+
+fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -> Result<Report> {
     let plan = manifest.plan(artifact.split)?;
     let mut errors = Vec::new();
     if artifact.manifest_sha256 != plan.manifest_sha256 {
@@ -105,11 +113,12 @@ pub fn report(manifest: &Manifest, artifact: &Artifact) -> Result<Report> {
         .collect();
     let mut configuration = None;
     for observation in &artifact.observations {
-        if let Err(error) = scoring::validate_with_hash(
+        if let Err(error) = scoring::validate_for_review_with_hash(
             manifest,
             &plan.manifest_sha256,
             observation,
             !artifact.offline,
+            allow_pending,
         ) {
             errors.push(error.to_string());
         }
@@ -126,7 +135,7 @@ pub fn report(manifest: &Manifest, artifact: &Artifact) -> Result<Report> {
             || observation.result.duration_ms.is_none()
             || observation.result.token_usage.is_none()
             || observation.execution_microusd.is_none()
-            || observation.unresolved_rubric
+            || (observation.unresolved_rubric && !allow_pending)
         {
             errors.push(format!(
                 "missing or unresolved task evidence: {}",
@@ -193,6 +202,7 @@ pub fn report(manifest: &Manifest, artifact: &Artifact) -> Result<Report> {
     }
     let harness_valid = errors.is_empty();
     let official_evidence = harness_valid
+        && !artifact.observations.iter().any(|o| o.unresolved_rubric)
         && !artifact.offline
         && artifact.split == Split::HeldOut
         && manifest
@@ -294,7 +304,7 @@ pub fn report(manifest: &Manifest, artifact: &Artifact) -> Result<Report> {
                 && comparisons
                     .iter()
                     .all(|c| c.delta >= 0.05 && c.simultaneous_lower > 0.0)
-                && !rows.iter().any(|o| o.critical_failure)
+                && !rows.iter().any(|o| scoring::critical_failure(o))
                 && cost_ratio.is_some_and(|r| r <= 2.0)
                 && median_latency_ratio.is_some_and(|r| r <= 2.0);
             tracks.push(TrackReport {
