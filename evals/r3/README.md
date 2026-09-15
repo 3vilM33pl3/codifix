@@ -32,7 +32,9 @@ sampled traces, completed requests and affected users. The seventh,
 [cohort assignment](representative/held-out/cohort-assignment/review.md), covers
 stable account identity and retained exposures. The eighth,
 [Unicode identity](representative/held-out/unicode-identity/review.md), separates
-normalized keys, display spelling and authorized ownership; seventeen remain.
+normalized keys, display spelling and authorized ownership. The ninth,
+[quantization error](representative/held-out/quantization-error/review.md), tests
+conversion placement, signed rounding and irreversible display values; sixteen remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:

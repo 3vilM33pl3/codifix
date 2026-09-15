@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out quantization-error knowledge family
+
+- Added five source documents and four draft questions distinguishing per-reading
+  rounding from final batch conversion, checked signed accumulation, reviewed
+  historical repair and the limits of recovering raw data from rounded values.
+- Canonical rubric validation and four pack/CLI tests pass without skips. There
+  are 36 held-out questions and seven coding repositories; sixteen knowledge
+  families and five coding repositories remain. No paid calls or label approval.
+
 ## 2026-09-15 held-out Unicode-identity knowledge family
 
 - Added five sources and four draft rubrics for explicit normalization rules,
