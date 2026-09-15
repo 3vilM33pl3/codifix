@@ -1,5 +1,18 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 mediated rehearsal deadline and retained evidence
+
+- The first mediated 75-task run reached its outer test deadline: the controller
+  finished task 75 after the CLI had been interrupted, so no completed campaign
+  artifact was accepted. Its partial journals/diagnostics remain at
+  `/data/tmp/memory-r3-rehearsal-cli-mxOzFg`. It is not passing evidence.
+- Increased the mediated test's overall allowance from ten to fifteen minutes,
+  leaving per-task deadlines, call/token/spend limits, labels and scoring unchanged.
+  A fresh zero-spend synthetic rerun is in progress, not yet claimed passed.
+- Workspace Clippy and the lean CLI check passed (the latter retains existing
+  dead-code warnings). Required-database workspace tests passed before this
+  test-only timeout adjustment.
+
 ## 2026-09-15 campaign multi-call integration
 
 - Added an explicit, bounded `provider_budget` manifest extension. Absent fields

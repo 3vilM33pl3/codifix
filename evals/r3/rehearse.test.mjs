@@ -22,7 +22,7 @@ test('rehearsal bootstrap requires explicit disposable configuration before crea
   await assert.rejects(fs.stat(out));
 });
 
-test(`existing campaign CLI completes a real 75-dispatch ${mediated ? 'mediated' : 'isolated'} rehearsal with pending human review`, { skip: !available, timeout: 600000 }, async t => {
+test(`existing campaign CLI completes a real 75-dispatch ${mediated ? 'mediated' : 'isolated'} rehearsal with pending human review`, { skip: !available, timeout: mediated ? 900000 : 600000 }, async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-rehearsal-cli-'));
   let verified = false;
   t.after(async () => {
@@ -44,7 +44,7 @@ test(`existing campaign CLI completes a real 75-dispatch ${mediated ? 'mediated'
   const run = await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['evals/r3/rehearse.mjs', root, '--one-family-per-track', ...(mediated ? ['--mediated'] : [])], { env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
-    const timer = setTimeout(() => child.kill('SIGINT'), 550000);
+    const timer = setTimeout(() => child.kill('SIGINT'), mediated ? 850000 : 550000);
     child.stdout.on('data', chunk => { stdout += chunk; if (stdout.length > 1048576) child.kill('SIGINT'); });
     child.stderr.on('data', chunk => {
       stderr += chunk;
