@@ -42,7 +42,7 @@ function files(family, relative) {
     return [name];
   });
 }
-const knowledge = ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure'];
+const knowledge = ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure', 'timezone-window'];
 const coding = ['durable-importer', 'evidence-publication', 'configuration-rollout', 'dependency-build'];
 for (const family of selection ? knowledge.slice(0, 1) : knowledge) {
   const sources = files(family, 'public').map(relative => {

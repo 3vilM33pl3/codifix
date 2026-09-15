@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 civil-time knowledge family
+
+- Added five sources defining a synthetic zone table, civil-date identity and
+  explicit fold/gap policy, with four draft questions and a review sheet.
+  Sources distinguish one rehearsal from unknown historical customer impact.
+- Canonical rubric and both pack/CLI tests pass, no skips. Twenty-four development
+  knowledge questions are materialized; no live timezone or provider lookup was
+  used to supply benchmark facts. Label and evaluation approval remain pending.
+
 ## 2026-09-15 capacity-pressure knowledge family
 
 - Added five synthetic sources and four draft rubrics on pool acquisition,
