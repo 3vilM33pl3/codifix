@@ -19,12 +19,51 @@ def col_label(n):
     return result
 
 
+def check_ai_revision(model,errors):
+    """Check the approved operating basis and safe publication interfaces.
+
+    Native scenario fixtures separately evaluate formula outputs; these checks
+    catch generator changes that lose an input, historical source or control.
+    """
+    inputs=model['initialInputValues'];immutable=model['immutableCells'];formulas=model['formulaCells']
+    required={'staffing':118,'employeeallowance':119,'employeeutil':120,'employeesubscription':121}
+    if any(model['assumptionRows'].get(k)!=v for k,v in required.items()):errors.append('AI assumption interface drift')
+    if model['sheetIds'].get('Employee AI')!=2040000004:errors.append('Employee AI native tab identity drift')
+    for case in 'BCD':
+        if [inputs[f'Assumptions!{case}{r}'] for r in range(118,122)]!=[0,5000,.5,250]:errors.append('Approved employee AI defaults drift')
+    expected_hires={5:1,6:1,7:2,8:4,10:10,12:8,13:12,16:16}
+    historical=[1,1,2,3,2,5,6,8,10,12,15,16,18,19,21,23,26,28]
+    heads=[]
+    for month in range(1,37):
+        heads.append(sum(inputs[f'Team!AQ{r}'] for r in range(5,23) if month>=inputs[f'Team!AM{r}']))
+    if [heads[i] for i in [11,23,35]]!=[7,8,8] or sum(heads[:24])!=146 or sum(heads)!=242:errors.append('Approved lean hiring economics drift')
+    for r,old_hire in zip(range(5,23),historical):
+        if inputs[f'Team!AQ{r}']!=(1 if r in expected_hires else 0):errors.append(f'Lean role inclusion drift: {r}')
+        if r in expected_hires and inputs[f'Team!AM{r}']!=expected_hires[r]:errors.append(f'Lean role hire drift: {r}')
+        if immutable.get(f'Team!AR{r}')!=old_hire or immutable.get(f'Team!AS{r}')!=1:errors.append(f'Historical staff source lost: {r}')
+        if not all(f'Team!{c}{r}' in inputs for c in ['AM','AN','AQ']):errors.append(f'Uncaptured staffing control: {r}')
+    for col in [col_label(c) for c in range(3,39)]:
+        # Prevent common economic wiring mistakes, without claiming that these
+        # static checks replace the independent native reconciliation fixtures.
+        if f'{col}38' not in formulas[f'P&L & Cash!{col}21']:errors.append('Employee AI Opex omitted')
+        if f'{col}38' in formulas[f'P&L & Cash!{col}20']:errors.append('AI incorrectly receives generic Opex contingency')
+        if f'{col}39' not in formulas[f'Costs!{col}34']:errors.append('Delivery AI omitted from cost of sales')
+    if 'B74' not in formulas['Summary!B22'] or '+B47' not in formulas['Summary!B42']:errors.append('AI funding or cash-spending bridge omitted')
+    case_ids={x['id'] for x in model['cases']}
+    if not {'ai_util25','ai_util50','ai_util100','ai_budget2000','ai_budget5000','ai_budget10000','historical_team_ai','lean_capacity_stress'}<=case_ids:errors.append('Missing approved AI sensitivities')
+    publication=model['publication']
+    if len(model['cases'])>publication['resultEndRow']-publication['resultStartRow']+1:errors.append('Sensitivity result range too short')
+    if any(not re.fullmatch(r'Sensitivity!AB\d+',x) for x in publication['captureCells'].values()):errors.append('Captured values moved into comparison outputs')
+    if not all(f'Checks!B{r}' in {x['cell'] for x in model['checks']} for r in range(28,35)):errors.append('Mandatory AI reconciliations omitted')
+
+
 def run(london_path,newyork_path):
     london=json.loads(pathlib.Path(london_path).read_text())
     newyork=json.loads(pathlib.Path(newyork_path).read_text())
     errors=[]
     if london['formulaCells']!=newyork['formulaCells']:errors.append('Regional formula structures differ')
     for model in [london,newyork]:
+        check_ai_revision(model,errors)
         inputs=model['editableCells'];formula=model['formulaCells']
         if len(inputs)!=len(set(inputs)):errors.append('Duplicate editable input')
         if set(inputs)!=set(model['publication']['captureCells']):errors.append('Incomplete captured-input coverage')
@@ -63,7 +102,7 @@ def run(london_path,newyork_path):
         try:
             for node in graph:visit(node)
         except ValueError as exc:errors.append(str(exc))
-    result={'passed':not errors,'checks':['identical regional formula structure','all editable inputs uniquely captured','sparse case controls preserve live baseline','fixed opening balances immutable','scalar formula syntax and balanced parentheses','no formula dependency cycles'],'formulas_per_region':len(london['formulaCells']),'inputs_per_region':len(london['editableCells']),'errors':errors}
+    result={'passed':not errors,'checks':['identical regional formula structure','all editable inputs uniquely captured','sparse case controls preserve live baseline','fixed opening balances immutable','approved lean headcounts and employee-month totals','historical staff sources immutable','employee AI cash and allocation wiring','AI sensitivity and capture interfaces','scalar formula syntax and balanced parentheses','no formula dependency cycles'],'formulas_per_region':len(london['formulaCells']),'inputs_per_region':len(london['editableCells']),'errors':errors}
     print(json.dumps(result,indent=2));return 0 if not errors else 1
 
 if __name__=='__main__':

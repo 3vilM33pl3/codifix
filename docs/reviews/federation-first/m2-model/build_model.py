@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse, datetime as dt, hashlib, json, pathlib, re
 
 ROOT = pathlib.Path(__file__).resolve().parent
-VERSION = 'M2-2026-09-15-v1'
+VERSION = 'M2-2026-09-15-v2-ai'
 TODAY = '2026-09-15'
 NAVY = {'red':.059,'green':.137,'blue':.235}
 TEAL = {'red':.0,'green':.42,'blue':.42}
@@ -63,7 +63,7 @@ class Model:
         self.currency = 'GBP' if region=='london' else 'USD'
         self.ids = {s['properties']['title']:s['properties']['sheetId'] for s in self.metadata['sheets']}
         self.original_ids = dict(self.ids)
-        self.ids.update({'Costs':2040000001,'Cohorts':2040000002,'Checks':2040000003})
+        self.ids.update({'Costs':2040000001,'Cohorts':2040000002,'Checks':2040000003,'Employee AI':2040000004})
         self.cells = {name:{} for name in self.ids}
         self.formulas = {}
         self.editable = []
@@ -216,6 +216,11 @@ class Model:
         self.textrow(r,112,['INTERPRETATION','Readiness=1 assumes future gate clearance for the forecast. It does not authorise a customer pilot. Fractional account forecasts are expectations.'])
         self.textrow(r,113,['COST OWNERSHIP','Customer runtime reference spend is separated from Codifix costs. Customer capacity value and cash savings are outside these company models.'])
         self.textrow(r,114,['EXPANSION','Commitment expansion increases renewal contract value; workload growth is independently editable in row 34. No automatic workload equivalence is assumed.'])
+        add('staffing',118,'Staffing profile: 0 lean / 1 historical',0,'0 or 1',approved,note='0 uses editable Team AM hire and AQ inclusion; 1 uses preserved original AR hire and AS inclusion. Historical comparison uses the same live forecast and AI policy.')
+        add('employeeallowance',119,'Employee AI allowance',5000,'GBP / employee / month',approved,note='Founder-selected operating hypothesis. Subscriptions and metered usage share one allowance. No provider quote, spending approval or productivity validation.')
+        add('employeeutil',120,'Employee AI expected utilisation',.50,'share',approved,note='Expected expense = allowance × utilisation; unused first 24-month allowance remains earmarked cash in the funding target, never an expense.')
+        add('employeesubscription',121,'Employee AI subscription allocation ceiling',250,'GBP / employee / month',approved,note='Allocation ceiling within expected spending, not a fixed executed subscription commitment. MIN(ceiling, allowance × utilisation); subscription-included usage is excluded from incremental metered charges.')
+        self.textrow(r,123,['AGENTIC ENGINEERING','The lean eight-person team and GBP 5000 allowance at 50% utilisation are founder-selected hypotheses. M3 must measure engineering throughput, review/rework, AI spending and delivery capacity.'])
         self.textrow(r,115,['BLANK INPUTS','Required numeric blanks or invalid values produce unavailable calculations and failed input checks. Fix the input; never replace an unknown with zero.'])
 
     def monthly_headers(self,name,title):
@@ -229,33 +234,66 @@ class Model:
     def team(self):
         self.monthly_headers('Team','CODIFIX | REGIONAL TEAM AND COST ALLOCATION')
         self.textrow('Team',4,['Role','Annual base salary'])
-        for c,v in [(39,'Hire month'),(40,'Delivery share'),(41,'Function'),(42,'Source / status')]:self.set('Team',4,c,v)
+        for c,v in [(39,'Lean hire month'),(40,'Delivery share'),(41,'Function'),(42,'Source / status'),(43,'Lean included (0 / 1)'),(44,'Original hire month'),(45,'Historical included'),(46,'Active hire month'),(47,'Active included')]:self.set('Team',4,c,v)
         delivery={7:.10,10:.10,12:.60,16:1.0}
+        lean_hires={5:1,6:1,7:2,8:4,12:8,10:10,13:12,16:16}
         for r in range(5,23):
             self.set('Team',r,1,self.src[f'Team!A{r}'])
-            self.set('Team',r,2,self.src[f'Team!B{r}'],MONEY,True,note=f'Legacy {self.region} Team B{r}; unvalidated salary, retained 2026-09-15.')
-            self.set('Team',r,39,self.src[f'Team!AN{r}'],INT,True)
-            self.set('Team',r,40,delivery.get(r,0),PCT,True,note='Provisional delivery allocation; salary charged once. Customer success fully direct, solutions 60%, platform/enterprise engineers 10%.')
+            self.set('Team',r,2,self.src[f'Team!B{r}'],MONEY,True,note=f'Legacy {self.region} Team B{r}; unvalidated salary, retained 2026-09-15. Unit: local currency/year; owner: founder/finance.')
+            self.set('Team',r,39,lean_hires.get(r,self.src[f'Team!AN{r}']),INT,True,note='Approved lean schedule, 2026-09-15; month index; founder/finance owner; operating hypothesis. Excluded roles retain their original hire index for reference.')
+            self.set('Team',r,40,delivery.get(r,0),PCT,True,note='Provisional delivery allocation; salary and employee AI charged once. Customer success fully direct, solutions 60%, platform/enterprise 10%. Owner founder/finance; share; 2026-09-15.')
             group='GTM' if r in [11,13,17,18,21] else 'Product'
             self.set('Team',r,41,group)
-            self.set('Team',r,42,'Legacy salary/hire; M2 allocation hypothesis')
+            self.set('Team',r,42,'Legacy salary; approved lean hiring / inclusion; founder planning hypothesis, 2026-09-15')
+            self.set('Team',r,43,1 if r in lean_hires else 0,INT,True,note='Approved lean role inclusion, 2026-09-15; numeric 0/1; founder/finance owner; unvalidated capacity hypothesis. Historical profile uses AS instead.')
+            self.set('Team',r,44,self.src[f'Team!AN{r}'],INT,note=f'Immutable original Team AN{r} hiring assumption; regional source snapshot, 2026-09-15.')
+            self.set('Team',r,45,1,INT,note='Original 18-role plan; historical reference, not current hiring authority.')
+            self.f('Team',r,46,f'IF({self.a("staffing")}=1,$AR{r},IF(AND(ISNUMBER($AM{r}),$AM{r}>=1,$AM{r}=INT($AM{r})),$AM{r},NA()))',INT)
+            self.f('Team',r,47,f'IF({self.a("staffing")}=1,$AS{r},IF(AND(ISNUMBER($AQ{r}),OR($AQ{r}=0,$AQ{r}=1)),$AQ{r},NA()))',INT)
             for m in range(1,37):
                 c=m+2;cc=col(c)
-                self.f('Team',r,c,f'IF({cc}$2>=$AM{r}+{self.a("hiredelay")},$B{r}*{self.a("salarymult")}*{self.a("load")}/12,0)',MONEY)
-        labels={24:'Total loaded payroll',25:'Reserved delivery payroll before cost ownership',26:'Reserved delivery capacity (hours)',27:'Paid headcount',28:'Operating expense payroll after allocation',29:'Product operating payroll',30:'GTM operating payroll',31:'Recruitment expense',32:'Reserved delivery FTE'}
+                self.f('Team',r,c,f'IF({cc}$2>=$AT{r}+{self.a("hiredelay")},$AU{r}*$B{r}*{self.a("salarymult")}*{self.a("load")}/12,0)',MONEY)
+        labels={24:'Total loaded payroll',25:'Reserved delivery payroll before cost ownership',26:'Reserved delivery capacity (hours)',27:'Paid headcount',28:'Operating expense payroll after allocation',29:'Product operating payroll',30:'GTM operating payroll',31:'Recruitment expense',32:'Reserved delivery FTE',40:'Historical schedule paid headcount (reference)',41:'Historical schedule loaded payroll (reference)',42:'Loaded payroll saving versus historical schedule'}
         for r,label in labels.items():self.set('Team',r,1,label)
         for m in range(1,37):
             c=m+2;x=col(c)
             self.f('Team',24,c,f'SUM({x}5:{x}22)',MONEY)
             self.f('Team',25,c,f'SUMPRODUCT({x}5:{x}22,$AN$5:$AN$22)',MONEY)
-            self.f('Team',32,c,'+'.join(f'IF({x}$2>=$AM{r}+{self.a("hiredelay")},$AN{r},0)' for r in range(5,23)),NUM)
+            self.f('Team',32,c,'+'.join(f'IF({x}$2>=$AT{r}+{self.a("hiredelay")},$AU{r}*$AN{r},0)' for r in range(5,23)),NUM)
             self.f('Team',26,c,f'{x}32*{self.a("productivehours")}',NUM)
-            self.f('Team',27,c,'+'.join(f'IF({x}$2>=$AM{r}+{self.a("hiredelay")},1,0)' for r in range(5,23)),NUM)
+            self.f('Team',27,c,'+'.join(f'IF({x}$2>=$AT{r}+{self.a("hiredelay")},$AU{r},0)' for r in range(5,23)),NUM)
             self.f('Team',28,c,f'{x}24-{x}25*{self.a("serviceowner")}',MONEY)
             for rr,group in [(29,'Product'),(30,'GTM')]:
                 self.f('Team',rr,c,'+'.join(f'IF($AO{r}="{group}",{x}{r}*(1-$AN{r}*{self.a("serviceowner")}),0)' for r in range(5,23)),MONEY)
-            self.f('Team',31,c,'+'.join(f'IF({x}$2=$AM{r}+{self.a("hiredelay")},$B{r}*{self.a("salarymult")}*{self.a("recruit")}*{self.a("agency")},0)' for r in range(5,23)),MONEY)
-        self.textrow('Team',35,['Allocation basis','Annual salary × regional load / 12. Reserved delivery salary is cost of sales; remaining salary is operating expense. Contractors cover only demand above salaried capacity.'])
+            self.f('Team',31,c,'+'.join(f'IF({x}$2=$AT{r}+{self.a("hiredelay")},$AU{r}*$B{r}*{self.a("salarymult")}*{self.a("recruit")}*{self.a("agency")},0)' for r in range(5,23)),MONEY)
+            self.f('Team',40,c,'+'.join(f'IF({x}$2>=$AR{r}+{self.a("hiredelay")},$AS{r},0)' for r in range(5,23)),NUM)
+            self.f('Team',41,c,'+'.join(f'IF({x}$2>=$AR{r}+{self.a("hiredelay")},$AS{r}*$B{r}*{self.a("salarymult")}*{self.a("load")}/12,0)' for r in range(5,23)),MONEY)
+            self.f('Team',42,c,f'{x}41-{x}24',MONEY)
+        self.textrow('Team',35,['Allocation basis','Salary and employee AI each allocated once. Contractors cover only demand above salaried capacity. Zero included roles generate zero employee-linked costs and capacity.'])
+        self.textrow('Team',36,['Profile controls','Assumptions row 118 selects lean AM/AQ or preserved historical AR/AS. Included roles start at active hire plus the common hiring delay. Original role names and regional salary rows are retained.'])
+        self.textrow('Team',37,['Lean role scope','Founder covers product direction and early sales; original Account executive 1 row is the commercial lead. Staff output, quality and customer delivery capacity remain hypotheses requiring M3 evidence.'])
+        self.textrow('Team',44,['Reference savings','Payroll-only saving uses the same current regional salary/load/delay assumptions with the preserved original hiring schedule. It excludes AI, contractors and other cost offsets; the full historical case runs through the live forecast.'])
+
+    def employee_ai(self):
+        s='Employee AI';self.monthly_headers(s,'CODIFIX | EMPLOYEE AI SPENDING AND FUNDING HEADROOM')
+        labels={5:'Active included employees',6:'Allowance per employee (GBP / month)',7:'Expected utilisation',8:'Subscription allocation ceiling (GBP / employee)',9:'Expected spend per employee (GBP / month)',10:'Subscription allocation per employee (GBP)',11:'Additional metered usage per employee (GBP)',12:'Unused allowance per employee (GBP)',14:'Total AI allowance (reporting currency)',15:'Expected subscription spending',16:'Expected additional metered usage spending',17:'Total expected AI spending',18:'Unused allowance — funding headroom, not expense',19:'Cumulative unused allowance',20:'Employee AI allocated to delivery cost',21:'Employee AI allocated to Product operating expense',22:'Employee AI allocated to GTM operating expense',23:'Total allocated AI spending',24:'Allocation residual',26:'Expected AI spending (GBP)',27:'Unused allowance (GBP)',28:'Total AI allowance (GBP)'}
+        for r,label in labels.items():self.set(s,r,1,label)
+        for m in range(1,37):
+            c=m+2;x=col(c)
+            f=lambda r,e,fmt=MONEY:self.f(s,r,c,e,fmt)
+            f(5,f'Team!{x}27',NUM);f(6,self.a('employeeallowance'));f(7,self.a('employeeutil'),PCT);f(8,self.a('employeesubscription'))
+            f(9,f'{x}6*{x}7');f(10,f'MIN({x}8,{x}9)');f(11,f'MAX(0,{x}9-{x}10)');f(12,f'MAX(0,{x}6-{x}9)')
+            for r,perperson in [(14,6),(15,10),(16,11),(17,9),(18,12)]:f(r,f'{x}5*{x}{perperson}*Assumptions!$E$6')
+            f(19,f'SUM($C18:{x}18)')
+            f(20,f'Team!{x}32*{self.a("serviceowner")}*{x}9*Assumptions!$E$6')
+            for rr,group in [(21,'Product'),(22,'GTM')]:
+                f(rr,'+'.join(f'IF(AND({x}$2>=Team!$AT{r}+{self.a("hiredelay")},Team!$AO{r}="{group}"),Team!$AU{r}*(1-Team!$AN{r}*{self.a("serviceowner")})*{x}9*Assumptions!$E$6,0)' for r in range(5,23)))
+            f(23,f'SUM({x}20:{x}22)');f(24,f'ABS({x}17-{x}23)',NUM)
+            for rr,ref in [(26,17),(27,18),(28,14)]:f(rr,f'{x}{ref}/Assumptions!$E$6')
+        self.textrow(s,31,['Spending policy','The subscription input is an allocation ceiling within expected spending, not a signed fixed commitment. Subscription-included usage is excluded from additional metered usage. Zero utilisation means zero expected spending.'])
+        self.textrow(s,32,['Cost separation','Employee AI supports internal agentic engineering and business work. Customer-facing Memory inference and customer-owned agent runtimes stay on Costs. Employee AI receives no generic Opex contingency.'])
+        self.textrow(s,33,['Funding policy','Unused first 24-month allowance increases the month 24 cash target alongside the following three-month operating buffer. This is earmarked cash, not an expense, accounting provision or supplier payment.'])
+        self.textrow(s,34,['Evidence','GBP 5000 allowance,50% utilisation and eight staff are founder-selected hypotheses, dated 2026-09-15. They do not establish engineering productivity or equivalent delivery capacity. M3 must measure actual use and review/rework.'])
 
     def cohorts(self):
         self.monthly_headers('Cohorts','CODIFIX | ANNUAL CONTRACT COHORTS')
@@ -331,7 +369,7 @@ class Model:
 
     def costs(self):
         self.monthly_headers('Costs','CODIFIX | BOTTOM-UP DELIVERY COST AND CAPACITY')
-        labels={4:'Active service accounts (paid + pilots)',5:'Deployments',6:'Collections',7:'Questions',8:'Attempts including retries',9:'Stored GB including replicas',10:'Transferred GB',12:'Deployment infrastructure',13:'Gateway / PDS',14:'Identity / key infrastructure',15:'Origin and replica storage',16:'Transfer',17:'Backup and recovery reserve',18:'Recovery test infrastructure',19:'Memory inference',20:'Shared delivery infrastructure',21:'Codifix external Memory delivery costs',23:'Initial deployment, collection and security hours',24:'Origin-reviewed correction hours',25:'Administration and key operation hours',26:'Multi-party support and failed exchange hours',27:'Recovery exercise hours',28:'Codifix delivery hours demanded',29:'Allocated salaried delivery capacity',30:'Allocated salaried delivery cost',31:'Contractor shortfall hours',32:'Contractor delivery cost',33:'Codifix share of customer runtime spend',34:'Total cost of sales',35:'External cost of sales excluding employees',37:'Customer runtime spend outside Codifix',38:'Customer share of external Memory costs'}
+        labels={4:'Active service accounts (paid + pilots)',5:'Deployments',6:'Collections',7:'Questions',8:'Attempts including retries',9:'Stored GB including replicas',10:'Transferred GB',12:'Deployment infrastructure',13:'Gateway / PDS',14:'Identity / key infrastructure',15:'Origin and replica storage',16:'Transfer',17:'Backup and recovery reserve',18:'Recovery test infrastructure',19:'Memory inference',20:'Shared delivery infrastructure',21:'Codifix external Memory delivery costs',23:'Initial deployment, collection and security hours',24:'Origin-reviewed correction hours',25:'Administration and key operation hours',26:'Multi-party support and failed exchange hours',27:'Recovery exercise hours',28:'Codifix delivery hours demanded',29:'Allocated salaried delivery capacity',30:'Allocated salaried delivery cost',31:'Contractor shortfall hours',32:'Contractor delivery cost',33:'Codifix share of customer runtime spend',34:'Total cost of sales',35:'External cost of sales excluding employees',37:'Customer runtime spend outside Codifix',38:'Customer share of external Memory costs',39:'Employee AI allocated to delivery'}
         for r,label in labels.items():self.set('Costs',r,1,label)
         for m in range(1,37):
             c=m+2;x=col(c);f=lambda r,e,fmt=MONEY:self.f('Costs',r,c,e,fmt)
@@ -352,7 +390,7 @@ class Model:
             f(31,f'MAX(0,{x}28-{x}29)',NUM)
             f(32,f'{x}31*{self.a("contractor")}*Assumptions!$E$6*{self.a("directmult")}')
             f(33,f'IF({self.a("agentowner")}=0,0,IF(ISNUMBER({self.a("agentcost")}),{x}4*{self.a("agentcost")}*Assumptions!$E$6*{self.a("agentowner")},NA()))')
-            f(34,f'{x}21+{x}30+{x}32+{x}33');f(35,f'{x}21+{x}32+{x}33')
+            f(39,f"'Employee AI'!{x}20");f(34,f'{x}21+{x}30+{x}32+{x}33+{x}39');f(35,f'{x}21+{x}32+{x}33')
             f(37,f'IF(ISNUMBER({self.a("agentcost")}),{x}4*{self.a("agentcost")}*Assumptions!$E$6*(1-{self.a("agentowner")}),"PENDING")')
             f(38,f'SUM({x}12:{x}20)*{self.a("directmult")}*(1-{self.a("serviceowner")})')
         self.textrow('Costs',41,['No duplicate labour','Reserved delivery salary is paid once, including unused capacity. Additional contractor cost covers only excess demanded hours. Delivery allocations remain provisional.'])
@@ -360,7 +398,7 @@ class Model:
 
     def pnl(self):
         s='P&L & Cash';self.monthly_headers(s,'CODIFIX | PROFIT, WORKING CAPITAL AND CASH')
-        labels={4:'Recognised revenue',5:'Cost of sales',6:'Gross profit',7:'Gross margin',9:'Operating payroll after delivery allocation',10:'New ARR commissions',11:'Recruitment',12:'Software and tools',13:'Workspace',14:'Marketing',15:'Events',16:'Legal, accounting and payroll',17:'SOC 2 programme',18:'Insurance',19:'Travel',20:'Contingency on other operating expenses',21:'Total operating expense',22:'Operating result before tax (EBITDA basis)',23:'Capital expenditure cash',24:'Customer receipts',25:'Total operating and capital cash outflows',26:'Net operating and capital cash flow',27:'Cash before financing (includes opening cash)',28:'Gross financing proceeds',29:'Financing fees',30:'Opening monthly cash',31:'Closing cash',33:'Accounts receivable',34:'Deferred platform and pilot revenue',35:'Unbilled usage asset',36:'Paying accounts',37:'Paid headcount'}
+        labels={4:'Recognised revenue',5:'Cost of sales',6:'Gross profit',7:'Gross margin',9:'Operating payroll after delivery allocation',10:'New ARR commissions',11:'Recruitment',12:'Software and tools',13:'Workspace',14:'Marketing',15:'Events',16:'Legal, accounting and payroll',17:'SOC 2 programme',18:'Insurance',19:'Travel',20:'Contingency on other operating expenses',21:'Total operating expense',22:'Operating result before tax (EBITDA basis)',23:'Capital expenditure cash',24:'Customer receipts',25:'Total operating and capital cash outflows',26:'Net operating and capital cash flow',27:'Cash before financing (includes opening cash)',28:'Gross financing proceeds',29:'Financing fees',30:'Opening monthly cash',31:'Closing cash',33:'Accounts receivable',34:'Deferred platform and pilot revenue',35:'Unbilled usage asset',36:'Paying accounts',37:'Paid headcount',38:'Employee AI — Product and GTM operating expense'}
         for r,label in labels.items():self.set(s,r,1,label)
         for m in range(1,37):
             c=m+2;x=col(c);p=col(c-1);f=lambda r,e,fmt=MONEY:self.f(s,r,c,e,fmt)
@@ -369,7 +407,7 @@ class Model:
             f(12,f'-Team!{x}27*{self.a("tools")}');f(13,f'-Team!{x}27*{self.a("office")}')
             for r,k,start in [(14,'marketing',4),(15,'events',6),(19,'travel',6)]:f(r,f'IF({x}$2>={start},-{self.a(k)},0)')
             f(16,f'-{self.a("legal")}');f(17,f'IF({x}$2={self.a("soc2month")},-{self.a("soc2")},0)');f(18,f'-{self.a("insurance")}')
-            f(20,f'SUM({x}12:{x}19)*{self.a("contingency")}');f(21,f'SUM({x}9:{x}20)');f(22,f'{x}6+{x}21')
+            f(38,f"-SUM('Employee AI'!{x}21:{x}22)");f(20,f'SUM({x}12:{x}19)*{self.a("contingency")}');f(21,f'SUM({x}9:{x}20)+{x}38');f(22,f'{x}6+{x}21')
             f(23,f'-{self.a("capex")}');f(24,f'Revenue!{x}32');f(25,f'-{x}5-{x}21-{x}23');f(26,f'{x}24-{x}25')
             f(27,f'{self.a("openingcash")}+SUM($C26:{x}26)')
             f(28,f'IF({x}$2={self.a("financemonth")},Summary!$B$23,0)');f(29,f'-{x}28*{self.a("fees")}')
@@ -377,7 +415,7 @@ class Model:
             for r,ref in [(33,33),(34,34),(35,35)]:f(r,f'Revenue!{x}{ref}')
             f(36,f'Revenue!{x}10',NUM);f(37,f'Team!{x}27',NUM)
         self.textrow(s,40,['Cash convention','Invoices settle after the chosen whole-month delay. Delivery costs and operating expenses are paid in the service month. No bad debt, VAT/sales tax, corporation tax, debt or distributions are modelled.'])
-        self.textrow(s,41,['Financing convention','Gross financing is derived from 24-month cash need plus months 25–27 cash-spend buffer. Arrival after an earlier deficit is explicitly infeasible; no retroactive financing.'])
+        self.textrow(s,41,['Financing convention','Gross financing is derived from 24-month cash need, months 25–27 operating cash buffer and unused first 24-month employee AI allowance. AI headroom remains cash. Arrival after an earlier deficit is explicitly infeasible; no retroactive financing.'])
 
     def summary(self):
         s='Summary';self.textrow(s,1,['CODIFIX | AGENTIC ENTERPRISE FINANCIAL MODEL'])
@@ -387,21 +425,29 @@ class Model:
         for year in range(3):
             c=year+3;startcol=col(3+year*12);endcol=col(14+year*12)
             self.f(s,5,c,f'TEXT(EDATE(Assumptions!$E$10,{year*12}),"mmm-yy")&" to "&TEXT(EDATE(Assumptions!$E$10,{year*12+11}),"mmm-yy")')
-            for rr,sheet,sourcerow,flow in [(6,'Revenue',21,False),(7,'Revenue',10,False),(8,'Revenue',11,False),(9,'Revenue',26,True),(10,'P&L & Cash',6,True),(12,'Costs',34,True),(13,'P&L & Cash',21,True),(14,'P&L & Cash',22,True),(15,'Revenue',32,True),(16,'P&L & Cash',25,True),(17,'P&L & Cash',31,False),(18,'Team',27,False)]:
+            for rr,sheet,sourcerow,flow in [(6,'Revenue',21,False),(7,'Revenue',10,False),(8,'Revenue',11,False),(9,'Revenue',26,True),(10,'P&L & Cash',6,True),(12,'Costs',34,True),(13,'P&L & Cash',21,True),(14,'P&L & Cash',22,True),(15,'Revenue',32,True),(16,'P&L & Cash',25,True),(17,'P&L & Cash',31,False),(18,'Team',27,False),(19,'Employee AI',17,True)]:
                 expr=f"SUM('{sheet}'!{startcol}{sourcerow}:{endcol}{sourcerow})" if flow else f"'{sheet}'!{endcol}{sourcerow}"
                 self.f(s,rr,c,expr,NUM if rr in (7,8,18) else MONEY)
             x=col(c);self.f(s,11,c,f'IF({x}9=0,"",{x}10/{x}9)',PCT)
-        labels={6:'Ending recurring ARR',7:'Ending paying accounts (expected)',8:'Ending live deployments including pilots',9:'Recognised revenue',10:'Gross profit',11:'Gross margin on recognised revenue',12:'Cost of sales',13:'Operating expense',14:'Operating result before tax',15:'Customer cash receipts',16:'Operating and capital cash outflows',17:'Ending funded cash',18:'Ending paid headcount',21:'FUNDING | 24 MONTHS + FOLLOWING THREE MONTHS OF CASH SPEND',22:'Required net financing',23:'Required gross financing',24:'Financing fees',25:'Months 25–27 cash-spend buffer',26:'Minimum funded cash through month 24',27:'Closing cash at month 24',28:'Closing cash at month 36',29:'Historical net raise reference',30:'Required net financing less historical reference',31:'Months with a cash deficit before financing',32:'Required gross financing (GBP comparison)',33:'Derived annual net revenue retention',34:'USES OF CASH | FIRST 24 MONTHS',35:'Product operating payroll',36:'GTM operating payroll',37:'Salaried delivery payroll',38:'External delivery including contractors',39:'Recruitment and new ARR commissions',40:'Other operating expenses',41:'Capital expenditure',42:'Total cash uses',43:'Customer collections',44:'Opening unrestricted cash',45:'Net financing received through month 24',46:'Closing cash at month 24',49:'SENSITIVITY OUTPUTS | FORECAST TOTALS',50:'Total recognised revenue, 36 months',51:'Gross margin, 36-month revenue weighted',52:'Ending recurring ARR in GBP',53:'Active pilots pending after horizon',54:'Planned pilot starts shifted past horizon',55:'Unbilled usage asset at horizon',56:'Accounts receivable at horizon',57:'Deferred revenue at horizon'}
+        labels={6:'Ending recurring ARR',7:'Ending paying accounts (expected)',8:'Ending live deployments including pilots',9:'Recognised revenue',10:'Gross profit',11:'Gross margin on recognised revenue',12:'Cost of sales',13:'Operating expense',14:'Operating result before tax',15:'Customer cash receipts',16:'Operating and capital cash outflows',17:'Ending funded cash',18:'Ending paid headcount',19:'Employee AI expected spending',21:'FUNDING | 24 MONTHS + OPERATING BUFFER + AI HEADROOM',22:'Required net financing',23:'Required gross financing',24:'Financing fees',25:'Months 25–27 cash-spend buffer',26:'Minimum funded cash through month 24',27:'Closing cash at month 24',28:'Closing cash at month 36',29:'Historical net raise reference',30:'Required net financing less historical reference',31:'Months with a cash deficit before financing',32:'Required gross financing (GBP comparison)',33:'Derived annual net revenue retention',34:'USES OF CASH | FIRST 24 MONTHS',35:'Product operating payroll',36:'GTM operating payroll',37:'Salaried delivery payroll',38:'External delivery including contractors',39:'Recruitment and new ARR commissions',40:'Other operating expenses',41:'Capital expenditure',42:'Total cash uses',43:'Customer collections',44:'Opening unrestricted cash',45:'Net financing received through month 24',46:'Closing cash at month 24',49:'SENSITIVITY OUTPUTS | FORECAST TOTALS',50:'Total recognised revenue, 36 months',51:'Gross margin, 36-month revenue weighted',52:'Ending recurring ARR in GBP',53:'Active pilots pending after horizon',54:'Planned pilot starts shifted past horizon',55:'Unbilled usage asset at horizon',56:'Accounts receivable at horizon',57:'Deferred revenue at horizon'}
         for r,label in labels.items():self.set(s,r,1,label)
         f=lambda r,e,fmt=MONEY:self.f(s,r,2,e,fmt)
-        f(22,'MAX(0,-MIN(\'P&L & Cash\'!C27:Z27),B25-\'P&L & Cash\'!Z27)')
+        f(22,'MAX(0,-MIN(\'P&L & Cash\'!C27:Z27),B25+B74-\'P&L & Cash\'!Z27)')
         f(23,f'B22/(1-{self.a("fees")})');f(24,'B23-B22');f(25,"SUM('P&L & Cash'!AA25:AC25)")
         f(26,"MIN('P&L & Cash'!C31:Z31)");f(27,"'P&L & Cash'!Z31");f(28,"'P&L & Cash'!AL31")
         f(29,self.a('legacyraise'));f(30,'B22-B29')
         f(31,f'COUNTIFS(\'P&L & Cash\'!C2:AL2,"<"&{self.a("financemonth")},\'P&L & Cash\'!C27:AL27,"<0")',INT)
         f(32,'B23/Assumptions!E6');f(33,'Assumptions!E109',PCT)
-        for r,e in [(35,'SUM(Team!C29:Z29)'),(36,'SUM(Team!C30:Z30)'),(37,'SUM(Costs!C30:Z30)'),(38,'SUM(Costs!C35:Z35)'),(39,"-SUM('P&L & Cash'!C10:Z11)"),(40,"-SUM('P&L & Cash'!C12:Z20)"),(41,"-SUM('P&L & Cash'!C23:Z23)"),(42,'SUM(B35:B41)'),(43,'SUM(Revenue!C32:Z32)'),(44,self.a('openingcash')),(45,"SUM('P&L & Cash'!C28:Z29)"),(46,"'P&L & Cash'!Z31"),(50,'SUM(C9:E9)'),(51,'IF(B50=0,"",SUM(C10:E10)/B50)'),(52,'E6/Assumptions!E6'),(53,'Revenue!C41'),(54,'Revenue!C42'),(55,'Revenue!AL35'),(56,'Revenue!AL33'),(57,'Revenue!AL34')]:f(r,e,PCT if r==51 else NUM if r in (53,54) else MONEY)
-        for r in range(35,42):self.f(s,r,3,f'IF($B$42=0,"",B{r}/$B$42)',PCT)
+        for r,e in [(35,'SUM(Team!C29:Z29)'),(36,'SUM(Team!C30:Z30)'),(37,'SUM(Costs!C30:Z30)'),(38,'SUM(Costs!C35:Z35)'),(39,"-SUM('P&L & Cash'!C10:Z11)"),(40,"-SUM('P&L & Cash'!C12:Z20)"),(41,"-SUM('P&L & Cash'!C23:Z23)"),(42,'SUM(B35:B41)+B47'),(43,'SUM(Revenue!C32:Z32)'),(44,self.a('openingcash')),(45,"SUM('P&L & Cash'!C28:Z29)"),(46,"'P&L & Cash'!Z31"),(50,'SUM(C9:E9)'),(51,'IF(B50=0,"",SUM(C10:E10)/B50)'),(52,'E6/Assumptions!E6'),(53,'Revenue!C41'),(54,'Revenue!C42'),(55,'Revenue!AL35'),(56,'Revenue!AL33'),(57,'Revenue!AL34')]:f(r,e,PCT if r==51 else NUM if r in (53,54) else MONEY)
+        self.textrow(s,47,['Employee AI expected spending (all allocations)',None]);f(47,"SUM('Employee AI'!C17:Z17)")
+        for r in list(range(35,42))+[47]:self.f(s,r,3,f'IF($B$42=0,"",B{r}/$B$42)',PCT)
+        self.textrow(s,71,['EMPLOYEE AI | SPENDING, RETAINED CASH AND STAFFING'])
+        ai_labels={72:'Total AI allowance — first 24-months',73:'Expected AI spending — first 24-months',74:'Earmarked unused AI allowance — first 24-months',75:'Total AI allowance — full 36 months',76:'Expected AI spending — full 36 months',77:'Unused AI allowance — full 36 months (disclosure)',78:'Month24 closing cash excluding AI earmark',79:'Payroll-only saving versus historical team — 24m',80:'Payroll-only saving versus historical team — 36m',81:'Expected AI spending 24m — GBP comparison',82:'AI headroom 24m — GBP comparison',83:'Payroll-only saving 24m — GBP comparison',84:'Required month 24 cash: operating buffer + AI'}
+        for rr,label in ai_labels.items():self.set(s,rr,1,label)
+        for rr,expr in [(72,"SUM('Employee AI'!C14:Z14)"),(73,"SUM('Employee AI'!C17:Z17)"),(74,"SUM('Employee AI'!C18:Z18)"),(75,"SUM('Employee AI'!C14:AL14)"),(76,"SUM('Employee AI'!C17:AL17)"),(77,"SUM('Employee AI'!C18:AL18)"),(78,'B27-B74'),(79,'SUM(Team!C42:Z42)'),(80,'SUM(Team!C42:AL42)'),(81,'B73/Assumptions!E6'),(82,'B74/Assumptions!E6'),(83,'B79/Assumptions!E6'),(84,'B25+B74')]:f(rr,expr)
+        self.textrow(s,86,['AI policy','Expected expense is allowance × utilisation. Subscriptions use MIN(allocation ceiling, expected spend); the remainder is incremental metered usage. Funding headroom is cash, never duplicate cost.'])
+        self.textrow(s,87,['Staffing comparison','Payroll savings compare against the original 18-role hiring schedule at current salary/load inputs. They exclude AI, contractor and overhead effects; use the verified historical-staffing sensitivity for the full financial comparison.'])
+        self.textrow(s,88,['Capacity evidence','Seven/eight/eight year-end staff and AI spending remain operating hypotheses. The revenue forecast is conditional on readiness; M3 must validate throughput, review/rework, actual employee AI spending and delivery capacity.'])
         self.textrow(s,60,['Interpretation','Staff capacity has value only with separate customer evidence. These company forecasts do not claim customer ROI, validated pricing, readiness, or signed business.'])
         self.textrow(s,61,['Funding timing','=IF(B31=0,"No deficit before scheduled financing in this scenario","INFEASIBLE: cash deficit precedes financing; revise opening cash or arrival month")'])
         self.textrow(s,62,['Cash presentation','Uses are gross cash spending; financing need is net of customer receipts and opening cash. Financing fees are shown separately from operating uses.'])
@@ -418,18 +464,19 @@ class Model:
             constraints=[f'ISNUMBER({ref})',f'{ref}>=0']
             if sheet=='Assumptions':
                 key=next(k for k,v in self.assumptions.items() if v==r)
-                if key in ['churn','conversion','failure','serviceowner','agentowner','agency','phase1','phase2','phase3','correctionshare','pilotqshare']:constraints.append(f'{ref}<=1')
+                if key in ['churn','conversion','failure','serviceowner','agentowner','agency','phase1','phase2','phase3','correctionshare','pilotqshare','employeeutil']:constraints.append(f'{ref}<=1')
                 if key=='fees':constraints.append(f'{ref}<1')
                 if key in ['fx','duration','productivehours','load']:constraints.append(f'{ref}>0')
                 if key in ['duration','lag','delay','financemonth','hiredelay','firstpilot','includeddeploy','deploy','collections','replicas','soc2month']:constraints.append(f'{ref}=INT({ref})')
                 if key in ['duration','financemonth','firstpilot','soc2month']:constraints.append(f'{ref}<=36')
                 if key in ['financemonth','firstpilot']:constraints.append(f'{ref}>=1')
                 if key=='firstpilot':constraints.append(f'{ref}>=5')
-                if key=='ready':constraints.append(f'OR({ref}=0,{ref}=1)')
+                if key in ['ready','staffing']:constraints.append(f'OR({ref}=0,{ref}=1)')
                 if key in ['extraopeningAR','extraopeningdeferred']:constraints.append(f'{ref}=0')
             if sheet=='Team':
                 if a1.startswith('AN'):constraints.append(f'{ref}<=1')
                 if a1.startswith('AM'):constraints.extend([f'{ref}=INT({ref})',f'{ref}>=1'])
+                if a1.startswith('AQ'):constraints.append(f'OR({ref}=0,{ref}=1)')
             self.set(s,i,1,address)
             self.f(s,i,2,ref,NUM)
             if sheet=='Assumptions' and r==63:
@@ -437,7 +484,7 @@ class Model:
                 expr=f'IFERROR(IF(OR(AND(ISNUMBER({ref}),{ref}>=0),AND({ref}="PENDING",Assumptions!{scenario_col}64=0)),0,1),1)'
             else:expr='IFERROR(IF(AND('+','.join(constraints)+'),0,1),1)'
             self.f(s,i,3,expr,INT)
-        labels={6:'Quarterly phasing sum less one',7:'Payroll allocation residual',8:'Monthly cash bridge residual',9:'Receivables bridge residual',10:'Deferred revenue bridge residual',11:'Accrual revenue to collections bridge residual',12:'24-month uses versus cash outflows residual',13:'24-month sources and uses residual',14:'Annual commitment recognition residual',15:'Derived annual retention residual',16:'Minimum deferred or receivable balance breach',17:'Customer runtime ownership with unknown cost',18:'Invalid selected case',19:'Deployment count below included package count (allowed)',20:'Funding timing breach count (warning)',21:'Funded cash floor breach through24 (warning)',22:'Month24 cash below operating buffer (warning)'}
+        labels={6:'Quarterly phasing sum less one',7:'Payroll allocation residual',8:'Monthly cash bridge residual',9:'Receivables bridge residual',10:'Deferred revenue bridge residual',11:'Accrual revenue to collections bridge residual',12:'24-month uses versus cash outflows residual',13:'24-month sources and uses residual',14:'Annual commitment recognition residual',15:'Derived annual retention residual',16:'Minimum deferred or receivable balance breach',17:'Customer runtime ownership with unknown cost',18:'Invalid selected case',19:'Deployment count below included package count (allowed)',20:'Funding timing breach count (warning)',21:'Funded cash floor breach through24 (warning)',22:'Month24 cash below operating buffer plus AI headroom (warning)'}
         for r,label in labels.items():self.set(s,r,1,label)
         self.f(s,6,2,'ABS(SUM(Assumptions!B88:B90)-1)+ABS(SUM(Assumptions!C88:C90)-1)+ABS(SUM(Assumptions!D88:D90)-1)',NUM)
         for m in range(1,37):
@@ -458,9 +505,20 @@ class Model:
         self.f(s,19,2,'MAX(0,Assumptions!E13-Assumptions!E14)',NUM)
         self.f(s,20,2,'Summary!B31',INT)
         self.f(s,21,2,'MAX(0,-Summary!B26)',NUM)
-        self.f(s,22,2,'MAX(0,Summary!B25-Summary!B27)',NUM)
-        self.textrow(s,24,['Warning policy','Rows19–22 inform decisions and may be nonzero in a stress. They never drive or suppress forecast results. Reconciliation rows5–18 must pass.'])
-        self.textrow(s,25,['Tolerance','Residual tolerance 0.00001 in reporting currency; no rounding in forecast calculations. Opening receivables/deferred balances are constrained to zero in v1.'])
+        self.f(s,22,2,'MAX(0,Summary!B84-Summary!B27)',NUM)
+        for rr,label in {28:'Employee AI allocation residual',29:'Employee AI allowance identity residual',30:'Employee AI subscription and metered spend residual',31:'Excluded role payroll residual',32:'Funding formula residual including AI headroom',33:'Month24 cash earmark presentation residual',34:'Employee AI Opex and delivery bridge residual'}.items():self.set(s,rr,1,label)
+        for m in range(1,37):
+            c=m+2;x=col(c)
+            self.f(s,28,c,f"'Employee AI'!{x}24",NUM)
+            self.f(s,29,c,f"ABS('Employee AI'!{x}14-'Employee AI'!{x}17-'Employee AI'!{x}18)",NUM)
+            self.f(s,30,c,f"ABS('Employee AI'!{x}17-'Employee AI'!{x}15-'Employee AI'!{x}16)",NUM)
+            self.f(s,31,c,'+'.join(f'IF(Team!$AU{r}=0,ABS(Team!{x}{r}),0)' for r in range(5,23)),NUM)
+            self.f(s,34,c,f"ABS('Employee AI'!{x}17-Costs!{x}39+'P&L & Cash'!{x}38)",NUM)
+        for rr in [28,29,30,31,34]:self.f(s,rr,2,f'SUM(C{rr}:AL{rr})','0.000000')
+        self.f(s,32,2,"ABS(Summary!B22-MAX(0,-MIN('P&L & Cash'!C27:Z27),Summary!B25+Summary!B74-'P&L & Cash'!Z27))",NUM)
+        self.f(s,33,2,'ABS(Summary!B27-Summary!B74-Summary!B78)',NUM)
+        self.textrow(s,24,['Warning policy','Rows19–22 inform decisions and may be nonzero in a stress. They never drive or suppress forecast results. Reconciliation rows 5–18 and 28–34 must pass.'])
+        self.textrow(s,25,['Tolerance','Residual tolerance 0.00001 in reporting currency; no rounding in forecast calculations. Opening receivables/deferred balances are constrained to zero in this version.'])
         self.textrow(s,26,['Unknown runtime cost','If Codifix is assigned any customer runtime costs, populate a measured numeric cost assumption. PENDING reference spend is unmeasured, not free.'])
 
     def documentation(self):
@@ -470,7 +528,7 @@ class Model:
             ['Purpose','London and New York are alternative company bases for the same global Agentic Enterprise product and workload. Do not aggregate them.'],
             ['Status','Financial preparation, 2026-09-15. All prices, customer volumes, conversion, retention, salaries and delivery rates remain unvalidated planning hypotheses.'],
             ['Start here','Select Base, Downside or Upside in Assumptions B3. Edit blue inputs; inspect Summary, then Checks. Monthly forecasts run for36months from the actual date input.'],
-            ['Navigation','Assumptions → Team / Cohorts / Revenue / Costs → P&L & Cash → Summary. Checks are terminal. Sensitivity snapshots use this one live engine.'],
+            ['Navigation','Assumptions → Team / Employee AI / Cohorts / Revenue / Costs → P&L & Cash → Summary. Checks are terminal. Sensitivity snapshots use this one live engine.'],
             ['Commercial scope','One paying enterprise account begins with two independently administered deployments. Existing customer agent runtimes remain separate. No billing replicated knowledge copies as new knowledge.'],
             ['Pilot funnel','Quarterly source volumes are provisional pilot starts; editable monthly phasing is0/40/60%. Earliest start M5, two-month operation,50% conversion. Delay shifts starts; pending pilots and shifted starts remain visible.'],
             ['Readiness','The Base readiness switch is a conditional forecasting convention. Deployment, security, recovery, evaluation and customer approval gates remain open independently.'],
@@ -480,10 +538,10 @@ class Model:
             ['Retention','5% annual logo churn and45% retained commitment expansion derive137.75% annual revenue retention. There is no independent140% retention assumption.'],
             ['Usage growth','Annual service workload growth is separately editable. Its provisional Base45% matches the legacy commitment expansion rate as an explicit cost stress assumption, not as a proven causal relationship.'],
             ['Costs','Bottom-up deployments, gateway/PDS, identity/key, collections, replicas, transfer, backup/recovery, inference, review, curation, administration and multi-party support. Failed/refused questions and retries remain in costs.'],
-            ['Labour','Existing regional hire timing and base salaries are retained. Delivery payroll is allocated once; only demand above reserved salaried hours buys contractors. Customer service ownership can reallocate payroll back to operating expense.'],
-            ['Funding','Net need is the maximum of cash-floor need through M24 and M24 cash needed for M25–27 operating outflows, less available opening cash/collections through the unfinanced cash path. Gross proceeds include financing fees.'],
+            ['Labour','Regional salaries and original hiring records are retained; the active lean profile has eight roles and editable inclusion. Delivery payroll and employee AI are each allocated once; only demand above reserved salaried hours buys contractors. Customer service ownership can reallocate payroll back to operating expense.'],
+            ['Funding','Net need is the maximum of cash-floor need through M24 and M24 cash needed for M25–27 operating outflows plus unused first 24-month employee AI allowance, less available opening cash/collections through the unfinanced cash path. Gross proceeds include financing fees.'],
             ['Funding timing','An earlier deficit cannot be cured by later financing. Summary displays cash-timing infeasibility separately. Historical £3m/$4.5m net raises are reference cases, not automatic targets.'],
-            ['Use of funds','First24month cash uses include delivery, product/GTM people, recruitment/commission, other expenses and capex. Customer collections, opening cash, net financing and closing cash reconcile independently.'],
+            ['Use of funds','First24month cash uses include delivery, product/GTM people, employee AI, recruitment/commission, other expenses and capex. AI headroom remains earmarked closing cash, not an expense. Customer collections, opening cash, net financing and closing cash reconcile independently.'],
             ['FX','GBP commercial prices and shared service costs convert using USD/GBP1.3476 (14Sep2026 planning snapshot). Regional wages/overheads remain local assumptions. Common GBP outputs aid comparison.'],
             ['Sensitivity refresh','Run the repository verified refresh routine. It captures each input, verifies formulas/version, recalculates cases on this engine, validates checks, restores inputs and only then publishes.'],
             ['Stale results','Sensitivity B3 compares captured inputs to all supported editable inputs with type/blank checks. Formula edits are verified during refresh; arbitrary formula changes between refreshes are not automatically marked stale.'],
@@ -499,6 +557,9 @@ class Model:
             ['Source backup',('https://docs.google.com/spreadsheets/d/1u14XLZQm8YsMyeYpLUdjerVUTZIaR4x_z7aTqm6aBnw/edit' if self.region=='london' else 'https://docs.google.com/spreadsheets/d/1ZfEpxpD-tQTY1AtSoYNgknsithA3QbxqF8h9ao6qu5U/edit')],
             ['Primary FX reference','https://www.bankofengland.co.uk/boeapps/database/Rates.asp?into=GBP&rateview=A'],
             ['Recognition reference','https://www.ifrs.org/issued-standards/list-of-standards/ifrs-15-revenue-from-contracts-with-customers/; simplified planning policy, not a statutory accounting opinion.'],
+            ['Employee AI policy','GBP 5000 per included employee/month at 50% expected utilisation. GBP 250 subscription allocation ceiling within spending; additional metered usage excludes subscription-included use. Founder-selected operating hypotheses, not a productivity claim.'],
+            ['Lean team','Founder M1, Rust M1, platform M2, retrieval M4, solutions M8, enterprise M10, commercial M12, support M16; 7/8/8 employees at year ends. Historical 18-role profile uses the same live forecast and AI policy.'],
+            ['Evidence and M3','Validate actual employee AI spending, engineering throughput, review/rework and delivery capacity. Vendor-reported typical coding-assistant spend and token-spend ambitions do not establish equivalent output from fewer people.'],
             ['Technical boundary','Private Q&A uses Memory gateway. ATProto publication/federation and governance do not imply broader delegated execution; F2 remains future work.'],
         ]
         for r,row in enumerate(content,1):self.textrow(s,r,row)
@@ -510,7 +571,7 @@ class Model:
         self.textrow(s,4,['Captured at','NOT REFRESHED'])
         self.textrow(s,5,['Input signature','NOT REFRESHED'])
         self.textrow(s,6,['Verified formula fingerprint','NOT REFRESHED'])
-        headers=['Case','Captured UTC','Captured case overrides','ARR M36','Revenue36m','Gross margin36m','Gross funding','Min cash M1–24','Cash M36','Accounts M36','Staff M36','Cash spend24m','Funding GBP','ARR M36 GBP','Model version','Status','Notes']
+        headers=['Case','Captured UTC','Captured case overrides','ARR M36','Revenue36m','Gross margin36m','Gross funding','Min cash M1–24','Cash M36','Accounts M36','Staff M36','Cash spend24m','Funding GBP','ARR M36 GBP','Model version','Status','Notes','AI spend24m','AI headroom 24m','AI spend36m','Payroll saving 24m','Payroll saving36m','AI spend24m GBP','AI headroom 24m GBP','Staff M12']
         self.textrow(s,7,headers)
         self.set(s,7,27,'Captured input address');self.set(s,7,28,'Captured raw input');self.set(s,7,29,'Matches live input')
         self.capture_cells={}
@@ -520,8 +581,8 @@ class Model:
             self.f(s,r,29,f'AND(ISBLANK({live})=ISBLANK({captured}),TYPE({live})=TYPE({captured}),{live}={captured})')
         end=7+len(self.editable)
         self.f(s,3,2,f'IF(B4="NOT REFRESHED","NOT REFRESHED",IF(AND(COUNTIF(AC8:AC{end},FALSE)=0,O8=Assumptions!B4),"CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH","STALE — RUN VERIFIED REFRESH"))')
-        self.textrow(s,33,['Formula assurance','Input edits are detected live. The refresh checks every expected formula at start/end. After manual formula editing, restore the generated formula or rebuild and revalidate before using results.'])
-        self.textrow(s,34,['Snapshot evidence','Rows8–31 are published only after original inputs are restored and formula/invariant checks pass. Concurrent spreadsheet edits can abort the best-effort refresh; Google Sheets has no transaction lock.'])
+        self.textrow(s,43,['Formula assurance','Input edits are detected live. The refresh checks every expected formula at start/end. After manual formula editing, restore the generated formula or rebuild and revalidate before using results.'])
+        self.textrow(s,44,['Snapshot evidence','Rows8–40 are published only after original inputs are restored and formula/invariant checks pass. Concurrent spreadsheet edits can abort the best-effort refresh; Google Sheets has no transaction lock.'])
 
     def manifest(self):
         return {
@@ -551,13 +612,21 @@ class Model:
                 {'id':'fx_high','label':'USD/GBP 1.50','inputs':{'Assumptions!B11':1.5}},
                 {'id':'extra_replica','label':'One additional stored replica','inputTransforms':{'Assumptions!B44':{'add':1}},'notes':'Storage and transfer costs change; no extra knowledge charge.'},
                 {'id':'readiness_hold','label':'Readiness gate remains closed','inputs':{'Assumptions!B23':0},'notes':'Staff/fixed costs continue; pilot plan remains pending.'},
+                {'id':'ai_util25','label':'Employee AI utilisation 25%','inputs':{'Assumptions!B120':.25}},
+                {'id':'ai_util50','label':'Employee AI utilisation 50%','inputs':{'Assumptions!B120':.50}},
+                {'id':'ai_util100','label':'Employee AI utilisation 100%','inputs':{'Assumptions!B120':1}},
+                {'id':'ai_budget2000','label':'AI allowance GBP 2000 per employee','inputs':{'Assumptions!B119':2000}},
+                {'id':'ai_budget5000','label':'AI allowance GBP 5000 per employee','inputs':{'Assumptions!B119':5000}},
+                {'id':'ai_budget10000','label':'AI allowance GBP 10000 per employee','inputs':{'Assumptions!B119':10000}},
+                {'id':'historical_team_ai','label':'Historical 18-role schedule, same AI policy','inputs':{'Assumptions!B118':1},'notes':'Same live engine, commercial assumptions and employee AI policy. Historical salary rows and hire dates retained.'},
+                {'id':'lean_capacity_stress','label':'Launch delay 3 / support 2× / AI 100%','inputs':{'Assumptions!B120':1},'inputTransforms':{'Assumptions!B22':{'add':3},'Assumptions!B67':{'multiply':2}},'notes':'Conditional target stress; AI spending does not prove lean-team productivity.'},
             ],
-            'outputCells':{'arr36':'Summary!E6','accounts36':'Summary!E7','deployments36':'Summary!E8','revenue36':'Summary!B50','grossMargin36':'Summary!B51','requiredGrossFunding':'Summary!B23','minCash24':'Summary!B26','endingCash36':'Summary!B28','staff36':'Summary!E18','totalSpend24':'Summary!B42','gbpFunding':'Summary!B32','gbpARR36':'Summary!B52'},
-            'checks':[{'cell':f'Checks!B{r}','expected':0,'tolerance':.00001,'label':self.cells['Checks'][(r,1)]['userEnteredValue']['stringValue']} for r in range(5,19)],
-            'publication':{'sheet':'Sensitivity','resultStartRow':8,'resultEndRow':31,'captureCells':self.capture_cells,'capturedAtCell':'Sensitivity!B4','signatureCell':'Sensitivity!B5','formulaFingerprintCell':'Sensitivity!B6'},
+            'outputCells':{'arr36':'Summary!E6','accounts36':'Summary!E7','deployments36':'Summary!E8','revenue36':'Summary!B50','grossMargin36':'Summary!B51','requiredGrossFunding':'Summary!B23','minCash24':'Summary!B26','endingCash36':'Summary!B28','staff36':'Summary!E18','totalSpend24':'Summary!B42','gbpFunding':'Summary!B32','gbpARR36':'Summary!B52','aiSpend24':'Summary!B73','aiReserve24':'Summary!B74','aiSpend36':'Summary!B76','payrollSavings24':'Summary!B79','payrollSavings36':'Summary!B80','gbpAISpend24':'Summary!B81','gbpAIReserve24':'Summary!B82','staff12':'Summary!C18'},
+            'checks':[{'cell':f'Checks!B{r}','expected':0,'tolerance':.00001,'label':self.cells['Checks'][(r,1)]['userEnteredValue']['stringValue']} for r in list(range(5,19))+list(range(28,35))],
+            'publication':{'sheet':'Sensitivity','resultStartRow':8,'resultEndRow':40,'captureCells':self.capture_cells,'capturedAtCell':'Sensitivity!B4','signatureCell':'Sensitivity!B5','formulaFingerprintCell':'Sensitivity!B6'},
             'assumptionRows':self.assumptions,
             'initialInputValues':{a:self.raw_value(a) for a in self.editable},
-            'modelNotes':['Figures are unvalidated planning hypotheses.','Separate annual commitment expansion and service workload growth assumptions both default45%.','No customer ROI or readiness conclusion.'],
+            'modelNotes':['Figures are unvalidated planning hypotheses.','Separate annual commitment expansion and service workload growth assumptions both default45%.','No customer ROI or readiness conclusion.','Employee AI allowance GBP 5000 at 50% utilisation and lean eight-role team are founder-selected operating hypotheses.','Unused first 24-month AI allowance is earmarked cash in funding target; no generic Opex contingency on employee AI.'],
         }
 
     def immutable_cells(self):
@@ -578,7 +647,7 @@ class Model:
         if sheet=='Assumptions':
             unit=self.cells[sheet].get((r,6),{}).get('userEnteredValue',{}).get('stringValue','')
             return f'{label} ({unit})'
-        kind='annual salary' if a1.startswith('B') else 'hire month' if a1.startswith('AM') else 'delivery allocation'
+        kind='annual salary' if a1.startswith('B') else 'lean hire month' if a1.startswith('AM') else 'lean included (0 / 1)' if a1.startswith('AQ') else 'delivery allocation'
         return f'{label} {kind}'
 
     def raw_value(self,address):
@@ -588,15 +657,15 @@ class Model:
 
     def requests(self):
         req=[]
-        names=['README','Summary','Assumptions','Team','Revenue','Costs','Cohorts','P&L & Cash','Sensitivity','Checks']
+        names=['README','Summary','Assumptions','Team','Employee AI','Revenue','Costs','Cohorts','P&L & Cash','Sensitivity','Checks']
         for index,name in enumerate(names):
             sheetid=self.ids[name]
-            if name not in self.original_ids:req.append({'addSheet':{'properties':{'sheetId':sheetid,'title':name,'gridProperties':{'rowCount':1000,'columnCount':44}}}})
-            req.append({'updateSheetProperties':{'properties':{'sheetId':sheetid,'index':index,'gridProperties':{'rowCount':1000,'columnCount':44,'frozenRowCount':8 if name=='Assumptions' else 7 if name=='Sensitivity' else 4 if name in ('Team','Checks') else 3 if name in ('Revenue','Costs','Cohorts','P&L & Cash') else 5 if name=='Summary' else 1,'frozenColumnCount':0,'hideGridlines':True}},'fields':'index,gridProperties'}})
+            if name not in self.original_ids:req.append({'addSheet':{'properties':{'sheetId':sheetid,'title':name,'gridProperties':{'rowCount':1000,'columnCount':47}}}})
+            req.append({'updateSheetProperties':{'properties':{'sheetId':sheetid,'index':index,'gridProperties':{'rowCount':1000,'columnCount':47,'frozenRowCount':8 if name=='Assumptions' else 7 if name=='Sensitivity' else 4 if name in ('Team','Checks') else 3 if name in ('Revenue','Costs','Cohorts','P&L & Cash','Employee AI') else 5 if name=='Summary' else 1,'frozenColumnCount':0,'hideGridlines':True}},'fields':'index,gridProperties'}})
             # Rebuild content in observed native tabs; backups retain historical cells/formatting.
-            req.append({'unmergeCells':{'range':{'sheetId':sheetid,'startRowIndex':0,'endRowIndex':1000,'startColumnIndex':0,'endColumnIndex':44}}})
-            req.append({'updateCells':{'range':{'sheetId':sheetid,'startRowIndex':0,'endRowIndex':1000,'startColumnIndex':0,'endColumnIndex':44},'fields':'userEnteredValue,userEnteredFormat,note,dataValidation'}})
-            req.append({'repeatCell':{'range':{'sheetId':sheetid,'startRowIndex':0,'endRowIndex':1000,'startColumnIndex':0,'endColumnIndex':44},'cell':{'userEnteredFormat':{'backgroundColor':WHITE,'textFormat':{'fontFamily':'Arial','fontSize':10,'foregroundColor':INK},'verticalAlignment':'MIDDLE'}},'fields':'userEnteredFormat'}})
+            req.append({'unmergeCells':{'range':{'sheetId':sheetid,'startRowIndex':0,'endRowIndex':1000,'startColumnIndex':0,'endColumnIndex':47}}})
+            req.append({'updateCells':{'range':{'sheetId':sheetid,'startRowIndex':0,'endRowIndex':1000,'startColumnIndex':0,'endColumnIndex':47},'fields':'userEnteredValue,userEnteredFormat,note,dataValidation'}})
+            req.append({'repeatCell':{'range':{'sheetId':sheetid,'startRowIndex':0,'endRowIndex':1000,'startColumnIndex':0,'endColumnIndex':47},'cell':{'userEnteredFormat':{'backgroundColor':WHITE,'textFormat':{'fontFamily':'Arial','fontSize':10,'foregroundColor':INK},'verticalAlignment':'MIDDLE'}},'fields':'userEnteredFormat'}})
             vals=self.cells[name];maxrow=max(r for r,c in vals);maxcol=max(c for r,c in vals)
             rows=[]
             for r in range(1,maxrow+1):
@@ -604,7 +673,7 @@ class Model:
             req.append({'updateCells':{'start':{'sheetId':sheetid,'rowIndex':0,'columnIndex':0},'rows':rows,'fields':'userEnteredValue,userEnteredFormat.textFormat.foregroundColor,userEnteredFormat.numberFormat,note'}})
             req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'ROWS','startIndex':0,'endIndex':maxrow},'properties':{'pixelSize':27},'fields':'pixelSize'}})
             req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'COLUMNS','startIndex':0,'endIndex':1},'properties':{'pixelSize':355 if name!='Cohorts' else 365},'fields':'pixelSize'}})
-            req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'COLUMNS','startIndex':1,'endIndex':44},'properties':{'pixelSize':132},'fields':'pixelSize'}})
+            req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'COLUMNS','startIndex':1,'endIndex':47},'properties':{'pixelSize':132},'fields':'pixelSize'}})
             if name=='README':
                 req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'COLUMNS','startIndex':0,'endIndex':1},'properties':{'pixelSize':205},'fields':'pixelSize'}})
                 req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'COLUMNS','startIndex':1,'endIndex':2},'properties':{'pixelSize':970},'fields':'pixelSize'}})
@@ -612,9 +681,9 @@ class Model:
                 req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'ROWS','startIndex':1,'endIndex':maxrow},'properties':{'pixelSize':56},'fields':'pixelSize'}})
             if name=='Assumptions':
                 for start,end,width in [(0,1,370),(5,6,175),(6,7,500),(7,8,110),(8,9,150),(9,10,260)]:req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'COLUMNS','startIndex':start,'endIndex':end},'properties':{'pixelSize':width},'fields':'pixelSize'}})
-                req.append({'repeatCell':{'range':{'sheetId':sheetid,'startRowIndex':8,'endRowIndex':115,'startColumnIndex':5,'endColumnIndex':10},'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP','textFormat':{'fontSize':9,'foregroundColor':GRAY}}},'fields':'userEnteredFormat.wrapStrategy,userEnteredFormat.textFormat'}})
-                req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'ROWS','startIndex':8,'endIndex':115},'properties':{'pixelSize':43},'fields':'pixelSize'}})
-                for rr in (2,7,112,113,114,115):
+                req.append({'repeatCell':{'range':{'sheetId':sheetid,'startRowIndex':8,'endRowIndex':123,'startColumnIndex':5,'endColumnIndex':10},'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP','textFormat':{'fontSize':9,'foregroundColor':GRAY}}},'fields':'userEnteredFormat.wrapStrategy,userEnteredFormat.textFormat'}})
+                req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'ROWS','startIndex':8,'endIndex':123},'properties':{'pixelSize':43},'fields':'pixelSize'}})
+                for rr in (2,7,112,113,114,115,123):
                     if rr==2:range_={'sheetId':sheetid,'startRowIndex':rr-1,'endRowIndex':rr,'startColumnIndex':0,'endColumnIndex':10}
                     else:range_={'sheetId':sheetid,'startRowIndex':rr-1,'endRowIndex':rr,'startColumnIndex':1,'endColumnIndex':10}
                     req.append({'mergeCells':{'range':range_,'mergeType':'MERGE_ALL'}})
@@ -622,13 +691,13 @@ class Model:
             if name=='Sensitivity':
                 req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'COLUMNS','startIndex':2,'endIndex':3},'properties':{'pixelSize':350},'fields':'pixelSize'}})
                 req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'COLUMNS','startIndex':26,'endIndex':29},'properties':{'hiddenByUser':True},'fields':'hiddenByUser'}})
-                for rr in [2,33,34]:
+                for rr in [2,43,44]:
                     start=0 if rr==2 else 1
                     ran={'sheetId':sheetid,'startRowIndex':rr-1,'endRowIndex':rr,'startColumnIndex':start,'endColumnIndex':10}
                     req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
                     req.append({'repeatCell':{'range':ran,'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
             # Notes span readable native cells without obscuring figures.
-            note_rows={'Summary':[60,61,62,66],'Team':[35],'Revenue':[43],'Costs':[41,42],'P&L & Cash':[40,41],'Checks':[24,25,26]}.get(name,[])
+            note_rows={'Summary':[60,61,62,66,86,87,88],'Team':[35,36,37,44],'Employee AI':[31,32,33,34],'Revenue':[43],'Costs':[41,42],'P&L & Cash':[40,41],'Checks':[24,25,26]}.get(name,[])
             for rr in note_rows:
                 ran={'sheetId':sheetid,'startRowIndex':rr-1,'endRowIndex':rr,'startColumnIndex':1,'endColumnIndex':6 if name=='Summary' else 12}
                 req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
@@ -640,7 +709,7 @@ class Model:
                     req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
                     req.append({'repeatCell':{'range':ran,'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
                     req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'ROWS','startIndex':rr-1,'endIndex':rr},'properties':{'pixelSize':45},'fields':'pixelSize'}})
-                for rr in [21,34,49]:req.append({'mergeCells':{'range':{'sheetId':sheetid,'startRowIndex':rr-1,'endRowIndex':rr,'startColumnIndex':0,'endColumnIndex':6},'mergeType':'MERGE_ALL'}})
+                for rr in [21,34,49,71]:req.append({'mergeCells':{'range':{'sheetId':sheetid,'startRowIndex':rr-1,'endRowIndex':rr,'startColumnIndex':0,'endColumnIndex':6},'mergeType':'MERGE_ALL'}})
             if name=='Revenue':
                 for rr in [41,42]:req.append({'mergeCells':{'range':{'sheetId':sheetid,'startRowIndex':rr-1,'endRowIndex':rr,'startColumnIndex':3,'endColumnIndex':12},'mergeType':'MERGE_ALL'}})
             if name=='Sensitivity':
@@ -652,25 +721,26 @@ class Model:
             req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'ROWS','startIndex':0,'endIndex':1},'properties':{'pixelSize':42},'fields':'pixelSize'}})
             hdr=8 if name=='Assumptions' else 7 if name=='Sensitivity' else 5 if name=='Summary' else 3 if name not in ('README',) else None
             if hdr:req.append({'updateDimensionProperties':{'range':{'sheetId':sheetid,'dimension':'ROWS','startIndex':hdr-1,'endIndex':hdr},'properties':{'pixelSize':45},'fields':'pixelSize'}})
-            if hdr:req.append({'repeatCell':{'range':{'sheetId':sheetid,'startRowIndex':hdr-1,'endRowIndex':hdr,'startColumnIndex':0,'endColumnIndex':10 if name=='Assumptions' else 17 if name=='Sensitivity' else 6 if name=='Summary' else 38},'cell':{'userEnteredFormat':{'backgroundColor':TEAL,'textFormat':{'foregroundColor':WHITE,'bold':True},'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat,userEnteredFormat.wrapStrategy'}})
-            totals={'Summary':[6,9,10,17,21,22,23,25,34,42,46,49],'Revenue':[21,26,31,32,33,34],'Costs':[21,28,30,34,35],'Team':[24,25,27,28],'P&L & Cash':[4,6,21,22,25,27,31],'Checks':[5,12,13,20,21,22],'Assumptions':[91,109,110]}.get(name,[])
+            if hdr:req.append({'repeatCell':{'range':{'sheetId':sheetid,'startRowIndex':hdr-1,'endRowIndex':hdr,'startColumnIndex':0,'endColumnIndex':10 if name=='Assumptions' else 25 if name=='Sensitivity' else 6 if name=='Summary' else 38},'cell':{'userEnteredFormat':{'backgroundColor':TEAL,'textFormat':{'foregroundColor':WHITE,'bold':True},'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat,userEnteredFormat.wrapStrategy'}})
+            totals={'Summary':[6,9,10,17,21,22,23,25,34,42,46,47,49,71,73,74,76,78,84],'Revenue':[21,26,31,32,33,34],'Costs':[21,28,30,34,35],'Team':[24,25,27,28,40,41,42],'Employee AI':[14,17,18,20,21,22,23,26,27,28],'P&L & Cash':[4,6,21,22,25,27,31],'Checks':[5,12,13,20,21,22],'Assumptions':[91,109,110,118,119,120,121]}.get(name,[])
             for r in totals:
                 req.append({'repeatCell':{'range':{'sheetId':sheetid,'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':0,'endColumnIndex':6 if name=='Summary' else 10 if name=='Assumptions' else 38},'cell':{'userEnteredFormat':{'backgroundColor':PALE,'textFormat':{'bold':True},'borders':{'top':{'style':'SOLID','color':{'red':.75,'green':.83,'blue':.86}}}}},'fields':'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.bold,userEnteredFormat.borders'}})
         # Native input validation: required numeric scenario values and exact case dropdown.
         req.append({'setDataValidation':{'range':{'sheetId':self.ids['Assumptions'],'startRowIndex':2,'endRowIndex':3,'startColumnIndex':1,'endColumnIndex':2},'rule':{'condition':{'type':'ONE_OF_LIST','values':[{'userEnteredValue':v} for v in ['Base','Downside','Upside']]},'strict':True,'showCustomUi':True,'inputMessage':'Select the one live forecast case.'}}})
         for r in self.assumptions.values():
-            condition={'type':'CUSTOM_FORMULA','values':[{'userEnteredValue':'=OR(ISNUMBER(B63),B63="PENDING")'}]} if r==63 else {'type':'NUMBER_GREATER_THAN_EQ','values':[{'userEnteredValue':'0'}]}
+            condition={'type':'CUSTOM_FORMULA','values':[{'userEnteredValue':'=OR(ISNUMBER(B63),B63="PENDING")'}]} if r==63 else {'type':'NUMBER_BETWEEN','values':[{'userEnteredValue':'0'},{'userEnteredValue':'1'}]} if r in [118,120] else {'type':'NUMBER_GREATER_THAN_EQ','values':[{'userEnteredValue':'0'}]}
             req.append({'setDataValidation':{'range':{'sheetId':self.ids['Assumptions'],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':1,'endColumnIndex':4},'rule':{'condition':condition,'strict':True,'inputMessage':'Required planning input. PENDING allowed only for unassigned customer runtime cost. See Checks.'}}})
+        req.append({'setDataValidation':{'range':{'sheetId':self.ids['Team'],'startRowIndex':4,'endRowIndex':22,'startColumnIndex':42,'endColumnIndex':43},'rule':{'condition':{'type':'CUSTOM_FORMULA','values':[{'userEnteredValue':'=AND(ISNUMBER(AQ5),OR(AQ5=0,AQ5=1))'}]},'strict':True,'inputMessage':'Required numeric role inclusion:0 or1; used by the lean staffing profile.'}}})
         req.append({'addConditionalFormatRule':{'index':0,'rule':{'ranges':[{'sheetId':self.ids['Checks'],'startRowIndex':4,'endRowIndex':18,'startColumnIndex':1,'endColumnIndex':2}],'booleanRule':{'condition':{'type':'NUMBER_GREATER','values':[{'userEnteredValue':'0.00001'}]},'format':{'backgroundColor':{'red':1,'green':.88,'blue':.88},'textFormat':{'bold':True,'foregroundColor':{'red':.65,'green':0,'blue':0}}}}}}})
         return [r for r in req if 'addSheet' in r]+[r for r in req if 'addSheet' not in r]
 
     def build(self):
-        self.setup();self.team();self.cohorts();self.revenue();self.costs();self.pnl();self.summary();self.checks();self.documentation();self.sensitivity()
+        self.setup();self.team();self.employee_ai();self.cohorts();self.revenue();self.costs();self.pnl();self.summary();self.checks();self.documentation();self.sensitivity()
         # Buffer expressly excludes capital cash: operating outflows only, per approved plan.
         self.f('Summary',25,2,"SUM('P&L & Cash'!AA25:AC25)+SUM('P&L & Cash'!AA23:AC23)",MONEY)
         self.textrow('Summary',65,['Funded runway (months from start)', "=IF(COUNTIF('P&L & Cash'!C31:AL31,\"<0\")=0,\">36\",MINIFS('P&L & Cash'!C2:AL2,'P&L & Cash'!C31:AL31,\"<0\")-1)"])
         self.textrow('Summary',66,['Historical net raise coverage', '=IF(B29>=B22,"Covers calculated net requirement","Below calculated net requirement")'])
-        self.textrow('Summary',64,['Recalculation sentinel','=SUM(Assumptions!E10:E90)+SUM(Assumptions!E95:E106)+SUM(Team!B5:B22)+SUM(Team!AM5:AN22)'])
+        self.textrow('Summary',64,['Recalculation sentinel','=SUM(Assumptions!E10:E90)+SUM(Assumptions!E95:E106)+SUM(Team!B5:B22)+SUM(Team!AM5:AN22)+SUM(Team!AQ5:AQ22)+SUM(Assumptions!E118:E121)'])
         return self
 
 
