@@ -116,6 +116,7 @@ fn fixture() -> (Manifest, Observation) {
     };
     let work = manifest.plan(Split::Development).unwrap().work[0].clone();
     let observation = Observation {
+        knowledge_review: None,
         work: work.clone(),
         model,
         result: mem_eval::EvalItemResult {

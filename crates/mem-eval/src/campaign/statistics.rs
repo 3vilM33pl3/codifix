@@ -105,6 +105,14 @@ pub fn report(manifest: &Manifest, artifact: &Artifact) -> Result<Report> {
         .collect();
     let mut configuration = None;
     for observation in &artifact.observations {
+        if let Err(error) = scoring::validate_with_hash(
+            manifest,
+            &plan.manifest_sha256,
+            observation,
+            !artifact.offline,
+        ) {
+            errors.push(error.to_string());
+        }
         if observation.model != manifest.model {
             errors.push("provider/model/reasoning/budget mismatch".into());
         }

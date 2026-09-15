@@ -33,6 +33,11 @@ precise amounts, counts, extra causes or claims that deployment was validated
 fail the relevant rubric. Automated substring matches are not sufficient for
 these labels; unresolved judgments require blinded review.
 
-The pack still needs corpus/handover preparation parity checks, campaign binding,
-semantic rubric execution and Olivier's review. It does not replace the complete
+The four rubric contracts are now executable through `r3_score` and are stored
+under `private/q1.json` through `private/q4.json`. They require genuine human
+decisions for semantic scoring; test ballots are not approval. Keep them out of
+agent inputs along with this document.
+
+The pack still needs corpus/handover preparation parity checks, full campaign
+binding and Olivier's review. It does not replace the complete
 10-development/25-held-out scenario requirement.

@@ -316,6 +316,9 @@ fn validate_task_evidence(
     first: Option<&Observation>,
 ) -> Result<()> {
     ensure!(observation.work == *work, "driver returned another task");
+    // Supplied semantic evidence must agree with the locked sources/labels even
+    // in offline mode; absence remains allowed only for diagnostic smoke runs.
+    c::scoring::validate_observation(manifest, observation, false)?;
     ensure!(
         observation.model == manifest.model,
         "driver model/configuration mismatch"

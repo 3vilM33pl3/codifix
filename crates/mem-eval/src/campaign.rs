@@ -13,6 +13,7 @@ use std::{
 pub mod baselines;
 pub mod budget;
 pub mod retriever;
+pub mod scoring;
 mod statistics;
 pub use statistics::{Comparison, Report, TrackReport, report};
 
@@ -466,6 +467,9 @@ pub struct Observation {
     pub uncertain_charge: bool,
     pub critical_failure: bool,
     pub unresolved_rubric: bool,
+    /// Absent in legacy smoke artifacts, mandatory for official knowledge scores.
+    #[serde(default)]
+    pub knowledge_review: Option<scoring::KnowledgeEvidence>,
     pub isolation: Isolation,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

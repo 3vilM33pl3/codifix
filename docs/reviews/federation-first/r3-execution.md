@@ -1,5 +1,24 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 evidence-bound knowledge adjudication
+
+- Added semantic rubric contracts, bounded blinded review packets, exact-source
+  citation validation and per-criterion human ballots. Model diagnoses cannot
+  pass a case; absent/conflicting judgments stay unresolved. Invalid citations
+  remain measured failures even with passing human judgments.
+- Reports now require independent review for official knowledge observations.
+  Campaign/case/execution, answer, locked rubric/source and computed-score
+  mismatches fail closed. Supplied offline reviews receive the same checks;
+  legacy smoke artifacts remain readable without becoming official evidence.
+- Added the trusted-host `r3_score` preparation/scoring utility, required CI
+  rehearsal and four draft machine-readable supplier-handover rubrics. Human
+  identity is an operator responsibility, not authenticated by a JSON field.
+- Verification: 46 evaluator tests, 232 CLI tests, the real scoring utility
+  rehearsal, scoped all-target Clippy, formatting and boundaries passed.
+- Full campaign review collection/reconciliation, complete representative suite,
+  provider mediation and isolated campaign integration remain open. No labels
+  were approved, providers called, or deployment/database settings changed.
+
 ## 2026-09-15 representative importer benchmark
 
 - Added the first five-module development Rust repository, its public contract

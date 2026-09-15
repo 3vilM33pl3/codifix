@@ -88,8 +88,10 @@ orchestration, complete corpus fingerprinting or crash-recovery driver.
   mediator, including coding sequences and uncertain calls. The current runner
   reservation is only a conservative single-request foundation; paid dispatch is
   rejected unconditionally before any driver starts.
-- Connect semantic/citation/refusal rubrics to independent grading and blinded
-  adjudication. Existing substring scoring is diagnostic only.
+- Connect the implemented evidence-bound adjudication utility to the complete
+  campaign driver and operator review flow. Existing substring scoring is
+  diagnostic only; official knowledge observations now require independent
+  review evidence, not just a driver's success boolean.
 - Run complete offline campaigns and crash/isolation fault tests. Reference
   solution tests alone do not establish these properties.
 
@@ -144,6 +146,56 @@ fake vectors only, never evidence of vector retrieval quality. The common answer
 model, equal-information corpus preparation and campaign integration remain open.
 
 ## Statistical interpretation
+
+### Knowledge adjudication
+
+`mem_eval::campaign::scoring` provides private, bounded review packets with
+factual, required-evidence and appropriate-refusal criteria. Citations identify
+an exact source asset and a verbatim quote. The scorer checks those bytes against
+the frozen source; semantic entailment and sufficient evidence still require
+human judgment. A valid quote alone never establishes a correct answer.
+
+`r3_score prepare INPUT.json NEW_DIRECTORY` creates `private/evidence.json` and
+`review/{packet,ballot}.json`. Build with
+`cargo build -p mem-eval --example r3_score --locked`. The input contains
+`manifest_sha256`, `work`, `rubric`, `sources` and a structured `answer`; these
+contracts are in `campaign/scoring.rs`. Use a trusted host, never an agent mount.
+Give the reviewer only `review/`, without condition/model/repeat or automated
+scores. The private salted execution binding prevents transferring a ballot
+between observations while hiding condition identity. Answer wording can still
+compromise blinding; this is not a claim of perfect anonymity.
+
+Each human reviewer replaces `pending-reviewer` with their operator-recorded ID,
+addresses every criterion with `pass`, `fail` or `unresolved`, and gives a reason.
+Collect ballots as a JSON array, then run:
+
+```sh
+target/debug/examples/r3_score score \
+  NEW_DIRECTORY/private/evidence.json BALLOTS.json
+```
+
+Output contains the assessment and adjudicated evidence for the observation's
+`knowledge_review` field. No ballots, model-only diagnoses, incomplete judgments
+and reviewer conflicts cannot pass. Conflicts remain unresolved regardless of
+ballot order; retain the originals and explicitly resolve the disagreement with
+the reviewers, rather than discarding dissent. The utility refuses to overwrite
+an existing preparation directory or replace ballots in adjudicated evidence.
+It does not authenticate humans: the operator must collect genuine decisions
+and retain their provenance. A model must never label itself a human reviewer.
+
+Official knowledge reports reject missing evidence and mismatched campaign,
+execution, answer, rubric, source or score bindings. Supplied reviews are also
+validated offline. Old smoke artifacts remain readable without a review but are
+not official evidence. Label files use compact JSON in `Rubric` field order and
+one trailing LF (`rubric_bytes`); their raw SHA-256 is locked in manifest assets.
+The first supplier-handover family's four machine-readable rubrics are drafted
+under its `private/` directory. They remain unapproved, not frozen labels.
+
+This utility does not yet collect/reconcile reviews across an interrupted full
+campaign; that integration remains open. Test ballots are explicitly synthetic
+and confer no benchmark label approval or product-quality evidence.
+
+### Campaign uncertainty
 
 Reports average repeats within tasks and resample complete scenario/repository
 clusters. Ten thousand deterministic paired bootstrap draws give a 95%

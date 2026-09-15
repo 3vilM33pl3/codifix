@@ -23,7 +23,7 @@ pub(super) fn fixture() -> Manifest {
             }
         }
     }
-    Manifest {
+    let mut manifest = Manifest {
         version: 1,
         name: "r3-test".into(),
         semantic_time: "2026-01-01T00:00:00Z".parse().unwrap(),
@@ -62,11 +62,45 @@ pub(super) fn fixture() -> Manifest {
         })
         .collect(),
         cases,
+    };
+    for case in &manifest.cases {
+        if case.track == Track::Knowledge {
+            manifest.assets.push(Asset {
+                path: format!("labels/{}.json", case.id).into(),
+                sha256: digest(&scoring::rubric_bytes(&rubric(&case.id)).unwrap()),
+                kind: AssetKind::Labels,
+            });
+        }
+    }
+    manifest
+}
+
+pub(super) fn rubric(case_id: &str) -> scoring::Rubric {
+    scoring::Rubric {
+        case_id: case_id.into(),
+        question: "Fixture-only question".into(),
+        criteria: [
+            scoring::Dimension::FactualCorrectness,
+            scoring::Dimension::RequiredEvidence,
+            scoring::Dimension::AppropriateRefusal,
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(i, dimension)| scoring::Criterion {
+            id: format!("criterion-{i}"),
+            dimension,
+            instruction: "Fixture-only decision".into(),
+            critical: false,
+        })
+        .collect(),
+        minimum_citations: 1,
+        citations_critical: true,
     }
 }
 
 fn artifact(manifest: &Manifest) -> Artifact {
     let plan = manifest.plan(Split::HeldOut).unwrap();
+    let manifest_hash = plan.manifest_sha256.clone();
     let approvals = [ApprovalPurpose::Labels, ApprovalPurpose::Official]
         .into_iter()
         .map(|purpose| Approval {
@@ -103,11 +137,52 @@ fn artifact(manifest: &Manifest) -> Artifact {
                         total_tokens: 10,
                         ..Default::default()
                     }),
-                    answer: None,
+                    answer: Some("Fixture-only answer".into()),
                     notes: vec![],
                     sub_results: vec![],
                 };
+                let knowledge_review = manifest
+                    .cases
+                    .iter()
+                    .find(|c| c.id == work.case_id)
+                    .filter(|c| c.track == Track::Knowledge)
+                    .map(|_| {
+                        let mut evidence = scoring::KnowledgeEvidence::prepare(
+                            manifest_hash.clone(),
+                            &work,
+                            rubric(&work.case_id),
+                            vec![scoring::Source {
+                                id: "source.md".into(),
+                                text: "fixture".into(),
+                            }],
+                            scoring::Answer {
+                                text: "Fixture-only answer".into(),
+                                refused: false,
+                                citations: vec![scoring::Citation {
+                                    source_id: "source.md".into(),
+                                    quote: "fixture".into(),
+                                }],
+                            },
+                        )
+                        .unwrap();
+                        let mut ballot = evidence
+                            .packet
+                            .blank_ballot("fixture-only-not-real-approval".into())
+                            .unwrap();
+                        for judgment in ballot.judgments.values_mut() {
+                            judgment.decision = if result.success {
+                                scoring::Decision::Pass
+                            } else {
+                                scoring::Decision::Fail
+                            };
+                            judgment.reason =
+                                "Synthetic test decision, not benchmark evidence".into();
+                        }
+                        evidence.ballots.push(ballot);
+                        evidence
+                    });
                 Observation {
+                    knowledge_review,
                     model: manifest.model.clone(),
                     work,
                     result,
@@ -192,6 +267,61 @@ fn invalid_evidence_fails_closed() {
     let mut a = original;
     a.approvals.clear();
     assert!(!report(&m, &a).unwrap().official_evidence);
+}
+
+#[test]
+fn official_knowledge_scores_require_bound_independent_review() {
+    let m = fixture();
+    let a = artifact(&m);
+    let original = a
+        .observations
+        .iter()
+        .find(|o| o.knowledge_review.is_some())
+        .unwrap();
+    scoring::validate_observation(&m, original, true).unwrap();
+    let mut missing = original.clone();
+    missing.knowledge_review = None;
+    assert!(scoring::validate_observation(&m, &missing, true).is_err());
+    scoring::validate_observation(&m, &missing, false).unwrap(); // legacy smoke only
+    let mut tampered = vec![original.clone(); 7];
+    tampered[0].result.success = !original.result.success;
+    tampered[1].result.answer = Some("changed".into());
+    tampered[2]
+        .knowledge_review
+        .as_mut()
+        .unwrap()
+        .packet
+        .sources[0]
+        .text = "new facts".into();
+    tampered[3]
+        .knowledge_review
+        .as_mut()
+        .unwrap()
+        .ballots
+        .clear();
+    tampered[4].work.repeat = (original.work.repeat + 1) % 3;
+    tampered[5]
+        .knowledge_review
+        .as_mut()
+        .unwrap()
+        .packet
+        .rubric
+        .criteria[0]
+        .instruction = "new rubric".into();
+    tampered[6]
+        .knowledge_review
+        .as_mut()
+        .unwrap()
+        .packet
+        .sources
+        .push(scoring::Source {
+            id: "hidden.md".into(),
+            text: "hidden answer".into(),
+        });
+    for observation in tampered {
+        assert!(scoring::validate_observation(&m, &observation, true).is_err());
+        assert!(scoring::validate_observation(&m, &observation, false).is_err());
+    }
 }
 
 #[test]

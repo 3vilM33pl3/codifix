@@ -44,6 +44,14 @@ error. This validation is not a substitute for container/network isolation.
 
 See [R3 draft material and remaining integration](../../../evals/r3/README.md).
 
+Official knowledge results now require independent, evidence-bound adjudication;
+a driver's success flag or automated judge alone is insufficient. The trusted-host
+`r3_score` utility prepares blinded packets and checks human ballots, exact-source
+citations and conflicting decisions. Missing or unresolved reviews invalidate
+official evidence. Older offline smoke artifacts remain readable. Preparation,
+review and privacy instructions are in the R3 README linked above; this is not
+yet a complete campaign review UI or an authorization to run paid evaluations.
+
 ## Suite Format
 
 Create a directory containing `suite.toml` and `items.jsonl`:

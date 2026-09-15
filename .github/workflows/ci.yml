@@ -313,6 +313,11 @@ jobs:
           cargo build -p mem-eval --example r3_retriever --locked
           MEMORY_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" MEMORY_R3_REQUIRE_RETRIEVER=1 \
             node --test evals/r3/retriever.test.mjs
+      - name: Verify R3 blinded adjudication utility
+        run: |
+          cargo build -p mem-eval --example r3_score --locked
+          MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_SCORE=1 \
+            node --test evals/r3/scoring.test.mjs
       - run: |
           cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
           cargo run --locked --bin memory -- \
