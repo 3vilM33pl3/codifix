@@ -94,6 +94,11 @@ authorized positive cases. No signatures, real PDS or paid provider is required.
 
 ## Expansion and validation contract
 
+The dependency-build family is assigned to development: transitive build order,
+dependency-aware cache invalidation and atomic cache replacement. Do not reuse
+this failure family in the held-out split. Compilation is represented by a
+deterministic artifact-generation counter, not an actual incremental compiler.
+
 The configuration-rollout family is assigned to development before its fixture
 is evaluated: overlay precedence, explicit deletion and revision-safe atomic
 reload. It must not also appear as a renamed held-out family. Its runtime and

@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 dependency-build coding family and grader correction
+
+- Materialized the fourth development repository: five modules, two public
+  tests and ten private probes across transitive ordering, dependency-map cache
+  invalidation, cycles and atomic failed builds. Artifact generations represent
+  a deterministic compiler test double. Labels remain draft.
+- No-op controls exposed intermittent stdin EPIPE being classified as unavailable
+  grading infrastructure. Early input closure now produces a failed submission;
+  a 64-KiB unread-input regression passes. Other infrastructure failures remain
+  fail-closed. All nine Rust/representative container test groups pass, zero skips;
+  the fixture's two public Cargo tests also pass.
+- Four development coding families are executable; twelve representative held-out
+  families, full driver integration and approval gates remain open.
+
 ## 2026-09-15 configuration rollout coding family
 
 - Assigned and materialized the third development repository: five modules,

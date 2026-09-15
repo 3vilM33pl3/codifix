@@ -39,6 +39,13 @@ five modules, two public tests and ten private probes across overlay precedence,
 deletion/revision semantics and atomic in-process reload. Its reference and
 cumulative sequence pass; the buggy starter and no-op controls fail each stage.
 
+The fourth development coding family is [dependency build](representative/development/dependency-build/review.md):
+five modules, two public tests and ten private probes covering transitive build
+order, dependency-aware invalidation, cycles and atomic cache replacement. The
+reference and cumulative sequence pass; starter and no-op controls fail. All four
+development repositories are now executable drafts; the twelve representative
+held-out repositories and complete campaign integration remain unimplemented.
+
 ```sh
 node evals/r3/build-review-pack.mjs target/memory-evals/r3-review
 node evals/r3/verify-review-pack.mjs target/memory-evals/r3-review
