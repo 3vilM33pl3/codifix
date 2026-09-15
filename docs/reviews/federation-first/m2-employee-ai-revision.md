@@ -1,5 +1,10 @@
 # M2 revision — Smaller team with substantial employee AI funding
 
+**Historical v2 record:** the working models now include the
+[legal and assurance leadership revision](m2-legal-assurance-revision.md).
+The eight-person figures and `ai-` captures below remain the completed v2 audit
+trail; they are not the current nine-person plus fractional-counsel forecast.
+
 **Status:** completed and validated financial preparation.
 **Formula version:** `M2-2026-09-15-v2-ai`.
 **Planning date:** 15 September 2026. **Owner:** founder / finance.

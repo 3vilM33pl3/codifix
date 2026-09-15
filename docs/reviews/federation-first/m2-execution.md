@@ -2,8 +2,10 @@
 
 **Status:** completed M2 v1 financial preparation · approved and delivered 2026-09-15.
 
-This is the preserved v1 execution record. See the [employee AI revision](m2-employee-ai-revision.md)
-for the current eight-person model, revised funding and subsequent validation.
+This is the preserved v1 execution record. See the [legal and assurance revision](m2-legal-assurance-revision.md)
+for the current nine-person model plus fractional counsel, revised funding and
+subsequent validation. The [employee AI revision](m2-employee-ai-revision.md)
+preserves the intermediate eight-person model.
 
 ## Approved-plan checklist
 

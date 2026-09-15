@@ -1,5 +1,6 @@
 # M2 revision — Legal counsel and assurance leadership
 
+Status: **implemented and validated financial preparation**.
 Date: **15 September 2026**. Owner: founder / finance. This revision adds the
 legal and assurance functions requested after the employee AI revision.
 
@@ -107,5 +108,63 @@ remain unchanged. Historical `ai-` captures and the
 [eight-person revision](m2-employee-ai-revision.md) remain audit evidence.
 Current model formula version: `M2-2026-09-15-v3-assurance`.
 
-Native validation, revised financial results and publication evidence are added
-below when the revision passes its checks.
+### Verified Base funding
+
+These are alternative company bases, not additive forecasts. Captures:
+London **20:38:21 UTC**, New York **20:38:16 UTC**, 15 September 2026.
+Both formula fingerprints are `fnv1a32:d74d6a28`.
+
+| Measure | London GBP | New York USD | New York in GBP |
+| --- | ---: | ---: | ---: |
+| Required net financing | £3,161,743 | $4,814,929 | £3,572,966 |
+| Required gross financing, including 2% fees | £3,226,268 | $4,913,193 | £3,645,884 |
+| Gross funding increase versus completed eight-person v2 | £595,791 | $891,426 | £661,491 |
+| Months 25–27 operating buffer | £504,025 | $743,765 | £551,918 |
+| First-24-month employee AI expected spending | £420,000 | $565,992 | £420,000 |
+| First-24-month earmarked AI cash | £420,000 | $565,992 | £420,000 |
+| Month-24 closing cash | £924,025 | $1,309,757 | £971,918 |
+| Month-36 closing cash | £1,062,469 | $1,238,160 | £918,789 |
+| Cash spending through month 24 | £3,298,118 | $4,934,167 | £3,661,447 |
+
+Independent incremental arithmetic reconciles the funding increases to the
+added payroll, recruitment, tools/workspace, net professional-service increase,
+AI expense, retained AI cash and operating buffer. Net financing exceeds the
+historical £3m / $4.5m raise references by £161,743 / $314,929. The G&A lead has
+zero delivery allocation, so Base gross margins and the existing commercial
+cohorts are unchanged. External audit-fee coverage remains unvalidated as stated
+above; these figures must not be presented as scoped funding for every initial
+and recurring ISO/SOC engagement.
+
+The combined three-month launch delay, doubled delivery effort and full AI
+utilisation case ends month 36 with **£120,768 / $356,370 cash shortfalls**,
+despite funding sized to its 24-month objective. Its gross funding requirement
+is £3,734,377 / $5,597,920. The funding policy does not guarantee a positive
+36-month outcome. The case retains the same conditional commercial assumptions.
+
+### Validation and publication
+
+- Both workbooks passed **42 native fixtures and 1,434 numerical checks per
+  region**: all 30 prior regressions and 12 additional legal/G&A cases. The
+  added tests isolate hiring, exclusion, historical staffing, legal-only costs,
+  four-way AI allocation and zero/full utilisation.
+- All **28 comparisons** passed **23 reconciliations per case**. The three new
+  comparisons remove the added lead, double counsel fees and delay the lead.
+  Removing the lead does not assume substitute assurance capacity.
+- Both regions have **12,354 identical formulas**, **371 captured inputs** and
+  **304 matching shared inputs** after excluding documented regional costs.
+- Deliberate refresh failures published no partial results and restored all
+  inputs. Missing counsel fees failed input checks. Counsel and lead edits
+  marked captures stale; restoring inputs returned current status. All **25
+  Base outputs exactly matched** the live forecast.
+- Native PDF exports were rendered for visual review of Summary, assumptions,
+  Team, Employee AI, P&L, comparisons, checks and ARR/cash charts. The default
+  export splits charts across pages and shrinks wide monthly schedules; these
+  inspection exports are not a redesigned print deliverable.
+
+See the [evidence index](m2-model/README.md#current-legal-and-assurance-revision--v3)
+for recorded tests, final captures, safety checks and publication readback.
+The matching [Notion business summary](https://app.notion.com/p/3dc8990715f4813fb281d4a8175c3d1a)
+retains the existing pitch-workspace location. M3 remains open for cost, capacity
+and assurance-scope validation; M4 updates the deck and M5 supplies customer
+evidence. This revision creates no supplier engagement, hiring commitment,
+spending authorisation or assurance claim.

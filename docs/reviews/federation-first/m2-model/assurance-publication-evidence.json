@@ -1,0 +1,78 @@
+{
+  "asOf": "2026-09-15T20:55:15.692Z",
+  "modelVersion": "M2-2026-09-15-v3-assurance",
+  "notion": [
+    {
+      "url": "https://app.notion.com/p/3dc8990715f4813fb281d4a8175c3d1a?pvs=204",
+      "title": "📊 M2 — Agentic Enterprise financial models",
+      "lastEdited": "2026-09-15T20:49:08.569Z",
+      "readBack": true,
+      "childrenPreserved": 0,
+      "requiredClaimsPresent": true
+    },
+    {
+      "url": "https://app.notion.com/p/3b38990715f48127970accded279fa63?pvs=204",
+      "title": "🧠 Codifix pitch deck workspace",
+      "lastEdited": "2026-09-15T20:49:12.595Z",
+      "readBack": true,
+      "childrenPreserved": 7,
+      "requiredClaimsPresent": true
+    }
+  ],
+  "visual": {
+    "method": "Native Google Sheets PDF exports rendered with Poppler; high-resolution bounded table views inspected.",
+    "regions": [
+      "london",
+      "newyork"
+    ],
+    "areas": [
+      "Summary funding and AI headroom",
+      "ARR and funded cash charts across continuation page",
+      "Assumptions accounting/counsel split, fee, start, inclusion, source and coverage note",
+      "Team added lead and G&A payroll",
+      "Employee AI G&A allocation",
+      "P&L professional services and AI expense",
+      "All 28 sensitivity cases and full caveats",
+      "Checks 35/36 and wrapped funding warning"
+    ],
+    "corrections": [
+      "New explanatory rows merged and wrapped",
+      "Team source column widened",
+      "Sensitivity result rows auto-sized to show complete caveats in Q31–Q35",
+      "Checks funding-warning rows wrapped"
+    ],
+    "finalCorrectedAreasReadBack": true,
+    "printLimit": "Default export splits charts across pages and compresses wide monthly schedules; these exports serve inspection rather than a redesigned print deliverable."
+  },
+  "validation": {
+    "fixturesPerRegion": 42,
+    "numericChecksPerRegion": 1434,
+    "comparisonsPerRegion": 28,
+    "checksPerComparison": 23,
+    "identicalFormulaCount": 12354,
+    "capturedInputs": 371,
+    "sharedInputs": 304,
+    "baseOutputsExactlyMatchingLive": 25,
+    "formulaFingerprint": "fnv1a32:d74d6a28"
+  },
+  "captureTimes": {
+    "london": "2026-09-15T20:38:21.652Z",
+    "newyork": "2026-09-15T20:38:16.635Z"
+  },
+  "preservation": {
+    "workingURLsRetained": true,
+    "v2Backups": "assurance-pre-revision-backups.json",
+    "earlierCapturesPreserved": true
+  },
+  "localEvidenceSave": {
+    "initialCommitInterruptedByDiskFull": true,
+    "spaceRecovered": true,
+    "evidenceRewrittenAndReadBack": true,
+    "projectOrCacheFilesRemoved": false
+  },
+  "limits": [
+    "Employment arrangements, hire dates, compensation and retainers remain planning hypotheses.",
+    "Only the historical external assurance allowance is modeled; scoped initial and recurring ISO/SOC fees require M3 evidence.",
+    "No hiring, procurement, spending, customer readiness or certification commitment."
+  ]
+}

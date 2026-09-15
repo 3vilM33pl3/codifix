@@ -2,8 +2,8 @@
 
 **Status:** historical M2 v1 specification and captures · 2026-09-15.
 
-The current models include the approved [eight-person team and employee AI
-revision](m2-employee-ai-revision.md). That dossier supersedes the staffing,
+The current models include [legal counsel and assurance leadership](m2-legal-assurance-revision.md)
+on top of the [employee AI revision](m2-employee-ai-revision.md). Those dossiers supersede the staffing,
 funding, interface counts and Base figures below. This original specification
 and its captures remain intact as the pre-revision audit trail.
 

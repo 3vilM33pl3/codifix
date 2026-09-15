@@ -38,7 +38,7 @@ def build(region, manifest):
         ran={'sheetId':ids[sheet],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':c0,'endColumnIndex':c1}
         req.append({'repeatCell':{'range':ran,'cell':{'userEnteredFormat':{'backgroundColor':teal,'textFormat':{'foregroundColor':white,'bold':True},'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat,userEnteredFormat.wrapStrategy'}})
         if sheet=='Summary':req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
-    for sheet,rows,end in [('Summary',[70,86,87,88],6),('Team',[36,37,44],12),('Assumptions',[123,130],10),('Sensitivity',[43,44],10)]:
+    for sheet,rows,end in [('Summary',[70,86,87,88],6),('Team',[36,37,44,48],12),('Assumptions',[123,130],10),('Sensitivity',[43,44],10)]:
         for r in rows:
             ran={'sheetId':ids[sheet],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':1,'endColumnIndex':end}
             req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
@@ -49,6 +49,11 @@ def build(region, manifest):
         req.append({'updateDimensionProperties':{'range':{'sheetId':ids[sheet],'dimension':'ROWS','startIndex':r0,'endIndex':r1},'properties':{'pixelSize':48},'fields':'pixelSize'}})
     req.append({'updateDimensionProperties':{'range':{'sheetId':ids['Employee AI'],'dimension':'COLUMNS','startIndex':0,'endIndex':1},'properties':{'pixelSize':450},'fields':'pixelSize'}})
     req.append({'updateDimensionProperties':{'range':{'sheetId':ids['Team'],'dimension':'COLUMNS','startIndex':42,'endIndex':47},'properties':{'pixelSize':145},'fields':'pixelSize'}})
+    req.append({'updateDimensionProperties':{'range':{'sheetId':ids['Team'],'dimension':'COLUMNS','startIndex':41,'endIndex':42},'properties':{'pixelSize':420},'fields':'pixelSize'}})
+    # Case notes qualify the financial counterfactuals; show them in full.
+    req.append({'autoResizeDimensions':{'dimensions':{'sheetId':ids['Sensitivity'],'dimension':'ROWS','startIndex':7,'endIndex':40}}})
+    req.append({'repeatCell':{'range':{'sheetId':ids['Checks'],'startRowIndex':18,'endRowIndex':22,'startColumnIndex':0,'endColumnIndex':2},'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
+    req.append({'updateDimensionProperties':{'range':{'sheetId':ids['Checks'],'dimension':'ROWS','startIndex':18,'endIndex':22},'properties':{'pixelSize':58},'fields':'pixelSize'}})
     for i,(chart_id,sheet,row,title) in enumerate([
         (CHARTS[region][0],'Revenue',21,'Recurring ARR'),
         (CHARTS[region][1],'P&L & Cash',31,'Closing cash after modelled financing')]):

@@ -4,9 +4,11 @@ The [London](https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeK
 
 ## Use and maintain the models
 
-Current specification: [eight-person team and employee AI revision](../m2-employee-ai-revision.md).
-The original M2 specification and unprefixed JSON captures remain historical v1
-evidence. Current revision captures use `ai-`; both workbook URLs are unchanged.
+Current specification: [legal counsel and assurance leadership](../m2-legal-assurance-revision.md),
+with nine employees plus fractional counsel. The original M2 specification and
+unprefixed JSON captures remain historical v1 evidence; `ai-` captures preserve
+the eight-person v2. Current revision captures use `assurance-`; both workbook
+URLs are unchanged.
 
 Edit the workbook's Assumptions and Team inputs and select Base, Downside or Upside. The main forecast recalculates immediately. Follow the [refresh guide](refresh-guide.md) to update the captured sensitivity comparisons; their visible stale flag identifies changed inputs.
 
@@ -20,6 +22,9 @@ Edit the workbook's Assumptions and Team inputs and select Base, Downside or Ups
 | [migrate_ai_revision.py](migrate_ai_revision.py) | One-time reviewed v1-to-v2 delta, requiring preflight manifests and current input captures; never a routine refresh |
 | [build_ai_validation.py](build_ai_validation.py) and [AI fixtures](ai-validation-cases.json) | Reproduce 17 AI/staffing fixtures and adapt the original 13 checks without overwriting historical evidence |
 | [Employee AI sources](employee-ai-sources.md) | Dated official rates, vendor usage and strategic ambition, separate from founder budget hypotheses |
+| [Legal and assurance sources](legal-assurance-sources.md) | Primary ISO/AICPA scope, limited public legal offers and salary evidence, separate from selected planning rates |
+| [migrate_assurance_revision.py](migrate_assurance_revision.py) | One-time bounded v2-to-v3 delta requiring verified live formulas/inputs and dated backups; never a routine refresh |
+| [build_assurance_validation.py](build_assurance_validation.py) and [assurance fixtures](assurance-validation-cases.json) | Preserve all 30 prior cases and add 12 independent legal/G&A fixtures |
 
 Generate the manifests with the actual supported command:
 
@@ -41,9 +46,29 @@ This emits `/tmp/m2-london-polish.json` and `/tmp/m2-newyork-polish.json`. Apply
 
 ## Evidence index
 
-### Current employee AI revision — v2
+### Current legal and assurance revision — v3
 
-The revision is complete. Both native workbooks have passed 30 financial
+Both native models passed 42 fixtures and 1,434 numerical checks per region.
+The 28 business comparisons passed 23 reconciliations per case, with input
+restoration. The added lead has separate G&A payroll and AI allocations; counsel
+is a professional service with independent fee/start/inclusion controls.
+Independent initial and recurring assurance fees still require scoped quotes;
+the historical allowance does not establish full programme coverage.
+
+| Evidence | Meaning |
+| --- | --- |
+| [Backups and preflight](assurance-pre-revision-backups.json) | Completed v2 copies created before updating either working URL |
+| [London migration](assurance-london-migration.json), [New York migration](assurance-newyork-migration.json) | Bounded cell changes and preserved existing inputs, with the explicit accounting/payroll split |
+| [Fixtures](assurance-validation-cases.json), [fixture builder](build_assurance_validation.py) | 30 preserved regressions plus 12 new cases; 468 independent arithmetic checks |
+| [London validation](assurance-london-validation.json), [New York validation](assurance-newyork-validation.json) | 42 cases / 1,434 passed checks in each live workbook |
+| [London comparisons](assurance-london-scenarios.json), [New York comparisons](assurance-newyork-scenarios.json) | All 28 comparisons through the live forecast, with restored inputs |
+| [Safety and regional parity](assurance-native-safety.json) | Deliberate failed-refresh restoration, missing input, stale detection, exact Base parity and shared assumptions |
+| [London final](assurance-london-final-summary.json), [New York final](assurance-newyork-final-summary.json) | Restored Base outputs and funding cash components |
+| [Notion summary](assurance-notion-summary.md), [publication evidence](assurance-publication-evidence.json) | Matching business summary, readback and visual inspection |
+
+### Historical employee AI revision — v2
+
+This is the completed v2 record. At that revision both native workbooks passed 30 financial
 fixtures and 920 numerical checks per region, including 17 employee AI/staffing
 fixtures and the 13 original cases run under historical staffing with zero
 employee AI allowance. All 25 business comparisons passed 21 reconciliations per
