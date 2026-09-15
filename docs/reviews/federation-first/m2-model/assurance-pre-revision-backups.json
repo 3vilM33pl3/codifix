@@ -1,0 +1,37 @@
+{
+  "asOf": "2026-09-15T20:25:34.010Z",
+  "fromVersion": "M2-2026-09-15-v2-ai",
+  "purpose": "Preserve completed eight-person employee AI forecasts before adding legal counsel and assurance leadership",
+  "regions": [
+    {
+      "region": "london",
+      "workingSpreadsheetId": "1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0",
+      "backup": {
+        "success": true,
+        "id": "1vmvXDz8i1HureGZUUzBeyFxRi7WctoLls4MY_hRG7kU",
+        "title": "Codifix — London — M2 v2 AI backup — 2026-09-15 before legal and assurance revision",
+        "mimeType": "application/vnd.google-apps.spreadsheet",
+        "url": "https://docs.google.com/spreadsheets/d/1vmvXDz8i1HureGZUUzBeyFxRi7WctoLls4MY_hRG7kU/edit?usp=drivesdk",
+        "made_private": false
+      },
+      "verifiedFormulaCount": 12086,
+      "verifiedInputCount": 358,
+      "preservedEvidencePrefix": "ai-"
+    },
+    {
+      "region": "newyork",
+      "workingSpreadsheetId": "1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es",
+      "backup": {
+        "success": true,
+        "id": "1CSIHhzD9vqf9fi0PfSB8SNR-XtZxFu8f1AdsFkc4odg",
+        "title": "Codifix — New York — M2 v2 AI backup — 2026-09-15 before legal and assurance revision",
+        "mimeType": "application/vnd.google-apps.spreadsheet",
+        "url": "https://docs.google.com/spreadsheets/d/1CSIHhzD9vqf9fi0PfSB8SNR-XtZxFu8f1AdsFkc4odg/edit?usp=drivesdk",
+        "made_private": false
+      },
+      "verifiedFormulaCount": 12086,
+      "verifiedInputCount": 358,
+      "preservedEvidencePrefix": "ai-"
+    }
+  ]
+}
