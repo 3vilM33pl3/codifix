@@ -1,0 +1,2417 @@
+{
+  "modelVersion": "M2-2026-09-15-v1",
+  "formulaFingerprint": "fnv1a32:15dd894c",
+  "sourceInputSignature": "fnv1a32:d2de28fa",
+  "capturedAt": "2026-09-15T17:55:19.163Z",
+  "originalInputValues": {
+    "Assumptions!B3": "Base",
+    "Assumptions!B10": 46296,
+    "Assumptions!C10": 46296,
+    "Assumptions!D10": 46296,
+    "Assumptions!B11": 1.3476,
+    "Assumptions!C11": 1.2,
+    "Assumptions!D11": 1.5,
+    "Assumptions!B12": 80000,
+    "Assumptions!C12": 64000,
+    "Assumptions!D12": 96000,
+    "Assumptions!B13": 2,
+    "Assumptions!C13": 2,
+    "Assumptions!D13": 2,
+    "Assumptions!B14": 2,
+    "Assumptions!C14": 2,
+    "Assumptions!D14": 2,
+    "Assumptions!B15": 10000,
+    "Assumptions!C15": 10000,
+    "Assumptions!D15": 10000,
+    "Assumptions!B16": 0,
+    "Assumptions!C16": 0,
+    "Assumptions!D16": 0,
+    "Assumptions!B17": 0,
+    "Assumptions!C17": 0,
+    "Assumptions!D17": 0,
+    "Assumptions!B18": 1000,
+    "Assumptions!C18": 1000,
+    "Assumptions!D18": 1000,
+    "Assumptions!B19": 500,
+    "Assumptions!C19": 750,
+    "Assumptions!D19": 500,
+    "Assumptions!B20": 0,
+    "Assumptions!C20": 0,
+    "Assumptions!D20": 0,
+    "Assumptions!B21": 5,
+    "Assumptions!C21": 5,
+    "Assumptions!D21": 5,
+    "Assumptions!B22": 0,
+    "Assumptions!C22": 3,
+    "Assumptions!D22": 0,
+    "Assumptions!B23": 1,
+    "Assumptions!C23": 1,
+    "Assumptions!D23": 1,
+    "Assumptions!B24": 2,
+    "Assumptions!C24": 2,
+    "Assumptions!D24": 2,
+    "Assumptions!B25": 0.5,
+    "Assumptions!C25": 0.25,
+    "Assumptions!D25": 0.65,
+    "Assumptions!B26": 0.05,
+    "Assumptions!C26": 0.1,
+    "Assumptions!D26": 0.03,
+    "Assumptions!B27": 0.45,
+    "Assumptions!C27": 0.15,
+    "Assumptions!D27": 0.5,
+    "Assumptions!B28": 1,
+    "Assumptions!C28": 0.75,
+    "Assumptions!D28": 1.25,
+    "Assumptions!B29": 1,
+    "Assumptions!C29": 3,
+    "Assumptions!D29": 1,
+    "Assumptions!B30": 1,
+    "Assumptions!C30": 1,
+    "Assumptions!D30": 1,
+    "Assumptions!B31": 0.02,
+    "Assumptions!C31": 0.02,
+    "Assumptions!D31": 0.02,
+    "Assumptions!B32": 0,
+    "Assumptions!C32": 0,
+    "Assumptions!D32": 0,
+    "Assumptions!B33": 3000000,
+    "Assumptions!C33": 3000000,
+    "Assumptions!D33": 3000000,
+    "Assumptions!B34": 0.45,
+    "Assumptions!C34": 0.45,
+    "Assumptions!D34": 0.45,
+    "Assumptions!B35": 0.1,
+    "Assumptions!C35": 0.2,
+    "Assumptions!D35": 0.05,
+    "Assumptions!B36": 1,
+    "Assumptions!C36": 1,
+    "Assumptions!D36": 1,
+    "Assumptions!B37": 4000,
+    "Assumptions!C37": 4000,
+    "Assumptions!D37": 4000,
+    "Assumptions!B38": 2.5,
+    "Assumptions!C38": 2.5,
+    "Assumptions!D38": 2.5,
+    "Assumptions!B39": 80,
+    "Assumptions!C39": 80,
+    "Assumptions!D39": 80,
+    "Assumptions!B40": 35,
+    "Assumptions!C40": 35,
+    "Assumptions!D40": 35,
+    "Assumptions!B41": 5,
+    "Assumptions!C41": 5,
+    "Assumptions!D41": 5,
+    "Assumptions!B42": 10,
+    "Assumptions!C42": 10,
+    "Assumptions!D42": 10,
+    "Assumptions!B43": 3,
+    "Assumptions!C43": 3,
+    "Assumptions!D43": 3,
+    "Assumptions!B44": 1,
+    "Assumptions!C44": 1,
+    "Assumptions!D44": 1,
+    "Assumptions!B45": 0.08,
+    "Assumptions!C45": 0.08,
+    "Assumptions!D45": 0.08,
+    "Assumptions!B46": 0.0005,
+    "Assumptions!C46": 0.0005,
+    "Assumptions!D46": 0.0005,
+    "Assumptions!B47": 0.06,
+    "Assumptions!C47": 0.06,
+    "Assumptions!D47": 0.06,
+    "Assumptions!B48": 0.04,
+    "Assumptions!C48": 0.04,
+    "Assumptions!D48": 0.04,
+    "Assumptions!B49": 4,
+    "Assumptions!C49": 4,
+    "Assumptions!D49": 4,
+    "Assumptions!B50": 8,
+    "Assumptions!C50": 8,
+    "Assumptions!D50": 8,
+    "Assumptions!B51": 8,
+    "Assumptions!C51": 8,
+    "Assumptions!D51": 8,
+    "Assumptions!B52": 2,
+    "Assumptions!C52": 2,
+    "Assumptions!D52": 2,
+    "Assumptions!B53": 0.02,
+    "Assumptions!C53": 0.02,
+    "Assumptions!D53": 0.02,
+    "Assumptions!B54": 0.25,
+    "Assumptions!C54": 0.25,
+    "Assumptions!D54": 0.25,
+    "Assumptions!B55": 1,
+    "Assumptions!C55": 1,
+    "Assumptions!D55": 1,
+    "Assumptions!B56": 3,
+    "Assumptions!C56": 3,
+    "Assumptions!D56": 3,
+    "Assumptions!B57": 0.03,
+    "Assumptions!C57": 0.03,
+    "Assumptions!D57": 0.03,
+    "Assumptions!B58": 0.25,
+    "Assumptions!C58": 0.25,
+    "Assumptions!D58": 0.25,
+    "Assumptions!B59": 0.5,
+    "Assumptions!C59": 0.5,
+    "Assumptions!D59": 0.5,
+    "Assumptions!B60": 75,
+    "Assumptions!C60": 75,
+    "Assumptions!D60": 75,
+    "Assumptions!B61": 120,
+    "Assumptions!C61": 120,
+    "Assumptions!D61": 120,
+    "Assumptions!B62": 1,
+    "Assumptions!C62": 1,
+    "Assumptions!D62": 1,
+    "Assumptions!B63": "PENDING",
+    "Assumptions!C63": "PENDING",
+    "Assumptions!D63": "PENDING",
+    "Assumptions!B64": 0,
+    "Assumptions!C64": 0,
+    "Assumptions!D64": 0,
+    "Assumptions!B65": 150,
+    "Assumptions!C65": 150,
+    "Assumptions!D65": 150,
+    "Assumptions!B66": 1,
+    "Assumptions!C66": 1.5,
+    "Assumptions!D66": 0.9,
+    "Assumptions!B67": 1,
+    "Assumptions!C67": 1.5,
+    "Assumptions!D67": 0.9,
+    "Assumptions!B68": 1,
+    "Assumptions!C68": 1.1,
+    "Assumptions!D68": 1,
+    "Assumptions!B69": 0,
+    "Assumptions!C69": 0,
+    "Assumptions!D69": 0,
+    "Assumptions!B70": 1.2,
+    "Assumptions!C70": 1.2,
+    "Assumptions!D70": 1.2,
+    "Assumptions!B71": 0.08,
+    "Assumptions!C71": 0.08,
+    "Assumptions!D71": 0.08,
+    "Assumptions!B72": 0.15,
+    "Assumptions!C72": 0.15,
+    "Assumptions!D72": 0.15,
+    "Assumptions!B73": 0.6,
+    "Assumptions!C73": 0.6,
+    "Assumptions!D73": 0.6,
+    "Assumptions!B74": 170,
+    "Assumptions!C74": 170,
+    "Assumptions!D74": 170,
+    "Assumptions!B75": 450,
+    "Assumptions!C75": 450,
+    "Assumptions!D75": 450,
+    "Assumptions!B76": 6000,
+    "Assumptions!C76": 6000,
+    "Assumptions!D76": 6000,
+    "Assumptions!B77": 3000,
+    "Assumptions!C77": 3000,
+    "Assumptions!D77": 3000,
+    "Assumptions!B78": 3500,
+    "Assumptions!C78": 3500,
+    "Assumptions!D78": 3500,
+    "Assumptions!B79": 45000,
+    "Assumptions!C79": 45000,
+    "Assumptions!D79": 45000,
+    "Assumptions!B80": 14,
+    "Assumptions!C80": 14,
+    "Assumptions!D80": 14,
+    "Assumptions!B81": 900,
+    "Assumptions!C81": 900,
+    "Assumptions!D81": 900,
+    "Assumptions!B82": 2500,
+    "Assumptions!C82": 2500,
+    "Assumptions!D82": 2500,
+    "Assumptions!B83": 0.05,
+    "Assumptions!C83": 0.05,
+    "Assumptions!D83": 0.05,
+    "Assumptions!B84": 0,
+    "Assumptions!C84": 0,
+    "Assumptions!D84": 0,
+    "Assumptions!B85": 0.5,
+    "Assumptions!C85": 0.5,
+    "Assumptions!D85": 0.5,
+    "Assumptions!B88": 0,
+    "Assumptions!C88": 0,
+    "Assumptions!D88": 0,
+    "Assumptions!B89": 0.4,
+    "Assumptions!C89": 0.4,
+    "Assumptions!D89": 0.4,
+    "Assumptions!B90": 0.6,
+    "Assumptions!C90": 0.6,
+    "Assumptions!D90": 0.6,
+    "Assumptions!B95": 0,
+    "Assumptions!C95": 0,
+    "Assumptions!D95": 0,
+    "Assumptions!B96": 1,
+    "Assumptions!C96": 1,
+    "Assumptions!D96": 1,
+    "Assumptions!B97": 3,
+    "Assumptions!C97": 3,
+    "Assumptions!D97": 3,
+    "Assumptions!B98": 4,
+    "Assumptions!C98": 4,
+    "Assumptions!D98": 4,
+    "Assumptions!B99": 4,
+    "Assumptions!C99": 4,
+    "Assumptions!D99": 4,
+    "Assumptions!B100": 4,
+    "Assumptions!C100": 4,
+    "Assumptions!D100": 4,
+    "Assumptions!B101": 5,
+    "Assumptions!C101": 5,
+    "Assumptions!D101": 5,
+    "Assumptions!B102": 5,
+    "Assumptions!C102": 5,
+    "Assumptions!D102": 5,
+    "Assumptions!B103": 6,
+    "Assumptions!C103": 6,
+    "Assumptions!D103": 6,
+    "Assumptions!B104": 7,
+    "Assumptions!C104": 7,
+    "Assumptions!D104": 7,
+    "Assumptions!B105": 7,
+    "Assumptions!C105": 7,
+    "Assumptions!D105": 7,
+    "Assumptions!B106": 8,
+    "Assumptions!C106": 8,
+    "Assumptions!D106": 8,
+    "Team!B5": 105000,
+    "Team!AM5": 1,
+    "Team!AN5": 0,
+    "Team!B6": 145000,
+    "Team!AM6": 1,
+    "Team!AN6": 0,
+    "Team!B7": 135000,
+    "Team!AM7": 2,
+    "Team!AN7": 0.1,
+    "Team!B8": 135000,
+    "Team!AM8": 3,
+    "Team!AN8": 0,
+    "Team!B9": 120000,
+    "Team!AM9": 2,
+    "Team!AN9": 0,
+    "Team!B10": 130000,
+    "Team!AM10": 5,
+    "Team!AN10": 0.1,
+    "Team!B11": 100000,
+    "Team!AM11": 6,
+    "Team!AN11": 0,
+    "Team!B12": 110000,
+    "Team!AM12": 8,
+    "Team!AN12": 0.6,
+    "Team!B13": 95000,
+    "Team!AM13": 10,
+    "Team!AN13": 0,
+    "Team!B14": 125000,
+    "Team!AM14": 12,
+    "Team!AN14": 0,
+    "Team!B15": 125000,
+    "Team!AM15": 15,
+    "Team!AN15": 0,
+    "Team!B16": 70000,
+    "Team!AM16": 16,
+    "Team!AN16": 1,
+    "Team!B17": 95000,
+    "Team!AM17": 18,
+    "Team!AN17": 0,
+    "Team!B18": 55000,
+    "Team!AM18": 19,
+    "Team!AN18": 0,
+    "Team!B19": 125000,
+    "Team!AM19": 21,
+    "Team!AN19": 0,
+    "Team!B20": 110000,
+    "Team!AM20": 23,
+    "Team!AN20": 0,
+    "Team!B21": 95000,
+    "Team!AM21": 26,
+    "Team!AN21": 0,
+    "Team!B22": 125000,
+    "Team!AM22": 28,
+    "Team!AN22": 0
+  },
+  "rows": [
+    {
+      "id": "base",
+      "label": "Base",
+      "inputs": {},
+      "outputs": {
+        "arr36": 2240301,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 2198035.2625,
+        "grossMargin36": 0.7056450233512406,
+        "requiredGrossFunding": 3312229.268863904,
+        "minCash24": 677690.7070280006,
+        "endingCash36": -31711.934879711596,
+        "staff36": 18,
+        "totalSpend24": 3622436.615916125,
+        "gbpFunding": 3312229.268863904,
+        "gbpARR36": 2240301
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.6152625903487206e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 6.828031473560259e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 3.1977833714336157e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 8.913048077374697e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "downside",
+      "label": "Downside",
+      "inputs": {
+        "Assumptions!B3": "Downside"
+      },
+      "outputs": {
+        "arr36": 475154.69999999995,
+        "accounts36": 6.995625,
+        "deployments36": 24.49125,
+        "revenue36": 457655.93999999994,
+        "grossMargin36": -0.3896220359618319,
+        "requiredGrossFunding": 4515203.985385014,
+        "minCash24": 719480.2435147827,
+        "endingCash36": -1988738.873435512,
+        "staff36": 18,
+        "totalSpend24": 3849419.662162531,
+        "gbpFunding": 4515203.985385014,
+        "gbpARR36": 475154.69999999995
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 2.1245796233415604e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 6.366462912410498e-11
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 7.463540896424092e-11
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 8.731149137020111e-11
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "upside",
+      "label": "Upside",
+      "inputs": {
+        "Assumptions!B3": "Upside"
+      },
+      "outputs": {
+        "arr36": 4539841.8,
+        "accounts36": 36.768550000000005,
+        "deployments36": 93.53710000000001,
+        "revenue36": 4385150.3475,
+        "grossMargin36": 0.8283107009830399,
+        "requiredGrossFunding": 2380968.4269210827,
+        "minCash24": 440563.98331409437,
+        "endingCash36": 2141032.4691364076,
+        "staff36": 18,
+        "totalSpend24": 3713166.6521755857,
+        "gbpFunding": 2380968.4269210827,
+        "gbpARR36": 4539841.8
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.4988472685217857e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 2.9831426218152046e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 4.5838532969355583e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 4.663888830691576e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 2.3283064365386963e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 1.7462298274040222e-10
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 9.458744898438454e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "price_minus20",
+      "label": "Package price −20%",
+      "inputs": {
+        "Assumptions!B12": 64000
+      },
+      "outputs": {
+        "arr36": 1792240.7999999998,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 1758428.21,
+        "grossMargin36": 0.6320562791890508,
+        "requiredGrossFunding": 3511657.840292475,
+        "minCash24": 680748.0675705001,
+        "endingCash36": -466972.1348797121,
+        "staff36": 18,
+        "totalSpend24": 3608996.615916125,
+        "gbpFunding": 3511657.840292475,
+        "gbpARR36": 1792240.7999999998
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.7025740817189217e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 4.772573447553441e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 1.6189005691558123e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 1.3460521586239338e-10
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "price_plus20",
+      "label": "Package price +20%",
+      "inputs": {
+        "Assumptions!B12": 96000
+      },
+      "outputs": {
+        "arr36": 2688361.2,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 2637642.315,
+        "grossMargin36": 0.7547041861260338,
+        "requiredGrossFunding": 3112800.697435332,
+        "minCash24": 637054.7070280001,
+        "endingCash36": 403548.2651202878,
+        "staff36": 18,
+        "totalSpend24": 3635876.615916125,
+        "gbpFunding": 3112800.697435332,
+        "gbpARR36": 2688361.2
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.5497789718210697e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.4551915228366852e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 5.456968210637569e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 1.862645149230957e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 2.9103830456733704e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "conversion_half",
+      "label": "Pilot conversion halved",
+      "inputs": {
+        "Assumptions!B25": 0.25
+      },
+      "outputs": {
+        "arr36": 1120150.5,
+        "accounts36": 11.19,
+        "deployments36": 38.379999999999995,
+        "revenue36": 1099017.63125,
+        "grossMargin36": 0.5096832583440698,
+        "requiredGrossFunding": 3777268.8797380747,
+        "minCash24": 663284.7358102505,
+        "endingCash36": -1044587.7418336053,
+        "staff36": 18,
+        "totalSpend24": 3568638.7663330627,
+        "gbpFunding": 3777268.8797380747,
+        "gbpARR36": 1120150.5
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.7025740817189217e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 3.4140157367801294e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 1.5988916857168078e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 4.4565240386873484e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 2.9103830456733704e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "launch_delay3",
+      "label": "Launch delayed 3 months",
+      "inputs": {
+        "Assumptions!B22": 3
+      },
+      "outputs": {
+        "arr36": 1822400.25,
+        "accounts36": 19.076249999999998,
+        "deployments36": 52.152499999999996,
+        "revenue36": 1658855.05,
+        "grossMargin36": 0.6504973012063358,
+        "requiredGrossFunding": 3638004.199914414,
+        "minCash24": 674819.7861416256,
+        "endingCash36": -406024.9509663731,
+        "staff36": 18,
+        "totalSpend24": 3585524.3297745,
+        "gbpFunding": 3638004.199914414,
+        "gbpARR36": 1822400.25
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.5279510989785194e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 5.663878255290911e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 1.684384187683463e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 6.002665031701326e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "zero_sales",
+      "label": "Zero paid conversion",
+      "inputs": {
+        "Assumptions!B25": 0
+      },
+      "outputs": {
+        "arr36": 0,
+        "accounts36": 0,
+        "deployments36": 16,
+        "revenue36": 0,
+        "grossMargin36": null,
+        "requiredGrossFunding": 4253853.324795919,
+        "minCash24": 647679.4040500002,
+        "endingCash36": -2081604.9731,
+        "staff36": 18,
+        "totalSpend24": 3521096.85425,
+        "gbpFunding": 4253853.324795919,
+        "gbpARR36": 0
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 2.168235369026661e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 2.3283064365386963e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "renewal_downside",
+      "label": "10% churn / 15% expansion",
+      "inputs": {
+        "Assumptions!B26": 0.1,
+        "Assumptions!B27": 0.15
+      },
+      "outputs": {
+        "arr36": 1875196,
+        "accounts36": 21.770000000000003,
+        "deployments36": 59.540000000000006,
+        "revenue36": 1979751.4499999997,
+        "grossMargin36": 0.6757564405831356,
+        "requiredGrossFunding": 3367417.5305160717,
+        "minCash24": 683433.0521509998,
+        "endingCash36": -392451.47700294893,
+        "staff36": 18,
+        "totalSpend24": 3622236.12775475,
+        "gbpFunding": 3367417.5305160717,
+        "gbpARR36": 1875196
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.4842953532934189e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 4.718003765447065e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 2.9067450668662786e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 6.002665031701326e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 8.731149137020111e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "delivery_plus50",
+      "label": "External delivery rates +50%",
+      "inputs": {
+        "Assumptions!B66": 1.5
+      },
+      "outputs": {
+        "arr36": 2240301,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 2198035.2625,
+        "grossMargin36": 0.6556566036667458,
+        "requiredGrossFunding": 3352385.740030549,
+        "minCash24": 693478.0605420006,
+        "endingCash36": -102234.90231956763,
+        "staff36": 18,
+        "totalSpend24": 3649908.4238741873,
+        "gbpFunding": 3352385.740030549,
+        "gbpARR36": 2240301
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.6880221664905548e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 6.828031473560259e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 3.1977833714336157e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 8.913048077374697e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "support_double",
+      "label": "Delivery effort doubled",
+      "inputs": {
+        "Assumptions!B67": 2
+      },
+      "outputs": {
+        "arr36": 2240301,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 2198035.2625,
+        "grossMargin36": 0.5225792546611443,
+        "requiredGrossFunding": 3493343.5928434953,
+        "minCash24": 732924.2675704998,
+        "endingCash36": -256604.91231721232,
+        "staff36": 18,
+        "totalSpend24": 3750952.453416125,
+        "gbpFunding": 3493343.5928434953,
+        "gbpARR36": 2240301
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.760781742632389e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 6.828031473560259e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 3.1977833714336157e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 8.913048077374697e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "collections_delay2",
+      "label": "Collections 2 months slower",
+      "inputs": {
+        "Assumptions!B29": 3
+      },
+      "outputs": {
+        "arr36": 2240301,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 2198035.2625,
+        "grossMargin36": 0.7056450233512406,
+        "requiredGrossFunding": 3684984.37090472,
+        "minCash24": 683948.0675705001,
+        "endingCash36": -449612.68487971206,
+        "staff36": 18,
+        "totalSpend24": 3622436.615916125,
+        "gbpFunding": 3684984.37090472,
+        "gbpARR36": 2240301
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.57160684466362e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.3096723705530167e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 6.828031473560259e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 2.499291440472007e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 8.913048077374697e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "failed_exchanges_double",
+      "label": "Initial failures doubled",
+      "inputs": {
+        "Assumptions!B35": 0.2
+      },
+      "outputs": {
+        "arr36": 2240301,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 2198035.2625,
+        "grossMargin36": 0.6912149257325,
+        "requiredGrossFunding": 3321219.6038464285,
+        "minCash24": 683006.0020760002,
+        "endingCash36": -54619.27000414589,
+        "staff36": 18,
+        "totalSpend24": 3627486.1847835,
+        "gbpFunding": 3321219.6038464285,
+        "gbpARR36": 2240301
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.6152625903487206e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 6.828031473560259e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 3.1977833714336157e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 5.820766091346741e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 8.913048077374697e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "fx_low",
+      "label": "USD/GBP 1.20",
+      "inputs": {
+        "Assumptions!B11": 1.2
+      },
+      "outputs": {
+        "arr36": 2240301,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 2198035.2625,
+        "grossMargin36": 0.7056450233512406,
+        "requiredGrossFunding": 3312229.268863904,
+        "minCash24": 677690.7070280006,
+        "endingCash36": -31711.934879711596,
+        "staff36": 18,
+        "totalSpend24": 3622436.615916125,
+        "gbpFunding": 3312229.268863904,
+        "gbpARR36": 2240301
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.6152625903487206e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 6.828031473560259e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 3.1977833714336157e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 8.913048077374697e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "fx_high",
+      "label": "USD/GBP 1.50",
+      "inputs": {
+        "Assumptions!B11": 1.5
+      },
+      "outputs": {
+        "arr36": 2240301,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 2198035.2625,
+        "grossMargin36": 0.7056450233512406,
+        "requiredGrossFunding": 3312229.268863904,
+        "minCash24": 677690.7070280006,
+        "endingCash36": -31711.934879711596,
+        "staff36": 18,
+        "totalSpend24": 3622436.615916125,
+        "gbpFunding": 3312229.268863904,
+        "gbpARR36": 2240301
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.6152625903487206e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 6.828031473560259e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 3.1977833714336157e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 4.656612873077393e-10
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 8.913048077374697e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "extra_replica",
+      "label": "One additional stored replica",
+      "inputs": {
+        "Assumptions!B44": 2
+      },
+      "outputs": {
+        "arr36": 2240301,
+        "accounts36": 22.38,
+        "deployments36": 60.76,
+        "revenue36": 2198035.2625,
+        "grossMargin36": 0.7042716543923794,
+        "requiredGrossFunding": 3313696.7831496173,
+        "minCash24": 678182.1790279996,
+        "endingCash36": -33292.48427971249,
+        "staff36": 18,
+        "totalSpend24": 3623504.987916125,
+        "gbpFunding": 3313696.7831496173,
+        "gbpARR36": 2240301
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 1.3969838619232178e-9
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 6.828031473560259e-10
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 3.1977833714336157e-9
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 1.1641532182693481e-10
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 8.913048077374697e-11
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 5.820766091346741e-11
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": "Storage and transfer costs change; no extra knowledge charge."
+    },
+    {
+      "id": "readiness_hold",
+      "label": "Readiness gate remains closed",
+      "inputs": {
+        "Assumptions!B23": 0
+      },
+      "outputs": {
+        "arr36": 0,
+        "accounts36": 0,
+        "deployments36": 0,
+        "revenue36": 0,
+        "grossMargin36": null,
+        "requiredGrossFunding": 4233191.8367346935,
+        "minCash24": 644634.9999999995,
+        "endingCash36": -2068317.0000000005,
+        "staff36": 18,
+        "totalSpend24": 3503893,
+        "gbpFunding": 4233191.8367346935,
+        "gbpARR36": 0
+      },
+      "verifiedChecks": [
+        {
+          "cell": "Checks!B5",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid numeric input count (all cases)",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B6",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Quarterly phasing sum less one",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B7",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Payroll allocation residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B8",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Monthly cash bridge residual",
+          "actual": 8.731149137020111e-11
+        },
+        {
+          "cell": "Checks!B9",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Receivables bridge residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B10",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Deferred revenue bridge residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B11",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Accrual revenue to collections bridge residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B12",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month uses versus cash outflows residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B13",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "24-month sources and uses residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B14",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Annual commitment recognition residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B15",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Derived annual retention residual",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B16",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Minimum deferred or receivable balance breach",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B17",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Customer runtime ownership with unknown cost",
+          "actual": 0
+        },
+        {
+          "cell": "Checks!B18",
+          "expected": 0,
+          "tolerance": 0.00001,
+          "label": "Invalid selected case",
+          "actual": 0
+        }
+      ],
+      "notes": "Staff/fixed costs continue; pilot plan remains pending."
+    }
+  ],
+  "restoration": {
+    "restored": true,
+    "conflicts": [],
+    "notRestored": []
+  },
+  "inputEncoding": "row.inputs are overrides relative to originalInputValues"
+}

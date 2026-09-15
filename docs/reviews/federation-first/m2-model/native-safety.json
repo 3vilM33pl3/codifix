@@ -1,0 +1,107 @@
+{
+  "capturedAt": "2026-09-15T18:07:50.763Z",
+  "regions": {
+    "london": {
+      "region": "london",
+      "tests": [
+        {
+          "test": "deliberate_failure",
+          "expectedFailure": "Case deliberate_failure failed Deliberate mismatch to exercise restoration",
+          "details": {
+            "caseId": "deliberate_failure",
+            "cell": "Summary!E6",
+            "actual": 2262704.01,
+            "expected": -1,
+            "restoration": {
+              "restored": true,
+              "conflicts": [],
+              "notRestored": []
+            },
+            "completedCases": [],
+            "published": false
+          }
+        },
+        {
+          "test": "missing_required_price",
+          "expectedFailure": "Summary!E6: N_A: undefined",
+          "details": {
+            "restoration": {
+              "restored": true,
+              "conflicts": [],
+              "notRestored": []
+            },
+            "completedCases": [],
+            "published": false
+          }
+        }
+      ],
+      "observedWhileChanged": [
+        {
+          "Sensitivity!B3": "STALE — RUN VERIFIED REFRESH"
+        },
+        {
+          "Sensitivity!B3": "STALE — RUN VERIFIED REFRESH"
+        }
+      ],
+      "final": {
+        "Assumptions!B3": "Base",
+        "Assumptions!B12": 80000,
+        "Sensitivity!B3": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+        "Sensitivity!D8": 2240301,
+        "Summary!E6": 2240301,
+        "Summary!B65": 30
+      }
+    },
+    "newyork": {
+      "region": "newyork",
+      "tests": [
+        {
+          "test": "deliberate_failure",
+          "expectedFailure": "Case deliberate_failure failed Deliberate mismatch to exercise restoration",
+          "details": {
+            "caseId": "deliberate_failure",
+            "cell": "Summary!E6",
+            "actual": 3049219.9238760006,
+            "expected": -1,
+            "restoration": {
+              "restored": true,
+              "conflicts": [],
+              "notRestored": []
+            },
+            "completedCases": [],
+            "published": false
+          }
+        },
+        {
+          "test": "missing_required_price",
+          "expectedFailure": "Summary!E6: N_A: undefined",
+          "details": {
+            "restoration": {
+              "restored": true,
+              "conflicts": [],
+              "notRestored": []
+            },
+            "completedCases": [],
+            "published": false
+          }
+        }
+      ],
+      "observedWhileChanged": [
+        {
+          "Sensitivity!B3": "STALE — RUN VERIFIED REFRESH"
+        },
+        {
+          "Sensitivity!B3": "STALE — RUN VERIFIED REFRESH"
+        }
+      ],
+      "final": {
+        "Assumptions!B3": "Base",
+        "Assumptions!B12": 80000,
+        "Sensitivity!B3": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+        "Sensitivity!D8": 3019029.6276000002,
+        "Summary!E6": 3019029.6276000002,
+        "Summary!B65": 30
+      }
+    }
+  }
+}

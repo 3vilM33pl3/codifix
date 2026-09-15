@@ -1,0 +1,1543 @@
+{
+  "spreadsheetId": "1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es",
+  "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es/edit?ouid=117996706485490200256",
+  "properties": {
+    "title": "Codifix — New York — M2 financial model",
+    "locale": "en_US",
+    "timeZone": "America/Los_Angeles"
+  },
+  "sheets": [
+    {
+      "properties": {
+        "sheetId": 1786192254,
+        "title": "Summary",
+        "index": 1,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 44,
+          "frozenRowCount": 5,
+          "hideGridlines": true
+        }
+      },
+      "data": [
+        {
+          "startRow": 4,
+          "rowData": [
+            {
+              "values": [
+                {},
+                {},
+                {
+                  "formattedValue": "Oct-26 to Sep-27",
+                  "userEnteredValue": {
+                    "formulaValue": "=TEXT(EDATE(Assumptions!$E$10,0),\"mmm-yy\")&\" to \"&TEXT(EDATE(Assumptions!$E$10,11),\"mmm-yy\")"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Oct-26 to Sep-27"
+                  }
+                },
+                {
+                  "formattedValue": "Oct-27 to Sep-28",
+                  "userEnteredValue": {
+                    "formulaValue": "=TEXT(EDATE(Assumptions!$E$10,12),\"mmm-yy\")&\" to \"&TEXT(EDATE(Assumptions!$E$10,23),\"mmm-yy\")"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Oct-27 to Sep-28"
+                  }
+                },
+                {
+                  "formattedValue": "Oct-28 to Sep-29",
+                  "userEnteredValue": {
+                    "formulaValue": "=TEXT(EDATE(Assumptions!$E$10,24),\"mmm-yy\")&\" to \"&TEXT(EDATE(Assumptions!$E$10,35),\"mmm-yy\")"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Oct-28 to Sep-29"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Ending recurring ARR",
+                  "userEnteredValue": {
+                    "stringValue": "Ending recurring ARR"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Ending recurring ARR"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "215,616",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!N21"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 215616
+                  }
+                },
+                {
+                  "formattedValue": "1,213,379",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!Z21"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1213379.04
+                  }
+                },
+                {
+                  "formattedValue": "3,019,030",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!AL21"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 3019029.6276000002
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Ending paying accounts (expected)",
+                  "userEnteredValue": {
+                    "stringValue": "Ending paying accounts (expected)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Ending paying accounts (expected)"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "2.00",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!N10"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 2
+                  }
+                },
+                {
+                  "formattedValue": "10.40",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!Z10"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 10.4
+                  }
+                },
+                {
+                  "formattedValue": "22.38",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!AL10"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 22.38
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Ending live deployments including pilots",
+                  "userEnteredValue": {
+                    "stringValue": "Ending live deployments including pilots"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Ending live deployments including pilots"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "12.00",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!N11"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 12
+                  }
+                },
+                {
+                  "formattedValue": "30.80",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!Z11"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 30.8
+                  }
+                },
+                {
+                  "formattedValue": "60.76",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!AL11"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 60.76
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Recognised revenue",
+                  "userEnteredValue": {
+                    "stringValue": "Recognised revenue"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Recognised revenue"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "56,599",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Revenue!C26:N26)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 56599.2
+                  }
+                },
+                {
+                  "formattedValue": "743,680",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Revenue!O26:Z26)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 743679.7980000001
+                  }
+                },
+                {
+                  "formattedValue": "2,161,793",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Revenue!AA26:AL26)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 2161793.3217450003
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Gross profit",
+                  "userEnteredValue": {
+                    "stringValue": "Gross profit"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Gross profit"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "(49,507)",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!C6:N6)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -49506.70885307332
+                  }
+                },
+                {
+                  "formattedValue": "419,754",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!O6:Z6)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 419754.10671116994
+                  }
+                },
+                {
+                  "formattedValue": "1,645,322",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!AA6:AL6)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1645321.710043094
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Gross margin on recognised revenue",
+                  "userEnteredValue": {
+                    "stringValue": "Gross margin on recognised revenue"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Gross margin on recognised revenue"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "(87.5%)",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF(C9=0,\"\",C10/C9)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -0.8746891979581571
+                  }
+                },
+                {
+                  "formattedValue": "56.4%",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF(D9=0,\"\",D10/D9)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0.5644285455111555
+                  }
+                },
+                {
+                  "formattedValue": "76.1%",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF(E9=0,\"\",E10/E9)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0.7610911244350546
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Cost of sales",
+                  "userEnteredValue": {
+                    "stringValue": "Cost of sales"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Cost of sales"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "106,106",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Costs!C34:N34)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 106105.90885307333
+                  }
+                },
+                {
+                  "formattedValue": "323,926",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Costs!O34:Z34)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 323925.69128883
+                  }
+                },
+                {
+                  "formattedValue": "516,472",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Costs!AA34:AL34)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 516471.6117019059
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Operating expense",
+                  "userEnteredValue": {
+                    "stringValue": "Operating expense"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Operating expense"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "(1,963,289)",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!C21:N21)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -1963288.8633333335
+                  }
+                },
+                {
+                  "formattedValue": "(3,183,113)",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!O21:Z21)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -3183112.7733333344
+                  }
+                },
+                {
+                  "formattedValue": "(3,953,309)",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!AA21:AL21)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -3953308.8333333344
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Operating result before tax",
+                  "userEnteredValue": {
+                    "stringValue": "Operating result before tax"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Operating result before tax"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "(2,012,796)",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!C22:N22)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -2012795.5721864067
+                  }
+                },
+                {
+                  "formattedValue": "(2,763,359)",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!O22:Z22)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -2763358.666622164
+                  }
+                },
+                {
+                  "formattedValue": "(2,307,987)",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!AA22:AL22)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -2307987.12329024
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Customer cash receipts",
+                  "userEnteredValue": {
+                    "stringValue": "Customer cash receipts"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Customer cash receipts"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "215,616",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Revenue!C32:N32)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 215616
+                  }
+                },
+                {
+                  "formattedValue": "1,213,379",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Revenue!O32:Z32)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1213379.04
+                  }
+                },
+                {
+                  "formattedValue": "3,019,030",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Revenue!AA32:AL32)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 3019029.6276000002
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Operating and capital cash outflows",
+                  "userEnteredValue": {
+                    "stringValue": "Operating and capital cash outflows"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Operating and capital cash outflows"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "2,069,395",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!C25:N25)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 2069394.772186407
+                  }
+                },
+                {
+                  "formattedValue": "3,507,038",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!O25:Z25)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 3507038.464622163
+                  }
+                },
+                {
+                  "formattedValue": "4,469,780",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!AA25:AL25)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 4469780.44503524
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Ending funded cash",
+                  "userEnteredValue": {
+                    "stringValue": "Ending funded cash"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Ending funded cash"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "3,331,540",
+                  "userEnteredValue": {
+                    "formulaValue": "='P&L & Cash'!N31"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 3331539.9678135025
+                  }
+                },
+                {
+                  "formattedValue": "1,037,881",
+                  "userEnteredValue": {
+                    "formulaValue": "='P&L & Cash'!Z31"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1037880.5431913391
+                  }
+                },
+                {
+                  "formattedValue": "(412,870)",
+                  "userEnteredValue": {
+                    "formulaValue": "='P&L & Cash'!AL31"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -412870.27424390067
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Ending paid headcount",
+                  "userEnteredValue": {
+                    "stringValue": "Ending paid headcount"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Ending paid headcount"
+                  }
+                },
+                {},
+                {
+                  "formattedValue": "10.00",
+                  "userEnteredValue": {
+                    "formulaValue": "=Team!N27"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 10
+                  }
+                },
+                {
+                  "formattedValue": "16.00",
+                  "userEnteredValue": {
+                    "formulaValue": "=Team!Z27"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 16
+                  }
+                },
+                {
+                  "formattedValue": "18.00",
+                  "userEnteredValue": {
+                    "formulaValue": "=Team!AL27"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 18
+                  }
+                }
+              ]
+            },
+            {},
+            {},
+            {
+              "values": [
+                {
+                  "formattedValue": "FUNDING | 24 MONTHS + FOLLOWING THREE MONTHS OF CASH SPEND",
+                  "userEnteredValue": {
+                    "stringValue": "FUNDING | 24 MONTHS + FOLLOWING THREE MONTHS OF CASH SPEND"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "FUNDING | 24 MONTHS + FOLLOWING THREE MONTHS OF CASH SPEND"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Required net financing",
+                  "userEnteredValue": {
+                    "stringValue": "Required net financing"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Required net financing"
+                  }
+                },
+                {
+                  "formattedValue": "5,185,319",
+                  "userEnteredValue": {
+                    "formulaValue": "=MAX(0,-MIN('P&L & Cash'!C27:Z27),B25-'P&L & Cash'!Z27)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 5185318.739999909
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Required gross financing",
+                  "userEnteredValue": {
+                    "stringValue": "Required gross financing"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Required gross financing"
+                  }
+                },
+                {
+                  "formattedValue": "5,291,142",
+                  "userEnteredValue": {
+                    "formulaValue": "=B22/(1-Assumptions!$E$31)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 5291141.571428479
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Financing fees",
+                  "userEnteredValue": {
+                    "stringValue": "Financing fees"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Financing fees"
+                  }
+                },
+                {
+                  "formattedValue": "105,823",
+                  "userEnteredValue": {
+                    "formulaValue": "=B23-B22"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 105822.83142856974
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Months 25–27 cash-spend buffer",
+                  "userEnteredValue": {
+                    "stringValue": "Months 25–27 cash-spend buffer"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Months 25–27 cash-spend buffer"
+                  }
+                },
+                {
+                  "formattedValue": "1,037,881",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!AA25:AC25)+SUM('P&L & Cash'!AA23:AC23)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1037880.5431913394
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Minimum funded cash through month 24",
+                  "userEnteredValue": {
+                    "stringValue": "Minimum funded cash through month 24"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Minimum funded cash through month 24"
+                  }
+                },
+                {
+                  "formattedValue": "1,037,881",
+                  "userEnteredValue": {
+                    "formulaValue": "=MIN('P&L & Cash'!C31:Z31)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1037880.5431913391
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Closing cash at month 24",
+                  "userEnteredValue": {
+                    "stringValue": "Closing cash at month 24"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Closing cash at month 24"
+                  }
+                },
+                {
+                  "formattedValue": "1,037,881",
+                  "userEnteredValue": {
+                    "formulaValue": "='P&L & Cash'!Z31"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1037880.5431913391
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Closing cash at month 36",
+                  "userEnteredValue": {
+                    "stringValue": "Closing cash at month 36"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Closing cash at month 36"
+                  }
+                },
+                {
+                  "formattedValue": "(412,870)",
+                  "userEnteredValue": {
+                    "formulaValue": "='P&L & Cash'!AL31"
+                  },
+                  "effectiveValue": {
+                    "numberValue": -412870.27424390067
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Historical net raise reference",
+                  "userEnteredValue": {
+                    "stringValue": "Historical net raise reference"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Historical net raise reference"
+                  }
+                },
+                {
+                  "formattedValue": "4,500,000",
+                  "userEnteredValue": {
+                    "formulaValue": "=Assumptions!$E$33"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 4500000
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Required net financing less historical reference",
+                  "userEnteredValue": {
+                    "stringValue": "Required net financing less historical reference"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Required net financing less historical reference"
+                  }
+                },
+                {
+                  "formattedValue": "685,319",
+                  "userEnteredValue": {
+                    "formulaValue": "=B22-B29"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 685318.739999909
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Months with a cash deficit before financing",
+                  "userEnteredValue": {
+                    "stringValue": "Months with a cash deficit before financing"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Months with a cash deficit before financing"
+                  }
+                },
+                {
+                  "formattedValue": "–",
+                  "userEnteredValue": {
+                    "formulaValue": "=COUNTIFS('P&L & Cash'!C2:AL2,\"<\"&Assumptions!$E$30,'P&L & Cash'!C27:AL27,\"<0\")"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Required gross financing (GBP comparison)",
+                  "userEnteredValue": {
+                    "stringValue": "Required gross financing (GBP comparison)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Required gross financing (GBP comparison)"
+                  }
+                },
+                {
+                  "formattedValue": "3,926,344",
+                  "userEnteredValue": {
+                    "formulaValue": "=B23/Assumptions!E6"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 3926344.2946189367
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Derived annual net revenue retention",
+                  "userEnteredValue": {
+                    "stringValue": "Derived annual net revenue retention"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Derived annual net revenue retention"
+                  }
+                },
+                {
+                  "formattedValue": "137.75%",
+                  "userEnteredValue": {
+                    "formulaValue": "=Assumptions!E109"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1.3775
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "USES OF CASH | FIRST 24 MONTHS",
+                  "userEnteredValue": {
+                    "stringValue": "USES OF CASH | FIRST 24 MONTHS"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "USES OF CASH | FIRST 24 MONTHS"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Product operating payroll",
+                  "userEnteredValue": {
+                    "stringValue": "Product operating payroll"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Product operating payroll"
+                  }
+                },
+                {
+                  "formattedValue": "3,265,365",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Team!C29:Z29)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 3265364.583333334
+                  }
+                },
+                {
+                  "formattedValue": "58.6%",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF($B$42=0,\"\",B35/$B$42)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0.5855650815972332
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "GTM operating payroll",
+                  "userEnteredValue": {
+                    "stringValue": "GTM operating payroll"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "GTM operating payroll"
+                  }
+                },
+                {
+                  "formattedValue": "661,458",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Team!C30:Z30)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 661458.3333333334
+                  }
+                },
+                {
+                  "formattedValue": "11.9%",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF($B$42=0,\"\",B36/$B$42)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0.11861674035066369
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Salaried delivery payroll",
+                  "userEnteredValue": {
+                    "stringValue": "Salaried delivery payroll"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Salaried delivery payroll"
+                  }
+                },
+                {
+                  "formattedValue": "355,990",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Costs!C30:Z30)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 355989.58333333326
+                  }
+                },
+                {
+                  "formattedValue": "6.4%",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF($B$42=0,\"\",B37/$B$42)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0.06383822207061308
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "External delivery including contractors",
+                  "userEnteredValue": {
+                    "stringValue": "External delivery including contractors"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "External delivery including contractors"
+                  }
+                },
+                {
+                  "formattedValue": "74,042",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Costs!C35:Z35)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 74042.01680857004
+                  }
+                },
+                {
+                  "formattedValue": "1.3%",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF($B$42=0,\"\",B38/$B$42)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0.013277665788202778
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Recruitment and new ARR commissions",
+                  "userEnteredValue": {
+                    "stringValue": "Recruitment and new ARR commissions"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Recruitment and new ARR commissions"
+                  }
+                },
+                {
+                  "formattedValue": "404,359",
+                  "userEnteredValue": {
+                    "formulaValue": "=-SUM('P&L & Cash'!C10:Z11)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 404358.72
+                  }
+                },
+                {
+                  "formattedValue": "7.3%",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF($B$42=0,\"\",B39/$B$42)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0.07251207049892291
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Other operating expenses",
+                  "userEnteredValue": {
+                    "stringValue": "Other operating expenses"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Other operating expenses"
+                  }
+                },
+                {
+                  "formattedValue": "815,220",
+                  "userEnteredValue": {
+                    "formulaValue": "=-SUM('P&L & Cash'!C12:Z20)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 815220
+                  }
+                },
+                {
+                  "formattedValue": "14.6%",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF($B$42=0,\"\",B40/$B$42)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0.1461902196943643
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Capital expenditure",
+                  "userEnteredValue": {
+                    "stringValue": "Capital expenditure"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Capital expenditure"
+                  }
+                },
+                {
+                  "formattedValue": "–",
+                  "userEnteredValue": {
+                    "formulaValue": "=-SUM('P&L & Cash'!C23:Z23)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0
+                  }
+                },
+                {
+                  "formattedValue": "–",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF($B$42=0,\"\",B41/$B$42)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Total cash uses",
+                  "userEnteredValue": {
+                    "stringValue": "Total cash uses"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Total cash uses"
+                  }
+                },
+                {
+                  "formattedValue": "5,576,433",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(B35:B41)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 5576433.236808571
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Customer collections",
+                  "userEnteredValue": {
+                    "stringValue": "Customer collections"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Customer collections"
+                  }
+                },
+                {
+                  "formattedValue": "1,428,995",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Revenue!C32:Z32)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1428995.04
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Opening unrestricted cash",
+                  "userEnteredValue": {
+                    "stringValue": "Opening unrestricted cash"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Opening unrestricted cash"
+                  }
+                },
+                {
+                  "formattedValue": "–",
+                  "userEnteredValue": {
+                    "formulaValue": "=Assumptions!$E$32"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Net financing received through month 24",
+                  "userEnteredValue": {
+                    "stringValue": "Net financing received through month 24"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Net financing received through month 24"
+                  }
+                },
+                {
+                  "formattedValue": "5,185,319",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM('P&L & Cash'!C28:Z29)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 5185318.739999909
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Closing cash at month 24",
+                  "userEnteredValue": {
+                    "stringValue": "Closing cash at month 24"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Closing cash at month 24"
+                  }
+                },
+                {
+                  "formattedValue": "1,037,881",
+                  "userEnteredValue": {
+                    "formulaValue": "='P&L & Cash'!Z31"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1037880.5431913391
+                  }
+                }
+              ]
+            },
+            {},
+            {},
+            {
+              "values": [
+                {
+                  "formattedValue": "SENSITIVITY OUTPUTS | FORECAST TOTALS",
+                  "userEnteredValue": {
+                    "stringValue": "SENSITIVITY OUTPUTS | FORECAST TOTALS"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "SENSITIVITY OUTPUTS | FORECAST TOTALS"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Total recognised revenue, 36 months",
+                  "userEnteredValue": {
+                    "stringValue": "Total recognised revenue, 36 months"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Total recognised revenue, 36 months"
+                  }
+                },
+                {
+                  "formattedValue": "2,962,072",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(C9:E9)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 2962072.3197450005
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Gross margin, 36-month revenue weighted",
+                  "userEnteredValue": {
+                    "stringValue": "Gross margin, 36-month revenue weighted"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Gross margin, 36-month revenue weighted"
+                  }
+                },
+                {
+                  "formattedValue": "68.0%",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF(B50=0,\"\",SUM(C10:E10)/B50)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0.6804591145413719
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Ending recurring ARR in GBP",
+                  "userEnteredValue": {
+                    "stringValue": "Ending recurring ARR in GBP"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Ending recurring ARR in GBP"
+                  }
+                },
+                {
+                  "formattedValue": "2,240,301",
+                  "userEnteredValue": {
+                    "formulaValue": "=E6/Assumptions!E6"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 2240301.0000000005
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Active pilots pending after horizon",
+                  "userEnteredValue": {
+                    "stringValue": "Active pilots pending after horizon"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Active pilots pending after horizon"
+                  }
+                },
+                {
+                  "formattedValue": "8.00",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!C41"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 8
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Planned pilot starts shifted past horizon",
+                  "userEnteredValue": {
+                    "stringValue": "Planned pilot starts shifted past horizon"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Planned pilot starts shifted past horizon"
+                  }
+                },
+                {
+                  "formattedValue": "–",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!C42"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Unbilled usage asset at horizon",
+                  "userEnteredValue": {
+                    "stringValue": "Unbilled usage asset at horizon"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Unbilled usage asset at horizon"
+                  }
+                },
+                {
+                  "formattedValue": "–",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!AL35"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Accounts receivable at horizon",
+                  "userEnteredValue": {
+                    "stringValue": "Accounts receivable at horizon"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Accounts receivable at horizon"
+                  }
+                },
+                {
+                  "formattedValue": "–",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!AL33"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 0
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Deferred revenue at horizon",
+                  "userEnteredValue": {
+                    "stringValue": "Deferred revenue at horizon"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Deferred revenue at horizon"
+                  }
+                },
+                {
+                  "formattedValue": "1,485,952",
+                  "userEnteredValue": {
+                    "formulaValue": "=Revenue!AL34"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1485952.3478550003
+                  }
+                }
+              ]
+            },
+            {},
+            {},
+            {
+              "values": [
+                {
+                  "formattedValue": "Interpretation",
+                  "userEnteredValue": {
+                    "stringValue": "Interpretation"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Interpretation"
+                  }
+                },
+                {
+                  "formattedValue": "Staff capacity has value only with separate customer evidence. These company forecasts do not claim customer ROI, validated pricing, readiness, or signed business.",
+                  "userEnteredValue": {
+                    "stringValue": "Staff capacity has value only with separate customer evidence. These company forecasts do not claim customer ROI, validated pricing, readiness, or signed business."
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Staff capacity has value only with separate customer evidence. These company forecasts do not claim customer ROI, validated pricing, readiness, or signed business."
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Funding timing",
+                  "userEnteredValue": {
+                    "stringValue": "Funding timing"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Funding timing"
+                  }
+                },
+                {
+                  "formattedValue": "No deficit before scheduled financing in this scenario",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF(B31=0,\"No deficit before scheduled financing in this scenario\",\"INFEASIBLE: cash deficit precedes financing; revise opening cash or arrival month\")"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "No deficit before scheduled financing in this scenario"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Cash presentation",
+                  "userEnteredValue": {
+                    "stringValue": "Cash presentation"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Cash presentation"
+                  }
+                },
+                {
+                  "formattedValue": "Uses are gross cash spending; financing need is net of customer receipts and opening cash. Financing fees are shown separately from operating uses.",
+                  "userEnteredValue": {
+                    "stringValue": "Uses are gross cash spending; financing need is net of customer receipts and opening cash. Financing fees are shown separately from operating uses."
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Uses are gross cash spending; financing need is net of customer receipts and opening cash. Financing fees are shown separately from operating uses."
+                  }
+                }
+              ]
+            },
+            {},
+            {
+              "values": [
+                {
+                  "formattedValue": "Recalculation sentinel",
+                  "userEnteredValue": {
+                    "stringValue": "Recalculation sentinel"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Recalculation sentinel"
+                  }
+                },
+                {
+                  "formattedValue": "Jul-60",
+                  "userEnteredValue": {
+                    "formulaValue": "=SUM(Assumptions!E10:E90)+SUM(Assumptions!E95:E106)+SUM(Team!B5:B22)+SUM(Team!AM5:AN22)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 7655667.128099998
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Funded runway (months from start)",
+                  "userEnteredValue": {
+                    "stringValue": "Funded runway (months from start)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Funded runway (months from start)"
+                  }
+                },
+                {
+                  "formattedValue": "30",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF(COUNTIF('P&L & Cash'!C31:AL31,\"<0\")=0,\">36\",MINIFS('P&L & Cash'!C2:AL2,'P&L & Cash'!C31:AL31,\"<0\")-1)"
+                  },
+                  "effectiveValue": {
+                    "numberValue": 30
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Historical net raise coverage",
+                  "userEnteredValue": {
+                    "stringValue": "Historical net raise coverage"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Historical net raise coverage"
+                  }
+                },
+                {
+                  "formattedValue": "Below calculated net requirement",
+                  "userEnteredValue": {
+                    "formulaValue": "=IF(B29>=B22,\"Covers calculated net requirement\",\"Below calculated net requirement\")"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Below calculated net requirement"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
