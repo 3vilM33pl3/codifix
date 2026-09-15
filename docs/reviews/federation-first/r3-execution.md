@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out bounded-decoder repository
+
+- Added five modules, two public tests and ten private probes for split run
+  pairs, exact/cumulative expansion limits, failed-stream fencing and atomic
+  publication of the last completed result. No filesystem or real decompressor.
+- Public tests, required container reference/cumulative/negative controls and
+  four pack/CLI tests pass without skips. Eleven of twelve held-out repositories
+  exist; only structured-redaction remains before draft fixture allocation is full.
+
 ## 2026-09-15 held-out route-precedence repository
 
 - Added five public modules, two tests and ten hidden probes for lexicographic
