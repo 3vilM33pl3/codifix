@@ -47,8 +47,10 @@ reference and cumulative sequence pass; starter and no-op controls fail. All fou
 development repositories are now executable drafts; the twelve representative
 held-out repositories are being implemented. The first,
 [framed stream](representative/held-out/framed-stream/review.md), has passing
-private reference/cumulative checks and failing starter/no-op controls; eleven
-remain. Run `node --test evals/r3/held-out.test.mjs` with the pinned Rust image.
+private reference/cumulative checks and failing starter/no-op controls. The second,
+[interval calendar](representative/held-out/interval-calendar/review.md), covers
+canonical half-open sets and bounded free-window queries with the same controls;
+ten remain. Run `node --test evals/r3/held-out.test.mjs` with the pinned Rust image.
 These are deterministic fixture checks, not held-out model calibration or label
 approval. The offline controller integrates
 development fixtures using synthetic agents; provider-backed execution remains

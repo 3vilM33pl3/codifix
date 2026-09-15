@@ -1,5 +1,16 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out interval-calendar repository
+
+- Added the allocated half-open interval repository with five modules, two public
+  tests and ten private probes over canonical unions, subtraction and clipped
+  free windows including signed-integer extremes. Abstract ticks have no civil
+  time or dispatch semantics, keeping this distinct from development scheduling.
+- Both public tests pass. Both held-out repository container groups pass without
+  skips: references/cumulative execution succeed, starter/no-op controls fail
+  each stage. Four pack/CLI tests pass and plan the isolated held-out allocation.
+  Two of twelve held-out repositories exist; labels remain draft.
+
 ## 2026-09-15 first held-out knowledge family and separate packs
 
 - Added the allocated telemetry-units scenario: five synthetic sources and four
