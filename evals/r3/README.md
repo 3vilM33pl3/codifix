@@ -8,22 +8,16 @@ credentials are needed to build them.
 
 The replacement benchmark is being designed around
 [representative incident and repository workflows](representative-benchmark.md).
-The first multi-document development source pack and draft rubric are now
-materialized at [supplier handover](representative/development/supplier-handover/review.md).
-The complete replacement suite is not yet implemented or approved; that pack is
-not wired into the smoke generator or an official campaign.
-
-A second multi-document development pack is now materialized at
-[staff-turnover recovery](representative/development/turnover-recovery/review.md).
-It joins restoration evidence, retired writer authority, ordered catch-up and an
-obsolete runbook, including refusal to claim a recovery objective or zero loss.
-Its four canonical rubric files are tested but remain draft; source/version and
-full campaign preparation still need integration.
-
-A third development knowledge pack, [cache partition](representative/development/cache-partition/review.md),
-separates request authorization, cache scope and signed origin attribution. Five
-documents and four draft rubrics require bounded conclusions from partial incident
-evidence, rather than assuming a valid signature grants access or proves truth.
+All ten development knowledge families are materialized: forty draft questions,
+each family with five source documents, a plain-language review sheet and four
+canonical private rubrics. They cover supplier handover, staff-turnover recovery,
+cache partition, schema transition, capacity pressure, civil-time windows,
+artifact origin, retention/holds, usage accounting and DNS cutover. Browse their
+review sheets under [representative/development](representative/development/).
+The source packs include current and superseded instructions, partial observations
+and explicit evidence limits. They are distinct development mechanisms, not
+renamed held-out cases. The 25 held-out knowledge families remain unimplemented.
+No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
 [durable importer](representative/development/durable-importer/review.md).
@@ -49,11 +43,13 @@ five modules, two public tests and ten private probes covering transitive build
 order, dependency-aware invalidation, cycles and atomic cache replacement. The
 reference and cumulative sequence pass; starter and no-op controls fail. All four
 development repositories are now executable drafts; the twelve representative
-held-out repositories and complete campaign integration remain unimplemented.
+held-out repositories remain unimplemented. The offline controller integrates
+development fixtures using synthetic agents; provider-backed execution remains
+unfinished.
 
 Materialize those representative development fixtures for the existing campaign
 CLI with `node evals/r3/build-representative-pack.mjs NEW_DIRECTORY`. This creates
-a hash-locked, private, **smoke-only partial rehearsal**: twelve knowledge questions
+a hash-locked, private, **smoke-only development rehearsal**: forty knowledge questions
 and four coding sequences, no held-out data. `--one-family-per-track` creates a
 smaller four-question/one-sequence rehearsal. Neither changes the required
 official suite sizes or can be promoted by changing its label status. The CLI

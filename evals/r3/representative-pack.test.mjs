@@ -23,7 +23,7 @@ test('representative development packs are reproducible, private, whole-family a
   assert.deepEqual(bytes, await fs.readFile(path.join(second, 'campaign.json')));
   const manifest = JSON.parse(bytes);
   assert(manifest.smoke_only && manifest.label_status === 'draft' && manifest.limits.microusd === 0);
-  assert.equal(manifest.cases.filter(c => c.track === 'knowledge').length, 36);
+  assert.equal(manifest.cases.filter(c => c.track === 'knowledge').length, 40);
   assert.equal(manifest.cases.filter(c => c.track === 'coding').length, 4);
   assert(manifest.cases.every(c => c.split === 'development'));
   for (const asset of manifest.assets) {
@@ -43,6 +43,14 @@ test('representative development packs are reproducible, private, whole-family a
   const small = JSON.parse(await fs.readFile(path.join(minimal, 'campaign.json')));
   assert.equal(small.cases.length, 5);
   assert.equal(new Set(small.cases.map(c => c.cluster)).size, 2);
+  const families = JSON.parse(await fs.readFile(path.join(first, 'private/families.json')));
+  const materialized = (await fs.readdir('evals/r3/representative/development')).sort();
+  assert.deepEqual(families.map(f => f.id).sort(), materialized, 'every materialized family participates');
+  assert.equal(new Set(families.map(f => f.id)).size, 14);
+  for (const family of families) {
+    assert.equal(family.cases.length, family.track === 'knowledge' ? 4 : 1);
+    assert(family.cases.every(id => manifest.cases.some(item => item.id === id && item.cluster === family.id)));
+  }
 });
 
 test('existing campaign CLI loads representative suites and refuses tampering or promotion', { skip: !binary }, async t => {
@@ -71,4 +79,28 @@ test('existing campaign CLI loads representative suites and refuses tampering or
   manifest.label_status = 'reviewed';
   await fs.writeFile(manifestPath, JSON.stringify(manifest));
   assert.equal(plan('development').status, 1, 'changing flags cannot make partial counts official');
+});
+
+test('complete development allocation plans all 660 executions but cannot become held-out evidence', { skip: !binary }, async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-development-cli-'));
+  t.after(() => fs.rm(directory, { recursive: true }));
+  const out = path.join(directory, 'pack');
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_PROFILE: 'prod' };
+  assert.equal(spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', out], { env }).status, 0);
+  const manifestPath = path.join(out, 'campaign.json');
+  const plan = split => spawnSync(binary, ['eval', 'campaign', 'plan', '--manifest', manifestPath, '--split', split], {
+    env, encoding: 'utf8', timeout: 10000, maxBuffer: 4 * 1048576 });
+  const result = plan('development');
+  assert.equal(result.status, 0, result.stderr);
+  const prepared = JSON.parse(result.stdout);
+  assert.equal(prepared.work.length, 660);
+  assert.equal(new Set(prepared.work.map(work => `${work.case_id}:${work.condition}:${work.repeat}`)).size, 660);
+  assert.equal(new Set(prepared.work.map(work => work.case_id)).size, 44);
+  assert(prepared.readiness_errors.some(reason => reason.includes('smoke-only')));
+  assert.equal(plan('held-out').status, 1);
+  const manifest = JSON.parse(await fs.readFile(manifestPath));
+  manifest.smoke_only = false;
+  manifest.label_status = 'reviewed';
+  await fs.writeFile(manifestPath, JSON.stringify(manifest));
+  assert.equal(plan('development').status, 1, 'complete development is not the complete approved benchmark');
 });

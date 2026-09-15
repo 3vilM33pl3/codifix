@@ -42,7 +42,7 @@ function files(family, relative) {
     return [name];
   });
 }
-const knowledge = ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure', 'timezone-window', 'artifact-origin', 'retention-hold', 'quota-accounting'];
+const knowledge = ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure', 'timezone-window', 'artifact-origin', 'retention-hold', 'quota-accounting', 'dns-cutover'];
 const coding = ['durable-importer', 'evidence-publication', 'configuration-rollout', 'dependency-build'];
 for (const family of selection ? knowledge.slice(0, 1) : knowledge) {
   const sources = files(family, 'public').map(relative => {
@@ -93,7 +93,7 @@ for (const [name, items] of [['knowledge', knowledgeItems], ['coding', codingIte
 write('private/families.json', families, 'configuration');
 write('configuration.json', { version: 1, semantic_time: semanticTime, labels: 'draft', offline_only: true,
   context_bytes: 32768, top_k: 8, learning: false, reinforcement_ranking: true,
-  driver_status: 'complete hash-locked campaign integration pending', embedding_status: 'offline fixtures only' }, 'configuration');
+  driver_status: 'offline rehearsal available; provider-backed execution pending', embedding_status: 'offline fixtures only' }, 'configuration');
 const manifest = { version: 1, name: 'r3-representative-development-rehearsal', smoke_only: true,
   semantic_time: semanticTime, seed: 20260910, repeats: 3, label_status: 'draft',
   model: { provider: 'offline-fake', resolved_id: 'deterministic-test-agent-v1', reasoning: 'none', embedding_id: 'offline-fake-only',

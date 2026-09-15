@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 complete development benchmark allocation
+
+- Added the tenth knowledge family, DNS cutover: five synthetic sources and four
+  draft rubrics on split views, previous TTLs, connection reuse and incomplete
+  rollout evidence. All forty development questions and four three-step coding
+  repositories are now materialized. The hundred held-out questions and twelve
+  held-out repositories remain unimplemented; no label approval is implied.
+- The real CLI plans all 660 unique development executions (44 tasks, five
+  conditions, three repeats). Tests verify every materialized family participates,
+  no sources/labels silently disappear, and changing approval flags cannot promote
+  the development-only pack to official evidence. All three pack/CLI tests and
+  all 56 evaluator tests pass without skips. This is planning/fixture evidence,
+  not a claim that all 660 representative tasks have executed successfully.
+
 ## 2026-09-15 quota-accounting knowledge family
 
 - Added five synthetic metering sources and four draft rubrics for reservations,
