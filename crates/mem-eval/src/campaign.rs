@@ -13,6 +13,7 @@ use std::{
 pub mod baselines;
 pub mod budget;
 pub mod embedding_evidence;
+pub mod preparation;
 pub mod provider_results;
 pub mod retriever;
 pub mod review;
@@ -125,6 +126,9 @@ pub struct Manifest {
     /// bytes and its single-call dispatch restriction.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_budget: Option<ProviderBudget>,
+    /// A separately bounded preparation phase, included in the global limits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preparation_budget: Option<Limits>,
     pub reference_baseline: Option<Condition>,
     pub assets: Vec<Asset>,
     pub cases: Vec<Case>,
@@ -235,6 +239,13 @@ impl Manifest {
                 .is_none_or(|b| (1..=128).contains(&b.max_calls_per_task)),
             "invalid per-task provider request bound"
         );
+        if let Some(preparation) = &self.preparation_budget {
+            preparation::validate_limits(&self.limits, preparation)?;
+            ensure!(
+                self.provider_budget.is_some(),
+                "preparation requires per-call mediation"
+            );
+        }
         ensure!(
             self.assets.len() <= 10000 && !self.cases.is_empty() && self.cases.len() <= 1000,
             "campaign too large"
@@ -631,6 +642,8 @@ pub struct Artifact {
     pub offline: bool,
     pub completed: bool,
     pub preparation_microusd: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preparation_receipt: Option<preparation::PreparationReceipt>,
     pub approvals: Vec<Approval>,
     pub observations: Vec<Observation>,
 }

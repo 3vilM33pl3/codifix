@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use super::*;
+mod preparation;
 
 #[tokio::test]
 async fn paid_dispatch_is_rejected_before_reading_files_or_starting_processes() {
@@ -249,6 +250,7 @@ fn fixture() -> (Manifest, Observation) {
         label_status: "draft".into(),
         smoke_only: true,
         provider_budget: None,
+        preparation_budget: None,
         model: model.clone(),
         limits: c::Limits {
             requests: 10000,
@@ -472,6 +474,7 @@ async fn driver_dispatch_settles_only_valid_evidence_and_preserves_uncertainty()
             offline: true,
             completed: false,
             preparation_microusd: None,
+            preparation_receipt: None,
             approvals: vec![],
             observations: vec![],
         };

@@ -5,9 +5,11 @@ use super::*;
 fn optional_mediation_preserves_legacy_bytes_and_requires_explicit_bounded_calls() {
     let mut manifest = fixture();
     manifest.provider_budget = None;
+    manifest.preparation_budget = None;
     let original = digest_value(&manifest).unwrap();
     let bytes = serde_json::to_vec(&manifest).unwrap();
     assert!(!String::from_utf8_lossy(&bytes).contains("provider_budget"));
+    assert!(!String::from_utf8_lossy(&bytes).contains("preparation_budget"));
     let decoded: Manifest = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(original, digest_value(&decoded).unwrap());
     for bound in [0, 129] {
@@ -53,6 +55,12 @@ pub(super) fn fixture() -> Manifest {
         repeats: 3,
         label_status: "reviewed".into(),
         smoke_only: false,
+        preparation_budget: Some(Limits {
+            requests: 10,
+            tokens: 100,
+            microusd: 100,
+            task_seconds: 60,
+        }),
         provider_budget: Some(ProviderBudget {
             max_calls_per_task: 1,
         }),
@@ -142,7 +150,22 @@ fn artifact(manifest: &Manifest) -> Artifact {
         split: Split::HeldOut,
         offline: false,
         completed: true,
-        preparation_microusd: Some(1),
+        preparation_microusd: Some(0),
+        preparation_receipt: manifest.preparation_budget.as_ref().map(|limits| {
+            preparation::PreparationReceipt {
+                version: 1,
+                snapshot_sha256: digest(b"snapshot"),
+                audit: provider_results::ProviderAudit {
+                    version: 1,
+                    manifest_sha256: manifest_hash.clone(),
+                    limits: limits.clone(),
+                    task_limits: limits.clone(),
+                    ledger: Ledger::default(),
+                    tasks: BTreeMap::new(),
+                    calls: vec![],
+                },
+            }
+        }),
         approvals,
         observations: plan
             .work
@@ -441,6 +464,7 @@ fn invalid_evidence_fails_closed() {
 fn legacy_unmediated_evidence_is_readable_but_cannot_be_official() {
     let mut m = fixture();
     m.provider_budget = None;
+    m.preparation_budget = None;
     let mut a = artifact(&m);
     let rejected = report(&m, &a).unwrap();
     assert!(!rejected.harness_valid && !rejected.official_evidence);
@@ -455,6 +479,26 @@ fn legacy_unmediated_evidence_is_readable_but_cannot_be_official() {
     assert!(
         diagnostic.harness_valid && !diagnostic.official_evidence && !diagnostic.quality_passed
     );
+}
+
+#[test]
+fn preparation_metadata_is_required_for_official_evidence_and_binds_snapshot_and_cost() {
+    let mut m = fixture();
+    let mut a = artifact(&m);
+    a.preparation_receipt = None;
+    assert!(!report(&m, &a).unwrap().execution_valid);
+    let mut a = artifact(&m);
+    a.preparation_receipt.as_mut().unwrap().snapshot_sha256 = digest(b"changed snapshot");
+    assert!(!report(&m, &a).unwrap().execution_valid);
+    let mut a = artifact(&m);
+    a.preparation_microusd = Some(1);
+    assert!(!report(&m, &a).unwrap().execution_valid);
+    m.preparation_budget = None;
+    let mut a = artifact(&m);
+    let r = report(&m, &a).unwrap();
+    assert!(!r.execution_valid && r.errors.iter().any(|e| e.contains("preparation budget")));
+    a.offline = true;
+    assert!(report(&m, &a).unwrap().execution_valid);
 }
 
 #[test]

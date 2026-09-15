@@ -1,5 +1,20 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 global preparation allocation and receipt phase
+
+- Added an optional canonical-compatible `preparation_budget` manifest contract
+  and a separately audited preparation receipt. Requests, tokens and spend consume
+  the global campaign allowance; only confirmed usage is subtracted before task
+  limits are issued. Official reports reject missing preparation accounting.
+- The CLI dispatches preparation before tasks, verifies its actual private budget
+  journal/results and persists an acceptance receipt. Resume rechecks it without
+  invoking preparation again; missing acceptance, changed evidence and uncertainty
+  stop execution. Task snapshots must match the accepted prepared snapshot.
+- Core campaign tests pass (49). The real subprocess preparation test proves
+  allocation before tasks, exact remaining request limits, release of unused token
+  reservations and no repeated preparation during resume. The paid-run guard is
+  unchanged. The integrated synthetic rehearsal is being extended separately.
+
 ## 2026-09-15 verification of scoped embedding and budget increments
 
 - Wired the new embedding receipt tests into the existing required-database CI

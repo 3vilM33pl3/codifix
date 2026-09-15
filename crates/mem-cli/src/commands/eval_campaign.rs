@@ -29,6 +29,7 @@ fn exclusive_json<T: serde::Serialize>(path: &Path, data: &T) -> Result<()> {
     Ok(())
 }
 
+mod preparation;
 mod provider_mediation;
 #[cfg(test)]
 mod tests;
@@ -185,6 +186,7 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
                 offline,
                 completed: false,
                 preparation_microusd: None,
+                preparation_receipt: None,
                 approvals,
                 observations: vec![],
             };
@@ -266,6 +268,52 @@ async fn execute(
     ledger: &mut Ledger,
     artifact: &mut Artifact,
 ) -> Result<()> {
+    let mut execution_manifest = manifest.clone();
+    if let Some(allocated) = &manifest.preparation_budget {
+        let receipt = preparation::run(
+            manifest_path,
+            manifest,
+            driver,
+            driver_hash,
+            out,
+            plan,
+            offline,
+            resume,
+        )
+        .await?;
+        execution_manifest.limits =
+            receipt.execution_limits(&manifest.limits, allocated, &plan.manifest_sha256)?;
+        artifact.preparation_microusd = Some(receipt.audit.ledger.microusd);
+        artifact.preparation_receipt = Some(receipt);
+    }
+    execute_tasks(
+        manifest_path,
+        &execution_manifest,
+        driver,
+        driver_hash,
+        out,
+        plan,
+        offline,
+        resume,
+        ledger,
+        artifact,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn execute_tasks(
+    manifest_path: &Path,
+    manifest: &Manifest,
+    driver: &Path,
+    driver_hash: &str,
+    out: &Path,
+    plan: &c::Plan,
+    offline: bool,
+    resume: bool,
+    ledger: &mut Ledger,
+    artifact: &mut Artifact,
+) -> Result<()> {
     // Reserve a whole task here; per-call mediation is nested inside this cap.
     // Never expose this campaign-level journal owner to agents.
     let open_budget = if resume {
@@ -333,10 +381,16 @@ async fn execute(
         )?;
         let cost = if offline { 0 } else { priced.microusd };
         if let Some(observation) = recovered.get(index) {
+            if let Some(prepared) = &artifact.preparation_receipt {
+                ensure!(
+                    observation.isolation.snapshot_sha256 == prepared.snapshot_sha256,
+                    "saved prepared snapshot changed"
+                );
+            }
             provider_requests = provider_requests
                 .checked_add(observation.provider_requests)
                 .context("provider request overflow")?;
-            if index == 0 {
+            if index == 0 && artifact.preparation_receipt.is_none() {
                 artifact.preparation_microusd = Some(bounded_json(
                     &out.join("work-00000/preparation-microusd.json"),
                 )?);
@@ -425,6 +479,12 @@ async fn execute(
         validate_task_evidence(manifest, work, &observation, artifact.observations.first())?;
         ensure!(observation.work == *work, "driver returned another task");
         observation.isolation.validate(manifest)?;
+        if let Some(prepared) = &artifact.preparation_receipt {
+            ensure!(
+                observation.isolation.snapshot_sha256 == prepared.snapshot_sha256,
+                "prepared snapshot changed"
+            );
+        }
         ensure!(
             observation.isolation.driver_sha256 == driver_hash,
             "driver evidence identity mismatch"
@@ -455,7 +515,7 @@ async fn execute(
             .context("provider request overflow")?;
         // Preparation receipt is mandatory and separate from task execution.
         // Only the first task can prepare; later tasks must restore its snapshot.
-        if index == 0 {
+        if index == 0 && artifact.preparation_receipt.is_none() {
             let path = dir.join("preparation-microusd.json");
             artifact.preparation_microusd = Some(serde_json::from_slice(
                 &std::fs::read(path).context("missing preparation receipt")?,
@@ -596,7 +656,7 @@ fn recover_dispatches(
         );
         recovered.push(observation);
     }
-    if !recovered.is_empty() {
+    if !recovered.is_empty() && manifest.preparation_budget.is_none() {
         let _: u64 = bounded_json(&out.join("work-00000/preparation-microusd.json"))?;
     }
     Ok(recovered)

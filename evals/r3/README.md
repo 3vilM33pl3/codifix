@@ -1,5 +1,20 @@
 # R3 engineering evaluation — implementation in progress
 
+Mediated rehearsals now declare `preparation_budget` in the locked manifest.
+The CLI invokes a separate preparation driver phase before any task. Its private
+receipt binds a sealed snapshot and an audit of the actual preparation journal.
+Confirmed preparation requests, tokens and cost are deducted from the same global
+campaign limits; unused reservations are released. Resume verifies the accepted
+receipt and journal instead of repeating preparation. Missing acceptance or
+uncertain calls stop execution for reconciliation. Task snapshots must match.
+Reports expose preparation request/token totals separately from execution and
+include both in campaign limits. Legacy offline artifacts remain readable, but
+non-offline evidence without this preparation contract is rejected.
+
+The current synthetic controller prepares Full Memory chunks and baseline corpus
+vectors in this phase. It still does not authorize paid calls or constitute the
+complete approved live-provider driver.
+
 Trusted service-session callers can bind query embedding accounting per task with
 `session.withInstance(project, use, { queryEmbedding })`. Its callback receives
 `(text, 'query', signal)`; forward the signal to the request mediator. Document

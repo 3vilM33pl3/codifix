@@ -52,6 +52,8 @@ pub struct Report {
     pub tracks: Vec<TrackReport>,
     pub execution_microusd: u64,
     pub preparation_microusd: Option<u64>,
+    pub preparation_tokens: Option<u64>,
+    pub preparation_requests: Option<u64>,
     pub uncertain_attempts: usize,
 }
 
@@ -126,6 +128,9 @@ fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -
     let mut errors = Vec::new();
     if !artifact.offline && manifest.provider_budget.is_none() {
         errors.push("official evidence requires a locked per-call mediation profile".into());
+    }
+    if !artifact.offline && manifest.preparation_budget.is_none() {
+        errors.push("official evidence requires a locked preparation budget and receipt".into());
     }
     if artifact.manifest_sha256 != plan.manifest_sha256 {
         errors.push("manifest hash mismatch".into());
@@ -236,10 +241,37 @@ fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -
         .iter()
         .try_fold(0u64, |sum, o| sum.checked_add(o.provider_requests))
         .context("request overflow")?;
+    let mut preparation_tokens = 0;
+    let mut preparation_requests = 0;
+    match (&manifest.preparation_budget, &artifact.preparation_receipt) {
+        (Some(limits), Some(receipt)) => {
+            if let Err(error) =
+                receipt.execution_limits(&manifest.limits, limits, &artifact.manifest_sha256)
+            {
+                errors.push(error.to_string());
+            }
+            preparation_tokens = receipt.audit.ledger.tokens;
+            preparation_requests = receipt.audit.ledger.requests;
+            if artifact.preparation_microusd != Some(receipt.audit.ledger.microusd)
+                || artifact
+                    .observations
+                    .iter()
+                    .any(|o| o.isolation.snapshot_sha256 != receipt.snapshot_sha256)
+            {
+                errors.push("preparation cost or snapshot mismatch".into());
+            }
+        }
+        (None, None) => {}
+        _ => errors.push("missing or unexpected preparation receipt".into()),
+    }
     if execution_microusd.saturating_add(artifact.preparation_microusd.unwrap_or(0))
         > manifest.limits.microusd
-        || tokens > manifest.limits.tokens
-        || requests > manifest.limits.requests
+        || tokens
+            .checked_add(preparation_tokens)
+            .is_none_or(|n| n > manifest.limits.tokens)
+        || requests
+            .checked_add(preparation_requests)
+            .is_none_or(|n| n > manifest.limits.requests)
     {
         errors.push("campaign limits exceeded".into());
     }
@@ -430,6 +462,14 @@ fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -
         tracks,
         execution_microusd,
         preparation_microusd: artifact.preparation_microusd,
+        preparation_tokens: artifact
+            .preparation_receipt
+            .as_ref()
+            .map(|r| r.audit.ledger.tokens),
+        preparation_requests: artifact
+            .preparation_receipt
+            .as_ref()
+            .map(|r| r.audit.ledger.requests),
         uncertain_attempts,
     })
 }
