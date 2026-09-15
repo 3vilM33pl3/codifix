@@ -13,6 +13,7 @@ tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+mem-search = { path = "../mem-search" }
 chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true

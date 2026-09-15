@@ -38,6 +38,27 @@ test('snapshot owner rejects arbitrary operations and unsafe source identifiers 
   }
 });
 
+test('supplied-vector snapshot profiles and coverage fail before database access', { skip: !snapshot }, () => {
+  const document = { project: 'synthetic', source: 'public/source.md', text: 'SYNTHETIC_PRIVATE_TEXT', vectors: [[1, 0]] };
+  const embedding = { model: 'synthetic-v1', dimensions: 2, base_url: 'http://127.0.0.1:12345/v1' };
+  for (const change of [
+    { embedding: { ...embedding, base_url: 'https://provider.example/v1' } },
+    { embedding: { ...embedding, dimensions: 3 } },
+    { embedding: { ...embedding, model: 'invalid/model' } },
+    { documents: [{ ...document, vectors: [] }] },
+    { documents: [{ ...document, vectors: [[0, 0]] }] },
+    { embedding: null },
+  ]) {
+    const input = { operation: 'prepare', semantic_time: '2026-01-01T00:00:00Z', documents: [document], embedding, ...change };
+    const result = spawnSync(snapshot, [], { env: { PATH: '/usr/bin:/bin', MEMORY_LAYER_TEST_REQUIRE_DB: '1' },
+      input: JSON.stringify(input) + '\n', encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /prepare-input/);
+    assert(!result.stderr.includes(document.text));
+  }
+});
+
 test('snapshot helper owns sealed resets and a real foreground Memory service', { skip: !snapshot || !memory || !database }, async t => {
   assert(path.isAbsolute(snapshot) && path.isAbsolute(memory));
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-snapshot-'));

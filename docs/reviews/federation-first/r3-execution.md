@@ -1,5 +1,23 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 configured semantic retrieval in sealed service clones
+
+- The trusted snapshot helper can plan chunks using Memory's actual chunker and
+  seed explicitly supplied vectors with a loopback-only embedding profile.
+  Supplied preparation cost remains unknown, not fabricated as zero.
+- A private, temporary embedding adapter binds each query to its exact text and
+  model, permits one callback, validates float32 vectors and rejects silent
+  lexical fallback. It is not a paid-provider or budget mediator. No credentials
+  from the host are inherited and the helper does not contact a provider.
+- Two required-database foreground-service tests pass: semantic candidates are
+  present, foreign-project contents stay excluded, independent clones preserve
+  their fingerprints, and a failed embedding callback invalidates the query.
+  Two adapter unit tests also pass. These are synthetic plumbing checks, not
+  production corpus/configuration parity or official evidence.
+- The preceding 75-dispatch CLI rehearsal passed in 395 seconds; diagnostics are
+  retained at `/data/tmp/memory-r3-rehearsal-cli-DzLP4J`. Human knowledge review
+  remains pending and no paid calls occurred.
+
 ## 2026-09-15 embedding evidence bindings
 
 - Vector comparator execution now requires exact document/query text and vector
@@ -10,7 +28,7 @@
 - Rust/JavaScript use binary64 little-endian vector hashing for byte agreement.
   All 58 evaluator tests, two required cross-language retriever tests, four
   isolated knowledge tests, Clippy, formatting and boundaries pass. A fresh
-  75-dispatch integrated rehearsal is running; its completion is not yet claimed.
+  75-dispatch integrated rehearsal subsequently passed (see entry above).
 - These hashes establish consistency, not provider origin, real embedding
   preparation or quality. Fake profiles remain explicit and paid dispatch remains
   disabled. Full Memory preparation parity and provider mediation are still open.

@@ -3183,6 +3183,7 @@ version = "2.0.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "mem-search",
  "serde",
  "serde_json",
  "sha2",

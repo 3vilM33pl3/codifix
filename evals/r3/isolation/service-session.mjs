@@ -9,6 +9,8 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
+import { createHash } from 'node:crypto';
+import { checkedVector, openEmbeddingProxy } from './embedding-proxy.mjs';
 
 function childProcess(binary, args, options) {
   const child = spawn(binary, args, options);
@@ -38,7 +40,8 @@ async function port() {
 }
 
 export async function openPreparedSession(options) {
-  const { snapshotBinary, memoryBinary, databaseUrl, semanticTime, documents } = structuredClone(options);
+  const { embedding, ...plainOptions } = options;
+  const { snapshotBinary, memoryBinary, databaseUrl, semanticTime, documents } = structuredClone(plainOptions);
   if (!path.isAbsolute(snapshotBinary) || !path.isAbsolute(memoryBinary)
       || typeof databaseUrl !== 'string' || !databaseUrl.startsWith('postgres')
       || !Array.isArray(documents) || documents.length < 1) throw Error('invalid disposable service contract');
@@ -47,7 +50,7 @@ export async function openPreparedSession(options) {
   const owner = childProcess(snapshotBinary, [], { cwd: directory,
     env: { ...env, MEMORY_LAYER_TEST_DATABASE_URL: databaseUrl, MEMORY_LAYER_TEST_REQUIRE_DB: '1' },
     stdio: ['pipe', 'pipe', 'pipe'] });
-  let pending, unavailable = false, closing = false, active = false;
+  let pending, unavailable = false, closing = false, active = false, proxy;
   const lines = createInterface({ input: owner.child.stdout });
   const fail = () => {
     unavailable = true;
@@ -85,21 +88,35 @@ export async function openPreparedSession(options) {
     }
     const timer = setTimeout(() => owner.child.kill('SIGKILL'), 10000);
     let outcome;
-    try { outcome = await owner.closed; } finally { clearTimeout(timer); lines.close(); }
+    try { outcome = await owner.closed; } finally { clearTimeout(timer); lines.close(); await proxy?.close(); }
     if (outcome.code !== 0) throw Error(`reconcile disposable snapshot session; private staging retained at ${directory}`);
     await fs.rm(directory, { recursive: true });
   };
   let prepared;
   try {
-    prepared = await request({ operation: 'prepare', semantic_time: semanticTime, documents });
+    if (embedding) {
+      proxy = await openEmbeddingProxy(embedding);
+      const plan = await request({ operation: 'plan_chunks', documents });
+      if (plan.chunking !== 'memory-split-search-chunks' || plan.official_evidence !== false
+          || plan.documents?.length !== documents.length) throw Error('invalid chunk plan');
+      for (let i = 0; i < documents.length; i++) {
+        const d = documents[i], p = plan.documents[i];
+        if (p.project !== d.project || p.source !== d.source || p.source_sha256 !== createHash('sha256').update(d.text).digest('hex')
+            || !Array.isArray(p.chunks) || !p.chunks.length || p.chunks.some(c => typeof c !== 'string' || !c)) throw Error('invalid chunk binding');
+        d.vectors = [];
+        for (const chunk of p.chunks) d.vectors.push(checkedVector(await embedding.embed(chunk, 'document'), proxy.dimensions));
+      }
+    }
+    prepared = await request({ operation: 'prepare', semantic_time: semanticTime, documents,
+      ...(proxy ? { embedding: { model: proxy.model, dimensions: proxy.dimensions, base_url: proxy.baseUrl } } : {}) });
     if (!prepared.prepared || prepared.official_evidence !== false || !/^[a-f0-9]{64}$/.test(prepared.snapshot_sha256)) throw Error('invalid snapshot preparation');
   } catch {
     await close();
     throw Error('disposable snapshot preparation failed');
   }
   return {
-    // The helper explicitly has no embedding preparation; consumers cannot use
-    // this offline lexical snapshot as full production-ranking parity evidence.
+    // Supplied vectors prove plumbing only, not provider provenance, preparation
+    // cost or full production-ranking parity. Those are separate campaign gates.
     preparation: structuredClone(prepared),
     close,
     async withInstance(project, use) {
@@ -117,9 +134,12 @@ export async function openPreparedSession(options) {
           `[database]\nurl = ${JSON.stringify(reader.database_url)}\n[evaluation]\nsemantic_time = ${JSON.stringify(semanticTime)}\n` +
           `[auth]\nmode = "multi_user"\npublic_base_url = "http://127.0.0.1:${bindPort}"\n` +
           `[auth.oidc]\nissuer_url = "https://unused.example.test"\nclient_id = "synthetic-unused"\n` +
-          `[offline]\nenabled = false\n[cluster]\nenabled = false\n[mcp]\nenabled = false\n`, { flag: 'wx', mode: 0o600 });
+          `[offline]\nenabled = false\n[cluster]\nenabled = false\n[mcp]\nenabled = false\n` +
+          (proxy ? `[embeddings]\nenabled = true\ncreate_enabled = false\nactive = "r3-supplied"\n` +
+            `[[embeddings.backends]]\nname = "r3-supplied"\nprovider = "openai_compatible"\ncreate_enabled = false\n` +
+            `model = ${JSON.stringify(proxy.model)}\ndimensions = ${proxy.dimensions}\nbase_url = ${JSON.stringify(proxy.baseUrl)}\napi_key_env = "R3_SUPPLIED_VECTOR_TOKEN"\n` : ''), { flag: 'wx', mode: 0o600 });
         service = childProcess(memoryBinary, ['--config', config, 'service', 'run'], {
-          cwd: directory, env, stdio: ['ignore', 'pipe', 'pipe'] });
+          cwd: directory, env: proxy ? { ...env, R3_SUPPLIED_VECTOR_TOKEN: proxy.token } : env, stdio: ['ignore', 'pipe', 'pipe'] });
         service.child.stdout.resume();
         const url = `http://127.0.0.1:${bindPort}`;
         let ready = false;
@@ -146,6 +166,7 @@ export async function openPreparedSession(options) {
               if (!accepting || typeof question !== 'string' || !question.trim() || Buffer.byteLength(question) > 4096
                   || !Number.isInteger(topK) || topK < 1 || topK > 8) throw Error('invalid scoped evaluation query');
               try {
+                const execute = async () => {
                 const response = await fetch(url + '/v1/query', { method: 'POST', redirect: 'error',
                   headers: { Authorization: `Bearer ${reader.project_tokens[project]}`, 'Content-Type': 'application/json' },
                   body: JSON.stringify({ project, query: question, top_k: topK, answer_mode: 'deterministic' }),
@@ -158,6 +179,8 @@ export async function openPreparedSession(options) {
                   chunks.push(chunk);
                 }
                 return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+                };
+                return await (proxy ? proxy.query(question, execute) : execute());
               } catch { throw Error('scoped disposable query failed'); }
             },
           });

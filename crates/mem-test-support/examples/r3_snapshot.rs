@@ -18,9 +18,14 @@ use uuid::Uuid;
 #[derive(Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 enum Request {
+    PlanChunks {
+        documents: Vec<Document>,
+    },
     Prepare {
         semantic_time: DateTime<Utc>,
         documents: Vec<Document>,
+        #[serde(default)]
+        embedding: Option<Embedding>,
     },
     Fork,
     Fingerprint {
@@ -38,6 +43,43 @@ struct Document {
     project: String,
     source: String,
     text: String,
+    #[serde(default)]
+    vectors: Vec<Vec<f32>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Embedding {
+    model: String,
+    dimensions: usize,
+    // Only a trusted-host loopback proxy is usable by this disposable harness.
+    // This is transport metadata; the snapshot owner makes no provider calls.
+    base_url: String,
+}
+
+impl Embedding {
+    fn validate(&self) -> Result<()> {
+        let port = self
+            .base_url
+            .strip_prefix("http://127.0.0.1:")
+            .and_then(|value| value.strip_suffix("/v1"))
+            .and_then(|value| value.parse::<u16>().ok());
+        ensure!(
+            port.is_some_and(|port| port > 0)
+                && (1..=8192).contains(&self.dimensions)
+                && !self.model.is_empty()
+                && self.model.len() <= 128
+                && self
+                    .model
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)),
+            "invalid disposable embedding profile"
+        );
+        Ok(())
+    }
+    fn space(&self) -> String {
+        format!("openai_compatible|{}|{}", self.base_url, self.model)
+    }
 }
 
 #[derive(Serialize)]
@@ -69,41 +111,66 @@ fn identifier(value: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
+fn validate_documents(documents: &[Document]) -> Result<()> {
+    ensure!(
+        !documents.is_empty() && documents.len() <= 1024,
+        "invalid document count"
+    );
+    let mut seen = BTreeSet::new();
+    let mut bytes = 0usize;
+    for d in documents {
+        ensure!(
+            identifier(&d.project)
+                && !d.source.is_empty()
+                && d.source.len() <= 240
+                && d.source.split('/').all(|s| !s.is_empty()
+                    && s != "."
+                    && s != ".."
+                    && s.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)))
+                && !d.text.trim().is_empty()
+                && d.text.len() <= 65536
+                && seen.insert((&d.project, &d.source)),
+            "invalid fixture document"
+        );
+        bytes = bytes.checked_add(d.text.len()).context("input overflow")?;
+    }
+    ensure!(bytes <= 8 * 1024 * 1024, "fixture too large");
+    Ok(())
+}
+
 impl Owner {
     async fn prepare(
         &mut self,
         semantic_time: DateTime<Utc>,
         documents: Vec<Document>,
+        embedding: Option<Embedding>,
     ) -> Result<Value> {
         self.phase = "prepare-input";
         ensure!(
             self.preparation.is_none() && self.frozen.is_none(),
             "snapshot already prepared"
         );
-        ensure!(
-            !documents.is_empty() && documents.len() <= 1024,
-            "invalid document count"
-        );
-        let mut seen = BTreeSet::new();
-        let mut bytes = 0usize;
-        for d in &documents {
-            ensure!(
-                identifier(&d.project)
-                    && !d.source.is_empty()
-                    && d.source.len() <= 240
-                    && d.source.split('/').all(|s| !s.is_empty()
-                        && s != "."
-                        && s != ".."
-                        && s.bytes()
-                            .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)))
-                    && !d.text.trim().is_empty()
-                    && d.text.len() <= 65536
-                    && seen.insert((&d.project, &d.source)),
-                "invalid fixture document"
-            );
-            bytes = bytes.checked_add(d.text.len()).context("input overflow")?;
+        validate_documents(&documents)?;
+        if let Some(profile) = &embedding {
+            profile.validate()?;
         }
-        ensure!(bytes <= 8 * 1024 * 1024, "fixture too large");
+        for d in &documents {
+            if let Some(profile) = &embedding {
+                let chunks = mem_search::split_search_chunks(&d.source, &d.text);
+                ensure!(
+                    d.vectors.len() == chunks.len()
+                        && d.vectors
+                            .iter()
+                            .all(|vector| vector.len() == profile.dimensions
+                                && vector.iter().all(|v| v.is_finite())
+                                && vector.iter().any(|v| *v != 0.0)),
+                    "invalid prepared fixture vectors"
+                );
+            } else {
+                ensure!(d.vectors.is_empty(), "vectors require an embedding profile");
+            }
+        }
         self.phase = "prepare-connect";
         self.preparation = Some(
             IsolatedDatabase::new()
@@ -150,6 +217,39 @@ impl Owner {
                 VALUES($1,$2,$1,1,false,$3,$4,'reference','project',3,0.9,$5,$5,to_tsvector('english',$3))")
                 .bind(memory).bind(project).bind(&d.text).bind(&d.source).bind(semantic_time)
                 .execute(&mut *tx).await?;
+            if let Some(profile) = &embedding {
+                let chunks = mem_search::split_search_chunks(&d.source, &d.text);
+                for (index, (text, vector)) in chunks.iter().zip(&d.vectors).enumerate() {
+                    let id = Uuid::new_v5(
+                        &memory,
+                        format!("search-chunk-v1:{index}:{text}").as_bytes(),
+                    );
+                    sqlx::query(
+                        "INSERT INTO memory_chunks(id,memory_entry_id,chunk_text,search_text,tsv)
+                        VALUES($1,$2,$3,$4,to_tsvector('english',$4))",
+                    )
+                    .bind(id)
+                    .bind(memory)
+                    .bind(text)
+                    .bind(format!("{}\n{text}", d.source))
+                    .execute(&mut *tx)
+                    .await?;
+                    let vector = format!(
+                        "[{}]",
+                        vector
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    );
+                    sqlx::query("INSERT INTO memory_chunk_embeddings
+                        (chunk_id,embedding_space,embedding,embedding_provider,embedding_base_url,embedding_model,embedding_dimension,embedding_updated_at)
+                        VALUES($1,$2,$3::vector,'openai_compatible',$4,$5,$6,$7)")
+                        .bind(id).bind(profile.space()).bind(vector).bind(&profile.base_url)
+                        .bind(&profile.model).bind(i32::try_from(profile.dimensions)?).bind(semantic_time)
+                        .execute(&mut *tx).await?;
+                }
+            }
             self.bindings.push(Binding {
                 project: d.project,
                 source: d.source,
@@ -172,17 +272,41 @@ impl Owner {
         );
         Ok(
             json!({"version":1,"prepared":true,"semantic_time":semantic_time,
-            "snapshot_sha256":self.fingerprint,"bindings":self.bindings,"preparation_microusd":0,
-            "embedding_preparation":"none; offline lexical fixture only","official_evidence":false}),
+            "snapshot_sha256":self.fingerprint,"bindings":self.bindings,
+            "preparation_microusd":if embedding.is_some() { None } else { Some(0u64) },
+            "embedding_preparation":if embedding.is_some() { "supplied vectors; provider accounting is external" } else { "none; offline lexical fixture only" },
+            "official_evidence":false}),
         )
     }
 
     async fn command(&mut self, request: Request) -> Result<Option<Value>> {
         match request {
+            Request::PlanChunks { documents } => {
+                self.phase = "plan-chunks";
+                ensure!(
+                    self.preparation.is_none() && self.frozen.is_none(),
+                    "plan before preparation"
+                );
+                validate_documents(&documents)?;
+                ensure!(
+                    documents.iter().all(|d| d.vectors.is_empty()),
+                    "planning does not accept vectors"
+                );
+                Ok(Some(
+                    json!({"version":1,"chunking":"memory-split-search-chunks",
+                    "documents":documents.into_iter().map(|d| json!({"project":d.project,
+                        "source":d.source,"source_sha256":format!("{:x}",Sha256::digest(d.text.as_bytes())),
+                        "chunks":mem_search::split_search_chunks(&d.source,&d.text)})).collect::<Vec<_>>(),
+                    "official_evidence":false}),
+                ))
+            }
             Request::Prepare {
                 semantic_time,
                 documents,
-            } => Ok(Some(self.prepare(semantic_time, documents).await?)),
+                embedding,
+            } => Ok(Some(
+                self.prepare(semantic_time, documents, embedding).await?,
+            )),
             Request::Fork => {
                 self.phase = "fork";
                 ensure!(

@@ -89,7 +89,7 @@ five modules, two public tests and ten private probes covering transitive build
 order, dependency-aware invalidation, cycles and atomic cache replacement. The
 reference and cumulative sequence pass; starter and no-op controls fail. All four
 development repositories are now executable drafts; the twelve representative
-held-out repositories are being implemented. The first,
+held-out repositories are also implemented as drafts. The first,
 [framed stream](representative/held-out/framed-stream/review.md), has passing
 private reference/cumulative checks and failing starter/no-op controls. The second,
 [interval calendar](representative/held-out/interval-calendar/review.md), covers
