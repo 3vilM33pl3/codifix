@@ -21,6 +21,14 @@ allowances only after verified settlement. Keep it with the durable journal.
 Per-call mediation is available for offline verification; paid execution remains
 disabled.
 
+A `provider_profile` locks the answer tokenizer and separate embedding model,
+dimensions, input price and tokenizer to hashed configuration assets, alongside
+reviewable configuration evidence. Missing profiles remain readable for legacy
+offline diagnostics but cannot authorize paid execution or qualify as non-offline
+evidence. Changing these settings changes the campaign hash and requires new
+approval. A hash proves identity, not tokenizer correctness or pricing accuracy.
+The live-driver guard still applies; this field alone cannot enable paid calls.
+
 An explicit `preparation_budget` allocates part of the global request, token and
 spend limits to a separate preparation phase. The driver receives
 `phase: "preparation"`, a bounded private provider-journal contract and a receipt

@@ -79,10 +79,21 @@ try {
     manifest.assets.push({ path: relative, sha256: createHash('sha256').update(bytes).digest('hex'), kind: 'configuration' });
   };
   for (const relative of ['rehearsal-controller.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'synthetic-embedding.mjs', 'request-mediator.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
-    'synthetic-wire-provider.mjs', 'provider-transport.mjs', 'responses-call.mjs', 'responses-request.mjs', 'responses-receipt.mjs', 'embeddings-call.mjs',
+    'synthetic-wire-provider.mjs', 'provider-profile.mjs', 'provider-transport.mjs', 'responses-call.mjs', 'responses-request.mjs', 'responses-receipt.mjs', 'embeddings-call.mjs',
     'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs', 'isolation/service-session.mjs', 'isolation/embedding-proxy.mjs',
     'isolation/model-agent.mjs', 'isolation/model-answer.mjs', 'isolation/model-dispatch.mjs', 'isolation/rehearsal-task.mjs']) {
     await add(`runtime/${relative}`, await fs.readFile(path.join(here, relative)), relative === 'offline-driver.mjs');
+  }
+  if (wire) {
+    const asset = manifest.assets.find(asset => asset.path === 'runtime/synthetic-wire-provider.mjs');
+    const tokenizer = { id: 'synthetic-wire-counter-not-real-tokenizer-v1', asset: { path: asset.path, sha256: asset.sha256 } };
+    await add('private/provider-review.json', JSON.stringify({ version: 1, synthetic_only: true,
+      tokenizer: 'Constant 64 symbolic tokens; not a verified tokenizer.', pricing: 'Zero-spend loopback provider only.',
+      approved: false }) + '\n');
+    const evidence = manifest.assets.find(asset => asset.path === 'private/provider-review.json');
+    manifest.provider_profile = { version: 1, protocol: 'openai-text-v1', responses_tokenizer: tokenizer,
+      embedding: { resolved_id: manifest.model.embedding_id, dimensions: 16, max_input_tokens: 8192,
+        input_microusd_per_million: 0, tokenizer }, configuration_evidence: { path: evidence.path, sha256: evidence.sha256 } };
   }
   await add('private/runtime.json', JSON.stringify({ version: 1, binaries: pins, images, syntheticWire: wire,
     socket: path.join(staging, 'dispatch.sock') }) + '\n');

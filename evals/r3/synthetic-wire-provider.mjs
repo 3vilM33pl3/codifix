@@ -3,19 +3,15 @@
 // tokenizer, price source or permission to send data outside this process.
 import http from 'node:http';
 import { once } from 'node:events';
-import { createHash } from 'node:crypto';
 import { createProviderTransport } from './provider-transport.mjs';
-import { createResponsesPreparation } from './responses-call.mjs';
-import { createEmbeddingsPreparation } from './embeddings-call.mjs';
-import { dispatchModel } from './isolation/model-dispatch.mjs';
+import { createProviderBindings, validateProviderProfile } from './provider-profile.mjs';
 import { syntheticVector, syntheticEmbeddingModel } from './synthetic-embedding.mjs';
 
-const counter = { id: 'synthetic-wire-counter-not-real-tokenizer-v1',
-  sha256: createHash('sha256').update('synthetic-wire-counter-v1:64-symbolic-input-tokens').digest('hex') };
 const noOp = ['/usr/local/bin/node', '-e',
   "const fs=require('fs');const input=JSON.parse(fs.readFileSync('task.json','utf8'));if(!input.prompt||!Array.isArray(input.context))process.exit(1);"];
 
 export async function openSyntheticWireProvider(manifest) {
+  manifest = structuredClone(manifest);
   const model = structuredClone(manifest.model);
   if (!manifest.smoke_only || manifest.label_status !== 'draft' || manifest.limits.microusd !== 0
       || !manifest.provider_budget || !manifest.preparation_budget || model.provider !== 'openai'
@@ -23,6 +19,11 @@ export async function openSyntheticWireProvider(manifest) {
       || model.max_input_tokens < 64 || model.max_output_tokens < 1
       || model.input_microusd_per_million !== 0 || model.output_microusd_per_million !== 0
       || (model.cached_input_microusd_per_million ?? 0) !== 0) throw Error('synthetic zero-spend wire profile required');
+  const { profile } = validateProviderProfile(manifest);
+  if (profile.embedding.dimensions !== 16 || profile.embedding.input_microusd_per_million !== 0
+      || [profile.responses_tokenizer, profile.embedding.tokenizer].some(counter => counter.id !== 'synthetic-wire-counter-not-real-tokenizer-v1')) {
+    throw Error('synthetic zero-spend wire profile required');
+  }
   let calls = 0, stopped = false;
   const shutdown = new AbortController();
   const server = http.createServer(async (req, res) => {
@@ -78,21 +79,9 @@ export async function openSyntheticWireProvider(manifest) {
     get calls() { return calls; },
     bind(mediator, taskId) {
       if (stopped || typeof taskId !== 'string' || !/^(preparation|work-[0-9]{5})$/.test(taskId)) throw Error('invalid wire task identity');
-      const prepareRequest = createResponsesPreparation({ mediator, model, tokenizer: counter,
-        countInputTokens: () => 64, send: responses });
-      const prepareEmbedding = createEmbeddingsPreparation({ mediator, model: { ...model, resolved_id: syntheticEmbeddingModel,
-        max_input_tokens: 8192 }, dimensions: 16, tokenizer: counter, countInputTokens: () => 64, send: embeddings });
-      let embeddingCalls = 0;
-      return {
-        prepareRequest,
-        async embed(input, purpose, signal) {
-          if (purpose !== (taskId === 'preparation' ? 'document' : 'query')) throw Error('wire embedding phase mismatch');
-          const requestId = `${purpose === 'document' ? 'document' : 'query-embedding'}-${embeddingCalls++}`;
-          return (await dispatchModel({ mediator, prepareRequest: prepareEmbedding, taskId, requestId,
-            payload: { input, purpose }, timeoutMs: 10000,
-            signal: signal ? AbortSignal.any([signal, shutdown.signal]) : shutdown.signal })).output;
-        },
-      };
+      const counter = value => ({ id: value.id, sha256: value.asset.sha256, countInputTokens: () => 64 });
+      return createProviderBindings({ manifest, mediator, taskId, responsesCounter: counter(profile.responses_tokenizer),
+        embeddingCounter: counter(profile.embedding.tokenizer), sendResponses: responses, sendEmbeddings: embeddings, signal: shutdown.signal });
     },
     async close() {
       if (stopped) return;

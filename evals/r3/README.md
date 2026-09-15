@@ -1,5 +1,22 @@
 # R3 engineering evaluation — implementation in progress
 
+The optional `provider_profile` manifest field locks the answer tokenizer, separate
+embedding model/dimensions/input price/tokenizer, and a configuration-evidence
+asset. Each tokenizer has an ID and a `{path, sha256}` reference to a configuration
+asset; the normal manifest checks verify those bytes before/after dispatch.
+Version 1 supports the existing `openai-text-v1` wire profile only. The embedding
+ID must equal `model.embedding_id`; its price is not copied from the answer model.
+Legacy manifests omit the field without changing canonical bytes, but cannot be
+authorized for paid execution or qualify as non-offline evidence without it.
+
+`provider-profile.mjs` is the common private binding for prepared answer and
+embedding calls. The trusted controller supplies local counter callbacks with
+matching IDs/hashes and explicit transports. The module does not load code,
+discover credentials or grant approval. Hashes bind identity, not tokenizer
+correctness or rate accuracy: the operator must review the configuration evidence
+and counter implementation. The fake HTTP rehearsal pins its actual symbolic
+counter source and an explicitly unapproved, synthetic-only evidence file.
+
 Mediated rehearsals now declare `preparation_budget` in the locked manifest.
 The CLI invokes a separate preparation driver phase before any task. Its private
 receipt binds a sealed snapshot and an audit of the actual preparation journal.

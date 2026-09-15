@@ -11,7 +11,12 @@ import { dispatchModel } from './isolation/model-dispatch.mjs';
 
 const binary = process.env.MEMORY_R3_BUDGET_BIN;
 if (process.env.MEMORY_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
+const tokenizer = { id: 'synthetic-wire-counter-not-real-tokenizer-v1', asset: { path: 'counter.mjs', sha256: 'a'.repeat(64) } };
 const profile = () => ({ smoke_only: true, label_status: 'draft', limits: { microusd: 0 },
+  assets: [{ ...tokenizer.asset, kind: 'configuration' }],
+  provider_profile: { version: 1, protocol: 'openai-text-v1', responses_tokenizer: tokenizer,
+    embedding: { resolved_id: syntheticEmbeddingModel, dimensions: 16, max_input_tokens: 8192,
+      input_microusd_per_million: 0, tokenizer }, configuration_evidence: tokenizer.asset },
   provider_budget: { max_calls_per_task: 7 }, preparation_budget: { requests: 10 }, model: {
     provider: 'openai', resolved_id: 'synthetic-mediated-excerpt-noop-v1', embedding_id: syntheticEmbeddingModel,
     reasoning: 'none', max_input_tokens: 100, max_output_tokens: 20,
