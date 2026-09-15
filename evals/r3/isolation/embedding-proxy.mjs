@@ -36,7 +36,7 @@ export async function openEmbeddingProxy({ model, dimensions, embed }) {
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       if (Object.keys(body).sort().join(',') !== 'input,model' || body.model !== model
           || !Array.isArray(body.input) || body.input.length !== 1 || body.input[0] !== current.question) throw Error('denied');
-      const vector = checkedVector(await embed(current.question, 'query'), dimensions);
+      const vector = checkedVector(await current.embed(current.question, 'query', current.controller.signal), dimensions);
       if (closed || permit !== current) throw Error('expired query');
       current.succeeded = true;
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -52,19 +52,23 @@ export async function openEmbeddingProxy({ model, dimensions, embed }) {
   await once(server, 'listening');
   return {
     model, dimensions, baseUrl: `http://127.0.0.1:${server.address().port}/v1`, token,
-    async query(question, run) {
+    async query(question, run, queryEmbed = embed) {
       if (closed || permit || typeof question !== 'string' || !question.trim()
-          || Buffer.byteLength(question) > 4096) throw Error('supplied embedding query unavailable');
-      const current = { question, used: false, succeeded: false };
+          || Buffer.byteLength(question) > 4096 || typeof run !== 'function'
+          || typeof queryEmbed !== 'function') throw Error('supplied embedding query unavailable');
+      // The trusted task owner supplies its own accounting closure. Never
+      // replace the preparation callback or retain this closure for later tasks.
+      const current = { question, embed: queryEmbed, controller: new AbortController(), used: false, succeeded: false };
       permit = current;
       try {
         const result = await run();
         if (!current.succeeded || result?.diagnostics?.semantic_status !== 'active_space_ok') throw Error('semantic retrieval was not verified');
         return result;
-      } finally { permit = undefined; }
+      } finally { current.controller.abort(); permit = undefined; }
     },
     async close() {
       closed = true;
+      permit?.controller.abort();
       permit = undefined;
       server.closeAllConnections();
       await new Promise(resolve => server.close(resolve));

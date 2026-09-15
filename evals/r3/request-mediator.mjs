@@ -80,13 +80,17 @@ export async function openRequestMediator(options) {
     // from a crash, timeout or missing usage. A receipt must already exist.
     recover: requestId => request({ operation: 'recover', request_id: requestId }),
     close,
-    async dispatch({ taskId, requestId, payload, allowance, timeoutMs, invoke, withReceipt = false }) {
+    async dispatch({ taskId, requestId, payload, allowance, timeoutMs, invoke, withReceipt = false, signal }) {
       if (busy || typeof invoke !== 'function' || !Number.isInteger(timeoutMs) || timeoutMs < 1
           || timeoutMs > Math.min(600000, taskLimits.task_seconds * 1000)
           || !counters(allowance, ['input_tokens', 'output_tokens', 'microusd'])) throw Error('invalid or busy provider dispatch');
+      if (signal !== undefined && !(signal instanceof AbortSignal)) throw Error('invalid provider cancellation signal');
+      if (signal?.aborted) throw Error('provider request cancelled before reservation');
       busy = true;
       let timer;
       const abort = new AbortController();
+      const cancel = () => abort.abort();
+      signal?.addEventListener('abort', cancel, { once: true });
       try {
         // Bind the exact trusted model/purpose/input contract, not an agent's
         // claimed usage. Callers derive allowance from locked tokenizer/prices.
@@ -103,19 +107,30 @@ export async function openRequestMediator(options) {
         if (decision.state !== 'reserved') throw Error('invalid reservation');
         let receipt;
         try {
+          if (abort.signal.aborted) throw Error('cancelled after reservation');
           receipt = await Promise.race([
-            Promise.resolve().then(() => invoke(frozenPayload, abort.signal)),
+            Promise.resolve().then(() => {
+              if (abort.signal.aborted) throw Error('cancelled before invocation');
+              return invoke(frozenPayload, abort.signal);
+            }),
             new Promise((_, reject) => { timer = setTimeout(() => {
               abort.abort(); reject(Error('deadline'));
-            }, timeoutMs); }),
+            }, timeoutMs);
+            abort.signal.addEventListener('abort', () => reject(Error('cancelled')), { once: true }); }),
           ]);
+          if (abort.signal.aborted) throw Error('cancelled provider outcome');
           if (!receipt || !Object.hasOwn(receipt, 'output')
               || !counters(receipt.usage, ['input_tokens', 'output_tokens', 'microusd'])) throw Error('missing provider receipt');
           const result = await request({ operation: 'complete', ...identity, output: receipt.output, usage: receipt.usage });
           if (!counters(result.usage, ['input_tokens', 'output_tokens', 'microusd'])) throw Error('invalid confirmed usage');
           return withReceipt ? { output: result.output, usage: result.usage, invoked: true } : result.output;
         } catch { throw Error('provider outcome uncertain; retain journal and reconcile before further calls'); }
-      } finally { clearTimeout(timer); busy = false; }
+      } finally {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
+        abort.abort();
+        busy = false;
+      }
     },
   };
 }

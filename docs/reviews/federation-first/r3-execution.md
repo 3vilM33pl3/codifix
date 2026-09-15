@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 task-scoped query embedding and cancellation
+
+- Prepared service clones accept a trusted task-specific query embedding callback;
+  document preparation retains its separate callback. Repeated questions in distinct
+  tasks cannot silently share execution allowances. Failed callbacks never fall back.
+- Query permits cancel their callbacks on release; late results cannot enter a new
+  permit. The request mediator accepts cancellation, denies already-cancelled calls
+  before reservation, and retains uncertain reservations for interrupted in-flight
+  calls. It does not infer free retries or log cancellation reasons.
+- Four proxy tests, nine mediator tests and all three real disposable-service tests
+  pass, including independent task budgets, exhaustion and unchanged snapshots.
+- This is offline integration evidence, not a paid-provider or quality result.
+  Full live-driver/preparation-budget integration and approval gates remain open.
+
 ## 2026-09-15 full mediated development rehearsal completed
 
 - Completed and independently checked all 660 development tasks: 600 knowledge

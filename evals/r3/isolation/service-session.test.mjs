@@ -24,25 +24,34 @@ test('service embedding callbacks reserve each preparation/query call and stop b
   const mediator = await openRequestMediator({ binary: budgetBinary, directory,
     manifestSha256: 'c'.repeat(64), limits, taskLimits: { ...limits, requests: 2 } });
   let session, calls = 0, requests = 0;
+  const embedFor = taskId => (input, purpose, signal) => mediator.dispatch({
+    signal,
+    taskId, requestId: `embedding-${requests++}`,
+    payload: { model: 'synthetic-v1', dimensions: 2, purpose, input },
+    allowance: { input_tokens: 10, output_tokens: 0, microusd: 5 }, timeoutMs: 1000,
+    invoke: async () => {
+      const journal = await fs.readFile(path.join(directory, 'budget.jsonl'), 'utf8');
+      assert.equal(journal.trim().split('\n').map(JSON.parse).at(-1).event, 'reserved');
+      calls++;
+      return { output: [1, 0], usage: { input_tokens: 3, output_tokens: 0, microusd: 1 } };
+    },
+  });
   try {
     session = await openPreparedSession({ snapshotBinary, memoryBinary, databaseUrl,
       semanticTime: '2026-01-01T00:00:00Z',
       documents: [{ project: 'r3-alpha', source: 'public/source.md', text: 'Reconcile acknowledgement before retry.' }],
-      embedding: { model: 'synthetic-v1', dimensions: 2, embed: (input, purpose) => mediator.dispatch({
-        taskId: purpose === 'document' ? 'preparation' : 'answer-sequence', requestId: `embedding-${requests++}`,
-        payload: { model: 'synthetic-v1', dimensions: 2, purpose, input },
-        allowance: { input_tokens: 10, output_tokens: 0, microusd: 5 }, timeoutMs: 1000,
-        invoke: async () => {
-          const journal = await fs.readFile(path.join(directory, 'budget.jsonl'), 'utf8');
-          assert.equal(journal.trim().split('\n').map(JSON.parse).at(-1).event, 'reserved');
-          calls++;
-          return { output: [1, 0], usage: { input_tokens: 3, output_tokens: 0, microusd: 1 } };
-        },
-      }) } });
-    for (let repeat = 0; repeat < 2; repeat++) await session.withInstance('r3-alpha', async instance => instance.query('acknowledgement'));
-    await assert.rejects(session.withInstance('r3-alpha', async instance => instance.query('acknowledgement')), /scoped disposable query failed/);
+      embedding: { model: 'synthetic-v1', dimensions: 2, embed: (input, purpose) => {
+        assert.equal(purpose, 'document'); // A query may not spend preparation allowance.
+        return embedFor('preparation')(input, purpose);
+      } } });
+    const queryEmbedding = embedFor('answer-sequence');
+    for (let repeat = 0; repeat < 2; repeat++) await session.withInstance('r3-alpha', async instance => instance.query('acknowledgement'), { queryEmbedding });
+    await assert.rejects(session.withInstance('r3-alpha', async instance => instance.query('acknowledgement'), { queryEmbedding }), /scoped disposable query failed/);
     assert.equal(calls, 3); // One preparation plus two queries; no fourth invocation.
     assert.deepEqual(await mediator.status(), { ledger: { requests: 3, tokens: 9, microusd: 3 }, uncertain_ids: [] });
+    await session.withInstance('r3-alpha', async instance => instance.query('acknowledgement'), { queryEmbedding: embedFor('next-task') });
+    assert.equal(calls, 4);
+    assert.deepEqual((await mediator.status()).ledger, { requests: 4, tokens: 12, microusd: 4 });
   } finally {
     await session?.close();
     await mediator.close();

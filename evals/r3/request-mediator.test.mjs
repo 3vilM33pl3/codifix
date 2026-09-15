@@ -19,6 +19,37 @@ const allowance = { input_tokens: 10, output_tokens: 10, microusd: 10 };
 const usage = { input_tokens: 3, output_tokens: 2, microusd: 2 };
 const payload = { model: 'synthetic-only', purpose: 'answer', input: 'PRIVATE_SYNTHETIC_INPUT' };
 
+test('task cancellation stops new calls and retains an uncertain reservation for an in-flight call', { skip: !binary }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-cancelled-mediator-'));
+  const mediator = await openRequestMediator({ binary, directory, manifestSha256: 'c'.repeat(64), limits, taskLimits });
+  let release;
+  try {
+    const request = { taskId: 'task', requestId: 'cancelled', payload, allowance, timeoutMs: 5000 };
+    await assert.rejects(mediator.dispatch({ ...request, signal: AbortSignal.abort(),
+      invoke: () => assert.fail('cancelled call invoked') }), /before reservation/);
+    assert.deepEqual((await mediator.status()).ledger, { requests: 0, tokens: 0, microusd: 0 });
+    const controller = new AbortController();
+    let entered, providerSignal;
+    const started = new Promise(resolve => { entered = resolve; });
+    const blocked = new Promise(resolve => { release = resolve; });
+    const pending = mediator.dispatch({ ...request, signal: controller.signal, invoke: async (_body, signal) => {
+      providerSignal = signal; entered(); await blocked;
+      return { output: { late: true }, usage };
+    } });
+    const rejected = assert.rejects(pending, /outcome uncertain/);
+    await started;
+    controller.abort(Error('PRIVATE_CANCEL_REASON'));
+    await rejected;
+    assert(providerSignal.aborted);
+    release();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(await mediator.status(), { ledger: { requests: 1, tokens: 20, microusd: 10 }, uncertain_ids: ['cancelled'] });
+    await assert.rejects(mediator.dispatch({ ...request, invoke: () => assert.fail('uncertain replay invoked') }), /rejected/);
+    const journal = await fs.readFile(path.join(directory, 'budget.jsonl'), 'utf8');
+    assert(!journal.includes('PRIVATE_CANCEL_REASON'));
+  } finally { release?.(); await mediator.close(); await fs.rm(directory, { recursive: true }); }
+});
+
 test('price bridge uses checked Rust arithmetic without reserving a call or inventing cache rates', { skip: !binary }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-price-bridge-'));
   const mediator = await openRequestMediator({ binary, directory, manifestSha256: 'c'.repeat(64), limits, taskLimits });

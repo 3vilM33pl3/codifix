@@ -119,9 +119,10 @@ export async function openPreparedSession(options) {
     // cost or full production-ranking parity. Those are separate campaign gates.
     preparation: structuredClone(prepared),
     close,
-    async withInstance(project, use) {
+    async withInstance(project, use, { queryEmbedding } = {}) {
       if (active || closing || unavailable) throw Error('disposable snapshot session unavailable or busy');
       if (typeof use !== 'function' || !prepared.bindings.some(binding => binding.project === project)) throw Error('unknown prepared project');
+      if (queryEmbedding !== undefined && (!proxy || typeof queryEmbedding !== 'function')) throw Error('invalid task embedding callback');
       active = true;
       let reader, service, config;
       try {
@@ -180,7 +181,7 @@ export async function openPreparedSession(options) {
                 }
                 return JSON.parse(Buffer.concat(chunks).toString('utf8'));
                 };
-                return await (proxy ? proxy.query(question, execute) : execute());
+                return await (proxy ? proxy.query(question, execute, queryEmbedding) : execute());
               } catch { throw Error('scoped disposable query failed'); }
             },
           });

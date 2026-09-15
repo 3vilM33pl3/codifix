@@ -1,5 +1,13 @@
 # R3 engineering evaluation — implementation in progress
 
+Trusted service-session callers can bind query embedding accounting per task with
+`session.withInstance(project, use, { queryEmbedding })`. Its callback receives
+`(text, 'query', signal)`; forward the signal to the request mediator. Document
+preparation keeps its separate callback and allowance. Failed query callbacks do
+not fall back to preparation. Cancelling an in-flight provider call retains an
+uncertain reservation; it is not permission for a free retry. This host-only API
+does not select a provider, authorize paid calls or complete campaign accounting.
+
 The existing generator produces **smoke tests**, not the official benchmark.
 They check the machinery, not Memory's product value. Generated manifests set
 `smoke_only = true`; older manifests without this field also default to smoke-only.
