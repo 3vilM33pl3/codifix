@@ -211,7 +211,7 @@ impl Manifest {
             "invalid campaign limits"
         );
         ensure!(
-            self.assets.len() <= 10000 && self.cases.len() <= 1000,
+            self.assets.len() <= 10000 && !self.cases.is_empty() && self.cases.len() <= 1000,
             "campaign too large"
         );
         let mut assets = BTreeSet::new();
@@ -268,10 +268,24 @@ impl Manifest {
                 .filter(|c| c.track == track && c.split == split)
                 .collect();
             let actual_clusters: BTreeSet<_> = cases.iter().map(|c| &c.cluster).collect();
-            ensure!(
-                cases.len() == count && actual_clusters.len() == cluster_count,
-                "incorrect {track:?}/{split:?} dataset size"
-            );
+            if self.smoke_only {
+                // Incremental offline rehearsals may contain fewer complete
+                // families. This flag always prohibits official evidence, even
+                // with reviewed labels and apparently valid spend approvals.
+                ensure!(
+                    cases.len() <= count && actual_clusters.len() <= cluster_count,
+                    "oversized {track:?}/{split:?} smoke dataset"
+                );
+                ensure!(
+                    !cases.is_empty() || !self.cases.iter().any(|c| c.split == split),
+                    "smoke split must contain both tracks"
+                );
+            } else {
+                ensure!(
+                    cases.len() == count && actual_clusters.len() == cluster_count,
+                    "incorrect {track:?}/{split:?} dataset size"
+                );
+            }
             let per_cluster = if track == Track::Knowledge { 4 } else { 1 };
             ensure!(
                 actual_clusters.iter().all(|cluster| cases
@@ -340,6 +354,10 @@ impl Manifest {
 
     pub fn plan(&self, split: Split) -> Result<Plan> {
         self.validate()?;
+        ensure!(
+            self.cases.iter().any(|c| c.split == split),
+            "requested split has no cases"
+        );
         let mut work = Vec::new();
         for case in self.cases.iter().filter(|c| c.split == split) {
             for repeat in 0..self.repeats {

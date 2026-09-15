@@ -1,5 +1,21 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 representative campaign materialization
+
+- The existing campaign contract now permits smaller whole-family smoke-only
+  rehearsals, with both tracks in each populated split and all three repeats.
+  Empty/mixed/oversized families are rejected. Non-smoke dataset requirements
+  remain exactly 40/100 knowledge and 4/12 coding; smoke evidence cannot be
+  promoted through approvals. A new report regression proves that distinction.
+- Added deterministic private materialization of all currently implemented
+  representative development families, or one family per track for fast driver
+  checks. Public contexts, source code, private rubrics and hidden graders remain
+  separate; every campaign input is hash-locked. Existing paths are never merged
+  or overwritten. The real CLI plans both existing suites and rejects tampering,
+  absent held-out execution and attempts to relabel partial counts as official.
+- The two executable materialization/CLI tests passed without skips. Complete
+  driver dispatch and the full representative benchmark remain unfinished.
+
 ## 2026-09-15 isolated knowledge-answer integration
 
 - Added an offline bridge from actual baseline results or exact prepared Memory

@@ -338,6 +338,8 @@ jobs:
             node --test evals/r3/isolation/knowledge.test.mjs
       - name: Verify R3 campaign dispatch and explicit recovery
         run: |
+          MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_REQUIRE_REPRESENTATIVE_PACK=1 \
+            node --test evals/r3/representative-pack.test.mjs
           MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_REQUIRE_RUNNER=1 \
             node --test evals/r3/runner.test.mjs
       - run: |

@@ -222,6 +222,43 @@ fn schedule_is_reproducible_complete_and_changes_with_seed() {
 }
 
 #[test]
+fn partial_smoke_rehearsals_keep_whole_families_and_cannot_be_promoted() {
+    let mut m = fixture();
+    m.smoke_only = true;
+    m.cases
+        .retain(|case| case.split == Split::HeldOut && case.cluster.ends_with("-0"));
+    let plan = m.plan(Split::HeldOut).unwrap();
+    assert_eq!(plan.work.len(), (4 + 1) * 5 * 3);
+    assert!(m.plan(Split::Development).is_err());
+    let mut evidence = artifact(&m);
+    // Even fabricated approval-shaped fixtures cannot promote smoke evidence.
+    assert!(m.authorize(Split::HeldOut, &evidence.approvals).is_err());
+    evidence.offline = true;
+    let result = report(&m, &evidence).unwrap();
+    assert!(result.harness_valid);
+    assert!(!result.official_evidence && !result.quality_passed);
+    assert_eq!(result.tracks[0].tasks, 4);
+    assert_eq!(result.tracks[1].tasks, 1);
+    let complete_smoke = m.clone();
+    m.smoke_only = false;
+    assert!(m.validate().is_err());
+    m = complete_smoke.clone();
+    m.cases.remove(0);
+    assert!(
+        m.validate().is_err(),
+        "knowledge families retain four questions"
+    );
+    m = complete_smoke;
+    m.cases.retain(|case| case.track == Track::Knowledge);
+    assert!(
+        m.validate().is_err(),
+        "both tracks remain required per split"
+    );
+    m.cases.clear();
+    assert!(m.validate().is_err());
+}
+
+#[test]
 fn parent_results_and_repeats_do_not_inflate_independence() {
     let m = fixture();
     let mut a = artifact(&m);

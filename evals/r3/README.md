@@ -46,6 +46,15 @@ reference and cumulative sequence pass; starter and no-op controls fail. All fou
 development repositories are now executable drafts; the twelve representative
 held-out repositories and complete campaign integration remain unimplemented.
 
+Materialize those representative development fixtures for the existing campaign
+CLI with `node evals/r3/build-representative-pack.mjs NEW_DIRECTORY`. This creates
+a hash-locked, private, **smoke-only partial rehearsal**: eight knowledge questions
+and four coding sequences, no held-out data. `--one-family-per-track` creates a
+smaller four-question/one-sequence rehearsal. Neither changes the required
+official suite sizes or can be promoted by changing its label status. The CLI
+can plan these packs; complete driver dispatch remains unfinished. Placeholder
+suite commands are contracts, not installed agent/grader programs.
+
 ```sh
 node evals/r3/build-review-pack.mjs target/memory-evals/r3-review
 node evals/r3/verify-review-pack.mjs target/memory-evals/r3-review
