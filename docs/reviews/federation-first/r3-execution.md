@@ -1,5 +1,28 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 verification of scoped embedding and budget increments
+
+- Wired the new embedding receipt tests into the existing required-database CI
+  group. Its exact local command passes all 31 tests, with no skipped tests.
+  Log: `/tmp/r3-scoped-ci-node-tests.log`.
+- Workspace Clippy, formatting, boundaries and the real isolated lean CLI build
+  pass. The lean build keeps eight existing dead-code warnings and its executable
+  reports `memory 2.0.0`.
+- The unfiltered required-database workspace run fails one unrelated, in-progress
+  M2 edit: `markdown_local_links_and_images_resolve` rejects an absolute local path
+  in `m2-model/refresh-guide.md`. All 232 other CLI tests pass. The complete
+  workspace rerun excluding only that test passes, including database/federation
+  regressions. This is not an unqualified green workspace run; the M2 files were
+  left untouched. Logs: `/tmp/r3-scoped-workspace-tests.log` and
+  `/tmp/r3-scoped-workspace-rest.log`.
+- Removed only the owned tmpfs container `memory-r3-scoped-20260915`, after all
+  database tests completed. Its synthetic contents were disposable; the 75-task
+  artifact, logs and source fixtures remain. Existing services were unchanged.
+- R3 remains incomplete. Remaining engineering includes global preparation-budget
+  integration and the complete approval-gated live driver with locked model,
+  tokenizer, pricing and embedding configuration. Label and paid-run approvals
+  are separate gates; they do not block continuing that offline implementation.
+
 ## 2026-09-15 integrated query-embedding accounting rehearsal
 
 - The existing mediated executor now routes vector-baseline and Full Memory query
