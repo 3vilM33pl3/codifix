@@ -368,6 +368,13 @@ coding durations describe agent work only. Official reports reject missing or
 inconsistent timing; older offline artifacts remain readable but must not be
 promoted as latency evidence. Synthetic callback timings are not real model latency.
 
+Official evidence also requires an explicit mediation profile, an audit for every
+task, and at least one accounted model invocation per task (including recovered
+receipts, which are not free replacement observations). Old unmediated artifacts
+remain diagnostic only. Portable audits establish accounting consistency; the
+CLI additionally checks their actual private journal/result files. They do not
+authenticate a provider's billing claims or authorize a paid run.
+
 ## Reusable dispatch results
 
 `ProviderResults` stores bounded outputs in a private directory, separately from

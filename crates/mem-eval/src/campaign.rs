@@ -546,7 +546,7 @@ impl Observation {
         manifest: &Manifest,
         manifest_sha256: &str,
         task_id: &str,
-        offline: bool,
+        _offline: bool,
     ) -> Result<()> {
         let Some(contract) = &manifest.provider_budget else {
             ensure!(
@@ -565,22 +565,20 @@ impl Observation {
             .max_input_tokens
             .checked_add(manifest.model.max_output_tokens)
             .context("task token overflow")?;
-        let cost = if offline {
-            0
-        } else {
-            budget::Allowance::for_model(
-                &manifest.model,
-                manifest.model.max_input_tokens,
-                manifest.model.max_output_tokens,
-            )?
-            .microusd
-        };
+        let cost = budget::Allowance::for_model(
+            &manifest.model,
+            manifest.model.max_input_tokens,
+            manifest.model.max_output_tokens,
+        )?
+        .microusd;
         ensure!(
             audit.manifest_sha256 == manifest_sha256
                 && audit.limits.requests > 0
                 && audit.limits.requests <= contract.max_calls_per_task
                 && audit.limits.tokens == tokens
-                && audit.limits.microusd == cost
+                // A dispatcher may reserve less, e.g. zero for offline calls.
+                // The CLI separately verifies its exact issued contract.
+                && audit.limits.microusd <= cost
                 && audit.limits.task_seconds == manifest.limits.task_seconds
                 && audit.task_limits == audit.limits
                 && audit.tasks.keys().all(|id| id == task_id),

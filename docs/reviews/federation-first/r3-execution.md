@@ -1,5 +1,17 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 official provider evidence gate
+
+- Official reports now require the bounded per-call profile, coherent task receipt
+  audits and at least one accounted model request per task. Legacy unmediated
+  artifacts remain readable offline, but cannot establish official evidence.
+- Portable audit validation permits conservative reservation ceilings within the
+  locked model price; CLI acceptance still verifies the exact issued contract and
+  actual private journal. Synthetic report fixtures do not authenticate providers.
+- Evaluator tests and scoped Clippy pass. Paid dispatch remains disabled; real
+  tokenization, pricing and embedding parity still need implementation and the
+  separate label/provider/budget approvals remain open.
+
 ## 2026-09-15 mediated rehearsal completed
 
 - The fresh mediated run passed all 75 tasks and verified 150 simulated calls

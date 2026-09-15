@@ -4,6 +4,7 @@ use super::*;
 #[test]
 fn optional_mediation_preserves_legacy_bytes_and_requires_explicit_bounded_calls() {
     let mut manifest = fixture();
+    manifest.provider_budget = None;
     let original = digest_value(&manifest).unwrap();
     let bytes = serde_json::to_vec(&manifest).unwrap();
     assert!(!String::from_utf8_lossy(&bytes).contains("provider_budget"));
@@ -52,7 +53,9 @@ pub(super) fn fixture() -> Manifest {
         repeats: 3,
         label_status: "reviewed".into(),
         smoke_only: false,
-        provider_budget: None,
+        provider_budget: Some(ProviderBudget {
+            max_calls_per_task: 1,
+        }),
         model: Model {
             provider: "fake".into(),
             resolved_id: "fake-v1".into(),
@@ -60,8 +63,8 @@ pub(super) fn fixture() -> Manifest {
             embedding_id: "fake-2d".into(),
             max_input_tokens: 100,
             max_output_tokens: 100,
-            input_microusd_per_million: 1,
-            output_microusd_per_million: 1,
+            input_microusd_per_million: 1_000_000,
+            output_microusd_per_million: 1_000_000,
         },
         limits: Limits {
             requests: 10000,
@@ -143,7 +146,8 @@ fn artifact(manifest: &Manifest) -> Artifact {
         observations: plan
             .work
             .into_iter()
-            .map(|work| {
+            .enumerate()
+            .map(|(index, work)| {
                 let result = crate::EvalItemResult {
                     item_id: work.case_id.clone(),
                     eval_type: "grounded_answer".into(),
@@ -211,7 +215,61 @@ fn artifact(manifest: &Manifest) -> Artifact {
                         grading_ms: 5,
                         executor_total_ms: 20,
                     }),
-                    provider_audit: None,
+                    // Portable synthetic metadata for report tests only. Actual
+                    // journal verification is covered by CLI integration tests.
+                    provider_audit: manifest.provider_budget.as_ref().map(|profile| {
+                        let limits = Limits {
+                            requests: profile.max_calls_per_task,
+                            tokens: manifest.model.max_input_tokens
+                                + manifest.model.max_output_tokens,
+                            microusd: budget::Allowance::for_model(
+                                &manifest.model,
+                                manifest.model.max_input_tokens,
+                                manifest.model.max_output_tokens,
+                            )
+                            .unwrap()
+                            .microusd,
+                            task_seconds: manifest.limits.task_seconds,
+                        };
+                        let task_id = format!("work-{index:05}");
+                        provider_results::ProviderAudit {
+                            version: 1,
+                            manifest_sha256: manifest_hash.clone(),
+                            task_limits: limits.clone(),
+                            limits,
+                            ledger: Ledger {
+                                requests: 1,
+                                tokens: 10,
+                                microusd: 10,
+                            },
+                            tasks: [(
+                                task_id.clone(),
+                                provider_results::TaskUsage {
+                                    requests: 1,
+                                    input_tokens: 5,
+                                    output_tokens: 5,
+                                    microusd: 10,
+                                },
+                            )]
+                            .into(),
+                            calls: vec![provider_results::ProviderCall {
+                                task_id,
+                                request_id: "synthetic-call".into(),
+                                payload_sha256: digest(b"synthetic input"),
+                                result_sha256: digest(b"synthetic result"),
+                                allowance: budget::Allowance {
+                                    input_tokens: 100,
+                                    output_tokens: 100,
+                                    microusd: 200,
+                                },
+                                usage: budget::Allowance {
+                                    input_tokens: 5,
+                                    output_tokens: 5,
+                                    microusd: 10,
+                                },
+                            }],
+                        }
+                    }),
                     knowledge_review,
                     model: manifest.model.clone(),
                     work,
@@ -330,6 +388,9 @@ fn invalid_evidence_fails_closed() {
     let m = fixture();
     let original = artifact(&m);
     let mut a = original.clone();
+    a.observations[0].provider_audit = None;
+    assert!(!report(&m, &a).unwrap().harness_valid);
+    let mut a = original.clone();
     a.observations[0].timing = None;
     assert!(!report(&m, &a).unwrap().harness_valid);
     let mut a = original.clone();
@@ -373,6 +434,48 @@ fn invalid_evidence_fails_closed() {
     let mut a = original;
     a.approvals.clear();
     assert!(!report(&m, &a).unwrap().official_evidence);
+}
+
+#[test]
+fn legacy_unmediated_evidence_is_readable_but_cannot_be_official() {
+    let mut m = fixture();
+    m.provider_budget = None;
+    let mut a = artifact(&m);
+    let rejected = report(&m, &a).unwrap();
+    assert!(!rejected.harness_valid && !rejected.official_evidence);
+    assert!(
+        rejected
+            .errors
+            .iter()
+            .any(|e| e.contains("per-call mediation profile"))
+    );
+    a.offline = true;
+    let diagnostic = report(&m, &a).unwrap();
+    assert!(
+        diagnostic.harness_valid && !diagnostic.official_evidence && !diagnostic.quality_passed
+    );
+}
+
+#[test]
+fn zero_call_official_answers_cannot_impersonate_measured_model_work() {
+    let m = fixture();
+    let mut a = artifact(&m);
+    let observation = &mut a.observations[0];
+    observation.provider_requests = 0;
+    observation.execution_microusd = Some(0);
+    observation.result.token_usage = Some(Default::default());
+    let audit = observation.provider_audit.as_mut().unwrap();
+    audit.calls.clear();
+    audit.tasks.clear();
+    audit.ledger = Ledger::default();
+    let result = report(&m, &a).unwrap();
+    assert!(
+        !result.harness_valid
+            && result
+                .errors
+                .iter()
+                .any(|e| e.contains("no accounted model invocation"))
+    );
 }
 
 #[test]
