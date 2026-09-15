@@ -183,6 +183,38 @@ billing truth. New result receipts are bounded to 2 MiB.
 
 ## Baseline adapter contract
 
+### Executable snapshot owner
+
+`cargo build -p mem-test-support --example r3_snapshot --locked` builds the
+trusted-host JSONL fixture owner. Use **only a disposable PostgreSQL cluster**
+through `MEMORY_LAYER_TEST_DATABASE_URL` and `MEMORY_LAYER_TEST_REQUIRE_DB=1`.
+It runs migrations and creates/drops owned databases and temporary login roles;
+it is not for the dev database, customer instances, or production recovery.
+
+One process accepts bounded requests on stdin:
+
+- `prepare`: a `semantic_time` and `documents` array with `project`, relative
+  `source`, and `text`. The caller must verify these against locked source assets
+  first. Preparation seeds reference records and scoped tokens transactionally,
+  then freezes the database and returns source/version bindings and a fingerprint.
+- `fork`: creates a sealed clone with an independent database login and returns
+  its opaque `id`, `database_url`, project API tokens and fingerprint.
+- `fingerprint` / `release`: act only on an `id` owned by that process.
+- `shutdown` or EOF: cleans up owned readers and the template. Stop owned services
+  first. If the owner is killed or cleanup fails, reconcile its disposable cluster.
+
+Keep stdout private: it contains temporary credentials. Never mount the owner,
+its admin connection or control channel into an execution agent. At most sixteen
+clones can be live. Input is bounded to 1,024 documents and 8 MiB of text. No
+arbitrary SQL, database names or external source paths are accepted by the protocol.
+
+The executable regression launches the actual `memory service run` with a sealed
+clone, isolated configuration/home and no provider credentials; verifies source
+bindings and denied cross-project access; checks unchanged fingerprints; then
+releases and resets clones. It does **not** provide embeddings, representative
+labels, model mediation, container/network isolation or an official campaign.
+The preparation reply explicitly marks this as an offline lexical fixture.
+
 Build `cargo build -p mem-eval --example r3_retriever --locked`. Invoke
 `target/debug/examples/r3_retriever PREPARED_CONFIG.json` with the existing
 external-retriever request JSON on stdin. Lock the executable/configuration in

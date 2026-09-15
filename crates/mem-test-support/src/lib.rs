@@ -153,16 +153,28 @@ impl IsolatedDatabase {
         ))
         .execute(&self.admin)
         .await?;
-        let connections: i64 =
-            sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=$1")
-                .bind(&self.name)
-                .fetch_one(&self.admin)
-                .await?;
-        anyhow::ensure!(
-            connections == 0,
-            "prepared database still has connections; reconcile disposable database {}",
-            self.name
-        );
+        // A background return-to-pool can race the initial close in a
+        // multithreaded owner. Re-drain only our own closed pool while waiting
+        // for PostgreSQL to observe disconnects. Never terminate an independently
+        // held preparation connection.
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            self.pool.close().await;
+            let connections: i64 =
+                sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=$1")
+                    .bind(&self.name)
+                    .fetch_one(&self.admin)
+                    .await?;
+            if connections == 0 {
+                break;
+            }
+            anyhow::ensure!(
+                tokio::time::Instant::now() < deadline,
+                "prepared database still has connections; reconcile disposable database {}",
+                self.name
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
         Ok(FrozenDatabase {
             admin: self.admin,
             name: self.name,

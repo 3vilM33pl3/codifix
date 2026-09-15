@@ -1,5 +1,23 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 executable snapshot owner and foreground service
+
+- Added a bounded trusted-host JSONL owner for synthetic source preparation,
+  sealed clones, fingerprint verification, release and shutdown. It returns
+  exact source/version bindings and temporary scoped credentials, never accepts
+  arbitrary SQL/database names, and requires the explicit test database profile.
+- Real executable tests prepare two projects, launch `memory service run` with
+  a sealed clone and isolated configuration/home, verify bindings and denied
+  cross-project queries, preserve fingerprints, reset readers and clean up.
+  Invalid operations and source paths fail before database access. Both pass.
+- The multithreaded executable exposed a close/return-to-pool race not seen in
+  earlier single-threaded unit tests. Freeze now re-drains only its own pool for
+  a bounded interval; the independent-preparer test still blocks freezing and
+  leaves that connection alive. Five required-database support tests and scoped
+  all-target Clippy passed. CI now requires the snapshot/service executable test.
+- This helper seeds an offline lexical fixture only: no embeddings, complete
+  campaign driver, model mediation or official quality evidence is implied.
+
 ## 2026-09-15 sealed HTTP authentication and current regression evidence
 
 - A new real HTTP regression reproduced a 500 on the initial scoped-token

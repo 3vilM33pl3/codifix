@@ -224,7 +224,7 @@ jobs:
     name: DB Integration
     runs-on: [self-hosted, memory, Linux, X64]
     needs: changes
-    if: needs.changes.outputs.db == 'true'
+    if: needs.changes.outputs.db == 'true' || needs.changes.outputs.evals == 'true'
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -255,6 +255,11 @@ jobs:
           RUST_TEST_THREADS: 8
       - run: cargo build -p mem-cli --bin memory --locked
       - run: node scripts/r1-process-smoke.mjs
+      - name: Verify R3 snapshot owner and foreground service
+        run: |
+          cargo build -p mem-test-support --example r3_snapshot --locked
+          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_REQUIRE_SNAPSHOT=1 \
+            node --test evals/r3/snapshot.test.mjs
 
 
   feature-matrix:

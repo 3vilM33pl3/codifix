@@ -3182,6 +3182,9 @@ name = "mem-test-support"
 version = "2.0.0"
 dependencies = [
  "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
  "sha2",
  "sqlx",
  "tokio",
