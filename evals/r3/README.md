@@ -42,7 +42,10 @@ tests complete embedding profiles and version-bound index coverage. The twelfth,
 [certificate chain](representative/held-out/certificate-chain/review.md), separates
 missing issuers from expiry and cached-client success. The thirteenth,
 [token audience](representative/held-out/token-audience/review.md), covers exact
-resource scope and membership checks after token issuance; twelve remain.
+resource scope and membership checks after token issuance. The next two,
+[stream framing](representative/held-out/stream-framing/review.md) and
+[traffic draining](representative/held-out/traffic-drain/review.md), cover byte
+boundaries and accepted-work lifecycle respectively; ten families remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:

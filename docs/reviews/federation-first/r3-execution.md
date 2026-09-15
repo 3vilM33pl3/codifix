@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out stream and drain knowledge families
+
+- Added ten sources and eight draft questions for byte framing/UTF-8 boundaries,
+  explicit failed-feed semantics, local admission gates, active streams and
+  uncertain provider outcomes. All observations are synthetic.
+- Canonical rubric and four pack/CLI checks pass without skips. Sixty held-out
+  questions and seven coding repositories are materialized; ten knowledge families
+  and five coding repositories remain. Held-out labels remain unapproved.
+
 ## 2026-09-15 held-out trust-boundary knowledge families
 
 - Added certificate-chain and token-audience families: ten synthetic sources and
