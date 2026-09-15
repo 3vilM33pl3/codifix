@@ -1,5 +1,15 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out identifier-catalog repository
+
+- Added a five-module catalog with an explicit small normalization table, distinct
+  display/key identity, collision-safe insertion/rename and released ownership.
+  Ten hidden probes do not assume full Unicode normalization or authentication.
+- Two public tests, the targeted required reference/cumulative/broken-control
+  group and four pack/CLI tests pass without skips. All four earlier held-out
+  repository groups also pass together (`/tmp/r3-held-out-four-repositories.log`).
+  Five of twelve held-out repositories exist; labels remain draft.
+
 ## 2026-09-15 held-out archive-expansion knowledge family
 
 - Added five synthetic sources and four draft rubrics on observed expansion,
