@@ -15,10 +15,26 @@ That makes comparisons reproducible and easy to attach to release notes.
 
 Offline campaign runs retain `dispatch-budget.jsonl`: a durable reservation
 before each driver launch and a settlement only after valid evidence is received.
-An interrupted or invalid dispatch remains unresolved. `ledger.json` retains
-conservative maximum allowances, not actual measured usage. Keep both with the
-campaign evidence; neither permits automatic retry. Multi-request provider
-mediation and paid execution remain unavailable.
+An interrupted or invalid dispatch remains unresolved. `ledger.json` reports
+confirmed execution usage plus unresolved reservations; it releases unused
+allowances only after verified settlement. Keep it with the durable journal.
+Per-call mediation is available for offline verification; paid execution remains
+disabled.
+
+An explicit `preparation_budget` allocates part of the global request, token and
+spend limits to a separate preparation phase. The driver receives
+`phase: "preparation"`, a bounded private provider-journal contract and a receipt
+output path. Preparation must return the sealed snapshot hash and its complete
+provider audit. The runner verifies the actual journal/results before issuing
+task budgets, deducts confirmed preparation usage, and requires each task to use
+that snapshot. Reports list preparation separately while enforcing combined
+campaign limits. The locked manifest is never rewritten to represent the remainder.
+
+Preparation resume requires its persisted acceptance receipt and unchanged
+journal/results. Interrupted preparation does not automatically run again;
+inspect retained evidence before deciding how to reconcile it. Older offline
+artifacts without this contract remain readable but cannot become official R3
+evidence.
 
 `memory eval campaign plan --manifest <campaign.json> [--split development|held-out]`
 validates asset hashes, suite items, split sizes and deterministic condition
@@ -34,7 +50,8 @@ files must use the existing `compare`/`report` commands instead.
 --out <new-directory>` is an integration interface for a reviewed isolation driver
 whose bytes are a locked configuration asset. A representative synthetic offline
 controller is available through `evals/r3/rehearse.mjs`; provider-backed execution
-is disabled pending per-request mediation and full isolation verification.
+is disabled pending the complete approval-gated live driver and verified provider
+configuration.
 It does not use the CLI's ambient service or provider credentials. Output paths
 must be new; interrupted evidence is retained, never overwritten or blindly retried.
 To recover, repeat the same command with `--resume` and the original `--out`.

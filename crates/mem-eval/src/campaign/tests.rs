@@ -502,6 +502,63 @@ fn preparation_metadata_is_required_for_official_evidence_and_binds_snapshot_and
 }
 
 #[test]
+fn preparation_and_execution_share_request_token_and_spend_caps() {
+    let with_preparation = |m: &Manifest| {
+        let mut a = artifact(m);
+        let mut audit = a.observations[0].provider_audit.clone().unwrap();
+        let usage = audit.tasks.values().next().unwrap().clone();
+        audit.tasks = [("preparation".into(), usage)].into();
+        for call in &mut audit.calls {
+            call.task_id = "preparation".into();
+            call.allowance = call.usage;
+        }
+        audit.limits = m.preparation_budget.clone().unwrap();
+        audit.task_limits = audit.limits.clone();
+        a.preparation_microusd = Some(audit.ledger.microusd);
+        a.preparation_receipt.as_mut().unwrap().audit = audit;
+        a
+    };
+    let m = fixture();
+    let a = with_preparation(&m);
+    assert!(report(&m, &a).unwrap().execution_valid);
+    let prep = &a.preparation_receipt.as_ref().unwrap().audit.ledger;
+    let requests = a
+        .observations
+        .iter()
+        .map(|o| o.provider_requests)
+        .sum::<u64>()
+        + prep.requests;
+    let tokens = a
+        .observations
+        .iter()
+        .map(|o| o.result.token_usage.as_ref().unwrap().total_tokens)
+        .sum::<u64>()
+        + prep.tokens;
+    let cost = a
+        .observations
+        .iter()
+        .map(|o| o.execution_microusd.unwrap())
+        .sum::<u64>()
+        + prep.microusd;
+    for dimension in 0..3 {
+        let mut m = fixture();
+        match dimension {
+            0 => m.limits.requests = requests - 1,
+            1 => m.limits.tokens = tokens - 1,
+            _ => m.limits.microusd = cost - 1,
+        }
+        let result = report(&m, &with_preparation(&m)).unwrap();
+        assert!(!result.execution_valid);
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e == "campaign limits exceeded")
+        );
+    }
+}
+
+#[test]
 fn zero_call_official_answers_cannot_impersonate_measured_model_work() {
     let m = fixture();
     let mut a = artifact(&m);

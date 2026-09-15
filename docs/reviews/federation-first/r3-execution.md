@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 preparation identity and failure regression checks
+
+- The first integrated preparation run stopped safely after one task: using a
+  reduced-budget manifest for validation changed its identity and failed the
+  knowledge-review binding. Retained failed evidence is at
+  `/data/tmp/memory-r3-rehearsal-cli-WAkQkk`; it is not a completed campaign.
+- Fixed execution to carry remaining limits separately from the immutable
+  manifest. Added an explicit identity assertion at the task boundary.
+- All eight CLI campaign tests pass, including process death immediately after
+  a preparation reservation, changed receipt rejection, no automatic preparation
+  restart and exhaustion of the shared request allowance. Core campaign tests
+  pass (50), including combined preparation/execution request, token and spend
+  limits. A fresh integrated rehearsal is running against the corrected driver.
+
 ## 2026-09-15 global preparation allocation and receipt phase
 
 - Added an optional canonical-compatible `preparation_budget` manifest contract

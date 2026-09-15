@@ -268,7 +268,7 @@ async fn execute(
     ledger: &mut Ledger,
     artifact: &mut Artifact,
 ) -> Result<()> {
-    let mut execution_manifest = manifest.clone();
+    let mut execution_limits = manifest.limits.clone();
     if let Some(allocated) = &manifest.preparation_budget {
         let receipt = preparation::run(
             manifest_path,
@@ -281,14 +281,14 @@ async fn execute(
             resume,
         )
         .await?;
-        execution_manifest.limits =
+        execution_limits =
             receipt.execution_limits(&manifest.limits, allocated, &plan.manifest_sha256)?;
         artifact.preparation_microusd = Some(receipt.audit.ledger.microusd);
         artifact.preparation_receipt = Some(receipt);
     }
     execute_tasks(
         manifest_path,
-        &execution_manifest,
+        manifest,
         driver,
         driver_hash,
         out,
@@ -297,6 +297,7 @@ async fn execute(
         resume,
         ledger,
         artifact,
+        &execution_limits,
     )
     .await
 }
@@ -313,9 +314,14 @@ async fn execute_tasks(
     resume: bool,
     ledger: &mut Ledger,
     artifact: &mut Artifact,
+    execution_limits: &c::Limits,
 ) -> Result<()> {
     // Reserve a whole task here; per-call mediation is nested inside this cap.
     // Never expose this campaign-level journal owner to agents.
+    ensure!(
+        c::digest_value(manifest)? == plan.manifest_sha256,
+        "execution must preserve the locked campaign manifest"
+    );
     let open_budget = if resume {
         RequestBudget::resume_scoped
     } else {
@@ -324,7 +330,7 @@ async fn execute_tasks(
     let mut dispatch_budget = open_budget(
         &out.join("dispatch-budget.jsonl"),
         &plan.manifest_sha256,
-        manifest.limits.clone(),
+        execution_limits.clone(),
         c::Limits {
             requests: 1,
             tokens: manifest
@@ -354,6 +360,11 @@ async fn execute_tasks(
     // pending request without a complete receipt remains ambiguous, even offline.
     // Keep the original journal locked for the entire resumed execution.
     *ledger = dispatch_budget.ledger().clone();
+    let preparation_requests = manifest
+        .limits
+        .requests
+        .checked_sub(execution_limits.requests)
+        .context("preparation request accounting")?;
     let recovered = recover_dispatches(
         manifest_path,
         manifest,
@@ -363,9 +374,10 @@ async fn execute_tasks(
         offline,
         &mut dispatch_budget,
         &dispatch_results,
+        preparation_requests,
     )?;
     *ledger = dispatch_budget.ledger().clone();
-    let mut provider_requests = 0u64;
+    let mut provider_requests = preparation_requests;
     for (index, work) in plan.work.iter().enumerate() {
         // Aggregate per-task token ceiling. Driver must enforce this across all
         // its provider requests; reservations remain charged after uncertain exit.
@@ -402,7 +414,7 @@ async fn execute_tasks(
         // durable owner. Do not charge the recovered prefix a second time or
         // retain settled worst-case tokens in this reporting/preflight ledger.
         *ledger = dispatch_budget.ledger().clone();
-        ledger.reserve(&manifest.limits, tokens, cost)?;
+        ledger.reserve(execution_limits, tokens, cost)?;
         verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
         let dir = out.join(format!("work-{index:05}"));
         std::fs::create_dir(&dir)?;
@@ -571,6 +583,7 @@ fn recover_dispatches(
     offline: bool,
     budget: &mut RequestBudget,
     results: &ProviderResults,
+    preparation_requests: u64,
 ) -> Result<Vec<Observation>> {
     verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
     let ids: Vec<String> = budget
@@ -593,7 +606,7 @@ fn recover_dispatches(
         allowance.microusd = 0;
     }
     let mut recovered = vec![];
-    let mut provider_requests = 0u64;
+    let mut provider_requests = preparation_requests;
     for (index, id) in ids.iter().enumerate() {
         ensure!(
             *id == format!("work-{index:05}"),

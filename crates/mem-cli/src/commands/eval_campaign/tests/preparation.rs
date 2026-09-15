@@ -20,6 +20,21 @@ fn driver_child() {
     .unwrap();
     let results = ProviderResults::create(&directory.join("results")).unwrap();
     let preparing = request["phase"] == "preparation";
+    if preparing && Path::new("../../interrupt-preparation").exists() {
+        budget
+            .reserve_for_task(
+                "preparation",
+                "interrupted",
+                &c::digest(b"fake-input"),
+                Allowance {
+                    input_tokens: 10,
+                    output_tokens: 0,
+                    microusd: 0,
+                },
+            )
+            .unwrap();
+        std::process::exit(17);
+    }
     let usage = Allowance {
         input_tokens: 5,
         output_tokens: if preparing { 0 } else { 5 },
@@ -227,4 +242,74 @@ async fn preparation_is_budgeted_before_tasks_and_verified_without_rerunning_on_
         .is_err()
     );
     assert_eq!(std::fs::read(out.join("phase-count")).unwrap(), b"ptt");
+    // A syntactically valid changed receipt is not a replacement for acceptance.
+    std::fs::rename(
+        out.join("preparation/accepted.saved"),
+        out.join("preparation/accepted.json"),
+    )
+    .unwrap();
+    let receipt_path = out.join("preparation/receipt.json");
+    let mut receipt: c::preparation::PreparationReceipt = bounded_json(&receipt_path).unwrap();
+    receipt.snapshot_sha256 = c::digest(b"changed");
+    std::fs::write(&receipt_path, serde_json::to_vec(&receipt).unwrap()).unwrap();
+    assert!(
+        execute(
+            &manifest_path,
+            &manifest,
+            &driver,
+            &driver_hash,
+            &out,
+            &plan,
+            true,
+            true,
+            &mut ledger,
+            &mut artifact
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(std::fs::read(out.join("phase-count")).unwrap(), b"ptt");
+
+    // Process death after the durable reservation cannot dispatch a first task
+    // or turn explicit resume into an automatic repeated preparation call.
+    std::fs::write(root.0.join("interrupt-preparation"), b"synthetic").unwrap();
+    let interrupted = root.0.join("interrupted");
+    std::fs::create_dir(&interrupted).unwrap();
+    artifact.preparation_receipt = None;
+    assert!(
+        execute(
+            &manifest_path,
+            &manifest,
+            &driver,
+            &driver_hash,
+            &interrupted,
+            &plan,
+            true,
+            false,
+            &mut ledger,
+            &mut artifact
+        )
+        .await
+        .is_err()
+    );
+    assert!(!interrupted.join("work-00000").exists());
+    let journal = interrupted.join("preparation/provider/budget.jsonl");
+    let bytes = std::fs::read(&journal).unwrap();
+    assert!(
+        execute(
+            &manifest_path,
+            &manifest,
+            &driver,
+            &driver_hash,
+            &interrupted,
+            &plan,
+            true,
+            true,
+            &mut ledger,
+            &mut artifact
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(std::fs::read(journal).unwrap(), bytes);
 }
