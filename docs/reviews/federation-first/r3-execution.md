@@ -1,5 +1,15 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 configuration rollout coding family
+
+- Assigned and materialized the third development repository: five modules,
+  two ordinary public tests and ten hidden black-box probes across three stages.
+  Covers overlay precedence, sticky deletion, optimistic revisions, validation
+  and an atomic in-process reload test double. It is not infrastructure rollback.
+- All four representative test groups passed with required Rust containers and
+  zero skips: reference/cumulative execution passes, buggy/no-op controls fail.
+  The two public Cargo tests passed. Labels remain draft; no held-out claim.
+
 ## 2026-09-15 complete condition diagnostics
 
 - Reports now expose raw task/execution counts, successes, critical failures,

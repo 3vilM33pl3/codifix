@@ -34,6 +34,11 @@ version-scoped correction attribution, revocation and request replay. Its refere
 passes while the buggy starter and no-op controls fail. Both families are draft
 development benchmarks, not held-out approval or a complete representative suite.
 
+The third coding family is [configuration rollout](representative/development/configuration-rollout/review.md):
+five modules, two public tests and ten private probes across overlay precedence,
+deletion/revision semantics and atomic in-process reload. Its reference and
+cumulative sequence pass; the buggy starter and no-op controls fail each stage.
+
 ```sh
 node evals/r3/build-review-pack.mjs target/memory-evals/r3-review
 node evals/r3/verify-review-pack.mjs target/memory-evals/r3-review

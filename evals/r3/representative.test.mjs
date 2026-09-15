@@ -53,6 +53,32 @@ test('representative evidence publication: reviewed bytes, correction ownership 
   }
 });
 
+test('representative configuration rollout: overlays, deletions and atomic reload', { skip: !image, timeout: 120000 }, async () => {
+  const root = new URL('./representative/development/configuration-rollout/', import.meta.url);
+  const files = {};
+  for (const name of ['main', 'input', 'schema', 'merge', 'service']) {
+    files[`src/${name}.rs`] = await fs.readFile(new URL(`public/src/${name}.rs`, root), 'utf8');
+  }
+  const steps = JSON.parse(await fs.readFile(new URL('private/steps.json', root), 'utf8'));
+  assert.equal(steps.length, 3);
+  assert.equal(new Set(steps.flatMap(s => s.probes.map(p => p.id))).size, 10);
+  const reference = { ...files };
+  for (const name of ['merge', 'service']) reference[`src/${name}.rs`] = await fs.readFile(new URL(`private/${name}.rs`, root), 'utf8');
+  assert.equal((await gradeRustCase({ image, files: reference, probes: steps.flatMap(s => s.probes) })).success, true);
+  const sequence = await runOfflineSequence({ image, initialFiles: files, submissionPaths: Object.keys(files), timeoutMs: 30000,
+    steps: steps.map((step, index) => ({ id: step.id,
+      argv: ['/usr/local/bin/node', '-e', index === 0
+        ? ['merge', 'service'].map(name => `require('fs').writeFileSync('src/${name}.rs',${JSON.stringify(reference[`src/${name}.rs`])})`).join(';') : ''],
+      grader: { kind: 'rust-blackbox', probes: steps.slice(0, index + 1).flatMap(s => s.probes) },
+    })),
+  });
+  assert.equal(sequence.success, true);
+  for (const step of steps) {
+    assert.equal((await gradeRustCase({ image, files, probes: step.probes })).success, false, step.id);
+    assert.equal((await gradeRustCase({ image, files: { 'src/main.rs': 'fn main() {}' }, probes: step.probes })).success, false);
+  }
+});
+
 test('representative importer: executable reference and broken controls', { skip: !image, timeout: 120000 }, async () => {
   const { files, steps } = await fixture();
   const reference = { ...files, 'src/replay.rs': await fs.readFile(new URL('private/replay.rs', root), 'utf8') };

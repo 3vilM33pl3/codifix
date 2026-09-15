@@ -94,6 +94,11 @@ authorized positive cases. No signatures, real PDS or paid provider is required.
 
 ## Expansion and validation contract
 
+The configuration-rollout family is assigned to development before its fixture
+is evaluated: overlay precedence, explicit deletion and revision-safe atomic
+reload. It must not also appear as a renamed held-out family. Its runtime and
+failure injection are deterministic test doubles, not a real deployment.
+
 These four examples define the difficulty and evidence structure, not the final
 held-out allocation. Expand to 10 development/25 held-out knowledge scenarios and
 4 development/12 held-out repository sequences using genuinely distinct failure
