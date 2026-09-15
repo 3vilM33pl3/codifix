@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out field-matching and trace-link families
+
+- Added ten sources and eight draft questions on field/token boundaries,
+  authorization-before-limits, immutable async carriers and sampled telemetry
+  versus durable business receipts. No retrieval tuning or telemetry changed.
+- Canonical rubric and four pack/CLI checks pass without skips. Ninety-two held-out
+  questions and seven coding repositories exist; two knowledge families and five
+  coding repositories remain. Labels remain draft and outside calibration.
+
 ## 2026-09-15 held-out persistence and null-filter families
 
 - Added ten sources and eight draft questions on rename/flush confirmations,

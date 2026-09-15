@@ -54,7 +54,10 @@ whole-group budgets and deterministic folds from misleading proxies.
 wait-cycle and complete-size reasoning.
 [Rename durability](representative/held-out/rename-durability/review.md) and
 [null-aware filtering](representative/held-out/null-filter/review.md) distinguish
-confirmed persistence and scoped absence from misleading success; four remain.
+confirmed persistence and scoped absence from misleading success.
+[Field/token boundaries](representative/held-out/token-boundary/review.md) and
+[asynchronous trace links](representative/held-out/trace-link/review.md) add scoped
+matching and diagnostic attribution; two knowledge families remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
