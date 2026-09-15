@@ -182,6 +182,27 @@ impl ProviderResults {
 
     /// No provider is called here. A complete durable result from the interrupted
     /// dispatcher can settle its reservation; absence/corruption cannot refund it.
+    pub fn recover_matching(
+        &self,
+        budget: &mut RequestBudget,
+        task_id: &str,
+        request_id: &str,
+        payload_sha256: &str,
+        allowance: Allowance,
+    ) -> Result<Value> {
+        let saved = budget
+            .saved_request(request_id)
+            .context("unknown provider request")?;
+        ensure!(
+            saved.task_id == Some(task_id)
+                && saved.payload_sha256 == payload_sha256
+                && saved.allowance == allowance,
+            "recovery request binding mismatch"
+        );
+        self.recover(budget, request_id)
+    }
+
+    /// Recover a previously reserved identity without invoking its provider.
     pub fn recover(&self, budget: &mut RequestBudget, request_id: &str) -> Result<Value> {
         let saved = budget
             .saved_request(request_id)

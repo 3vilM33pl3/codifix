@@ -166,8 +166,17 @@ without making a call; it cannot refund a missing result or infer provider usage
 
 The existing offline campaign dispatcher now persists validated observations in
 `dispatch-results/` before settling its scoped reservation. This is durable
-driver-result recovery, not yet resuming an entire campaign or mediating every
-internal provider call. The single-request restriction and paid-run block remain.
+driver-result recovery. Explicit `campaign run --resume` reopens the same `--out`
+and holds its budget journal lock throughout recovery and new dispatches. It
+validates the entire saved prefix first, reuses complete receipts (including a
+crash before settlement), and starts only previously unreserved tasks. Changed
+inputs, gaps, missing results or ambiguous attempts stop before new dispatch.
+The original start/plan and earlier reports remain intact; a new `resume-UUID/`
+directory holds the reconstructed artifact, ledger and report. Keep the output
+at its original absolute path because request identities bind that path.
+An orphan pre-reservation work directory currently requires operator inspection;
+it is never overwritten. This does not mediate every internal provider call.
+The single-request restriction and paid-run block remain.
 Keep result files outside agent mounts and protect the trusted host from other
 writers. Local receipts establish persistence, not provider authentication or
 billing truth. New result receipts are bounded to 2 MiB.
@@ -262,7 +271,8 @@ Pending human judgments no longer abort otherwise valid task execution. The run
 retains pending evidence and completes remaining work; its final report still
 fails closed until judgments are resolved. Campaign review validates all other
 execution evidence first and cannot repair an interrupted campaign, missing
-usage or failed isolation. Resume of interrupted execution remains separate.
+usage or failed isolation. Use explicit execution resume first if it is safe;
+review cannot resolve an uncertain provider attempt.
 Test ballots are explicitly synthetic and confer no benchmark label approval
 or product-quality evidence.
 

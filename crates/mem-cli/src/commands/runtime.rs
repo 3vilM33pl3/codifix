@@ -2441,6 +2441,10 @@ pub(in crate::commands) enum EvalCampaignCommand {
         /// Fake-provider harness evidence only; never product-quality evidence.
         #[arg(long)]
         offline: bool,
+        /// Explicitly recover durable results in --out and dispatch only unstarted work.
+        /// Ambiguous attempts stop recovery; no automatic provider retry.
+        #[arg(long)]
+        resume: bool,
         /// Separate human-authored label and spend approvals bound to this manifest.
         #[arg(long = "approval")]
         approvals: Vec<PathBuf>,

@@ -264,6 +264,11 @@ impl RequestBudget {
         self.tasks.get(id)
     }
 
+    /// Metadata-only identities for explicit host recovery. Never a retry grant.
+    pub fn request_ids(&self) -> Vec<&str> {
+        self.requests.keys().map(String::as_str).collect()
+    }
+
     /// These requests may already have incurred their entire reserved charge.
     /// No automatic retry or new dispatch is permitted until reconciliation.
     pub fn uncertain_ids(&self) -> Vec<&str> {

@@ -36,6 +36,12 @@ whose bytes are a locked configuration asset. No complete driver is shipped yet;
 paid execution is disabled pending per-request mediation and isolation tests.
 It does not use the CLI's ambient service or provider credentials. Output paths
 must be new; interrupted evidence is retained, never overwritten or blindly retried.
+To recover, repeat the same command with `--resume` and the original `--out`.
+The runner locks and validates the saved dispatch journal, reuses durable results,
+and starts only unreserved work. Missing/invalid receipts stop before new work;
+they are not permission to retry an ambiguous provider call. Recovery writes new
+reports under `--out/resume-UUID/`, preserving earlier artifacts. Do not move the
+run directory: saved request identities bind its absolute path.
 The runner revalidates the locked manifest and assets after every driver exit,
 including the final task. Changed inputs, model/build mismatches, skipped or
 unbacked pending results, inconsistent token usage and uncertain charges stop further

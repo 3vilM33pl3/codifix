@@ -126,6 +126,7 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
             split: requested,
             allow_shell,
             offline,
+            resume,
             approvals,
         } => {
             // Fail before dispatch until the multi-request provider budget proxy
@@ -161,14 +162,22 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
                         && root.join(&a.path).canonicalize().ok().as_ref() == Some(&driver)),
                 "driver is not a locked campaign configuration asset"
             );
-            ensure!(
-                !out.exists(),
-                "output already exists; inspect interrupted evidence, never overwrite or blindly replay"
-            );
-            std::fs::create_dir_all(&out)?;
+            if !resume {
+                ensure!(
+                    !out.exists(),
+                    "output already exists; use explicit --resume after inspecting interrupted evidence"
+                );
+                let mut builder = std::fs::DirBuilder::new();
+                builder.recursive(true);
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::DirBuilderExt;
+                    builder.mode(0o700);
+                }
+                builder.create(&out)?;
+            }
             let out = out.canonicalize()?;
             let plan = manifest.plan(requested)?;
-            exclusive_json(&out.join("plan.json"), &plan)?;
             let mut artifact = Artifact {
                 manifest_sha256: plan.manifest_sha256.clone(),
                 split: requested,
@@ -178,7 +187,22 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
                 approvals,
                 observations: vec![],
             };
-            exclusive_json(&out.join("started.json"), &artifact)?;
+            let evidence_out = if resume {
+                let original: Artifact = bounded_json(&out.join("started.json"))?;
+                let original_plan: c::Plan = bounded_json(&out.join("plan.json"))?;
+                ensure!(
+                    c::digest_value(&original)? == c::digest_value(&artifact)?
+                        && c::digest_value(&original_plan)? == c::digest_value(&plan)?,
+                    "resume campaign/start identity mismatch"
+                );
+                let evidence_out = out.join(format!("resume-{}", uuid::Uuid::new_v4()));
+                std::fs::create_dir(&evidence_out)?;
+                evidence_out
+            } else {
+                exclusive_json(&out.join("plan.json"), &plan)?;
+                exclusive_json(&out.join("started.json"), &artifact)?;
+                out.clone()
+            };
             let mut ledger = Ledger::default();
             let execution = execute(
                 &manifest_path,
@@ -188,21 +212,23 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
                 &out,
                 &plan,
                 offline,
+                resume,
                 &mut ledger,
                 &mut artifact,
             )
             .await;
             artifact.completed = execution.is_ok();
-            exclusive_json(&out.join("artifact.json"), &artifact)?;
-            exclusive_json(&out.join("ledger.json"), &ledger)?;
+            exclusive_json(&evidence_out.join("artifact.json"), &artifact)?;
+            exclusive_json(&evidence_out.join("ledger.json"), &ledger)?;
             if let Err(error) = execution {
                 anyhow::bail!(
                     "campaign interrupted; reservations may include uncertain provider charges; evidence at {}: {error:#}",
-                    out.display()
+                    evidence_out.display()
                 );
             }
             let report = c::report(&manifest, &artifact)?;
-            exclusive_json(&out.join("report.json"), &report)?;
+            exclusive_json(&evidence_out.join("report.json"), &report)?;
+            eprintln!("Campaign evidence: {}", evidence_out.display());
             println!("{}", serde_json::to_string_pretty(&report)?);
             ensure!(
                 report.harness_valid,
@@ -235,12 +261,18 @@ async fn execute(
     out: &Path,
     plan: &c::Plan,
     offline: bool,
+    resume: bool,
     ledger: &mut Ledger,
     artifact: &mut Artifact,
 ) -> Result<()> {
     // One conservative reservation per driver dispatch while multi-request
     // provider mediation remains unavailable. Never expose this owner to agents.
-    let mut dispatch_budget = RequestBudget::create_scoped(
+    let open_budget = if resume {
+        RequestBudget::resume_scoped
+    } else {
+        RequestBudget::create_scoped
+    };
+    let mut dispatch_budget = open_budget(
         &out.join("dispatch-budget.jsonl"),
         &plan.manifest_sha256,
         manifest.limits.clone(),
@@ -264,9 +296,25 @@ async fn execute(
             task_seconds: manifest.limits.task_seconds,
         },
     )?;
-    let dispatch_results = ProviderResults::create(&out.join("dispatch-results"))?;
+    let dispatch_results = if resume {
+        ProviderResults::open(&out.join("dispatch-results"))?
+    } else {
+        ProviderResults::create(&out.join("dispatch-results"))?
+    };
+    // Recover the entire reserved prefix before dispatching anything new. A
+    // pending request without a complete receipt remains ambiguous, even offline.
+    // Keep the original journal locked for the entire resumed execution.
+    let recovered = recover_dispatches(
+        manifest_path,
+        manifest,
+        driver_hash,
+        out,
+        plan,
+        offline,
+        &mut dispatch_budget,
+        &dispatch_results,
+    )?;
     for (index, work) in plan.work.iter().enumerate() {
-        verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
         // Aggregate per-task token ceiling. Driver must enforce this across all
         // its provider requests; reservations remain charged after uncertain exit.
         let tokens = manifest
@@ -281,13 +329,21 @@ async fn execute(
         )?;
         let cost = if offline { 0 } else { priced.microusd };
         ledger.reserve(&manifest.limits, tokens, cost)?;
+        if let Some(observation) = recovered.get(index) {
+            if index == 0 {
+                artifact.preparation_microusd = Some(bounded_json(
+                    &out.join("work-00000/preparation-microusd.json"),
+                )?);
+            }
+            artifact.observations.push(observation.clone());
+            continue;
+        }
+        verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
         let dir = out.join(format!("work-{index:05}"));
         std::fs::create_dir(&dir)?;
         std::fs::create_dir(dir.join("home"))?;
         exclusive_json(&dir.join("reservation.json"), ledger)?;
-        let request = serde_json::json!({"version":1,"manifest":manifest_path,"manifest_sha256":plan.manifest_sha256,
-            "work":work,"offline":offline,"maximum_tokens":tokens,"maximum_microusd":cost,
-            "response":dir.join("observation.json")});
+        let request = dispatch_request(manifest_path, plan, work, &dir, offline, tokens, cost);
         exclusive_json(&dir.join("request.json"), &request)?;
         let dispatch_id = format!("work-{index:05}");
         let request_hash = c::digest_value(&request)?;
@@ -400,7 +456,106 @@ async fn execute(
         )?;
         artifact.observations.push(observation);
     }
+    verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
     Ok(())
+}
+
+fn dispatch_request(
+    manifest_path: &Path,
+    plan: &c::Plan,
+    work: &c::Work,
+    dir: &Path,
+    offline: bool,
+    tokens: u64,
+    cost: u64,
+) -> serde_json::Value {
+    serde_json::json!({"version":1,"manifest":manifest_path,"manifest_sha256":plan.manifest_sha256,
+        "work":work,"offline":offline,"maximum_tokens":tokens,"maximum_microusd":cost,
+        "response":dir.join("observation.json")})
+}
+
+#[allow(clippy::too_many_arguments)]
+fn recover_dispatches(
+    manifest_path: &Path,
+    manifest: &Manifest,
+    driver_hash: &str,
+    out: &Path,
+    plan: &c::Plan,
+    offline: bool,
+    budget: &mut RequestBudget,
+    results: &ProviderResults,
+) -> Result<Vec<Observation>> {
+    verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
+    let ids: Vec<String> = budget
+        .request_ids()
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    ensure!(ids.len() <= plan.work.len(), "unexpected saved dispatches");
+    let tokens = manifest
+        .model
+        .max_input_tokens
+        .checked_add(manifest.model.max_output_tokens)
+        .context("token bound overflow")?;
+    let mut allowance = Allowance::for_model(
+        &manifest.model,
+        manifest.model.max_input_tokens,
+        manifest.model.max_output_tokens,
+    )?;
+    if offline {
+        allowance.microusd = 0;
+    }
+    let mut recovered = vec![];
+    for (index, id) in ids.iter().enumerate() {
+        ensure!(
+            *id == format!("work-{index:05}"),
+            "saved dispatch prefix has gaps"
+        );
+        let work = &plan.work[index];
+        let dir = out.join(id);
+        let expected = dispatch_request(
+            manifest_path,
+            plan,
+            work,
+            &dir,
+            offline,
+            tokens,
+            allowance.microusd,
+        );
+        let saved: serde_json::Value = bounded_json(&dir.join("request.json"))?;
+        ensure!(saved == expected, "saved dispatch request changed");
+        let observation: Observation = serde_json::from_value(
+            results
+                .recover_matching(budget, id, id, &c::digest_value(&expected)?, allowance)
+                .context("saved dispatch is ambiguous or invalid; no new work started")?,
+        )?;
+        validate_task_evidence(manifest, work, &observation, recovered.first())?;
+        ensure!(
+            observation.isolation.driver_sha256 == driver_hash,
+            "saved driver mismatch"
+        );
+        ensure!(
+            observation.provider_requests <= 1,
+            "saved multi-request evidence unsupported"
+        );
+        let usage = observation
+            .result
+            .token_usage
+            .as_ref()
+            .context("saved usage missing")?;
+        ensure!(
+            usage.total_tokens <= tokens
+                && observation
+                    .execution_microusd
+                    .is_some_and(|cost| cost <= allowance.microusd),
+            "saved observation exceeds allowance"
+        );
+        recovered.push(observation);
+    }
+    if !recovered.is_empty() {
+        let _: u64 = bounded_json(&out.join("work-00000/preparation-microusd.json"))?;
+    }
+    Ok(recovered)
 }
 
 fn verify_campaign_inputs(path: &Path, expected_hash: &str) -> Result<()> {

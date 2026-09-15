@@ -10,6 +10,7 @@ async fn paid_dispatch_is_rejected_before_reading_files_or_starting_processes() 
         split: "held-out".into(),
         allow_shell: true,
         offline: false,
+        resume: false,
         approvals: vec![],
     })
     .await
@@ -30,6 +31,7 @@ async fn offline_driver_requires_explicit_shell_consent() {
         split: "development".into(),
         allow_shell: false,
         offline: true,
+        resume: false,
         approvals: vec![],
     })
     .await
@@ -255,7 +257,7 @@ async fn driver_dispatch_settles_only_valid_evidence_and_preserves_uncertainty()
         let driver = root.0.join("driver.sh");
         std::fs::write(
             &driver,
-            format!("#!/bin/sh\nset -eu\ngrep -q reserved ../dispatch-budget.jsonl\n{command}\n"),
+            format!("#!/bin/sh\nset -eu\ngrep -q reserved ../dispatch-budget.jsonl\nprintf x >> ../dispatch-count\n{command}\n"),
         )
         .unwrap();
         std::fs::set_permissions(&driver, std::fs::Permissions::from_mode(0o700)).unwrap();
@@ -313,6 +315,7 @@ async fn driver_dispatch_settles_only_valid_evidence_and_preserves_uncertainty()
             &out,
             &plan,
             true,
+            false,
             &mut ledger,
             &mut artifact,
         )
@@ -354,6 +357,165 @@ async fn driver_dispatch_settles_only_valid_evidence_and_preserves_uncertainty()
         } else {
             assert_eq!(budget.uncertain_ids(), ["work-00000"]);
             assert_eq!(budget.ledger().tokens, 200);
+        }
+        // An owning process excludes a second resume, even for settled output.
+        let mut resumed_artifact = artifact.clone();
+        resumed_artifact.observations.clear();
+        let mut resumed_ledger = Ledger::default();
+        assert!(
+            execute(
+                &path,
+                &manifest,
+                &driver,
+                &driver_hash,
+                &out,
+                &plan,
+                true,
+                true,
+                &mut resumed_ledger,
+                &mut resumed_artifact
+            )
+            .await
+            .is_err()
+        );
+        drop(budget);
+        let resumed = execute(
+            &path,
+            &manifest,
+            &driver,
+            &driver_hash,
+            &out,
+            &plan,
+            true,
+            true,
+            &mut resumed_ledger,
+            &mut resumed_artifact,
+        )
+        .await;
+        assert_eq!(
+            resumed.is_ok(),
+            index == 5 || index == 10,
+            "resume {index}: {resumed:?}"
+        );
+        assert_eq!(
+            std::fs::read(out.join("dispatch-count")).unwrap(),
+            b"x",
+            "no repeated driver execution"
+        );
+        if index == 5 || index == 10 {
+            assert_eq!(
+                c::digest_value(&resumed_artifact.observations).unwrap(),
+                c::digest_value(&artifact.observations).unwrap()
+            );
+            // Simulate a crash after persisted output but before acknowledgement.
+            let journal = out.join("dispatch-budget.jsonl");
+            let original = std::fs::read_to_string(&journal).unwrap();
+            let reserved = original.lines().take(2).collect::<Vec<_>>().join("\n") + "\n";
+            std::fs::write(&journal, reserved).unwrap();
+            resumed_artifact.observations.clear();
+            resumed_ledger = Ledger::default();
+            execute(
+                &path,
+                &manifest,
+                &driver,
+                &driver_hash,
+                &out,
+                &plan,
+                true,
+                true,
+                &mut resumed_ledger,
+                &mut resumed_artifact,
+            )
+            .await
+            .unwrap();
+            assert_eq!(std::fs::read_to_string(&journal).unwrap(), original);
+            assert_eq!(std::fs::read(out.join("dispatch-count")).unwrap(), b"x");
+            // Raw observation tampering cannot replace the bound receipt.
+            std::fs::write(out.join("work-00000/observation.json"), b"{}").unwrap();
+            resumed_artifact.observations.clear();
+            resumed_ledger = Ledger::default();
+            execute(
+                &path,
+                &manifest,
+                &driver,
+                &driver_hash,
+                &out,
+                &plan,
+                true,
+                true,
+                &mut resumed_ledger,
+                &mut resumed_artifact,
+            )
+            .await
+            .unwrap();
+            assert_eq!(resumed_artifact.observations.len(), 1);
+            let mut extended = manifest.plan(Split::Development).unwrap();
+            extended.work.truncate(2);
+            let mut next = observation.clone();
+            next.work = extended.work[1].clone();
+            next.result.item_id = next.work.case_id.clone();
+            std::fs::write(
+                root.0.join("observation.json"),
+                serde_json::to_vec(&next).unwrap(),
+            )
+            .unwrap();
+            resumed_artifact.observations.clear();
+            resumed_ledger = Ledger::default();
+            execute(
+                &path,
+                &manifest,
+                &driver,
+                &driver_hash,
+                &out,
+                &extended,
+                true,
+                true,
+                &mut resumed_ledger,
+                &mut resumed_artifact,
+            )
+            .await
+            .unwrap();
+            assert_eq!(resumed_artifact.observations.len(), 2);
+            assert_eq!(
+                std::fs::read(out.join("dispatch-count")).unwrap(),
+                b"xx",
+                "only unstarted work dispatched"
+            );
+            resumed_artifact.observations.clear();
+            resumed_ledger = Ledger::default();
+            execute(
+                &path,
+                &manifest,
+                &driver,
+                &driver_hash,
+                &out,
+                &extended,
+                true,
+                true,
+                &mut resumed_ledger,
+                &mut resumed_artifact,
+            )
+            .await
+            .unwrap();
+            assert_eq!(std::fs::read(out.join("dispatch-count")).unwrap(), b"xx");
+            std::fs::write(out.join("work-00000/request.json"), b"{}").unwrap();
+            assert!(
+                execute(
+                    &path,
+                    &manifest,
+                    &driver,
+                    &driver_hash,
+                    &out,
+                    &extended,
+                    true,
+                    true,
+                    &mut resumed_ledger,
+                    &mut resumed_artifact
+                )
+                .await
+                .is_err()
+            );
+            assert_eq!(std::fs::read(out.join("dispatch-count")).unwrap(), b"xx");
         }
         assert_eq!(
             verify_campaign_inputs(&path, &plan.manifest_sha256).is_err(),

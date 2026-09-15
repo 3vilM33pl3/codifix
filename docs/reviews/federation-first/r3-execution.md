@@ -1,5 +1,21 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 explicit interrupted campaign recovery
+
+- `campaign run --resume` holds the original budget lock, validates the complete
+  reserved prefix, reuses durable results and dispatches only unreserved tasks.
+  It preserves earlier artifacts and creates a new resume report directory.
+  Missing receipts, altered requests, unknown prefixes and uncertain outcomes
+  stop before new work. Complete receipts can repair a missing acknowledgement.
+- The real CLI completed all 660 synthetic development dispatches. Repeated
+  resume, a missing final settlement and a missing final result were exercised;
+  the driver invocation count stayed at 660. This is protocol/recovery evidence
+  with synthetic observations, not a complete isolated quality campaign.
+- 232 CLI and 55 evaluator tests passed serially. The first parallel run had an
+  unrelated cache-home environment-sensitive CLI test failure; it passed on the
+  serial rerun. Scoped Clippy, formatting and boundary checks passed. CI requires
+  the real runner test. Paid execution remains disabled.
+
 ## 2026-09-15 campaign-wide blinded review
 
 - Added CLI export/apply of evidence-bound review packets and human ballots.
