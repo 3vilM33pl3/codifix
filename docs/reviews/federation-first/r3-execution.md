@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out vector-compatibility knowledge family
+
+- Added five sources and four draft questions on model aliases, complete profile
+  equality, exact index coverage and unavailable compatibility. Toy vectors are
+  explicit diagnostic data, not an embedding-quality or provider claim.
+- Canonical rubric and four pack/CLI checks pass without skips. Forty-four held-out
+  questions and seven coding repositories exist; fourteen knowledge families and
+  five coding repositories remain. No change to retrieval algorithms or egress.
+
 ## 2026-09-15 held-out watcher-replacement knowledge family
 
 - Added five sources and four draft questions for stale file-object watches,

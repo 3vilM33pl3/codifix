@@ -36,7 +36,9 @@ normalized keys, display spelling and authorized ownership. The ninth,
 [quantization error](representative/held-out/quantization-error/review.md), tests
 conversion placement, signed rounding and irreversible display values. The tenth,
 [watcher replacement](representative/held-out/watcher-rename/review.md), separates
-logical names, stale open handles and validated adoption; fifteen remain.
+logical names, stale open handles and validated adoption. The eleventh,
+[vector compatibility](representative/held-out/vector-compatibility/review.md),
+tests complete embedding profiles and version-bound index coverage; fourteen remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
