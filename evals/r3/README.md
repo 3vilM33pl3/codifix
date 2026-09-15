@@ -18,7 +18,9 @@ The source packs include current and superseded instructions, partial observatio
 and explicit evidence limits. They are distinct development mechanisms, not
 renamed held-out cases. The first held-out knowledge family,
 [telemetry units](representative/held-out/telemetry-units/review.md), is materialized
-with four draft questions; 24 families remain.
+with four draft questions. A second,
+[cursor snapshot](representative/held-out/cursor-snapshot/review.md), covers tied
+sort values, mutable live ordering and scoped continuation; 23 families remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:

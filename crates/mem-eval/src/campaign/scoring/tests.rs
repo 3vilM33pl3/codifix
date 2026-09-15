@@ -147,6 +147,7 @@ fn representative_rubrics_use_canonical_locked_bytes_and_all_dimensions() {
         ("development", "quota-accounting"),
         ("development", "dns-cutover"),
         ("held-out", "telemetry-units"),
+        ("held-out", "cursor-snapshot"),
     ] {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
             "../../evals/r3/representative/{split}/{family}/private"

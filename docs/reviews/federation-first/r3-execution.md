@@ -1,5 +1,17 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out cursor-snapshot knowledge family
+
+- Added five sources and four draft rubrics for tied sort fields, immutable page
+  snapshots, changed live ordering and cursor/project scope. The source journal
+  describes observed rows; private rubrics derive the required continuation.
+- Removed precomputed Celsius conversions from the draft telemetry journal so
+  answers must join raw samples with the supplied unit contract. No model outcome
+  motivated this source cleanup; neither family is approved or calibrated.
+- Canonical rubrics and all four pack/CLI tests pass, no skips. Eight held-out
+  questions and two held-out coding repositories are materialized. The separate
+  held-out pack plans 150 fixture executions but is not official evidence.
+
 ## 2026-09-15 held-out interval-calendar repository
 
 - Added the allocated half-open interval repository with five modules, two public
