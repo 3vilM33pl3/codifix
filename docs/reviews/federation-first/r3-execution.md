@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out archive-expansion knowledge family
+
+- Added five synthetic sources and four draft rubrics on observed expansion,
+  simultaneous per-entry/total/ratio limits, private staging and incomplete
+  exposure evidence. No archive was generated, extracted or delivered.
+- Canonical rubric and four pack/CLI tests pass without skips. Sixteen held-out
+  questions and four coding repositories are materialized. The fixture pack
+  remains draft/smoke-only and excluded from model calibration.
+
 ## 2026-09-15 held-out decimal-register repository
 
 - Added five modules and three private reference replacements for exact fixed-

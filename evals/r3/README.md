@@ -22,7 +22,9 @@ with four draft questions. A second,
 [cursor snapshot](representative/held-out/cursor-snapshot/review.md), covers tied
 sort values, mutable live ordering and scoped continuation. The third,
 [cancellation scope](representative/held-out/cancellation-scope/review.md), separates
-caller timeouts from remote terminal outcomes; 22 families remain.
+caller timeouts from remote terminal outcomes. The fourth,
+[archive expansion](representative/held-out/archive-expansion/review.md), covers
+streamed byte limits and private activation; 21 families remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
@@ -53,9 +55,9 @@ held-out repositories are being implemented. The first,
 [framed stream](representative/held-out/framed-stream/review.md), has passing
 private reference/cumulative checks and failing starter/no-op controls. The second,
 [interval calendar](representative/held-out/interval-calendar/review.md), covers
-canonical half-open sets and bounded free-window queries with the same controls;
+canonical half-open sets and bounded free-window queries with the same controls.
 The third repository,
-[path policy](representative/held-out/path-policy/review.md), which adds component,
+[path policy](representative/held-out/path-policy/review.md), adds component,
 operation and alias-bound authorization in a deterministic model. The fourth,
 [decimal register](representative/held-out/decimal-register/review.md), tests exact
 parsing, checked arithmetic and bounded rational rounding; eight remain. Run
