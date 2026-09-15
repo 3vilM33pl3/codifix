@@ -142,6 +142,7 @@ fn representative_rubrics_use_canonical_locked_bytes_and_all_dimensions() {
         "schema-transition",
         "capacity-pressure",
         "timezone-window",
+        "artifact-origin",
     ] {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
             "../../evals/r3/representative/development/{family}/private"

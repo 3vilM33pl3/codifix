@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 artifact-origin knowledge family
+
+- Added five fictional release sources and four draft rubrics distinguishing
+  byte/channel identity, current signing authority, installation verification
+  and unsupported reproducibility or fleet-wide exposure claims.
+- Canonical rubric and two pack/CLI tests pass without skips. Twenty-eight
+  development questions are materialized; synthetic digest labels do not claim
+  real binary verification. Human labels and official evidence remain pending.
+
 ## 2026-09-15 civil-time knowledge family
 
 - Added five sources defining a synthetic zone table, civil-date identity and
