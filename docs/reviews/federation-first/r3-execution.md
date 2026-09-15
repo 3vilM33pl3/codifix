@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out lock and aggregate-size families
+
+- Added ten sources and eight draft questions on opposite lock ordering,
+  callback reentry, source revalidation and checked aggregate sizing. All models
+  are explicit and synthetic; no production synchronization changed.
+- Canonical rubric and four pack/CLI checks pass without skips. Seventy-six
+  held-out questions and seven coding repositories exist; six knowledge families
+  and five coding repositories remain. Labels and paid approvals remain open.
+
 ## 2026-09-15 held-out memory-budget and reduction-order families
 
 - Added ten synthetic sources and eight draft questions on disjoint group charges,

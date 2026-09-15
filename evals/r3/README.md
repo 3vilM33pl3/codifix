@@ -48,7 +48,10 @@ resource scope and membership checks after token issuance. The next two,
 boundaries and accepted-work lifecycle respectively. The next two,
 [group memory pressure](representative/held-out/cgroup-pressure/review.md) and
 [reduction order](representative/held-out/reproducible-order/review.md), distinguish
-whole-group budgets and deterministic folds from misleading proxies; eight remain.
+whole-group budgets and deterministic folds from misleading proxies.
+[Lock inversion](representative/held-out/lock-inversion/review.md) and
+[aggregate overflow](representative/held-out/numeric-overflow/review.md) add
+wait-cycle and complete-size reasoning; six knowledge families remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
