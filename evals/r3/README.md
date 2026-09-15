@@ -6,7 +6,11 @@ They check the machinery, not Memory's product value. Generated manifests set
 Changing labels to reviewed cannot make them official evidence. No provider
 credentials are needed to build them.
 
-The replacement benchmark is being designed around
+Start the human label review with the [plain-language review guide](label-review.md).
+It links every family and identifies the exact draft fixture version; no approval
+or paid execution has been recorded.
+
+The replacement draft benchmark is organized around
 [representative incident and repository workflows](representative-benchmark.md).
 All ten development knowledge families are materialized: forty draft questions,
 each family with five source documents, a plain-language review sheet and four

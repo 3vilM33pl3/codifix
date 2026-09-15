@@ -1,5 +1,13 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 human label-review entrypoint
+
+- Added `evals/r3/label-review.md` with the exact fixture-tree identity, every
+  family review sheet and a plain-language explanation of label-only approval.
+  It does not approve labels, select a provider or authorize spending.
+- Its test verifies all 51 sheets, the committed fixture identity and absence
+  of uncommitted/untracked fixture changes. Unrelated project work is out of scope.
+
 ## 2026-09-15 prepared-counter failures and current short rehearsal
 
 - Local tokenizer exceptions are sanitized before any reservation or model call.
@@ -1140,8 +1148,14 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
   - [x] No-network synthetic answer/coding containers and separate hidden Rust
     grading; real 75-dispatch representative offline rehearsal.
   - [ ] Complete the provider-backed isolation/egress profile.
+    - [x] Fixed-destination bounded HTTP, request/receipt codecs and private
+      prepared model calls, including isolated coding and private scoring tests.
+    - [ ] Select and verify the real model/tokenizer/price/egress configuration;
+      synthetic counters and fake HTTP receipts are not live-provider evidence.
 - [ ] Equal-information document, lexical, vector and full-Memory baselines.
   - [x] Existing baseline executables and real Memory retrieval integrated offline.
+  - [x] Supplied embedding vectors through sealed Memory services and a shared
+    synthetic embedding function, with chunking differences recorded explicitly.
   - [ ] Real embedding preparation and frozen full-Memory configuration parity.
 - [x] Synthetic development/held-out knowledge and coding draft review pack.
   - [x] Four representative development coding families, executable controls.
@@ -1150,6 +1164,10 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
   - [x] Full held-out fixture/reference/cumulative/negative-control verification.
     Label approval remains a separate unchecked gate below.
 - [ ] Campaign plan/run/report, provenance, limits and fail-closed gates.
+  - [x] Multi-call journal/result verification, exact private billing metadata,
+    cache-price arithmetic, timing separation and separate calibration approvals.
+  - [ ] Complete the approved live-provider driver path; paid dispatch remains
+    disabled while the real tokenizer/provider profile is unresolved.
 - [ ] Offline fault/isolation/statistical tests and integration evidence.
   - [x] Real partial CLI rehearsal, pending review export, source/hash fencing,
     independent snapshots and negative coding controls.
