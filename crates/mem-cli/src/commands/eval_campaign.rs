@@ -171,16 +171,12 @@ async fn execute(
             .max_input_tokens
             .checked_add(manifest.model.max_output_tokens)
             .context("token bound overflow")?;
-        let estimated = (u128::from(manifest.model.max_input_tokens)
-            * u128::from(manifest.model.input_microusd_per_million)
-            + u128::from(manifest.model.max_output_tokens)
-                * u128::from(manifest.model.output_microusd_per_million))
-        .div_ceil(1_000_000);
-        let cost = if offline {
-            0
-        } else {
-            u64::try_from(estimated).context("cost bound overflow")?
-        };
+        let priced = Allowance::for_model(
+            &manifest.model,
+            manifest.model.max_input_tokens,
+            manifest.model.max_output_tokens,
+        )?;
+        let cost = if offline { 0 } else { priced.microusd };
         ledger.reserve(&manifest.limits, tokens, cost)?;
         let dir = out.join(format!("work-{index:05}"));
         std::fs::create_dir(&dir)?;

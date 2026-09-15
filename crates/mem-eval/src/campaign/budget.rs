@@ -21,6 +21,30 @@ pub struct Allowance {
     pub microusd: u64,
 }
 impl Allowance {
+    /// Conservative text-token charge using the locked model price sheet. Cache
+    /// discounts are not assumed. Non-token fees require a different approved
+    /// contract; callers must not silently report them as zero.
+    pub fn for_model(model: &super::Model, input_tokens: u64, output_tokens: u64) -> Result<Self> {
+        ensure!(
+            input_tokens <= model.max_input_tokens && output_tokens <= model.max_output_tokens,
+            "request exceeds locked model limits"
+        );
+        input_tokens
+            .checked_add(output_tokens)
+            .context("token overflow")?;
+        let input = u128::from(input_tokens) * u128::from(model.input_microusd_per_million);
+        let output = u128::from(output_tokens) * u128::from(model.output_microusd_per_million);
+        let cost = input
+            .checked_add(output)
+            .context("price overflow")?
+            .div_ceil(1_000_000);
+        Ok(Self {
+            input_tokens,
+            output_tokens,
+            microusd: u64::try_from(cost).context("cost overflow")?,
+        })
+    }
+
     fn tokens(self) -> Result<u64> {
         self.input_tokens
             .checked_add(self.output_tokens)
@@ -35,11 +59,15 @@ enum Event {
         version: u8,
         manifest_sha256: String,
         limits: Limits,
+        #[serde(default)]
+        task_limits: Option<Limits>,
     },
     Reserved {
         id: String,
         payload_sha256: String,
         allowance: Allowance,
+        #[serde(default)]
+        task_id: Option<String>,
     },
     Settled {
         id: String,
@@ -51,6 +79,7 @@ enum Event {
 struct Request {
     allowance: Allowance,
     settled: bool,
+    task_id: Option<String>,
 }
 
 /// Holds an exclusive OS file lock for its lifetime. A process crash releases
@@ -58,13 +87,36 @@ struct Request {
 pub struct RequestBudget {
     file: File,
     limits: Limits,
+    task_limits: Option<Limits>,
     ledger: Ledger,
+    tasks: BTreeMap<String, Ledger>,
     requests: BTreeMap<String, Request>,
     poisoned: bool,
 }
 
 impl RequestBudget {
     pub fn create(path: &Path, manifest_sha256: &str, limits: Limits) -> Result<Self> {
+        Self::create_inner(path, manifest_sha256, limits, None)
+    }
+
+    /// A coding sequence is one task across all of its provider calls/steps.
+    /// Aggregate token/request/spend limits are enforced in addition to the
+    /// campaign ceiling. Wall-clock deadlines still belong to the dispatcher.
+    pub fn create_scoped(
+        path: &Path,
+        manifest_sha256: &str,
+        limits: Limits,
+        task_limits: Limits,
+    ) -> Result<Self> {
+        Self::create_inner(path, manifest_sha256, limits, Some(task_limits))
+    }
+
+    fn create_inner(
+        path: &Path,
+        manifest_sha256: &str,
+        limits: Limits,
+        task_limits: Option<Limits>,
+    ) -> Result<Self> {
         ensure!(valid_digest(manifest_sha256), "invalid campaign identity");
         let mut options = OpenOptions::new();
         options.read(true).write(true).create_new(true);
@@ -82,11 +134,14 @@ impl RequestBudget {
             version: 1,
             manifest_sha256: manifest_sha256.into(),
             limits: limits.clone(),
+            task_limits: task_limits.clone(),
         };
         let mut budget = Self {
             file,
             limits,
+            task_limits,
             ledger: Ledger::default(),
+            tasks: BTreeMap::new(),
             requests: BTreeMap::new(),
             poisoned: false,
         };
@@ -103,6 +158,24 @@ impl RequestBudget {
     }
 
     pub fn resume(path: &Path, manifest_sha256: &str, limits: Limits) -> Result<Self> {
+        Self::resume_inner(path, manifest_sha256, limits, None)
+    }
+
+    pub fn resume_scoped(
+        path: &Path,
+        manifest_sha256: &str,
+        limits: Limits,
+        task_limits: Limits,
+    ) -> Result<Self> {
+        Self::resume_inner(path, manifest_sha256, limits, Some(task_limits))
+    }
+
+    fn resume_inner(
+        path: &Path,
+        manifest_sha256: &str,
+        limits: Limits,
+        task_limits: Option<Limits>,
+    ) -> Result<Self> {
         ensure!(valid_digest(manifest_sha256), "invalid campaign identity");
         ensure!(
             std::fs::symlink_metadata(path)?.file_type().is_file(),
@@ -132,14 +205,19 @@ impl RequestBudget {
                 version: 1,
                 manifest_sha256: saved,
                 limits: saved_limits,
+                task_limits: saved_task_limits,
             } if saved == manifest_sha256
-                && serde_json::to_value(&saved_limits)? == serde_json::to_value(&limits)? => {}
+                && serde_json::to_value(&saved_limits)? == serde_json::to_value(&limits)?
+                && serde_json::to_value(&saved_task_limits)?
+                    == serde_json::to_value(&task_limits)? => {}
             _ => anyhow::bail!("budget campaign/configuration mismatch"),
         }
         let mut budget = Self {
             file,
             limits,
+            task_limits,
             ledger: Ledger::default(),
+            tasks: BTreeMap::new(),
             requests: BTreeMap::new(),
             poisoned: false,
         };
@@ -154,6 +232,10 @@ impl RequestBudget {
         &self.ledger
     }
 
+    pub fn task_ledger(&self, id: &str) -> Option<&Ledger> {
+        self.tasks.get(id)
+    }
+
     /// These requests may already have incurred their entire reserved charge.
     /// No automatic retry or new dispatch is permitted until reconciliation.
     pub fn uncertain_ids(&self) -> Vec<&str> {
@@ -165,10 +247,31 @@ impl RequestBudget {
     }
 
     pub fn reserve(&mut self, id: &str, payload_sha256: &str, allowance: Allowance) -> Result<()> {
+        self.reserve_inner(id, payload_sha256, allowance, None)
+    }
+
+    pub fn reserve_for_task(
+        &mut self,
+        task_id: &str,
+        id: &str,
+        payload_sha256: &str,
+        allowance: Allowance,
+    ) -> Result<()> {
+        self.reserve_inner(id, payload_sha256, allowance, Some(task_id.into()))
+    }
+
+    fn reserve_inner(
+        &mut self,
+        id: &str,
+        payload_sha256: &str,
+        allowance: Allowance,
+        task_id: Option<String>,
+    ) -> Result<()> {
         let event = Event::Reserved {
             id: id.into(),
             payload_sha256: payload_sha256.into(),
             allowance,
+            task_id,
         };
         self.validate(&event)?;
         self.append(&event)?; // fsync before the caller is allowed to dispatch.
@@ -203,6 +306,21 @@ impl RequestBudget {
         Ok(output)
     }
 
+    pub fn dispatch_for_task<T>(
+        &mut self,
+        task_id: &str,
+        id: &str,
+        payload_sha256: &str,
+        allowance: Allowance,
+        provider: impl FnOnce() -> Result<(T, Allowance)>,
+    ) -> Result<T> {
+        self.reserve_for_task(task_id, id, payload_sha256, allowance)?;
+        let (output, usage) = provider()
+            .map_err(|_| anyhow::anyhow!("provider outcome uncertain; reconciliation required"))?;
+        self.settle(id, usage)?;
+        Ok(output)
+    }
+
     fn validate(&self, event: &Event) -> Result<()> {
         ensure!(
             !self.poisoned,
@@ -213,6 +331,7 @@ impl RequestBudget {
                 id,
                 payload_sha256,
                 allowance,
+                task_id,
             } => {
                 ensure!(
                     !id.is_empty()
@@ -238,6 +357,20 @@ impl RequestBudget {
                     microusd: self.ledger.microusd,
                 };
                 next.reserve(&self.limits, allowance.tokens()?, allowance.microusd)?;
+                match (&self.task_limits, task_id) {
+                    (Some(limits), Some(task_id)) => {
+                        ensure!(super::identifier(task_id), "invalid task identity");
+                        let previous = self.tasks.get(task_id);
+                        let mut next = Ledger {
+                            requests: previous.map_or(0, |l| l.requests),
+                            tokens: previous.map_or(0, |l| l.tokens),
+                            microusd: previous.map_or(0, |l| l.microusd),
+                        };
+                        next.reserve(limits, allowance.tokens()?, allowance.microusd)?;
+                    }
+                    (None, None) => {}
+                    _ => anyhow::bail!("task-scoped journal requires a task on every reservation"),
+                }
             }
             Event::Settled { id, usage } => {
                 let request = self.requests.get(id).context("unknown request receipt")?;
@@ -257,14 +390,27 @@ impl RequestBudget {
     fn apply(&mut self, event: &Event) -> Result<()> {
         self.validate(event)?;
         match event {
-            Event::Reserved { id, allowance, .. } => {
+            Event::Reserved {
+                id,
+                allowance,
+                task_id,
+                ..
+            } => {
                 self.ledger
                     .reserve(&self.limits, allowance.tokens()?, allowance.microusd)?;
+                if let (Some(task_id), Some(limits)) = (task_id, &self.task_limits) {
+                    self.tasks.entry(task_id.clone()).or_default().reserve(
+                        limits,
+                        allowance.tokens()?,
+                        allowance.microusd,
+                    )?;
+                }
                 self.requests.insert(
                     id.clone(),
                     Request {
                         allowance: *allowance,
                         settled: false,
+                        task_id: task_id.clone(),
                     },
                 );
             }
@@ -275,6 +421,11 @@ impl RequestBudget {
                     .context("unknown request receipt")?;
                 self.ledger.tokens -= request.allowance.tokens()? - usage.tokens()?;
                 self.ledger.microusd -= request.allowance.microusd - usage.microusd;
+                if let Some(task_id) = &request.task_id {
+                    let task = self.tasks.get_mut(task_id).context("missing task ledger")?;
+                    task.tokens -= request.allowance.tokens()? - usage.tokens()?;
+                    task.microusd -= request.allowance.microusd - usage.microusd;
+                }
                 request.settled = true;
             }
             Event::Opened { .. } => unreachable!("validated event"),
@@ -379,6 +530,168 @@ mod tests {
     }
     fn identity() -> String {
         "a".repeat(64)
+    }
+
+    #[test]
+    fn locked_prices_round_up_and_reject_excess_tokens_or_overflow() {
+        let mut model = super::super::tests::fixture().model;
+        model.input_microusd_per_million = 1;
+        model.output_microusd_per_million = 2;
+        assert_eq!(Allowance::for_model(&model, 1, 1).unwrap().microusd, 1);
+        assert!(Allowance::for_model(&model, model.max_input_tokens + 1, 1).is_err());
+        assert!(Allowance::for_model(&model, 1, model.max_output_tokens + 1).is_err());
+        model.input_microusd_per_million = 1_000_000;
+        model.output_microusd_per_million = 2_000_000;
+        assert_eq!(Allowance::for_model(&model, 20, 10).unwrap().microusd, 40);
+        model.max_input_tokens = u64::MAX;
+        model.input_microusd_per_million = u64::MAX;
+        assert!(Allowance::for_model(&model, u64::MAX, 1).is_err());
+        assert!(Allowance::for_model(&model, u64::MAX, 0).is_err());
+    }
+
+    #[test]
+    fn scoped_requests_enforce_task_and_campaign_caps_before_each_provider_call() {
+        for task_limits in [
+            Limits {
+                requests: 1,
+                ..limits()
+            },
+            Limits {
+                tokens: 35,
+                ..limits()
+            },
+            Limits {
+                microusd: 20,
+                ..limits()
+            },
+        ] {
+            let fixture = Fixture::new();
+            let mut budget = RequestBudget::create_scoped(
+                &fixture.journal(),
+                &identity(),
+                limits(),
+                task_limits.clone(),
+            )
+            .unwrap();
+            assert!(
+                budget
+                    .reserve("unscoped-bypass", &identity(), allowance())
+                    .is_err()
+            );
+            budget
+                .dispatch_for_task("sequence-1", "step-1", &identity(), allowance(), || {
+                    Ok(((), allowance()))
+                })
+                .unwrap();
+            assert!(
+                budget
+                    .dispatch_for_task::<()>(
+                        "sequence-1",
+                        "step-2",
+                        &identity(),
+                        allowance(),
+                        || panic!("task limit must prevent dispatch")
+                    )
+                    .is_err()
+            );
+            assert_eq!(budget.ledger().requests, 1);
+            budget
+                .dispatch_for_task("sequence-2", "step-3", &identity(), allowance(), || {
+                    Ok(((), allowance()))
+                })
+                .unwrap();
+            assert_eq!(budget.task_ledger("sequence-1").unwrap().requests, 1);
+            assert_eq!(budget.task_ledger("sequence-2").unwrap().requests, 1);
+            drop(budget);
+            assert!(RequestBudget::resume(&fixture.journal(), &identity(), limits()).is_err());
+            let mut budget = RequestBudget::resume_scoped(
+                &fixture.journal(),
+                &identity(),
+                limits(),
+                task_limits,
+            )
+            .unwrap();
+            assert_eq!(budget.task_ledger("sequence-1").unwrap().tokens, 30);
+            assert!(
+                budget
+                    .reserve_for_task("sequence-1", "restart-bypass", &identity(), allowance())
+                    .is_err()
+            );
+            budget
+                .dispatch_for_task("sequence-3", "step-4", &identity(), allowance(), || {
+                    Ok(((), allowance()))
+                })
+                .unwrap();
+            assert!(
+                budget
+                    .dispatch_for_task::<()>(
+                        "sequence-4",
+                        "step-5",
+                        &identity(),
+                        allowance(),
+                        || panic!("campaign cap must prevent dispatch")
+                    )
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn scoped_uncertainty_and_confirmed_refunds_survive_reopen_without_resetting_history() {
+        let fixture = Fixture::new();
+        let mut budget =
+            RequestBudget::create_scoped(&fixture.journal(), &identity(), limits(), limits())
+                .unwrap();
+        let used = Allowance {
+            input_tokens: 4,
+            output_tokens: 2,
+            microusd: 3,
+        };
+        budget
+            .dispatch_for_task("sequence", "first", &identity(), allowance(), || {
+                Ok(((), used))
+            })
+            .unwrap();
+        assert!(
+            budget
+                .dispatch_for_task::<()>(
+                    "sequence",
+                    "second",
+                    &identity(),
+                    allowance(),
+                    || anyhow::bail!("sensitive failure")
+                )
+                .is_err()
+        );
+        assert_eq!(budget.task_ledger("sequence").unwrap().tokens, 36);
+        drop(budget);
+        let mut budget =
+            RequestBudget::resume_scoped(&fixture.journal(), &identity(), limits(), limits())
+                .unwrap();
+        assert_eq!(budget.task_ledger("sequence").unwrap().microusd, 18);
+        assert_eq!(budget.uncertain_ids(), ["second"]);
+        assert!(
+            budget
+                .reserve_for_task("other", "third", &identity(), allowance())
+                .is_err()
+        );
+        budget.settle("second", used).unwrap();
+        assert_eq!(budget.task_ledger("sequence").unwrap().tokens, 12);
+        assert_eq!(budget.task_ledger("sequence").unwrap().requests, 2);
+        assert!(
+            budget
+                .reserve_for_task("other", "first", &identity(), allowance())
+                .is_err()
+        );
+        drop(budget);
+        let changed = Limits {
+            requests: 4,
+            ..limits()
+        };
+        assert!(
+            RequestBudget::resume_scoped(&fixture.journal(), &identity(), limits(), changed)
+                .is_err()
+        );
     }
 
     #[test]

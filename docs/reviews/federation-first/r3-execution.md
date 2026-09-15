@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 per-task provider budget accounting
+
+- Durable request journals now optionally enforce task-level ceilings in
+  addition to campaign totals. A three-step sequence can retain one task budget;
+  unscoped reservations cannot bypass it. Refunds and uncertainty affect both
+  ledgers, and restart retains task history and rejects changed limits.
+- Shared locked-price calculation rounds charges up and rejects excessive token
+  requests/overflow; the existing dispatcher now uses that calculation.
+- Forty-nine evaluator tests and 232 CLI tests passed, including task request,
+  token and cost caps, reopen, uncertainty and no-dispatch-on-limit checks.
+- These are multi-call mediator foundations, not complete provider egress,
+  tokenization, result caching or reconciliation. Paid execution and the current
+  single-request driver restriction remain unchanged; R3 is not complete.
+
 ## 2026-09-15 evidence-bound knowledge adjudication
 
 - Added semantic rubric contracts, bounded blinded review packets, exact-source

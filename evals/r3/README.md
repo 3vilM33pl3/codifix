@@ -126,6 +126,17 @@ provider billing or provide an approval mechanism. Asynchronous cancellation
 between reservation and settlement must remain uncertain, never automatically
 refund or retry. The trusted host must protect the journal from replacement.
 
+`RequestBudget::create_scoped` / `resume_scoped` additionally enforce the same
+per-task request/token/spend ceilings across all steps in a sequence. Every call
+must name its task; an unscoped call cannot bypass the limit. Confirmed refunds
+update both ledgers, while uncertain calls block the entire dispatcher. Restart
+reconstructs task totals and rejects changed limits. `Allowance::for_model`
+calculates rounded-up charges from locked token prices and rejects excess token
+bounds/overflow. These APIs are tested foundations for multi-call mediation;
+the current campaign driver restriction is not lifted by their availability.
+They do not impose wall-clock deadlines, verify tokenization or account for
+non-token provider fees. Those remain responsibilities of the complete mediator.
+
 ## Baseline adapter contract
 
 Build `cargo build -p mem-eval --example r3_retriever --locked`. Invoke
