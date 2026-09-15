@@ -21,6 +21,12 @@ documented durable-store test double, not a claim of disk recovery. Run it with
 the pinned Rust image using the isolation instructions and
 `node --test evals/r3/representative.test.mjs`. CI requires this test without skips.
 
+The second coding family is [evidence publication](representative/development/evidence-publication/review.md):
+five modules, three cumulative stages and ten private probes for reviewed bytes,
+version-scoped correction attribution, revocation and request replay. Its reference
+passes while the buggy starter and no-op controls fail. Both families are draft
+development benchmarks, not held-out approval or a complete representative suite.
+
 ```sh
 node evals/r3/build-review-pack.mjs target/memory-evals/r3-review
 node evals/r3/verify-review-pack.mjs target/memory-evals/r3-review

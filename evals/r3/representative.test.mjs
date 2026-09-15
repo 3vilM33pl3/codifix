@@ -27,6 +27,32 @@ test('representative importer declares three cumulative stages and distinct priv
   for (const source of Object.values(files)) assert(!source.includes('expectedStdout'));
 });
 
+test('representative evidence publication: reviewed bytes, correction ownership and retry controls', { skip: !image, timeout: 120000 }, async () => {
+  const root = new URL('./representative/development/evidence-publication/', import.meta.url);
+  const files = {};
+  for (const name of ['main', 'capture', 'policy', 'review', 'publish']) {
+    files[`src/${name}.rs`] = await fs.readFile(new URL(`public/src/${name}.rs`, root), 'utf8');
+  }
+  const steps = JSON.parse(await fs.readFile(new URL('private/steps.json', root), 'utf8'));
+  assert.equal(steps.length, 3);
+  assert.equal(new Set(steps.flatMap(s => s.probes.map(p => p.id))).size, 10);
+  const reference = { ...files, 'src/publish.rs': await fs.readFile(new URL('private/publish.rs', root), 'utf8') };
+  const correct = await gradeRustCase({ image, files: reference, probes: steps.flatMap(s => s.probes) });
+  assert.equal(correct.success, true);
+  const sequence = await runOfflineSequence({ image, initialFiles: files, submissionPaths: Object.keys(files), timeoutMs: 30000,
+    steps: steps.map((step, index) => ({ id: step.id,
+      argv: ['/usr/local/bin/node', '-e', index === 0
+        ? `require('fs').writeFileSync('src/publish.rs',${JSON.stringify(reference['src/publish.rs'])})` : ''],
+      grader: { kind: 'rust-blackbox', probes: steps.slice(0, index + 1).flatMap(s => s.probes) },
+    })),
+  });
+  assert.equal(sequence.success, true);
+  for (const step of steps) {
+    assert.equal((await gradeRustCase({ image, files, probes: step.probes })).success, false, step.id);
+    assert.equal((await gradeRustCase({ image, files: { 'src/main.rs': 'fn main() {}' }, probes: step.probes })).success, false);
+  }
+});
+
 test('representative importer: executable reference and broken controls', { skip: !image, timeout: 120000 }, async () => {
   const { files, steps } = await fixture();
   const reference = { ...files, 'src/replay.rs': await fs.readFile(new URL('private/replay.rs', root), 'utf8') };

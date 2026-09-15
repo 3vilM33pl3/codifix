@@ -1,5 +1,16 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 representative evidence-publication repository
+
+- Added a second five-module development coding repository and three cumulative
+  stages with ten private black-box probes. They cover snapshot substitution,
+  review ownership, stale proposals, separate author/editor/publisher attribution,
+  revocation, pre-send failure and lost-acknowledgement request replay.
+- The reference passes all probes and the full isolated sequence; buggy/no-op
+  controls fail each stage. All three required representative tests passed with
+  zero skips. The starter's public smoke test passed with intentional unused-code
+  warnings from the incomplete implementation. Labels remain draft.
+
 ## 2026-09-15 reusable dispatch results
 
 - Added private, bounded result receipts separated from metadata-only budgets.
