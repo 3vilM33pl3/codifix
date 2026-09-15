@@ -110,6 +110,54 @@ Together with the three existing development scenarios these fill ten families.
 Do not reuse these mechanisms as renamed held-out scenarios. This allocation is
 not label approval; sources precede private questions and scoring rubrics.
 
+### Held-out allocation (before implementation, labels still draft)
+
+The held-out knowledge mechanisms are assigned independently of development:
+
+| Family | Primary evidence-joining problem |
+| --- | --- |
+| telemetry-units | Gauge units, conversion location and mislabeled dashboards |
+| cursor-snapshot | Tied sort values and stable paginated read snapshots |
+| cancellation-scope | Caller cancellation versus already-started remote effects |
+| archive-expansion | Small compressed inputs and bounded expanded output |
+| circuit-probes | Dependency circuit state and controlled half-open probes |
+| alert-denominator | Sampled observations versus population alert rates |
+| cohort-assignment | Stable experiment buckets and changing assignment inputs |
+| unicode-identity | Display-equivalent names versus normalized identity rules |
+| quantization-error | Fixed-point precision and accumulating rounding error |
+| watcher-rename | Atomic editor replacement versus watching an old file inode |
+| vector-compatibility | Embedding dimensions versus semantic model compatibility |
+| certificate-chain | Missing intermediates versus expired leaf certificates |
+| token-audience | Valid tokens intended for a different service audience |
+| stream-framing | Transport chunks versus complete application messages |
+| traffic-drain | Endpoint removal versus active long-lived stream completion |
+| cgroup-pressure | Process heap measurements versus container memory charges |
+| reproducible-order | Random seeds versus nondeterministic parallel reduction |
+| lock-inversion | Conflicting acquisition order across otherwise valid operations |
+| numeric-overflow | Individually valid lengths and overflowing aggregate bounds |
+| rename-durability | Atomic namespace replacement versus crash durability |
+| null-filter | SQL null semantics and unexpectedly omitted anti-join results |
+| token-boundary | Search field/token boundaries versus substring expectations |
+| trace-link | Trace propagation versus sampled log absence |
+| color-profile | Pixel values versus display color-space interpretation |
+| distribution-notice | Recorded dependency origin versus distribution notice obligations |
+
+Twelve held-out coding repository mechanisms are also allocated: `framed-stream`,
+`interval-calendar`, `path-policy`, `decimal-register`, `identifier-catalog`,
+`snapshot-pages`, `notice-bundle`, `sensor-matrix`, `circuit-window`,
+`route-precedence`, `bounded-decoder` and `structured-redaction`.
+These cover stream framing, half-open interval operations, component-based path
+authorization, exact arithmetic, explicit normalized keys, stable page cursors,
+notice composition, sparse sensor transforms, clocked dependency protection,
+route specificity, bounded decompression and schema-aware disclosure respectively.
+They must not reuse the development reference implementations or hidden probes.
+Related knowledge/coding mechanisms stay wholly in held-out, never development.
+
+This is an allocation, not a claim that any held-out fixture exists or is ready.
+Materialize source contracts before tests/questions. Keep all held-out material
+out of development calibration packs and do not inspect model outcomes to tune
+its sources, labels or thresholds. All labels require Olivier's later approval.
+
 The cache-partition knowledge family is assigned to development before fixture
 implementation: distinguishing request authorization and signed provenance from
 the scope of a reused answer, with bounded incident evidence. Do not reuse that
