@@ -1,5 +1,15 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out trust-boundary knowledge families
+
+- Added certificate-chain and token-audience families: ten synthetic sources and
+  eight draft questions on missing intermediates, clean clients, exact resource
+  audiences, independent scope/membership checks and unsafe workaround refusal.
+  No live certificates, credentials, issuer or network connection is used.
+- Canonical rubric and four pack/CLI checks pass without skips. Fifty-two held-out
+  questions and seven coding repositories are materialized; twelve knowledge
+  families and five coding repositories remain. Approval gates remain open.
+
 ## 2026-09-15 held-out vector-compatibility knowledge family
 
 - Added five sources and four draft questions on model aliases, complete profile
