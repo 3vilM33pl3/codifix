@@ -14,6 +14,7 @@ pub mod baselines;
 pub mod budget;
 pub mod embedding_evidence;
 pub mod preparation;
+pub mod provider_profile;
 pub mod provider_results;
 pub mod retriever;
 pub mod review;
@@ -129,6 +130,9 @@ pub struct Manifest {
     /// A separately bounded preparation phase, included in the global limits.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preparation_budget: Option<Limits>,
+    /// Optional for legacy offline artifacts; required for provider-backed evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_profile: Option<provider_profile::ProviderProfile>,
     pub reference_baseline: Option<Condition>,
     pub assets: Vec<Asset>,
     pub cases: Vec<Case>,
@@ -268,6 +272,9 @@ impl Manifest {
                 self.assets.iter().any(|a| a.kind == kind),
                 "missing {kind:?} assets"
             );
+        }
+        if let Some(profile) = &self.provider_profile {
+            profile.validate(self)?;
         }
         let mut ids = BTreeSet::new();
         let mut clusters = BTreeMap::new();
@@ -411,6 +418,9 @@ impl Manifest {
             digest(format!("{}:{}:{:?}:{}", self.seed, w.case_id, w.condition, w.repeat).as_bytes())
         });
         let mut readiness_errors = Vec::new();
+        if self.provider_profile.is_none() {
+            readiness_errors.push("locked provider/tokenizer/embedding profile required".into());
+        }
         if self.smoke_only && split == Split::HeldOut {
             readiness_errors.push("smoke-only dataset cannot be official product evidence".into());
         }

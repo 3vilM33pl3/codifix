@@ -1,15 +1,88 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use super::*;
 
+fn test_tokenizer() -> provider_profile::Tokenizer {
+    provider_profile::Tokenizer {
+        id: "fixture-only-not-verified".into(),
+        asset: provider_profile::Pin {
+            path: "config.json".into(),
+            sha256: digest(b"fixture"),
+        },
+    }
+}
+
+#[test]
+fn provider_profile_binds_models_counters_rates_and_private_assets() {
+    let original = fixture();
+    original.validate().unwrap();
+    for mutation in 0..9 {
+        let mut manifest = original.clone();
+        let profile = manifest.provider_profile.as_mut().unwrap();
+        match mutation {
+            0 => profile.embedding.resolved_id = "unapproved-embedding".into(),
+            1 => profile.embedding.dimensions = 0,
+            2 => profile.embedding.max_input_tokens = 8193,
+            3 => profile.responses_tokenizer.asset.sha256 = digest(b"changed counter"),
+            4 => profile.configuration_evidence.path = "source.md".into(),
+            5 => profile.embedding.input_microusd_per_million = u64::MAX,
+            6 => profile.protocol = "unknown".into(),
+            7 => profile.embedding.tokenizer.id = "../counter".into(),
+            _ => profile.version = 2,
+        }
+        assert!(manifest.validate().is_err(), "mutation {mutation}");
+    }
+    let mut changed_rate = original.clone();
+    changed_rate
+        .provider_profile
+        .as_mut()
+        .unwrap()
+        .embedding
+        .input_microusd_per_million += 1;
+    changed_rate.validate().unwrap();
+    assert_ne!(
+        digest_value(&original).unwrap(),
+        digest_value(&changed_rate).unwrap()
+    );
+    assert!(
+        changed_rate
+            .authorize(Split::HeldOut, &artifact(&original).approvals)
+            .is_err()
+    );
+}
+
+#[test]
+fn missing_provider_profile_cannot_qualify_as_official_evidence() {
+    let mut manifest = fixture();
+    manifest.provider_profile = None;
+    let mut evidence = artifact(&manifest);
+    let rejected = report(&manifest, &evidence).unwrap();
+    assert!(!rejected.harness_valid);
+    assert!(
+        rejected
+            .errors
+            .iter()
+            .any(|e| e.contains("provider/tokenizer/embedding"))
+    );
+    evidence.offline = true;
+    assert!(report(&manifest, &evidence).unwrap().harness_valid);
+    assert!(
+        manifest
+            .authorize(Split::HeldOut, &evidence.approvals)
+            .is_err()
+    );
+}
+
 #[test]
 fn optional_mediation_preserves_legacy_bytes_and_requires_explicit_bounded_calls() {
     let mut manifest = fixture();
     manifest.provider_budget = None;
     manifest.preparation_budget = None;
+    manifest.provider_profile = None;
     let original = digest_value(&manifest).unwrap();
     let bytes = serde_json::to_vec(&manifest).unwrap();
     assert!(!String::from_utf8_lossy(&bytes).contains("provider_budget"));
     assert!(!String::from_utf8_lossy(&bytes).contains("preparation_budget"));
+    assert!(!String::from_utf8_lossy(&bytes).contains("provider_profile"));
     let decoded: Manifest = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(original, digest_value(&decoded).unwrap());
     for bound in [0, 129] {
@@ -55,6 +128,19 @@ pub(super) fn fixture() -> Manifest {
         repeats: 3,
         label_status: "reviewed".into(),
         smoke_only: false,
+        provider_profile: Some(provider_profile::ProviderProfile {
+            version: 1,
+            protocol: "openai-text-v1".into(),
+            responses_tokenizer: test_tokenizer(),
+            embedding: provider_profile::Embedding {
+                resolved_id: "fake-2d".into(),
+                dimensions: 2,
+                max_input_tokens: 100,
+                input_microusd_per_million: 1_000_000,
+                tokenizer: test_tokenizer(),
+            },
+            configuration_evidence: test_tokenizer().asset,
+        }),
         preparation_budget: Some(Limits {
             requests: 10,
             tokens: 100,
@@ -65,7 +151,7 @@ pub(super) fn fixture() -> Manifest {
             max_calls_per_task: 1,
         }),
         model: Model {
-            provider: "fake".into(),
+            provider: "openai".into(),
             resolved_id: "fake-v1".into(),
             reasoning: "none".into(),
             embedding_id: "fake-2d".into(),

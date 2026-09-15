@@ -126,6 +126,11 @@ pub(super) fn report_for_review(manifest: &Manifest, artifact: &Artifact) -> Res
 fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -> Result<Report> {
     let plan = manifest.plan(artifact.split)?;
     let mut errors = Vec::new();
+    if !artifact.offline && manifest.provider_profile.is_none() {
+        errors.push(
+            "official evidence requires a locked provider/tokenizer/embedding profile".into(),
+        );
+    }
     if !artifact.offline && manifest.provider_budget.is_none() {
         errors.push("official evidence requires a locked per-call mediation profile".into());
     }

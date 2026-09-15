@@ -251,6 +251,7 @@ fn fixture() -> (Manifest, Observation) {
         smoke_only: true,
         provider_budget: None,
         preparation_budget: None,
+        provider_profile: None,
         model: model.clone(),
         limits: c::Limits {
             requests: 10000,
