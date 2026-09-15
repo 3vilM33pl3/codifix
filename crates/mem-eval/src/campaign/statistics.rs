@@ -153,6 +153,13 @@ fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -
         if observation.model != manifest.model {
             errors.push("provider/model/reasoning/budget mismatch".into());
         }
+        if let Some(timing) = &observation.timing {
+            if let Err(error) = timing.validate(observation.result.duration_ms) {
+                errors.push(error.to_string());
+            }
+        } else if !artifact.offline {
+            errors.push("missing execution-only task timing".into());
+        }
         let w = &observation.work;
         let key = (&w.case_id, w.condition, w.repeat);
         if !expected.contains(&key) || !seen.insert(key) {

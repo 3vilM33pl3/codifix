@@ -204,6 +204,13 @@ fn artifact(manifest: &Manifest) -> Artifact {
                         evidence
                     });
                 Observation {
+                    timing: Some(TaskTiming {
+                        version: 1,
+                        retrieval_ms: 1,
+                        answer_or_agent_ms: 9,
+                        grading_ms: 5,
+                        executor_total_ms: 20,
+                    }),
                     provider_audit: None,
                     knowledge_review,
                     model: manifest.model.clone(),
@@ -323,6 +330,16 @@ fn invalid_evidence_fails_closed() {
     let m = fixture();
     let original = artifact(&m);
     let mut a = original.clone();
+    a.observations[0].timing = None;
+    assert!(!report(&m, &a).unwrap().harness_valid);
+    let mut a = original.clone();
+    a.observations[0]
+        .timing
+        .as_mut()
+        .unwrap()
+        .answer_or_agent_ms = 10;
+    assert!(!report(&m, &a).unwrap().harness_valid);
+    let mut a = original.clone();
     a.observations.pop();
     assert!(!report(&m, &a).unwrap().harness_valid);
     let mut a = original.clone();
@@ -356,6 +373,23 @@ fn invalid_evidence_fails_closed() {
     let mut a = original;
     a.approvals.clear();
     assert!(!report(&m, &a).unwrap().official_evidence);
+}
+
+#[test]
+fn task_timing_cannot_include_grading_in_execution_or_overflow() {
+    let mut timing = TaskTiming {
+        version: 1,
+        retrieval_ms: 2,
+        answer_or_agent_ms: 3,
+        grading_ms: 7,
+        executor_total_ms: 15,
+    };
+    timing.validate(Some(5)).unwrap();
+    assert!(timing.validate(Some(12)).is_err());
+    timing.executor_total_ms = 11;
+    assert!(timing.validate(Some(5)).is_err());
+    timing.retrieval_ms = u64::MAX;
+    assert!(timing.validate(Some(5)).is_err());
 }
 
 #[test]

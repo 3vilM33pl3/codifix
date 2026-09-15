@@ -1,5 +1,29 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 mediated rehearsal completed
+
+- The fresh mediated run passed all 75 tasks and verified 150 simulated calls
+  against actual journals and saved receipts in 446 seconds. Artifact directory:
+  `/data/tmp/memory-r3-rehearsal-cli-SZaLCz/pack/run`.
+- All task counters match their audits; database fingerprints stay unchanged.
+  Sixty knowledge judgments remain pending and fifteen no-op coding sequences
+  correctly fail hidden tests. Zero actual provider calls/spend; no product-quality
+  or label-approval claim. The earlier interrupted run remains retained separately.
+
+## 2026-09-15 execution-only timing
+
+- New task timing separates retrieval, answering/agent execution, private grading
+  and the complete executor span. Parent duration is retrieval plus answer/agent
+  time; child coding durations exclude hidden grading. Snapshot provisioning and
+  private adjudication no longer feed execution latency comparisons.
+- Official reports reject missing timing metadata; legacy offline artifacts remain
+  readable. Supplied timing must add up without overflow or overlapping totals.
+  Mediated CLI dispatch requires this evidence before accepting a task.
+- The required-database task test exercises all five knowledge conditions and a
+  real hidden Rust sequence with these assertions. Six CLI tests pass. This timing
+  change was made after the full mediated run froze its executables; that run is
+  evidence for mediation, not for the new timing fields.
+
 ## 2026-09-15 mediated rehearsal deadline and retained evidence
 
 - The first mediated 75-task run reached its outer test deadline: the controller

@@ -630,6 +630,14 @@ fn validate_task_evidence(
         !observation.uncertain_charge,
         "uncertain provider charge; stop campaign"
     );
+    if let Some(timing) = &observation.timing {
+        timing.validate(observation.result.duration_ms)?;
+    } else {
+        ensure!(
+            manifest.provider_budget.is_none(),
+            "mediated execution requires execution-only timing"
+        );
+    }
     let usage = observation
         .result
         .token_usage

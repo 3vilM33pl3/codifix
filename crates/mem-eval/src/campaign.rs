@@ -493,6 +493,34 @@ impl Isolation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskTiming {
+    pub version: u8,
+    pub retrieval_ms: u64,
+    pub answer_or_agent_ms: u64,
+    pub grading_ms: u64,
+    pub executor_total_ms: u64,
+}
+impl TaskTiming {
+    pub fn validate(&self, duration_ms: Option<u64>) -> Result<()> {
+        let execution = self
+            .retrieval_ms
+            .checked_add(self.answer_or_agent_ms)
+            .context("execution timing overflow")?;
+        ensure!(
+            self.version == 1
+                && execution > 0
+                && Some(execution) == duration_ms
+                && execution
+                    .checked_add(self.grading_ms)
+                    .is_some_and(|v| v <= self.executor_total_ms),
+            "missing, overlapping or inconsistent execution timing"
+        );
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Observation {
     pub work: Work,
     pub model: Model,
@@ -502,6 +530,8 @@ pub struct Observation {
     pub provider_requests: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_audit: Option<provider_results::ProviderAudit>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timing: Option<TaskTiming>,
     pub uncertain_charge: bool,
     pub critical_failure: bool,
     pub unresolved_rubric: bool,

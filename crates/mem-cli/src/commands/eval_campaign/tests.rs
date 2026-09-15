@@ -273,6 +273,13 @@ fn fixture() -> (Manifest, Observation) {
     };
     let work = manifest.plan(Split::Development).unwrap().work[0].clone();
     let observation = Observation {
+        timing: Some(c::TaskTiming {
+            version: 1,
+            retrieval_ms: 0,
+            answer_or_agent_ms: 1,
+            grading_ms: 0,
+            executor_total_ms: 1,
+        }),
         provider_audit: None,
         knowledge_review: None,
         work: work.clone(),

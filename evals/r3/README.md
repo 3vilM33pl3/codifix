@@ -361,6 +361,13 @@ new invocations are distinguished separately. Sequence parents aggregate once,
 while children remain diagnostics. Paid-provider configuration, tokenizer/price
 validation, real embedding parity and official approval remain separate gates.
 
+New observations include `timing`: retrieval, answer/agent execution, private
+grading and total executor milliseconds. Task duration is exactly retrieval plus
+answer/agent time, not database/service provisioning or private grading. Child
+coding durations describe agent work only. Official reports reject missing or
+inconsistent timing; older offline artifacts remain readable but must not be
+promoted as latency evidence. Synthetic callback timings are not real model latency.
+
 ## Reusable dispatch results
 
 `ProviderResults` stores bounded outputs in a private directory, separately from

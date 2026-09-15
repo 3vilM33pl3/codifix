@@ -18,6 +18,14 @@ const retrieverBinary = process.env.MEMORY_R3_RETRIEVER_BIN;
 const available = snapshotBinary && memoryBinary && databaseUrl && nodeImage && rustImage && scoreBinary && retrieverBinary;
 if (process.env.MEMORY_R3_REQUIRE_REHEARSAL_TASK === '1' && !available) throw Error('required rehearsal task configuration missing');
 
+function checkTiming(observation) {
+  const timing = observation.timing;
+  assert.equal(timing.version, 1);
+  assert.equal(observation.result.duration_ms, timing.retrieval_ms + timing.answer_or_agent_ms);
+  assert(timing.executor_total_ms >= observation.result.duration_ms + timing.grading_ms);
+  assert(timing.grading_ms > 0);
+}
+
 test('representative tasks execute all knowledge conditions and real hidden Rust grading', { skip: !available, timeout: 180000 }, async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-rehearsal-task-'));
   t.after(() => fs.rm(directory, { recursive: true }));
@@ -53,6 +61,7 @@ test('representative tasks execute all knowledge conditions and real hidden Rust
       assert.equal(observation.knowledge_review.packet.sources.length, 5);
       assert(observation.knowledge_review.packet.sources.every(source => source.id.includes('supplier-handover')));
       assert(observation.result.duration_ms > 0);
+      checkTiming(observation);
       if (condition === 'no-memory') assert(observation.knowledge_review.packet.answer.refused);
     }
     const coding = await execute({ case_id: 'durable-importer', condition: 'full-memory', repeat: 0 });
@@ -62,6 +71,8 @@ test('representative tasks execute all knowledge conditions and real hidden Rust
     assert(coding.result.sub_results.every(step => !step.success));
     assert.equal(coding.knowledge_review, null);
     assert.equal(coding.isolation.after_sha256, session.preparation.snapshot_sha256);
+    checkTiming(coding);
+    assert.equal(coding.timing.answer_or_agent_ms, coding.result.sub_results.reduce((sum,step) => sum + step.duration_ms,0));
     const source = manifest.cases[0].sources[0];
     await fs.appendFile(path.join(root, source), 'tampered');
     await assert.rejects(execute({ case_id: 'supplier-handover-q1', condition: 'handover', repeat: 1 }), /changed rehearsal input/);

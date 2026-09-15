@@ -89,7 +89,7 @@ export async function createRehearsalExecutor(options) {
         || selected.repeat < 0 || selected.repeat >= 3) throw Error('unknown rehearsal work');
     busy = true;
     const started = performance.now();
-    let mediator;
+    let mediator, observation;
     try {
       await verify();
       if (manifest.provider_budget) {
@@ -112,8 +112,9 @@ export async function createRehearsalExecutor(options) {
       const sources = await Promise.all(item.sources.map(async id => ({ id, text: await readAsset(id) })));
       const project = `r3-${item.cluster}`;
       const executed = await session.withInstance(project, async instance => {
+        let retrievalMs = 0;
         const contextFor = async question => {
-          let retrieval;
+          let retrieval, retrievalStarted = performance.now();
           if (selected.condition === 'no-memory') retrieval = { results: [] };
           else if (selected.condition === 'full-memory') retrieval = await instance.query(question);
           else {
@@ -126,12 +127,15 @@ export async function createRehearsalExecutor(options) {
               await fs.writeFile(file, JSON.stringify({ project, condition: 'external-retriever', mode: selected.condition,
                 documents: sources, embeddings: vectors, embedding_corpus: bindCorpus(profile, sources, vectors),
                 top_k: 8, bytes: 32768 }), { flag: 'wx', mode: 0o600 });
+              retrievalStarted = performance.now(); // Prepared corpus/configuration is not task retrieval.
               retrieval = await runRetriever(retrieverBinary, file, { schema_version: 1, project, condition: 'external-retriever',
                 query: question, limit: 8, item_id: item.id, context: { fixture_path: '', hidden_facts: [] },
                 query_embedding: queryVector, embedding_query: bindQuery(profile, question, queryVector) }, temporary);
             } finally { await fs.rm(temporary, { recursive: true }); }
           }
-          return preparedContext({ condition: selected.condition, sources, retrieval, bindings: instance.bindings, project });
+          const context = preparedContext({ condition: selected.condition, sources, retrieval, bindings: instance.bindings, project });
+          retrievalMs += performance.now() - retrievalStarted;
+          return context;
         };
         if (item.track === 'knowledge') {
           const rubric = JSON.parse(await readAsset(`private/rubrics/${item.id}.json`));
@@ -147,7 +151,9 @@ export async function createRehearsalExecutor(options) {
           return { success: answer.assessment.success, answer: answer.answer.text,
             knowledge_review: answer.evidence, unresolved_rubric: answer.assessment.unresolved,
             critical_failure: answer.assessment.critical_failure, diagnostics: [], input_sha256: answer.publicInputSha256,
-            providerUsage: { provider_requests: answer.providerRequests, ...answer.tokenUsage, microusd: answer.executionMicrousd } };
+            providerUsage: { provider_requests: answer.providerRequests, ...answer.tokenUsage, microusd: answer.executionMicrousd },
+            timing: { retrieval_ms: Math.ceil(retrievalMs), answer_or_agent_ms: Math.max(1,Math.ceil(answer.answerDurationMs)),
+              grading_ms: Math.ceil(answer.adjudicationPreparationMs) } };
         }
         const stages = JSON.parse(await readAsset(family.stages));
         const initialFiles = {};
@@ -166,7 +172,9 @@ export async function createRehearsalExecutor(options) {
             grader: { kind: 'rust-blackbox', probes: stages.slice(0, index + 1).flatMap(stage => stage.probes) } })) });
         return { success: sequence.success, answer: null, knowledge_review: null,
           unresolved_rubric: false, critical_failure: false, diagnostics: sequence.steps, input_sha256: sequence.initialSha256,
-          providerUsage: sequence.providerUsage };
+          providerUsage: sequence.providerUsage,
+          timing: { retrieval_ms: Math.ceil(retrievalMs), answer_or_agent_ms: sequence.steps.reduce((sum,step) => sum + Math.ceil(step.agentElapsedMs),0),
+            grading_ms: sequence.steps.reduce((sum,step) => sum + Math.ceil(step.graderElapsedMs),0) } };
       });
       await verify();
       const value = executed.value;
@@ -176,13 +184,14 @@ export async function createRehearsalExecutor(options) {
         metadata: { claim: 'offline-synthetic-not-quality', reasoning_mode: 'none' },
         success, skipped: false, scores: {}, duration_ms: Math.max(1, Math.ceil(duration)), token_usage: tokenUsage(usage), answer,
         notes: ['Offline synthetic agent; not measured model quality.', `Prepared input SHA-256: ${value.input_sha256}`,
-          'Rehearsal timing includes disposable service setup and hidden grading; not model/user latency.'], sub_results });
-      return { work: selected, model: manifest.model,
-        result: result(item.id, value.success, performance.now() - started, value.answer,
+          'Execution timing excludes disposable service setup and private grading; simulated callbacks are not model latency evidence.'], sub_results });
+      return observation = { work: selected, model: manifest.model,
+        timing: { version: 1, ...value.timing, executor_total_ms: 0 },
+        result: result(item.id, value.success, value.timing.retrieval_ms + value.timing.answer_or_agent_ms, value.answer,
           value.diagnostics.map(step => ({ id: step.id, eval_type: 'agent_build_step',
-            metadata: { claim: 'offline-synthetic-not-quality', reasoning_mode: 'none' },
+            metadata: { claim: 'offline-synthetic-not-quality', reasoning_mode: 'none', grading_duration_ms: String(Math.ceil(step.graderElapsedMs)) },
             success: step.passed, skipped: false, scores: {},
-            duration_ms: Math.max(1, Math.ceil(step.agentElapsedMs + step.graderElapsedMs)), token_usage: tokenUsage(step.providerUsage),
+            duration_ms: Math.max(1, Math.ceil(step.agentElapsedMs)), token_usage: tokenUsage(step.providerUsage),
             notes: [`Agent input SHA-256: ${step.agentInputSha256}`, `Private grader input SHA-256: ${step.graderInputSha256}`] })),value.providerUsage),
         execution_microusd: value.providerUsage?.microusd ?? 0, provider_requests: value.providerUsage?.provider_requests ?? 0, uncertain_charge: false,
         ...(mediator ? { provider_audit: (await mediator.audit()).audit } : {}),
@@ -191,6 +200,9 @@ export async function createRehearsalExecutor(options) {
           snapshot_sha256: executed.beforeSha256, configuration_sha256: configurationSha256, driver_sha256: driverSha256,
           service_build: serviceBuild, semantic_time: manifest.semantic_time, sealed: true,
           restricted_network: true, hidden_tests_inaccessible: true } };
-    } finally { try { await mediator?.close(); } finally { busy = false; } }
+    } finally { try { await mediator?.close(); } finally {
+      if (observation) observation.timing.executor_total_ms = Math.ceil(performance.now() - started);
+      busy = false;
+    } }
   };
 }

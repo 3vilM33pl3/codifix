@@ -135,7 +135,7 @@ try {
   console.log(JSON.stringify({ execution_complete: true, task_executions: cursor,
     campaign_exit_code: run.code, knowledge_reviews_pending: artifact.observations.filter(row => row.unresolved_rubric).length,
     official_evidence: false, quality_passed: false, artifact: path.join(out, 'artifact.json'), review: path.join(out, 'review'),
-    limitations: ['Synthetic excerpt/no-op agents and fake vectors.', 'Timing includes setup and hidden grading.',
+    limitations: ['Synthetic excerpt/no-op agents and fake vectors.', 'Execution timings separate setup/grading but do not measure real model latency.',
       'Development-only fixtures; labels, paid evaluation and complete R3 evidence remain pending.'] }));
 } catch {
   console.error('Offline R3 rehearsal incomplete or invalid. Retain its private artifacts; do not automatically repeat uncertain work.');
