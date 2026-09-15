@@ -110,7 +110,7 @@ Together with the three existing development scenarios these fill ten families.
 Do not reuse these mechanisms as renamed held-out scenarios. This allocation is
 not label approval; sources precede private questions and scoring rubrics.
 
-### Held-out allocation (before implementation, labels still draft)
+### Held-out allocation (fixed before implementation, labels still draft)
 
 The held-out knowledge mechanisms are assigned independently of development:
 
@@ -153,7 +153,10 @@ route specificity, bounded decompression and schema-aware disclosure respectivel
 They must not reuse the development reference implementations or hidden probes.
 Related knowledge/coding mechanisms stay wholly in held-out, never development.
 
-This is an allocation, not a claim that any held-out fixture exists or is ready.
+All 25 knowledge families are now materialized as five-source/four-question drafts.
+Seven coding repositories are executable; the remaining five are `sensor-matrix`,
+`circuit-window`, `route-precedence`, `bounded-decoder` and `structured-redaction`.
+This is not approved benchmark or measured model-quality evidence.
 Materialize source contracts before tests/questions. Keep all held-out material
 out of development calibration packs and do not inspect model outcomes to tune
 its sources, labels or thresholds. All labels require Olivier's later approval.

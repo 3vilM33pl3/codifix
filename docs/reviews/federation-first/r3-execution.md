@@ -1,5 +1,20 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 complete draft knowledge allocation
+
+- Color-profile and distribution-notice families complete all 100 held-out
+  questions across 25 independently allocated families. Each has five synthetic
+  source documents, four canonical private rubrics and a review sheet. All 40
+  development questions across ten separate families also exist. No labels are
+  frozen or approved and no held-out model calibration has occurred.
+- All 56 evaluator tests and four required pack/CLI tests pass without skips.
+  The explicit draft held-out pack plans 1,605 dispatches for 100 questions plus
+  seven coding repositories across five conditions/three repeats. This is a
+  planning check, not a completed held-out run or permission for paid calls.
+- Five held-out coding repositories remain, alongside real embedding parity,
+  provider-call mediation and approval/evidence gates. These new fixtures do not
+  change production retrieval, filesystem, identity or distribution behavior.
+
 ## 2026-09-15 held-out field-matching and trace-link families
 
 - Added ten sources and eight draft questions on field/token boundaries,
