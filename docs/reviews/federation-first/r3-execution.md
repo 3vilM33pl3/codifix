@@ -1,5 +1,15 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out cancellation-scope knowledge family
+
+- Added five sources and four draft rubrics distinguishing disconnected callers,
+  explicit remote stop requests, operation-bound terminal receipts and unresolved
+  external work. Cancellation does not imply rollback, free usage or compensation
+  authority. All names and operations are synthetic.
+- Canonical rubric and four pack/CLI tests pass without skips. Twelve held-out
+  questions and three coding repositories are materialized; the explicit fixture
+  pack plans 225 executions. No model calibration, label approval or paid run.
+
 ## 2026-09-15 held-out path-policy repository
 
 - Added the allocated five-module path model with two public tests and ten

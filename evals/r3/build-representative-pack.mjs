@@ -46,7 +46,7 @@ function files(family, relative) {
     return [name];
   });
 }
-const knowledge = split === 'held_out' ? ['telemetry-units', 'cursor-snapshot']
+const knowledge = split === 'held_out' ? ['telemetry-units', 'cursor-snapshot', 'cancellation-scope']
   : ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure', 'timezone-window', 'artifact-origin', 'retention-hold', 'quota-accounting', 'dns-cutover'];
 const coding = split === 'held_out' ? ['framed-stream', 'interval-calendar', 'path-policy']
   : ['durable-importer', 'evidence-publication', 'configuration-rollout', 'dependency-build'];

@@ -20,7 +20,9 @@ renamed held-out cases. The first held-out knowledge family,
 [telemetry units](representative/held-out/telemetry-units/review.md), is materialized
 with four draft questions. A second,
 [cursor snapshot](representative/held-out/cursor-snapshot/review.md), covers tied
-sort values, mutable live ordering and scoped continuation; 23 families remain.
+sort values, mutable live ordering and scoped continuation. The third,
+[cancellation scope](representative/held-out/cancellation-scope/review.md), separates
+caller timeouts from remote terminal outcomes; 22 families remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
