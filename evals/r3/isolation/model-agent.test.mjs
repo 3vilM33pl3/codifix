@@ -7,6 +7,7 @@ import path from 'node:path';
 import { openRequestMediator } from '../request-mediator.mjs';
 import { createModelAgent } from './model-agent.mjs';
 import { runOfflineSequence } from './sequence.mjs';
+import { createResponsesPreparation } from '../responses-call.mjs';
 
 const binary = process.env.MEMORY_R3_BUDGET_BIN, image = process.env.MEMORY_R3_TEST_IMAGE;
 if (process.env.MEMORY_R3_REQUIRE_MODEL_AGENT === '1' && (!binary || !image)) throw Error('required isolated model agent configuration missing');
@@ -27,6 +28,43 @@ function sequence() {
       } },
     })) };
 }
+
+test('prepared Responses actions use durable pricing and the existing isolated three-step driver', { skip: !binary || !image, timeout: 60000 }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-prepared-agent-'));
+  const limits = { requests: 6, tokens: 2000, microusd: 1000, task_seconds: 60 };
+  const mediator = await openRequestMediator({ binary, directory, manifestSha256: 'a'.repeat(64), limits, taskLimits: limits });
+  const profile = { provider: 'openai', resolved_id: 'synthetic-command-v1', reasoning: 'none' };
+  let calls = 0;
+  try {
+    const prepareRequest = createResponsesPreparation({ mediator,
+      model: { ...profile, embedding_id: 'fake', max_input_tokens: 100, max_output_tokens: 100,
+        input_microusd_per_million: 1000000, output_microusd_per_million: 1000000 },
+      tokenizer: { id: 'synthetic-counter', sha256: 'a'.repeat(64) }, countInputTokens: () => 100,
+      send: async body => {
+        calls++;
+        assert.deepEqual(body.tools, []);
+        const serialized = JSON.stringify(body);
+        assert(!serialized.includes('HIDDEN_GRADING_SENTINEL') && !serialized.includes(directory));
+        const input = JSON.parse(body.input[0].content[0].text);
+        const action = input.previous ? { kind: 'finish' } : { kind: 'command', argv: ['/usr/local/bin/node', '-e',
+          `const fs=require('fs');const v=JSON.parse(fs.readFileSync('counter.json'));v.value++;fs.writeFileSync('counter.json',JSON.stringify(v));`] };
+        return JSON.stringify({ id: `resp_fake${calls}`, object: 'response', status: 'completed', model: profile.resolved_id,
+          error: null, incomplete_details: null,
+          output: [{ type: 'message', role: 'assistant', status: 'completed', content: [
+            { type: 'output_text', annotations: [], text: JSON.stringify({ action }) }] }],
+          usage: { input_tokens: 20, output_tokens: 10, total_tokens: 30,
+            input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
+      } });
+    const result = await runOfflineSequence({ ...sequence(), runAgent: createModelAgent({
+      mediator, prepareRequest, taskId: 'prepared-sequence', model: profile, maxCalls: 6 }) });
+    assert.equal(result.success, true);
+    assert.equal(calls, 6);
+    assert.equal(result.providerUsage.microusd, 180);
+    assert.equal(result.providerUsage.input_tokens, 120);
+    assert.deepEqual(JSON.parse(result.submission['counter.json']), { value: 3 });
+    assert.equal((await mediator.audit()).audit.ledger.microusd, 180);
+  } finally { await mediator.close(); await fs.rm(directory, { recursive: true }); }
+});
 
 test('six budgeted model calls span three isolated steps without leaking future tasks or hidden checks', { skip: !binary || !image, timeout: 60000 }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-model-agent-'));

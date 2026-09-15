@@ -3,7 +3,7 @@
 //! store. No network, provider credentials, payment approval or agent API.
 use anyhow::{Result, ensure};
 use mem_eval::campaign::{
-    Limits,
+    Limits, Model,
     budget::{Allowance, RequestBudget},
     provider_results::ProviderResults,
 };
@@ -45,6 +45,12 @@ enum Request {
     },
     Status,
     Audit,
+    Price {
+        model: Model,
+        input_tokens: u64,
+        output_tokens: u64,
+        cached_input_tokens: Option<u64>,
+    },
     Shutdown,
 }
 
@@ -142,6 +148,17 @@ fn run() -> Result<()> {
                     let audit = results.audit(&mut budget)?;
                     json!({"sha256":mem_eval::campaign::digest_value(&audit)?,"audit":audit})
                 }
+                Request::Price {
+                    model,
+                    input_tokens,
+                    output_tokens,
+                    cached_input_tokens,
+                } => serde_json::to_value(match cached_input_tokens {
+                    Some(cached) => {
+                        Allowance::for_reported_tokens(&model, input_tokens, output_tokens, cached)?
+                    }
+                    None => Allowance::for_model(&model, input_tokens, output_tokens)?,
+                })?,
                 Request::Shutdown => unreachable!(),
             })
         })();

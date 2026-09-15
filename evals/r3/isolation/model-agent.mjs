@@ -5,11 +5,13 @@
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import { runOfflineContainer, validateInput } from './container.mjs';
+import { dispatchModel } from './model-dispatch.mjs';
 
 export function createModelAgent(options) {
-  const { mediator, invoke, ...plain } = options;
+  const { mediator, invoke, prepareRequest, ...plain } = options;
   const { taskId, model, allowance, maxCalls = 12, taskTimeoutMs = 60000 } = structuredClone(plain);
-  if (!mediator || typeof mediator.dispatch !== 'function' || typeof invoke !== 'function'
+  if (!mediator || typeof mediator.dispatch !== 'function'
+      || (typeof invoke === 'function') === (typeof prepareRequest === 'function')
       || typeof taskId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(taskId)
       || !model || Object.keys(model).sort().join(',') !== 'provider,reasoning,resolved_id'
       || Object.values(model).some(v => typeof v !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(v))
@@ -39,7 +41,7 @@ export function createModelAgent(options) {
             finish: { kind: 'finish' }, network: 'none', persistence: 'selected-submission-files-only' } };
         const requestId = 'call-' + createHash('sha256').update(JSON.stringify([taskId, stepId, round])).digest('hex');
         calls++;
-        const receipt = await mediator.dispatch({ taskId, requestId, payload, allowance, withReceipt: true,
+        const receipt = await dispatchModel({ mediator, prepareRequest, taskId, requestId, payload, allowance, withReceipt: true,
           timeoutMs: Math.min(remaining, container.timeoutMs), invoke });
         const increments = { provider_requests: 1, new_provider_requests: receipt.invoked ? 1 : 0, ...receipt.usage };
         for (const key of Object.keys(usage)) {

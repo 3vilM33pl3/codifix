@@ -19,6 +19,21 @@ const allowance = { input_tokens: 10, output_tokens: 10, microusd: 10 };
 const usage = { input_tokens: 3, output_tokens: 2, microusd: 2 };
 const payload = { model: 'synthetic-only', purpose: 'answer', input: 'PRIVATE_SYNTHETIC_INPUT' };
 
+test('price bridge uses checked Rust arithmetic without reserving a call or inventing cache rates', { skip: !binary }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-price-bridge-'));
+  const mediator = await openRequestMediator({ binary, directory, manifestSha256: 'c'.repeat(64), limits, taskLimits });
+  const model = { provider: 'fake', resolved_id: 'fake-v1', reasoning: 'none', embedding_id: 'fake-vectors',
+    max_input_tokens: 100, max_output_tokens: 100, input_microusd_per_million: 2000000, output_microusd_per_million: 4000000 };
+  try {
+    assert.deepEqual(await mediator.price({ model, inputTokens: 20, outputTokens: 10 }),
+      { input_tokens: 20, output_tokens: 10, microusd: 80 });
+    await assert.rejects(mediator.price({ model, inputTokens: 20, outputTokens: 10, cachedInputTokens: 5 }), /rejected/);
+    model.cached_input_microusd_per_million = 500000;
+    assert.equal((await mediator.price({ model, inputTokens: 20, outputTokens: 10, cachedInputTokens: 5 })).microusd, 73);
+    assert.deepEqual((await mediator.status()).ledger, { requests: 0, tokens: 0, microusd: 0 });
+  } finally { await mediator.close(); await fs.rm(directory, { recursive: true }); }
+});
+
 test('loopback HTTP receipts are reserved before transmission, cached and rejected when usage disappears', { skip: !binary }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-mediated-http-'));
   let calls = 0;

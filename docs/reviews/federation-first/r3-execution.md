@@ -1,5 +1,23 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 prepared provider calls through existing isolated workflows
+
+- The private budget bridge exposes checked price arithmetic without reserving
+  or authorizing a call. The existing knowledge/agent adapters accept preparation
+  of the complete wire request before reservation, preserving their task identities
+  and accounting preparation time inside the deadline.
+- Provider preparation binds model, tokenizer identity, quoted input count and
+  exact request bytes. Saved private results retain cache/reasoning billing
+  metadata; agents receive only their answer/action. Token undercounts and unknown
+  cache prices leave an uncertain attempt and block further calls.
+- Eight mediator tests, four prepared-call tests and five model workflow tests
+  pass, including all knowledge conditions and the actual isolated three-step
+  driver. Evaluator Clippy passes after the Rust price-bridge addition.
+- These tests use synthetic local counters and fake responses, not a verified
+  production tokenizer or paid provider. Provider/model/tokenizer/price approvals,
+  real embedding parity and the paid CLI guard remain unresolved. The full
+  development rehearsal is still running against its earlier frozen runtime.
+
 ## 2026-09-15 common provider request codec and query timing correction
 
 - Added a pure structured-request codec shared across knowledge conditions and

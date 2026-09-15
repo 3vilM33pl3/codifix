@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { openRequestMediator } from '../request-mediator.mjs';
 import { runMediatedKnowledge } from './model-answer.mjs';
+import { createResponsesPreparation } from '../responses-call.mjs';
 
 const binary = process.env.MEMORY_R3_BUDGET_BIN, scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
 if (process.env.MEMORY_R3_REQUIRE_MODEL_ANSWER === '1' && (!binary || !scoreBinary)) throw Error('required mediated answer configuration missing');
@@ -17,6 +18,46 @@ const rubric = { case_id: 'synthetic-question', question: 'What should precede r
     id: `criterion-${i}`, dimension, instruction: 'HIDDEN_RUBRIC_TEXT requires human review.', critical: false })) };
 const model = { provider: 'synthetic', resolved_id: 'fake-answer-v1', reasoning: 'none' };
 const allowance = { input_tokens: 100, output_tokens: 100, microusd: 10 };
+
+test('prepared Responses knowledge retains private adjudication and exact priced receipts', { skip: !binary || !scoreBinary }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-prepared-answer-'));
+  const limits = { requests: 5, tokens: 2000, microusd: 1000, task_seconds: 20 };
+  const mediator = await openRequestMediator({ binary, directory, manifestSha256: 'b'.repeat(64), limits, taskLimits: limits });
+  const profile = { provider: 'openai', resolved_id: 'synthetic-answer-v1', reasoning: 'none' };
+  const inputs = [];
+  try {
+    const prepareRequest = createResponsesPreparation({ mediator,
+      model: { ...profile, embedding_id: 'fake', max_input_tokens: 100, max_output_tokens: 100,
+        input_microusd_per_million: 1000000, output_microusd_per_million: 1000000 },
+      tokenizer: { id: 'synthetic-counter', sha256: 'b'.repeat(64) }, countInputTokens: () => 100,
+      send: async body => {
+        const serialized = JSON.stringify(body);
+        assert(!serialized.includes('UNSELECTED_PRIVATE_SOURCE') && !serialized.includes('HIDDEN_RUBRIC_TEXT') && !serialized.includes(directory));
+        inputs.push(body);
+        const source = JSON.parse(body.input[0].content[0].text).context[0];
+        const answer = source ? { text: source.text, refused: false, citations: [{ source_id: source.id, quote: source.text }] }
+          : { text: 'Insufficient supplied evidence.', refused: true, citations: [] };
+        return JSON.stringify({ id: `resp_fake${inputs.length}`, object: 'response', status: 'completed', model: profile.resolved_id,
+          error: null, incomplete_details: null,
+          output: [{ type: 'message', role: 'assistant', status: 'completed', content: [
+            { type: 'output_text', annotations: [], text: JSON.stringify(answer) }] }],
+          usage: { input_tokens: 7, output_tokens: 5, total_tokens: 12,
+            input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
+      } });
+    for (const condition of ['handover', 'lexical', 'vector', 'full-memory', 'no-memory']) {
+      const result = await runMediatedKnowledge({ mediator, prepareRequest, model: profile,
+        taskId: condition, requestId: condition, scoreBinary, sources, rubric, question: rubric.question,
+        context: condition === 'no-memory' ? [] : [sources[0]], manifestSha256: 'b'.repeat(64),
+        work: { case_id: rubric.case_id, condition, repeat: 0 } });
+      assert.equal(result.executionMicrousd, 12);
+      assert.equal(result.assessment.success, false);
+      assert.equal(result.officialEvidence, false);
+      if (condition !== 'no-memory') assert(result.assessment.citations_valid && result.assessment.unresolved);
+    }
+    for (const body of inputs.slice(1, 4)) assert.deepEqual(body, inputs[0]);
+    assert.equal((await mediator.audit()).audit.ledger.microusd, 60);
+  } finally { await mediator.close(); await fs.rm(directory, { recursive: true }); }
+});
 
 test('all five conditions use one tool-free model contract and private adjudication with exact call accounting', { skip: !binary || !scoreBinary }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-model-answer-'));

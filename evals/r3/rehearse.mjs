@@ -75,7 +75,7 @@ try {
   };
   for (const relative of ['rehearsal-controller.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'synthetic-embedding.mjs', 'request-mediator.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
     'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs', 'isolation/service-session.mjs', 'isolation/embedding-proxy.mjs',
-    'isolation/model-agent.mjs', 'isolation/model-answer.mjs', 'isolation/rehearsal-task.mjs']) {
+    'isolation/model-agent.mjs', 'isolation/model-answer.mjs', 'isolation/model-dispatch.mjs', 'isolation/rehearsal-task.mjs']) {
     await add(`runtime/${relative}`, await fs.readFile(path.join(here, relative)), relative === 'offline-driver.mjs');
   }
   await add('private/runtime.json', JSON.stringify({ version: 1, binaries: pins, images,

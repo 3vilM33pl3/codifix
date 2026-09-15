@@ -423,6 +423,21 @@ driver, not provider tool calls. Private labels, graders and condition names are
 not request fields. The caller must still quote and reserve the exact wire body
 before transmission; the codec does not supply a tokenizer or spend authority.
 
+The existing knowledge/agent adapters also accept a trusted `prepareRequest`
+instead of `invoke`. `createResponsesPreparation` counts the complete wire request
+through an explicitly supplied **local, reviewed tokenizer**, obtains checked Rust
+pricing, and returns the exact body/quote for durable reservation. Preparation time
+consumes the task deadline. Saved results retain cache/reasoning billing metadata
+privately; agents receive only the decoded answer/action. Unknown usage, missing
+cache prices or tokenizer undercounts become uncertain, never free retries.
+
+The tests use a clearly named synthetic counter and fake responses, including
+loopback HTTP. A tokenizer ID/hash establishes identity, not correctness or an
+automatic match to a model. A verified tokenizer for the selected provider/model,
+approved prices and the locked campaign authorization remain required before live
+execution. The paid CLI guard remains in place. Do not pass an HTTP token-count
+request as the local counter or assume such a request is free/unmetered.
+
 ## Reusable dispatch results
 
 `ProviderResults` stores bounded outputs in a private directory, separately from

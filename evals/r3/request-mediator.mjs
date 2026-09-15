@@ -72,6 +72,10 @@ export async function openRequestMediator(options) {
   return {
     status: () => request({ operation: 'status' }),
     audit: () => request({ operation: 'audit' }),
+    // Pure arithmetic, not a reservation or approval. The trusted caller must
+    // supply its manifest-locked model; no rate is fetched or inferred here.
+    price: ({ model, inputTokens, outputTokens, cachedInputTokens }) => request({ operation: 'price', model,
+      input_tokens: inputTokens, output_tokens: outputTokens, ...(cachedInputTokens === undefined ? {} : { cached_input_tokens: cachedInputTokens }) }),
     // Recovery is deliberately separate from dispatch; never infer a free retry
     // from a crash, timeout or missing usage. A receipt must already exist.
     recover: requestId => request({ operation: 'recover', request_id: requestId }),

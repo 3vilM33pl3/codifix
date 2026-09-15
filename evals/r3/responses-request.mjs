@@ -17,6 +17,7 @@ export function prepareResponsesRequest(payload, bounds) {
   if (!keys(limit, 'maxInputTokens,maxOutputTokens')
       || Object.values(limit).some(n => !Number.isSafeInteger(n) || n < 1)
       || !keys(p?.model, 'provider,reasoning,resolved_id') || p.model.provider !== 'openai'
+      || typeof p.model.resolved_id !== 'string'
       || !/^[A-Za-z0-9._-]{1,128}$/.test(p.model.resolved_id)
       || !['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'].includes(p.model.reasoning)) {
     throw Error('invalid locked Responses profile');

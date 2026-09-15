@@ -32,6 +32,7 @@ test('common answer profile has no tools, retained conversation or condition-spe
   assert.deepEqual(prepared.decode(response(answer)).output, answer);
   assert.throws(() => prepared.decode(response({ ...answer, hidden: 'not allowed' })));
   assert.throws(() => prepareResponsesRequest({ ...knowledge(), condition: 'full-memory' }, bounds));
+  assert.throws(() => prepareResponsesRequest({ ...knowledge(), model: { ...model, resolved_id: undefined } }, bounds));
 });
 
 test('coding JSON action is not a provider tool and malformed actions cannot reach execution', () => {
