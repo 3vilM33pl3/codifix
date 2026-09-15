@@ -33,6 +33,9 @@ reference solutions, seed input and suite/hidden-test definitions. Never mount
 - Pure indexed-document, fixed BM25 and cosine-vector comparator functions in
   `mem-eval::campaign::baselines`. Embeddings are supplied by the caller; no
   provider or Memory ranking is silently substituted for a baseline.
+- `r3_retriever` example executable connects those comparators to the existing
+  external-retriever JSON protocol. See the adapter contract below; this is
+  context retrieval, not a common answer model or complete campaign driver.
 - Campaign identity/order/approval contracts and fail-closed statistical reports.
 - Dispatch-boundary checks reject changed manifests/assets after the final task
   as well as between tasks. Invalid model, usage, timing, rubric and isolation
@@ -78,6 +81,25 @@ orchestration, complete corpus fingerprinting or crash-recovery driver.
   adjudication. Existing substring scoring is diagnostic only.
 - Run complete offline campaigns and crash/isolation fault tests. Reference
   solution tests alone do not establish these properties.
+
+## Baseline adapter contract
+
+Build `cargo build -p mem-eval --example r3_retriever --locked`. Invoke
+`target/debug/examples/r3_retriever PREPARED_CONFIG.json` with the existing
+external-retriever request JSON on stdin. Lock the executable/configuration in
+the campaign before use. Configuration fields are `project`, `condition`,
+`mode` (`handover`, `lexical`, `vector`), prepared `documents` (`id`, `text`),
+`embeddings` for vector mode, `top_k` and the common context `bytes` limit.
+Project and condition must match exactly; handover refuses truncation.
+
+The adapter never follows the request's `context.fixture_path`, rejects nonempty
+`context.hidden_facts`, and returns selected texts with source-ID citations.
+Errors omit query/configuration contents. It makes no provider calls. Vector
+mode requires `query_embedding` on the request and fails if missing; the legacy
+external runner does not supply this extension. Future campaign mediation must
+generate/account for that embedding using the locked provider. Tests use explicit
+fake vectors only, never evidence of vector retrieval quality. The common answer
+model, equal-information corpus preparation and campaign integration remain open.
 
 ## Statistical interpretation
 

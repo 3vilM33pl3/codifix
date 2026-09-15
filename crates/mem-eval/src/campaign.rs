@@ -11,6 +11,7 @@ use std::{
 };
 
 pub mod baselines;
+pub mod retriever;
 mod statistics;
 pub use statistics::{Comparison, Report, TrackReport, report};
 

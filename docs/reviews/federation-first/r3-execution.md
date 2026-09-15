@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 external baseline adapter
+
+- Added the existing-protocol `r3_retriever` executable for prepared handover,
+  BM25 and explicit-vector context selection with shared limits and citations.
+- The adapter denies project/condition mismatches and hidden answer facts,
+  ignores host fixture paths, and emits sanitized failures. Vector mode requires
+  an explicit query embedding rather than inventing vectors or falling back.
+- Thirty-two evaluator tests, scoped all-target Clippy and a real executable
+  stdin/stdout rehearsal passed. The rehearsal tests all three comparators and
+  scope, label-leak, missing-vector, oversize and budget rejection.
+- This is context retrieval only. Common answer generation, provider-mediated
+  query embeddings and complete campaign integration remain open. No quality,
+  parity or R3-completion claim follows from these tests.
+
 ## 2026-09-15 sealed database reset integration
 
 - Evaluation startup now rejects public-schema sequence USAGE/UPDATE and

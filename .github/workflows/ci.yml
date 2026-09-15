@@ -308,6 +308,11 @@ jobs:
           r3_rust_image=$(docker image inspect --format '{{.Id}}' memory-r3-rust:offline)
           MEMORY_R3_RUST_IMAGE="$r3_rust_image" MEMORY_R3_REQUIRE_RUST=1 \
             node --test evals/r3/isolation/rust.test.mjs
+      - name: Verify R3 external baseline adapter
+        run: |
+          cargo build -p mem-eval --example r3_retriever --locked
+          MEMORY_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" MEMORY_R3_REQUIRE_RETRIEVER=1 \
+            node --test evals/r3/retriever.test.mjs
       - run: |
           cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
           cargo run --locked --bin memory -- \
