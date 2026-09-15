@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 retention-hold knowledge family
+
+- Added five fictional policy/inventory/journal sources and four draft rubrics
+  separating read expiry, hold authority, uncertain external deletion and copies
+  in backups/exports. No jurisdictional legal conclusions are benchmark facts.
+- Canonical rubric and both pack/CLI tests pass, no skips. Thirty-two development
+  knowledge questions are materialized. These are offline fixture checks, not
+  tested customer retention compliance or approved evaluation labels.
+
 ## 2026-09-15 artifact-origin knowledge family
 
 - Added five fictional release sources and four draft rubrics distinguishing
