@@ -80,6 +80,17 @@ writes, denied cross-clone connections and acceptance by the service's seal
 checker. This is an integration-test primitive, not yet the campaign's snapshot
 orchestration, complete corpus fingerprinting or crash-recovery driver.
 
+`mem_test_support::fingerprint::benchmark_fingerprint` now hashes all public
+benchmark tables and their column shapes from a single normalized, read-only
+snapshot. Only the four permitted operational journals are excluded; new tables,
+reinforcement, embeddings and query activity are included automatically. A real
+service-query test uses fake embeddings with the actual full-Memory retrieval
+path, verifies seeded reinforcement ranking, and checks identical fingerprints
+before/after queries and across independently sealed clones. It is a service
+handler integration test, not HTTP authentication or a complete campaign.
+The fingerprint utility is bounded for small disposable fixtures, and does not
+prove permissions, indexes, functions, external evidence files or backup recovery.
+
 - Implement and verify disposable snapshot preparation/reset and per-condition
   service/agent/grader containers with denied cross-condition/hidden-test access.
 - Wire baseline adapters and the existing suite runner into that driver, including

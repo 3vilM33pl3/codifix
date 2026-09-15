@@ -32,6 +32,97 @@ mod evaluation_tests {
     }
 
     #[tokio::test]
+    async fn real_query_on_sealed_clones_preserves_corpus_embeddings_and_reinforcement() {
+        use mem_test_support::fingerprint::benchmark_fingerprint;
+        use sqlx::ConnectOptions;
+        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
+            return;
+        };
+        let project = Uuid::new_v4();
+        let other = Uuid::new_v4();
+        let hot = Uuid::new_v4();
+        let cold = Uuid::new_v4();
+        let forbidden = Uuid::new_v4();
+        for (id, slug) in [(project, "r3-corpus"), (other, "r3-other")] {
+            sqlx::query(
+                "INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,$2,'/synthetic')",
+            )
+            .bind(id)
+            .bind(slug)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        }
+        for (id, owner) in [(hot, project), (cold, project), (forbidden, other)] {
+            sqlx::query("INSERT INTO memory_entries
+                (id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document)
+                VALUES($1,$2,$1,1,false,'Reconcile settlement acknowledgement before retry.',
+                'Settlement reconciliation','implementation','project',3,0.9,
+                '2025-12-01T00:00:00Z','2025-12-01T00:00:00Z',to_tsvector('english','Reconcile settlement acknowledgement before retry.'))")
+                .bind(id).bind(owner).execute(&db.pool).await.unwrap();
+        }
+        sqlx::query("INSERT INTO memory_scores(canonical_id,project_id,activation,access_count,last_decay_at)
+            VALUES($1,$2,10,7,'2025-12-31T00:00:00Z')")
+            .bind(hot).bind(project).execute(&db.pool).await.unwrap();
+        let mut registry = mem_search::test_support::static_embedding_registry(&[("r3-fake", 1.0)]);
+        registry.set_active("r3-fake").unwrap();
+        for slug in ["r3-corpus", "r3-other"] {
+            mem_search::rebuild_chunks(&db.pool, slug, &registry, None)
+                .await
+                .unwrap();
+        }
+        let before = benchmark_fingerprint(&db.pool).await.unwrap();
+        let frozen = db.freeze().await.unwrap();
+        let mut previous = None;
+        for _ in 0..2 {
+            let reader = frozen.fork_read_only().await.unwrap();
+            assert_eq!(benchmark_fingerprint(&reader.pool).await.unwrap(), before);
+            let mut cfg = config(true);
+            cfg.database.url = reader.pool.connect_options().to_url_lossy().to_string();
+            let state = build_state(cfg, Arc::new(Mutex::new(None))).await.unwrap();
+            *state.embedders.write().await = registry.clone(); // Fake provider, real retrieval path.
+            let request: QueryRequest = serde_json::from_value(serde_json::json!({
+                "project":"r3-corpus", "query":"settlement acknowledgement retry",
+                "top_k":5, "answer_mode":"deterministic", "retrieval_mode":"full-memory"
+            }))
+            .unwrap();
+            let Json(answer) = crate::handlers::query::query(State(state.clone()), Json(request))
+                .await
+                .unwrap();
+            assert_eq!(answer.results.len(), 2);
+            assert_eq!(answer.results[0].memory_id, hot);
+            assert!(answer.results.iter().all(|r| r.memory_id != forbidden));
+            assert!(
+                answer
+                    .results
+                    .iter()
+                    .any(|r| r.debug.semantic_similarity > 0.0)
+            );
+            assert!(
+                answer.results[0]
+                    .score_explanation
+                    .iter()
+                    .any(|s| s.starts_with("activation"))
+            );
+            let scores: Vec<_> = answer
+                .results
+                .iter()
+                .map(|r| (r.memory_id, r.score, r.debug.recency_boost))
+                .collect();
+            if let Some(previous) = &previous {
+                assert_eq!(&scores, previous);
+            }
+            previous = Some(scores);
+            assert!(state.recent_activity.lock().unwrap().is_empty());
+            assert_eq!(benchmark_fingerprint(&reader.pool).await.unwrap(), before);
+            state.pool().unwrap().close().await;
+            drop(state);
+            reader.cleanup().await.unwrap();
+        }
+        frozen.cleanup().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn evaluation_rejects_writable_service_before_connecting() {
         let result = build_state(config(false), Arc::new(Mutex::new(None))).await;
         assert!(result.err().unwrap().to_string().contains("read_only"));

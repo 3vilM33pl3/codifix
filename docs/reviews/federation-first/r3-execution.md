@@ -1,5 +1,29 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 corpus fingerprints and combined regression evidence
+
+- Added a bounded fingerprint of public benchmark table contents and column
+  shapes from one normalized read-only snapshot. Reinforcement, embeddings,
+  activity and newly added tables are included; only the four permitted
+  operational journals are excluded. This is not a full schema/security audit.
+- A real service-handler test queries two independently sealed PostgreSQL clones
+  using fake embeddings and actual full-Memory retrieval. Seeded reinforcement
+  remains effective, another project's rows stay out, scores match across clones,
+  and complete benchmark fingerprints remain unchanged before/after queries.
+- Fingerprint tests cover row-order/timezone independence, changed data/columns,
+  prepared-template reset and restricted readers. Test data and PostgreSQL were
+  disposable; the running dev service/database was not modified by these tests.
+- Combined verification: 874 required-database workspace Rust tests passed with
+  two test threads; workspace all-target Clippy, fmt and boundaries passed.
+  Eleven required live container/Rust benchmark tests and two executable
+  retriever/adjudication tests passed without skips. Web: 90 tests and build
+  passed; Lean build/test and lean CLI check passed with existing warnings.
+- This verifies components and a real retrieval/isolation integration, not a
+  complete campaign. Full campaign orchestration, complete representative suite,
+  all-provider mediation/cached results/reconciliation, review collection,
+  approvals and official measured evidence remain open. No paid/provider or
+  customer deployment operations were performed; R3 remains incomplete.
+
 ## 2026-09-15 per-task provider budget accounting
 
 - Durable request journals now optionally enforce task-level ceilings in

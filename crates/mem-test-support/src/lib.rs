@@ -4,6 +4,8 @@ use anyhow::{Context, Result};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use uuid::Uuid;
 
+pub mod fingerprint;
+
 const PGVECTOR_MIGRATION_WITHOUT_LEGACY_HNSW: &str = r#"
 CREATE EXTENSION IF NOT EXISTS vector;
 
