@@ -438,6 +438,12 @@ approved prices and the locked campaign authorization remain required before liv
 execution. The paid CLI guard remains in place. Do not pass an HTTP token-count
 request as the local counter or assume such a request is free/unmetered.
 
+Development authorization does not require an already-selected reference baseline:
+calibration is how that choice is made. Label approval and a separate matching
+development spend approval are still required. Held-out authorization requires
+the frozen reference baseline. Changing the manifest after calibration changes
+its identity and requires matching approvals for the newly locked campaign.
+
 ## Reusable dispatch results
 
 `ProviderResults` stores bounded outputs in a private directory, separately from

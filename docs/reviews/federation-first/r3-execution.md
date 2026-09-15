@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 remove circular development baseline gate
+
+- Development readiness no longer demands the reference baseline that calibration
+  is intended to select. It still requires matching label/development approvals;
+  held-out authorization continues to require the frozen baseline and its own
+  approval. Changing the manifest invalidates earlier approvals as before.
+- Evaluator tests pass, including a new test of this distinction. The paid CLI
+  guard is unchanged, so this is not authorization to make any provider call.
+
 ## 2026-09-15 prepared provider calls through existing isolated workflows
 
 - The private budget bridge exposes checked price arithmetic without reserving

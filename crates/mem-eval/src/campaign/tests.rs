@@ -689,6 +689,47 @@ fn draft_labels_or_changed_manifest_cannot_be_authorized() {
 }
 
 #[test]
+fn development_can_select_a_reference_but_cannot_authorize_held_out_execution() {
+    let mut manifest = fixture();
+    manifest.reference_baseline = None;
+    assert!(
+        manifest
+            .plan(Split::Development)
+            .unwrap()
+            .readiness_errors
+            .is_empty()
+    );
+    assert!(
+        manifest
+            .plan(Split::HeldOut)
+            .unwrap()
+            .readiness_errors
+            .iter()
+            .any(|e| e.contains("reference baseline"))
+    );
+    let approvals: Vec<_> = [ApprovalPurpose::Labels, ApprovalPurpose::Development]
+        .into_iter()
+        .map(|purpose| Approval {
+            manifest_sha256: digest_value(&manifest).unwrap(),
+            reviewer: "fixture-not-real-approval".into(),
+            approved_at: Utc::now(),
+            purpose,
+            maximum_microusd: manifest.limits.microusd,
+        })
+        .collect();
+    assert!(manifest.authorize(Split::Development, &approvals).is_ok());
+    assert!(manifest.authorize(Split::HeldOut, &approvals).is_err());
+    assert!(
+        manifest
+            .authorize(Split::Development, &approvals[1..])
+            .is_err()
+    );
+    manifest.reference_baseline = Some(Condition::Lexical);
+    // Changing the locked campaign still requires fresh matching approvals.
+    assert!(manifest.authorize(Split::Development, &approvals).is_err());
+}
+
+#[test]
 fn smoke_and_legacy_manifests_cannot_be_promoted_by_label_approval() {
     let mut m = fixture();
     m.smoke_only = true;

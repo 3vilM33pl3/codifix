@@ -406,7 +406,7 @@ impl Manifest {
         if self.label_status != "reviewed" {
             readiness_errors.push("labels require Olivier's approval".into());
         }
-        if self.reference_baseline.is_none() {
+        if split == Split::HeldOut && self.reference_baseline.is_none() {
             readiness_errors.push("freeze development-selected reference baseline".into());
         }
         if self.model.resolved_id == "pending"
