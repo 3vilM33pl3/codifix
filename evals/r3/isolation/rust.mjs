@@ -15,7 +15,9 @@ if(compiled.status!==0) process.exit(65);
 const run=spawnSync('/work/program',probe.argv,{
   input:probe.stdin,encoding:'utf8',timeout:5000,maxBuffer:1048576
 });
-if(run.error) process.exit(70);
+// An evaluated program may exit without consuming stdin. That can race the
+// host pipe writer (EPIPE); it is a failed submission, not missing infrastructure.
+if(run.error) process.exit(run.error.code === 'EPIPE' ? 66 : 70);
 if(run.status!==0) process.exit(66);
 process.stdout.write(run.stdout);
 `;

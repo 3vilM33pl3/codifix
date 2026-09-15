@@ -78,3 +78,13 @@ test('real Rust: multi-file success, wrong answer, compile failure and hidden ex
   assert.equal(privacy.probes[0].exitCode, 0);
   assert(!JSON.stringify(privacy).includes('HOST_ONLY_EXPECTATION'));
 });
+
+test('a program closing stdin early is a submission failure, not unavailable infrastructure', { skip: !image, timeout: 120000 }, async () => {
+  const result = await gradeRustCase({
+    image,
+    files: { 'src/main.rs': 'fn main() {}' },
+    probes: [{ id: 'unread-input', argv: [], stdin: 'x'.repeat(64 * 1024), expectedStdout: 'processed\n' }],
+  });
+  assert.equal(result.success, false);
+  assert([0, 66].includes(result.probes[0].exitCode));
+});
