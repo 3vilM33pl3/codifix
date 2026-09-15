@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out snapshot-pages repository
+
+- Added five modules and ten probes for tied ordering, project-before-limit
+  filtering, immutable reads under live mutations, cursor binding and expiry.
+  This is an in-memory snapshot model, not deployed database or auth evidence.
+- Two public tests, the required targeted reference/cumulative/broken-control
+  group and four pack/CLI tests pass without skips. Six of twelve held-out
+  repositories exist. The development rehearsal has not yet completed.
+
 ## 2026-09-15 held-out circuit-probes knowledge family
 
 - Added five synthetic sources and four draft rubrics for shared half-open

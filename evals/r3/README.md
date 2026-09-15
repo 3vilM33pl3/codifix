@@ -64,8 +64,9 @@ operation and alias-bound authorization in a deterministic model. The fourth,
 [decimal register](representative/held-out/decimal-register/review.md), tests exact
 parsing, checked arithmetic and bounded rational rounding. The fifth,
 [identifier catalog](representative/held-out/identifier-catalog/review.md), separates
-display spelling and normalized ownership with an explicit rule table; seven
-remain. Run
+display spelling and normalized ownership with an explicit rule table. The sixth,
+[snapshot pages](representative/held-out/snapshot-pages/review.md), checks immutable
+ordered reads and scoped cursors; six remain. Run
 `node --test evals/r3/held-out.test.mjs` with the pinned Rust image.
 These are deterministic fixture checks, not held-out model calibration or label
 approval. The offline controller integrates
