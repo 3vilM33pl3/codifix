@@ -20,6 +20,18 @@ mod evaluation_tests {
     }
 
     #[tokio::test]
+    async fn cloned_evaluation_database_satisfies_service_seal() {
+        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
+            return;
+        };
+        let frozen = db.freeze().await.unwrap();
+        let reader = frozen.fork_read_only().await.unwrap();
+        verify_evaluation_seal(&reader.pool).await.unwrap();
+        reader.cleanup().await.unwrap();
+        frozen.cleanup().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn evaluation_rejects_writable_service_before_connecting() {
         let result = build_state(config(false), Arc::new(Mutex::new(None))).await;
         assert!(result.err().unwrap().to_string().contains("read_only"));
@@ -69,6 +81,37 @@ mod evaluation_tests {
         );
         assert!(state.recent_activity.lock().unwrap().is_empty());
         let pool = state.pool().unwrap();
+        // nextval is a write even though it appears in SELECT. A granted
+        // sequence capability must not bypass the frozen benchmark contract.
+        sqlx::raw_sql(&format!(
+            "CREATE SEQUENCE r3_seal_probe;
+             GRANT USAGE ON SEQUENCE r3_seal_probe TO {role};"
+        ))
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        assert!(
+            verify_evaluation_seal(&pool)
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("sequence writes")
+        );
+        sqlx::query(&format!(
+            "REVOKE USAGE ON SEQUENCE r3_seal_probe FROM {role}"
+        ))
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        verify_evaluation_seal(&pool).await.unwrap();
+        let error = sqlx::query("SELECT nextval('r3_seal_probe')")
+            .execute(&pool)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.as_database_error().unwrap().code().as_deref(),
+            Some("42501")
+        );
         let error = sqlx::query("UPDATE memory_scores SET activation=0")
             .execute(&pool)
             .await
@@ -361,7 +404,7 @@ pub(crate) async fn connect_primary_pool(config: &AppConfig) -> Result<PgPool> {
 /// write privileges. Operational effect journals are the explicit exception.
 async fn verify_evaluation_seal(pool: &PgPool) -> Result<()> {
     let privileged: bool = sqlx::query_scalar(
-        "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls
+        "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls OR rolreplication
          OR has_schema_privilege(current_user, 'public', 'CREATE')
          OR EXISTS (SELECT 1 FROM pg_auth_members WHERE member = r.oid)
          FROM pg_roles r WHERE rolname = current_user",
@@ -382,6 +425,17 @@ async fn verify_evaluation_seal(pool: &PgPool) -> Result<()> {
     .fetch_one(pool)
     .await?;
     anyhow::ensure!(!writable, "evaluation database allows benchmark writes");
+    let writable_sequences: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+         WHERE n.nspname='public' AND c.relkind='S'
+         AND has_sequence_privilege(current_user, c.oid, 'USAGE,UPDATE'))",
+    )
+    .fetch_one(pool)
+    .await?;
+    anyhow::ensure!(
+        !writable_sequences,
+        "evaluation database allows sequence writes"
+    );
     let unsafe_functions: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
          WHERE n.nspname='public' AND p.prosecdef AND has_function_privilege(current_user,p.oid,'EXECUTE'))",

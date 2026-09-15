@@ -1,5 +1,22 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 sealed database reset integration
+
+- Evaluation startup now rejects public-schema sequence USAGE/UPDATE and
+  replication roles, closing writes through `SELECT nextval(...)`.
+- Test-support databases can be frozen with connections disabled and cloned
+  without migrations or reseeding. Read-only clones receive distinct logins,
+  benchmark SELECT and only the existing permitted operational DML.
+- Real PostgreSQL tests verify exact seeded reinforcement restoration, denied
+  writes, denied cross-clone connections and acceptance by the service seal.
+- Required-database verification: 127 service tests and two test-support unit
+  tests passed; the migration integration test also passed separately. Scoped
+  all-target Clippy, formatting and boundary checks passed after fixing test
+  assertion lint errors. Existing federation service regressions were included.
+- Database testing used an isolated pgvector container, never the dev database.
+  This is a test-support primitive, not complete campaign snapshot orchestration,
+  corpus fingerprinting or crash reconciliation. No R3 completion claim.
+
 ## 2026-09-15 real Rust grading integration
 
 - Added a minimal digest-pinned Rust/Node image without checkout or assistant.

@@ -53,8 +53,18 @@ an open gate.
 The same component now executes three-step agent/private-grader handoffs with
 explicit source-only carryover and no grader feedback returned to agents.
 Positive, negative, deleted-file recovery and fresh-reset tests run in real
-containers using inert JSON submissions. This is not yet the Rust coding grader,
-existing suite-runner integration or an official campaign result.
+containers using inert JSON submissions. It also supports dependency-free,
+multi-file Rust binaries with host-held black-box expectations in a pinned
+Rust/Node image. Existing suite-runner integration and official campaign results
+remain unfinished.
+
+`mem-test-support::IsolatedDatabase::freeze` and `FrozenDatabase::fork_read_only`
+provide tested prepared-database clones for service integration tests. The
+template refuses new connections; each clone uses a distinct restricted login.
+Tests verify unchanged seeded reinforcement state after reset, denied benchmark
+writes, denied cross-clone connections and acceptance by the service's seal
+checker. This is an integration-test primitive, not yet the campaign's snapshot
+orchestration, complete corpus fingerprinting or crash-recovery driver.
 
 - Implement and verify disposable snapshot preparation/reset and per-condition
   service/agent/grader containers with denied cross-condition/hidden-test access.
@@ -104,7 +114,9 @@ Keep reinforcement ranking enabled if it is part of the locked configuration.
 Measurement mode disables learning independently. It does not run migrations or
 bootstrap identities; prepare these before sealing. Use a non-owner login with
 SELECT on benchmark tables and no role memberships, schema CREATE or privileged
-attributes. Only `external_effects`, `external_effect_outcomes`,
+attributes (including replication). No public-schema sequence USAGE/UPDATE is
+allowed: `SELECT nextval(...)` would otherwise change the frozen state.
+Only `external_effects`, `external_effect_outcomes`,
 `foreground_executions`, and `auth_audit_events` may receive operational DML.
 Security-definer functions in the public schema are rejected. A privileged
 preparation process must not continue writing after the snapshot is sealed.
