@@ -54,6 +54,7 @@ export async function createRehearsalExecutor(options) {
   const { root, manifestSha256, nodeImage, rustImage, scoreBinary, retrieverBinary,
     driverSha256, configurationSha256, serviceBuild, budgetBinary } = structuredClone(options.configuration);
   const session = options.session; // Trusted host owner, never serialized to an agent.
+  const baselineEmbeddings = options.baselineEmbeddings;
   if (!path.isAbsolute(root) || !path.isAbsolute(scoreBinary) || !path.isAbsolute(retrieverBinary)
       || [manifestSha256, driverSha256, configurationSha256].some(value => !/^[a-f0-9]{64}$/.test(value))) throw Error('invalid rehearsal configuration');
   const manifestBytes = await fs.readFile(path.join(root, 'campaign.json'));
@@ -130,7 +131,12 @@ export async function createRehearsalExecutor(options) {
             try {
               const file = path.join(temporary, 'configuration.json');
               const profile = syntheticProfile(16, syntheticEmbeddingModel);
-              const vectors = selected.condition === 'vector' ? sources.map(source => syntheticVector(source.text)) : [];
+              const vectors = selected.condition === 'vector' ? sources.map(source => {
+                if (!baselineEmbeddings) return syntheticVector(source.text);
+                const vector = baselineEmbeddings.get(`${project}:${source.id}`);
+                if (!vector) throw Error('missing prepared baseline vector');
+                return vector;
+              }) : [];
               await fs.writeFile(file, JSON.stringify({ project, condition: 'external-retriever', mode: selected.condition,
                 documents: sources, ...(selected.condition === 'vector'
                   ? { embeddings: vectors, embedding_corpus: bindCorpus(profile, sources, vectors) } : {}),

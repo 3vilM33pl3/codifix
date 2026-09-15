@@ -1,5 +1,25 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 integrated preparation-budget rehearsal completed
+
+- The corrected 75-task rehearsal passes in 483 seconds. Artifact:
+  `/data/tmp/memory-r3-rehearsal-cli-ujsK8K/pack/run/artifact.json`.
+  Its preparation phase records 34 simulated embedding calls and 34 symbolic
+  input tokens; execution records 180 simulated calls, including 30 query
+  embeddings. All 214 calls consume the same campaign request allowance.
+- One sealed snapshot is preserved throughout. Preparation and execution spend
+  are zero. Sixty knowledge judgments remain pending and the 15 no-op coding
+  sequences fail as expected; this is execution evidence, not measured quality.
+- Required-database workspace tests pass when excluding only the existing M2
+  `markdown_local_links_and_images_resolve` failure. The unfiltered run fails
+  because `m2-model/refresh-guide.md` contains a machine-local path; those
+  unrelated files were left untouched. Logs are
+  `/tmp/r3-preparation-workspace-tests.log` and
+  `/tmp/r3-preparation-workspace-rest.log`.
+- Preparation-budget integration is implemented. The complete approval-gated
+  provider driver and verified real provider/tokenizer/pricing profile remain
+  unfinished. No paid calls or label approvals were performed.
+
 ## 2026-09-15 preparation identity and failure regression checks
 
 - The first integrated preparation run stopped safely after one task: using a

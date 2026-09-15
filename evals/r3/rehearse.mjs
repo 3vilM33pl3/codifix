@@ -66,6 +66,9 @@ try {
     manifest.provider_budget = { max_calls_per_task: 7 };
     manifest.model.resolved_id = 'synthetic-mediated-excerpt-noop-v1';
     manifest.limits.requests *= 7;
+    const sources = new Set(manifest.cases.flatMap(item => item.sources)).size;
+    manifest.preparation_budget = { requests: sources * 8, tokens: sources * 4096, microusd: 0, task_seconds: 600 };
+    manifest.limits.requests += manifest.preparation_budget.requests;
   }
   const add = async (relative, bytes, executable = false) => {
     const target = path.join(root, relative);

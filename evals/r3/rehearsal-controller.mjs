@@ -9,7 +9,8 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { openPreparedSession } from './isolation/service-session.mjs';
 import { createRehearsalExecutor } from './isolation/rehearsal-task.mjs';
-import { syntheticServiceEmbedding } from './synthetic-embedding.mjs';
+import { syntheticServiceEmbedding, syntheticVector, syntheticEmbeddingModel } from './synthetic-embedding.mjs';
+import { openRequestMediator } from './request-mediator.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = path.join(root, 'campaign.json');
@@ -61,17 +62,42 @@ try {
       documents.push({ project: `r3-${item.cluster}`, source, text: await fs.readFile(path.join(root, source), 'utf8') });
     }
   }
-  session = await openPreparedSession({ snapshotBinary: configuration.binaries.snapshot.path,
-    memoryBinary: configuration.binaries.memory.path, databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL,
-    semanticTime: manifest.semantic_time, documents, embedding: syntheticServiceEmbedding() });
+  let execute;
+  const prepare = async contract => {
+    let mediator, call = 0;
+    const baselineEmbeddings = new Map();
+    try {
+      if (manifest.preparation_budget) {
+        if (!contract || contract.directory !== path.join(out, 'preparation/provider')
+            || contract.task_id !== 'preparation' || contract.manifest_sha256 !== plan.manifest_sha256
+            || !contract.limits || Object.keys(contract.limits).length !== 4
+            || ['requests', 'tokens', 'microusd', 'task_seconds'].some(key => contract.limits[key] !== manifest.preparation_budget[key])
+            || JSON.stringify(contract.task_limits) !== JSON.stringify(contract.limits)) throw Error('invalid preparation contract');
+        mediator = await openRequestMediator({ binary: configuration.binaries.budget.path, directory: contract.directory,
+          manifestSha256: plan.manifest_sha256, limits: contract.limits, taskLimits: contract.task_limits });
+      }
+      const embedding = syntheticServiceEmbedding();
+      if (mediator) embedding.embed = (input, purpose) => mediator.dispatch({ taskId: 'preparation', requestId: `document-${call++}`,
+        payload: { model: syntheticEmbeddingModel, purpose, input }, allowance: { input_tokens: 64, output_tokens: 0, microusd: 0 },
+        timeoutMs: 10000, invoke: async payload => ({ output: syntheticVector(payload.input), usage: { input_tokens: 1, output_tokens: 0, microusd: 0 } }) });
+      session = await openPreparedSession({ snapshotBinary: configuration.binaries.snapshot.path,
+        memoryBinary: configuration.binaries.memory.path, databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL,
+        semanticTime: manifest.semantic_time, documents, embedding });
+      if (mediator) for (const document of documents) {
+        baselineEmbeddings.set(`${document.project}:${document.source}`, await embedding.embed(document.text, 'document'));
+      }
+      execute = await createRehearsalExecutor({ session, baselineEmbeddings: mediator ? baselineEmbeddings : undefined, configuration: { root,
+        manifestSha256: plan.manifest_sha256, nodeImage: configuration.images.node, rustImage: configuration.images.rust,
+        scoreBinary: configuration.binaries.score.path, retrieverBinary: configuration.binaries.retriever.path,
+        budgetBinary: configuration.binaries.budget?.path,
+        driverSha256: manifest.assets.find(asset => asset.path === 'runtime/offline-driver.mjs').sha256,
+        configurationSha256: manifest.assets.find(asset => asset.path === 'private/runtime.json').sha256,
+        serviceBuild: `memory-sha256:${configuration.binaries.memory.sha256}` } });
+      return mediator ? { version: 1, snapshot_sha256: session.preparation.snapshot_sha256, audit: (await mediator.audit()).audit } : undefined;
+    } finally { await mediator?.close(); }
+  };
+  if (!manifest.preparation_budget) await prepare();
   const driver = path.join(root, 'runtime/offline-driver.mjs');
-  const execute = await createRehearsalExecutor({ session, configuration: { root,
-    manifestSha256: plan.manifest_sha256, nodeImage: configuration.images.node, rustImage: configuration.images.rust,
-    scoreBinary: configuration.binaries.score.path, retrieverBinary: configuration.binaries.retriever.path,
-    budgetBinary: configuration.binaries.budget?.path,
-    driverSha256: manifest.assets.find(asset => asset.path === 'runtime/offline-driver.mjs').sha256,
-    configurationSha256: manifest.assets.find(asset => asset.path === 'private/runtime.json').sha256,
-    serviceBuild: `memory-sha256:${configuration.binaries.memory.sha256}` } });
   let cursor = 0;
   const receipts = new Map();
   server = http.createServer(async (request, response) => {
@@ -88,18 +114,18 @@ try {
       const dispatch = JSON.parse(bytes);
       if (dispatch.version !== 1 || dispatch.offline !== true || dispatch.maximum_microusd !== 0
           || dispatch.manifest !== manifestPath || dispatch.manifest_sha256 !== plan.manifest_sha256) throw Error('invalid dispatch');
-      const identity = key(dispatch.work);
+      const preparing = dispatch.phase === 'preparation';
+      const identity = preparing ? 'preparation' : key(dispatch.work);
       const digest = createHash('sha256').update(bytes).digest('hex');
       let receipt = receipts.get(identity);
       if (receipt && receipt.digest !== digest) throw Error('changed retry');
       if (!receipt) {
-        if (activeTask || !plan.work[cursor] || key(plan.work[cursor]) !== identity) throw Error('out of order dispatch');
+        if (activeTask || (preparing ? !manifest.preparation_budget || session : !execute || !plan.work[cursor] || key(plan.work[cursor]) !== identity)) throw Error('out of order dispatch');
         const task = (async () => {
           await verifyBinaries();
-          const observation = await execute(dispatch.work,dispatch.provider_budget);
+          const observation = preparing ? await prepare(dispatch.provider_budget) : await execute(dispatch.work,dispatch.provider_budget);
           await verifyBinaries();
-          cursor++;
-          console.error(`Offline rehearsal completed ${cursor}/${plan.work.length} tasks.`);
+          if (!preparing) { cursor++; console.error(`Offline rehearsal completed ${cursor}/${plan.work.length} tasks.`); }
           return observation;
         })();
         activeTask = task;

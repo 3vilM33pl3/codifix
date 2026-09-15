@@ -12,7 +12,9 @@ try {
   const input = await fs.readFile(inputPath);
   if (input.length > 32768) throw Error('oversized request');
   const request = JSON.parse(input);
-  if (request.offline !== true || request.maximum_microusd !== 0 || request.response !== path.join(process.cwd(), 'observation.json')) throw Error('invalid dispatch');
+  const preparing = request.phase === 'preparation';
+  if (request.offline !== true || request.maximum_microusd !== 0
+      || request.response !== path.join(process.cwd(), preparing ? 'receipt.json' : 'observation.json')) throw Error('invalid dispatch');
   const config = JSON.parse(await fs.readFile(new URL('../private/runtime.json', import.meta.url)));
   const response = await new Promise((resolve, reject) => {
     const call = http.request({ socketPath: config.socket, path: '/dispatch', method: 'POST',
@@ -33,7 +35,7 @@ try {
   });
   JSON.parse(response); // Complete bounded JSON; the Rust runner validates its contract.
   await fs.writeFile(request.response, response, { flag: 'wx', mode: 0o600 });
-  await fs.writeFile(path.join(process.cwd(), 'preparation-microusd.json'), '0', { flag: 'wx', mode: 0o600 });
+  if (!preparing) await fs.writeFile(path.join(process.cwd(), 'preparation-microusd.json'), '0', { flag: 'wx', mode: 0o600 });
 } catch {
   console.error('Offline R3 dispatch failed; no automatic repeat was attempted.');
   process.exitCode = 1;

@@ -73,6 +73,10 @@ test(`existing campaign CLI completes a real 75-dispatch ${mediated ? 'mediated'
   assert.equal(new Set(artifact.observations.map(row => JSON.stringify(row.work))).size, 75);
   assert(artifact.observations.every(row => row.execution_microusd === 0));
   if (mediated) {
+    assert(artifact.preparation_receipt);
+    assert(artifact.preparation_receipt.audit.ledger.requests >= 12); // Six source documents, both preparation paths.
+    assert.equal(artifact.preparation_receipt.audit.ledger.tokens, artifact.preparation_receipt.audit.ledger.requests);
+    assert.equal(artifact.preparation_receipt.snapshot_sha256, artifact.observations[0].isolation.snapshot_sha256);
     assert.equal(artifact.observations.reduce((sum,row) => sum + row.provider_requests,0),180);
     assert(artifact.observations.every(row => row.provider_audit.calls.length === row.provider_requests
       && row.provider_audit.ledger.tokens === row.result.token_usage.total_tokens));

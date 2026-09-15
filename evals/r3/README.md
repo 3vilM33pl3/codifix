@@ -34,7 +34,7 @@ indexed vector and complete input-only usage; values must survive float32 storag
 Undercounted tokens, missing usage and malformed vectors remain uncertain.
 Tests use synthetic counters, rates and loopback responses—not verified real
 tokenization, prices or paid-provider evidence. Global preparation-budget wiring
-and the complete approved live campaign driver are still pending.
+is implemented; the complete approved live campaign driver is still pending.
 
 The existing generator produces **smoke tests**, not the official benchmark.
 They check the machinery, not Memory's product value. Generated manifests set
