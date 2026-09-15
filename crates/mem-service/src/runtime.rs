@@ -8,6 +8,7 @@ const HTTP_SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(2);
 #[cfg(test)]
 mod evaluation_tests {
     use super::*;
+    mod http;
 
     fn config(read_only: bool) -> AppConfig {
         serde_json::from_value(serde_json::json!({

@@ -1,5 +1,20 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 sealed HTTP authentication and current regression evidence
+
+- A new real HTTP regression reproduced a 500 on the initial scoped-token
+  request: authentication tried to update a sealed credential row. Evaluation
+  now retains the protected audit receipt without mutating token/session
+  timestamps. Normal authentication is unchanged; expiry still uses real time.
+- The test passes with scoped tokens and browser sessions, cross-project/write
+  denials, expired/unknown token denials, unchanged benchmark fingerprints and
+  retained operational audits. Uses disposable PostgreSQL and fake credentials.
+- Current required-database workspace tests (including federation regressions),
+  workspace all-target Clippy, formatting and boundaries passed. All 90 Web tests
+  and build passed. Lean build/tests passed with existing linter warnings; the
+  lean CLI check passed with existing dead-code warnings. Web build retains its
+  existing large-chunk warning. No paid providers or existing deployment changes.
+
 ## 2026-09-15 explicit interrupted campaign recovery
 
 - `campaign run --resume` holds the original budget lock, validates the complete

@@ -299,13 +299,21 @@ async fn load_service_token_principal(
     principal.credential_source = CredentialSource::ServiceToken;
     principal.token_id = Some(token_id);
     if should_touch_last_used(token_id) {
-        sqlx::query("WITH touched AS (UPDATE auth_service_tokens SET last_used_at = now() WHERE id = $1 RETURNING id,principal_id)
+        if state.config.evaluation.active() {
+            // Frozen credential rows are part of the benchmark snapshot. Keep
+            // operational auditing, but do not change last_used_at during R3.
+            sqlx::query("INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,target_token_id,event_type,outcome,metadata_json,recorded_at)
+                VALUES(gen_random_uuid(),$1,$1,$2,'service_token.seen','success','{\"evaluation\":true}'::jsonb,now())")
+                .bind(principal.id).bind(token_id).execute(pool).await.map_err(ApiError::sql)?;
+        } else {
+            sqlx::query("WITH touched AS (UPDATE auth_service_tokens SET last_used_at = now() WHERE id = $1 RETURNING id,principal_id)
             INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,target_token_id,event_type,outcome,metadata_json,recorded_at)
             SELECT gen_random_uuid(),principal_id,principal_id,id,'service_token.seen','success','{}'::jsonb,now() FROM touched")
             .bind(token_id)
             .execute(pool)
             .await
             .map_err(ApiError::sql)?;
+        }
     }
     Ok(principal)
 }
@@ -339,13 +347,19 @@ async fn load_session_principal(
     principal.session_id = Some(session_id);
     principal.session_csrf_hash = Some(csrf_hash);
     if should_touch_last_used(session_id) {
-        sqlx::query("WITH touched AS (UPDATE auth_web_sessions SET last_seen_at = now() WHERE id = $1 RETURNING id,principal_id)
+        if state.config.evaluation.active() {
+            sqlx::query("INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,event_type,outcome,metadata_json,recorded_at)
+                VALUES(gen_random_uuid(),$1,$1,'session.seen','success',jsonb_build_object('session_id',$2::uuid,'evaluation',true),now())")
+                .bind(principal.id).bind(session_id).execute(pool).await.map_err(ApiError::sql)?;
+        } else {
+            sqlx::query("WITH touched AS (UPDATE auth_web_sessions SET last_seen_at = now() WHERE id = $1 RETURNING id,principal_id)
             INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,event_type,outcome,metadata_json,recorded_at)
             SELECT gen_random_uuid(),principal_id,principal_id,'session.seen','success',jsonb_build_object('session_id',id),now() FROM touched")
             .bind(session_id)
             .execute(pool)
             .await
             .map_err(ApiError::sql)?;
+        }
     }
     Ok(principal)
 }

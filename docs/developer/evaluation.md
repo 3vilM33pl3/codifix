@@ -18,6 +18,21 @@ aggregate comparisons and makes statistical tests meaningful.
   require `memory eval run --allow-shell`. Dry runs validate shape without
   executing shell commands.
 
+## R3 frozen service authentication
+
+The operator-configured evaluation profile requires a sealed, read-only benchmark
+database. Token and session expiry/revocation checks still use real time. In that
+profile, authentication records its permitted `auth_audit_events` receipt without
+updating frozen credential `last_used_at`/`last_seen_at` fields. Normal service
+authentication is unchanged. Audit receipts are operational journals, excluded
+from the benchmark corpus, not new retrievable knowledge.
+
+The required-database HTTP regression covers scoped tokens, browser session reads,
+denied cross-project queries, denied writes and expired credentials, checking an
+unchanged benchmark fingerprint. This is one service's authorization boundary,
+not proof of complete campaign/container/network isolation. R3 campaign status
+and remaining integration are in [the R3 README](../../evals/r3/README.md).
+
 ## Agent Build Tasks
 
 `agent_build_task` is the build-simulation path. It is intentionally generic:
