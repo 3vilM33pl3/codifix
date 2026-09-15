@@ -1,5 +1,32 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 full mediated development rehearsal completed
+
+- Completed and independently checked all 660 development tasks: 600 knowledge
+  observations, 60 three-step coding sequences and 960 simulated model calls.
+  Artifact: `/data/tmp/memory-r3-full-mediated-QVhHrk/pack/run/artifact.json`.
+  Every call count matches its private audit; one sealed snapshot fingerprint is
+  preserved throughout. Provider spend and preparation spend are both zero.
+- `execution_valid` is true. `harness_valid`, `official_evidence` and
+  `quality_passed` remain false: 600 semantic judgments are pending, and the 60
+  no-op coding failures are expected negative controls. Do not ask a human to
+  grade these fake outputs as if they were paid model outcomes.
+- This run froze at the shared-synthetic-embedding increment; the later query
+  timing correction is covered by the passing 75-task run at
+  `/data/tmp/memory-r3-rehearsal-cli-7yDI2p/pack/run`. Prepared Responses calls are
+  covered separately by fake-server and isolated model workflow tests.
+- Refreshed required-database workspace tests, workspace Clippy, formatting,
+  boundaries and 29 provider/packet tests pass. A real no-default-features CLI
+  build and executable version check pass at
+  `/data/tmp/memory-r3-lean-target-EzlJOc/debug/memory`; the build retains eight
+  existing dead-code warnings. No shared development binary was replaced by it.
+- Removed only the owned tmpfs PostgreSQL container `memory-r3-http-20260915`.
+  Its synthetic database was disposable; source fixtures and run evidence remain.
+  Existing services and unrelated M2 financial-model work were left untouched.
+- R3 is not complete. The live driver still needs the selected, verified real
+  provider/tokenizer/pricing and embedding profile. Label approval is requested
+  separately, and paid development/official runs remain unauthorized and disabled.
+
 ## 2026-09-15 human label-review entrypoint
 
 - Added `evals/r3/label-review.md` with the exact fixture-tree identity, every
@@ -1174,6 +1201,9 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
   - [x] Full 660-dispatch development rehearsal with zero provider calls,
     unchanged sealed snapshots and 600 pending semantic review packets.
   - [ ] Complete provider-mediated fault/limit tests and the full benchmark run.
+    - [x] Full 660-task mediated development rehearsal with 960 simulated calls;
+      prepared-call faults, counter failures and isolated workflows tested separately.
+    - [ ] Verified real-provider profile and official approved campaign evidence.
 - [ ] Olivier approves labels; freeze suite only after approval.
 - [ ] Approve and run paid development calibration.
 - [ ] Separately approve and run official campaign; publish measured outcome.
