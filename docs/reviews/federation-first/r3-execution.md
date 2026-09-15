@@ -1,5 +1,22 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 durable per-request budget boundary
+
+- Added `RequestBudget`: exclusive owner, private append-only metadata journal,
+  fsynced pre-dispatch reservations, separately bounded input/output usage,
+  request/token/spend caps and conservative handling of uncertain outcomes.
+- Confirmed receipts refund unused tokens/cost only. Reused request IDs,
+  altered campaign limits, concurrent owners and partial journals fail closed.
+  Process termination releases the OS lock but retains the uncertain charge;
+  a new dispatcher cannot blindly retry or start another call.
+- Thirty-eight evaluator tests passed, including fake-provider budget gates and
+  a child-process termination/recovery test. Scoped all-target Clippy, formatting
+  and boundaries passed. No providers, databases or deployments were used.
+- This is a dispatcher component, not yet integration with `campaign run`.
+  Existing single-request and paid-run restrictions remain. Task-level limits,
+  price/parameter validation, all-provider mediation, persisted results and
+  reconciliation still need driver integration. R3 remains incomplete.
+
 ## 2026-09-15 combined verification and first representative source pack
 
 - Materialized the first development knowledge family: supplier handover has

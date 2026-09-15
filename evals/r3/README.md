@@ -85,6 +85,31 @@ orchestration, complete corpus fingerprinting or crash-recovery driver.
 - Run complete offline campaigns and crash/isolation fault tests. Reference
   solution tests alone do not establish these properties.
 
+## Per-request reservation journal
+
+`mem_eval::campaign::budget::RequestBudget` is a tested boundary for a trusted
+campaign dispatcher. Create its journal in a private campaign directory, outside
+all agent mounts. Each reservation records a bounded request ID, payload digest,
+input/output token allowances and micro-USD allowance. The manifest identity and
+limits are bound to the journal header. The file is exclusively locked for the
+owner's lifetime and fsynced before `reserve` or `dispatch` permits a call.
+
+Confirmed usage releases only unused token/cost allowances; request count is
+never refunded. An error, invalid usage receipt or process termination retains
+the full allowance and blocks further requests until explicit reconciliation.
+Used IDs cannot dispatch again, even with identical inputs. Torn journals,
+changed limits/campaigns and competing owners fail closed. Metadata journals do
+not store questions, model outputs, credentials or provider error bodies.
+
+This is not yet wired into `campaign run`, and does not remove its single-request
+restriction or unconditional paid-run block. The complete driver must calculate
+conservative allowances from locked model settings/prices, enforce task-level
+limits as well as campaign limits, mediate every provider path, persist results,
+and reconcile confirmed receipts. The journal does not independently verify
+provider billing or provide an approval mechanism. Asynchronous cancellation
+between reservation and settlement must remain uncertain, never automatically
+refund or retry. The trusted host must protect the journal from replacement.
+
 ## Baseline adapter contract
 
 Build `cargo build -p mem-eval --example r3_retriever --locked`. Invoke
