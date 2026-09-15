@@ -6,6 +6,11 @@ hypotheses await customer discovery. Completion evidence is maintained in the
 [financial and pitch appendix](m1-finance-pitch.md) for economic inputs, narrative,
 demonstration and claim evidence.
 
+Published business summary:
+[M1 — Agentic Enterprise commercial preparation](https://app.notion.com/p/3dc8990715f4815a812bf2a9262ef282),
+under the existing Codifix pitch workspace. The repository dossier is the detailed
+source of truth; the Notion page is its business-facing summary.
+
 ## 1. Decision and product definition
 
 **Codifix is positioned as the knowledge and governance network for the Agentic

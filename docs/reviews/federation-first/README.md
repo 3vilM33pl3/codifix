@@ -7,6 +7,15 @@ and protocol remain general-purpose. Preserve expert knowledge locally, improve
 it through reviewed corrections, and exchange selected knowledge across
 organizational boundaries without sharing databases.
 
+Commercial direction refined on 2026-09-15: Codifix is the knowledge and governance
+network for the Agentic Enterprise. The first buyer/pilot focus is incident
+handover between application and platform/operations business units, each with
+independent administration and local agents. The completed
+[M1 preparation pack](m1-buyer-pilot-scorecard.md) records the shift from
+centralized-memory positioning and engineering/MSP-first buyer selection.
+Customer deployments, financial-model rebuilds and full deck revisions remain
+separate milestones.
+
 Implementation evidence: [2026-09-07 checkpoint](2026-09-07-implementation.md)
 and [2026-09-08 domain checkpoint](2026-09-08-publication-domain.md), followed by
 the [B2/B3 permission and conformance increment](2026-09-08-b2-b3.md) and
@@ -130,7 +139,7 @@ retention contract; native Spaces is not the public relay topology.
 
 ## Commercial, financial and pitch work
 
-- [ ] M1 Define the boundary-problem buyer/pilot scorecard (engineering/MSP, business units, acquired entities, customer/supplier incidents); require two independently administered instances and measure time, expert interruptions, correction reuse, onboarding and operating cost.
+- [x] M1 Define the boundary-problem buyer/pilot scorecard. Completed preparation pack (2026-09-15): [buyer, discovery and pilot dossier](m1-buyer-pilot-scorecard.md), [financial inputs and pitch brief](m1-finance-pitch.md), and [tabletop/publication evidence](m1-execution.md). First focus: application/platform business units with two independently administered instances; measure time, expert interruptions, correction reuse, onboarding, cost and quality. [Notion business summary](https://app.notion.com/p/3dc8990715f4815a812bf2a9262ef282). This completes preparation, not customer discovery, validated ROI, pricing, deployments or M2–M5.
 - [ ] M2 Rebuild separate London (1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0) and New York (1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es) models for the same product scope: UK usage 2940 pounds versus independent 80000-pound ACV, US usage 25x UK, about 138% modeled retention versus 140% renewal, coherent cohort/cash sensitivities, real margins and correct use-of-funds basis.
 - [ ] M3 Add federation identity/key, gateway/PDS, replica storage, transfer, recovery, security-review and multi-party support costs. Define annual platform/included-deployment/usage packaging without billing duplicate sync copies as new knowledge. Stress delayed pilots/support costs; revenue starts after federation gates. Recalculate both funding cases before hiring commitments.
 - [ ] M4 Revise deck (1RtPlKvSxf3Z3dmLRHoIaiaKN3n8xtr6WGWJAzeWXCIY) and startup narrative for the two-organization demo, honest competitive comparisons, measured versus planned evidence, ATProto versus Memory responsibilities, privacy/availability limits and milestone-linked funding. Do not invent pilot outcomes or partner commitments.
