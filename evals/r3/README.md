@@ -381,9 +381,13 @@ The synthetic rehearsal supports this path through `--mediated`. Build
 `cargo build -p mem-eval --example r3_budget --locked`, then add
 `MEMORY_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget"` to the previously
 documented disposable rehearsal environment and append `--mediated` to its command.
-The one-family-per-track run executes 75 tasks with 150 simulated model callbacks:
-one per question and six per coding sequence. Symbolic token usage and zero spend
-exercise accounting, not a real tokenizer, provider, model quality or billing.
+The one-family-per-track run executes 75 tasks with 180 simulated model callbacks:
+one per question, six per coding sequence, and 30 task-scoped query embeddings
+across the vector and Full Memory conditions. Other conditions make no query
+embedding calls. Sequence parents include retrieval usage once; their child
+diagnostics contain only agent calls. Symbolic token usage and zero spend exercise
+accounting, not a real tokenizer, provider, model quality or billing. Older saved
+150-call artifacts predate query-embedding mediation and are not rewritten.
 
 New rehearsals use the same deterministic synthetic embedding function in the
 simple vector baseline and Full Memory's active semantic backend. Its binary

@@ -63,9 +63,9 @@ try {
   const manifestPath = path.join(root, 'campaign.json');
   const manifest = JSON.parse(await fs.readFile(manifestPath));
   if (mediated) {
-    manifest.provider_budget = { max_calls_per_task: 6 };
+    manifest.provider_budget = { max_calls_per_task: 7 };
     manifest.model.resolved_id = 'synthetic-mediated-excerpt-noop-v1';
-    manifest.limits.requests *= 6;
+    manifest.limits.requests *= 7;
   }
   const add = async (relative, bytes, executable = false) => {
     const target = path.join(root, relative);

@@ -105,6 +105,16 @@ export async function createRehearsalExecutor(options) {
       const allowance = { input_tokens: 64, output_tokens: 64, microusd: 0 };
       // Symbolic fake usage exercises receipts, not a real tokenizer or billing.
       const fakeUsage = { input_tokens: 1, output_tokens: 1, microusd: 0 };
+      let embeddingCalls = 0;
+      const queryEmbedding = async (input, purpose = 'query', signal) => {
+        if (purpose !== 'query') throw Error('task cannot perform document preparation');
+        if (!mediator) return syntheticVector(input);
+        return mediator.dispatch({ taskId: providerContract.task_id, requestId: `query-embedding-${embeddingCalls++}`,
+          payload: { model: syntheticEmbeddingModel, purpose, input }, signal,
+          allowance: { input_tokens: 64, output_tokens: 0, microusd: 0 }, timeoutMs: 10000,
+          invoke: async payload => ({ output: syntheticVector(payload.input),
+            usage: { input_tokens: 1, output_tokens: 0, microusd: 0 } }) });
+      };
       const family = families.find(family => family.id === item.cluster);
       if (!family || family.track !== item.track) throw Error('missing rehearsal family');
       const sources = await Promise.all(item.sources.map(async id => ({ id, text: await readAsset(id) })));
@@ -128,7 +138,7 @@ export async function createRehearsalExecutor(options) {
               retrievalStarted = performance.now(); // Prepared corpus/configuration is not task retrieval.
               // Query embedding is execution, not corpus preparation. Plain
               // document/lexical conditions must not invoke an embedding model.
-              const queryVector = selected.condition === 'vector' ? syntheticVector(question) : undefined;
+              const queryVector = selected.condition === 'vector' ? await queryEmbedding(question) : undefined;
               retrieval = await runRetriever(retrieverBinary, file, { schema_version: 1, project, condition: 'external-retriever',
                 query: question, limit: 8, item_id: item.id, context: { fixture_path: '', hidden_facts: [] },
                 ...(queryVector ? { query_embedding: queryVector, embedding_query: bindQuery(profile, question, queryVector) } : {}) }, temporary);
@@ -176,9 +186,18 @@ export async function createRehearsalExecutor(options) {
           providerUsage: sequence.providerUsage,
           timing: { retrieval_ms: Math.ceil(retrievalMs), answer_or_agent_ms: sequence.steps.reduce((sum,step) => sum + Math.ceil(step.agentElapsedMs),0),
             grading_ms: sequence.steps.reduce((sum,step) => sum + Math.ceil(step.graderElapsedMs),0) } };
-      });
+      }, { queryEmbedding });
       await verify();
       const value = executed.value;
+      // Task totals include retrieval model calls once. Sequence step totals
+      // remain agent-only diagnostics, not an additional execution charge.
+      const audit = mediator ? (await mediator.audit()).audit : undefined;
+      if (audit) {
+        const totals = audit.tasks[providerContract.task_id];
+        if (!totals) throw Error('missing task provider totals');
+        value.providerUsage = { provider_requests: totals.requests, input_tokens: totals.input_tokens,
+          output_tokens: totals.output_tokens, microusd: totals.microusd };
+      }
       const legacyCondition = selected.condition === 'vector' ? 'semantic' : selected.condition === 'handover' ? 'lexical' : selected.condition;
       const result = (id, success, duration, answer, sub_results = [], usage) => ({ item_id: id,
         eval_type: item.track === 'knowledge' ? 'grounded_answer' : 'agent_build_sequence', condition: legacyCondition,
@@ -195,7 +214,7 @@ export async function createRehearsalExecutor(options) {
             duration_ms: Math.max(1, Math.ceil(step.agentElapsedMs)), token_usage: tokenUsage(step.providerUsage),
             notes: [`Agent input SHA-256: ${step.agentInputSha256}`, `Private grader input SHA-256: ${step.graderInputSha256}`] })),value.providerUsage),
         execution_microusd: value.providerUsage?.microusd ?? 0, provider_requests: value.providerUsage?.provider_requests ?? 0, uncertain_charge: false,
-        ...(mediator ? { provider_audit: (await mediator.audit()).audit } : {}),
+        ...(audit ? { provider_audit: audit } : {}),
         critical_failure: value.critical_failure, unresolved_rubric: value.unresolved_rubric, knowledge_review: value.knowledge_review,
         isolation: { before_sha256: executed.beforeSha256, after_sha256: executed.afterSha256,
           snapshot_sha256: executed.beforeSha256, configuration_sha256: configurationSha256, driver_sha256: driverSha256,

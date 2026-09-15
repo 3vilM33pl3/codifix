@@ -1,5 +1,22 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 integrated query-embedding accounting rehearsal
+
+- The existing mediated executor now routes vector-baseline and Full Memory query
+  embeddings through each task's durable budget. Handover, lexical and no-memory
+  conditions make no query-embedding calls. Parent totals come from the complete
+  task audit; coding step diagnostics retain agent-only usage.
+- The 75-task rehearsal passes in 599 seconds at
+  `/data/tmp/memory-r3-rehearsal-cli-Ihwq1D/pack/run/artifact.json`: 180 simulated
+  calls, including 30 query embeddings. Independent audit confirms all call/token
+  totals, parent-versus-step attribution and unchanged snapshot fingerprints.
+- `execution_valid` is true; `harness_valid`, `official_evidence` and
+  `quality_passed` remain false. The 60 knowledge judgments are pending and 15
+  no-op coding sequences are expected failures. No paid calls occurred.
+- This run freezes the synthetic task-embedding path and predates the later
+  prepared-embedding receipt adapter and outer-ledger fix. Their focused tests
+  provide separate evidence; the old artifact is not retroactively changed.
+
 ## 2026-09-15 prepared embedding receipt adapter
 
 - Added a single-input embedding request/receipt adapter based on the official

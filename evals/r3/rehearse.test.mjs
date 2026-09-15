@@ -73,9 +73,17 @@ test(`existing campaign CLI completes a real 75-dispatch ${mediated ? 'mediated'
   assert.equal(new Set(artifact.observations.map(row => JSON.stringify(row.work))).size, 75);
   assert(artifact.observations.every(row => row.execution_microusd === 0));
   if (mediated) {
-    assert.equal(artifact.observations.reduce((sum,row) => sum + row.provider_requests,0),150);
+    assert.equal(artifact.observations.reduce((sum,row) => sum + row.provider_requests,0),180);
     assert(artifact.observations.every(row => row.provider_audit.calls.length === row.provider_requests
       && row.provider_audit.ledger.tokens === row.result.token_usage.total_tokens));
+    for (const row of artifact.observations) {
+      const embeddings = row.provider_audit.calls.filter(call => call.request_id.startsWith('query-embedding-'));
+      assert.equal(embeddings.length, ['vector', 'full-memory'].includes(row.work.condition) ? 1 : 0);
+      if (row.result.sub_results?.length) {
+        assert.equal(row.result.token_usage.total_tokens,
+          row.result.sub_results.reduce((sum, step) => sum + step.token_usage.total_tokens, 0) + embeddings.length);
+      }
+    }
   } else assert(artifact.observations.every(row => row.provider_requests === 0));
   assert(artifact.observations.every(row => row.isolation.before_sha256 === row.isolation.after_sha256));
   assert.equal(new Set(artifact.observations.map(row => row.isolation.snapshot_sha256)).size, 1);
