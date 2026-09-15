@@ -26,6 +26,7 @@ test('representative development packs are reproducible, private, whole-family a
   assert.equal(manifest.cases.filter(c => c.track === 'knowledge').length, 40);
   assert.equal(manifest.cases.filter(c => c.track === 'coding').length, 4);
   assert(manifest.cases.every(c => c.split === 'development'));
+  assert(manifest.cases.every(c => !['telemetry-units', 'framed-stream'].includes(c.cluster)));
   for (const asset of manifest.assets) {
     const file = path.join(first, asset.path);
     assert.equal(hash(await fs.readFile(file)), asset.sha256, asset.path);
@@ -51,6 +52,31 @@ test('representative development packs are reproducible, private, whole-family a
     assert.equal(family.cases.length, family.track === 'knowledge' ? 4 : 1);
     assert(family.cases.every(id => manifest.cases.some(item => item.id === id && item.cluster === family.id)));
   }
+});
+
+test('explicit held-out fixture packs remain separate, draft and non-promotable', { skip: !binary }, async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-held-out-cli-'));
+  t.after(() => fs.rm(directory, { recursive: true }));
+  const out = path.join(directory, 'pack');
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_PROFILE: 'prod' };
+  assert.equal(spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', out, '--held-out'], { env }).status, 0);
+  const manifestPath = path.join(out, 'campaign.json');
+  const manifest = JSON.parse(await fs.readFile(manifestPath));
+  assert.equal(manifest.cases.length, 5);
+  assert(manifest.cases.every(item => item.split === 'held_out'));
+  const families = JSON.parse(await fs.readFile(path.join(out, 'private/families.json')));
+  assert.deepEqual(families.map(f => f.id).sort(), (await fs.readdir('evals/r3/representative/held-out')).sort());
+  for (const asset of manifest.assets) assert.equal(hash(await fs.readFile(path.join(out, asset.path))), asset.sha256);
+  const plan = split => spawnSync(binary, ['eval', 'campaign', 'plan', '--manifest', manifestPath, '--split', split], {
+    env, encoding: 'utf8', timeout: 10000, maxBuffer: 1048576 });
+  const result = plan('held-out');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).work.length, 75);
+  assert.equal(plan('development').status, 1, 'held-out data is not a calibration pack');
+  manifest.smoke_only = false;
+  manifest.label_status = 'reviewed';
+  await fs.writeFile(manifestPath, JSON.stringify(manifest));
+  assert.equal(plan('held-out').status, 1, 'partial held-out fixtures are not approved official evidence');
 });
 
 test('existing campaign CLI loads representative suites and refuses tampering or promotion', { skip: !binary }, async t => {

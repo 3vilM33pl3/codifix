@@ -16,7 +16,9 @@ artifact origin, retention/holds, usage accounting and DNS cutover. Browse their
 review sheets under [representative/development](representative/development/).
 The source packs include current and superseded instructions, partial observations
 and explicit evidence limits. They are distinct development mechanisms, not
-renamed held-out cases. The 25 held-out knowledge families remain unimplemented.
+renamed held-out cases. The first held-out knowledge family,
+[telemetry units](representative/held-out/telemetry-units/review.md), is materialized
+with four draft questions; 24 families remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
@@ -61,6 +63,14 @@ official suite sizes or can be promoted by changing its label status. The CLI
 can plan these packs; the controller below provides synthetic offline dispatch.
 Live provider-backed execution remains unfinished. Placeholder suite commands
 are contracts, not installed agent/grader programs.
+
+`node evals/r3/build-representative-pack.mjs NEW_DIRECTORY --held-out` explicitly
+materializes only the currently available held-out fixtures, separately from
+development. The real planner loads them with `--split held-out`; it refuses
+development planning on that pack. This is for deterministic fixture verification
+and reviewer preparation, not model calibration, approved labels or paid runs.
+The integrated controller below remains development-only. Changing flags cannot
+promote partial or draft held-out material into official evidence.
 
 ### Integrated offline rehearsal
 

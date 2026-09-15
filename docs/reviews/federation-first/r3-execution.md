@@ -1,5 +1,18 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 first held-out knowledge family and separate packs
+
+- Added the allocated telemetry-units scenario: five synthetic sources and four
+  draft rubrics joining mixed firmware, conversion provenance, genuine warnings
+  and absent physical/population measurements. No equipment or provider was used.
+- Added explicit held-out-only materialization. Default development packs remain
+  separate; the real CLI rejects calibration planning on a held-out pack and
+  refuses promotion of partial fixtures. The offline controller remains
+  development-only. All four pack/CLI tests and canonical rubric tests pass.
+- One of 25 held-out knowledge families and one of twelve coding families exist.
+  Labels remain draft; deterministic fixture verification is not model calibration
+  or official held-out execution. The development rehearsal is still running.
+
 ## 2026-09-15 first held-out coding repository
 
 - Added the allocated framed-stream repository: five modules, two public starter

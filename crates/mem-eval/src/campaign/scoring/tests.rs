@@ -135,20 +135,21 @@ fn blinded_packet_has_no_condition_model_repeat_or_automatic_score() {
 
 #[test]
 fn representative_rubrics_use_canonical_locked_bytes_and_all_dimensions() {
-    for family in [
-        "supplier-handover",
-        "turnover-recovery",
-        "cache-partition",
-        "schema-transition",
-        "capacity-pressure",
-        "timezone-window",
-        "artifact-origin",
-        "retention-hold",
-        "quota-accounting",
-        "dns-cutover",
+    for (split, family) in [
+        ("development", "supplier-handover"),
+        ("development", "turnover-recovery"),
+        ("development", "cache-partition"),
+        ("development", "schema-transition"),
+        ("development", "capacity-pressure"),
+        ("development", "timezone-window"),
+        ("development", "artifact-origin"),
+        ("development", "retention-hold"),
+        ("development", "quota-accounting"),
+        ("development", "dns-cutover"),
+        ("held-out", "telemetry-units"),
     ] {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-            "../../evals/r3/representative/development/{family}/private"
+            "../../evals/r3/representative/{split}/{family}/private"
         ));
         for index in 1..=4 {
             let bytes = std::fs::read(root.join(format!("q{index}.json"))).unwrap();
