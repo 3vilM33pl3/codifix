@@ -63,7 +63,7 @@ test('explicit held-out fixture packs remain separate, draft and non-promotable'
   assert.equal(spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', out, '--held-out'], { env }).status, 0);
   const manifestPath = path.join(out, 'campaign.json');
   const manifest = JSON.parse(await fs.readFile(manifestPath));
-  assert.equal(manifest.cases.length, 107);
+  assert.equal(manifest.cases.length, 108);
   assert(manifest.cases.every(item => item.split === 'held_out'));
   const families = JSON.parse(await fs.readFile(path.join(out, 'private/families.json')));
   assert.deepEqual(families.map(f => f.id).sort(), (await fs.readdir('evals/r3/representative/held-out')).sort());
@@ -72,7 +72,7 @@ test('explicit held-out fixture packs remain separate, draft and non-promotable'
     env, encoding: 'utf8', timeout: 10000, maxBuffer: 1048576 });
   const result = plan('held-out');
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(JSON.parse(result.stdout).work.length, 1605);
+  assert.equal(JSON.parse(result.stdout).work.length, 1620);
   assert.equal(manifest.limits.requests, JSON.parse(result.stdout).work.length);
   assert.equal(plan('development').status, 1, 'held-out data is not a calibration pack');
   manifest.smoke_only = false;

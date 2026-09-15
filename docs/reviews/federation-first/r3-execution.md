@@ -1,5 +1,16 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out sparse-sensor repository
+
+- Added five public modules, two public tests and ten hidden probes across
+  canonical sparse ingestion, rectangular transposition and checked dot-product
+  composition. The reference preserves aliases, source shape and rejected state.
+- Public tests and the required container reference/cumulative/starter/no-op
+  group pass without skips, as do four pack/CLI tests. Eight of twelve held-out
+  repositories exist. The knowledge allocation remains complete but unapproved.
+- Current evaluator Clippy, formatting and boundary checks also pass. These
+  synthetic fixture tests do not establish actual sensor or model quality.
+
 ## 2026-09-15 complete draft knowledge allocation
 
 - Color-profile and distribution-notice families complete all 100 held-out
