@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out alert-denominator knowledge family
+
+- Added five sources and four draft rubrics for biased trace samples, aligned
+  completed-request counters, weighted window aggregation and unsupported user/
+  causal/revenue claims. Counts and rates are synthetic; no production metrics.
+- Canonical rubric and four pack/CLI tests pass without skips. Twenty-four
+  held-out questions and six coding repositories exist. Labels remain draft;
+  the held-out fixture pack is separate and non-promotable.
+
 ## 2026-09-15 held-out snapshot-pages repository
 
 - Added five modules and ten probes for tied ordering, project-before-limit

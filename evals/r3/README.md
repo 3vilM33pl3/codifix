@@ -26,7 +26,9 @@ caller timeouts from remote terminal outcomes. The fourth,
 [archive expansion](representative/held-out/archive-expansion/review.md), covers
 streamed byte limits and private activation. The fifth,
 [circuit probes](representative/held-out/circuit-probes/review.md), tests shared
-recovery claims and stale results; twenty families remain.
+recovery claims and stale results. The sixth,
+[alert denominators](representative/held-out/alert-denominator/review.md), distinguishes
+sampled traces, completed requests and affected users; nineteen families remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
