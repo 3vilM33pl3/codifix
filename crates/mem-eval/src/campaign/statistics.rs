@@ -10,6 +10,18 @@ pub struct Comparison {
     pub simultaneous_upper: f64,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConditionReport {
+    pub condition: Condition,
+    pub tasks: usize,
+    pub successful_executions: usize,
+    /// Repeats are executions, never additional independent observations.
+    pub total_executions: usize,
+    pub critical_failures: usize,
+    pub execution_microusd: u64,
+    pub total_tokens: u64,
+    pub median_duration_ms: f64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackReport {
     pub track: Track,
     pub independent_clusters: usize,
@@ -18,6 +30,9 @@ pub struct TrackReport {
     pub total_executions: usize,
     pub candidate_success: f64,
     pub comparisons: Vec<Comparison>,
+    /// Raw diagnostics for all five conditions, including no-memory.
+    #[serde(default)]
+    pub conditions: Vec<ConditionReport>,
     pub cost_ratio: Option<f64>,
     pub median_latency_ratio: Option<f64>,
     pub quality_passed: bool,
@@ -299,6 +314,45 @@ fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -
                 )
             };
             let floor = if track == Track::Knowledge { 0.9 } else { 0.8 };
+            let conditions = CONDITIONS
+                .into_iter()
+                .map(|condition| {
+                    let executions: Vec<_> = rows
+                        .iter()
+                        .copied()
+                        .filter(|o| o.work.condition == condition)
+                        .collect();
+                    // Campaign totals were checked for overflow above; these are
+                    // disjoint nonnegative subsets of those validated parent totals.
+                    ConditionReport {
+                        condition,
+                        tasks: cases.len(),
+                        successful_executions: executions
+                            .iter()
+                            .filter(|o| o.result.success)
+                            .count(),
+                        total_executions: executions.len(),
+                        critical_failures: executions
+                            .iter()
+                            .filter(|o| scoring::critical_failure(o))
+                            .count(),
+                        execution_microusd: executions
+                            .iter()
+                            .map(|o| o.execution_microusd.unwrap_or(0))
+                            .sum(),
+                        total_tokens: executions
+                            .iter()
+                            .map(|o| o.result.token_usage.as_ref().map_or(0, |u| u.total_tokens))
+                            .sum(),
+                        median_duration_ms: median(
+                            executions
+                                .iter()
+                                .map(|o| o.result.duration_ms.unwrap_or(0) as f64)
+                                .collect(),
+                        ),
+                    }
+                })
+                .collect();
             let quality_passed = official_evidence
                 && candidate_success >= floor
                 && comparisons
@@ -315,6 +369,7 @@ fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -
                 total_executions: candidate.len(),
                 candidate_success,
                 comparisons,
+                conditions,
                 cost_ratio,
                 median_latency_ratio,
                 quality_passed,

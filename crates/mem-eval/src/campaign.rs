@@ -17,7 +17,7 @@ pub mod retriever;
 pub mod review;
 pub mod scoring;
 mod statistics;
-pub use statistics::{Comparison, Report, TrackReport, report};
+pub use statistics::{Comparison, ConditionReport, Report, TrackReport, report};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

@@ -317,6 +317,13 @@ or product-quality evidence.
 
 ### Campaign uncertainty
 
+Each track includes raw diagnostics for all five conditions: independent task
+count, successful/total executions, critical failures, execution spend, token
+total and median latency. Repeats remain executions, not extra independent tasks;
+sequence children are not added again. The no-memory diagnostic is visible even
+though it is not an informed-baseline superiority comparison. This reporting
+does not change the current critical-failure gate.
+
 Reports average repeats within tasks and resample complete scenario/repository
 clusters. Ten thousand deterministic paired bootstrap draws give a 95%
 simultaneous band using the maximum absolute centered deviation over the three

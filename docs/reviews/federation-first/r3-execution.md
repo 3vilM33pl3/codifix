@@ -1,5 +1,16 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 complete condition diagnostics
+
+- Reports now expose raw task/execution counts, successes, critical failures,
+  spend, tokens and median latency for all five conditions, including no-memory.
+  Repeats and sequence diagnostics do not inflate independent observations or
+  task costs. Older serialized reports remain readable.
+- All 55 evaluator tests and scoped all-target Clippy passed. The current gate
+  remains unchanged. Olivier was asked whether baseline semantic failures should
+  be reported separately from the Full Memory product gate; no approval has been
+  assumed. Isolation failures remain fail-closed in every condition.
+
 ## 2026-09-15 staff-turnover recovery benchmark
 
 - Materialized the planned second knowledge family: five public documents and

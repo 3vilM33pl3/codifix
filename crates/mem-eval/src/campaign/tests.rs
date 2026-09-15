@@ -233,6 +233,25 @@ fn parent_results_and_repeats_do_not_inflate_independence() {
     assert_eq!(report.tracks[1].independent_clusters, 12);
     assert_eq!(report.tracks[1].total_executions, 36);
     assert_eq!(report.tracks[0].comparisons[0].simultaneous_lower, 1.0);
+    for track in &report.tracks {
+        assert_eq!(track.conditions.len(), 5);
+        for condition in &track.conditions {
+            assert_eq!(condition.tasks, track.tasks);
+            assert_eq!(condition.total_executions, track.tasks * 3);
+            assert_eq!(
+                condition.successful_executions,
+                if condition.condition == Condition::FullMemory {
+                    track.tasks * 3
+                } else {
+                    0
+                }
+            );
+            assert_eq!(condition.execution_microusd, (track.tasks * 3 * 10) as u64);
+            assert_eq!(condition.total_tokens, (track.tasks * 3 * 10) as u64);
+            assert_eq!(condition.critical_failures, 0);
+            assert_eq!(condition.median_duration_ms, 10.0);
+        }
+    }
     a.offline = true;
     let offline = super::report(&m, &a).unwrap();
     assert!(offline.harness_valid);
@@ -263,7 +282,17 @@ fn invalid_evidence_fails_closed() {
     assert!(!report(&m, &a).unwrap().harness_valid);
     let mut a = original.clone();
     a.observations[0].critical_failure = true;
-    assert!(!report(&m, &a).unwrap().quality_passed);
+    let critical = report(&m, &a).unwrap();
+    assert!(!critical.quality_passed);
+    assert_eq!(
+        critical
+            .tracks
+            .iter()
+            .flat_map(|t| &t.conditions)
+            .map(|c| c.critical_failures)
+            .sum::<usize>(),
+        1
+    );
     let mut a = original;
     a.approvals.clear();
     assert!(!report(&m, &a).unwrap().official_evidence);
