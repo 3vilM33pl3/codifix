@@ -34,6 +34,15 @@ pub struct ProviderResults {
     directory: PathBuf,
 }
 
+/// Trusted async dispatchers must durably reserve before invoking a provider.
+/// A cached result does not authorize another invocation.
+#[derive(Debug, Serialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum DispatchDecision {
+    Cached { output: Value },
+    Reserved,
+}
+
 impl ProviderResults {
     pub fn create(directory: &Path) -> Result<Self> {
         let mut builder = fs::DirBuilder::new();
@@ -89,6 +98,25 @@ impl ProviderResults {
         allowance: Allowance,
         provider: impl FnOnce() -> Result<(Value, Allowance)>,
     ) -> Result<Value> {
+        match self.begin(budget, task_id, request_id, payload_sha256, allowance)? {
+            DispatchDecision::Cached { output } => return Ok(output),
+            DispatchDecision::Reserved => {}
+        }
+        let (output, usage) = provider()
+            .map_err(|_| anyhow::anyhow!("provider outcome uncertain; recovery required"))?;
+        self.complete_reserved(budget, task_id, request_id, payload_sha256, output, usage)
+    }
+
+    /// Persist the reservation or return an exact previously completed result.
+    /// Cancellation after Reserved remains uncertain even if no bytes were sent.
+    pub fn begin(
+        &self,
+        budget: &mut RequestBudget,
+        task_id: &str,
+        request_id: &str,
+        payload_sha256: &str,
+        allowance: Allowance,
+    ) -> Result<DispatchDecision> {
         if let Some(saved) = budget.saved_request(request_id) {
             ensure!(
                 saved.task_id == Some(task_id)
@@ -100,16 +128,16 @@ impl ProviderResults {
                 saved.usage.is_some(),
                 "provider attempt uncertain; explicit recovery required"
             );
-            return self.recover(budget, request_id);
+            return Ok(DispatchDecision::Cached {
+                output: self.recover(budget, request_id)?,
+            });
         }
         ensure!(
             !self.path(request_id).try_exists()?,
             "orphan provider result requires investigation"
         );
         budget.reserve_for_task(task_id, request_id, payload_sha256, allowance)?;
-        let (output, usage) = provider()
-            .map_err(|_| anyhow::anyhow!("provider outcome uncertain; recovery required"))?;
-        self.complete_reserved(budget, task_id, request_id, payload_sha256, output, usage)
+        Ok(DispatchDecision::Reserved)
     }
 
     /// Async dispatchers reserve before awaiting the provider, then persist a

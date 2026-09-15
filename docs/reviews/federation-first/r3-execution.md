@@ -1,5 +1,24 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 per-call execution bridge
+
+- The existing Rust request-budget/result store now exposes a reservation-or-cache
+  decision for asynchronous dispatch. A private JSONL helper and trusted-host
+  adapter reserve before each callback, save confirmed outputs, and reuse exact
+  completed requests without invoking again. No agent receives budget authority.
+- Six required bridge tests pass, including an actual killed budget process,
+  restart, per-sequence and campaign request caps, changed retries, missing or
+  excessive usage, and timed-out callbacks. Uncertain attempts retain the whole
+  allowance and block further calls until explicit reconciliation.
+- Three required-database service tests pass. One connects this bridge to actual
+  foreground-service embedding callbacks: one preparation call and two query
+  calls settle; the next query hits its task cap before the callback executes.
+  Synthetic microdollar counters test accounting only; no paid calls occurred.
+- This is not yet an approved provider adapter, tokenizer/price contract, coding
+  agent loop or official campaign integration. Whole-task wall-clock enforcement
+  remains the controller's responsibility; this adapter bounds individual calls.
+  Do not use these test callbacks as proof of paid execution safety or quality.
+
 ## 2026-09-15 configured semantic retrieval in sealed service clones
 
 - The trusted snapshot helper can plan chunks using Memory's actual chunker and
