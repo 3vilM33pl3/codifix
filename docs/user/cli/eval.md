@@ -13,6 +13,13 @@ That makes comparisons reproducible and easy to attach to release notes.
 
 ## Isolated R3 campaigns (in progress)
 
+Offline campaign runs retain `dispatch-budget.jsonl`: a durable reservation
+before each driver launch and a settlement only after valid evidence is received.
+An interrupted or invalid dispatch remains unresolved. `ledger.json` retains
+conservative maximum allowances, not actual measured usage. Keep both with the
+campaign evidence; neither permits automatic retry. Multi-request provider
+mediation and paid execution remain unavailable.
+
 `memory eval campaign plan --manifest <campaign.json> [--split development|held-out]`
 validates asset hashes, suite items, split sizes and deterministic condition
 ordering without querying a service. It reports unresolved label/model/budget

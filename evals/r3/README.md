@@ -101,8 +101,14 @@ Used IDs cannot dispatch again, even with identical inputs. Torn journals,
 changed limits/campaigns and competing owners fail closed. Metadata journals do
 not store questions, model outputs, credentials or provider error bodies.
 
-This is not yet wired into `campaign run`, and does not remove its single-request
-restriction or unconditional paid-run block. The complete driver must calculate
+The existing single-request `campaign run` dispatcher now writes
+`dispatch-budget.jsonl` before launching each driver, and settles it only after
+validating usage, isolation, locked inputs and the preparation receipt. Failed or
+invalid dispatches remain unresolved. Its legacy `ledger.json` remains a
+conservative sum of maximum dispatch allowances; the journal records confirmed
+usage separately. Neither artifact is authority to replay an interrupted run.
+This does not remove the single-request restriction or unconditional paid-run
+block, nor mediate calls inside an external driver. The complete driver must calculate
 conservative allowances from locked model settings/prices, enforce task-level
 limits as well as campaign limits, mediate every provider path, persist results,
 and reconcile confirmed receipts. The journal does not independently verify

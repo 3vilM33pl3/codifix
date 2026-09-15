@@ -2,6 +2,7 @@
 //! R3 orchestrator: no ambient ApiClient/config/provider credentials are used.
 use super::runtime::EvalCampaignCommand;
 use anyhow::{Context, Result, ensure};
+use mem_eval::campaign::budget::{Allowance, RequestBudget};
 use mem_eval::campaign::{self as c, Artifact, Ledger, Manifest, Observation, Split};
 use std::{fs::OpenOptions, io::Write, path::Path, process::Stdio};
 
@@ -154,6 +155,13 @@ async fn execute(
     ledger: &mut Ledger,
     artifact: &mut Artifact,
 ) -> Result<()> {
+    // One conservative reservation per driver dispatch while multi-request
+    // provider mediation remains unavailable. Never expose this owner to agents.
+    let mut dispatch_budget = RequestBudget::create(
+        &out.join("dispatch-budget.jsonl"),
+        &plan.manifest_sha256,
+        manifest.limits.clone(),
+    )?;
     for (index, work) in plan.work.iter().enumerate() {
         verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
         // Aggregate per-task token ceiling. Driver must enforce this across all
@@ -182,6 +190,16 @@ async fn execute(
             "work":work,"offline":offline,"maximum_tokens":tokens,"maximum_microusd":cost,
             "response":dir.join("observation.json")});
         exclusive_json(&dir.join("request.json"), &request)?;
+        let dispatch_id = format!("work-{index:05}");
+        dispatch_budget.reserve(
+            &dispatch_id,
+            &c::digest_value(&request)?,
+            Allowance {
+                input_tokens: manifest.model.max_input_tokens,
+                output_tokens: manifest.model.max_output_tokens,
+                microusd: cost,
+            },
+        )?;
         let stdout = OpenOptions::new()
             .create_new(true)
             .write(true)
@@ -252,7 +270,6 @@ async fn execute(
             observation.provider_requests <= 1,
             "multi-request driver needs per-request budget mediation; unsupported"
         );
-        artifact.observations.push(observation);
         // Preparation receipt is mandatory and separate from task execution.
         // Only the first task can prepare; later tasks must restore its snapshot.
         if index == 0 {
@@ -261,6 +278,22 @@ async fn execute(
                 &std::fs::read(path).context("missing preparation receipt")?,
             )?);
         }
+        dispatch_budget.settle(
+            &dispatch_id,
+            Allowance {
+                // Some providers report cache tokens outside input_tokens.
+                // Account for every reported token, without adding caches twice.
+                input_tokens: usage
+                    .total_tokens
+                    .checked_sub(usage.output_tokens)
+                    .context("inconsistent total usage")?,
+                output_tokens: usage.output_tokens,
+                microusd: observation
+                    .execution_microusd
+                    .context("missing confirmed spend")?,
+            },
+        )?;
+        artifact.observations.push(observation);
     }
     Ok(())
 }
@@ -309,6 +342,10 @@ fn validate_task_evidence(
             .checked_add(usage.output_tokens)
             .is_some_and(|sum| sum <= usage.total_tokens)
             && usage.input_tokens <= manifest.model.max_input_tokens
+            && usage
+                .total_tokens
+                .checked_sub(usage.output_tokens)
+                .is_some_and(|input| input <= manifest.model.max_input_tokens)
             && usage.output_tokens <= manifest.model.max_output_tokens,
         "inconsistent or excessive task token usage"
     );

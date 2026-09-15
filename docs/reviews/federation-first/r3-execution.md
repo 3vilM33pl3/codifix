@@ -1,5 +1,22 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 dispatch journal integration
+
+- Existing offline campaign dispatch now writes `dispatch-budget.jsonl` with
+  a durable reservation before driver launch. Settlement requires validated
+  usage, locked inputs, isolation metadata and the preparation receipt.
+- Failed, timed-out, mutated, missing-usage and unsupported multi-request
+  dispatches retain unresolved reservations. Exact reported total tokens are
+  accounted for, including cached input outside the provider's input count.
+- The legacy ledger retains conservative maximum dispatch allowances. This is
+  still one reservation per driver, not mediation of arbitrary internal calls;
+  the single-request restriction and unconditional paid-run block remain.
+- All 232 CLI tests passed, including eleven real fake-driver scenarios with
+  journal inspection/reopening. CLI all-target Clippy, fmt and boundaries passed.
+  No providers, database/deployment changes or new benchmark approvals were used.
+- Full provider mediation, complete campaign driver and representative suite
+  remain unfinished. R3 is not complete.
+
 ## 2026-09-15 durable per-request budget boundary
 
 - Added `RequestBudget`: exclusive owner, private append-only metadata journal,

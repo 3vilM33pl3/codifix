@@ -214,22 +214,53 @@ impl Drop for Scratch {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn final_driver_cannot_mutate_locked_inputs_or_rewrite_the_manifest() {
+async fn driver_dispatch_settles_only_valid_evidence_and_preserves_uncertainty() {
     use std::os::unix::fs::PermissionsExt;
-    for command in [
+    for (index, command) in [
         "printf changed > ../../source.md",
         "printf '{}' > ../../campaign.json",
         "sed -i 's/\"seed\": 1,/\"seed\": 2,/' ../../campaign.json",
-    ] {
+        "exit 17",
+        "true",
+        "cp ../../observation.json observation.json\nprintf '0' > preparation-microusd.json",
+        "cp ../../observation.json observation.json",
+        "cp ../../observation.json observation.json\nprintf '0' > preparation-microusd.json",
+        "cp ../../observation.json observation.json\nprintf '0' > preparation-microusd.json",
+        "exec /bin/sleep 20",
+        "cp ../../observation.json observation.json\nprintf '0' > preparation-microusd.json",
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let root = Scratch::new();
-        let (mut manifest, _) = fixture();
+        let (mut manifest, mut observation) = fixture();
+        if index == 7 {
+            observation.provider_requests = 2;
+        }
+        if index == 8 {
+            observation.result.token_usage = None;
+        }
+        if index == 9 {
+            manifest.limits.task_seconds = 1;
+        }
+        if index == 10 {
+            let usage = observation.result.token_usage.as_mut().unwrap();
+            usage.cache_read_tokens = 20;
+            usage.total_tokens = 30;
+        }
         for asset in &manifest.assets {
             std::fs::write(root.0.join(&asset.path), b"fixture").unwrap();
         }
         let driver = root.0.join("driver.sh");
-        std::fs::write(&driver, format!("#!/bin/sh\nset -eu\n{command}\n")).unwrap();
+        std::fs::write(
+            &driver,
+            format!("#!/bin/sh\nset -eu\ngrep -q reserved ../dispatch-budget.jsonl\n{command}\n"),
+        )
+        .unwrap();
         std::fs::set_permissions(&driver, std::fs::Permissions::from_mode(0o700)).unwrap();
         let driver_hash = c::digest(&std::fs::read(&driver).unwrap());
+        observation.isolation.driver_sha256 = driver_hash.clone();
+        exclusive_json(&root.0.join("observation.json"), &observation).unwrap();
         manifest.assets.last_mut().unwrap().sha256 = driver_hash.clone();
         std::fs::create_dir(root.0.join("suite")).unwrap();
         let items = manifest.cases.iter().map(|case| {
@@ -273,24 +304,45 @@ async fn final_driver_cannot_mutate_locked_inputs_or_rewrite_the_manifest() {
             observations: vec![],
         };
         let mut ledger = Ledger::default();
-        assert!(
-            execute(
-                &path,
-                &manifest,
-                &driver,
-                &driver_hash,
-                &out,
-                &plan,
-                true,
-                &mut ledger,
-                &mut artifact
-            )
-            .await
-            .is_err()
+        let execution = execute(
+            &path,
+            &manifest,
+            &driver,
+            &driver_hash,
+            &out,
+            &plan,
+            true,
+            &mut ledger,
+            &mut artifact,
+        )
+        .await;
+        assert_eq!(
+            execution.is_ok(),
+            index == 5 || index == 10,
+            "scenario {index}: {execution:?}"
         );
         assert_eq!(ledger.requests, 1);
-        assert!(artifact.observations.is_empty());
+        assert_eq!(
+            artifact.observations.len(),
+            usize::from(index == 5 || index == 10)
+        );
         assert!(out.join("work-00000/reservation.json").exists());
-        assert!(verify_campaign_inputs(&path, &plan.manifest_sha256).is_err());
+        let budget = RequestBudget::resume(
+            &out.join("dispatch-budget.jsonl"),
+            &plan.manifest_sha256,
+            manifest.limits.clone(),
+        )
+        .unwrap();
+        if index == 5 || index == 10 {
+            assert!(budget.uncertain_ids().is_empty());
+            assert_eq!(budget.ledger().tokens, if index == 10 { 30 } else { 10 });
+        } else {
+            assert_eq!(budget.uncertain_ids(), ["work-00000"]);
+            assert_eq!(budget.ledger().tokens, 200);
+        }
+        assert_eq!(
+            verify_campaign_inputs(&path, &plan.manifest_sha256).is_err(),
+            index < 3
+        );
     }
 }
