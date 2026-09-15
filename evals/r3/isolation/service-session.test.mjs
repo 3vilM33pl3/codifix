@@ -7,6 +7,8 @@ import path from 'node:path';
 import { openPreparedSession } from './service-session.mjs';
 import { openRequestMediator } from '../request-mediator.mjs';
 import { preparedContext, runOfflineKnowledge } from './knowledge.mjs';
+import { createEmbeddingsPreparation } from '../embeddings-call.mjs';
+import { dispatchModel } from './model-dispatch.mjs';
 
 const snapshotBinary = process.env.MEMORY_R3_SNAPSHOT_BIN;
 const memoryBinary = process.env.MEMORY_R3_CLI_BIN;
@@ -17,6 +19,38 @@ const budgetBinary = process.env.MEMORY_R3_BUDGET_BIN;
 const available = snapshotBinary && memoryBinary && databaseUrl && image && scoreBinary;
 if (process.env.MEMORY_R3_REQUIRE_SERVICE_SESSION === '1' && !available) throw Error('required service-session configuration missing');
 if (process.env.MEMORY_R3_REQUIRE_BUDGETED_SERVICE === '1' && (!available || !budgetBinary)) throw Error('required budgeted service configuration missing');
+
+test('prepared embedding receipts seed and query the real isolated service with separate accounting', { skip: !available || !budgetBinary, timeout: 120000 }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-prepared-service-'));
+  const limits = { requests: 10, tokens: 1000, microusd: 1000, task_seconds: 30 };
+  const mediator = await openRequestMediator({ binary: budgetBinary, directory, manifestSha256: 'd'.repeat(64), limits, taskLimits: limits });
+  const model = { provider: 'openai', resolved_id: 'synthetic-embedding-v1', reasoning: 'none', embedding_id: 'synthetic-embedding-v1',
+    max_input_tokens: 100, max_output_tokens: 1, input_microusd_per_million: 1000000, output_microusd_per_million: 0 };
+  let requests = 0, session;
+  try {
+    const prepareRequest = createEmbeddingsPreparation({ mediator, model, dimensions: 2,
+      tokenizer: { id: 'synthetic-counter', sha256: 'a'.repeat(64) }, countInputTokens: () => 10,
+      send: async (body, signal) => {
+        assert(!signal.aborted);
+        assert.equal(body.model, model.resolved_id);
+        assert.equal(body.input.length, 1);
+        return JSON.stringify({ object: 'list', model: model.resolved_id,
+          data: [{ object: 'embedding', index: 0, embedding: [1, 0] }], usage: { prompt_tokens: 3, total_tokens: 3 } });
+      } });
+    const scoped = taskId => async (input, purpose, signal) => (await dispatchModel({ mediator, prepareRequest, taskId,
+      requestId: `embedding-${requests++}`, payload: { input, purpose }, timeoutMs: 2000, signal })).output;
+    session = await openPreparedSession({ snapshotBinary, memoryBinary, databaseUrl, semanticTime: '2026-01-01T00:00:00Z',
+      documents: [{ project: 'r3-alpha', source: 'public/source.md', text: 'Reconcile acknowledgement before retry.' }],
+      embedding: { model: model.resolved_id, dimensions: 2, embed: scoped('preparation') } });
+    const result = await session.withInstance('r3-alpha', async instance => instance.query('acknowledgement'), { queryEmbedding: scoped('task-1') });
+    assert.equal(result.value.diagnostics.semantic_status, 'active_space_ok');
+    assert(result.value.results.length > 0);
+    assert.equal(result.beforeSha256, result.afterSha256);
+    const audit = (await mediator.audit()).audit;
+    assert.deepEqual(audit.tasks.preparation, { requests: 1, input_tokens: 3, output_tokens: 0, microusd: 3 });
+    assert.deepEqual(audit.tasks['task-1'], audit.tasks.preparation);
+  } finally { await session?.close(); await mediator.close(); await fs.rm(directory, { recursive: true }); }
+});
 
 test('service embedding callbacks reserve each preparation/query call and stop before exceeding a task cap', { skip: !available || !budgetBinary, timeout: 120000 }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-budgeted-service-'));

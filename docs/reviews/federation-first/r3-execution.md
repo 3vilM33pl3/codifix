@@ -1,5 +1,21 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 prepared embedding receipt adapter
+
+- Added a single-input embedding request/receipt adapter based on the official
+  OpenAI schema, with explicit model, dimensions, local counter identity and rates.
+  The existing transport now selects Responses or embeddings explicitly; no
+  credentials are discovered, persisted or selected by this change.
+- Checked pricing uses the existing Rust mediator. Exact retries reuse saved
+  float32 vectors; changed payloads, undercounted tokens, missing usage and invalid
+  vectors fail closed. Preparation and query calls use separate task identities.
+- The 26-test combined adapter/mediator/proxy suite passes. A real disposable
+  Memory service test seeds prepared vectors and queries through this adapter,
+  with separate preparation/query audit totals and unchanged sealed contents.
+- These are fake-provider integration tests only. They do not supply a verified
+  real tokenizer, current rates, approval, global preparation-budget integration
+  or a complete paid campaign driver.
+
 ## 2026-09-15 confirmed campaign reservation settlement
 
 - The CLI reporting/preflight ledger now follows the locked durable dispatch

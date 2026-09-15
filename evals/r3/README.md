@@ -8,6 +8,19 @@ not fall back to preparation. Cancelling an in-flight provider call retains an
 uncertain reservation; it is not permission for a free retry. This host-only API
 does not select a provider, authorize paid calls or complete campaign accounting.
 
+`embeddings-call.mjs` prepares single-input embedding calls using the
+[official embeddings wire format](https://developers.openai.com/api/reference/ruby/resources/embeddings/methods/create).
+It requires an explicit model, dimensions, local tokenizer identity/counter and
+price contract. Use it with `dispatchModel` and the existing private mediator for
+both document preparation and task query callbacks, with separate task identities.
+The fixed transport requires `api: 'embeddings'`; its default remains Responses.
+No endpoint can switch API types implicitly. Receipts require exact model, one
+indexed vector and complete input-only usage; values must survive float32 storage.
+Undercounted tokens, missing usage and malformed vectors remain uncertain.
+Tests use synthetic counters, rates and loopback responses—not verified real
+tokenization, prices or paid-provider evidence. Global preparation-budget wiring
+and the complete approved live campaign driver are still pending.
+
 The existing generator produces **smoke tests**, not the official benchmark.
 They check the machinery, not Memory's product value. Generated manifests set
 `smoke_only = true`; older manifests without this field also default to smoke-only.

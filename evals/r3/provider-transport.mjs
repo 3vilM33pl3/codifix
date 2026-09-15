@@ -2,12 +2,13 @@
 // Trusted-host transport primitive. No environment lookup, automatic retries,
 // redirects, SDK tools or credential persistence. Calling it still requires the
 // campaign's approval and durable pre-dispatch reservation; this is not a runner.
-export function createProviderTransport({ endpoint, bearer, offline = true }) {
+export function createProviderTransport({ endpoint, bearer, offline = true, api = 'responses' }) {
+  if (!['responses', 'embeddings'].includes(api)) throw Error('invalid provider API');
   let url;
   try { url = new URL(endpoint); } catch { throw Error('invalid provider destination'); }
   const local = url.protocol === 'http:' && url.hostname === '127.0.0.1' && !!url.port
-    && url.pathname === '/v1/responses';
-  const hosted = url.href === 'https://api.openai.com/v1/responses';
+    && url.pathname === `/v1/${api}`;
+  const hosted = url.href === `https://api.openai.com/v1/${api}`;
   if (typeof offline !== 'boolean' || url.username || url.password || url.search || url.hash
       || (offline ? !local : !hosted) || typeof bearer !== 'string'
       || !/^[A-Za-z0-9._-]{1,512}$/.test(bearer)
