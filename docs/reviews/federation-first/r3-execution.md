@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out circuit-probes knowledge family
+
+- Added five synthetic sources and four draft rubrics for shared half-open
+  admission, generation/claim-bound completion, separate liveness and unresolved
+  dependency recovery. These are stated fixture policies, not production changes.
+- Canonical rubric and four pack/CLI tests pass without skips. Twenty held-out
+  questions and five coding repositories are materialized. The explicit fixture
+  pack plans 375 executions; labels and official evidence remain pending.
+
 ## 2026-09-15 held-out identifier-catalog repository
 
 - Added a five-module catalog with an explicit small normalization table, distinct

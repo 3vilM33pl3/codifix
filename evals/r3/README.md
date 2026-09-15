@@ -24,7 +24,9 @@ sort values, mutable live ordering and scoped continuation. The third,
 [cancellation scope](representative/held-out/cancellation-scope/review.md), separates
 caller timeouts from remote terminal outcomes. The fourth,
 [archive expansion](representative/held-out/archive-expansion/review.md), covers
-streamed byte limits and private activation; 21 families remain.
+streamed byte limits and private activation. The fifth,
+[circuit probes](representative/held-out/circuit-probes/review.md), tests shared
+recovery claims and stale results; twenty families remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
