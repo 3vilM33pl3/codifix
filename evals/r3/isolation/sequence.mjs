@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import { runOfflineContainer, validateInput } from './container.mjs';
+import { gradeRustCase, validateRustCase } from './rust.mjs';
 
 const digest = files => createHash('sha256').update(JSON.stringify(
   Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0),
@@ -17,6 +18,11 @@ export function validateSequence({ image, initialFiles, submissionPaths, steps, 
     if (!step || typeof step.id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(step.id) || ids.has(step.id)) throw Error('invalid step identity');
     ids.add(step.id);
     validateInput({ image, argv: step.argv, files: initialFiles, timeoutMs });
+    if (step.grader?.kind === 'rust-blackbox') {
+      validateRustCase({ image, files: Object.fromEntries(submissionPaths.map(p => [p, initialFiles[p]])),
+        probes: step.grader.probes, timeoutMs });
+      continue;
+    }
     if (!step.grader || !step.grader.files || Object.getPrototypeOf(step.grader.files) !== Object.prototype || !Object.keys(step.grader.files).length) throw Error('hidden grader required');
     validateInput({ image, argv: step.grader.argv, files: gradeFiles(initialFiles, submissionPaths, step.grader.files), timeoutMs });
   }
@@ -49,16 +55,30 @@ export async function runOfflineSequence(options) {
   for (const step of steps) {
     const publicFiles = Object.fromEntries(Object.entries(initialFiles).filter(([p]) => !submissionPaths.includes(p)));
     const agentFiles = { ...publicFiles, ...submission };
-    const agent = await runOfflineContainer({ image, files: agentFiles, argv: step.argv, timeoutMs, exportPaths: submissionPaths });
+    const rust = step.grader.kind === 'rust-blackbox';
+    const agent = await runOfflineContainer({ image, files: agentFiles, argv: step.argv, timeoutMs,
+      exportPaths: submissionPaths, profile: rust ? 'rust' : 'text' });
     const selected = selectedSubmission(agent, submissionPaths);
-    const grader = await runOfflineContainer({ image,
-      files: gradeFiles(selected, submissionPaths, step.grader.files), argv: step.grader.argv, timeoutMs, exportPaths: [] });
+    let grader, graderInputSha256;
+    if (rust) {
+      graderInputSha256 = digest({ source: selected, probes: step.grader.probes });
+      // A deleted required file is a valid failed submission, not malformed
+      // campaign configuration. Preserve the missing file for the next agent.
+      const result = submissionPaths.every(p => Object.hasOwn(selected, p))
+        ? await gradeRustCase({ image, files: selected, probes: step.grader.probes, timeoutMs })
+        : { success: false, elapsedMs: 0 };
+      grader = { exitCode: result.success ? 0 : 1, elapsedMs: result.elapsedMs };
+    } else {
+      graderInputSha256 = digest(gradeFiles(selected, submissionPaths, step.grader.files));
+      grader = await runOfflineContainer({ image,
+        files: gradeFiles(selected, submissionPaths, step.grader.files), argv: step.grader.argv, timeoutMs, exportPaths: [] });
+    }
     // Only allowlisted agent bytes move forward. Never carry grader output files,
     // stdout, hidden test contents or grading feedback into another agent step.
     diagnostics.push({ id: step.id, agentExitCode: agent.exitCode, graderExitCode: grader.exitCode,
       passed: agent.exitCode === 0 && grader.exitCode === 0 && submissionPaths.every(p => Object.hasOwn(selected, p)),
       agentInputSha256: digest(agentFiles), submissionSha256: digest(selected),
-      graderInputSha256: digest(gradeFiles(selected, submissionPaths, step.grader.files)),
+      graderInputSha256, graderKind: rust ? 'rust-blackbox' : 'command',
       agentElapsedMs: agent.elapsedMs, graderElapsedMs: grader.elapsedMs });
     submission = selected;
   }

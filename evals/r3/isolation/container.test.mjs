@@ -18,6 +18,7 @@ test('unsafe or excessive input fails before Docker dispatch', () => {
     { files: { 'a': 'file', 'a/b': 'conflict' } }, { files: { 'huge': 'x'.repeat(1048577) } },
     { exportPaths: ['../private'] }, { exportPaths: ['src', 'src/lib.rs'] },
     { exportPaths: ['a', 'a'] }, { exportPaths: [null] },
+    { profile: 'unlimited' },
   ]) assert.throws(() => validateInput({ ...valid, ...change }));
 });
 

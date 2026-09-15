@@ -1,5 +1,20 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 real Rust grading integration
+
+- Added a minimal digest-pinned Rust/Node image without checkout or assistant.
+- Added bounded executable Rust scratch and independent host-side exact-output
+  grading. Hidden expectations never enter submitted programs; a reference
+  compile/run distinguishes unavailable tooling from incorrect submissions.
+- Connected real Rust grading to three-step source-only sequence execution.
+  A failed middle step remains a whole-sequence failure after later repair.
+- Nine required live isolation tests passed without skips; boundaries and diff
+  checks passed. CI now requires the Rust tests separately. Remote CI and broad
+  Rust/database/Web regression suites were not rerun for this Node-only slice.
+- This is dependency-free black-box Rust, not arbitrary Cargo tests. Full
+  campaign/service snapshot integration, representative benchmarks and approvals
+  remain open. R3 is not complete and no paid execution is enabled.
+
 ## 2026-09-15 source-only coding handoff
 
 - Container invocations clone reviewed inputs before asynchronous staging.

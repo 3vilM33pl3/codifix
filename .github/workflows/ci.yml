@@ -301,7 +301,13 @@ jobs:
           docker pull "$r3_fixture_image"
           r3_container_image=$(docker image inspect --format '{{.Id}}' "$r3_fixture_image")
           MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_REQUIRE_CONTAINER=1 \
-            node --test evals/r3/isolation/*.test.mjs
+            node --test evals/r3/isolation/container.test.mjs evals/r3/isolation/sequence.test.mjs
+      - name: Verify isolated Rust black-box grading
+        run: |
+          docker build --network=none -f evals/r3/isolation/Dockerfile.rust -t memory-r3-rust:offline evals/r3/isolation
+          r3_rust_image=$(docker image inspect --format '{{.Id}}' memory-r3-rust:offline)
+          MEMORY_R3_RUST_IMAGE="$r3_rust_image" MEMORY_R3_REQUIRE_RUST=1 \
+            node --test evals/r3/isolation/rust.test.mjs
       - run: |
           cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
           cargo run --locked --bin memory -- \

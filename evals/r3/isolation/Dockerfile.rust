@@ -1,0 +1,7 @@
+# No repository COPY, assistant, credentials, npm packages or dependency download.
+FROM node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90 AS node
+FROM rust:1.98.1-bookworm@sha256:9a73a5088750b4c95158ab26629c854c3d6fc4b173cb7bc8079ad252d8ed7bfa
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+# Avoid rustup HOME discovery in the env-cleared, non-root execution container.
+RUN ln -s "$(rustc --print sysroot)/bin/rustc" /usr/local/bin/rustc
+WORKDIR /work

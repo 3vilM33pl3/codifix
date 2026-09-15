@@ -44,9 +44,8 @@ No file archive is extracted onto the host.
 For a coding sequence, the future driver may explicitly carry validated submission
 files into the next step of that sequence. Unrelated cases/conditions must start
 from their original prepared files. The test demonstrates this transfer and a
-fresh reset. Real Rust build images and sufficiently bounded build scratch space
-still need integration; this small
-text-workspace component does not yet run a complete maintenance benchmark.
+fresh reset. The Rust profile below supplies executable bounded build scratch;
+this component does not yet run a complete maintenance benchmark.
 
 Normal completion, nonzero supervisor exit, excess output and timeout remove only
 the invocation's uniquely named container and staging directory. Cleanup ambiguity
@@ -112,13 +111,49 @@ error. Container failures still fail closed. These records explicitly say
 complete `mem-eval` observations or approved benchmark evidence. Steps must not be
 counted as independent campaign samples.
 
-The live test uses trusted Node checks over inert JSON submissions. It proves
+The original live test uses trusted Node checks over inert JSON submissions. It proves
 the handoff, hidden-feedback exclusion, fake-grader exclusion, positive/negative
 controls, deleted-file carryover and fresh sequence reset. It does not yet grade
 untrusted compiled Rust programs or claim resistance to attacks on such graders.
-Reviewed Rust toolchain images, build scratch limits, existing suite
-runner integration and artifact mapping remain unfinished. No new representative
+Existing suite runner integration and artifact mapping remain unfinished. No new representative
 benchmark labels or paid execution are enabled.
+
+## Dependency-free Rust black-box grading
+
+`Dockerfile.rust` combines digest-pinned official Rust 1.98.1 and Node 22.19.0
+images. It copies no checkout, host configuration or assistant. Build with:
+
+```bash
+docker build --network=none -f evals/r3/isolation/Dockerfile.rust -t memory-r3-rust:offline evals/r3/isolation
+r3_rust_image=$(docker image inspect --format '{{.Id}}' memory-r3-rust:offline)
+MEMORY_R3_RUST_IMAGE="$r3_rust_image" MEMORY_R3_REQUIRE_RUST=1 \
+  node --test evals/r3/isolation/rust.test.mjs
+```
+
+Image acquisition may access registries; build commands and grading have no
+network access. The fixed `rust` execution profile allows 512 MiB memory,
+128 MiB executable work tmpfs and 32 MiB per output file. `/tmp` remains
+non-executable and limited to 16 MiB. Default text executions retain their
+smaller limits and non-executable scratch. All input/export bounds remain.
+
+`gradeRustCase({ image, files, probes, timeoutMs })` compiles a dependency-free
+binary rooted at `src/main.rs`, including ordinary Rust modules. Each probe
+has an ID, argv, stdin and exact expected stdout. Expected outputs remain in
+the host grader, never the execution container. Probe inputs are necessarily
+visible to the program while it executes. An independent reference compilation
+and execution checks toolchain availability before submitted code is graded.
+Compilation errors and incorrect results are measured failures; unavailable
+tooling/launch infrastructure fails the measurement. No Cargo build scripts,
+dependency resolution or submitted test harness is used.
+
+Sequence steps select this with `grader: { kind: 'rust-blackbox', probes }`.
+The agent receives neither probes nor expectations; fresh grading containers
+receive selected source and probe inputs only. No compiler/program output is
+returned to subsequent agents. All three steps must pass. Tests exercise real
+multi-file Rust, a falsely successful program, invalid code, private expectation
+exclusion, source carryover and a failed middle step followed by repair.
+These are smoke checks, not representative tasks or official evaluation.
+This provides black-box executable testing, not general Cargo unit-test support.
 
 Run all component tests with the same explicitly required image configuration:
 

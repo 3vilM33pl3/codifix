@@ -14,7 +14,8 @@ const docker = (args, timeout = 15000) => exec('/usr/bin/docker', ['--host', 'un
 });
 const cap = 1024 * 1024;
 
-export function validateInput({ image, argv, files, timeoutMs = 10000, exportPaths }) {
+export function validateInput({ image, argv, files, timeoutMs = 10000, exportPaths, profile = 'text' }) {
+  if (!['text', 'rust'].includes(profile)) throw Error('invalid resource profile');
   if (!/^sha256:[a-f0-9]{64}$/.test(image)) throw Error('require a reviewed immutable local image ID');
   if (!Array.isArray(argv) || !argv.length || argv.length > 64 || argv.some(v => typeof v !== 'string' || v.includes('\0') || v.length > 32768)) throw Error('invalid command');
   if (!argv[0].startsWith('/')) throw Error('command executable must be absolute');
@@ -60,7 +61,11 @@ export function validateResult(result) {
 export async function runOfflineContainer(options) {
   validateInput(options);
   // Preserve the reviewed contract across image inspection and staging awaits.
-  const { image, argv, files, timeoutMs = 10000, exportPaths } = structuredClone(options);
+  const { image, argv, files, timeoutMs = 10000, exportPaths, profile = 'text' } = structuredClone(options);
+  const memory = profile === 'rust' ? '512m' : '256m';
+  const scratch = profile === 'rust' ? '128m' : '16m';
+  const executable = profile === 'rust' ? 'exec' : 'noexec';
+  const fileSize = profile === 'rust' ? '33554432' : '2097152';
   const uid = process.getuid(), gid = process.getgid();
   if (!uid || !gid) throw Error('run the supervisor as a non-root operator');
   // No registry login, implicit pull, custom Docker context or inherited credentials.
@@ -83,8 +88,8 @@ export async function runOfflineContainer(options) {
     await docker(['create', '--name', name, '--label', 'memory.r3.disposable=true',
       '--pull', 'never', '--network', 'none', '--no-healthcheck', '--read-only', '--cap-drop', 'ALL',
       '--security-opt', 'no-new-privileges', '--user', `${uid}:${gid}`, '--pids-limit', '64',
-      '--memory', '256m', '--memory-swap', '256m', '--cpus', '1', '--ulimit', 'fsize=2097152:2097152',
-      '--tmpfs', `/work:rw,nosuid,nodev,size=16m,uid=${uid},gid=${gid},mode=0700`,
+      '--memory', memory, '--memory-swap', memory, '--cpus', '1', '--ulimit', `fsize=${fileSize}:${fileSize}`,
+      '--tmpfs', `/work:rw,nosuid,nodev,${executable},size=${scratch},uid=${uid},gid=${gid},mode=0700`,
       '--tmpfs', `/tmp:rw,nosuid,nodev,noexec,size=16m,uid=${uid},gid=${gid},mode=0700`,
       '--mount', `type=bind,src=${directory},dst=/input,readonly`,
       '--mount', `type=bind,src=${guest},dst=/runner.mjs,readonly`,
