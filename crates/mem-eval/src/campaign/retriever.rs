@@ -2,6 +2,7 @@
 //! Adapter for the existing external-retriever JSON protocol. No filesystem,
 //! provider access, question-specific summaries, or Memory ranking fallback.
 use super::baselines::{self, Document};
+use super::embedding_evidence;
 use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -23,6 +24,8 @@ pub struct Configuration {
     pub documents: Vec<Document>,
     #[serde(default)]
     pub embeddings: Vec<Vec<f64>>,
+    #[serde(default)]
+    pub embedding_corpus: Option<embedding_evidence::Corpus>,
     pub top_k: usize,
     pub bytes: usize,
 }
@@ -41,6 +44,8 @@ pub struct Request {
     /// does not; vector mode fails closed rather than inventing one.
     #[serde(default)]
     pub query_embedding: Option<Vec<f64>>,
+    #[serde(default)]
+    pub embedding_query: Option<embedding_evidence::Query>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -112,16 +117,33 @@ pub fn retrieve(config: &Configuration, request: &Request) -> Result<Response> {
         Mode::Lexical => {
             baselines::lexical(&config.documents, &request.query, top_k, config.bytes)?
         }
-        Mode::Vector => baselines::vector(
-            &config.documents,
-            &config.embeddings,
-            request
+        Mode::Vector => {
+            let vector = request
                 .query_embedding
                 .as_deref()
-                .ok_or_else(|| anyhow::anyhow!("query embedding required"))?,
-            top_k,
-            config.bytes,
-        )?,
+                .ok_or_else(|| anyhow::anyhow!("query embedding required"))?;
+            embedding_evidence::validate(
+                config
+                    .embedding_corpus
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("embedding corpus bindings required"))?,
+                &config.documents,
+                &config.embeddings,
+                request
+                    .embedding_query
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("embedding query binding required"))?,
+                &request.query,
+                vector,
+            )?;
+            baselines::vector(
+                &config.documents,
+                &config.embeddings,
+                vector,
+                top_k,
+                config.bytes,
+            )?
+        }
     };
     Ok(Response {
         schema_version: 1,
@@ -176,6 +198,30 @@ mod tests {
         config.embeddings = vec![vec![1.0, 0.0]];
         assert!(retrieve(&config, &request).is_err());
         request.query_embedding = Some(vec![1.0, 0.0]);
+        // Legacy vector arrays still decode, but cannot run as bound R3 evidence.
+        assert!(retrieve(&config, &request).is_err());
+        let profile = embedding_evidence::Profile {
+            provider: "synthetic".into(),
+            model: "test-r1".into(),
+            dimensions: 2,
+            normalization: "identity-r1".into(),
+            document_purpose: "document".into(),
+            query_purpose: "query".into(),
+            metric: "cosine".into(),
+        };
+        config.embedding_corpus = Some(embedding_evidence::Corpus {
+            profile: profile.clone(),
+            bindings: vec![embedding_evidence::DocumentBinding {
+                document_id: config.documents[0].id.clone(),
+                text_sha256: embedding_evidence::text_digest(&config.documents[0].text),
+                vector_sha256: embedding_evidence::vector_digest(&config.embeddings[0]),
+            }],
+        });
+        request.embedding_query = Some(embedding_evidence::Query {
+            profile,
+            text_sha256: embedding_evidence::text_digest(&request.query),
+            vector_sha256: embedding_evidence::vector_digest(&[1.0, 0.0]),
+        });
         assert_eq!(
             retrieve(&config, &request)
                 .expect("vector result")

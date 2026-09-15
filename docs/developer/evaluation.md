@@ -33,6 +33,28 @@ unchanged benchmark fingerprint. This is one service's authorization boundary,
 not proof of complete campaign/container/network isolation. R3 campaign status
 and remaining integration are in [the R3 README](../../evals/r3/README.md).
 
+## R3 vector evidence bindings
+
+The R3 external comparator requires `embedding_corpus` for vector configuration
+and `embedding_query` beside each query vector. Both include an identical profile:
+`provider`, resolved `model`, `dimensions`, `normalization`, `document_purpose`,
+`query_purpose` and `metric` (currently `cosine`). The operator freezes these
+identifiers; an alias or an asserted profile is not a provider-origin receipt.
+
+Corpus bindings retain each document ID, SHA-256 of its exact UTF-8 text and
+SHA-256 of its vector. Query bindings retain exact query-text/vector hashes.
+Vector hashing uses IEEE-754 binary64 little-endian bytes, not JSON serialization,
+so Rust and the trusted-host JavaScript mediator agree. Finite nonzero vectors,
+exact dimensions, complete ordered source coverage and matching profiles are
+required before ranking. Swapped vectors, changed text and same-dimensional
+different profiles fail with sanitized errors.
+
+Older configurations still decode without bindings, but unbound vector execution
+is rejected; lexical/handover behavior is unchanged. Synthetic tests explicitly
+identify synthetic profiles. Hash consistency is not proof of real embedding
+preparation, provider execution, model quality or paid-run approval. Full Memory
+preparation/parity and per-provider-call mediation remain separate unfinished work.
+
 ## Agent Build Tasks
 
 `agent_build_task` is the build-simulation path. It is intentionally generic:

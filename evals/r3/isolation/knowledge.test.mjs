@@ -7,6 +7,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { preparedContext, runOfflineKnowledge } from './knowledge.mjs';
+import { bindCorpus, bindQuery, syntheticProfile } from '../embedding-evidence.mjs';
 
 const image = process.env.MEMORY_R3_TEST_IMAGE;
 const scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
@@ -78,10 +79,13 @@ test('actual retriever, isolated answer and Rust blinded adjudicator share sourc
   // actual BM25 or fake offline cosine; no expected answer is passed to either.
   for (const mode of ['handover', 'lexical', 'vector']) {
     const limit = mode === 'handover' ? 2 : 1;
+    const profile = syntheticProfile(2, 'unit-vectors-r1');
     await fs.writeFile(config, JSON.stringify({ project: 'r3-alpha', condition: 'external-retriever', mode,
-      documents: sources, embeddings: [[1, 0], [0, 1]], top_k: limit, bytes: 32768 }));
+      documents: sources, embeddings: [[1, 0], [0, 1]], embedding_corpus: bindCorpus(profile, sources, [[1, 0], [0, 1]]),
+      top_k: limit, bytes: 32768 }));
     const request = { schema_version: 1, project: 'r3-alpha', condition: 'external-retriever', query: 'settlement',
-      limit, item_id: rubric.case_id, context: { fixture_path: '', hidden_facts: [] }, query_embedding: [1, 0] };
+      limit, item_id: rubric.case_id, context: { fixture_path: '', hidden_facts: [] }, query_embedding: [1, 0],
+      embedding_query: bindQuery(profile, 'settlement', [1, 0]) };
     // execFile has no input option; use the existing CLI's JSON stdin contract.
     const retrieval = await new Promise((resolve, reject) => {
       const child = spawn(retrieverBinary, [config], { env: { PATH: '/usr/bin:/bin' }, stdio: ['pipe', 'pipe', 'pipe'] });

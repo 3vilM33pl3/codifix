@@ -5,9 +5,21 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { bindCorpus, bindQuery, syntheticProfile, vectorDigest } from './embedding-evidence.mjs';
 
 const binary = process.env.MEMORY_R3_RETRIEVER_BIN;
 if (process.env.MEMORY_R3_REQUIRE_RETRIEVER === '1' && !binary) throw Error('required retriever binary missing');
+test('embedding bindings are strict, bounded and do not mutate caller profiles', () => {
+  const profile = syntheticProfile(2, 'unit-vectors-r1');
+  const docs = [{ id: 'a', text: 'source' }];
+  const corpus = bindCorpus(profile, docs, [[1, 0]]);
+  profile.model = 'changed';
+  assert.equal(corpus.profile.model, 'unit-vectors-r1');
+  for (const vector of [[], [0, 0], [NaN, 1], [Infinity, 1], new Array(8193).fill(1)]) assert.throws(() => vectorDigest(vector));
+  assert.throws(() => bindCorpus(profile, [docs[0], docs[0]], [[1, 0], [1, 0]]));
+  assert.throws(() => bindQuery({ ...profile, unknown: true }, 'q', [1, 0]));
+  assert.throws(() => bindQuery(profile, 'q', [1]));
+});
 test('real external retriever protocol: baselines, scoped context and sanitized rejection', { skip: !binary }, async t => {
   assert(path.isAbsolute(binary));
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-retriever-'));
@@ -15,6 +27,8 @@ test('real external retriever protocol: baselines, scoped context and sanitized 
   const config = { project: 'synthetic', condition: 'external-retriever', mode: 'lexical',
     documents: [{ id: 'runbook', text: 'retry after reconciliation' }, { id: 'incident', text: 'gateway maintenance' }],
     top_k: 8, bytes: 1024, embeddings: [[1, 0], [0, 1]] };
+  const profile = syntheticProfile(2, 'unit-vectors-r1');
+  config.embedding_corpus = bindCorpus(profile, config.documents, config.embeddings);
   const request = { schema_version: 1, project: 'synthetic', condition: 'external-retriever',
     query: 'retry', limit: 8, item_id: 'q1', context: { fixture_path: '/private/not-readable', hidden_facts: [] } };
   async function invoke(configuration, input) {
@@ -29,12 +43,21 @@ test('real external retriever protocol: baselines, scoped context and sanitized 
   assert.deepEqual(JSON.parse(lexical.stdout).results[0].citations, ['runbook']);
   const handover = await invoke({ ...config, mode: 'handover' }, request);
   assert.equal(JSON.parse(handover.stdout).results.length, 2);
-  const vector = await invoke({ ...config, mode: 'vector' }, { ...request, query_embedding: [0, 1] });
+  const vectorRequest = { ...request, query_embedding: [0, 1], embedding_query: bindQuery(profile, request.query, [0, 1]) };
+  const vector = await invoke({ ...config, mode: 'vector' }, vectorRequest);
+  assert.equal(vector.status, 0, vector.stderr);
   assert.equal(JSON.parse(vector.stdout).results[0].id, 'incident');
   for (const [cfg, req] of [
     [config, { ...request, project: 'another-project' }],
     [config, { ...request, context: { ...request.context, hidden_facts: ['SECRET_LABEL'] } }],
     [{ ...config, mode: 'vector' }, request],
+    [{ ...config, mode: 'vector', embedding_corpus: undefined }, vectorRequest],
+    [{ ...config, mode: 'vector' }, { ...vectorRequest, embedding_query: undefined }],
+    [{ ...config, mode: 'vector' }, { ...vectorRequest, query: 'changed question' }],
+    [{ ...config, mode: 'vector' }, { ...vectorRequest, query_embedding: [1, 0] }],
+    [{ ...config, mode: 'vector' }, { ...vectorRequest, embedding_query: bindQuery({ ...profile, model: 'unit-vectors-r2' }, request.query, [0, 1]) }],
+    [{ ...config, mode: 'vector', documents: [{ ...config.documents[0], text: 'changed source' }, config.documents[1]] }, vectorRequest],
+    [{ ...config, mode: 'vector', embeddings: [...config.embeddings].reverse() }, vectorRequest],
     [{ ...config, mode: 'handover', bytes: 1 }, request],
     [config, { ...request, query: 'sensitive'.repeat(150000) }],
   ]) {

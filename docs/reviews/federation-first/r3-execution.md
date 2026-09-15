@@ -1,5 +1,31 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 embedding evidence bindings
+
+- Vector comparator execution now requires exact document/query text and vector
+  hashes plus equal declared profiles, including model, dimensions, normalization,
+  purposes and metric. Same-dimensional incompatible models, swapped rows and
+  changed inputs fail before ranking. Older unbound configs decode but cannot
+  execute vector mode; lexical/handover behavior is unchanged.
+- Rust/JavaScript use binary64 little-endian vector hashing for byte agreement.
+  All 58 evaluator tests, two required cross-language retriever tests, four
+  isolated knowledge tests, Clippy, formatting and boundaries pass. A fresh
+  75-dispatch integrated rehearsal is running; its completion is not yet claimed.
+- These hashes establish consistency, not provider origin, real embedding
+  preparation or quality. Fake profiles remain explicit and paid dispatch remains
+  disabled. Full Memory preparation parity and provider mediation are still open.
+
+## 2026-09-15 combined held-out fixture verification
+
+- All twelve held-out repositories passed together, including private references,
+  cumulative stages and deliberately failing starter/no-op controls: twelve test
+  groups, zero failures/skips, 284 seconds. Log:
+  `/tmp/r3-all-held-out-repositories.log`. Every public repository's two ordinary
+  tests also passed during its implementation.
+- This verifies the draft fixtures and isolation machinery, not held-out model
+  performance. Full draft counts are 140 questions and sixteen three-step
+  repositories across the two splits; labels and official evidence remain pending.
+
 ## 2026-09-15 complete draft coding allocation
 
 - Structured-redaction completes twelve held-out repositories, each with five
@@ -854,14 +880,18 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
 - [ ] Equal-information document, lexical, vector and full-Memory baselines.
   - [x] Existing baseline executables and real Memory retrieval integrated offline.
   - [ ] Real embedding preparation and frozen full-Memory configuration parity.
-- [ ] Synthetic development/held-out knowledge and coding review pack.
+- [x] Synthetic development/held-out knowledge and coding draft review pack.
   - [x] Four representative development coding families, executable controls.
-  - [ ] Complete knowledge families (currently 3/10 development, 0/25 held-out)
-    and held-out coding families (0/12), then obtain label approval.
+  - [x] Complete knowledge families (10/10 development, 25/25 held-out) and
+    held-out coding families (12/12), with source-first contracts and private rubrics.
+  - [x] Full held-out fixture/reference/cumulative/negative-control verification.
+    Label approval remains a separate unchecked gate below.
 - [ ] Campaign plan/run/report, provenance, limits and fail-closed gates.
 - [ ] Offline fault/isolation/statistical tests and integration evidence.
   - [x] Real partial CLI rehearsal, pending review export, source/hash fencing,
     independent snapshots and negative coding controls.
+  - [x] Full 660-dispatch development rehearsal with zero provider calls,
+    unchanged sealed snapshots and 600 pending semantic review packets.
   - [ ] Complete provider-mediated fault/limit tests and the full benchmark run.
 - [ ] Olivier approves labels; freeze suite only after approval.
 - [ ] Approve and run paid development calibration.

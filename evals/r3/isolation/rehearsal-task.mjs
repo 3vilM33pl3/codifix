@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { preparedContext, runOfflineKnowledge } from './knowledge.mjs';
 import { runOfflineSequence } from './sequence.mjs';
+import { bindCorpus, bindQuery, syntheticProfile } from '../embedding-evidence.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const zeroUsage = () => ({ input_tokens: 0, output_tokens: 0, total_tokens: 0 });
@@ -97,10 +98,15 @@ export async function createRehearsalExecutor(options) {
             const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-task-retriever-'));
             try {
               const file = path.join(temporary, 'configuration.json');
+              const vectors = sources.map(source => fakeVector(source.text));
+              const queryVector = fakeVector(question);
+              const profile = syntheticProfile(16, 'sha256-byte-fixture-r1');
               await fs.writeFile(file, JSON.stringify({ project, condition: 'external-retriever', mode: selected.condition,
-                documents: sources, embeddings: sources.map(source => fakeVector(source.text)), top_k: 8, bytes: 32768 }), { flag: 'wx', mode: 0o600 });
+                documents: sources, embeddings: vectors, embedding_corpus: bindCorpus(profile, sources, vectors),
+                top_k: 8, bytes: 32768 }), { flag: 'wx', mode: 0o600 });
               retrieval = await runRetriever(retrieverBinary, file, { schema_version: 1, project, condition: 'external-retriever',
-                query: question, limit: 8, item_id: item.id, context: { fixture_path: '', hidden_facts: [] }, query_embedding: fakeVector(question) }, temporary);
+                query: question, limit: 8, item_id: item.id, context: { fixture_path: '', hidden_facts: [] },
+                query_embedding: queryVector, embedding_query: bindQuery(profile, question, queryVector) }, temporary);
             } finally { await fs.rm(temporary, { recursive: true }); }
           }
           return preparedContext({ condition: selected.condition, sources, retrieval, bindings: instance.bindings, project });

@@ -12,6 +12,7 @@ use std::{
 
 pub mod baselines;
 pub mod budget;
+pub mod embedding_evidence;
 pub mod provider_results;
 pub mod retriever;
 pub mod review;

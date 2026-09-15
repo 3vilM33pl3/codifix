@@ -202,8 +202,10 @@ reference solutions, seed input and suite/hidden-test definitions. Never mount
 - 40 development / 100 held-out knowledge questions, grouped into 10 / 25
   distinct fictional scenarios. Each includes one unsupported-impact question.
 - 4 development / 12 held-out three-step coding sequences. These are small,
-  single-function Rust maintenance exercises, not large-repository tasks.
-- Forty-eight executable reference graders; source and label hashes; existing
+  five-module Rust maintenance repositories, not large-repository tasks. The old
+  `build-review-pack.mjs` single-function smoke generator is retained separately;
+  use `build-representative-pack.mjs` for the replacement draft benchmark above.
+- Forty-eight cumulative stages and 160 hidden probes; source and label hashes; existing
   mem-eval suite compatibility; a review document and explicit label caveats.
 - Pure indexed-document, fixed BM25 and cosine-vector comparator functions in
   `mem-eval::campaign::baselines`. Embeddings are supplied by the caller; no
@@ -211,6 +213,10 @@ reference solutions, seed input and suite/hidden-test definitions. Never mount
 - `r3_retriever` example executable connects those comparators to the existing
   external-retriever JSON protocol. See the adapter contract below; this is
   context retrieval, not a common answer model or complete campaign driver.
+- Vector execution binds exact source/query bytes and vector bytes to a shared
+  embedding profile. Same dimensions alone are insufficient. Legacy unbound
+  arrays decode but are rejected for vector execution; synthetic profiles remain
+  explicitly synthetic, not provider-origin or quality evidence.
 - Campaign identity/order/approval contracts and fail-closed statistical reports.
 - Dispatch-boundary checks reject changed manifests/assets after the final task
   as well as between tasks. Invalid model, usage, timing, rubric and isolation
@@ -274,7 +280,7 @@ prove permissions, indexes, functions, external evidence files or backup recover
 - Complete provider-backed campaign dispatch and genuine operator adjudication.
   The offline controller already exports bound pending review packets; it does
   not decide semantic correctness or approve labels.
-- Finish representative datasets and broader provider-mediated crash/isolation
+- Obtain review/approval of the now-complete draft representative datasets and finish provider-mediated crash/isolation
   fault tests. Interrupted campaigns must remain fail-closed with retained
   evidence; automatic restoration of a killed controller's snapshot is not an
   additional R3 completion requirement. A completed partial offline rehearsal is

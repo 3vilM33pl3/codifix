@@ -65,7 +65,7 @@ try {
     await fs.writeFile(target, bytes, { flag: 'wx', mode: executable ? 0o700 : 0o600 });
     manifest.assets.push({ path: relative, sha256: createHash('sha256').update(bytes).digest('hex'), kind: 'configuration' });
   };
-  for (const relative of ['rehearsal-controller.mjs', 'offline-driver.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
+  for (const relative of ['rehearsal-controller.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
     'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs', 'isolation/service-session.mjs', 'isolation/rehearsal-task.mjs']) {
     await add(`runtime/${relative}`, await fs.readFile(path.join(here, relative)), relative === 'offline-driver.mjs');
   }
