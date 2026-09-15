@@ -93,7 +93,7 @@ For a local harness, import `refreshModel` and `snapshotWrites` as ES modules an
 
 | Native area | Purpose |
 | --- | --- |
-| `Sensitivity!A8:Y40` | Complete v2 case table: 25 cases, including AI and staffing; unused result rows are cleared |
+| `Sensitivity!A8:Y40` | Complete v3 case table: 28 cases, including AI, staffing and counsel; unused result rows are cleared |
 | `Sensitivity!B4` | Capture timestamp |
 | `Sensitivity!B5` | Captured source-input signature |
 | `Sensitivity!B6` | Verified formula fingerprint |
@@ -106,19 +106,29 @@ The writer changes result values, capture values and metadata; it preserves the 
 
 ## Failure and recovery
 
-Version `M2-2026-09-15-v2-ai` captures 358 inputs and verifies 12,086 formulas
-plus immutable source cells. Employee AI controls are Assumptions B:D118–121;
-lean role inclusion is Team AQ5:AQ22. R:Y adds AI spending, headroom, payroll
-savings, GBP AI amounts and year-one headcount. Capture columns remain AA:AC.
-The 21 mandatory checks include seven AI/staffing/funding reconciliations.
+Version `M2-2026-09-15-v3-assurance` captures 371 inputs and verifies 12,354
+formulas plus immutable source cells. Employee AI controls are Assumptions
+B:D118–121; role inclusion is Team AQ5:AQ22 and AQ46. The added assurance lead
+uses B46 salary, AM46 hire and AN46 delivery share. Fractional counsel controls
+are Assumptions B:D126–128 (local monthly fee, start month and inclusion).
+R:Y retains AI spending, headroom, payroll savings, GBP AI amounts and year-one
+headcount. Capture columns remain AA:AC. The 23 mandatory checks include G&A
+payroll allocation and excluded/pre-start counsel expense.
 Comparisons cover utilisation 25/50/100%, allowance GBP2k/5k/10k, historical
 staffing under the same AI policy, and combined delay/support/full-use stress.
+Additional cases exclude the assurance lead while retaining counsel, double
+counsel fees, and delay the lead to month 6. These are financial counterfactuals;
+removing or delaying an owner does not establish substitute assurance capacity.
 
-For regression validation, `build_ai_validation.py` emits the original 13 cases
-with historical staffing and zero AI allowance plus 17 additional arithmetic
-fixtures. Run them with `adapter.publishSnapshot` omitted; fixture results must
-never replace the business sensitivity table. Keep v1 JSON captures unchanged;
-save revision evidence under the `ai-` prefix.
+For regression validation, `build_assurance_validation.py` emits all 42 cases:
+the previous 30 with the added lead and counsel disabled, plus 12 legal/G&A
+fixtures. The original 290 expected values are preserved; the complete suite
+has 468 arithmetic checks in addition to per-case reconciliations. Run them
+with `adapter.publishSnapshot` omitted; fixture results must never replace the
+business sensitivity table. Keep v1 and `ai-` v2 captures unchanged; save current
+revision evidence under the `assurance-` prefix. The one-time
+`migrate_assurance_revision.py` prepares a bounded v2-to-v3 delta and requires
+verified current manifests/inputs and dated backups. Never replay it as refresh.
 
 - A failed case or read prevents publication. `finally` attempts to restore original controls even when a write returned an error after applying its values.
 - Restoration writes only values still recognisable as refresh-owned. A concurrent user edit is left intact; the error reports conflicts, cells not restored and the captured original controls. Reconcile those cells before another run. Do not copy all original inputs over the workbook.
