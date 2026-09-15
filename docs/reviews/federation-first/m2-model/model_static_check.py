@@ -52,6 +52,14 @@ def check_ai_revision(model,errors):
     case_ids={x['id'] for x in model['cases']}
     if not {'ai_util25','ai_util50','ai_util100','ai_budget2000','ai_budget5000','ai_budget10000','historical_team_ai','lean_capacity_stress'}<=case_ids:errors.append('Missing approved AI sensitivities')
     publication=model['publication']
+    expected_columns=[('label','Case'),('capturedAt','Captured UTC'),('caseInputs','Captured case overrides'),('arr36','ARR M36'),('revenue36','Revenue36m'),('grossMargin36','Gross margin36m'),('requiredGrossFunding','Gross funding'),('minCash24','Min cash M1–24'),('endingCash36','Cash M36'),('accounts36','Accounts M36'),('staff36','Staff M36'),('totalSpend24','Cash spend24m'),('gbpFunding','Funding GBP'),('gbpARR36','ARR M36 GBP'),('modelVersion','Model version'),('status','Status'),('notes','Notes'),('aiSpend24','AI spend24m'),('aiReserve24','AI headroom 24m'),('aiSpend36','AI spend36m'),('payrollSavings24','Payroll saving 24m'),('payrollSavings36','Payroll saving36m'),('gbpAISpend24','AI spend24m GBP'),('gbpAIReserve24','AI headroom 24m GBP'),('staff12','Staff M12')]
+    columns=publication.get('resultColumns',[])
+    if columns!=[key for key,label in expected_columns]:errors.append('Sensitivity publication column order omits or misplaces outputs')
+    metadata={'label','capturedAt','caseInputs','modelVersion','status','notes'}
+    if any(key not in metadata and key not in model['outputCells'] for key in columns):errors.append('Sensitivity publication metric has no live output cell')
+    for index,(key,label) in enumerate(expected_columns,1):
+        if immutable.get(f'Sensitivity!{col_label(index)}7')!=label:errors.append(f'Sensitivity header and publication metric disagree: {key}')
+    if len(columns)>26:errors.append('Sensitivity result columns overlap captured-input columns AA:AC')
     if len(model['cases'])>publication['resultEndRow']-publication['resultStartRow']+1:errors.append('Sensitivity result range too short')
     if any(not re.fullmatch(r'Sensitivity!AB\d+',x) for x in publication['captureCells'].values()):errors.append('Captured values moved into comparison outputs')
     if not all(f'Checks!B{r}' in {x['cell'] for x in model['checks']} for r in range(28,35)):errors.append('Mandatory AI reconciliations omitted')
