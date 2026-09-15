@@ -54,9 +54,11 @@ held-out repositories are being implemented. The first,
 private reference/cumulative checks and failing starter/no-op controls. The second,
 [interval calendar](representative/held-out/interval-calendar/review.md), covers
 canonical half-open sets and bounded free-window queries with the same controls;
-nine remain after the third repository,
+The third repository,
 [path policy](representative/held-out/path-policy/review.md), which adds component,
-operation and alias-bound authorization in a deterministic model. Run
+operation and alias-bound authorization in a deterministic model. The fourth,
+[decimal register](representative/held-out/decimal-register/review.md), tests exact
+parsing, checked arithmetic and bounded rational rounding; eight remain. Run
 `node --test evals/r3/held-out.test.mjs` with the pinned Rust image.
 These are deterministic fixture checks, not held-out model calibration or label
 approval. The offline controller integrates

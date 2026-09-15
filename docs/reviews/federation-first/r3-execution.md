@@ -1,5 +1,15 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out decimal-register repository
+
+- Added five modules and three private reference replacements for exact fixed-
+  point parsing, checked accumulation and rational half-away rounding. Ten probes
+  include both i64 extremes, invalid grammar, wide products and state preservation.
+  Units are fictional measurements, not provider prices or money.
+- Two public tests, the required targeted container group (reference/cumulative
+  pass; starter/no-op fail each stage), and four pack/CLI tests pass with no skips.
+  Four of twelve held-out repositories are materialized. No labels are approved.
+
 ## 2026-09-15 held-out cancellation-scope knowledge family
 
 - Added five sources and four draft rubrics distinguishing disconnected callers,
