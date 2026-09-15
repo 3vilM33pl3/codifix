@@ -65,6 +65,7 @@ pub(super) fn fixture() -> Manifest {
             max_output_tokens: 100,
             input_microusd_per_million: 1_000_000,
             output_microusd_per_million: 1_000_000,
+            cached_input_microusd_per_million: None,
         },
         limits: Limits {
             requests: 10000,

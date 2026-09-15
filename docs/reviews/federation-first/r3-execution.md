@@ -1,5 +1,17 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 explicit cache-price accounting
+
+- Added an optional approved cached-input rate while preserving legacy model
+  encodings when it is absent. Reservations remain undiscounted; settlement keeps
+  cached tokens inside input totals and requires a known rate before discounting.
+- Checked integer arithmetic rounds once, rejects impossible counts, unknown
+  cache pricing and rates above the reservation price. Evaluator tests, six CLI
+  campaign tests and scoped Clippy pass. This is not provider billing validation.
+- Refreshed required-database workspace tests and workspace Clippy passed before
+  this small price extension; the full mediated rehearsal is still running with
+  its previously frozen executable copies and no cache-price extension in its pack.
+
 ## 2026-09-15 bounded provider transport and refreshed timing rehearsal
 
 - Added a trusted HTTP primitive with fixed destinations, explicit credentials,

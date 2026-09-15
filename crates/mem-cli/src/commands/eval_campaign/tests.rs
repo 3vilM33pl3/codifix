@@ -238,6 +238,7 @@ fn fixture() -> (Manifest, Observation) {
         max_output_tokens: 100,
         input_microusd_per_million: 0,
         output_microusd_per_million: 0,
+        cached_input_microusd_per_million: None,
     };
     let manifest = Manifest {
         version: 1,

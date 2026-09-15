@@ -25,17 +25,49 @@ impl Allowance {
     /// discounts are not assumed. Non-token fees require a different approved
     /// contract; callers must not silently report them as zero.
     pub fn for_model(model: &super::Model, input_tokens: u64, output_tokens: u64) -> Result<Self> {
+        Self::for_reported_tokens(model, input_tokens, output_tokens, 0)
+    }
+
+    /// Price confirmed text usage using explicitly locked rates. Input includes
+    /// cached tokens and output includes reasoning tokens: neither is added twice.
+    /// This calculation is not tokenization or authentication of a provider receipt.
+    pub fn for_reported_tokens(
+        model: &super::Model,
+        input_tokens: u64,
+        output_tokens: u64,
+        cached_input_tokens: u64,
+    ) -> Result<Self> {
         ensure!(
             input_tokens <= model.max_input_tokens && output_tokens <= model.max_output_tokens,
             "request exceeds locked model limits"
         );
+        ensure!(
+            cached_input_tokens <= input_tokens,
+            "invalid cached input usage"
+        );
+        ensure!(
+            model
+                .cached_input_microusd_per_million
+                .is_none_or(|price| price <= model.input_microusd_per_million),
+            "cached input price exceeds reservation price"
+        );
+        let cached_price = if cached_input_tokens == 0 {
+            0
+        } else {
+            model
+                .cached_input_microusd_per_million
+                .context("cached input price is unknown")?
+        };
         input_tokens
             .checked_add(output_tokens)
             .context("token overflow")?;
-        let input = u128::from(input_tokens) * u128::from(model.input_microusd_per_million);
+        let input = u128::from(input_tokens - cached_input_tokens)
+            * u128::from(model.input_microusd_per_million);
+        let cached = u128::from(cached_input_tokens) * u128::from(cached_price);
         let output = u128::from(output_tokens) * u128::from(model.output_microusd_per_million);
         let cost = input
-            .checked_add(output)
+            .checked_add(cached)
+            .and_then(|cost| cost.checked_add(output))
             .context("price overflow")?
             .div_ceil(1_000_000);
         Ok(Self {
@@ -610,6 +642,42 @@ mod tests {
         model.input_microusd_per_million = u64::MAX;
         assert!(Allowance::for_model(&model, u64::MAX, 1).is_err());
         assert!(Allowance::for_model(&model, u64::MAX, 0).is_err());
+    }
+
+    #[test]
+    fn cache_discounts_require_locked_prices_and_never_increase_reservations() {
+        let mut model = super::super::tests::fixture().model;
+        model.input_microusd_per_million = 2_000_000;
+        model.output_microusd_per_million = 4_000_000;
+        assert!(Allowance::for_reported_tokens(&model, 20, 10, 5).is_err());
+        model.cached_input_microusd_per_million = Some(500_000);
+        let reservation = Allowance::for_model(&model, 20, 10).unwrap();
+        assert_eq!(reservation.microusd, 80);
+        let usage = Allowance::for_reported_tokens(&model, 20, 10, 5).unwrap();
+        assert_eq!(usage.input_tokens, 20);
+        assert_eq!(usage.output_tokens, 10);
+        assert_eq!(usage.microusd, 73); // 30 + 2.5 + 40, rounded up once.
+        assert!(usage.microusd <= reservation.microusd);
+        assert!(Allowance::for_reported_tokens(&model, 20, 10, 21).is_err());
+        model.cached_input_microusd_per_million = Some(0);
+        assert_eq!(
+            Allowance::for_reported_tokens(&model, 20, 10, 20)
+                .unwrap()
+                .microusd,
+            40
+        );
+        model.cached_input_microusd_per_million = Some(2_000_001);
+        assert!(Allowance::for_model(&model, 20, 10).is_err());
+    }
+
+    #[test]
+    fn absent_cache_price_preserves_legacy_model_bytes() {
+        let model = super::super::tests::fixture().model;
+        let bytes = serde_json::to_vec(&model).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("cached_input"));
+        let decoded: super::super::Model = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.cached_input_microusd_per_million, None);
+        assert_eq!(serde_json::to_vec(&decoded).unwrap(), bytes);
     }
 
     #[test]

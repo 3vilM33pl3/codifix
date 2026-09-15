@@ -329,6 +329,13 @@ their availability alone does not grant permission for paid dispatch.
 They do not impose wall-clock deadlines, verify tokenization or account for
 non-token provider fees. Those remain responsibilities of the complete mediator.
 
+The optional locked model field `cached_input_microusd_per_million` is omitted
+from legacy encodings when absent. Reservations still use the full input rate.
+`Allowance::for_reported_tokens` settles confirmed token counts against explicitly
+approved cache prices, rounds integer microdollars up once and rejects unknown
+cache rates or impossible counts. Output usage already includes reasoning tokens.
+This is a price calculation, not verification of the rate sheet or provider bill.
+
 ### Explicit multi-call rehearsal
 
 A locked manifest can opt into `provider_budget: { "max_calls_per_task": 6 }`

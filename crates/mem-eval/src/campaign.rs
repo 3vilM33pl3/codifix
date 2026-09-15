@@ -90,6 +90,9 @@ pub struct Model {
     /// Integer USD microdollars per million tokens, from the approved price sheet.
     pub input_microusd_per_million: u64,
     pub output_microusd_per_million: u64,
+    /// Optional approved cached-input price. Absence is unknown, not free.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_input_microusd_per_million: Option<u64>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -212,6 +215,12 @@ impl Manifest {
         ensure!(
             self.model.max_input_tokens > 0 && self.model.max_output_tokens > 0,
             "invalid model token bounds"
+        );
+        ensure!(
+            self.model
+                .cached_input_microusd_per_million
+                .is_none_or(|price| price <= self.model.input_microusd_per_million),
+            "cached input price exceeds reservation price"
         );
         ensure!(
             self.limits.requests > 0
