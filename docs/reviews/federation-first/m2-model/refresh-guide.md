@@ -92,7 +92,7 @@ For a local harness, import `refreshModel` and `snapshotWrites` as ES modules an
 | `Sensitivity!AC8:AC…` | Generator-owned, type-aware live-versus-captured comparisons |
 | `Sensitivity!B3` | Generator-owned visible stale flag |
 
-The writer changes result values, capture values and metadata; it preserves the native stale formulas. Each result includes its scenario inputs and model version. A timestamp alone never establishes freshness: changing any supported editable input makes the capture stale until another successful refresh. Formula drift is separately checked against the manifest during refresh; the input stale flag is not a full continuous formula audit.
+The writer changes result values, capture values and metadata; it preserves the native stale formulas. Each result shows a concise description of the selected case and changed inputs, using the manifest's human-readable input labels. The complete control values remain in the snapshot evidence and captured input area. A timestamp alone never establishes freshness: changing any supported editable input makes the capture stale until another successful refresh. Formula drift is separately checked against the manifest during refresh; the input stale flag is not a full continuous formula audit.
 
 ## Failure and recovery
 

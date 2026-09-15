@@ -253,3 +253,23 @@ test('per-case expected financial values are checked and captured with evidence'
   f.manifest.cases[0].checks[0].expected = 41000;
   await assert.rejects(refreshModel({...f}), /failed single contract ARR/);
 });
+
+test('visible case inputs show labelled changes instead of the full control JSON', async () => {
+  const f = fixture();
+  f.cells['Assumptions!B3'] = 'Base';
+  f.manifest.scenarioCell = 'Assumptions!B3';
+  f.manifest.inputLabels = {'Assumptions!B10': 'Annual platform package (GBP/year)'};
+  f.manifest.cases.push({id: 'downside', inputs: {'Assumptions!B3': 'Downside'}});
+  f.manifest.publication = {
+    sheet: 'Sensitivity', resultStartRow: 8, resultEndRow: 12,
+    resultColumns: ['label', 'capturedAt', 'caseInputs', 'arr36'],
+    captureCells: Object.fromEntries(f.manifest.editableCells.map((cell, index) => [cell, `Sensitivity!AB${index + 8}`])),
+  };
+  const snapshot = await refreshModel({...f, now: fixedNow});
+  const writes = snapshotWrites(snapshot, f.manifest);
+  assert.equal(writes["'Sensitivity'!C8"], 'Base assumptions at capture');
+  assert.equal(writes["'Sensitivity'!C9"], 'Annual platform package (GBP/year): 100000');
+  assert.equal(writes["'Sensitivity'!C10"], 'Assumptions!B11: 0.25');
+  assert.equal(writes["'Sensitivity'!C11"], 'Selected case: Downside');
+  assert.equal(Object.keys(snapshot.rows[1].inputs).length, f.manifest.controlCells.length);
+});

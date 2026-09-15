@@ -319,6 +319,24 @@ function quoteCell(address) {
   return `'${sheet.replaceAll("'", "''")}'!${address.slice(bang + 1)}`;
 }
 
+function caseInputSummary(row, snapshot, manifest) {
+  const scenarioCell = manifest.scenarioCell ?? Object.keys(manifest.baseControls ?? {})
+    .find(cell => manifest.baseControls[cell] === 'Base');
+  const selectedCase = scenarioCell ? row.inputs[scenarioCell] : null;
+  const changes = Object.entries(row.inputs)
+    .filter(([cell, value]) => cell !== scenarioCell && !equal(value, snapshot.originalInputValues[cell]))
+    .map(([cell, value]) => {
+      const label = manifest.inputLabels?.[cell] ?? cell;
+      const displayValue = value === null ? 'blank'
+        : typeof value === 'number' ? String(Number(value.toPrecision(12))) : String(value);
+      return `${label}: ${displayValue}`;
+    });
+  if (selectedCase && (selectedCase !== 'Base' || (scenarioCell && snapshot.originalInputValues[scenarioCell] !== selectedCase))) {
+    changes.unshift(`Selected case: ${selectedCase}`);
+  }
+  return changes.length ? changes.join('; ') : 'Base assumptions at capture';
+}
+
 /**
  * Make the ONE publication batch. Null means clear the cell; formulas are never
  * included here. Native B3/AC stale formulas remain owned by the generator.
@@ -329,6 +347,9 @@ function quoteCell(address) {
  *   captureCells:{sourceA1:destinationA1},
  *   capturedAtCell, signatureCell, formulaFingerprintCell, modelVersionCell?
  * }
+ * Optional manifest.inputLabels maps input A1 cells to human-readable labels;
+ * scenarioCell identifies the selector. Visible inputs show only changes from
+ * the captured baseline. Full controls remain in the snapshot evidence.
  */
 export function snapshotWrites(snapshot, manifest) {
   const layout = manifest.publication;
@@ -356,7 +377,7 @@ export function snapshotWrites(snapshot, manifest) {
   snapshot.rows.forEach((row, index) => {
     const fields = {
       ...row.outputs, id: row.id, label: row.label, capturedAt: snapshot.capturedAt,
-      caseInputs: JSON.stringify(ordered(row.inputs)), modelVersion: snapshot.modelVersion,
+      caseInputs: caseInputSummary(row, snapshot, manifest), modelVersion: snapshot.modelVersion,
       status: 'Verified at capture; see live stale flag', notes: row.notes,
     };
     columns.forEach((key, col) => {
