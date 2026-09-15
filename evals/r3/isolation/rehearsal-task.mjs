@@ -13,6 +13,7 @@ import { openRequestMediator } from '../request-mediator.mjs';
 import { createModelAgent } from './model-agent.mjs';
 import { runMediatedKnowledge } from './model-answer.mjs';
 import { syntheticVector, syntheticEmbeddingModel } from '../synthetic-embedding.mjs';
+import { validateProviderProfile, validateProviderBinding } from '../provider-profile.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const zeroUsage = () => ({ input_tokens: 0, output_tokens: 0, total_tokens: 0 });
@@ -51,6 +52,19 @@ function runRetriever(binary, configuration, request, directory) {
 }
 
 export async function createRehearsalExecutor(options) {
+  return createExecutor(options, false);
+}
+
+// Trusted controller entrypoint. This does not grant authority to spend: the
+// owner must authorize the campaign before constructing its provider transport.
+export async function createProviderExecutor(options) {
+  if (typeof options.offline !== 'boolean' || !['development', 'held_out'].includes(options.split)) throw Error('explicit provider execution mode and split required');
+  return createExecutor(options, true);
+}
+
+async function createExecutor(options, providerOnly) {
+  const offlineMode = !providerOnly || options.offline;
+  const selectedSplit = options.split;
   const { root, manifestSha256, nodeImage, rustImage, scoreBinary, retrieverBinary,
     driverSha256, configurationSha256, serviceBuild, budgetBinary } = structuredClone(options.configuration);
   const session = options.session; // Trusted host owner, never serialized to an agent.
@@ -60,9 +74,15 @@ export async function createRehearsalExecutor(options) {
       || [manifestSha256, driverSha256, configurationSha256].some(value => !/^[a-f0-9]{64}$/.test(value))) throw Error('invalid rehearsal configuration');
   const manifestBytes = await fs.readFile(path.join(root, 'campaign.json'));
   const manifest = JSON.parse(manifestBytes);
-  if (!manifest.smoke_only || manifest.limits.microusd !== 0 || manifest.label_status !== 'draft'
-      || session.preparation.official_evidence !== false) throw Error('only draft zero-spend offline rehearsals are supported');
-  if (manifest.model.embedding_id !== syntheticEmbeddingModel) throw Error('synthetic embedding profile mismatch');
+  if (providerOnly) {
+    validateProviderProfile(manifest);
+    if (!wireProvider || !(baselineEmbeddings instanceof Map) || !baselineEmbeddings.size || !manifest.provider_budget || !manifest.preparation_budget
+        || (offlineMode && manifest.limits.microusd !== 0)) throw Error('complete provider preparation required');
+  } else {
+    if (!manifest.smoke_only || manifest.limits.microusd !== 0 || manifest.label_status !== 'draft'
+        || session.preparation.official_evidence !== false) throw Error('only draft zero-spend offline rehearsals are supported');
+    if (manifest.model.embedding_id !== syntheticEmbeddingModel) throw Error('synthetic embedding profile mismatch');
+  }
   if (!!manifest.provider_budget !== !!budgetBinary || (budgetBinary && !path.isAbsolute(budgetBinary))) throw Error('mediated rehearsal binary/profile mismatch');
   if (wireProvider && (!budgetBinary || typeof wireProvider.bind !== 'function')) throw Error('wire provider requires mediated execution');
   const readAsset = async relative => {
@@ -86,7 +106,7 @@ export async function createRehearsalExecutor(options) {
     if (busy) throw Error('rehearsal executor busy');
     const selected = structuredClone(work);
     const item = manifest.cases.find(item => item.id === selected.case_id);
-    if (!item || !conditions.includes(selected.condition) || !Number.isInteger(selected.repeat)
+    if (!item || (providerOnly && item.split !== selectedSplit) || !conditions.includes(selected.condition) || !Number.isInteger(selected.repeat)
         || selected.repeat < 0 || selected.repeat >= 3) throw Error('unknown rehearsal work');
     busy = true;
     const started = performance.now();
@@ -96,7 +116,9 @@ export async function createRehearsalExecutor(options) {
       if (manifest.provider_budget) {
         const p = structuredClone(providerContract);
         if (!p || !/^work-[0-9]{5}$/.test(p.task_id) || p.directory !== path.join(root,'run',p.task_id,'provider')
-            || p.manifest_sha256 !== manifestSha256 || p.limits?.microusd !== 0
+            || p.manifest_sha256 !== manifestSha256
+            || !Number.isSafeInteger(p.limits?.microusd) || p.limits.microusd < 0 || p.limits.microusd > manifest.limits.microusd
+            || (offlineMode && p.limits.microusd !== 0)
             || !Number.isInteger(p.limits.requests) || p.limits.requests < 1 || p.limits.requests > manifest.provider_budget.max_calls_per_task
             || p.limits.tokens !== manifest.model.max_input_tokens + manifest.model.max_output_tokens
             || p.limits.task_seconds !== manifest.limits.task_seconds
@@ -109,6 +131,7 @@ export async function createRehearsalExecutor(options) {
       // Symbolic fake usage exercises receipts, not a real tokenizer or billing.
       const fakeUsage = { input_tokens: 1, output_tokens: 1, microusd: 0 };
       const wire = wireProvider?.bind(mediator, providerContract.task_id);
+      const lockedEmbedding = providerOnly ? validateProviderBinding(manifest, wire) : undefined;
       let embeddingCalls = 0;
       const queryEmbedding = async (input, purpose = 'query', signal) => {
         if (purpose !== 'query') throw Error('task cannot perform document preparation');
@@ -134,7 +157,7 @@ export async function createRehearsalExecutor(options) {
             const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-task-retriever-'));
             try {
               const file = path.join(temporary, 'configuration.json');
-              const profile = syntheticProfile(16, syntheticEmbeddingModel);
+              const profile = lockedEmbedding ?? syntheticProfile(16, syntheticEmbeddingModel);
               const vectors = selected.condition === 'vector' ? sources.map(source => {
                 if (!baselineEmbeddings) return syntheticVector(source.text);
                 const vector = baselineEmbeddings.get(`${project}:${source.id}`);
@@ -210,17 +233,20 @@ export async function createRehearsalExecutor(options) {
           output_tokens: totals.output_tokens, microusd: totals.microusd };
       }
       const legacyCondition = selected.condition === 'vector' ? 'semantic' : selected.condition === 'handover' ? 'lexical' : selected.condition;
+      const offline = offlineMode;
+      const claim = offline ? 'offline-synthetic-not-quality' : 'provider-execution-pending-adjudication';
       const result = (id, success, duration, answer, sub_results = [], usage) => ({ item_id: id,
         eval_type: item.track === 'knowledge' ? 'grounded_answer' : 'agent_build_sequence', condition: legacyCondition,
-        metadata: { claim: 'offline-synthetic-not-quality', reasoning_mode: 'none' },
+        metadata: { claim, reasoning_mode: manifest.model.reasoning },
         success, skipped: false, scores: {}, duration_ms: Math.max(1, Math.ceil(duration)), token_usage: tokenUsage(usage), answer,
-        notes: ['Offline synthetic agent; not measured model quality.', `Prepared input SHA-256: ${value.input_sha256}`,
-          'Execution timing excludes disposable service setup and private grading; simulated callbacks are not model latency evidence.'], sub_results });
+        notes: [offline ? 'Offline synthetic agent; not measured model quality.' : 'Provider execution; quality requires independent adjudication.',
+          `Prepared input SHA-256: ${value.input_sha256}`,
+          'Execution timing excludes disposable service setup and private grading.'], sub_results });
       return observation = { work: selected, model: manifest.model,
         timing: { version: 1, ...value.timing, executor_total_ms: 0 },
         result: result(item.id, value.success, value.timing.retrieval_ms + value.timing.answer_or_agent_ms, value.answer,
           value.diagnostics.map(step => ({ id: step.id, eval_type: 'agent_build_step',
-            metadata: { claim: 'offline-synthetic-not-quality', reasoning_mode: 'none', grading_duration_ms: String(Math.ceil(step.graderElapsedMs)) },
+            metadata: { claim, reasoning_mode: manifest.model.reasoning, grading_duration_ms: String(Math.ceil(step.graderElapsedMs)) },
             success: step.passed, skipped: false, scores: {},
             duration_ms: Math.max(1, Math.ceil(step.agentElapsedMs)), token_usage: tokenUsage(step.providerUsage),
             notes: [`Agent input SHA-256: ${step.agentInputSha256}`, `Private grader input SHA-256: ${step.graderInputSha256}`] })),value.providerUsage),

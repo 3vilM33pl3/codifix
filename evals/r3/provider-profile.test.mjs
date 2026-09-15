@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createProviderBindings, validateProviderProfile } from './provider-profile.mjs';
+import { createProviderBindings, validateProviderProfile, validateProviderBinding } from './provider-profile.mjs';
 import { openRequestMediator } from './request-mediator.mjs';
 import { dispatchModel } from './isolation/model-dispatch.mjs';
 
@@ -35,6 +35,20 @@ test('shared profile refuses mismatched assets, models, numbers and undocumented
     m => { m.provider_profile.configuration_evidence.path = '/private/model-review.json'; }]) {
     const manifest = fixture(); mutate(manifest);
     assert.throws(() => validateProviderProfile(manifest), /locked provider profile/);
+  }
+});
+
+test('executor bindings must match every locked embedding assumption before use', () => {
+  const manifest = fixture();
+  const binding = () => ({ prepareRequest() { assert.fail('must not invoke'); }, embed() { assert.fail('must not invoke'); },
+    embeddingProfile: { provider: 'openai', model: 'synthetic-embedding', dimensions: 2,
+      normalization: 'float32-rounding-v1', document_purpose: 'document', query_purpose: 'query', metric: 'cosine' } });
+  assert.deepEqual(validateProviderBinding(manifest, binding()), binding().embeddingProfile);
+  for (const mutate of [b => { b.embed = undefined; }, b => { b.prepareRequest = undefined; },
+    ...Object.keys(binding().embeddingProfile).map(key => b => { b.embeddingProfile[key] = 'changed'; }),
+    b => { b.embeddingProfile.endpoint = 'https://unapproved.invalid'; }]) {
+    const candidate = binding(); mutate(candidate);
+    assert.throws(() => validateProviderBinding(manifest, candidate), /locked embedding profile/);
   }
 });
 

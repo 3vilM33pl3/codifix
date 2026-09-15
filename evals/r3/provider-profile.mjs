@@ -10,6 +10,20 @@ const exact = (object, keys) => object && typeof object === 'object' && !Array.i
   && Object.keys(object).sort().join(',') === keys.split(',').sort().join(',');
 const identifier = value => typeof value === 'string' && /^[A-Za-z0-9._-]{1,128}$/.test(value);
 const integer = value => Number.isSafeInteger(value) && value >= 0;
+const embeddingProfile = (model, profile) => ({ provider: model.provider, model: profile.embedding.resolved_id,
+  dimensions: profile.embedding.dimensions, normalization: 'float32-rounding-v1',
+  document_purpose: 'document', query_purpose: 'query', metric: 'cosine' });
+
+export function validateProviderBinding(manifest, binding) {
+  const { model, profile } = validateProviderProfile(manifest);
+  const expected = embeddingProfile(model, profile);
+  if (!binding || typeof binding.prepareRequest !== 'function' || typeof binding.embed !== 'function'
+      || !exact(binding.embeddingProfile, Object.keys(expected).join(','))
+      || Object.keys(expected).some(key => binding.embeddingProfile[key] !== expected[key])) {
+    throw Error('provider binding differs from locked embedding profile');
+  }
+  return expected;
+}
 
 export function validateProviderProfile(manifest) {
   const profile = structuredClone(manifest.provider_profile), model = structuredClone(manifest.model);
@@ -61,9 +75,7 @@ export function createProviderBindings({ manifest, mediator, taskId, responsesCo
   let embeddingCalls = 0;
   return {
     // For shared vector provenance; never claim normalization not performed.
-    embeddingProfile: { provider: model.provider, model: profile.embedding.resolved_id,
-      dimensions: profile.embedding.dimensions, normalization: 'float32-rounding-v1',
-      document_purpose: 'document', query_purpose: 'query', metric: 'cosine' },
+    embeddingProfile: embeddingProfile(model, profile),
     async prepareRequest(payload) {
       if (taskId === 'preparation' || signal?.aborted) throw Error('response invocation not permitted in this phase');
       return responsePreparation(payload);

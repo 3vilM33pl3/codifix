@@ -12,6 +12,7 @@ import { createRehearsalExecutor } from './isolation/rehearsal-task.mjs';
 import { syntheticServiceEmbedding, syntheticVector, syntheticEmbeddingModel } from './synthetic-embedding.mjs';
 import { openRequestMediator } from './request-mediator.mjs';
 import { openSyntheticWireProvider } from './synthetic-wire-provider.mjs';
+import { openProviderCampaignSession } from './provider-campaign-session.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = path.join(root, 'campaign.json');
@@ -47,7 +48,7 @@ const verifyBinaries = async () => {
 };
 const key = work => JSON.stringify([work.case_id, work.condition, work.repeat]);
 const out = path.join(root, 'run');
-let session, server, activeTask, wireProvider;
+let session, server, activeTask, wireProvider, providerSession;
 try {
   await verifyBinaries();
   if (configuration.syntheticWire) wireProvider = await openSyntheticWireProvider(manifest);
@@ -66,6 +67,20 @@ try {
   }
   let execute;
   const prepare = async contract => {
+    if (wireProvider) {
+      providerSession = await openProviderCampaignSession({ provider: wireProvider, offline: true, split: 'development',
+        snapshotBinary: configuration.binaries.snapshot.path, memoryBinary: configuration.binaries.memory.path,
+        databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL,
+        configuration: { root, manifestSha256: plan.manifest_sha256, nodeImage: configuration.images.node, rustImage: configuration.images.rust,
+          scoreBinary: configuration.binaries.score.path, retrieverBinary: configuration.binaries.retriever.path,
+          budgetBinary: configuration.binaries.budget.path,
+          driverSha256: manifest.assets.find(asset => asset.path === 'runtime/offline-driver.mjs').sha256,
+          configurationSha256: manifest.assets.find(asset => asset.path === 'private/runtime.json').sha256,
+          serviceBuild: `memory-sha256:${configuration.binaries.memory.sha256}` } });
+      const receipt = await providerSession.prepare(contract);
+      execute = (work, contract) => providerSession.execute(work, contract);
+      return receipt;
+    }
     let mediator, call = 0;
     const baselineEmbeddings = new Map();
     try {
@@ -181,5 +196,9 @@ try {
   if (session) {
     try { await session.close(); }
     catch (error) { console.error(error.message); process.exitCode = 1; }
+  }
+  if (providerSession) {
+    try { await providerSession.close(); }
+    catch { console.error('Provider campaign cleanup failed; retain private staging.'); process.exitCode = 1; }
   }
 }

@@ -276,7 +276,8 @@ jobs:
           MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_RUST_IMAGE="$r3_rust_image" \
             MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" MEMORY_R3_REQUIRE_REHEARSAL_TASK=1 \
-            node --test evals/r3/isolation/rehearsal-task.test.mjs
+            MEMORY_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" MEMORY_R3_REQUIRE_PROVIDER_SESSION=1 \
+            node --test evals/r3/isolation/rehearsal-task.test.mjs evals/r3/provider-campaign-session.test.mjs
           MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_RUST_IMAGE="$r3_rust_image" \
             MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" MEMORY_R3_REQUIRE_REHEARSAL=1 \

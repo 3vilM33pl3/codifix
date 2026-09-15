@@ -17,6 +17,21 @@ correctness or rate accuracy: the operator must review the configuration evidenc
 and counter implementation. The fake HTTP rehearsal pins its actual symbolic
 counter source and an explicitly unapproved, synthetic-only evidence file.
 
+`provider-campaign-session.mjs` owns preparation and execution for an explicitly
+supplied provider binding. The HTTP rehearsal uses this path too. It derives
+snapshot and baseline embedding identity/dimensions from the locked profile,
+requires mediated preparation and task budgets, and uses provider answers/actions
+for both tracks without a synthetic fallback. It prepares only the selected split,
+verifies frozen assets, and refuses further work after a failed preparation/task.
+Its owner must await or cancel active work before cleanup. Legacy offline-only
+rehearsals remain available through their original guarded entrypoint.
+
+This library is not the approved live campaign launcher. It neither discovers
+credentials nor grants spending authority; approval, reviewed real tokenizers and
+transport construction belong to the trusted owner. The CLI's paid-run guard
+remains in place. Tests use fake providers and disposable databases, including an
+independently named model and a three-dimensional embedding profile.
+
 Mediated rehearsals now declare `preparation_budget` in the locked manifest.
 The CLI invokes a separate preparation driver phase before any task. Its private
 receipt binds a sealed snapshot and an audit of the actual preparation journal.
