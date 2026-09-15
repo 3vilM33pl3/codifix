@@ -415,6 +415,14 @@ It must sit behind a durable reservation and a verified input-token/price contra
 The combined fake-server/mediator test proves reservation before transmission,
 completed-result reuse and fail-closed missing usage. No real credential is loaded.
 
+`responses-request.mjs` constructs a common, tool-free structured request for
+knowledge answers or isolated coding actions. It disables storage, background
+execution, streaming, automatic truncation and hosted tools, and fixes the model,
+reasoning and output limit. Coding actions are JSON data for the existing isolated
+driver, not provider tool calls. Private labels, graders and condition names are
+not request fields. The caller must still quote and reserve the exact wire body
+before transmission; the codec does not supply a tokenizer or spend authority.
+
 ## Reusable dispatch results
 
 `ProviderResults` stores bounded outputs in a private directory, separately from

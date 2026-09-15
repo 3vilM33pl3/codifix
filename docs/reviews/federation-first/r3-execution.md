@@ -1,5 +1,18 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 common provider request codec and query timing correction
+
+- Added a pure structured-request codec shared across knowledge conditions and
+  isolated coding actions. Model/reasoning/output settings are fixed; hosted tools,
+  storage, background execution and automatic truncation are disabled. Tests cover
+  payload isolation, common instructions and malformed action rejection.
+- Query-vector generation now belongs inside retrieval timing; document and
+  lexical conditions no longer calculate unnecessary synthetic vectors. The real
+  required-database five-condition/hidden-Rust task test passes after this change.
+- The ongoing full rehearsal uses its earlier immutable copy, so it excludes the
+  small synthetic query-vector calculation from baseline timing. Do not claim
+  that artifact verifies this newer timing fix or the provider request codec.
+
 ## 2026-09-15 explicit cache-price accounting
 
 - Added an optional approved cached-input rate while preserving legacy model

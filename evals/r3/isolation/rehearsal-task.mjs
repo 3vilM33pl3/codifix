@@ -119,16 +119,19 @@ export async function createRehearsalExecutor(options) {
             const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-task-retriever-'));
             try {
               const file = path.join(temporary, 'configuration.json');
-              const vectors = sources.map(source => syntheticVector(source.text));
-              const queryVector = syntheticVector(question);
               const profile = syntheticProfile(16, syntheticEmbeddingModel);
+              const vectors = selected.condition === 'vector' ? sources.map(source => syntheticVector(source.text)) : [];
               await fs.writeFile(file, JSON.stringify({ project, condition: 'external-retriever', mode: selected.condition,
-                documents: sources, embeddings: vectors, embedding_corpus: bindCorpus(profile, sources, vectors),
+                documents: sources, ...(selected.condition === 'vector'
+                  ? { embeddings: vectors, embedding_corpus: bindCorpus(profile, sources, vectors) } : {}),
                 top_k: 8, bytes: 32768 }), { flag: 'wx', mode: 0o600 });
               retrievalStarted = performance.now(); // Prepared corpus/configuration is not task retrieval.
+              // Query embedding is execution, not corpus preparation. Plain
+              // document/lexical conditions must not invoke an embedding model.
+              const queryVector = selected.condition === 'vector' ? syntheticVector(question) : undefined;
               retrieval = await runRetriever(retrieverBinary, file, { schema_version: 1, project, condition: 'external-retriever',
                 query: question, limit: 8, item_id: item.id, context: { fixture_path: '', hidden_facts: [] },
-                query_embedding: queryVector, embedding_query: bindQuery(profile, question, queryVector) }, temporary);
+                ...(queryVector ? { query_embedding: queryVector, embedding_query: bindQuery(profile, question, queryVector) } : {}) }, temporary);
             } finally { await fs.rm(temporary, { recursive: true }); }
           }
           const context = preparedContext({ condition: selected.condition, sources, retrieval, bindings: instance.bindings, project });
