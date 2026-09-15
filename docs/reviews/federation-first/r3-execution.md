@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 shared synthetic embedding profile
+
+- New rehearsal packs bind the same synthetic embedding function to the simple
+  vector baseline and Full Memory's active semantic service. Values survive f32
+  storage exactly; the service rejects silent lexical fallback.
+- Preserve existing Memory chunking and the baseline's fixed whole-source chunks;
+  record that distinction in the hashed configuration. An initial test wrongly
+  demanded identical chunk strings and failed during preparation; it was corrected
+  without changing retrieval algorithms or treating that failed run as evidence.
+- The required-database test passes all five knowledge conditions and real hidden
+  Rust grading, alongside two fixture checks. These are synthetic model-plumbing
+  checks, not real embeddings or quality evidence. The already-running timing
+  campaign froze earlier code and does not verify this newer change.
+
 ## 2026-09-15 strict provider receipt decoding
 
 - Added a pure decoder for completed, tool-free Responses text receipts. It

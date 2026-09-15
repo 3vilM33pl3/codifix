@@ -353,6 +353,14 @@ The one-family-per-track run executes 75 tasks with 150 simulated model callback
 one per question and six per coding sequence. Symbolic token usage and zero spend
 exercise accounting, not a real tokenizer, provider, model quality or billing.
 
+New rehearsals use the same deterministic synthetic embedding function in the
+simple vector baseline and Full Memory's active semantic backend. Its binary
+fractions survive f32 storage exactly. Memory retains its existing chunker and
+summary prefix; the baseline retains fixed whole-source chunks, recorded in the
+locked configuration. This tests common model plumbing, not equivalent ranking
+inputs, meaningful semantic vectors or real-provider parity. The service query
+must actually use the configured semantic backend; lexical fallback is rejected.
+
 Knowledge uses one tool-free model contract for every condition; selected context
 and the question are its only benchmark inputs. Coding uses bounded structured
 commands inside network-none containers and private graders. Only selected source

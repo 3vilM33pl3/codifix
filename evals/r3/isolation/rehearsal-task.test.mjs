@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { openPreparedSession } from './service-session.mjs';
 import { createRehearsalExecutor } from './rehearsal-task.mjs';
+import { syntheticServiceEmbedding } from '../synthetic-embedding.mjs';
 
 const snapshotBinary = process.env.MEMORY_R3_SNAPSHOT_BIN;
 const memoryBinary = process.env.MEMORY_R3_CLI_BIN;
@@ -45,7 +46,7 @@ test('representative tasks execute all knowledge conditions and real hidden Rust
     documents.push({ project: `r3-${item.cluster}`, source, text: await fs.readFile(path.join(root, source), 'utf8') });
   }
   const session = await openPreparedSession({ snapshotBinary, memoryBinary, databaseUrl,
-    semanticTime: manifest.semantic_time, documents });
+    semanticTime: manifest.semantic_time, documents, embedding: syntheticServiceEmbedding() });
   try {
     const configurationSha256 = manifest.assets.find(asset => asset.path === 'configuration.json').sha256;
     const execute = await createRehearsalExecutor({ session, configuration: { root, nodeImage, rustImage, scoreBinary, retrieverBinary,

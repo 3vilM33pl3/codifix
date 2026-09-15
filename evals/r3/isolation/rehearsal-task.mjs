@@ -12,6 +12,7 @@ import { bindCorpus, bindQuery, syntheticProfile } from '../embedding-evidence.m
 import { openRequestMediator } from '../request-mediator.mjs';
 import { createModelAgent } from './model-agent.mjs';
 import { runMediatedKnowledge } from './model-answer.mjs';
+import { syntheticVector, syntheticEmbeddingModel } from '../synthetic-embedding.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const zeroUsage = () => ({ input_tokens: 0, output_tokens: 0, total_tokens: 0 });
@@ -49,10 +50,6 @@ function runRetriever(binary, configuration, request, directory) {
   });
 }
 
-// Fake vectors are deterministic and question-independent at preparation. They
-// are explicitly not a real embedding model or equivalent to Memory ranking.
-function fakeVector(text) { return [...createHash('sha256').update(text).digest().subarray(0, 16)].map(byte => (byte + 1) / 256); }
-
 export async function createRehearsalExecutor(options) {
   const { root, manifestSha256, nodeImage, rustImage, scoreBinary, retrieverBinary,
     driverSha256, configurationSha256, serviceBuild, budgetBinary } = structuredClone(options.configuration);
@@ -63,6 +60,7 @@ export async function createRehearsalExecutor(options) {
   const manifest = JSON.parse(manifestBytes);
   if (!manifest.smoke_only || manifest.limits.microusd !== 0 || manifest.label_status !== 'draft'
       || session.preparation.official_evidence !== false) throw Error('only draft zero-spend offline rehearsals are supported');
+  if (manifest.model.embedding_id !== syntheticEmbeddingModel) throw Error('synthetic embedding profile mismatch');
   if (!!manifest.provider_budget !== !!budgetBinary || (budgetBinary && !path.isAbsolute(budgetBinary))) throw Error('mediated rehearsal binary/profile mismatch');
   const readAsset = async relative => {
     const asset = manifest.assets.find(asset => asset.path === relative);
@@ -121,9 +119,9 @@ export async function createRehearsalExecutor(options) {
             const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-task-retriever-'));
             try {
               const file = path.join(temporary, 'configuration.json');
-              const vectors = sources.map(source => fakeVector(source.text));
-              const queryVector = fakeVector(question);
-              const profile = syntheticProfile(16, 'sha256-byte-fixture-r1');
+              const vectors = sources.map(source => syntheticVector(source.text));
+              const queryVector = syntheticVector(question);
+              const profile = syntheticProfile(16, syntheticEmbeddingModel);
               await fs.writeFile(file, JSON.stringify({ project, condition: 'external-retriever', mode: selected.condition,
                 documents: sources, embeddings: vectors, embedding_corpus: bindCorpus(profile, sources, vectors),
                 top_k: 8, bytes: 32768 }), { flag: 'wx', mode: 0o600 });

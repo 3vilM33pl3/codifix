@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { openPreparedSession } from './isolation/service-session.mjs';
 import { createRehearsalExecutor } from './isolation/rehearsal-task.mjs';
+import { syntheticServiceEmbedding } from './synthetic-embedding.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = path.join(root, 'campaign.json');
@@ -62,7 +63,7 @@ try {
   }
   session = await openPreparedSession({ snapshotBinary: configuration.binaries.snapshot.path,
     memoryBinary: configuration.binaries.memory.path, databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL,
-    semanticTime: manifest.semantic_time, documents });
+    semanticTime: manifest.semantic_time, documents, embedding: syntheticServiceEmbedding() });
   const driver = path.join(root, 'runtime/offline-driver.mjs');
   const execute = await createRehearsalExecutor({ session, configuration: { root,
     manifestSha256: plan.manifest_sha256, nodeImage: configuration.images.node, rustImage: configuration.images.rust,

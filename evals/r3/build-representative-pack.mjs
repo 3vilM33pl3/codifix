@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { syntheticEmbeddingModel } from './synthetic-embedding.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const [destination, selection, ...extra] = process.argv.slice(2);
@@ -99,10 +100,12 @@ for (const [name, items] of [['knowledge', knowledgeItems], ['coding', codingIte
 write('private/families.json', families, 'configuration');
 write('configuration.json', { version: 1, semantic_time: semanticTime, labels: 'draft', offline_only: true,
   context_bytes: 32768, top_k: 8, learning: false, reinforcement_ranking: true,
-  driver_status: 'offline rehearsal available; provider-backed execution pending', embedding_status: 'offline fixtures only' }, 'configuration');
+  driver_status: 'offline rehearsal available; provider-backed execution pending', embedding_status: 'offline fixtures only',
+  embedding: { model: syntheticEmbeddingModel, dimensions: 16, numeric_format: 'f32-exact-binary-fractions',
+    baseline_chunking: 'whole-source', memory_chunking: 'existing-memory-split-search-chunks', normalization: 'none' } }, 'configuration');
 const manifest = { version: 1, name: `r3-representative-${split}-rehearsal`, smoke_only: true,
   semantic_time: semanticTime, seed: 20260910, repeats: 3, label_status: 'draft',
-  model: { provider: 'offline-fake', resolved_id: 'deterministic-test-agent-v1', reasoning: 'none', embedding_id: 'offline-fake-only',
+  model: { provider: 'offline-fake', resolved_id: 'deterministic-test-agent-v1', reasoning: 'none', embedding_id: syntheticEmbeddingModel,
     max_input_tokens: 32768, max_output_tokens: 8192, input_microusd_per_million: 0, output_microusd_per_million: 0 },
   // One offline controller dispatch per task/condition/repeat. This is not a
   // provider allowance: paid multi-call agents require their separate mediator.
