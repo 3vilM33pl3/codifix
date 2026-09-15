@@ -130,7 +130,7 @@ fn run() -> Result<()> {
                     output,
                     usage,
                 } => json!({"output":
-                results.complete_reserved(&mut budget, &task_id, &request_id, &payload_sha256, output, usage)?}),
+                results.complete_reserved(&mut budget, &task_id, &request_id, &payload_sha256, output, usage)?, "usage": usage}),
                 Request::Recover { request_id } => {
                     json!({"output":results.recover(&mut budget, &request_id)?})
                 }

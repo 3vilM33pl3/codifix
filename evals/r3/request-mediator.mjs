@@ -75,7 +75,7 @@ export async function openRequestMediator(options) {
     // from a crash, timeout or missing usage. A receipt must already exist.
     recover: requestId => request({ operation: 'recover', request_id: requestId }),
     close,
-    async dispatch({ taskId, requestId, payload, allowance, timeoutMs, invoke }) {
+    async dispatch({ taskId, requestId, payload, allowance, timeoutMs, invoke, withReceipt = false }) {
       if (busy || typeof invoke !== 'function' || !Number.isInteger(timeoutMs) || timeoutMs < 1
           || timeoutMs > Math.min(600000, taskLimits.task_seconds * 1000)
           || !counters(allowance, ['input_tokens', 'output_tokens', 'microusd'])) throw Error('invalid or busy provider dispatch');
@@ -91,7 +91,10 @@ export async function openRequestMediator(options) {
         const identity = { task_id: taskId, request_id: requestId,
           payload_sha256: createHash('sha256').update(bytes).digest('hex') };
         const decision = await request({ operation: 'begin', ...identity, allowance });
-        if (decision.state === 'cached') return decision.output;
+        if (decision.state === 'cached') {
+          if (!counters(decision.usage, ['input_tokens', 'output_tokens', 'microusd'])) throw Error('invalid cached usage');
+          return withReceipt ? { output: decision.output, usage: decision.usage, invoked: false } : decision.output;
+        }
         if (decision.state !== 'reserved') throw Error('invalid reservation');
         let receipt;
         try {
@@ -104,7 +107,8 @@ export async function openRequestMediator(options) {
           if (!receipt || !Object.hasOwn(receipt, 'output')
               || !counters(receipt.usage, ['input_tokens', 'output_tokens', 'microusd'])) throw Error('missing provider receipt');
           const result = await request({ operation: 'complete', ...identity, output: receipt.output, usage: receipt.usage });
-          return result.output;
+          if (!counters(result.usage, ['input_tokens', 'output_tokens', 'microusd'])) throw Error('invalid confirmed usage');
+          return withReceipt ? { output: result.output, usage: result.usage, invoked: true } : result.output;
         } catch { throw Error('provider outcome uncertain; retain journal and reconcile before further calls'); }
       } finally { clearTimeout(timer); busy = false; }
     },

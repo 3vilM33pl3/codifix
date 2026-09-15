@@ -25,8 +25,9 @@ export function createModelAgent(options) {
     busy = true;
     const started = performance.now();
     let files = container.files, previous = null;
+    const usage = { provider_requests: 0, new_provider_requests: 0, input_tokens: 0, output_tokens: 0, microusd: 0 };
     const result = exitCode => ({ version: 1, image: container.image, exitCode,
-      elapsedMs: performance.now() - started, stdout: '', stderr: '',
+      elapsedMs: performance.now() - started, stdout: '', stderr: '', usage: { ...usage },
       files: Object.fromEntries(container.exportPaths.filter(p => Object.hasOwn(files, p))
         .map(p => [p, Buffer.from(files[p]).toString('base64')])) });
     try {
@@ -38,8 +39,15 @@ export function createModelAgent(options) {
             finish: { kind: 'finish' }, network: 'none', persistence: 'selected-submission-files-only' } };
         const requestId = 'call-' + createHash('sha256').update(JSON.stringify([taskId, stepId, round])).digest('hex');
         calls++;
-        const action = await mediator.dispatch({ taskId, requestId, payload, allowance,
+        const receipt = await mediator.dispatch({ taskId, requestId, payload, allowance, withReceipt: true,
           timeoutMs: Math.min(remaining, container.timeoutMs), invoke });
+        const increments = { provider_requests: 1, new_provider_requests: receipt.invoked ? 1 : 0, ...receipt.usage };
+        for (const key of Object.keys(usage)) {
+          if (!Number.isSafeInteger(increments[key]) || increments[key] < 0
+              || !Number.isSafeInteger(usage[key] + increments[key])) throw Error('invalid model usage accounting');
+          usage[key] += increments[key];
+        }
+        const action = receipt.output;
         if (!action || Object.getPrototypeOf(action) !== Object.prototype) return result(1);
         if (action.kind === 'finish' && Object.keys(action).join(',') === 'kind') return result(0);
         if (action.kind !== 'command' || Object.keys(action).sort().join(',') !== 'argv,kind') return result(1);

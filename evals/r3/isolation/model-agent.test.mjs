@@ -64,6 +64,9 @@ test('six budgeted model calls span three isolated steps without leaking future 
     assert.equal(result.success, true);
     assert.equal(result.officialEvidence, false);
     assert.equal(calls, 6);
+    assert.deepEqual(result.providerUsage, { provider_requests: 6, new_provider_requests: 6,
+      input_tokens: 120, output_tokens: 60, microusd: 12 });
+    assert(result.steps.every(step => step.providerUsage.provider_requests === 2 && step.providerUsage.microusd === 4));
     assert.deepEqual(JSON.parse(result.submission['counter.json']), { value: 3 });
     assert(result.steps.every(step => step.agentElapsedMs > 0 && step.graderElapsedMs > 0));
     assert.deepEqual((await mediator.status()).ledger, { requests: 6, tokens: 180, microusd: 12 });

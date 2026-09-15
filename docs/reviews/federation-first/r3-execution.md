@@ -1,5 +1,20 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 common mediated answers and recovered task accounting
+
+- All five conditions can use the same tool-free answer adapter after the existing
+  exact-source/context checks. Only selected context and the question reach the
+  model; full sources and rubrics stay in the existing private Rust adjudicator.
+  The result does not pretend the external model ran inside our container image.
+- Durable call receipts supply token/cost counts. Recovered tasks retain their
+  original attributed cost, with new invocations reported separately; a cached
+  answer is neither a second charge nor a zero-cost replacement for prior usage.
+  Coding sequence parents sum their per-step receipts once; steps stay diagnostic.
+- The combined three model-adapter tests, six mediator fault/restart tests and
+  four existing knowledge/retriever tests pass. Fake outputs with invalid citations
+  fail; valid citations still await human rubric judgment. No labels or paid runs
+  were approved by these checks. Integrated CLI regression is being re-run.
+
 ## 2026-09-15 isolated multi-call coding driver
 
 - The existing three-step sequence runner accepts a trusted agent adapter with

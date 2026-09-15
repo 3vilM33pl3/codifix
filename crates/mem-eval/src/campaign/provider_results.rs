@@ -39,7 +39,7 @@ pub struct ProviderResults {
 #[derive(Debug, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum DispatchDecision {
-    Cached { output: Value },
+    Cached { output: Value, usage: Allowance },
     Reserved,
 }
 
@@ -99,7 +99,7 @@ impl ProviderResults {
         provider: impl FnOnce() -> Result<(Value, Allowance)>,
     ) -> Result<Value> {
         match self.begin(budget, task_id, request_id, payload_sha256, allowance)? {
-            DispatchDecision::Cached { output } => return Ok(output),
+            DispatchDecision::Cached { output, .. } => return Ok(output),
             DispatchDecision::Reserved => {}
         }
         let (output, usage) = provider()
@@ -128,8 +128,10 @@ impl ProviderResults {
                 saved.usage.is_some(),
                 "provider attempt uncertain; explicit recovery required"
             );
+            let usage = saved.usage.context("missing cached usage")?;
             return Ok(DispatchDecision::Cached {
                 output: self.recover(budget, request_id)?,
+                usage,
             });
         }
         ensure!(

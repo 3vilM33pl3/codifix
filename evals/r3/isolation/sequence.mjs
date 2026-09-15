@@ -66,10 +66,13 @@ export async function runOfflineSequence(options) {
     // pass the step object: it contains the hidden probes and future context.
     const agent = runAgent ? await runAgent({ ...structuredClone(publicInput), stepId: step.id })
       : await runOfflineContainer(publicInput);
-    const { elapsedMs, image: resultImage, ...result } = agent;
+    const { elapsedMs, image: resultImage, usage: agentUsage, ...result } = agent;
     validateResult(result);
     if (resultImage !== image || !Number.isFinite(elapsedMs) || elapsedMs < 0
         || Object.keys(result.files).some(p => !submissionPaths.includes(p))) throw Error('invalid agent adapter result');
+    if (runAgent && (!agentUsage || Object.keys(agentUsage).sort().join(',') !== 'input_tokens,microusd,new_provider_requests,output_tokens,provider_requests'
+        || Object.values(agentUsage).some(v => !Number.isSafeInteger(v) || v < 0)
+        || agentUsage.new_provider_requests > agentUsage.provider_requests)) throw Error('missing or invalid agent usage');
     const selected = selectedSubmission(agent, submissionPaths);
     let grader, graderInputSha256;
     if (rust) {
@@ -91,10 +94,21 @@ export async function runOfflineSequence(options) {
       passed: agent.exitCode === 0 && grader.exitCode === 0 && submissionPaths.every(p => Object.hasOwn(selected, p)),
       agentInputSha256: digest(agentFiles), submissionSha256: digest(selected),
       graderInputSha256, graderKind: rust ? 'rust-blackbox' : 'command',
-      agentElapsedMs: agent.elapsedMs, graderElapsedMs: grader.elapsedMs });
+      agentElapsedMs: agent.elapsedMs, graderElapsedMs: grader.elapsedMs,
+      ...(runAgent ? { providerUsage: structuredClone(agentUsage) } : {}) });
     submission = selected;
+  }
+  let providerUsage;
+  if (runAgent) {
+    providerUsage = Object.fromEntries(Object.keys(diagnostics[0].providerUsage).map(key => [key, 0]));
+    for (const step of diagnostics) for (const key of Object.keys(providerUsage)) {
+      const sum = providerUsage[key] + step.providerUsage[key];
+      if (!Number.isSafeInteger(sum)) throw Error('sequence usage overflow');
+      providerUsage[key] = sum;
+    }
   }
   return { version: 1, kind: 'offline-sequence-smoke', officialEvidence: false,
     success: diagnostics.every(s => s.passed), elapsedMs: performance.now() - started,
-    initialSha256: digest(initialFiles), image, steps: diagnostics, submission };
+    initialSha256: digest(initialFiles), image, steps: diagnostics, submission,
+    ...(runAgent ? { providerUsage } : {}) };
 }

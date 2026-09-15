@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Trusted-host bridge: explicit retrieved chunks -> isolated offline answer ->
-// existing Rust adjudicator. It cannot invoke a provider or approve a rubric.
+// existing Rust adjudicator. A trusted answer callback may supply a mediated
+// tool-free answer; no private rubric/source pool is passed to that callback.
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -82,8 +83,10 @@ function validateAnswer(answer) {
 export async function runOfflineKnowledge(options) {
   // Snapshot caller-owned inputs before the first await. Private sources/rubrics
   // are retained only on the host, not copied alongside the selected context.
+  const { runAnswer, ...plain } = options;
+  if (runAnswer !== undefined && typeof runAnswer !== 'function') throw Error('invalid trusted answer adapter');
   const { image, question, sources, context, argv, manifestSha256, work, rubric,
-    scoreBinary, timeoutMs = 10000 } = structuredClone(options);
+    scoreBinary, timeoutMs = 10000 } = structuredClone(plain);
   const sourceMap = corpus(sources);
   if (!Array.isArray(context) || context.length > 8 || !conditions.includes(work?.condition)
       || !/^[a-f0-9]{64}$/.test(manifestSha256) || !path.isAbsolute(scoreBinary)
@@ -99,19 +102,29 @@ export async function runOfflineKnowledge(options) {
     seen.add(source.id);
   }
   const publicInput = JSON.stringify({ question, context });
-  const execution = { image, argv, files: { 'input.json': publicInput }, timeoutMs, exportPaths: ['answer.json'] };
-  validateInput(execution);
   const started = performance.now();
-  const result = await runOfflineContainer(execution);
-  const answerDurationMs = performance.now() - started;
-  if (result.exitCode !== 0 || Object.keys(result.files).join(',') !== 'answer.json') throw Error('offline answer process failed');
-  let answer;
-  try {
-    const bytes = Buffer.from(result.files['answer.json'], 'base64');
-    if (bytes.length > 65536) throw Error('oversized');
-    answer = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  let answer, providerRequests = 0, newProviderRequests = 0, executionMicrousd = 0, tokenUsage = { input_tokens: 0, output_tokens: 0 };
+  if (runAnswer) {
+    const received = await runAnswer(JSON.parse(publicInput));
+    if (!received || !Number.isSafeInteger(received.providerRequests) || received.providerRequests < 0
+        || !Number.isSafeInteger(received.newProviderRequests) || received.newProviderRequests < 0 || received.newProviderRequests > received.providerRequests
+        || !Number.isSafeInteger(received.executionMicrousd) || received.executionMicrousd < 0
+        || !received.tokenUsage || ['input_tokens', 'output_tokens'].some(k => !Number.isSafeInteger(received.tokenUsage[k]) || received.tokenUsage[k] < 0)) throw Error('missing mediated answer usage');
+    ({ answer, providerRequests, newProviderRequests, executionMicrousd, tokenUsage } = structuredClone(received));
     validateAnswer(answer);
-  } catch { throw Error('invalid structured offline answer'); }
+  } else {
+    const execution = { image, argv, files: { 'input.json': publicInput }, timeoutMs, exportPaths: ['answer.json'] };
+    validateInput(execution);
+    const result = await runOfflineContainer(execution);
+    if (result.exitCode !== 0 || Object.keys(result.files).join(',') !== 'answer.json') throw Error('offline answer process failed');
+    try {
+      const bytes = Buffer.from(result.files['answer.json'], 'base64');
+      if (bytes.length > 65536) throw Error('oversized');
+      answer = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      validateAnswer(answer);
+    } catch { throw Error('invalid structured offline answer'); }
+  }
+  const answerDurationMs = performance.now() - started;
   const scoringStarted = performance.now();
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-knowledge-'));
   try {
@@ -124,10 +137,10 @@ export async function runOfflineKnowledge(options) {
       timeout: 10000, maxBuffer: 4 * 1024 * 1024, killSignal: 'SIGKILL' });
     await invoke(['prepare', input, out]);
     const scored = JSON.parse((await invoke(['score', path.join(out, 'private/evidence.json'), ballots])).stdout);
-    return { version: 1, kind: 'offline-knowledge-answer', officialEvidence: false,
-      image, publicInputSha256: hash(publicInput), answerDurationMs,
+    return { version: 1, kind: runAnswer ? 'mediated-knowledge-answer' : 'offline-knowledge-answer', officialEvidence: false,
+      image: runAnswer ? null : image, publicInputSha256: hash(publicInput), answerDurationMs,
       adjudicationPreparationMs: performance.now() - scoringStarted,
-      providerRequests: 0, executionMicrousd: 0,
+      providerRequests, newProviderRequests, executionMicrousd, tokenUsage,
       answer, evidence: scored.evidence, assessment: scored.assessment };
   } catch {
     throw Error('offline knowledge adjudication failed');
