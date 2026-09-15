@@ -158,6 +158,16 @@ fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -
         if !expected.contains(&key) || !seen.insert(key) {
             errors.push("unexpected/duplicate observation".into());
         }
+        if let Some(index) = plan.work.iter().position(|work| work == w)
+            && let Err(error) = observation.validate_provider_audit(
+                manifest,
+                &plan.manifest_sha256,
+                &format!("work-{index:05}"),
+                artifact.offline,
+            )
+        {
+            errors.push(error.to_string());
+        }
         if observation.result.item_id != w.case_id
             || observation.result.skipped
             || observation.result.duration_ms.is_none()

@@ -67,6 +67,7 @@ try {
   const execute = await createRehearsalExecutor({ session, configuration: { root,
     manifestSha256: plan.manifest_sha256, nodeImage: configuration.images.node, rustImage: configuration.images.rust,
     scoreBinary: configuration.binaries.score.path, retrieverBinary: configuration.binaries.retriever.path,
+    budgetBinary: configuration.binaries.budget?.path,
     driverSha256: manifest.assets.find(asset => asset.path === 'runtime/offline-driver.mjs').sha256,
     configurationSha256: manifest.assets.find(asset => asset.path === 'private/runtime.json').sha256,
     serviceBuild: `memory-sha256:${configuration.binaries.memory.sha256}` } });
@@ -94,7 +95,7 @@ try {
         if (activeTask || !plan.work[cursor] || key(plan.work[cursor]) !== identity) throw Error('out of order dispatch');
         const task = (async () => {
           await verifyBinaries();
-          const observation = await execute(dispatch.work);
+          const observation = await execute(dispatch.work,dispatch.provider_budget);
           await verifyBinaries();
           cursor++;
           console.error(`Offline rehearsal completed ${cursor}/${plan.work.length} tasks.`);

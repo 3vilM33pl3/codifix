@@ -29,6 +29,7 @@ fn exclusive_json<T: serde::Serialize>(path: &Path, data: &T) -> Result<()> {
     Ok(())
 }
 
+mod provider_mediation;
 #[cfg(test)]
 mod tests;
 
@@ -314,6 +315,7 @@ async fn execute(
         &mut dispatch_budget,
         &dispatch_results,
     )?;
+    let mut provider_requests = 0u64;
     for (index, work) in plan.work.iter().enumerate() {
         // Aggregate per-task token ceiling. Driver must enforce this across all
         // its provider requests; reservations remain charged after uncertain exit.
@@ -330,6 +332,9 @@ async fn execute(
         let cost = if offline { 0 } else { priced.microusd };
         ledger.reserve(&manifest.limits, tokens, cost)?;
         if let Some(observation) = recovered.get(index) {
+            provider_requests = provider_requests
+                .checked_add(observation.provider_requests)
+                .context("provider request overflow")?;
             if index == 0 {
                 artifact.preparation_microusd = Some(bounded_json(
                     &out.join("work-00000/preparation-microusd.json"),
@@ -343,9 +348,19 @@ async fn execute(
         std::fs::create_dir(&dir)?;
         std::fs::create_dir(dir.join("home"))?;
         exclusive_json(&dir.join("reservation.json"), ledger)?;
-        let request = dispatch_request(manifest_path, plan, work, &dir, offline, tokens, cost);
-        exclusive_json(&dir.join("request.json"), &request)?;
         let dispatch_id = format!("work-{index:05}");
+        let provider_contract = provider_mediation::contract(
+            manifest,
+            &plan.manifest_sha256,
+            &dir,
+            &dispatch_id,
+            offline,
+            provider_requests,
+        )?;
+        provider_mediation::prepare(provider_contract.as_ref())?;
+        let mut request = dispatch_request(manifest_path, plan, work, &dir, offline, tokens, cost);
+        provider_mediation::bind(&mut request, provider_contract.as_ref())?;
+        exclusive_json(&dir.join("request.json"), &request)?;
         let request_hash = c::digest_value(&request)?;
         dispatch_budget.reserve_for_task(
             &dispatch_id,
@@ -421,12 +436,17 @@ async fn execute(
             observation.execution_microusd.is_some_and(|c| c <= cost),
             "unknown/excess task spend"
         );
-        // More than one call consumes additional request quota. The driver must
-        // enforce the supplied remaining request limit before each dispatch.
-        ensure!(
-            observation.provider_requests <= 1,
-            "multi-request driver needs per-request budget mediation; unsupported"
-        );
+        provider_mediation::verify(
+            manifest,
+            &plan.manifest_sha256,
+            &dispatch_id,
+            offline,
+            provider_contract.as_ref(),
+            &observation,
+        )?;
+        provider_requests = provider_requests
+            .checked_add(observation.provider_requests)
+            .context("provider request overflow")?;
         // Preparation receipt is mandatory and separate from task execution.
         // Only the first task can prepare; later tasks must restore its snapshot.
         if index == 0 {
@@ -506,6 +526,7 @@ fn recover_dispatches(
         allowance.microusd = 0;
     }
     let mut recovered = vec![];
+    let mut provider_requests = 0u64;
     for (index, id) in ids.iter().enumerate() {
         ensure!(
             *id == format!("work-{index:05}"),
@@ -513,7 +534,7 @@ fn recover_dispatches(
         );
         let work = &plan.work[index];
         let dir = out.join(id);
-        let expected = dispatch_request(
+        let mut expected = dispatch_request(
             manifest_path,
             plan,
             work,
@@ -522,6 +543,15 @@ fn recover_dispatches(
             tokens,
             allowance.microusd,
         );
+        let provider_contract = provider_mediation::contract(
+            manifest,
+            &plan.manifest_sha256,
+            &dir,
+            id,
+            offline,
+            provider_requests,
+        )?;
+        provider_mediation::bind(&mut expected, provider_contract.as_ref())?;
         let saved: serde_json::Value = bounded_json(&dir.join("request.json"))?;
         ensure!(saved == expected, "saved dispatch request changed");
         let observation: Observation = serde_json::from_value(
@@ -534,10 +564,17 @@ fn recover_dispatches(
             observation.isolation.driver_sha256 == driver_hash,
             "saved driver mismatch"
         );
-        ensure!(
-            observation.provider_requests <= 1,
-            "saved multi-request evidence unsupported"
-        );
+        provider_mediation::verify(
+            manifest,
+            &plan.manifest_sha256,
+            id,
+            offline,
+            provider_contract.as_ref(),
+            &observation,
+        )?;
+        provider_requests = provider_requests
+            .checked_add(observation.provider_requests)
+            .context("provider request overflow")?;
         let usage = observation
             .result
             .token_usage

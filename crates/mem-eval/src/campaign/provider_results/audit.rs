@@ -3,9 +3,9 @@
 //! persistence/accounting evidence, not a signature authenticating a provider.
 use super::*;
 use crate::campaign::{Ledger, Limits};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderCall {
     pub task_id: String,
@@ -16,7 +16,7 @@ pub struct ProviderCall {
     pub usage: Allowance,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct TaskUsage {
     pub requests: u64,
@@ -43,7 +43,7 @@ impl TaskUsage {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderAudit {
     pub version: u8,
@@ -54,6 +54,71 @@ pub struct ProviderAudit {
     pub tasks: BTreeMap<String, TaskUsage>,
     /// One entry per unique durable request, irrespective of cached deliveries.
     pub calls: Vec<ProviderCall>,
+}
+
+impl ProviderAudit {
+    /// Validate a portable metadata report. The CLI must additionally compare it
+    /// to an audit of the actual journal/results before accepting driver output.
+    pub fn validate(&self) -> Result<()> {
+        ensure!(
+            self.version == 1
+                && crate::campaign::valid_digest(&self.manifest_sha256)
+                && self.calls.len() <= 100000,
+            "invalid provider audit"
+        );
+        let mut ids = BTreeSet::new();
+        let mut tasks = BTreeMap::<String, TaskUsage>::new();
+        let mut total = TaskUsage::default();
+        for call in &self.calls {
+            ensure!(
+                crate::campaign::identifier(&call.request_id)
+                    && crate::campaign::identifier(&call.task_id)
+                    && ids.insert(&call.request_id)
+                    && crate::campaign::valid_digest(&call.payload_sha256)
+                    && crate::campaign::valid_digest(&call.result_sha256),
+                "invalid or duplicate call identity"
+            );
+            ensure!(
+                call.usage.input_tokens <= call.allowance.input_tokens
+                    && call.usage.output_tokens <= call.allowance.output_tokens
+                    && call.usage.microusd <= call.allowance.microusd,
+                "usage exceeds call allowance"
+            );
+            tasks
+                .entry(call.task_id.clone())
+                .or_default()
+                .add(call.usage)?;
+            total.add(call.usage)?;
+        }
+        let within = |usage: &TaskUsage, limits: &Limits| -> Result<bool> {
+            Ok(usage.requests <= limits.requests
+                && usage.microusd <= limits.microusd
+                && usage
+                    .input_tokens
+                    .checked_add(usage.output_tokens)
+                    .context("token overflow")?
+                    <= limits.tokens)
+        };
+        ensure!(
+            tasks == self.tasks
+                && self.ledger.requests == total.requests
+                && self.ledger.tokens
+                    == total
+                        .input_tokens
+                        .checked_add(total.output_tokens)
+                        .context("token overflow")?
+                && self.ledger.microusd == total.microusd
+                && within(&total, &self.limits)?,
+            "provider audit totals mismatch"
+        );
+        for usage in tasks.values() {
+            ensure!(
+                within(usage, &self.task_limits)?,
+                "task audit exceeds limits"
+            );
+        }
+        Ok(())
+    }
 }
 
 impl ProviderResults {

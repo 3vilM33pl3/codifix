@@ -53,6 +53,160 @@ fn evidence_files_cannot_be_overwritten() {
     assert_eq!(split("held-out").unwrap(), Split::HeldOut);
 }
 
+#[test]
+fn mediated_driver_counts_must_match_actual_locked_journal_and_receipts() {
+    let root = Scratch::new();
+    let (mut manifest, mut observation) = fixture();
+    manifest.provider_budget = Some(c::ProviderBudget {
+        max_calls_per_task: 4,
+    });
+    let hash = c::digest_value(&manifest).unwrap();
+    let contract = provider_mediation::contract(&manifest, &hash, &root.0, "work-00000", true, 0)
+        .unwrap()
+        .unwrap();
+    provider_mediation::prepare(Some(&contract)).unwrap();
+    let directory = root.0.join("provider");
+    let limits = c::Limits {
+        requests: 4,
+        tokens: manifest.model.max_input_tokens + manifest.model.max_output_tokens,
+        microusd: 0,
+        task_seconds: manifest.limits.task_seconds,
+    };
+    let mut budget = RequestBudget::create_scoped(
+        &directory.join("budget.jsonl"),
+        &hash,
+        limits.clone(),
+        limits,
+    )
+    .unwrap();
+    let results = ProviderResults::create(&directory.join("results")).unwrap();
+    for id in ["call-1", "call-2"] {
+        results
+            .dispatch(
+                &mut budget,
+                "work-00000",
+                id,
+                &c::digest(b"synthetic-input"),
+                Allowance {
+                    input_tokens: 20,
+                    output_tokens: 10,
+                    microusd: 0,
+                },
+                || {
+                    Ok((
+                        serde_json::json!("synthetic output"),
+                        Allowance {
+                            input_tokens: 3,
+                            output_tokens: 2,
+                            microusd: 0,
+                        },
+                    ))
+                },
+            )
+            .unwrap();
+    }
+    observation.provider_requests = 2;
+    let usage = observation.result.token_usage.as_mut().unwrap();
+    usage.input_tokens = 6;
+    usage.output_tokens = 4;
+    usage.total_tokens = 10;
+    observation.provider_audit = Some(results.audit(&mut budget).unwrap());
+    assert!(
+        provider_mediation::verify(
+            &manifest,
+            &hash,
+            "work-00000",
+            true,
+            Some(&contract),
+            &observation
+        )
+        .is_err(),
+        "live provider owner must retain the lock"
+    );
+    drop(budget);
+    provider_mediation::verify(
+        &manifest,
+        &hash,
+        "work-00000",
+        true,
+        Some(&contract),
+        &observation,
+    )
+    .unwrap();
+    let mut forged = observation.clone();
+    let audit = forged.provider_audit.as_mut().unwrap();
+    let mut call = audit.calls[0].clone();
+    call.request_id = "invented-call".into();
+    audit.calls.push(call);
+    audit.ledger.requests = 3;
+    audit.ledger.tokens = 15;
+    let task = audit.tasks.get_mut("work-00000").unwrap();
+    task.requests = 3;
+    task.input_tokens = 9;
+    task.output_tokens = 6;
+    forged.provider_requests = 3;
+    let usage = forged.result.token_usage.as_mut().unwrap();
+    usage.input_tokens = 9;
+    usage.output_tokens = 6;
+    usage.total_tokens = 15;
+    forged
+        .validate_provider_audit(&manifest, &hash, "work-00000", true)
+        .unwrap();
+    assert!(
+        provider_mediation::verify(
+            &manifest,
+            &hash,
+            "work-00000",
+            true,
+            Some(&contract),
+            &forged
+        )
+        .is_err(),
+        "self-consistent metadata is not journal evidence"
+    );
+    let mut request = serde_json::json!({"version":1});
+    let last = provider_mediation::contract(
+        &manifest,
+        &hash,
+        &root.0,
+        "work-00001",
+        true,
+        manifest.limits.requests - 1,
+    )
+    .unwrap();
+    provider_mediation::bind(&mut request, last.as_ref()).unwrap();
+    assert_eq!(request["provider_budget"]["limits"]["requests"], 1);
+    assert!(
+        provider_mediation::contract(
+            &manifest,
+            &hash,
+            &root.0,
+            "work-00001",
+            true,
+            manifest.limits.requests
+        )
+        .is_err()
+    );
+    std::fs::write(
+        directory
+            .join("results")
+            .join(format!("{}.json", c::digest(b"call-1"))),
+        b"{}",
+    )
+    .unwrap();
+    assert!(
+        provider_mediation::verify(
+            &manifest,
+            &hash,
+            "work-00000",
+            true,
+            Some(&contract),
+            &observation
+        )
+        .is_err()
+    );
+}
+
 fn fixture() -> (Manifest, Observation) {
     let mut cases = Vec::new();
     for (track, split, count, size) in [
@@ -93,6 +247,7 @@ fn fixture() -> (Manifest, Observation) {
         repeats: 3,
         label_status: "draft".into(),
         smoke_only: true,
+        provider_budget: None,
         model: model.clone(),
         limits: c::Limits {
             requests: 10000,
@@ -118,6 +273,7 @@ fn fixture() -> (Manifest, Observation) {
     };
     let work = manifest.plan(Split::Development).unwrap().work[0].clone();
     let observation = Observation {
+        provider_audit: None,
         knowledge_review: None,
         work: work.clone(),
         model,

@@ -1,6 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use super::*;
 
+#[test]
+fn optional_mediation_preserves_legacy_bytes_and_requires_explicit_bounded_calls() {
+    let mut manifest = fixture();
+    let original = digest_value(&manifest).unwrap();
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    assert!(!String::from_utf8_lossy(&bytes).contains("provider_budget"));
+    let decoded: Manifest = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(original, digest_value(&decoded).unwrap());
+    for bound in [0, 129] {
+        manifest.provider_budget = Some(ProviderBudget {
+            max_calls_per_task: bound,
+        });
+        assert!(manifest.validate().is_err());
+    }
+    manifest.provider_budget = Some(ProviderBudget {
+        max_calls_per_task: 6,
+    });
+    manifest.validate().unwrap();
+    assert_ne!(original, digest_value(&manifest).unwrap());
+}
+
 pub(super) fn fixture() -> Manifest {
     let mut cases = Vec::new();
     for (track, split, clusters, size) in [
@@ -31,6 +52,7 @@ pub(super) fn fixture() -> Manifest {
         repeats: 3,
         label_status: "reviewed".into(),
         smoke_only: false,
+        provider_budget: None,
         model: Model {
             provider: "fake".into(),
             resolved_id: "fake-v1".into(),
@@ -182,6 +204,7 @@ fn artifact(manifest: &Manifest) -> Artifact {
                         evidence
                     });
                 Observation {
+                    provider_audit: None,
                     knowledge_review,
                     model: manifest.model.clone(),
                     work,

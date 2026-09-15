@@ -11,14 +11,17 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
-const [destination, selection, ...extra] = process.argv.slice(2);
-if (!destination || extra.length || (selection && selection !== '--one-family-per-track')) throw Error('usage: node rehearse.mjs NEW_DIRECTORY [--one-family-per-track]');
+const [destination, ...flags] = process.argv.slice(2);
+if (!destination || new Set(flags).size !== flags.length || flags.some(flag => !['--one-family-per-track','--mediated'].includes(flag))) throw Error('usage: node rehearse.mjs NEW_DIRECTORY [--one-family-per-track] [--mediated]');
+const selection = flags.includes('--one-family-per-track') ? '--one-family-per-track' : undefined;
+const mediated = flags.includes('--mediated');
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(destination);
 const databaseUrl = process.env.MEMORY_LAYER_TEST_DATABASE_URL;
 const binaries = {
   memory: process.env.MEMORY_R3_CLI_BIN, snapshot: process.env.MEMORY_R3_SNAPSHOT_BIN,
   score: process.env.MEMORY_R3_SCORE_BIN, retriever: process.env.MEMORY_R3_RETRIEVER_BIN,
+  ...(mediated ? { budget: process.env.MEMORY_R3_BUDGET_BIN } : {}),
 };
 const images = { node: process.env.MEMORY_R3_TEST_IMAGE, rust: process.env.MEMORY_R3_RUST_IMAGE };
 if (!databaseUrl || process.env.MEMORY_LAYER_TEST_REQUIRE_DB !== '1' || Object.values(binaries).some(value => !value || !path.isAbsolute(value))
@@ -59,14 +62,20 @@ const staging = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-controller-')
 try {
   const manifestPath = path.join(root, 'campaign.json');
   const manifest = JSON.parse(await fs.readFile(manifestPath));
+  if (mediated) {
+    manifest.provider_budget = { max_calls_per_task: 6 };
+    manifest.model.resolved_id = 'synthetic-mediated-excerpt-noop-v1';
+    manifest.limits.requests *= 6;
+  }
   const add = async (relative, bytes, executable = false) => {
     const target = path.join(root, relative);
     await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
     await fs.writeFile(target, bytes, { flag: 'wx', mode: executable ? 0o700 : 0o600 });
     manifest.assets.push({ path: relative, sha256: createHash('sha256').update(bytes).digest('hex'), kind: 'configuration' });
   };
-  for (const relative of ['rehearsal-controller.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
-    'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs', 'isolation/service-session.mjs', 'isolation/embedding-proxy.mjs', 'isolation/rehearsal-task.mjs']) {
+  for (const relative of ['rehearsal-controller.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'request-mediator.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
+    'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs', 'isolation/service-session.mjs', 'isolation/embedding-proxy.mjs',
+    'isolation/model-agent.mjs', 'isolation/model-answer.mjs', 'isolation/rehearsal-task.mjs']) {
     await add(`runtime/${relative}`, await fs.readFile(path.join(here, relative)), relative === 'offline-driver.mjs');
   }
   await add('private/runtime.json', JSON.stringify({ version: 1, binaries: pins, images,

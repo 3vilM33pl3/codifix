@@ -91,13 +91,18 @@ pub struct Model {
     pub input_microusd_per_million: u64,
     pub output_microusd_per_million: u64,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Limits {
     pub requests: u64,
     pub tokens: u64,
     pub microusd: u64,
     pub task_seconds: u64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderBudget {
+    pub max_calls_per_task: u64,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -113,6 +118,10 @@ pub struct Manifest {
     pub smoke_only: bool,
     pub model: Model,
     pub limits: Limits,
+    /// Explicit per-call mediation mode. Omission preserves legacy canonical
+    /// bytes and its single-call dispatch restriction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_budget: Option<ProviderBudget>,
     pub reference_baseline: Option<Condition>,
     pub assets: Vec<Asset>,
     pub cases: Vec<Case>,
@@ -210,6 +219,12 @@ impl Manifest {
                 && self.limits.task_seconds > 0
                 && self.limits.task_seconds <= 3600,
             "invalid campaign limits"
+        );
+        ensure!(
+            self.provider_budget
+                .as_ref()
+                .is_none_or(|b| (1..=128).contains(&b.max_calls_per_task)),
+            "invalid per-task provider request bound"
         );
         ensure!(
             self.assets.len() <= 10000 && !self.cases.is_empty() && self.cases.len() <= 1000,
@@ -485,6 +500,8 @@ pub struct Observation {
     pub result: crate::EvalItemResult,
     pub execution_microusd: Option<u64>,
     pub provider_requests: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_audit: Option<provider_results::ProviderAudit>,
     pub uncertain_charge: bool,
     pub critical_failure: bool,
     pub unresolved_rubric: bool,
@@ -492,6 +509,83 @@ pub struct Observation {
     #[serde(default)]
     pub knowledge_review: Option<scoring::KnowledgeEvidence>,
     pub isolation: Isolation,
+}
+impl Observation {
+    pub fn validate_provider_audit(
+        &self,
+        manifest: &Manifest,
+        manifest_sha256: &str,
+        task_id: &str,
+        offline: bool,
+    ) -> Result<()> {
+        let Some(contract) = &manifest.provider_budget else {
+            ensure!(
+                self.provider_audit.is_none(),
+                "unexpected provider audit without locked mediation profile"
+            );
+            return Ok(());
+        };
+        let audit = self
+            .provider_audit
+            .as_ref()
+            .context("missing per-call provider audit")?;
+        audit.validate()?;
+        let tokens = manifest
+            .model
+            .max_input_tokens
+            .checked_add(manifest.model.max_output_tokens)
+            .context("task token overflow")?;
+        let cost = if offline {
+            0
+        } else {
+            budget::Allowance::for_model(
+                &manifest.model,
+                manifest.model.max_input_tokens,
+                manifest.model.max_output_tokens,
+            )?
+            .microusd
+        };
+        ensure!(
+            audit.manifest_sha256 == manifest_sha256
+                && audit.limits.requests > 0
+                && audit.limits.requests <= contract.max_calls_per_task
+                && audit.limits.tokens == tokens
+                && audit.limits.microusd == cost
+                && audit.limits.task_seconds == manifest.limits.task_seconds
+                && audit.task_limits == audit.limits
+                && audit.tasks.keys().all(|id| id == task_id),
+            "provider audit contract mismatch"
+        );
+        let usage = self
+            .result
+            .token_usage
+            .as_ref()
+            .context("unknown task usage")?;
+        ensure!(
+            !self.uncertain_charge
+                && audit.ledger.requests == self.provider_requests
+                && audit.ledger.tokens == usage.total_tokens
+                && Some(audit.ledger.microusd) == self.execution_microusd,
+            "provider audit does not match task totals"
+        );
+        let output = audit
+            .tasks
+            .values()
+            .try_fold(0u64, |sum, t| sum.checked_add(t.output_tokens))
+            .context("output overflow")?;
+        ensure!(
+            output == usage.output_tokens,
+            "provider audit output tokens mismatch"
+        );
+        for call in &audit.calls {
+            ensure!(
+                call.allowance.input_tokens <= manifest.model.max_input_tokens
+                    && call.allowance.output_tokens <= manifest.model.max_output_tokens,
+                "provider call exceeds model bounds"
+            );
+        }
+        Ok(())
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Artifact {

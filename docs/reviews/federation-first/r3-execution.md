@@ -1,5 +1,24 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 campaign multi-call integration
+
+- Added an explicit, bounded `provider_budget` manifest extension. Absent fields
+  preserve legacy canonical bytes and its single-call behavior. In mediated mode
+  each task receives a private journal contract clamped to remaining request quota.
+- The CLI verifies actual journal/result files before accepting the portable
+  audit, on both fresh execution and recovery. Task counters must match; a live
+  writer, self-consistent invented audit, altered receipt or exhausted quota fails.
+  Report validation checks the portable audit against the locked task/model bounds.
+- Six CLI campaign tests, 61 evaluator tests and the required-database workspace
+  suite pass. Formatting and boundaries pass. Workspace Clippy and the 75-task
+  mediated rehearsal are running; they are not yet claimed passed.
+- The preceding legacy 75-task regression passed in 415 seconds, retained at
+  `/data/tmp/memory-r3-rehearsal-cli-w2teEy`. The first attempt used a mistyped image
+  ID and failed before dispatch; it was not accepted as evidence.
+- `--mediated` uses simulated excerpt/no-op callbacks, symbolic token receipts and
+  zero spend. It does not enable paid execution, settle labels, provide real
+  embedding parity or establish task latency/quality.
+
 ## 2026-09-15 provider receipt audit
 
 - The mediator can produce a metadata-only audit by verifying every actual result

@@ -275,8 +275,9 @@ prove permissions, indexes, functions, external evidence files or backup recover
   integrated rehearsal deliberately uses fake vectors and a lexical snapshot.
 - Enforce request/token/spend limits at every provider dispatch in a budget
   mediator, including coding sequences and uncertain calls. The current runner
-  reservation is only a conservative single-request foundation; paid dispatch is
-  rejected unconditionally before any driver starts.
+  legacy reservation remains conservative; explicit multi-call mode verifies
+  actual per-task journals and receipts. Paid dispatch is still rejected
+  unconditionally before any driver starts.
 - Complete provider-backed campaign dispatch and genuine operator adjudication.
   The offline controller already exports bound pending review packets; it does
   not decide semantic correctness or approve labels.
@@ -302,14 +303,14 @@ Used IDs cannot dispatch again, even with identical inputs. Torn journals,
 changed limits/campaigns and competing owners fail closed. Metadata journals do
 not store questions, model outputs, credentials or provider error bodies.
 
-The existing single-request `campaign run` dispatcher now writes
+The `campaign run` dispatcher writes
 `dispatch-budget.jsonl` before launching each driver, and settles it only after
 validating usage, isolation, locked inputs and the preparation receipt. Failed or
 invalid dispatches remain unresolved. Its legacy `ledger.json` remains a
 conservative sum of maximum dispatch allowances; the journal records confirmed
 usage separately. Neither artifact is authority to replay an interrupted run.
-This does not remove the single-request restriction or unconditional paid-run
-block, nor mediate calls inside an external driver. The complete driver must calculate
+Legacy profiles retain the single-request restriction. Explicit mediation is
+described below; it does not remove the unconditional paid-run block. A paid driver must calculate
 conservative allowances from locked model settings/prices, enforce task-level
 limits as well as campaign limits, mediate every provider path, persist results,
 and reconcile confirmed receipts. The journal does not independently verify
@@ -324,9 +325,41 @@ update both ledgers, while uncertain calls block the entire dispatcher. Restart
 reconstructs task totals and rejects changed limits. `Allowance::for_model`
 calculates rounded-up charges from locked token prices and rejects excess token
 bounds/overflow. These APIs are tested foundations for multi-call mediation;
-the current campaign driver restriction is not lifted by their availability.
+their availability alone does not grant permission for paid dispatch.
 They do not impose wall-clock deadlines, verify tokenization or account for
 non-token provider fees. Those remain responsibilities of the complete mediator.
+
+### Explicit multi-call rehearsal
+
+A locked manifest can opt into `provider_budget: { "max_calls_per_task": 6 }`
+(1–128 calls). Omission preserves old canonical bytes and the legacy single-call
+restriction. Task token/cost ceilings remain the existing aggregate bounds; calls
+do not each receive an additional task allowance.
+
+The CLI supplies a private per-task `provider_budget` contract and directory in
+its driver request. Its request ceiling is clamped to the campaign's remaining
+quota. The trusted driver uses `request-mediator.mjs` with `r3_budget`, closes the
+owner, and attaches the resulting metadata-only `provider_audit` to its observation.
+Before accepting it, the CLI locks and replays the actual journal, verifies every
+result file, and compares the audit and task totals. A self-consistent invented
+report is insufficient. Recovery repeats those checks; missing, altered, active
+or uncertain receipts cannot permit another dispatch.
+
+The synthetic rehearsal supports this path through `--mediated`. Build
+`cargo build -p mem-eval --example r3_budget --locked`, then add
+`MEMORY_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget"` to the previously
+documented disposable rehearsal environment and append `--mediated` to its command.
+The one-family-per-track run executes 75 tasks with 150 simulated model callbacks:
+one per question and six per coding sequence. Symbolic token usage and zero spend
+exercise accounting, not a real tokenizer, provider, model quality or billing.
+
+Knowledge uses one tool-free model contract for every condition; selected context
+and the question are its only benchmark inputs. Coding uses bounded structured
+commands inside network-none containers and private graders. Only selected source
+files persist between commands. Recovered receipts retain the original task cost;
+new invocations are distinguished separately. Sequence parents aggregate once,
+while children remain diagnostics. Paid-provider configuration, tokenizer/price
+validation, real embedding parity and official approval remain separate gates.
 
 ## Reusable dispatch results
 

@@ -9,9 +9,14 @@ import { spawn } from 'node:child_process';
 import { preparedContext, runOfflineKnowledge } from './knowledge.mjs';
 import { runOfflineSequence } from './sequence.mjs';
 import { bindCorpus, bindQuery, syntheticProfile } from '../embedding-evidence.mjs';
+import { openRequestMediator } from '../request-mediator.mjs';
+import { createModelAgent } from './model-agent.mjs';
+import { runMediatedKnowledge } from './model-answer.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const zeroUsage = () => ({ input_tokens: 0, output_tokens: 0, total_tokens: 0 });
+const tokenUsage = usage => usage ? { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
+  total_tokens: usage.input_tokens + usage.output_tokens } : zeroUsage();
 const conditions = ['handover', 'lexical', 'vector', 'full-memory', 'no-memory'];
 const excerptAgent = ['/usr/local/bin/node', '-e', `
   const fs=require('fs');const input=JSON.parse(fs.readFileSync('input.json','utf8'));
@@ -50,7 +55,7 @@ function fakeVector(text) { return [...createHash('sha256').update(text).digest(
 
 export async function createRehearsalExecutor(options) {
   const { root, manifestSha256, nodeImage, rustImage, scoreBinary, retrieverBinary,
-    driverSha256, configurationSha256, serviceBuild } = structuredClone(options.configuration);
+    driverSha256, configurationSha256, serviceBuild, budgetBinary } = structuredClone(options.configuration);
   const session = options.session; // Trusted host owner, never serialized to an agent.
   if (!path.isAbsolute(root) || !path.isAbsolute(scoreBinary) || !path.isAbsolute(retrieverBinary)
       || [manifestSha256, driverSha256, configurationSha256].some(value => !/^[a-f0-9]{64}$/.test(value))) throw Error('invalid rehearsal configuration');
@@ -58,6 +63,7 @@ export async function createRehearsalExecutor(options) {
   const manifest = JSON.parse(manifestBytes);
   if (!manifest.smoke_only || manifest.limits.microusd !== 0 || manifest.label_status !== 'draft'
       || session.preparation.official_evidence !== false) throw Error('only draft zero-spend offline rehearsals are supported');
+  if (!!manifest.provider_budget !== !!budgetBinary || (budgetBinary && !path.isAbsolute(budgetBinary))) throw Error('mediated rehearsal binary/profile mismatch');
   const readAsset = async relative => {
     const asset = manifest.assets.find(asset => asset.path === relative);
     if (!asset || !relative.split('/').every(part => /^[a-zA-Z0-9_.-]+$/.test(part) && part !== '.' && part !== '..')) throw Error('unlocked rehearsal input');
@@ -75,7 +81,7 @@ export async function createRehearsalExecutor(options) {
   await verify();
   const families = JSON.parse(await readAsset('private/families.json'));
   let busy = false;
-  return async work => {
+  return async (work, providerContract) => {
     if (busy) throw Error('rehearsal executor busy');
     const selected = structuredClone(work);
     const item = manifest.cases.find(item => item.id === selected.case_id);
@@ -83,8 +89,24 @@ export async function createRehearsalExecutor(options) {
         || selected.repeat < 0 || selected.repeat >= 3) throw Error('unknown rehearsal work');
     busy = true;
     const started = performance.now();
+    let mediator;
     try {
       await verify();
+      if (manifest.provider_budget) {
+        const p = structuredClone(providerContract);
+        if (!p || !/^work-[0-9]{5}$/.test(p.task_id) || p.directory !== path.join(root,'run',p.task_id,'provider')
+            || p.manifest_sha256 !== manifestSha256 || p.limits?.microusd !== 0
+            || !Number.isInteger(p.limits.requests) || p.limits.requests < 1 || p.limits.requests > manifest.provider_budget.max_calls_per_task
+            || p.limits.tokens !== manifest.model.max_input_tokens + manifest.model.max_output_tokens
+            || p.limits.task_seconds !== manifest.limits.task_seconds
+            || JSON.stringify(p.limits) !== JSON.stringify(p.task_limits)) throw Error('invalid per-task provider contract');
+        mediator = await openRequestMediator({ binary: budgetBinary, directory: p.directory,
+          manifestSha256, limits: p.limits, taskLimits: p.task_limits });
+      } else if (providerContract) throw Error('unexpected provider contract');
+      const model = { provider: manifest.model.provider, resolved_id: manifest.model.resolved_id, reasoning: manifest.model.reasoning };
+      const allowance = { input_tokens: 64, output_tokens: 64, microusd: 0 };
+      // Symbolic fake usage exercises receipts, not a real tokenizer or billing.
+      const fakeUsage = { input_tokens: 1, output_tokens: 1, microusd: 0 };
       const family = families.find(family => family.id === item.cluster);
       if (!family || family.track !== item.track) throw Error('missing rehearsal family');
       const sources = await Promise.all(item.sources.map(async id => ({ id, text: await readAsset(id) })));
@@ -114,11 +136,18 @@ export async function createRehearsalExecutor(options) {
         if (item.track === 'knowledge') {
           const rubric = JSON.parse(await readAsset(`private/rubrics/${item.id}.json`));
           const context = await contextFor(rubric.question);
-          const answer = await runOfflineKnowledge({ image: nodeImage, scoreBinary, sources, context, question: rubric.question,
-            rubric, manifestSha256, work: selected, argv: excerptAgent });
+          const answerOptions = { image: nodeImage, scoreBinary, sources, context, question: rubric.question,
+            rubric, manifestSha256, work: selected, argv: excerptAgent };
+          const answer = mediator ? await runMediatedKnowledge({ ...answerOptions, mediator, model, allowance,
+            taskId: providerContract.task_id, requestId: 'answer', invoke: async payload => {
+              const source = payload.input.context[0];
+              return { output: source ? { text: source.text, refused: false, citations: [{ source_id: source.id, quote: source.text }] }
+                : { text: 'Insufficient supplied evidence.', refused: true, citations: [] }, usage: fakeUsage };
+            } }) : await runOfflineKnowledge(answerOptions);
           return { success: answer.assessment.success, answer: answer.answer.text,
             knowledge_review: answer.evidence, unresolved_rubric: answer.assessment.unresolved,
-            critical_failure: answer.assessment.critical_failure, diagnostics: [], input_sha256: answer.publicInputSha256 };
+            critical_failure: answer.assessment.critical_failure, diagnostics: [], input_sha256: answer.publicInputSha256,
+            providerUsage: { provider_requests: answer.providerRequests, ...answer.tokenUsage, microusd: answer.executionMicrousd } };
         }
         const stages = JSON.parse(await readAsset(family.stages));
         const initialFiles = {};
@@ -128,20 +157,24 @@ export async function createRehearsalExecutor(options) {
         const context = await contextFor(`What is the documented ${family.id} maintenance contract?`);
         // Each stage's prompt is selected in its own invocation; the sequence
         // runner supplies no private grader output or reference implementation.
-        const sequence = await runOfflineSequence({ image: rustImage, initialFiles, submissionPaths: family.submission_paths,
+        const runAgent = mediator ? createModelAgent({ mediator, model, allowance, taskId: providerContract.task_id,
+          maxCalls: manifest.provider_budget.max_calls_per_task, taskTimeoutMs: manifest.limits.task_seconds * 1000,
+          invoke: async payload => ({ output: payload.previous ? { kind: 'finish' } : { kind: 'command', argv: noOpAgent }, usage: fakeUsage }) }) : undefined;
+        const sequence = await runOfflineSequence({ image: rustImage, initialFiles, submissionPaths: family.submission_paths, runAgent,
           timeoutMs: 30000, steps: stages.map((stage, index) => ({ id: `${family.id}-${stage.id}`, argv: noOpAgent,
             inputFiles: { 'task.json': JSON.stringify({ prompt: stage.prompt, context }) },
             grader: { kind: 'rust-blackbox', probes: stages.slice(0, index + 1).flatMap(stage => stage.probes) } })) });
         return { success: sequence.success, answer: null, knowledge_review: null,
-          unresolved_rubric: false, critical_failure: false, diagnostics: sequence.steps, input_sha256: sequence.initialSha256 };
+          unresolved_rubric: false, critical_failure: false, diagnostics: sequence.steps, input_sha256: sequence.initialSha256,
+          providerUsage: sequence.providerUsage };
       });
       await verify();
       const value = executed.value;
       const legacyCondition = selected.condition === 'vector' ? 'semantic' : selected.condition === 'handover' ? 'lexical' : selected.condition;
-      const result = (id, success, duration, answer, sub_results = []) => ({ item_id: id,
+      const result = (id, success, duration, answer, sub_results = [], usage) => ({ item_id: id,
         eval_type: item.track === 'knowledge' ? 'grounded_answer' : 'agent_build_sequence', condition: legacyCondition,
         metadata: { claim: 'offline-synthetic-not-quality', reasoning_mode: 'none' },
-        success, skipped: false, scores: {}, duration_ms: Math.max(1, Math.ceil(duration)), token_usage: zeroUsage(), answer,
+        success, skipped: false, scores: {}, duration_ms: Math.max(1, Math.ceil(duration)), token_usage: tokenUsage(usage), answer,
         notes: ['Offline synthetic agent; not measured model quality.', `Prepared input SHA-256: ${value.input_sha256}`,
           'Rehearsal timing includes disposable service setup and hidden grading; not model/user latency.'], sub_results });
       return { work: selected, model: manifest.model,
@@ -149,14 +182,15 @@ export async function createRehearsalExecutor(options) {
           value.diagnostics.map(step => ({ id: step.id, eval_type: 'agent_build_step',
             metadata: { claim: 'offline-synthetic-not-quality', reasoning_mode: 'none' },
             success: step.passed, skipped: false, scores: {},
-            duration_ms: Math.max(1, Math.ceil(step.agentElapsedMs + step.graderElapsedMs)), token_usage: zeroUsage(),
-            notes: [`Agent input SHA-256: ${step.agentInputSha256}`, `Private grader input SHA-256: ${step.graderInputSha256}`] }))),
-        execution_microusd: 0, provider_requests: 0, uncertain_charge: false,
+            duration_ms: Math.max(1, Math.ceil(step.agentElapsedMs + step.graderElapsedMs)), token_usage: tokenUsage(step.providerUsage),
+            notes: [`Agent input SHA-256: ${step.agentInputSha256}`, `Private grader input SHA-256: ${step.graderInputSha256}`] })),value.providerUsage),
+        execution_microusd: value.providerUsage?.microusd ?? 0, provider_requests: value.providerUsage?.provider_requests ?? 0, uncertain_charge: false,
+        ...(mediator ? { provider_audit: (await mediator.audit()).audit } : {}),
         critical_failure: value.critical_failure, unresolved_rubric: value.unresolved_rubric, knowledge_review: value.knowledge_review,
         isolation: { before_sha256: executed.beforeSha256, after_sha256: executed.afterSha256,
           snapshot_sha256: executed.beforeSha256, configuration_sha256: configurationSha256, driver_sha256: driverSha256,
           service_build: serviceBuild, semantic_time: manifest.semantic_time, sealed: true,
           restricted_network: true, hidden_tests_inaccessible: true } };
-    } finally { busy = false; }
+    } finally { try { await mediator?.close(); } finally { busy = false; } }
   };
 }

@@ -8,6 +8,8 @@ import { spawn, spawnSync } from 'node:child_process';
 
 const names = ['MEMORY_LAYER_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_CLI_BIN',
   'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN'];
+const mediated = process.env.MEMORY_R3_MEDIATED === '1';
+if (mediated) names.push('MEMORY_R3_BUDGET_BIN');
 const available = names.every(name => process.env[name]);
 if (process.env.MEMORY_R3_REQUIRE_REHEARSAL === '1' && !available) throw Error('required integrated rehearsal configuration missing');
 
@@ -20,7 +22,7 @@ test('rehearsal bootstrap requires explicit disposable configuration before crea
   await assert.rejects(fs.stat(out));
 });
 
-test('existing campaign CLI completes a real 75-dispatch isolated rehearsal with pending human review', { skip: !available, timeout: 600000 }, async t => {
+test(`existing campaign CLI completes a real 75-dispatch ${mediated ? 'mediated' : 'isolated'} rehearsal with pending human review`, { skip: !available, timeout: 600000 }, async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-rehearsal-cli-'));
   let verified = false;
   t.after(async () => {
@@ -40,7 +42,7 @@ test('existing campaign CLI completes a real 75-dispatch isolated rehearsal with
   }
   let replacedBuildOutput = false, replacement;
   const run = await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['evals/r3/rehearse.mjs', root, '--one-family-per-track'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, ['evals/r3/rehearse.mjs', root, '--one-family-per-track', ...(mediated ? ['--mediated'] : [])], { env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
     const timer = setTimeout(() => child.kill('SIGINT'), 550000);
     child.stdout.on('data', chunk => { stdout += chunk; if (stdout.length > 1048576) child.kill('SIGINT'); });
@@ -69,7 +71,12 @@ test('existing campaign CLI completes a real 75-dispatch isolated rehearsal with
   assert(artifact.completed && artifact.offline);
   assert.equal(artifact.observations.length, 75);
   assert.equal(new Set(artifact.observations.map(row => JSON.stringify(row.work))).size, 75);
-  assert(artifact.observations.every(row => row.provider_requests === 0 && row.execution_microusd === 0));
+  assert(artifact.observations.every(row => row.execution_microusd === 0));
+  if (mediated) {
+    assert.equal(artifact.observations.reduce((sum,row) => sum + row.provider_requests,0),150);
+    assert(artifact.observations.every(row => row.provider_audit.calls.length === row.provider_requests
+      && row.provider_audit.ledger.tokens === row.result.token_usage.total_tokens));
+  } else assert(artifact.observations.every(row => row.provider_requests === 0));
   assert(artifact.observations.every(row => row.isolation.before_sha256 === row.isolation.after_sha256));
   assert.equal(new Set(artifact.observations.map(row => row.isolation.snapshot_sha256)).size, 1);
   const coding = artifact.observations.filter(row => row.work.case_id === 'durable-importer');
