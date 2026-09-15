@@ -1,5 +1,20 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 isolated multi-call coding driver
+
+- The existing three-step sequence runner accepts a trusted agent adapter with
+  only the current public workspace. It never passes the private grader object,
+  future tasks or grading feedback. Adapter submissions use the same validation
+  and private grading path as the existing container runner.
+- A bounded structured model loop routes every callback through the durable
+  request mediator. Commands run only in network-none containers; only selected
+  submission files persist. The model gets no host command facility or secrets.
+  Per-sequence call/time limits cover the answering loop, excluding hidden grading.
+- Two required container tests pass: six budgeted fake model calls complete three
+  steps, while malformed commands cannot execute on the host or pass scoring.
+  Existing sequence isolation/reset tests also pass. This verifies a restricted
+  driver protocol, not model competence or a paid-provider integration.
+
 ## 2026-09-15 per-call execution bridge
 
 - The existing Rust request-budget/result store now exposes a reservation-or-cache

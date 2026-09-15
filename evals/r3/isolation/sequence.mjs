@@ -2,7 +2,7 @@
 // Driver component, not official grading or a replacement for mem-eval results.
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
-import { runOfflineContainer, validateInput } from './container.mjs';
+import { runOfflineContainer, validateInput, validateResult } from './container.mjs';
 import { gradeRustCase, validateRustCase } from './rust.mjs';
 
 const digest = files => createHash('sha256').update(JSON.stringify(
@@ -48,9 +48,11 @@ function selectedSubmission(result, paths) {
 
 export async function runOfflineSequence(options) {
   validateSequence(options); // Validate every future step before any execution.
+  const { runAgent, ...contract } = options;
+  if (runAgent !== undefined && typeof runAgent !== 'function') throw Error('invalid trusted agent adapter');
   // Copy the reviewed JSON contract so asynchronous caller mutation cannot change
   // a later grader, command or allowlist while the current step is running.
-  const { image, initialFiles, submissionPaths, steps, timeoutMs = 10000 } = structuredClone(options);
+  const { image, initialFiles, submissionPaths, steps, timeoutMs = 10000 } = structuredClone(contract);
   let submission = Object.fromEntries(submissionPaths.map(p => [p, initialFiles[p]]));
   const diagnostics = [];
   const started = performance.now();
@@ -58,8 +60,16 @@ export async function runOfflineSequence(options) {
     const publicFiles = Object.fromEntries(Object.entries(initialFiles).filter(([p]) => !submissionPaths.includes(p)));
     const agentFiles = { ...publicFiles, ...(step.inputFiles ?? {}), ...submission };
     const rust = step.grader.kind === 'rust-blackbox';
-    const agent = await runOfflineContainer({ image, files: agentFiles, argv: step.argv, timeoutMs,
-      exportPaths: submissionPaths, profile: rust ? 'rust' : 'text' });
+    const publicInput = { image, files: agentFiles, argv: step.argv, timeoutMs,
+      exportPaths: submissionPaths, profile: rust ? 'rust' : 'text' };
+    // Trusted model adapters receive only this step's public workspace. Do not
+    // pass the step object: it contains the hidden probes and future context.
+    const agent = runAgent ? await runAgent({ ...structuredClone(publicInput), stepId: step.id })
+      : await runOfflineContainer(publicInput);
+    const { elapsedMs, image: resultImage, ...result } = agent;
+    validateResult(result);
+    if (resultImage !== image || !Number.isFinite(elapsedMs) || elapsedMs < 0
+        || Object.keys(result.files).some(p => !submissionPaths.includes(p))) throw Error('invalid agent adapter result');
     const selected = selectedSubmission(agent, submissionPaths);
     let grader, graderInputSha256;
     if (rust) {
