@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 capacity-pressure knowledge family
+
+- Added five synthetic sources and four draft rubrics on pool acquisition,
+  contention, process-wide connection budgets and confounded recovery evidence.
+  The arithmetic ceiling is explicitly not a throughput recommendation.
+- Canonical rubric and two pack/CLI tests pass without skips. Twenty development
+  knowledge questions and four coding sequences are materialized. Labels and
+  official evaluation remain unapproved; these are fixture validations only.
+
 ## 2026-09-15 schema-transition knowledge family
 
 - Allocated the remaining seven development knowledge mechanisms before writing
