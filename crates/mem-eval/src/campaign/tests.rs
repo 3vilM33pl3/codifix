@@ -743,6 +743,39 @@ fn smoke_and_legacy_manifests_cannot_be_promoted_by_label_approval() {
 }
 
 #[test]
+fn small_development_calibration_requires_its_own_approvals_and_whole_families() {
+    let mut manifest = fixture();
+    manifest.smoke_only = true;
+    manifest.reference_baseline = None;
+    manifest
+        .cases
+        .retain(|case| case.split == Split::Development && case.cluster.ends_with("-0"));
+    let plan = manifest.plan(Split::Development).unwrap();
+    assert_eq!(plan.work.len(), 75);
+    assert!(plan.readiness_errors.is_empty());
+    assert!(manifest.authorize(Split::Development, &[]).is_err());
+    let approvals: Vec<_> = [ApprovalPurpose::Labels, ApprovalPurpose::Development]
+        .into_iter()
+        .map(|purpose| Approval {
+            manifest_sha256: plan.manifest_sha256.clone(),
+            reviewer: "fixture-not-real-approval".into(),
+            approved_at: Utc::now(),
+            purpose,
+            maximum_microusd: manifest.limits.microusd,
+        })
+        .collect();
+    assert!(manifest.authorize(Split::Development, &approvals).is_ok());
+    assert!(manifest.authorize(Split::HeldOut, &approvals).is_err());
+    assert!(
+        manifest
+            .authorize(Split::Development, &approvals[..1])
+            .is_err()
+    );
+    manifest.cases.remove(0);
+    assert!(manifest.validate().is_err());
+}
+
+#[test]
 fn reservation_is_atomic_bounded_and_conservative_on_uncertain_execution() {
     let limits = Limits {
         requests: 2,

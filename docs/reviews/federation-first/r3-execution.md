@@ -1,5 +1,18 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 bounded development calibration allocation
+
+- Diagnostic development packs can now be authorized for the plan's small
+  calibration, rather than requiring all 660 development dispatches up front.
+  Complete families, both tracks, all conditions/repeats and separate matching
+  label/spend approvals are still required. Held-out diagnostic packs remain
+  ineligible for official evidence; the paid CLI guard is unchanged.
+- Added a 75-dispatch calibration contract test covering absent approvals,
+  missing spend approval, held-out denial and partial-family rejection.
+- Evaluator tests and the four representative-pack tests pass with the freshly
+  rebuilt CLI. Draft labels, missing budget and manifest/source tampering still
+  fail closed; no paid execution is enabled by this change.
+
 ## 2026-09-15 remove circular development baseline gate
 
 - Development readiness no longer demands the reference baseline that calibration

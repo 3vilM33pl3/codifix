@@ -443,6 +443,11 @@ calibration is how that choice is made. Label approval and a separate matching
 development spend approval are still required. Held-out authorization requires
 the frozen reference baseline. Changing the manifest after calibration changes
 its identity and requires matching approvals for the newly locked campaign.
+A small development calibration may use a diagnostic (`smoke_only`) pack containing
+fewer **complete** families, with both tracks and all five conditions/repeats.
+It still needs its own matching label and spend approvals. This permits the planned
+small calibration without paying for the entire development allocation; it never
+makes a diagnostic or legacy pack eligible for held-out product-quality evidence.
 
 ## Reusable dispatch results
 

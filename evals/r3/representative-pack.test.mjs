@@ -94,7 +94,8 @@ test('existing campaign CLI loads representative suites and refuses tampering or
   assert.equal(result.status, 0, result.stderr);
   const prepared = JSON.parse(result.stdout);
   assert.equal(prepared.work.length, 75);
-  assert(prepared.readiness_errors.some(reason => reason.includes('smoke-only')));
+  assert(prepared.readiness_errors.some(reason => reason.includes('labels')));
+  assert(prepared.readiness_errors.some(reason => reason.includes('budget')));
   assert.equal(plan('held-out').status, 1, 'there is no materialized held-out split');
   const manifest = JSON.parse(await fs.readFile(manifestPath));
   const asset = manifest.assets.find(a => a.kind === 'source');
@@ -125,7 +126,8 @@ test('complete development allocation plans all 660 executions but cannot become
   assert.equal(JSON.parse(await fs.readFile(manifestPath)).limits.requests, prepared.work.length);
   assert.equal(new Set(prepared.work.map(work => `${work.case_id}:${work.condition}:${work.repeat}`)).size, 660);
   assert.equal(new Set(prepared.work.map(work => work.case_id)).size, 44);
-  assert(prepared.readiness_errors.some(reason => reason.includes('smoke-only')));
+  assert(prepared.readiness_errors.some(reason => reason.includes('labels')));
+  assert(prepared.readiness_errors.some(reason => reason.includes('budget')));
   assert.equal(plan('held-out').status, 1);
   const manifest = JSON.parse(await fs.readFile(manifestPath));
   manifest.smoke_only = false;

@@ -294,7 +294,7 @@ impl Manifest {
                 .collect();
             let actual_clusters: BTreeSet<_> = cases.iter().map(|c| &c.cluster).collect();
             if self.smoke_only {
-                // Incremental offline rehearsals may contain fewer complete
+                // Diagnostic rehearsals/calibration may contain fewer complete
                 // families. This flag always prohibits official evidence, even
                 // with reviewed labels and apparently valid spend approvals.
                 ensure!(
@@ -400,7 +400,7 @@ impl Manifest {
             digest(format!("{}:{}:{:?}:{}", self.seed, w.case_id, w.condition, w.repeat).as_bytes())
         });
         let mut readiness_errors = Vec::new();
-        if self.smoke_only {
+        if self.smoke_only && split == Split::HeldOut {
             readiness_errors.push("smoke-only dataset cannot be official product evidence".into());
         }
         if self.label_status != "reviewed" {
