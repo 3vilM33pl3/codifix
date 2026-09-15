@@ -1,5 +1,27 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 combined verification and first representative source pack
+
+- Materialized the first development knowledge family: supplier handover has
+  five public documents and a separate draft four-question review rubric.
+  Labels remain draft; this is not the complete suite or a campaign input yet.
+- A frozen test template now rejects any remaining preparation connection
+  without killing it; its required-database regression passed.
+- Initial unbounded workspace testing exhausted the disposable PostgreSQL
+  connection limit (one service test failed with `53300`). The rerun with
+  `--test-threads=2` passed: 854 tests, zero failures, with
+  `MEMORY_LAYER_TEST_REQUIRE_DB=1`. Final test-support verification separately
+  passed three unit tests and one migration test after the active-writer guard.
+- Workspace all-target Clippy, Rust formatting and boundary checks passed.
+  Web: 90 tests and build passed. Lean build/test passed with existing lint
+  warnings. The no-default-features CLI check passed with existing warnings.
+- Nine live container/sequence tests and the external retriever executable
+  rehearsal passed. No paid calls, customer data, deployed-service changes or
+  label approval. Live PDS activation/rehearsal was not performed in this run.
+- R3 remains incomplete: complete campaign orchestration, source/label/config
+  fingerprint integration, per-request provider mediation, complete representative
+  datasets, semantic adjudication, approval and official measurement remain open.
+
 ## 2026-09-15 external baseline adapter
 
 - Added the existing-protocol `r3_retriever` executable for prepared handover,

@@ -151,6 +151,16 @@ impl IsolatedDatabase {
         ))
         .execute(&self.admin)
         .await?;
+        let connections: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=$1")
+                .bind(&self.name)
+                .fetch_one(&self.admin)
+                .await?;
+        anyhow::ensure!(
+            connections == 0,
+            "prepared database still has connections; reconcile disposable database {}",
+            self.name
+        );
         Ok(FrozenDatabase {
             admin: self.admin,
             name: self.name,
@@ -232,6 +242,33 @@ fn require_database() -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn freezing_refuses_another_preparation_connection() {
+        use sqlx::Connection;
+        let Some(db) = super::IsolatedDatabase::new().await else {
+            return;
+        };
+        let admin = db.admin.clone();
+        let name = db.name.clone();
+        let other = sqlx::PgConnection::connect_with(db.pool.connect_options().as_ref())
+            .await
+            .expect("second preparation connection");
+        let error = db
+            .freeze()
+            .await
+            .err()
+            .expect("active preparer must prevent freeze");
+        assert!(error.to_string().contains("still has connections"));
+        // The helper does not kill connections it does not own. Close this
+        // explicitly owned test connection before exact-target cleanup.
+        other.close().await.expect("close test preparer");
+        sqlx::query(&format!("DROP DATABASE {name}"))
+            .execute(&admin)
+            .await
+            .expect("remove rejected test template");
+        admin.close().await;
+    }
+
     #[tokio::test]
     async fn frozen_database_resets_reinforcement_and_rejects_new_source_connections() {
         let Some(db) = super::IsolatedDatabase::new().await else {

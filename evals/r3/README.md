@@ -8,7 +8,10 @@ credentials are needed to build them.
 
 The replacement benchmark is being designed around
 [representative incident and repository workflows](representative-benchmark.md).
-Those designs are drafts, not implemented or approved fixtures.
+The first multi-document development source pack and draft rubric are now
+materialized at [supplier handover](representative/development/supplier-handover/review.md).
+The complete replacement suite is not yet implemented or approved; that pack is
+not wired into the smoke generator or an official campaign.
 
 ```sh
 node evals/r3/build-review-pack.mjs target/memory-evals/r3-review
