@@ -23,7 +23,7 @@ test('representative development packs are reproducible, private, whole-family a
   assert.deepEqual(bytes, await fs.readFile(path.join(second, 'campaign.json')));
   const manifest = JSON.parse(bytes);
   assert(manifest.smoke_only && manifest.label_status === 'draft' && manifest.limits.microusd === 0);
-  assert.equal(manifest.cases.filter(c => c.track === 'knowledge').length, 8);
+  assert.equal(manifest.cases.filter(c => c.track === 'knowledge').length, 12);
   assert.equal(manifest.cases.filter(c => c.track === 'coding').length, 4);
   assert(manifest.cases.every(c => c.split === 'development'));
   for (const asset of manifest.assets) {

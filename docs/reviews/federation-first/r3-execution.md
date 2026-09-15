@@ -1,5 +1,16 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 cache-partition knowledge family
+
+- Added a third development scenario: five source documents and four canonical
+  draft rubrics covering wrong-space answer reuse, scope versus signed origin,
+  obsolete instructions, containment and refusal of unsupported exposure totals.
+  This fictional incident does not describe Memory's deployed implementation.
+- Canonical rubric validation and both representative materialization/CLI tests
+  pass. Default rehearsal packs now contain twelve knowledge questions and four
+  coding sequences. Seven development and all twenty-five held-out knowledge
+  families, plus twelve held-out coding families, remain to be materialized.
+
 ## 2026-09-15 execution validity versus pending review
 
 - Reports now expose execution validity separately from the complete harness
@@ -412,10 +423,23 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
 - [x] Checkpoint approved contract and inspect existing evaluation machinery.
 - [x] Operator-only frozen semantic clock and no-learning service profile.
 - [ ] Sealed/reset disposable datasets and restricted agent containers.
+  - [x] Prepare once, fork read-only PostgreSQL/service instances, verify snapshots
+    before/after work, and deny cross-project reads and stale query closures.
+  - [x] No-network synthetic answer/coding containers and separate hidden Rust
+    grading; real 75-dispatch representative offline rehearsal.
+  - [ ] Complete the provider-backed isolation/egress profile.
 - [ ] Equal-information document, lexical, vector and full-Memory baselines.
+  - [x] Existing baseline executables and real Memory retrieval integrated offline.
+  - [ ] Real embedding preparation and frozen full-Memory configuration parity.
 - [ ] Synthetic development/held-out knowledge and coding review pack.
+  - [x] Four representative development coding families, executable controls.
+  - [ ] Complete knowledge families (currently 3/10 development, 0/25 held-out)
+    and held-out coding families (0/12), then obtain label approval.
 - [ ] Campaign plan/run/report, provenance, limits and fail-closed gates.
 - [ ] Offline fault/isolation/statistical tests and integration evidence.
+  - [x] Real partial CLI rehearsal, pending review export, source/hash fencing,
+    independent snapshots and negative coding controls.
+  - [ ] Complete provider-mediated fault/limit tests and the full benchmark run.
 - [ ] Olivier approves labels; freeze suite only after approval.
 - [ ] Approve and run paid development calibration.
 - [ ] Separately approve and run official campaign; publish measured outcome.

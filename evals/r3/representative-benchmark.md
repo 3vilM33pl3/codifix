@@ -94,6 +94,11 @@ authorized positive cases. No signatures, real PDS or paid provider is required.
 
 ## Expansion and validation contract
 
+The cache-partition knowledge family is assigned to development before fixture
+implementation: distinguishing request authorization and signed provenance from
+the scope of a reused answer, with bounded incident evidence. Do not reuse that
+failure family in held-out material.
+
 The dependency-build family is assigned to development: transitive build order,
 dependency-aware cache invalidation and atomic cache replacement. Do not reuse
 this failure family in the held-out split. Compilation is represented by a
