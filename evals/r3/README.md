@@ -323,12 +323,12 @@ prove permissions, indexes, functions, external evidence files or backup recover
 - Complete the official isolation profile beyond the current trusted-host
   offline services and network-disabled agent/grader containers.
 - Complete real vector preparation and full-Memory configuration parity; the
-  integrated rehearsal deliberately uses fake vectors and a lexical snapshot.
-- Enforce request/token/spend limits at every provider dispatch in a budget
-  mediator, including coding sequences and uncertain calls. The current runner
-  legacy reservation remains conservative; explicit multi-call mode verifies
-  actual per-task journals and receipts. Paid dispatch is still rejected
-  unconditionally before any driver starts.
+  integrated rehearsal deliberately uses fake vectors, not semantic embeddings.
+- Bind the complete live driver to the selected, reviewed model/embedding,
+  tokenizer, rate and explicit credential-delivery configuration. Per-call
+  request/token/spend mediation and combined preparation/execution limits are
+  implemented and exercised offline; this is not a live-provider configuration
+  or approval. Paid dispatch is still rejected before any driver starts.
 - Complete provider-backed campaign dispatch and genuine operator adjudication.
   The offline controller already exports bound pending review packets; it does
   not decide semantic correctness or approve labels.

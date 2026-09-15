@@ -1,5 +1,33 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 complete HTTP-mediated rehearsal
+
+- The new `--wire` rehearsal passes all 75 tasks in 470 seconds through the
+  existing Responses/embedding codecs and loopback HTTP transports. Artifact:
+  `/data/tmp/memory-r3-rehearsal-cli-yFbvex/pack/run/artifact.json`.
+  There are 34 preparation calls and 180 execution calls; the controller verifies
+  all 214 actual HTTP requests against the durable audits. A single unchanged
+  sealed snapshot is used throughout.
+- `execution_valid` is true; `harness_valid`, `official_evidence` and
+  `quality_passed` are false. Sixty knowledge judgments remain pending, and the
+  15 no-op coding failures are expected controls. The symbolic token counter,
+  model answers and vectors remain synthetic. No paid provider was contacted.
+- The updated required-database CI command passes all 33 adapter/service/agent
+  tests without skips. The separate wire/receipt/transport suite passes 20 tests.
+  Workspace Clippy, formatting, boundaries and the isolated no-default-features
+  CLI build pass; that build retains eight existing dead-code warnings and
+  reports `memory 2.0.0`. The unrelated M2 workspace-test exception remains as
+  documented below. Logs: `/tmp/r3-wire-rehearsal.log`,
+  `/tmp/r3-wire-ci-tests.log`, `/tmp/r3-wire-adapters.log`,
+  `/tmp/r3-preparation-final-clippy.log`, `/tmp/r3-preparation-lean-build.log`.
+- Removed only the owned tmpfs PostgreSQL container
+  `memory-r3-preparation-20260915` after all tests completed. Synthetic database
+  contents can be regenerated; source fixtures and private run artifacts remain.
+  Existing services and project data were not changed.
+- The paid-run guard remains in place. The remaining live-driver integration,
+  verified real model/tokenizer/pricing configuration and label/paid approvals
+  are not claimed complete by this rehearsal.
+
 ## 2026-09-15 integrated preparation-budget rehearsal completed
 
 - The corrected 75-task rehearsal passes in 483 seconds. Artifact:
@@ -1324,6 +1352,8 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
 - [ ] Campaign plan/run/report, provenance, limits and fail-closed gates.
   - [x] Multi-call journal/result verification, exact private billing metadata,
     cache-price arithmetic, timing separation and separate calibration approvals.
+  - [x] Global preparation/execution request, token and spend accounting;
+    durable preparation receipt, snapshot binding and fail-closed resume.
   - [ ] Complete the approved live-provider driver path; paid dispatch remains
     disabled while the real tokenizer/provider profile is unresolved.
 - [ ] Offline fault/isolation/statistical tests and integration evidence.
