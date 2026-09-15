@@ -1,5 +1,35 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 complete development offline execution
+
+- The real controller/CLI completed all 660 representative development executions
+  (40 knowledge questions and four three-step repositories, five conditions,
+  three repeats) and the independent review export validated their evidence.
+  The controller exited successfully. The inner campaign exit1 correctly reflects
+  pending semantic review, not an execution failure or fabricated approval.
+- Artifact: `/data/tmp/memory-r3-full-development-0D0PLW/pack/run/artifact.json`;
+  progress/result log: `/tmp/r3-full-development-rehearsal.log`. There are 600
+  pending knowledge packets and 60 failed no-op coding sequences, zero provider
+  calls/spend, one prepared snapshot fingerprint and zero before/after changes.
+  Report execution validity is true; harness/official/quality gates remain false.
+- Private pinned executables and cloned service/agent/grader isolation were used.
+  Normal controller cleanup completed. Synthetic agents/fake vectors do not
+  establish real embedding parity, task latency, model quality or customer ROI.
+  Labels, remaining held-out fixtures, provider mediation and paid gates remain
+  open. No existing deployment or customer data was used.
+
+## 2026-09-15 held-out notice-bundle repository
+
+- Added five modules, two public tests and ten hidden probes for selected scope,
+  retained attribution, text deduplication and complete metadata before replacing
+  a generated bundle. Fictional notice classes are not actual license-law claims.
+- Public tests, the targeted required reference/cumulative/broken-control group
+  and four pack/CLI tests pass without skips. Seven of twelve held-out repositories
+  exist. Offline fixture dispatch ceilings now match the exact planned work count;
+  this does not authorize paid requests or replace per-provider-call mediation.
+- Current evaluator Clippy, formatting and boundaries also pass. Remote CI is
+  not claimed. All held-out labels remain draft and outside calibration packs.
+
 ## 2026-09-15 held-out alert-denominator knowledge family
 
 - Added five sources and four draft rubrics for biased trace samples, aligned

@@ -23,6 +23,7 @@ test('representative development packs are reproducible, private, whole-family a
   assert.deepEqual(bytes, await fs.readFile(path.join(second, 'campaign.json')));
   const manifest = JSON.parse(bytes);
   assert(manifest.smoke_only && manifest.label_status === 'draft' && manifest.limits.microusd === 0);
+  assert.equal(manifest.limits.requests, manifest.cases.length * 5 * 3);
   assert.equal(manifest.cases.filter(c => c.track === 'knowledge').length, 40);
   assert.equal(manifest.cases.filter(c => c.track === 'coding').length, 4);
   assert(manifest.cases.every(c => c.split === 'development'));
@@ -62,7 +63,7 @@ test('explicit held-out fixture packs remain separate, draft and non-promotable'
   assert.equal(spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', out, '--held-out'], { env }).status, 0);
   const manifestPath = path.join(out, 'campaign.json');
   const manifest = JSON.parse(await fs.readFile(manifestPath));
-  assert.equal(manifest.cases.length, 30);
+  assert.equal(manifest.cases.length, 31);
   assert(manifest.cases.every(item => item.split === 'held_out'));
   const families = JSON.parse(await fs.readFile(path.join(out, 'private/families.json')));
   assert.deepEqual(families.map(f => f.id).sort(), (await fs.readdir('evals/r3/representative/held-out')).sort());
@@ -71,7 +72,8 @@ test('explicit held-out fixture packs remain separate, draft and non-promotable'
     env, encoding: 'utf8', timeout: 10000, maxBuffer: 1048576 });
   const result = plan('held-out');
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(JSON.parse(result.stdout).work.length, 450);
+  assert.equal(JSON.parse(result.stdout).work.length, 465);
+  assert.equal(manifest.limits.requests, JSON.parse(result.stdout).work.length);
   assert.equal(plan('development').status, 1, 'held-out data is not a calibration pack');
   manifest.smoke_only = false;
   manifest.label_status = 'reviewed';
@@ -120,6 +122,7 @@ test('complete development allocation plans all 660 executions but cannot become
   assert.equal(result.status, 0, result.stderr);
   const prepared = JSON.parse(result.stdout);
   assert.equal(prepared.work.length, 660);
+  assert.equal(JSON.parse(await fs.readFile(manifestPath)).limits.requests, prepared.work.length);
   assert.equal(new Set(prepared.work.map(work => `${work.case_id}:${work.condition}:${work.repeat}`)).size, 660);
   assert.equal(new Set(prepared.work.map(work => work.case_id)).size, 44);
   assert(prepared.readiness_errors.some(reason => reason.includes('smoke-only')));

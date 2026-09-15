@@ -68,7 +68,9 @@ parsing, checked arithmetic and bounded rational rounding. The fifth,
 [identifier catalog](representative/held-out/identifier-catalog/review.md), separates
 display spelling and normalized ownership with an explicit rule table. The sixth,
 [snapshot pages](representative/held-out/snapshot-pages/review.md), checks immutable
-ordered reads and scoped cursors; six remain. Run
+ordered reads and scoped cursors. The seventh,
+[notice bundle](representative/held-out/notice-bundle/review.md), validates selected
+metadata and retained component attribution under a fictional policy; five remain. Run
 `node --test evals/r3/held-out.test.mjs` with the pinned Rust image.
 These are deterministic fixture checks, not held-out model calibration or label
 approval. The offline controller integrates
@@ -94,6 +96,14 @@ The integrated controller below remains development-only. Changing flags cannot
 promote partial or draft held-out material into official evidence.
 
 ### Integrated offline rehearsal
+
+The complete development allocation has now executed all660 dispatches through
+this controller with valid execution evidence, unchanged snapshots and zero
+provider calls. Six hundred knowledge judgments remain pending; all60 no-op
+coding sequences fail real hidden checks as expected. This demonstrates offline
+harness operation, not model quality, real embedding parity or task latency.
+See the [execution ledger](../../docs/reviews/federation-first/r3-execution.md)
+for retained artifact paths. Held-out construction and paid approvals remain open.
 
 `node evals/r3/rehearse.mjs NEW_DIRECTORY --one-family-per-track` runs that small
 representative pack through the existing campaign CLI. Supply these explicit

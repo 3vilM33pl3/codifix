@@ -48,7 +48,7 @@ function files(family, relative) {
 }
 const knowledge = split === 'held_out' ? ['telemetry-units', 'cursor-snapshot', 'cancellation-scope', 'archive-expansion', 'circuit-probes', 'alert-denominator']
   : ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure', 'timezone-window', 'artifact-origin', 'retention-hold', 'quota-accounting', 'dns-cutover'];
-const coding = split === 'held_out' ? ['framed-stream', 'interval-calendar', 'path-policy', 'decimal-register', 'identifier-catalog', 'snapshot-pages']
+const coding = split === 'held_out' ? ['framed-stream', 'interval-calendar', 'path-policy', 'decimal-register', 'identifier-catalog', 'snapshot-pages', 'notice-bundle']
   : ['durable-importer', 'evidence-publication', 'configuration-rollout', 'dependency-build'];
 for (const family of minimal ? knowledge.slice(0, 1) : knowledge) {
   const sources = files(family, 'public').map(relative => {
@@ -104,7 +104,9 @@ const manifest = { version: 1, name: `r3-representative-${split}-rehearsal`, smo
   semantic_time: semanticTime, seed: 20260910, repeats: 3, label_status: 'draft',
   model: { provider: 'offline-fake', resolved_id: 'deterministic-test-agent-v1', reasoning: 'none', embedding_id: 'offline-fake-only',
     max_input_tokens: 32768, max_output_tokens: 8192, input_microusd_per_million: 0, output_microusd_per_million: 0 },
-  limits: { requests: 1000, tokens: 100000000, microusd: 0, task_seconds: 600 }, reference_baseline: null, assets, cases };
+  // One offline controller dispatch per task/condition/repeat. This is not a
+  // provider allowance: paid multi-call agents require their separate mediator.
+  limits: { requests: cases.length * 5 * 3, tokens: 100000000, microusd: 0, task_seconds: 600 }, reference_baseline: null, assets, cases };
 write('campaign.json', manifest);
 write('REVIEW.md', `# Representative ${split} fixture pack — DRAFT\n\n` +
   `This partial pack has ${knowledgeItems.length} knowledge questions and ${codingItems.length} three-step coding sequences. ` +
