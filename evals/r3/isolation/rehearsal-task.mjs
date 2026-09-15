@@ -55,6 +55,7 @@ export async function createRehearsalExecutor(options) {
     driverSha256, configurationSha256, serviceBuild, budgetBinary } = structuredClone(options.configuration);
   const session = options.session; // Trusted host owner, never serialized to an agent.
   const baselineEmbeddings = options.baselineEmbeddings;
+  const wireProvider = options.wireProvider;
   if (!path.isAbsolute(root) || !path.isAbsolute(scoreBinary) || !path.isAbsolute(retrieverBinary)
       || [manifestSha256, driverSha256, configurationSha256].some(value => !/^[a-f0-9]{64}$/.test(value))) throw Error('invalid rehearsal configuration');
   const manifestBytes = await fs.readFile(path.join(root, 'campaign.json'));
@@ -63,6 +64,7 @@ export async function createRehearsalExecutor(options) {
       || session.preparation.official_evidence !== false) throw Error('only draft zero-spend offline rehearsals are supported');
   if (manifest.model.embedding_id !== syntheticEmbeddingModel) throw Error('synthetic embedding profile mismatch');
   if (!!manifest.provider_budget !== !!budgetBinary || (budgetBinary && !path.isAbsolute(budgetBinary))) throw Error('mediated rehearsal binary/profile mismatch');
+  if (wireProvider && (!budgetBinary || typeof wireProvider.bind !== 'function')) throw Error('wire provider requires mediated execution');
   const readAsset = async relative => {
     const asset = manifest.assets.find(asset => asset.path === relative);
     if (!asset || !relative.split('/').every(part => /^[a-zA-Z0-9_.-]+$/.test(part) && part !== '.' && part !== '..')) throw Error('unlocked rehearsal input');
@@ -106,9 +108,11 @@ export async function createRehearsalExecutor(options) {
       const allowance = { input_tokens: 64, output_tokens: 64, microusd: 0 };
       // Symbolic fake usage exercises receipts, not a real tokenizer or billing.
       const fakeUsage = { input_tokens: 1, output_tokens: 1, microusd: 0 };
+      const wire = wireProvider?.bind(mediator, providerContract.task_id);
       let embeddingCalls = 0;
       const queryEmbedding = async (input, purpose = 'query', signal) => {
         if (purpose !== 'query') throw Error('task cannot perform document preparation');
+        if (wire) return wire.embed(input, purpose, signal);
         if (!mediator) return syntheticVector(input);
         return mediator.dispatch({ taskId: providerContract.task_id, requestId: `query-embedding-${embeddingCalls++}`,
           payload: { model: syntheticEmbeddingModel, purpose, input }, signal,
@@ -160,11 +164,11 @@ export async function createRehearsalExecutor(options) {
           const answerOptions = { image: nodeImage, scoreBinary, sources, context, question: rubric.question,
             rubric, manifestSha256, work: selected, argv: excerptAgent };
           const answer = mediator ? await runMediatedKnowledge({ ...answerOptions, mediator, model, allowance,
-            taskId: providerContract.task_id, requestId: 'answer', invoke: async payload => {
+            taskId: providerContract.task_id, requestId: 'answer', ...(wire ? { prepareRequest: wire.prepareRequest } : { invoke: async payload => {
               const source = payload.input.context[0];
               return { output: source ? { text: source.text, refused: false, citations: [{ source_id: source.id, quote: source.text }] }
                 : { text: 'Insufficient supplied evidence.', refused: true, citations: [] }, usage: fakeUsage };
-            } }) : await runOfflineKnowledge(answerOptions);
+            } }) }) : await runOfflineKnowledge(answerOptions);
           return { success: answer.assessment.success, answer: answer.answer.text,
             knowledge_review: answer.evidence, unresolved_rubric: answer.assessment.unresolved,
             critical_failure: answer.assessment.critical_failure, diagnostics: [], input_sha256: answer.publicInputSha256,
@@ -182,7 +186,8 @@ export async function createRehearsalExecutor(options) {
         // runner supplies no private grader output or reference implementation.
         const runAgent = mediator ? createModelAgent({ mediator, model, allowance, taskId: providerContract.task_id,
           maxCalls: manifest.provider_budget.max_calls_per_task, taskTimeoutMs: manifest.limits.task_seconds * 1000,
-          invoke: async payload => ({ output: payload.previous ? { kind: 'finish' } : { kind: 'command', argv: noOpAgent }, usage: fakeUsage }) }) : undefined;
+          ...(wire ? { prepareRequest: wire.prepareRequest } : {
+            invoke: async payload => ({ output: payload.previous ? { kind: 'finish' } : { kind: 'command', argv: noOpAgent }, usage: fakeUsage }) }) }) : undefined;
         const sequence = await runOfflineSequence({ image: rustImage, initialFiles, submissionPaths: family.submission_paths, runAgent,
           timeoutMs: 30000, steps: stages.map((stage, index) => ({ id: `${family.id}-${stage.id}`, argv: noOpAgent,
             inputFiles: { 'task.json': JSON.stringify({ prompt: stage.prompt, context }) },

@@ -12,9 +12,10 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
 const [destination, ...flags] = process.argv.slice(2);
-if (!destination || new Set(flags).size !== flags.length || flags.some(flag => !['--one-family-per-track','--mediated'].includes(flag))) throw Error('usage: node rehearse.mjs NEW_DIRECTORY [--one-family-per-track] [--mediated]');
+if (!destination || new Set(flags).size !== flags.length || flags.some(flag => !['--one-family-per-track','--mediated','--wire'].includes(flag))) throw Error('usage: node rehearse.mjs NEW_DIRECTORY [--one-family-per-track] [--mediated] [--wire]');
 const selection = flags.includes('--one-family-per-track') ? '--one-family-per-track' : undefined;
-const mediated = flags.includes('--mediated');
+const wire = flags.includes('--wire');
+const mediated = flags.includes('--mediated') || wire;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(destination);
 const databaseUrl = process.env.MEMORY_LAYER_TEST_DATABASE_URL;
@@ -65,6 +66,7 @@ try {
   if (mediated) {
     manifest.provider_budget = { max_calls_per_task: 7 };
     manifest.model.resolved_id = 'synthetic-mediated-excerpt-noop-v1';
+    if (wire) manifest.model.provider = 'openai'; // Fake wire protocol, never a hosted provider.
     manifest.limits.requests *= 7;
     const sources = new Set(manifest.cases.flatMap(item => item.sources)).size;
     manifest.preparation_budget = { requests: sources * 8, tokens: sources * 4096, microusd: 0, task_seconds: 600 };
@@ -77,11 +79,12 @@ try {
     manifest.assets.push({ path: relative, sha256: createHash('sha256').update(bytes).digest('hex'), kind: 'configuration' });
   };
   for (const relative of ['rehearsal-controller.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'synthetic-embedding.mjs', 'request-mediator.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
+    'synthetic-wire-provider.mjs', 'provider-transport.mjs', 'responses-call.mjs', 'responses-request.mjs', 'responses-receipt.mjs', 'embeddings-call.mjs',
     'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs', 'isolation/service-session.mjs', 'isolation/embedding-proxy.mjs',
     'isolation/model-agent.mjs', 'isolation/model-answer.mjs', 'isolation/model-dispatch.mjs', 'isolation/rehearsal-task.mjs']) {
     await add(`runtime/${relative}`, await fs.readFile(path.join(here, relative)), relative === 'offline-driver.mjs');
   }
-  await add('private/runtime.json', JSON.stringify({ version: 1, binaries: pins, images,
+  await add('private/runtime.json', JSON.stringify({ version: 1, binaries: pins, images, syntheticWire: wire,
     socket: path.join(staging, 'dispatch.sock') }) + '\n');
   // Only this freshly created draft manifest is amended; no existing pack is edited.
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');

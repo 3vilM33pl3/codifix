@@ -11,6 +11,7 @@ import { openPreparedSession } from './isolation/service-session.mjs';
 import { createRehearsalExecutor } from './isolation/rehearsal-task.mjs';
 import { syntheticServiceEmbedding, syntheticVector, syntheticEmbeddingModel } from './synthetic-embedding.mjs';
 import { openRequestMediator } from './request-mediator.mjs';
+import { openSyntheticWireProvider } from './synthetic-wire-provider.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = path.join(root, 'campaign.json');
@@ -46,9 +47,10 @@ const verifyBinaries = async () => {
 };
 const key = work => JSON.stringify([work.case_id, work.condition, work.repeat]);
 const out = path.join(root, 'run');
-let session, server, activeTask;
+let session, server, activeTask, wireProvider;
 try {
   await verifyBinaries();
+  if (configuration.syntheticWire) wireProvider = await openSyntheticWireProvider(manifest);
   const planned = await cli(['plan', '--manifest', manifestPath, '--split', 'development']);
   if (planned.code !== 0) throw Error('campaign inputs invalid');
   const plan = JSON.parse(planned.stdout);
@@ -77,7 +79,8 @@ try {
           manifestSha256: plan.manifest_sha256, limits: contract.limits, taskLimits: contract.task_limits });
       }
       const embedding = syntheticServiceEmbedding();
-      if (mediator) embedding.embed = (input, purpose) => mediator.dispatch({ taskId: 'preparation', requestId: `document-${call++}`,
+      if (wireProvider) embedding.embed = wireProvider.bind(mediator, 'preparation').embed;
+      else if (mediator) embedding.embed = (input, purpose) => mediator.dispatch({ taskId: 'preparation', requestId: `document-${call++}`,
         payload: { model: syntheticEmbeddingModel, purpose, input }, allowance: { input_tokens: 64, output_tokens: 0, microusd: 0 },
         timeoutMs: 10000, invoke: async payload => ({ output: syntheticVector(payload.input), usage: { input_tokens: 1, output_tokens: 0, microusd: 0 } }) });
       session = await openPreparedSession({ snapshotBinary: configuration.binaries.snapshot.path,
@@ -86,7 +89,7 @@ try {
       if (mediator) for (const document of documents) {
         baselineEmbeddings.set(`${document.project}:${document.source}`, await embedding.embed(document.text, 'document'));
       }
-      execute = await createRehearsalExecutor({ session, baselineEmbeddings: mediator ? baselineEmbeddings : undefined, configuration: { root,
+      execute = await createRehearsalExecutor({ session, wireProvider, baselineEmbeddings: mediator ? baselineEmbeddings : undefined, configuration: { root,
         manifestSha256: plan.manifest_sha256, nodeImage: configuration.images.node, rustImage: configuration.images.rust,
         scoreBinary: configuration.binaries.score.path, retrieverBinary: configuration.binaries.retriever.path,
         budgetBinary: configuration.binaries.budget?.path,
@@ -154,6 +157,8 @@ try {
   await fs.writeFile(path.join(root, 'private/run-diagnostic.txt'), run.stderr, { flag: 'wx', mode: 0o600 });
   const artifact = JSON.parse(await fs.readFile(path.join(out, 'artifact.json')));
   if (!artifact.completed || artifact.observations.length !== plan.work.length || cursor !== plan.work.length) throw Error('rehearsal incomplete');
+  if (wireProvider && wireProvider.calls !== artifact.preparation_receipt.audit.ledger.requests
+      + artifact.observations.reduce((sum, row) => sum + row.provider_requests, 0)) throw Error('wire call accounting mismatch');
   // A complete execution normally exits nonzero because semantic judgments are
   // genuinely pending. The existing review validator distinguishes that from
   // missing/invalid usage, input bindings or isolation evidence.
@@ -170,6 +175,7 @@ try {
 } finally {
   stopping = true;
   activeCli?.kill('SIGINT');
+  await wireProvider?.close();
   if (activeTask) { try { await activeTask; } catch { /* attempt remains failed */ } }
   if (server?.listening) await new Promise(resolve => server.close(resolve));
   if (session) {

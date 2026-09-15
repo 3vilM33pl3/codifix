@@ -8,7 +8,8 @@ import { spawn, spawnSync } from 'node:child_process';
 
 const names = ['MEMORY_LAYER_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_CLI_BIN',
   'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN'];
-const mediated = process.env.MEMORY_R3_MEDIATED === '1';
+const wire = process.env.MEMORY_R3_WIRE === '1';
+const mediated = process.env.MEMORY_R3_MEDIATED === '1' || wire;
 if (mediated) names.push('MEMORY_R3_BUDGET_BIN');
 const available = names.every(name => process.env[name]);
 if (process.env.MEMORY_R3_REQUIRE_REHEARSAL === '1' && !available) throw Error('required integrated rehearsal configuration missing');
@@ -22,7 +23,7 @@ test('rehearsal bootstrap requires explicit disposable configuration before crea
   await assert.rejects(fs.stat(out));
 });
 
-test(`existing campaign CLI completes a real 75-dispatch ${mediated ? 'mediated' : 'isolated'} rehearsal with pending human review`, { skip: !available, timeout: mediated ? 900000 : 600000 }, async t => {
+test(`existing campaign CLI completes a real 75-dispatch ${wire ? 'HTTP-mediated' : mediated ? 'mediated' : 'isolated'} rehearsal with pending human review`, { skip: !available, timeout: mediated ? 900000 : 600000 }, async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-rehearsal-cli-'));
   let verified = false;
   t.after(async () => {
@@ -42,7 +43,7 @@ test(`existing campaign CLI completes a real 75-dispatch ${mediated ? 'mediated'
   }
   let replacedBuildOutput = false, replacement;
   const run = await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['evals/r3/rehearse.mjs', root, '--one-family-per-track', ...(mediated ? ['--mediated'] : [])], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, ['evals/r3/rehearse.mjs', root, '--one-family-per-track', ...(wire ? ['--wire'] : mediated ? ['--mediated'] : [])], { env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
     const timer = setTimeout(() => child.kill('SIGINT'), mediated ? 850000 : 550000);
     child.stdout.on('data', chunk => { stdout += chunk; if (stdout.length > 1048576) child.kill('SIGINT'); });
@@ -73,6 +74,13 @@ test(`existing campaign CLI completes a real 75-dispatch ${mediated ? 'mediated'
   assert.equal(new Set(artifact.observations.map(row => JSON.stringify(row.work))).size, 75);
   assert(artifact.observations.every(row => row.execution_microusd === 0));
   if (mediated) {
+    if (wire) {
+      assert.equal(artifact.manifest_sha256, JSON.parse(await fs.readFile(path.join(root, 'run/plan.json'))).manifest_sha256);
+      const results = path.join(root, 'run/preparation/provider/results');
+      const saved = JSON.parse(await fs.readFile(path.join(results, (await fs.readdir(results))[0])));
+      assert(saved.output.provider, 'wire mode must retain decoded provider usage');
+      assert.deepEqual(saved.output.vector.length, 16);
+    }
     assert(artifact.preparation_receipt);
     assert(artifact.preparation_receipt.audit.ledger.requests >= 12); // Six source documents, both preparation paths.
     assert.equal(artifact.preparation_receipt.audit.ledger.tokens, artifact.preparation_receipt.audit.ledger.requests);

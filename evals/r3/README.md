@@ -15,6 +15,17 @@ The current synthetic controller prepares Full Memory chunks and baseline corpus
 vectors in this phase. It still does not authorize paid calls or constitute the
 complete approved live-provider driver.
 
+Use `--wire` with the disposable `rehearse.mjs` bootstrap to route the entire
+rehearsal through local fake Responses/embeddings HTTP endpoints. It implies
+`--mediated` and retains the zero-spend, draft-only restrictions. Full Memory
+preparation, baseline vectors, query embeddings, knowledge answers and coding
+actions all use the normal request codecs, exact-model receipt checks and durable
+budget mediation. The controller checks observed HTTP calls against the combined
+preparation/task audit. CI uses this mode for its mediated campaign rehearsal.
+Its fixed symbolic token counter and hash vectors are test fixtures, not verified
+real tokenization or model quality. The `openai` provider identifier denotes the
+wire format here; only a loopback fake server receives the synthetic inputs.
+
 Trusted service-session callers can bind query embedding accounting per task with
 `session.withInstance(project, use, { queryEmbedding })`. Its callback receives
 `(text, 'query', signal)`; forward the signal to the request mediator. Document
