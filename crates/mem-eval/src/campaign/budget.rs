@@ -72,6 +72,8 @@ enum Event {
     Settled {
         id: String,
         usage: Allowance,
+        #[serde(default)]
+        result_sha256: Option<String>,
     },
 }
 
@@ -80,12 +82,24 @@ struct Request {
     allowance: Allowance,
     settled: bool,
     task_id: Option<String>,
+    payload_sha256: String,
+    usage: Option<Allowance>,
+    result_sha256: Option<String>,
+}
+
+pub(crate) struct SavedRequest<'a> {
+    pub task_id: Option<&'a str>,
+    pub payload_sha256: &'a str,
+    pub allowance: Allowance,
+    pub usage: Option<Allowance>,
+    pub result_sha256: Option<&'a str>,
 }
 
 /// Holds an exclusive OS file lock for its lifetime. A process crash releases
 /// that lock, but never refunds a reservation. Partial journals fail closed.
 pub struct RequestBudget {
     file: File,
+    manifest_sha256: String,
     limits: Limits,
     task_limits: Option<Limits>,
     ledger: Ledger,
@@ -95,6 +109,18 @@ pub struct RequestBudget {
 }
 
 impl RequestBudget {
+    pub(crate) fn identity(&self) -> &str {
+        &self.manifest_sha256
+    }
+    pub(crate) fn saved_request(&self, id: &str) -> Option<SavedRequest<'_>> {
+        self.requests.get(id).map(|r| SavedRequest {
+            task_id: r.task_id.as_deref(),
+            payload_sha256: &r.payload_sha256,
+            allowance: r.allowance,
+            usage: r.usage,
+            result_sha256: r.result_sha256.as_deref(),
+        })
+    }
     pub fn create(path: &Path, manifest_sha256: &str, limits: Limits) -> Result<Self> {
         Self::create_inner(path, manifest_sha256, limits, None)
     }
@@ -138,6 +164,7 @@ impl RequestBudget {
         };
         let mut budget = Self {
             file,
+            manifest_sha256: manifest_sha256.into(),
             limits,
             task_limits,
             ledger: Ledger::default(),
@@ -214,6 +241,7 @@ impl RequestBudget {
         }
         let mut budget = Self {
             file,
+            manifest_sha256: manifest_sha256.into(),
             limits,
             task_limits,
             ledger: Ledger::default(),
@@ -281,9 +309,19 @@ impl RequestBudget {
     /// Call only with confirmed provider usage. A missing/invalid receipt leaves
     /// the full allowance reserved and blocks further dispatch, including restart.
     pub fn settle(&mut self, id: &str, usage: Allowance) -> Result<()> {
+        self.settle_result(id, usage, None)
+    }
+
+    pub(crate) fn settle_result(
+        &mut self,
+        id: &str,
+        usage: Allowance,
+        result_sha256: Option<String>,
+    ) -> Result<()> {
         let event = Event::Settled {
             id: id.into(),
             usage,
+            result_sha256,
         };
         self.validate(&event)?;
         self.append(&event)?;
@@ -372,7 +410,15 @@ impl RequestBudget {
                     _ => anyhow::bail!("task-scoped journal requires a task on every reservation"),
                 }
             }
-            Event::Settled { id, usage } => {
+            Event::Settled {
+                id,
+                usage,
+                result_sha256,
+            } => {
+                ensure!(
+                    result_sha256.as_ref().is_none_or(|d| valid_digest(d)),
+                    "invalid result digest"
+                );
                 let request = self.requests.get(id).context("unknown request receipt")?;
                 ensure!(!request.settled, "request receipt already recorded");
                 ensure!(
@@ -394,7 +440,7 @@ impl RequestBudget {
                 id,
                 allowance,
                 task_id,
-                ..
+                payload_sha256,
             } => {
                 self.ledger
                     .reserve(&self.limits, allowance.tokens()?, allowance.microusd)?;
@@ -411,10 +457,17 @@ impl RequestBudget {
                         allowance: *allowance,
                         settled: false,
                         task_id: task_id.clone(),
+                        payload_sha256: payload_sha256.clone(),
+                        usage: None,
+                        result_sha256: None,
                     },
                 );
             }
-            Event::Settled { id, usage } => {
+            Event::Settled {
+                id,
+                usage,
+                result_sha256,
+            } => {
                 let request = self
                     .requests
                     .get_mut(id)
@@ -427,6 +480,8 @@ impl RequestBudget {
                     task.microusd -= request.allowance.microusd - usage.microusd;
                 }
                 request.settled = true;
+                request.usage = Some(*usage);
+                request.result_sha256 = result_sha256.clone();
             }
             Event::Opened { .. } => unreachable!("validated event"),
         }

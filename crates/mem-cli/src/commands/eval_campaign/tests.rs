@@ -328,15 +328,29 @@ async fn driver_dispatch_settles_only_valid_evidence_and_preserves_uncertainty()
             usize::from(index == 5 || index == 10)
         );
         assert!(out.join("work-00000/reservation.json").exists());
-        let budget = RequestBudget::resume(
+        let mut budget = RequestBudget::resume_scoped(
             &out.join("dispatch-budget.jsonl"),
             &plan.manifest_sha256,
             manifest.limits.clone(),
+            c::Limits {
+                requests: 1,
+                tokens: 200,
+                microusd: 0,
+                task_seconds: manifest.limits.task_seconds,
+            },
         )
         .unwrap();
         if index == 5 || index == 10 {
             assert!(budget.uncertain_ids().is_empty());
             assert_eq!(budget.ledger().tokens, if index == 10 { 30 } else { 10 });
+            let saved = ProviderResults::open(&out.join("dispatch-results"))
+                .unwrap()
+                .recover(&mut budget, "work-00000")
+                .unwrap();
+            assert_eq!(
+                saved,
+                serde_json::to_value(&artifact.observations[0]).unwrap()
+            );
         } else {
             assert_eq!(budget.uncertain_ids(), ["work-00000"]);
             assert_eq!(budget.ledger().tokens, 200);

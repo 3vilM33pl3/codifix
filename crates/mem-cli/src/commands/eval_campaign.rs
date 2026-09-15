@@ -3,6 +3,7 @@
 use super::runtime::EvalCampaignCommand;
 use anyhow::{Context, Result, ensure};
 use mem_eval::campaign::budget::{Allowance, RequestBudget};
+use mem_eval::campaign::provider_results::ProviderResults;
 use mem_eval::campaign::{self as c, Artifact, Ledger, Manifest, Observation, Split};
 use std::{fs::OpenOptions, io::Write, path::Path, process::Stdio};
 
@@ -157,11 +158,31 @@ async fn execute(
 ) -> Result<()> {
     // One conservative reservation per driver dispatch while multi-request
     // provider mediation remains unavailable. Never expose this owner to agents.
-    let mut dispatch_budget = RequestBudget::create(
+    let mut dispatch_budget = RequestBudget::create_scoped(
         &out.join("dispatch-budget.jsonl"),
         &plan.manifest_sha256,
         manifest.limits.clone(),
+        c::Limits {
+            requests: 1,
+            tokens: manifest
+                .model
+                .max_input_tokens
+                .checked_add(manifest.model.max_output_tokens)
+                .context("task token overflow")?,
+            microusd: if offline {
+                0
+            } else {
+                Allowance::for_model(
+                    &manifest.model,
+                    manifest.model.max_input_tokens,
+                    manifest.model.max_output_tokens,
+                )?
+                .microusd
+            },
+            task_seconds: manifest.limits.task_seconds,
+        },
     )?;
+    let dispatch_results = ProviderResults::create(&out.join("dispatch-results"))?;
     for (index, work) in plan.work.iter().enumerate() {
         verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
         // Aggregate per-task token ceiling. Driver must enforce this across all
@@ -187,9 +208,11 @@ async fn execute(
             "response":dir.join("observation.json")});
         exclusive_json(&dir.join("request.json"), &request)?;
         let dispatch_id = format!("work-{index:05}");
-        dispatch_budget.reserve(
+        let request_hash = c::digest_value(&request)?;
+        dispatch_budget.reserve_for_task(
             &dispatch_id,
-            &c::digest_value(&request)?,
+            &dispatch_id,
+            &request_hash,
             Allowance {
                 input_tokens: manifest.model.max_input_tokens,
                 output_tokens: manifest.model.max_output_tokens,
@@ -274,8 +297,12 @@ async fn execute(
                 &std::fs::read(path).context("missing preparation receipt")?,
             )?);
         }
-        dispatch_budget.settle(
+        dispatch_results.complete_reserved(
+            &mut dispatch_budget,
             &dispatch_id,
+            &dispatch_id,
+            &request_hash,
+            serde_json::to_value(&observation)?,
             Allowance {
                 // Some providers report cache tokens outside input_tokens.
                 // Account for every reported token, without adding caches twice.

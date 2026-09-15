@@ -148,6 +148,24 @@ the current campaign driver restriction is not lifted by their availability.
 They do not impose wall-clock deadlines, verify tokenization or account for
 non-token provider fees. Those remain responsibilities of the complete mediator.
 
+## Reusable dispatch results
+
+`ProviderResults` stores bounded outputs in a private directory, separately from
+the budget journal. Completed receipts bind campaign, task, request, exact input
+digest, reservation and usage; the journal records their digest, not their body.
+Exact completed retries reuse output. Changed retries, missing/corrupt receipts
+and uncertain calls cannot trigger automatic provider execution. Explicit
+`recover` can settle a complete result persisted before a dispatcher crash,
+without making a call; it cannot refund a missing result or infer provider usage.
+
+The existing offline campaign dispatcher now persists validated observations in
+`dispatch-results/` before settling its scoped reservation. This is durable
+driver-result recovery, not yet resuming an entire campaign or mediating every
+internal provider call. The single-request restriction and paid-run block remain.
+Keep result files outside agent mounts and protect the trusted host from other
+writers. Local receipts establish persistence, not provider authentication or
+billing truth. New result receipts are bounded to 2 MiB.
+
 ## Baseline adapter contract
 
 Build `cargo build -p mem-eval --example r3_retriever --locked`. Invoke

@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 reusable dispatch results
+
+- Added private, bounded result receipts separated from metadata-only budgets.
+  Completed exact retries reuse results; altered inputs/tasks/campaigns, corrupt
+  receipts and uncertain attempts fail closed without invoking providers again.
+- A real child-process crash test verifies explicit recovery after durable result
+  persistence but before settlement, preserving task/campaign accounting.
+- Connected validated offline driver observations to the same persistence path
+  and task-scoped reservations. Campaign-wide resume and all-provider mediation
+  remain separate; paid execution and the single-call restriction stay disabled.
+- Verification: 54 evaluator tests and 232 CLI tests passed, including saved
+  observation recovery in the real fake-driver scenarios. Scoped Clippy,
+  formatting and boundary checks passed. No paid calls or deployment changes.
+
 ## 2026-09-15 corpus fingerprints and combined regression evidence
 
 - Added a bounded fingerprint of public benchmark table contents and column
