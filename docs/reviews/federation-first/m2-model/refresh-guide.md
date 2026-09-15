@@ -6,15 +6,24 @@ The comparison tables are **captured results from the workbook's single live for
 
 - [refresh.mjs](refresh.mjs) runs the cases and handles restoration. It has no network, credential or Node dependencies.
 - [connector-adapter.mjs](connector-adapter.mjs) uses the existing Google Drive/Sheets connector. No Apps Script deployment, new authentication or add-on is required.
-- The region's generated `manifest-london.json` or `manifest-newyork.json` supplies the observed workbook and sheet IDs, expected formula text, editable cells, controls, cases, checks and publication layout.
+- The region's generated `/tmp/m2-london-manifest.json` or `/tmp/m2-newyork-manifest.json` supplies the workbook and sheet IDs, expected formula text, editable cells, controls, cases, checks and publication layout. Manifests are regenerated from the committed source; they are not committed repository files. Verify their IDs against live metadata before use.
 - [refresh.test.mjs](refresh.test.mjs) tests failure handling and the adapter contract with a fake workbook. These tests complement the separately recorded native workbook validation.
 
 Adapters return every requested cell, using `null` for a blank. Formula-mode reads return the entered formula text or raw scalar; value-mode reads return the effective result. Spreadsheet errors must be raised, rather than converted to zero. Writes use one native `batchUpdate` containing only the requested cells; `null` clears a cell.
 
 ## Before running
 
+Generate the manifests from the repository source, then run the static checks:
+
+```bash
+python3 /home/olivier/Projects/memory/docs/reviews/federation-first/m2-model/build_model.py --region both --output-dir /tmp
+python3 /home/olivier/Projects/memory/docs/reviews/federation-first/m2-model/model_static_check.py /tmp/m2-london-manifest.json /tmp/m2-newyork-manifest.json
+```
+
+Both commands are local. The generator also emits `/tmp/m2-london-batch.json` and `/tmp/m2-newyork-batch.json`: **these are bootstrap rebuild requests, not refresh requests**. They contain `addSheet` and content-clearing operations. Do not submit these batches to the already rebuilt workbooks. The refresh below reads only the generated manifest and preserves current working assumptions.
+
 1. Coordinate a **quiescent workbook**: nobody should edit its inputs or formulas while cases run. Google Sheets offers no cell compare-and-swap lock. The routine detects observable concurrent edits and preserves conflicting user values, but cannot eliminate a race between a read and a write.
-2. Use the manifest belonging to the workbook. Check its `spreadsheetId` and sheet name/ID mapping against live metadata. Never substitute the other region's workbook ID.
+2. Use the manifest belonging to the workbook. Check its `spreadsheetId` and sheet name/ID mapping against live metadata. Never substitute the other region's workbook ID. If choosing a different `--output-dir`, change `generatedDirectory` in the recipe to the same directory.
 3. Keep the original manifest formula version. A formula change requires review, a regenerated manifest and validation; accepting the changed formula text as expected merely to bypass an error defeats verification.
 4. Read the forecast's validation and funding warnings. A reconciliation failure prevents capture. A financing-timing warning is meaningful scenario evidence and must remain visible in the main forecast.
 
@@ -25,15 +34,16 @@ The following is an execution recipe for `functions.exec`. The helper reads repo
 ```javascript
 // @exec: {"yield_time_ms": 1000, "max_output_tokens": 2000}
 const directory = '/home/olivier/Projects/memory/docs/reviews/federation-first/m2-model/';
+const generatedDirectory = '/tmp/';
 const region = 'london';
 const shellQuote = value => "'" + value.replaceAll("'", "'\"'\"'") + "'";
-async function readRepositoryText(filename) {
+async function readLocalText(path) {
   const source = 'import json,pathlib,sys; s=pathlib.Path(sys.argv[1]).read_text(); start=int(sys.argv[2]); end=min(start+16000,len(s)); print(json.dumps({"text":s[start:end],"next":end,"total":len(s)}))';
   let offset = 0;
   let text = '';
   for (;;) {
     const response = await tools.exec_command({
-      cmd: 'python3 -c ' + shellQuote(source) + ' ' + shellQuote(directory + filename) + ' ' + offset,
+      cmd: 'python3 -c ' + shellQuote(source) + ' ' + shellQuote(path) + ' ' + offset,
       max_output_tokens: 20000,
     });
     if (response.exit_code !== 0) throw new Error(response.output);
@@ -44,9 +54,9 @@ async function readRepositoryText(filename) {
     offset = page.next;
   }
 }
-const refreshSource = await readRepositoryText('refresh.mjs');
-const adapterSource = await readRepositoryText('connector-adapter.mjs');
-const manifest = JSON.parse(await readRepositoryText('manifest-' + region + '.json'));
+const refreshSource = await readLocalText(directory + 'refresh.mjs');
+const adapterSource = await readLocalText(directory + 'connector-adapter.mjs');
+const manifest = JSON.parse(await readLocalText(generatedDirectory + 'm2-' + region + '-manifest.json'));
 const {refreshModel, snapshotWrites} = new Function(
   refreshSource.replace(/^export /gm, '') + '\nreturn {refreshModel, snapshotWrites};'
 )();
