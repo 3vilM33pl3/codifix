@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 quota-accounting knowledge family
+
+- Added five synthetic metering sources and four draft rubrics for reservations,
+  uncertain effects, parent/child aggregation and incomplete-campaign reporting.
+  Uses fictional microcredits, not provider pricing or a new provider adapter.
+- Canonical rubric and both pack/CLI tests pass without skips. Thirty-six
+  development knowledge questions are materialized. Unknown usage remains a
+  reason not to claim valid official results, rather than a fabricated zero.
+
 ## 2026-09-15 retention-hold knowledge family
 
 - Added five fictional policy/inventory/journal sources and four draft rubrics
