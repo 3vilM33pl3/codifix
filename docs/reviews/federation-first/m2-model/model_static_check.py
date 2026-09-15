@@ -26,31 +26,44 @@ def check_ai_revision(model,errors):
     catch generator changes that lose an input, historical source or control.
     """
     inputs=model['initialInputValues'];immutable=model['immutableCells'];formulas=model['formulaCells']
-    required={'staffing':118,'employeeallowance':119,'employeeutil':120,'employeesubscription':121}
+    required={'staffing':118,'employeeallowance':119,'employeeutil':120,'employeesubscription':121,
+              'counselfee':126,'counselstart':127,'counselincluded':128}
     if any(model['assumptionRows'].get(k)!=v for k,v in required.items()):errors.append('AI assumption interface drift')
     if model['sheetIds'].get('Employee AI')!=2040000004:errors.append('Employee AI native tab identity drift')
     for case in 'BCD':
         if [inputs[f'Assumptions!{case}{r}'] for r in range(118,122)]!=[0,5000,.5,250]:errors.append('Approved employee AI defaults drift')
-    expected_hires={5:1,6:1,7:2,8:4,10:10,12:8,13:12,16:16}
+    expected_hires={5:1,6:1,7:2,8:4,10:10,12:8,13:12,16:16,46:3}
     historical=[1,1,2,3,2,5,6,8,10,12,15,16,18,19,21,23,26,28]
     heads=[]
     for month in range(1,37):
-        heads.append(sum(inputs[f'Team!AQ{r}'] for r in range(5,23) if month>=inputs[f'Team!AM{r}']))
-    if [heads[i] for i in [11,23,35]]!=[7,8,8] or sum(heads[:24])!=146 or sum(heads)!=242:errors.append('Approved lean hiring economics drift')
+        heads.append(sum(inputs[f'Team!AQ{r}'] for r in (*range(5,23),46) if month>=inputs[f'Team!AM{r}']))
+    if [heads[i] for i in [11,23,35]]!=[8,9,9] or sum(heads[:24])!=168 or sum(heads)!=276:errors.append('Nine-role hiring economics drift')
     for r,old_hire in zip(range(5,23),historical):
         if inputs[f'Team!AQ{r}']!=(1 if r in expected_hires else 0):errors.append(f'Lean role inclusion drift: {r}')
         if r in expected_hires and inputs[f'Team!AM{r}']!=expected_hires[r]:errors.append(f'Lean role hire drift: {r}')
         if immutable.get(f'Team!AR{r}')!=old_hire or immutable.get(f'Team!AS{r}')!=1:errors.append(f'Historical staff source lost: {r}')
         if not all(f'Team!{c}{r}' in inputs for c in ['AM','AN','AQ']):errors.append(f'Uncaptured staffing control: {r}')
+    if not all(f'Team!{c}46' in inputs for c in ['B','AM','AN','AQ']):errors.append('Uncaptured assurance-lead control')
+    if [inputs['Team!AM46'],inputs['Team!AN46'],inputs['Team!AQ46']]!=[3,0,1]:errors.append('Assurance-lead hiring or allocation default drift')
+    if immutable.get('Team!AS46')!=0 or immutable.get('Team!AO46')!='G&A':errors.append('Assurance lead historical exclusion or G&A classification lost')
+    for case in 'BCD':
+        if not all(f'Assumptions!{case}{r}' in inputs for r in [126,127,128]):errors.append('Uncaptured counsel control')
+        if [inputs[f'Assumptions!{case}127'],inputs[f'Assumptions!{case}128']]!=[1,1]:errors.append('Counsel timing or inclusion default drift')
     for col in [col_label(c) for c in range(3,39)]:
         # Prevent common economic wiring mistakes, without claiming that these
         # static checks replace the independent native reconciliation fixtures.
         if f'{col}38' not in formulas[f'P&L & Cash!{col}21']:errors.append('Employee AI Opex omitted')
         if f'{col}38' in formulas[f'P&L & Cash!{col}20']:errors.append('AI incorrectly receives generic Opex contingency')
         if f'{col}39' not in formulas[f'Costs!{col}34']:errors.append('Delivery AI omitted from cost of sales')
+        if f'{col}29' not in formulas[f'Employee AI!{col}23']:errors.append('G&A employee AI omitted from allocation')
+        if f'{col}29' not in formulas[f'P&L & Cash!{col}38']:errors.append('G&A employee AI omitted from operating expense')
+        if f'{col}39' not in formulas[f'P&L & Cash!{col}20'] or f'{col}39' not in formulas[f'P&L & Cash!{col}21']:errors.append('Counsel omitted from other-cost contingency or operating expense')
+        if '$E$127' not in formulas[f'P&L & Cash!{col}39'] or '$E$128' not in formulas[f'P&L & Cash!{col}39']:errors.append('Counsel start or inclusion gate omitted')
     if 'B74' not in formulas['Summary!B22'] or '+B47' not in formulas['Summary!B42']:errors.append('AI funding or cash-spending bridge omitted')
+    if 'B48' not in formulas['Summary!B42'] or 'C39:Z39' not in formulas['Summary!B40']:errors.append('G&A payroll or counsel omitted from use of funds')
     case_ids={x['id'] for x in model['cases']}
     if not {'ai_util25','ai_util50','ai_util100','ai_budget2000','ai_budget5000','ai_budget10000','historical_team_ai','lean_capacity_stress'}<=case_ids:errors.append('Missing approved AI sensitivities')
+    if not {'eight_staff_same_counsel','counsel_double','assurance_lead_month6'}<=case_ids:errors.append('Missing counsel and assurance-lead sensitivities')
     publication=model['publication']
     expected_columns=[('label','Case'),('capturedAt','Captured UTC'),('caseInputs','Captured case overrides'),('arr36','ARR M36'),('revenue36','Revenue36m'),('grossMargin36','Gross margin36m'),('requiredGrossFunding','Gross funding'),('minCash24','Min cash M1–24'),('endingCash36','Cash M36'),('accounts36','Accounts M36'),('staff36','Staff M36'),('totalSpend24','Cash spend24m'),('gbpFunding','Funding GBP'),('gbpARR36','ARR M36 GBP'),('modelVersion','Model version'),('status','Status'),('notes','Notes'),('aiSpend24','AI spend24m'),('aiReserve24','AI headroom 24m'),('aiSpend36','AI spend36m'),('payrollSavings24','Payroll saving 24m'),('payrollSavings36','Payroll saving36m'),('gbpAISpend24','AI spend24m GBP'),('gbpAIReserve24','AI headroom 24m GBP'),('staff12','Staff M12')]
     columns=publication.get('resultColumns',[])
@@ -62,7 +75,7 @@ def check_ai_revision(model,errors):
     if len(columns)>26:errors.append('Sensitivity result columns overlap captured-input columns AA:AC')
     if len(model['cases'])>publication['resultEndRow']-publication['resultStartRow']+1:errors.append('Sensitivity result range too short')
     if any(not re.fullmatch(r'Sensitivity!AB\d+',x) for x in publication['captureCells'].values()):errors.append('Captured values moved into comparison outputs')
-    if not all(f'Checks!B{r}' in {x['cell'] for x in model['checks']} for r in range(28,35)):errors.append('Mandatory AI reconciliations omitted')
+    if not all(f'Checks!B{r}' in {x['cell'] for x in model['checks']} for r in range(28,37)):errors.append('Mandatory AI, G&A or counsel reconciliations omitted')
 
 
 def run(london_path,newyork_path):
@@ -110,7 +123,7 @@ def run(london_path,newyork_path):
         try:
             for node in graph:visit(node)
         except ValueError as exc:errors.append(str(exc))
-    result={'passed':not errors,'checks':['identical regional formula structure','all editable inputs uniquely captured','sparse case controls preserve live baseline','fixed opening balances immutable','approved lean headcounts and employee-month totals','historical staff sources immutable','employee AI cash and allocation wiring','AI sensitivity and capture interfaces','scalar formula syntax and balanced parentheses','no formula dependency cycles'],'formulas_per_region':len(london['formulaCells']),'inputs_per_region':len(london['editableCells']),'errors':errors}
+    result={'passed':not errors,'checks':['identical regional formula structure','all editable inputs uniquely captured','sparse case controls preserve live baseline','fixed opening balances immutable','nine-role headcounts and employee-month totals','historical staff sources immutable','assurance lead excluded from historical profile','employee AI cash and four-function allocation wiring','counsel timing and inclusion controls','counsel and G&A cash-use bridges','AI and assurance sensitivity and capture interfaces','scalar formula syntax and balanced parentheses','no formula dependency cycles'],'formulas_per_region':len(london['formulaCells']),'inputs_per_region':len(london['editableCells']),'errors':errors}
     print(json.dumps(result,indent=2));return 0 if not errors else 1
 
 if __name__=='__main__':

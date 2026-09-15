@@ -19,6 +19,8 @@ def build(region, manifest):
     fmt('Assumptions',108,109,4,5,'0.00%')
     fmt('Assumptions',117,118,1,5,'0')
     fmt('Team',4,22,42,47,'0')
+    fmt('Team',45,46,42,47,'0')
+    fmt('Assumptions',127,128,1,5,'0')
     for start,end in [(3,5),(6,9),(11,14),(17,24)]: fmt('Sensitivity',7,40,start,end,money)
     fmt('Sensitivity',7,40,5,6,'0.0%;(0.0%);"–"')
     fmt('Sensitivity',7,40,9,10,'0.00')
@@ -36,13 +38,13 @@ def build(region, manifest):
         ran={'sheetId':ids[sheet],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':c0,'endColumnIndex':c1}
         req.append({'repeatCell':{'range':ran,'cell':{'userEnteredFormat':{'backgroundColor':teal,'textFormat':{'foregroundColor':white,'bold':True},'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat,userEnteredFormat.wrapStrategy'}})
         if sheet=='Summary':req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
-    for sheet,rows,end in [('Summary',[86,87,88],6),('Team',[36,37,44],12),('Assumptions',[123],10),('Sensitivity',[43,44],10)]:
+    for sheet,rows,end in [('Summary',[70,86,87,88],6),('Team',[36,37,44],12),('Assumptions',[123,130],10),('Sensitivity',[43,44],10)]:
         for r in rows:
             ran={'sheetId':ids[sheet],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':1,'endColumnIndex':end}
             req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
             req.append({'repeatCell':{'range':ran,'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
             req.append({'updateDimensionProperties':{'range':{'sheetId':ids[sheet],'dimension':'ROWS','startIndex':r-1,'endIndex':r},'properties':{'pixelSize':62},'fields':'pixelSize'}})
-    for sheet,r0,r1,c0,c1 in [('Summary',71,84,0,2),('Assumptions',117,121,0,10),('Employee AI',4,28,0,1),('Team',3,4,38,47),('Checks',27,34,0,2)]:
+    for sheet,r0,r1,c0,c1 in [('Summary',71,84,0,2),('Summary',57,59,0,2),('Assumptions',117,121,0,10),('Assumptions',125,128,0,10),('Employee AI',4,29,0,1),('Team',3,4,38,47),('Team',45,46,0,47),('Checks',27,36,0,2)]:
         req.append({'repeatCell':{'range':{'sheetId':ids[sheet],'startRowIndex':r0,'endRowIndex':r1,'startColumnIndex':c0,'endColumnIndex':c1},'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
         req.append({'updateDimensionProperties':{'range':{'sheetId':ids[sheet],'dimension':'ROWS','startIndex':r0,'endIndex':r1},'properties':{'pixelSize':48},'fields':'pixelSize'}})
     req.append({'updateDimensionProperties':{'range':{'sheetId':ids['Employee AI'],'dimension':'COLUMNS','startIndex':0,'endIndex':1},'properties':{'pixelSize':450},'fields':'pixelSize'}})
