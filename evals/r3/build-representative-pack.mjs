@@ -48,7 +48,7 @@ function files(family, relative) {
 }
 const knowledge = split === 'held_out' ? ['telemetry-units', 'cursor-snapshot', 'cancellation-scope', 'archive-expansion', 'circuit-probes', 'alert-denominator', 'cohort-assignment', 'unicode-identity', 'quantization-error', 'watcher-rename', 'vector-compatibility', 'certificate-chain', 'token-audience', 'stream-framing', 'traffic-drain', 'cgroup-pressure', 'reproducible-order', 'lock-inversion', 'numeric-overflow', 'rename-durability', 'null-filter', 'token-boundary', 'trace-link', 'color-profile', 'distribution-notice']
   : ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure', 'timezone-window', 'artifact-origin', 'retention-hold', 'quota-accounting', 'dns-cutover'];
-const coding = split === 'held_out' ? ['framed-stream', 'interval-calendar', 'path-policy', 'decimal-register', 'identifier-catalog', 'snapshot-pages', 'notice-bundle', 'sensor-matrix', 'circuit-window', 'route-precedence', 'bounded-decoder']
+const coding = split === 'held_out' ? ['framed-stream', 'interval-calendar', 'path-policy', 'decimal-register', 'identifier-catalog', 'snapshot-pages', 'notice-bundle', 'sensor-matrix', 'circuit-window', 'route-precedence', 'bounded-decoder', 'structured-redaction']
   : ['durable-importer', 'evidence-publication', 'configuration-rollout', 'dependency-build'];
 for (const family of minimal ? knowledge.slice(0, 1) : knowledge) {
   const sources = files(family, 'public').map(relative => {

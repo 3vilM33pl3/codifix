@@ -1,5 +1,20 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 complete draft coding allocation
+
+- Structured-redaction completes twelve held-out repositories, each with five
+  public modules, three cumulative stages and ten hidden probes. The final family
+  tests schema allowlists, ambiguous structures, exact destination consent and
+  invalidated grants after source replacement. No real secrets or model calls.
+- Its two public tests, required reference/cumulative/starter/no-op container
+  group and four pack/CLI tests pass without skips. Every held-out repository
+  passed those controls individually; a combined twelve-repository rerun is in
+  progress and is not yet claimed passed here.
+- The full draft allocation now matches R3: 40/100 knowledge questions and 4/12
+  coding sequences for development/held-out. The held-out planner produces 1,680
+  dispatches across five conditions and three repeats. These are fixtures, not
+  approved labels, real-model quality or an official completed campaign.
+
 ## 2026-09-15 held-out bounded-decoder repository
 
 - Added five modules, two public tests and ten private probes for split run

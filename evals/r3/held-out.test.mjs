@@ -21,6 +21,7 @@ for (const [family, modules, replacements] of [
   ['circuit-window', ['main', 'command', 'policy', 'permit', 'breaker'], ['breaker']],
   ['route-precedence', ['main', 'command', 'pattern', 'request', 'router'], ['router']],
   ['bounded-decoder', ['main', 'command', 'hex', 'store', 'decoder'], ['decoder']],
+  ['structured-redaction', ['main', 'command', 'record', 'policy', 'filter'], ['policy', 'filter']],
 ]) test(`held-out ${family}: reference, cumulative stages and broken controls`, { skip: !image, timeout: 180000 }, async () => {
   const root = new URL(`./representative/held-out/${family}/`, import.meta.url);
   const files = {};

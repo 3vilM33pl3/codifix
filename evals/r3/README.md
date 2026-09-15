@@ -62,7 +62,7 @@ matching and diagnostic attribution. Finally,
 [distribution notices](representative/held-out/distribution-notice/review.md)
 complete all 25 held-out knowledge families and 100 draft questions. Every family
 has five source documents and a private review sheet; none was used to calibrate
-model outputs. One held-out coding repository still needs implementation.
+model outputs. All twelve held-out coding repositories are also implemented as drafts.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
@@ -112,7 +112,9 @@ streaks, single recovery probes, expiry and monotonic time. The tenth,
 [route precedence](representative/held-out/route-precedence/review.md), checks
 specificity, method selection and atomic bounded table updates. The eleventh,
 [bounded decoder](representative/held-out/bounded-decoder/review.md), verifies
-streaming pairs, pre-expansion caps and private staging; one remains. Run
+streaming pairs, pre-expansion caps and private staging. The twelfth,
+[structured redaction](representative/held-out/structured-redaction/review.md),
+checks exact schema fields, shape validation and destination-specific consent. Run
 `node --test evals/r3/held-out.test.mjs` with the pinned Rust image.
 These are deterministic fixture checks, not held-out model calibration or label
 approval. The offline controller integrates

@@ -154,7 +154,8 @@ They must not reuse the development reference implementations or hidden probes.
 Related knowledge/coding mechanisms stay wholly in held-out, never development.
 
 All 25 knowledge families are now materialized as five-source/four-question drafts.
-Eleven coding repositories are executable; `structured-redaction` remains.
+All twelve coding repositories are executable drafts with public source contracts,
+private reference implementations and cumulative positive/negative controls.
 This is not approved benchmark or measured model-quality evidence.
 Materialize source contracts before tests/questions. Keep all held-out material
 out of development calibration packs and do not inspect model outcomes to tune
