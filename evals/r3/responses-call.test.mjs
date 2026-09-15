@@ -79,3 +79,14 @@ test('preparation cannot replace task identities or consume the entire deadline'
     prepareRequest: async () => { await new Promise(resolve => setTimeout(resolve, 10));
       return { payload: {}, allowance: {}, invoke() {}, decodeStored() {} }; } }), /expired/);
 });
+
+test('counter failures are sanitized and async counting is rejected before reservation', async () => {
+  for (const countInputTokens of [() => { throw Error('PRIVATE_COUNTER_INPUT'); }, async () => { throw Error('PRIVATE_ASYNC_INPUT'); }]) {
+    const prepare = createResponsesPreparation({
+      mediator: { price: () => assert.fail('no pricing/reservation after counter failure') }, model,
+      tokenizer: { id: 'synthetic-counter', sha256: 'a'.repeat(64) }, countInputTokens,
+      send: () => assert.fail('no model transmission after counter failure'),
+    });
+    await assert.rejects(prepare(payload), error => error.message === 'local input token counter failed');
+  }
+});

@@ -22,7 +22,16 @@ export function createResponsesPreparation({ mediator, model, tokenizer, countIn
     const codec = prepareResponsesRequest(payload, { maxInputTokens: locked.max_input_tokens, maxOutputTokens: locked.max_output_tokens });
     // Count the exact request including instructions, schema and framing, not
     // just the question. No network preflight is permitted by this interface.
-    const inputTokens = countInputTokens(structuredClone(codec.body));
+    let inputTokens;
+    try {
+      inputTokens = countInputTokens(structuredClone(codec.body));
+      if (inputTokens instanceof Promise) {
+        // A misconfigured async counter must not leave an unhandled rejection
+        // printing source/provider details after preparation has been denied.
+        inputTokens.catch(() => {});
+        throw Error('async counter');
+      }
+    } catch { throw Error('local input token counter failed'); }
     if (!Number.isSafeInteger(inputTokens) || inputTokens < 1 || inputTokens > locked.max_input_tokens) {
       throw Error('unverified or excessive input token count');
     }

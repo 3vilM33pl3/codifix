@@ -1,5 +1,16 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 prepared-counter failures and current short rehearsal
+
+- Local tokenizer exceptions are sanitized before any reservation or model call.
+  Async counters are rejected and their rejected promises are consumed, preventing
+  accidental raw-input error output. Five prepared-call tests pass.
+- The current short mediated rehearsal passes all 75 tasks in 475 seconds at
+  `/data/tmp/memory-r3-rehearsal-cli-7yDI2p/pack/run`, with shared synthetic semantic
+  embeddings and corrected query-vector timing. Its 150 calls are simulated and
+  its semantic judgments remain pending. It does not exercise live tokenization
+  or prices; the full 660-task run remains in progress.
+
 ## 2026-09-15 bounded development calibration allocation
 
 - Diagnostic development packs can now be authorized for the plan's small
