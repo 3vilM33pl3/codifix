@@ -49,10 +49,10 @@ export async function runOfflineSequence(options) {
   for (const step of steps) {
     const publicFiles = Object.fromEntries(Object.entries(initialFiles).filter(([p]) => !submissionPaths.includes(p)));
     const agentFiles = { ...publicFiles, ...submission };
-    const agent = await runOfflineContainer({ image, files: agentFiles, argv: step.argv, timeoutMs });
+    const agent = await runOfflineContainer({ image, files: agentFiles, argv: step.argv, timeoutMs, exportPaths: submissionPaths });
     const selected = selectedSubmission(agent, submissionPaths);
     const grader = await runOfflineContainer({ image,
-      files: gradeFiles(selected, submissionPaths, step.grader.files), argv: step.grader.argv, timeoutMs });
+      files: gradeFiles(selected, submissionPaths, step.grader.files), argv: step.grader.argv, timeoutMs, exportPaths: [] });
     // Only allowlisted agent bytes move forward. Never carry grader output files,
     // stdout, hidden test contents or grading feedback into another agent step.
     diagnostics.push({ id: step.id, agentExitCode: agent.exitCode, graderExitCode: grader.exitCode,

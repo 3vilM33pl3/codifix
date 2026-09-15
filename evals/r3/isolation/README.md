@@ -7,7 +7,7 @@ prepare PostgreSQL snapshots, run Memory retrieval, authorize labels
 or mediate paid calls. The earlier shared Docker eval stacks remain unsuitable
 for R3 isolation and are not modified by this component.
 
-`runOfflineContainer({ image, argv, files, timeoutMs })` accepts an immutable local
+`runOfflineContainer({ image, argv, files, timeoutMs, exportPaths })` accepts an immutable local
 Docker image ID, an absolute executable with argument array, and a map of explicit
 relative filenames to UTF-8 contents. There is no host source-directory mount or
 inherited environment option. Defaults: 10-second command deadline, maximum
@@ -15,6 +15,14 @@ inherited environment option. Defaults: 10-second command deadline, maximum
 The image must supply `/usr/bin/env` and `/usr/local/bin/node`, contain no implicit
 volumes, and be reviewed separately. Mutable image tags and automatic pulls are
 rejected by the component.
+
+Optional `exportPaths` is an exact list of relative regular-file paths (at most
+256, no duplicates or ancestor conflicts). Omission preserves bounded whole-tree
+export; an empty list exports no files. Selected missing files remain missing.
+Only ancestors of selected files are traversed; build products outside the list
+are not exported. Selected symlinks, hard links, special files and directories
+fail closed. The host rejects unsolicited returned files. The invocation contract
+is copied before the first await, preventing caller mutation during staging.
 
 Each invocation gets a new non-root container, read-only root filesystem, no
 network, all capabilities dropped, no-new-privileges, disabled healthchecks and
@@ -36,8 +44,8 @@ No file archive is extracted onto the host.
 For a coding sequence, the future driver may explicitly carry validated submission
 files into the next step of that sequence. Unrelated cases/conditions must start
 from their original prepared files. The test demonstrates this transfer and a
-fresh reset. Real Rust build images, sufficiently bounded build scratch space and
-an explicit source-only export contract still need integration; this small
+fresh reset. Real Rust build images and sufficiently bounded build scratch space
+still need integration; this small
 text-workspace component does not yet run a complete maintenance benchmark.
 
 Normal completion, nonzero supervisor exit, excess output and timeout remove only
@@ -90,6 +98,7 @@ previous step, never grader files or feedback. The grader receives only selected
 agent bytes under `submission/` and trusted checks under `grader/`. These separate
 namespaces prevent an agent-written fake grader from replacing the real checks.
 Only selected agent files advance; modifications made by the grader are discarded.
+Agent containers export only `submissionPaths`; grader containers export no files.
 Non-submission public inputs are restored from the original fixture every step.
 A deleted selected file stays missing until the agent deliberately recreates it.
 
@@ -107,7 +116,7 @@ The live test uses trusted Node checks over inert JSON submissions. It proves
 the handoff, hidden-feedback exclusion, fake-grader exclusion, positive/negative
 controls, deleted-file carryover and fresh sequence reset. It does not yet grade
 untrusted compiled Rust programs or claim resistance to attacks on such graders.
-Reviewed Rust toolchain images, source export/build scratch limits, existing suite
+Reviewed Rust toolchain images, build scratch limits, existing suite
 runner integration and artifact mapping remain unfinished. No new representative
 benchmark labels or paid execution are enabled.
 

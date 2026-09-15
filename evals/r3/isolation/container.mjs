@@ -14,12 +14,19 @@ const docker = (args, timeout = 15000) => exec('/usr/bin/docker', ['--host', 'un
 });
 const cap = 1024 * 1024;
 
-export function validateInput({ image, argv, files, timeoutMs = 10000 }) {
+export function validateInput({ image, argv, files, timeoutMs = 10000, exportPaths }) {
   if (!/^sha256:[a-f0-9]{64}$/.test(image)) throw Error('require a reviewed immutable local image ID');
   if (!Array.isArray(argv) || !argv.length || argv.length > 64 || argv.some(v => typeof v !== 'string' || v.includes('\0') || v.length > 32768)) throw Error('invalid command');
   if (!argv[0].startsWith('/')) throw Error('command executable must be absolute');
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60000) throw Error('invalid deadline');
   if (!files || Object.getPrototypeOf(files) !== Object.prototype) throw Error('files must be an explicit map');
+  if (exportPaths !== undefined) {
+    if (!Array.isArray(exportPaths) || exportPaths.length > 256 || new Set(exportPaths).size !== exportPaths.length) throw Error('invalid export selection');
+    for (const name of exportPaths) {
+      if (typeof name !== 'string' || name.length > 240 || !name.split('/').every(p => /^[a-zA-Z0-9_.-]+$/.test(p) && p !== '.' && p !== '..')) throw Error('unsafe export path');
+      if (exportPaths.some(other => typeof other === 'string' && other.startsWith(name + '/'))) throw Error('conflicting export paths');
+    }
+  }
   let bytes = 0;
   const names = Object.keys(files);
   if (names.length > 256) throw Error('input file count exceeded');
@@ -52,7 +59,8 @@ export function validateResult(result) {
 
 export async function runOfflineContainer(options) {
   validateInput(options);
-  const { image, argv, files, timeoutMs = 10000 } = options;
+  // Preserve the reviewed contract across image inspection and staging awaits.
+  const { image, argv, files, timeoutMs = 10000, exportPaths } = structuredClone(options);
   const uid = process.getuid(), gid = process.getgid();
   if (!uid || !gid) throw Error('run the supervisor as a non-root operator');
   // No registry login, implicit pull, custom Docker context or inherited credentials.
@@ -68,7 +76,7 @@ export async function runOfflineContainer(options) {
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, content, { flag: 'wx', mode: 0o600 });
     }
-    await fs.writeFile(path.join(directory, 'request.json'), JSON.stringify({ argv, commandTimeoutMs: timeoutMs }), { flag: 'wx', mode: 0o600 });
+    await fs.writeFile(path.join(directory, 'request.json'), JSON.stringify({ argv, commandTimeoutMs: timeoutMs, exportPaths }), { flag: 'wx', mode: 0o600 });
     const guest = fileURLToPath(new URL('./guest.mjs', import.meta.url));
     // Mark before create: a lost successful response still requires exact-name cleanup.
     created = true;
@@ -88,6 +96,7 @@ export async function runOfflineContainer(options) {
     if (inspection.State.Running || inspection.State.ExitCode !== 0 || inspection.State.OOMKilled) throw Error('offline container failed');
     const result = JSON.parse(stdout);
     validateResult(result);
+    if (exportPaths && Object.keys(result.files).some(name => !exportPaths.includes(name))) throw Error('unsolicited export');
     return { ...result, elapsedMs: performance.now() - started, image };
   } catch {
     // Do not surface evaluated stdout, provider text, host config or Docker errors.

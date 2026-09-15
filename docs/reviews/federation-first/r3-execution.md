@@ -1,5 +1,20 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 source-only coding handoff
+
+- Container invocations clone reviewed inputs before asynchronous staging.
+- Explicit bounded export paths prevent build products and grader files from
+  crossing the submission boundary. Sequence agents export declared source files;
+  graders export none. Missing sources stay missing for negative grading.
+- Six required live container/sequence tests passed without skips, including
+  asynchronous input mutation, oversized unselected build output, selected
+  directory/symlink/hard-link rejection and empty grader export.
+- `git diff --check` and `scripts/check-boundaries.sh` passed. This Node-only
+  increment did not rerun Rust/database/Web tests or an official campaign.
+- R3 remains incomplete: real Rust build/grading integration, complete campaign
+  driver, sealed/reset service datasets, representative benchmarks and approvals
+  remain open. No paid calls, label approval or existing deployment changes.
+
 ## Approved benchmark refinement
 
 The small original cases are now smoke-only, not proposed official evidence.

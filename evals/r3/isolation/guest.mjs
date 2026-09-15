@@ -34,11 +34,17 @@ const files = Object.create(null);
 let total = 0, count = 0;
 async function collect(directory, prefix = '') {
   for (const name of (await fs.readdir(directory)).sort()) {
+    const relative = prefix + name;
+    if (request.exportPaths && !request.exportPaths.some(p => p === relative || p.startsWith(relative + '/'))) continue;
     if (!/^[a-zA-Z0-9_.-]+$/.test(name) || name === '.' || name === '..') throw Error('unsafe output name');
-    const location = path.join(directory, name), relative = prefix + name;
+    const location = path.join(directory, name);
     const stat = await fs.lstat(location);
     if (++count > 512) throw Error('output file count exceeded');
-    if (stat.isDirectory()) { await collect(location, relative + '/'); continue; }
+    if (stat.isDirectory()) {
+      if (request.exportPaths?.includes(relative)) throw Error('export must be a file');
+      await collect(location, relative + '/'); continue;
+    }
+    if (request.exportPaths && !request.exportPaths.includes(relative)) throw Error('export parent must be a directory');
     if (!stat.isFile() || stat.nlink !== 1 || stat.size > cap) throw Error('unsafe output file');
     const handle = await fs.open(location, constants.O_RDONLY | constants.O_NOFOLLOW);
     try {

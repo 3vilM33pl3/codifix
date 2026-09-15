@@ -16,7 +16,35 @@ test('unsafe or excessive input fails before Docker dispatch', () => {
     { argv: ['/bin/sh', '\0'] }, { timeoutMs: 0 }, { timeoutMs: 60001 },
     { files: { '../private/answers': 'no' } }, { files: { '/etc/config': 'no' } },
     { files: { 'a': 'file', 'a/b': 'conflict' } }, { files: { 'huge': 'x'.repeat(1048577) } },
+    { exportPaths: ['../private'] }, { exportPaths: ['src', 'src/lib.rs'] },
+    { exportPaths: ['a', 'a'] }, { exportPaths: [null] },
   ]) assert.throws(() => validateInput({ ...valid, ...change }));
+});
+
+test('explicit source exports exclude build products and freeze the invocation', { skip: !image, timeout: 30000 }, async () => {
+  const options = { image, files: { 'src/lib.rs': 'reviewed' }, exportPaths: ['src/lib.rs'],
+    argv: ['/usr/local/bin/node', '-e', `
+      const fs=require('fs');
+      fs.mkdirSync('target');fs.writeFileSync('target/build.bin',Buffer.alloc(1500000));
+      fs.symlinkSync('/etc/passwd','target/link');
+      require('assert').equal(fs.readFileSync('src/lib.rs','utf8'),'reviewed');
+    `] };
+  const pending = runOfflineContainer(options);
+  options.files['src/lib.rs'] = 'changed after dispatch';
+  options.exportPaths.push('target/build.bin');
+  options.argv[2] = 'process.exit(42)';
+  const result = await pending;
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(result.files, { 'src/lib.rs': Buffer.from('reviewed').toString('base64') });
+  for (const code of [
+    "fs.rmSync('src',{recursive:true});fs.symlinkSync('/etc','src')",
+    "fs.rmSync('src/lib.rs');fs.mkdirSync('src/lib.rs')",
+    "fs.linkSync('src/lib.rs','alias')",
+  ]) await assert.rejects(runOfflineContainer({ image, files: { 'src/lib.rs': 'reviewed' },
+    exportPaths: ['src/lib.rs'], argv: ['/usr/local/bin/node', '-e', "const fs=require('fs');" + code] }), /offline execution failed/);
+  const empty = await runOfflineContainer({ image, files: {}, exportPaths: [],
+    argv: ['/usr/local/bin/node', '-e', "require('fs').writeFileSync('private-feedback','not exported')"] });
+  assert.deepEqual(empty.files, {});
 });
 
 test('guest output remains untrusted and bounded before submission import', () => {
