@@ -1,0 +1,28 @@
+{
+  "capturedAt": "2026-09-15T19:46:06.736Z",
+  "version": "M2-2026-09-15-v1",
+  "backups": {
+    "london": {
+      "success": true,
+      "id": "1FgNSmHrD03JBAM0Zkd9raGMkFQR1sJxxoazmc_PDtuM",
+      "title": "Codifix London — M2 v1 backup before employee AI revision — 2026-09-15",
+      "mimeType": "application/vnd.google-apps.spreadsheet",
+      "url": "https://docs.google.com/spreadsheets/d/1FgNSmHrD03JBAM0Zkd9raGMkFQR1sJxxoazmc_PDtuM/edit?usp=drivesdk",
+      "made_private": false
+    },
+    "newyork": {
+      "success": true,
+      "id": "1teBkocvvZALGsP3HDZ5ldmXIlG9xD1OcEo_DVeQFNb4",
+      "title": "Codifix New York — M2 v1 backup before employee AI revision — 2026-09-15",
+      "mimeType": "application/vnd.google-apps.spreadsheet",
+      "url": "https://docs.google.com/spreadsheets/d/1teBkocvvZALGsP3HDZ5ldmXIlG9xD1OcEo_DVeQFNb4/edit?usp=drivesdk",
+      "made_private": false
+    }
+  },
+  "preflight": {
+    "guardedCellsPerRegion": 17261,
+    "mismatches": 0,
+    "editableInputsPerRegion": 328
+  },
+  "note": "Native v1 formulas and immutable cells matched the committed manifest before revision. Original v1 captures remain in their existing files and these native backup workbooks."
+}
