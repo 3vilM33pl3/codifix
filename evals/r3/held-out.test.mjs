@@ -12,6 +12,7 @@ if (process.env.MEMORY_R3_REQUIRE_RUST === '1' && !image) throw Error('required 
 for (const [family, modules, replacement] of [
   ['framed-stream', ['main', 'command', 'hex', 'frame', 'decoder'], 'decoder'],
   ['interval-calendar', ['main', 'command', 'display', 'interval', 'calendar'], 'calendar'],
+  ['path-policy', ['main', 'command', 'links', 'path', 'policy'], 'policy'],
 ]) test(`held-out ${family}: reference, cumulative stages and broken controls`, { skip: !image, timeout: 180000 }, async () => {
   const root = new URL(`./representative/held-out/${family}/`, import.meta.url);
   const files = {};

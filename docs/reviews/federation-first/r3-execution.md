@@ -1,5 +1,15 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out path-policy repository
+
+- Added the allocated five-module path model with two public tests and ten
+  private probes: normalized component boundaries, independent operations,
+  exact revocation, aliases, cycles and bounded rewrite depth. No host paths are
+  opened and this is not evidence of a deployed filesystem sandbox.
+- Two public tests, the targeted required container reference/cumulative/broken
+  controls (one group, no skips), and all four pack/CLI tests pass. Three of
+  twelve held-out repositories are materialized. Held-out labels remain draft.
+
 ## 2026-09-15 held-out cursor-snapshot knowledge family
 
 - Added five sources and four draft rubrics for tied sort fields, immutable page

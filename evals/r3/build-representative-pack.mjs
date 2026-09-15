@@ -48,7 +48,7 @@ function files(family, relative) {
 }
 const knowledge = split === 'held_out' ? ['telemetry-units', 'cursor-snapshot']
   : ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure', 'timezone-window', 'artifact-origin', 'retention-hold', 'quota-accounting', 'dns-cutover'];
-const coding = split === 'held_out' ? ['framed-stream', 'interval-calendar']
+const coding = split === 'held_out' ? ['framed-stream', 'interval-calendar', 'path-policy']
   : ['durable-importer', 'evidence-publication', 'configuration-rollout', 'dependency-build'];
 for (const family of minimal ? knowledge.slice(0, 1) : knowledge) {
   const sources = files(family, 'public').map(relative => {
