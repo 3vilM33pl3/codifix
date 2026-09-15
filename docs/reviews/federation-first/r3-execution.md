@@ -1,5 +1,17 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 provider receipt audit
+
+- The mediator can produce a metadata-only audit by verifying every actual result
+  file against the locked journal. It reports unique calls, task aggregates,
+  limits, payload/result digests and usage, never prompts or outputs.
+- Unknown or tampered receipts invalidate the audit; cached deliveries and restart
+  do not change it. Task aggregates must exactly equal the journal totals.
+- Sixty evaluator tests and six bridge tests pass, including new audit checks;
+  evaluator Clippy passes. This does not authenticate a provider or remove the
+  CLI's current single-call/paid-dispatch guard. Connecting verified multi-call
+  audits to campaign execution is the next integration step.
+
 ## 2026-09-15 common mediated answers and recovered task accounting
 
 - All five conditions can use the same tool-free answer adapter after the existing

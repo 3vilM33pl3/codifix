@@ -112,6 +112,9 @@ impl RequestBudget {
     pub(crate) fn identity(&self) -> &str {
         &self.manifest_sha256
     }
+    pub(crate) fn contract(&self) -> (&Limits, Option<&Limits>) {
+        (&self.limits, self.task_limits.as_ref())
+    }
     pub(crate) fn saved_request(&self, id: &str) -> Option<SavedRequest<'_>> {
         self.requests.get(id).map(|r| SavedRequest {
             task_id: r.task_id.as_deref(),

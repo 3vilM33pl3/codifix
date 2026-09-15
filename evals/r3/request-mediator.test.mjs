@@ -62,10 +62,16 @@ test('actual per-call bridge reserves durably, aggregates sequence steps, reuses
     await assert.rejects(dispatch('step-one-call-one', 'sequence-one', { payload: { ...payload, model: 'changed' } }), /rejected/);
     assert.equal(calls, 2);
     assert.deepEqual((await mediator.status()).ledger, { requests: 2, tokens: 10, microusd: 4 });
+    const audit = await mediator.audit();
+    assert.match(audit.sha256, /^[a-f0-9]{64}$/);
+    assert.equal(audit.audit.calls.length, 2);
+    assert.deepEqual(audit.audit.tasks['sequence-one'], { requests: 2, input_tokens: 6, output_tokens: 4, microusd: 4 });
+    assert(!JSON.stringify(audit).includes('PRIVATE_SYNTHETIC'));
     await mediator.close();
     mediator = await openRequestMediator({ ...config, resume: true });
     await dispatch('step-two-call-one');
     assert.equal(calls, 2);
+    assert.deepEqual(await mediator.audit(), audit);
     await dispatch('other-one', 'sequence-two');
     await dispatch('other-two', 'sequence-two');
     await assert.rejects(dispatch('another', 'sequence-three'), /rejected/);
@@ -90,6 +96,7 @@ for (const failure of ['throw', 'missing-usage', 'over-usage', 'timeout']) {
     try {
       await assert.rejects(dispatch('first'), error => /uncertain/.test(error.message) && !error.message.includes('PRIVATE'));
       assert.deepEqual(await mediator.status(), { ledger: { requests: 1, tokens: 20, microusd: 10 }, uncertain_ids: ['first'] });
+      await assert.rejects(mediator.audit(), /rejected/);
       await assert.rejects(dispatch('second'), /rejected/);
       await mediator.close();
       mediator = await openRequestMediator({ ...config, resume: true });

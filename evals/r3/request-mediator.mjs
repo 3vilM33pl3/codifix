@@ -35,7 +35,7 @@ export async function openRequestMediator(options) {
   const lines = createInterface({ input: child.stdout });
   lines.on('line', line => {
     try {
-      if (!pending || Buffer.byteLength(line) > 2 * 1024 * 1024) throw Error('invalid frame');
+      if (!pending || Buffer.byteLength(line) > 16 * 1024 * 1024) throw Error('invalid frame');
       const reply = JSON.parse(line), callback = pending;
       if (reply.version !== 1 || typeof reply.ok !== 'boolean') throw Error('invalid reply');
       pending = undefined;
@@ -71,6 +71,7 @@ export async function openRequestMediator(options) {
   try { await request({ operation: 'status' }); } catch { await close(); throw Error('private budget initialization failed'); }
   return {
     status: () => request({ operation: 'status' }),
+    audit: () => request({ operation: 'audit' }),
     // Recovery is deliberately separate from dispatch; never infer a free retry
     // from a crash, timeout or missing usage. A receipt must already exist.
     recover: requestId => request({ operation: 'recover', request_id: requestId }),

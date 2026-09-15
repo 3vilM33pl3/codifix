@@ -15,6 +15,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod audit;
+pub use audit::{ProviderAudit, ProviderCall, TaskUsage};
+
 const MAX_RECEIPT: usize = 2 * 1024 * 1024;
 
 #[derive(Serialize, Deserialize)]

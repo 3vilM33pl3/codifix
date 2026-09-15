@@ -44,6 +44,7 @@ enum Request {
         request_id: String,
     },
     Status,
+    Audit,
     Shutdown,
 }
 
@@ -137,6 +138,10 @@ fn run() -> Result<()> {
                 Request::Status => {
                     json!({"ledger":budget.ledger(),"uncertain_ids":budget.uncertain_ids()})
                 }
+                Request::Audit => {
+                    let audit = results.audit(&mut budget)?;
+                    json!({"sha256":mem_eval::campaign::digest_value(&audit)?,"audit":audit})
+                }
                 Request::Shutdown => unreachable!(),
             })
         })();
@@ -146,7 +151,12 @@ fn run() -> Result<()> {
             Ok(value) => json!({"version":1,"ok":true,"result":value}),
             Err(_) => json!({"version":1,"ok":false,"error":"budget or receipt rejected"}),
         };
-        serde_json::to_writer(&mut output, &response)?;
+        let bytes = serde_json::to_vec(&response)?;
+        ensure!(
+            bytes.len() <= 16 * 1024 * 1024,
+            "oversized private response"
+        );
+        output.write_all(&bytes)?;
         output.write_all(b"\n")?;
         output.flush()?;
     }

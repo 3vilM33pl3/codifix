@@ -58,6 +58,92 @@ fn usage() -> Allowance {
 }
 
 #[test]
+fn complete_audit_counts_unique_calls_by_task_without_exposing_outputs() {
+    let f = Fixture::new();
+    let mut budget = f.budget(false);
+    let results = ProviderResults::create(&f.0.join("results")).unwrap();
+    for (task, request) in [
+        ("sequence", "step-one"),
+        ("sequence", "step-two"),
+        ("question", "answer"),
+    ] {
+        results
+            .dispatch(
+                &mut budget,
+                task,
+                request,
+                &digest(b"private input"),
+                allowance(),
+                || Ok((serde_json::json!({"text":"PRIVATE_OUTPUT"}), usage())),
+            )
+            .unwrap();
+    }
+    let audit = results.audit(&mut budget).unwrap();
+    assert_eq!(audit.calls.len(), 3);
+    assert_eq!(
+        audit.tasks["sequence"],
+        TaskUsage {
+            requests: 2,
+            input_tokens: 6,
+            output_tokens: 4,
+            microusd: 4
+        }
+    );
+    assert_eq!(audit.ledger.requests, 3);
+    assert_eq!(audit.ledger.tokens, 15);
+    assert_eq!(audit.ledger.microusd, 6);
+    let original = serde_json::to_value(&audit).unwrap();
+    assert!(!original.to_string().contains("PRIVATE_OUTPUT"));
+    results
+        .dispatch(
+            &mut budget,
+            "sequence",
+            "step-one",
+            &digest(b"private input"),
+            allowance(),
+            || panic!("cached request must not invoke"),
+        )
+        .unwrap();
+    assert_eq!(
+        original,
+        serde_json::to_value(results.audit(&mut budget).unwrap()).unwrap()
+    );
+    drop(budget);
+    let mut budget = f.budget(true);
+    assert_eq!(
+        original,
+        serde_json::to_value(results.audit(&mut budget).unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn audit_never_drops_uncertain_or_tampered_results() {
+    let f = Fixture::new();
+    let mut budget = f.budget(false);
+    let results = ProviderResults::create(&f.0.join("results")).unwrap();
+    results
+        .begin(&mut budget, "task", "call", &digest(b"input"), allowance())
+        .unwrap();
+    assert!(results.audit(&mut budget).is_err());
+    results
+        .complete_reserved(
+            &mut budget,
+            "task",
+            "call",
+            &digest(b"input"),
+            serde_json::json!("first"),
+            usage(),
+        )
+        .unwrap();
+    assert!(results.audit(&mut budget).is_ok());
+    let path = results.path("call");
+    let mut receipt: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    receipt["output"] = serde_json::json!("altered");
+    fs::write(path, serde_json::to_vec(&receipt).unwrap()).unwrap();
+    assert!(results.audit(&mut budget).is_err());
+}
+
+#[test]
 fn completed_output_is_reused_after_restart_without_another_call_or_charge() {
     let f = Fixture::new();
     let mut budget = f.budget(false);
