@@ -1,5 +1,42 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 locked provider and tokenizer configuration
+
+- Added the optional canonical-compatible `provider_profile` contract. It binds
+  response and embedding tokenizers to hashed configuration assets, records the
+  separate embedding model/dimensions/input price and pins configuration evidence.
+  Missing profiles cannot authorize paid execution or qualify as non-offline
+  evidence. Unsupported protocols, mismatched models/assets and non-portable
+  numeric values fail closed. Hashes do not prove tokenizer or price correctness.
+- The shared prepared-call binding now supplies both call types. Focused tests
+  demonstrate different response/embedding rates, immutable active bindings,
+  phase separation, counter identity checks and retained provider receipts.
+  The fake HTTP controller uses this binding with its actual counter source
+  pinned and explicitly unapproved synthetic configuration evidence.
+- Core campaign tests pass (52), CLI campaign tests pass (8), and the profile/
+  compatibility/review group passes all 10 tests without skips. The previous
+  75-task artifact still reports `execution_valid: true` with 60 pending judgments
+  under the new binary; its canonical identity remains unchanged.
+- The fresh profile-backed HTTP rehearsal passes all 75 tasks in 543 seconds:
+  `/data/tmp/memory-r3-rehearsal-cli-IjOBFI/pack/run/artifact.json`.
+  The counter-source pin matches the copied source; 34 preparation calls and 180
+  execution calls reconcile. `execution_valid` is true; official/quality gates
+  remain false, with 60 knowledge judgments pending. All calls are simulated.
+- The updated required-database CI group passes all 35 tests without skips.
+  Workspace Clippy, formatting, boundaries and the isolated lean CLI build pass
+  (eight existing lean-feature warnings). The unfiltered workspace run retains
+  the unrelated M2 documentation-path failure, with its other 234 CLI tests
+  passing. The workspace rerun excluding only that check passes. Logs:
+  `/tmp/r3-provider-profile-rehearsal.log`, `/tmp/r3-provider-profile-ci-node.log`,
+  `/tmp/r3-provider-profile-workspace.log`,
+  `/tmp/r3-provider-profile-workspace-rest.log`.
+- No real model was selected or invoked; the paid-driver guard, label approval
+  and paid-run gates remain unchanged. This completes configuration binding,
+  not the remaining live-controller/tokenizer integration or R3 as a whole.
+- Removed only the owned tmpfs database `memory-r3-profile-20260915` after
+  verification. Its synthetic contents are regenerable; artifacts and fixtures
+  remain. Existing dev services and project data were untouched.
+
 ## 2026-09-15 complete HTTP-mediated rehearsal
 
 - The new `--wire` rehearsal passes all 75 tasks in 470 seconds through the
@@ -1336,6 +1373,8 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
   - [ ] Complete the provider-backed isolation/egress profile.
     - [x] Fixed-destination bounded HTTP, request/receipt codecs and private
       prepared model calls, including isolated coding and private scoring tests.
+    - [x] Canonical provider/tokenizer/embedding configuration contract and shared
+      prepared-call bindings with distinct response/embedding pricing.
     - [ ] Select and verify the real model/tokenizer/price/egress configuration;
       synthetic counters and fake HTTP receipts are not live-provider evidence.
 - [ ] Equal-information document, lexical, vector and full-Memory baselines.
