@@ -39,6 +39,12 @@ pub struct TrackReport {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Report {
+    /// Execution/accounting/input checks, allowing only genuinely bound pending
+    /// semantic judgments. This is not a claim of deployed security or quality.
+    #[serde(default)]
+    pub execution_valid: bool,
+    #[serde(default)]
+    pub pending_knowledge_reviews: usize,
     pub harness_valid: bool,
     pub official_evidence: bool,
     pub quality_passed: bool,
@@ -101,7 +107,14 @@ fn ratio(a: f64, b: f64) -> Option<f64> {
 }
 
 pub fn report(manifest: &Manifest, artifact: &Artifact) -> Result<Report> {
-    report_inner(manifest, artifact, false)
+    let mut result = report_inner(manifest, artifact, false)?;
+    if !result.harness_valid && result.pending_knowledge_reviews > 0 {
+        // Use the same fail-closed review validator, not a filter over error
+        // strings. Missing usage, forged evidence and isolation failures still
+        // invalidate execution even when some judgments are pending.
+        result.execution_valid = report_inner(manifest, artifact, true)?.harness_valid;
+    }
+    Ok(result)
 }
 
 pub(super) fn report_for_review(manifest: &Manifest, artifact: &Artifact) -> Result<Report> {
@@ -379,6 +392,14 @@ fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -
     errors.sort();
     errors.dedup();
     Ok(Report {
+        execution_valid: harness_valid,
+        pending_knowledge_reviews: artifact
+            .observations
+            .iter()
+            .filter(|observation| {
+                observation.unresolved_rubric && observation.knowledge_review.is_some()
+            })
+            .count(),
         harness_valid,
         official_evidence,
         quality_passed: official_evidence && tracks.iter().all(|t| t.quality_passed),

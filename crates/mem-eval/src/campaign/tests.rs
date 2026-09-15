@@ -404,7 +404,23 @@ fn blinded_campaign_review_retains_execution_and_revision_history() {
     pending.knowledge_review.as_mut().unwrap().ballots.clear();
     pending.unresolved_rubric = true;
     pending.result.success = false;
-    assert!(!report(&m, &original).unwrap().harness_valid);
+    let pending_report = report(&m, &original).unwrap();
+    assert!(!pending_report.harness_valid && pending_report.execution_valid);
+    assert_eq!(pending_report.pending_knowledge_reviews, 1);
+    assert!(!pending_report.official_evidence && !pending_report.quality_passed);
+    let mut changed_snapshot = original.clone();
+    changed_snapshot.observations[index].isolation.after_sha256 = digest(b"changed snapshot");
+    assert!(!report(&m, &changed_snapshot).unwrap().execution_valid);
+    let mut changed_answer = original.clone();
+    changed_answer.observations[index]
+        .knowledge_review
+        .as_mut()
+        .unwrap()
+        .packet
+        .answer
+        .text
+        .push_str(" changed");
+    assert!(!report(&m, &changed_answer).unwrap().execution_valid);
     let packets = review::prepare(&m, &original).unwrap();
     assert_eq!(packets.len(), 1500);
     let packet = original.observations[index]
@@ -495,6 +511,7 @@ fn blinded_campaign_review_retains_execution_and_revision_history() {
     assert!(!report(&m, &tampered).unwrap().harness_valid);
     let mut broken = original;
     broken.observations[index].result.token_usage = None;
+    assert!(!report(&m, &broken).unwrap().execution_valid);
     assert!(review::prepare(&m, &broken).is_err());
 }
 

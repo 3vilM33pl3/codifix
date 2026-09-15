@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 execution validity versus pending review
+
+- Reports now expose execution validity separately from the complete harness
+  gate and count pending knowledge reviews. The existing review validator checks
+  this distinction; no error-string filtering or automatic approval is used.
+- The 56 evaluator tests passed. Targeted regressions also verify that missing
+  usage, modified answer bindings and changed snapshots remain execution failures
+  even when genuine semantic judgments are pending. The quality gate is unchanged.
+
 ## 2026-09-15 representative per-task execution
 
 - Added composition of the real prepared-service/baseline/agent/grader/scorer

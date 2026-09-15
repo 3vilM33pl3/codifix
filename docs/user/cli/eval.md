@@ -32,8 +32,9 @@ files must use the existing `compare`/`report` commands instead.
 
 `campaign run --offline --allow-shell --manifest <campaign.json> --driver <executable>
 --out <new-directory>` is an integration interface for a reviewed isolation driver
-whose bytes are a locked configuration asset. No complete driver is shipped yet;
-paid execution is disabled pending per-request mediation and isolation tests.
+whose bytes are a locked configuration asset. A representative synthetic offline
+controller is available through `evals/r3/rehearse.mjs`; provider-backed execution
+is disabled pending per-request mediation and full isolation verification.
 It does not use the CLI's ambient service or provider credentials. Output paths
 must be new; interrupted evidence is retained, never overwritten or blindly retried.
 To recover, repeat the same command with `--resume` and the original `--out`.
@@ -71,6 +72,13 @@ Genuine pending review evidence allows execution to finish and be saved, but the
 campaign report remains invalid until adjudication is resolved. Review cannot
 repair missing usage, interrupted execution or isolation failures. None of these
 commands authorizes paid evaluations or approves benchmark labels.
+
+Reports separate `execution_valid` from `harness_valid` and show
+`pending_knowledge_reviews`. Bound pending judgments can leave execution checks
+valid while the complete harness/quality gate remains closed. Missing usage,
+forged review bindings or changed snapshots invalidate execution too; they are
+not reclassified as ordinary pending review. Older serialized reports lack these
+new diagnostics and should be regenerated from the original artifacts.
 
 ## Suite Format
 
