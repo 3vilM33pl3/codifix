@@ -1,5 +1,18 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 first held-out coding repository
+
+- Added the allocated framed-stream repository: five modules, two public starter
+  tests, three cumulative stages and ten distinct private probes. Covers chunked
+  headers/payloads, complete UTF-8 validation, bounded frames, poisoned input and
+  explicit close/reset. This models an in-memory receiver, not live networking.
+- Both public tests pass. The required container test passes in 25 seconds with
+  no skips: reference and cumulative execution pass, starter/no-op controls fail
+  every stage. CI requires the held-out fixture verifier. No model execution,
+  calibration or label approval uses these held-out references.
+- One of twelve held-out repositories is materialized. The larger development
+  rehearsal remains running; its completion is not yet claimed.
+
 ## 2026-09-15 complete development benchmark allocation
 
 - Added the tenth knowledge family, DNS cutover: five synthetic sources and four
