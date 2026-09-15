@@ -13,6 +13,14 @@ materialized at [supplier handover](representative/development/supplier-handover
 The complete replacement suite is not yet implemented or approved; that pack is
 not wired into the smoke generator or an official campaign.
 
+The first multi-file coding family is also executable:
+[durable importer](representative/development/durable-importer/review.md).
+Its three cumulative stages have ten private black-box probes. The reference
+passes; the buggy starter and no-op controls fail. Restart uses an explicitly
+documented durable-store test double, not a claim of disk recovery. Run it with
+the pinned Rust image using the isolation instructions and
+`node --test evals/r3/representative.test.mjs`. CI requires this test without skips.
+
 ```sh
 node evals/r3/build-review-pack.mjs target/memory-evals/r3-review
 node evals/r3/verify-review-pack.mjs target/memory-evals/r3-review

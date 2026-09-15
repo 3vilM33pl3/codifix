@@ -1,0 +1,18 @@
+[
+  {"id":"atomicity","prompt":"Repair the mutation/cursor transaction boundary. Before-commit failure must leave the complete durable snapshot unchanged; normal ordered deliveries and overflow rejection must still work.","probes":[
+    {"id":"ordered","argv":[],"stdin":"apply 1 a 10 none\napply 2 b -3 none\nshow\n","expectedStdout":"applied\napplied\ncursor=2 total=7 accepted=2 pending=0\n"},
+    {"id":"rollback","argv":[],"stdin":"apply 1 a 10 before\nshow\napply 1 a 10 none\nshow\n","expectedStdout":"failed\ncursor=0 total=0 accepted=0 pending=0\napplied\ncursor=1 total=10 accepted=1 pending=0\n"},
+    {"id":"overflow","argv":[],"stdin":"apply 1 a 9223372036854775807 none\napply 2 b 1 none\nshow\n","expectedStdout":"applied\nrejected\ncursor=1 total=9223372036854775807 accepted=1 pending=0\n"}
+  ]},
+  {"id":"reordered-deduplication","prompt":"Support reordered and duplicate delivery using immutable sequence/operation identities. Persist gaps; advance only the contiguous authority prefix. Reject conflicting identities without replacing accepted or queued data. Preserve atomicity.","probes":[
+    {"id":"gap","argv":[],"stdin":"apply 2 a 5 none\nshow\napply 1 z 7 none\nshow\napply 2 a 5 none\nshow\n","expectedStdout":"queued\ncursor=0 total=0 accepted=0 pending=1\napplied\ncursor=2 total=12 accepted=2 pending=0\nduplicate\ncursor=2 total=12 accepted=2 pending=0\n"},
+    {"id":"identity-conflicts","argv":[],"stdin":"apply 1 a 3 none\napply 2 a 4 none\napply 1 b 3 none\napply 3 c 8 none\napply 3 c 9 none\nshow\n","expectedStdout":"applied\nrejected\nrejected\nqueued\nrejected\ncursor=1 total=3 accepted=1 pending=1\n"},
+    {"id":"atomic-drain","argv":[],"stdin":"apply 2 b 4 none\napply 1 a 6 before\nshow\napply 1 a 6 none\nshow\n","expectedStdout":"queued\nfailed\ncursor=0 total=0 accepted=0 pending=1\napplied\ncursor=2 total=10 accepted=2 pending=0\n"},
+    {"id":"authority-not-key-order","argv":[],"stdin":"apply 2 z -9223372036854775807 none\napply 3 a 1 none\napply 1 b 9223372036854775807 none\nshow\n","expectedStdout":"queued\nqueued\napplied\ncursor=3 total=1 accepted=3 pending=0\n"}
+  ]},
+  {"id":"restart-catchup","prompt":"Recover after worker restart and acknowledgement loss. Preserve committed effects, identities, cursor and pending deliveries. Exact replay after commit-before-ack must not repeat effects; precommit failures remain retryable.","probes":[
+    {"id":"lost-ack","argv":[],"stdin":"apply 1 a 9 after\nrestart\napply 1 a 9 none\nshow\n","expectedStdout":"uncertain\nrestarted\nduplicate\ncursor=1 total=9 accepted=1 pending=0\n"},
+    {"id":"durable-gap","argv":[],"stdin":"apply 3 c 2 none\nrestart\napply 1 a 3 none\napply 2 b 4 after\nrestart\napply 2 b 4 none\nshow\n","expectedStdout":"queued\nrestarted\napplied\nuncertain\nrestarted\nduplicate\ncursor=3 total=9 accepted=3 pending=0\n"},
+    {"id":"precommit-restart","argv":[],"stdin":"apply 1 a 9 before\nrestart\nshow\napply 1 a 9 none\nshow\n","expectedStdout":"failed\nrestarted\ncursor=0 total=0 accepted=0 pending=0\napplied\ncursor=1 total=9 accepted=1 pending=0\n"}
+  ]}
+]

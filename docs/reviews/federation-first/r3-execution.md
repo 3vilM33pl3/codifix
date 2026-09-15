@@ -1,5 +1,18 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 representative importer benchmark
+
+- Added the first five-module development Rust repository, its public contract
+  and smoke tests, three cumulative private stages and reference implementation.
+- Ten black-box probes cover partial commit, arithmetic overflow, gaps, identity
+  conflicts, authority ordering, lost acknowledgements and restart/catch-up.
+  Reference execution passes; buggy and no-op controls fail each stage.
+- Five required live Rust/container tests passed with zero skips; the standalone
+  public repository's two tests passed offline. CI requires the new benchmark.
+- Labels are draft. The store is an in-process durability test double, not a
+  disk-recovery experiment. This is one development sequence, not the complete
+  representative suite or a campaign/product-quality result. R3 remains open.
+
 ## 2026-09-15 dispatch journal integration
 
 - Existing offline campaign dispatch now writes `dispatch-budget.jsonl` with
