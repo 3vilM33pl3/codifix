@@ -1,5 +1,17 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 confirmed campaign reservation settlement
+
+- The CLI reporting/preflight ledger now follows the locked durable dispatch
+  ledger. Confirmed tasks release unused token/spend reservations; recovered tasks
+  are not reserved twice. Interrupted attempts retain their reserved allowance.
+- All six campaign command tests pass. The extended crash/recovery regression
+  allows 240 tokens: enough for a completed 10/30-token task and the next 200-token
+  reservation, but not two obsolete 200-token reservations. Resume completes the
+  next task once and reports actual 20/60-token totals.
+- This corrects execution accounting, not the still-pending integration of
+  pre-dispatch corpus-preparation costs into the global campaign allowance.
+
 ## 2026-09-15 task-scoped query embedding and cancellation
 
 - Prepared service clones accept a trusted task-specific query embedding callback;

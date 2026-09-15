@@ -401,6 +401,11 @@ async fn driver_dispatch_settles_only_valid_evidence_and_preserves_uncertainty()
     {
         let root = Scratch::new();
         let (mut manifest, mut observation) = fixture();
+        if index == 5 || index == 10 {
+            // Enough for confirmed usage plus the next 200-token reservation,
+            // not two obsolete worst-case reservations (400 tokens).
+            manifest.limits.tokens = 240;
+        }
         if index == 7 {
             observation.provider_requests = 2;
         }
@@ -640,6 +645,8 @@ async fn driver_dispatch_settles_only_valid_evidence_and_preserves_uncertainty()
             .await
             .unwrap();
             assert_eq!(resumed_artifact.observations.len(), 2);
+            assert_eq!(resumed_ledger.requests, 2);
+            assert_eq!(resumed_ledger.tokens, if index == 10 { 60 } else { 20 });
             assert_eq!(
                 std::fs::read(out.join("dispatch-count")).unwrap(),
                 b"xx",

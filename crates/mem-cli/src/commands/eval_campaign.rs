@@ -266,8 +266,8 @@ async fn execute(
     ledger: &mut Ledger,
     artifact: &mut Artifact,
 ) -> Result<()> {
-    // One conservative reservation per driver dispatch while multi-request
-    // provider mediation remains unavailable. Never expose this owner to agents.
+    // Reserve a whole task here; per-call mediation is nested inside this cap.
+    // Never expose this campaign-level journal owner to agents.
     let open_budget = if resume {
         RequestBudget::resume_scoped
     } else {
@@ -305,6 +305,7 @@ async fn execute(
     // Recover the entire reserved prefix before dispatching anything new. A
     // pending request without a complete receipt remains ambiguous, even offline.
     // Keep the original journal locked for the entire resumed execution.
+    *ledger = dispatch_budget.ledger().clone();
     let recovered = recover_dispatches(
         manifest_path,
         manifest,
@@ -315,6 +316,7 @@ async fn execute(
         &mut dispatch_budget,
         &dispatch_results,
     )?;
+    *ledger = dispatch_budget.ledger().clone();
     let mut provider_requests = 0u64;
     for (index, work) in plan.work.iter().enumerate() {
         // Aggregate per-task token ceiling. Driver must enforce this across all
@@ -330,7 +332,6 @@ async fn execute(
             manifest.model.max_output_tokens,
         )?;
         let cost = if offline { 0 } else { priced.microusd };
-        ledger.reserve(&manifest.limits, tokens, cost)?;
         if let Some(observation) = recovered.get(index) {
             provider_requests = provider_requests
                 .checked_add(observation.provider_requests)
@@ -343,6 +344,11 @@ async fn execute(
             artifact.observations.push(observation.clone());
             continue;
         }
+        // Confirmed receipts have already released unused reservations in the
+        // durable owner. Do not charge the recovered prefix a second time or
+        // retain settled worst-case tokens in this reporting/preflight ledger.
+        *ledger = dispatch_budget.ledger().clone();
+        ledger.reserve(&manifest.limits, tokens, cost)?;
         verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
         let dir = out.join(format!("work-{index:05}"));
         std::fs::create_dir(&dir)?;
@@ -474,6 +480,7 @@ async fn execute(
                     .context("missing confirmed spend")?,
             },
         )?;
+        *ledger = dispatch_budget.ledger().clone();
         artifact.observations.push(observation);
     }
     verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
