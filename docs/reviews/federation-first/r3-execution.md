@@ -1,5 +1,15 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out route-precedence repository
+
+- Added five public modules, two tests and ten hidden probes for lexicographic
+  route specificity, HEAD fallback, capture isolation, normalized conflicts,
+  exact retry and atomic replacement/removal, including the full-table boundary.
+- Public tests, required container reference/cumulative/negative controls and
+  four pack/CLI tests pass. Re-ran container checks after extending capacity
+  coverage; all pass without skips. Ten of twelve held-out repositories exist.
+  This is an in-memory router fixture, not an HTTP or access-control release.
+
 ## 2026-09-15 held-out clocked circuit repository
 
 - Added five modules, two public tests and ten hidden probes for consecutive

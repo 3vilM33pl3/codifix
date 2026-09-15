@@ -154,8 +154,8 @@ They must not reuse the development reference implementations or hidden probes.
 Related knowledge/coding mechanisms stay wholly in held-out, never development.
 
 All 25 knowledge families are now materialized as five-source/four-question drafts.
-Nine coding repositories are executable; the remaining three are `route-precedence`,
-`bounded-decoder` and `structured-redaction`.
+Ten coding repositories are executable; the remaining two are `bounded-decoder`
+and `structured-redaction`.
 This is not approved benchmark or measured model-quality evidence.
 Materialize source contracts before tests/questions. Keep all held-out material
 out of development calibration packs and do not inspect model outcomes to tune

@@ -62,7 +62,7 @@ matching and diagnostic attribution. Finally,
 [distribution notices](representative/held-out/distribution-notice/review.md)
 complete all 25 held-out knowledge families and 100 draft questions. Every family
 has five source documents and a private review sheet; none was used to calibrate
-model outputs. Three held-out coding repositories still need implementation.
+model outputs. Two held-out coding repositories still need implementation.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:
@@ -108,7 +108,9 @@ metadata and retained component attribution under a fictional policy. The eighth
 [sensor matrix](representative/held-out/sensor-matrix/review.md), tests canonical
 sparse ingestion, rectangular transposition and atomic checked composition. The ninth,
 [circuit window](representative/held-out/circuit-window/review.md), checks failure
-streaks, single recovery probes, expiry and monotonic time; three remain. Run
+streaks, single recovery probes, expiry and monotonic time. The tenth,
+[route precedence](representative/held-out/route-precedence/review.md), checks
+specificity, method selection and atomic bounded table updates; two remain. Run
 `node --test evals/r3/held-out.test.mjs` with the pinned Rust image.
 These are deterministic fixture checks, not held-out model calibration or label
 approval. The offline controller integrates
