@@ -51,7 +51,10 @@ boundaries and accepted-work lifecycle respectively. The next two,
 whole-group budgets and deterministic folds from misleading proxies.
 [Lock inversion](representative/held-out/lock-inversion/review.md) and
 [aggregate overflow](representative/held-out/numeric-overflow/review.md) add
-wait-cycle and complete-size reasoning; six knowledge families remain.
+wait-cycle and complete-size reasoning.
+[Rename durability](representative/held-out/rename-durability/review.md) and
+[null-aware filtering](representative/held-out/null-filter/review.md) distinguish
+confirmed persistence and scoped absence from misleading success; four remain.
 No labels are approved and none of these fixtures measures model quality alone.
 
 The first multi-file coding family is also executable:

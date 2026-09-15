@@ -46,7 +46,7 @@ function files(family, relative) {
     return [name];
   });
 }
-const knowledge = split === 'held_out' ? ['telemetry-units', 'cursor-snapshot', 'cancellation-scope', 'archive-expansion', 'circuit-probes', 'alert-denominator', 'cohort-assignment', 'unicode-identity', 'quantization-error', 'watcher-rename', 'vector-compatibility', 'certificate-chain', 'token-audience', 'stream-framing', 'traffic-drain', 'cgroup-pressure', 'reproducible-order', 'lock-inversion', 'numeric-overflow']
+const knowledge = split === 'held_out' ? ['telemetry-units', 'cursor-snapshot', 'cancellation-scope', 'archive-expansion', 'circuit-probes', 'alert-denominator', 'cohort-assignment', 'unicode-identity', 'quantization-error', 'watcher-rename', 'vector-compatibility', 'certificate-chain', 'token-audience', 'stream-framing', 'traffic-drain', 'cgroup-pressure', 'reproducible-order', 'lock-inversion', 'numeric-overflow', 'rename-durability', 'null-filter']
   : ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure', 'timezone-window', 'artifact-origin', 'retention-hold', 'quota-accounting', 'dns-cutover'];
 const coding = split === 'held_out' ? ['framed-stream', 'interval-calendar', 'path-policy', 'decimal-register', 'identifier-catalog', 'snapshot-pages', 'notice-bundle']
   : ['durable-importer', 'evidence-publication', 'configuration-rollout', 'dependency-build'];

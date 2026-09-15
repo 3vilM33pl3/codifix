@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out persistence and null-filter families
+
+- Added ten sources and eight draft questions on rename/flush confirmations,
+  uncertain external effects, SQL UNKNOWN and project-correlated anti-joins.
+  Filesystem and query semantics are explicit synthetic contracts.
+- Canonical rubric and four pack/CLI checks pass without skips. Eighty-four
+  held-out questions and seven coding repositories exist; four knowledge families
+  and five coding repositories remain. No live storage or database writes.
+
 ## 2026-09-15 held-out lock and aggregate-size families
 
 - Added ten sources and eight draft questions on opposite lock ordering,
