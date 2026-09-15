@@ -9,11 +9,14 @@ function fixture(image) {
   return { image, initialFiles: { 'source.json': '{"count":0}', 'public.txt': 'Only increment the count once per step.' },
     submissionPaths: ['source.json'], timeoutMs: 4000,
     steps: [1, 2, 3].map(n => ({ id: `step-${n}`,
+      inputFiles: { 'task.json': JSON.stringify({ stage: n }), [`current-${n}.txt`]: 'Only this stage is disclosed.' },
       argv: ['/usr/local/bin/node', '-e', `
         const fs=require('fs'),a=require('assert');
         a(!fs.existsSync('grader'));a(!fs.existsSync('grading-feedback.txt'));
         a(!fs.existsSync('/input/files/grader'));a(!fs.existsSync('private.json'));
         a.equal(fs.readFileSync('public.txt','utf8'),'Only increment the count once per step.');
+        a.equal(JSON.parse(fs.readFileSync('task.json')).stage,${n});
+        for(let i=1;i<=3;i++) a.equal(fs.existsSync('current-'+i+'.txt'),i===${n});
         const value=JSON.parse(fs.readFileSync('source.json'));a.equal(value.count,${n-1});
         value.count++;fs.writeFileSync('source.json',JSON.stringify(value));
         fs.mkdirSync('grader');fs.writeFileSync('grader/check.mjs','process.exit(0)');
@@ -44,6 +47,10 @@ test('sequence validates the complete hidden grader contract before execution', 
     o => { o.submissionPaths = ['../private']; }, o => { o.steps[2].grader.files = {}; },
     o => { o.steps[2].grader.files = { '../escape': 'no' }; },
     o => { o.steps[2].grader.argv = ['relative-command']; },
+    o => { o.steps[2].inputFiles = { 'source.json': 'override submission' }; },
+    o => { o.steps[2].inputFiles = { 'public.txt': 'override prepared context' }; },
+    o => { o.steps[2].inputFiles = { '../private': 'unsafe' }; },
+    o => { o.steps[2].inputFiles = []; },
   ]) { const invalid = structuredClone(valid); mutate(invalid); assert.throws(() => validateSequence(invalid)); }
 });
 

@@ -17,7 +17,9 @@ export function validateSequence({ image, initialFiles, submissionPaths, steps, 
   for (const step of steps) {
     if (!step || typeof step.id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(step.id) || ids.has(step.id)) throw Error('invalid step identity');
     ids.add(step.id);
-    validateInput({ image, argv: step.argv, files: initialFiles, timeoutMs });
+    const inputs = step.inputFiles ?? {};
+    if (Object.getPrototypeOf(inputs) !== Object.prototype || Object.keys(inputs).some(p => Object.hasOwn(initialFiles, p))) throw Error('step inputs cannot replace fixture or submission files');
+    validateInput({ image, argv: step.argv, files: { ...initialFiles, ...inputs }, timeoutMs });
     if (step.grader?.kind === 'rust-blackbox') {
       validateRustCase({ image, files: Object.fromEntries(submissionPaths.map(p => [p, initialFiles[p]])),
         probes: step.grader.probes, timeoutMs });
@@ -54,7 +56,7 @@ export async function runOfflineSequence(options) {
   const started = performance.now();
   for (const step of steps) {
     const publicFiles = Object.fromEntries(Object.entries(initialFiles).filter(([p]) => !submissionPaths.includes(p)));
-    const agentFiles = { ...publicFiles, ...submission };
+    const agentFiles = { ...publicFiles, ...(step.inputFiles ?? {}), ...submission };
     const rust = step.grader.kind === 'rust-blackbox';
     const agent = await runOfflineContainer({ image, files: agentFiles, argv: step.argv, timeoutMs,
       exportPaths: submissionPaths, profile: rust ? 'rust' : 'text' });

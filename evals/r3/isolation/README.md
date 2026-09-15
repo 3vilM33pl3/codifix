@@ -1,5 +1,27 @@
 # R3 offline container boundary
 
+## Representative task executor
+
+`rehearsal-task.mjs` composes a prepared service session, existing baseline
+executable, isolated synthetic answers or three-step Rust grading, and the
+existing campaign observation shape. It accepts only a draft zero-spend smoke
+pack and verifies all input hashes before and after work. Each condition gets a
+fresh clone of the same prepared snapshot. All knowledge conditions are exercised
+with real sources; coding no-op controls fail real private acceptance tests.
+
+The fake vector function and excerpt/no-op agents are harness controls, not model
+or ranking quality evidence. Rehearsal duration currently includes disposable
+service setup and hidden grading and is explicitly not model/user latency.
+Host-side service orchestration remains trusted; answering/coding containers have
+no network. The complete hash-locked controller/CLI driver, official preparation
+parity and paid provider mediation remain unfinished.
+
+Sequence steps may supply `inputFiles` for the current prompt/context. They cannot
+overwrite fixture/submission paths. Inputs are validated for every stage before
+execution, but only the current stage's files enter its process; they do not carry
+over with the allowlisted source submission. Tests verify that future stage files
+and earlier stage-only files are absent and prepared context cannot be replaced.
+
 ## Knowledge answer and adjudication bridge
 
 `knowledge.mjs` connects explicitly selected prepared source chunks to an offline

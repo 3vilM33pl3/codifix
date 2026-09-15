@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 representative per-task execution
+
+- Added composition of the real prepared-service/baseline/agent/grader/scorer
+  components into campaign-shaped observations. The required executable test
+  passes all five knowledge conditions and a three-stage Rust no-op control,
+  with unchanged cloned snapshots, pending semantic judgments and rejected
+  source tampering. No made-up observations or passing human ballots are used.
+- Added per-stage public input files to sequence isolation. They cannot replace
+  prepared fixture/submission files; current prompts are not disclosed early or
+  carried into subsequent steps. Both required sequence tests pass.
+- These are synthetic excerpt/no-op agents and fake vectors. Rehearsal timing
+  includes setup/hidden grading and is not product latency. Complete controller/
+  CLI integration, real preparation parity and paid mediation remain open.
+
 ## 2026-09-15 reusable prepared-service sessions
 
 - Added a trusted-host snapshot session that prepares once and runs each callback
