@@ -1,5 +1,15 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 staff-turnover recovery benchmark
+
+- Materialized the planned second knowledge family: five public documents and
+  four private rubrics plus a plain-language review sheet. The questions join
+  restored data, retired generation 8/current generation 9 authority, receipt
+  reconciliation, offline knowledge and unmeasured recovery/loss claims.
+- The canonical rubric/required-dimension test now checks both development
+  knowledge families and passed. No human decisions, held-out freeze or paid
+  evaluation are implied. Complete representative allocation remains open.
+
 ## 2026-09-15 executable snapshot owner and foreground service
 
 - Added a bounded trusted-host JSONL owner for synthetic source preparation,

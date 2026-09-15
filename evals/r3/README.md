@@ -13,6 +13,13 @@ materialized at [supplier handover](representative/development/supplier-handover
 The complete replacement suite is not yet implemented or approved; that pack is
 not wired into the smoke generator or an official campaign.
 
+A second multi-document development pack is now materialized at
+[staff-turnover recovery](representative/development/turnover-recovery/review.md).
+It joins restoration evidence, retired writer authority, ordered catch-up and an
+obsolete runbook, including refusal to claim a recovery objective or zero loss.
+Its four canonical rubric files are tested but remain draft; source/version and
+full campaign preparation still need integration.
+
 The first multi-file coding family is also executable:
 [durable importer](representative/development/durable-importer/review.md).
 Its three cumulative stages have ten private black-box probes. The reference

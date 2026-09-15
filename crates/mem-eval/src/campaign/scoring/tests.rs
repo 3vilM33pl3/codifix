@@ -134,17 +134,20 @@ fn blinded_packet_has_no_condition_model_repeat_or_automatic_score() {
 }
 
 #[test]
-fn representative_supplier_rubrics_use_canonical_locked_bytes_and_all_dimensions() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../evals/r3/representative/development/supplier-handover/private");
-    for index in 1..=4 {
-        let bytes = std::fs::read(root.join(format!("q{index}.json"))).unwrap();
-        let rubric: Rubric = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(rubric_bytes(&rubric).unwrap(), bytes);
-        assert_eq!(rubric.case_id, format!("supplier-handover-q{index}"));
-        let mut p = packet();
-        p.rubric = rubric;
-        p.validate().unwrap();
-        assert!(assess(&p, &[]).unwrap().unresolved);
+fn representative_rubrics_use_canonical_locked_bytes_and_all_dimensions() {
+    for family in ["supplier-handover", "turnover-recovery"] {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+            "../../evals/r3/representative/development/{family}/private"
+        ));
+        for index in 1..=4 {
+            let bytes = std::fs::read(root.join(format!("q{index}.json"))).unwrap();
+            let rubric: Rubric = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(rubric_bytes(&rubric).unwrap(), bytes);
+            assert_eq!(rubric.case_id, format!("{family}-q{index}"));
+            let mut p = packet();
+            p.rubric = rubric;
+            p.validate().unwrap();
+            assert!(assess(&p, &[]).unwrap().unresolved);
+        }
     }
 }
