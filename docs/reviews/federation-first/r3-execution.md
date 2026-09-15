@@ -1,5 +1,47 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 shared provider campaign session
+
+- Added a trusted-owner session for mediated preparation and isolated task
+  execution. The HTTP rehearsal now uses it. Snapshot embedding identity,
+  dimensions and baseline vector provenance come from the locked provider
+  profile, not synthetic defaults. The provider-only executor requires both
+  model and embedding bindings; failures cannot select a fake fallback.
+- Preparation consumes only the selected split. Frozen assets are checked,
+  active work is serialized, and a failed preparation/task prevents additional
+  execution. Cleanup refuses to race active work. This is an internal lifecycle,
+  not an approved live launcher or authority to spend.
+- The new disposable-database test executes all five knowledge conditions and
+  a three-step Rust sequence with independently named answer/embedding models
+  and three-dimensional vectors. Model calls, query embeddings, unchanged
+  snapshots and pending private scoring are asserted. Changed source bytes
+  prevent another call; completed preparation cannot be repeated.
+- The three-test legacy/new-session group and 36-test provider/service group
+  pass with no skips. The 52 core campaign tests and eight CLI campaign tests
+  pass. The final three-test session suite also verifies rejection of invalid
+  bindings before snapshot creation and denial of concurrent execution/cleanup.
+  Workspace Clippy, formatting, boundaries and the isolated lean CLI build pass
+  (eight existing lean-feature warnings). CI requires the new session test;
+  remote CI execution is not claimed.
+- The required-database workspace run again fails only at the existing M2
+  `markdown_local_links_and_images_resolve` check, with the other 234 CLI tests
+  passing. The workspace rerun excluding only that check passes, including
+  federation regressions. Logs: `/tmp/r3-provider-session-workspace.log` and
+  `/tmp/r3-provider-session-workspace-rest.log`. The unrelated M2 file was not
+  changed. Web and Lean theorem builds were not rerun for this Node-only change.
+- The fresh shared-session HTTP rehearsal passes all 75 tasks in 603 seconds:
+  `/data/tmp/memory-r3-rehearsal-cli-SSbtJN/pack/run/artifact.json`.
+  Its 34 preparation calls and 180 execution calls reconcile, and all snapshots
+  remain unchanged. `execution_valid` is true; `harness_valid`, official and
+  quality gates remain false, with 60 knowledge judgments pending. Every
+  provider call was simulated; this is not measured answer quality.
+- Removed only the owned tmpfs database `memory-r3-controller-20260915` after
+  verification. Synthetic data can be regenerated; artifacts and source fixtures
+  remain. Existing dev services and project data were untouched.
+- Label approval, verified real tokenizers/prices/egress, live-launcher wiring,
+  paid calibration and the official campaign remain open. The paid CLI guard
+  is unchanged. **R3 is not complete.**
+
 ## 2026-09-15 locked provider and tokenizer configuration
 
 - Added the optional canonical-compatible `provider_profile` contract. It binds
@@ -1393,6 +1435,9 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
     cache-price arithmetic, timing separation and separate calibration approvals.
   - [x] Global preparation/execution request, token and spend accounting;
     durable preparation receipt, snapshot binding and fail-closed resume.
+  - [x] Shared provider-only preparation/task lifecycle, profile-derived snapshot
+    and baseline embeddings, and isolated knowledge/coding execution without
+    synthetic fallback; verified with fake providers only.
   - [ ] Complete the approved live-provider driver path; paid dispatch remains
     disabled while the real tokenizer/provider profile is unresolved.
 - [ ] Offline fault/isolation/statistical tests and integration evidence.
