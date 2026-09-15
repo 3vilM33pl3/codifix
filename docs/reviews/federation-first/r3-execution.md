@@ -1,5 +1,20 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 bounded provider transport and refreshed timing rehearsal
+
+- Added a trusted HTTP primitive with fixed destinations, explicit credentials,
+  no redirects/retries, deadline cancellation and bounded UTF-8 JSON responses.
+  The offline default accepts only synthetic loopback credentials. It does not
+  enable paid campaign dispatch or replace input-token and price verification.
+- Four transport tests and the combined 14-test transport/receipt/mediator suite
+  pass. The real journal is reserved before fake HTTP transmission; an exact retry
+  is cached, missing usage becomes uncertain and prevents a further request.
+- The refreshed 75-task mediated timing rehearsal passes in 435 seconds at
+  `/data/tmp/memory-r3-rehearsal-cli-6YFPFh/pack/run`. All 150 calls are simulated;
+  labels remain pending and no quality/paid evidence is claimed.
+- The newer full 660-task mediated run includes shared synthetic embeddings and
+  is in progress, as are refreshed required-database workspace tests.
+
 ## 2026-09-15 shared synthetic embedding profile
 
 - New rehearsal packs bind the same synthetic embedding function to the simple

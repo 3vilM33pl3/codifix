@@ -398,6 +398,16 @@ approval. Its synthetic fixtures are checked with
 `node --test evals/r3/responses-receipt.test.mjs`. The authenticated transport and
 locked pricing integration remain separate; no live compatibility is claimed.
 
+`provider-transport.mjs` supplies the bounded HTTP primitive: one fixed destination,
+explicit credentials, no ambient configuration, redirects or automatic retries,
+deadline cancellation, strict response encoding and a 1 MiB response ceiling.
+Its default offline mode accepts only a loopback fake server and synthetic bearer;
+the hosted mode is restricted to the exact OpenAI Responses endpoint. This is a
+library primitive, not authorization or a way around the campaign's paid-run guard.
+It must sit behind a durable reservation and a verified input-token/price contract.
+The combined fake-server/mediator test proves reservation before transmission,
+completed-result reuse and fail-closed missing usage. No real credential is loaded.
+
 ## Reusable dispatch results
 
 `ProviderResults` stores bounded outputs in a private directory, separately from

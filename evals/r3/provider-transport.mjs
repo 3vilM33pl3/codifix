@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Trusted-host transport primitive. No environment lookup, automatic retries,
+// redirects, SDK tools or credential persistence. Calling it still requires the
+// campaign's approval and durable pre-dispatch reservation; this is not a runner.
+export function createProviderTransport({ endpoint, bearer, offline = true }) {
+  let url;
+  try { url = new URL(endpoint); } catch { throw Error('invalid provider destination'); }
+  const local = url.protocol === 'http:' && url.hostname === '127.0.0.1' && !!url.port
+    && url.pathname === '/v1/responses';
+  const hosted = url.href === 'https://api.openai.com/v1/responses';
+  if (typeof offline !== 'boolean' || url.username || url.password || url.search || url.hash
+      || (offline ? !local : !hosted) || typeof bearer !== 'string'
+      || !/^[A-Za-z0-9._-]{1,512}$/.test(bearer)
+      || (offline && !bearer.startsWith('synthetic-'))) throw Error('invalid provider destination or credential contract');
+  const target = url.href;
+  return async (body, signal) => {
+    if (!(signal instanceof AbortSignal) || signal.aborted) throw Error('provider dispatch requires active deadline signal');
+    let bytes;
+    try { bytes = JSON.stringify(body); } catch { throw Error('invalid provider request'); }
+    if (!bytes || !body || Array.isArray(body) || typeof body !== 'object'
+        || Buffer.byteLength(bytes) > 1024 * 1024) throw Error('invalid provider request');
+    const deadline = AbortSignal.any([signal, AbortSignal.timeout(600000)]);
+    let response;
+    try {
+      response = await fetch(target, { method: 'POST', redirect: 'error', signal: deadline,
+        headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: bytes });
+      if (response.status !== 200 || response.redirected
+          || response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
+        await response.body?.cancel();
+        throw Error('rejected');
+      }
+      const declared = response.headers.get('content-length');
+      if (declared !== null && (!/^[0-9]+$/.test(declared) || Number(declared) > 1024 * 1024)) {
+        await response.body?.cancel();
+        throw Error('oversized');
+      }
+      if (!response.body) throw Error('missing response');
+      const reader = response.body.getReader();
+      const chunks = [];
+      let length = 0;
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if ((length += value.byteLength) > 1024 * 1024) throw Error('oversized');
+          chunks.push(value);
+        }
+        return new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks));
+      } finally {
+        try { await reader.cancel(); } finally { reader.releaseLock(); }
+      }
+    } catch {
+      // Dispatch may already have reached the provider. Never infer that an HTTP
+      // failure, deadline or lost response authorizes another paid invocation.
+      throw Error('provider transport failed; retain uncertain attempt');
+    }
+  };
+}

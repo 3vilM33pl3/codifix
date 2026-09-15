@@ -6,7 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import http from 'node:http';
 import { openRequestMediator } from './request-mediator.mjs';
+import { createProviderTransport } from './provider-transport.mjs';
+import { decodeResponsesReceipt } from './responses-receipt.mjs';
 
 const binary = process.env.MEMORY_R3_BUDGET_BIN;
 if (process.env.MEMORY_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
@@ -15,6 +18,51 @@ const taskLimits = { ...limits, requests: 2 };
 const allowance = { input_tokens: 10, output_tokens: 10, microusd: 10 };
 const usage = { input_tokens: 3, output_tokens: 2, microusd: 2 };
 const payload = { model: 'synthetic-only', purpose: 'answer', input: 'PRIVATE_SYNTHETIC_INPUT' };
+
+test('loopback HTTP receipts are reserved before transmission, cached and rejected when usage disappears', { skip: !binary }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-mediated-http-'));
+  let calls = 0;
+  const server = http.createServer(async (_req, res) => {
+    calls++;
+    const journal = await fs.readFile(path.join(directory, 'budget.jsonl'), 'utf8');
+    assert.equal(journal.split('\n').filter(line => line.includes('"event":"reserved"')).length, calls);
+    const response = { id: 'resp_synthetic', object: 'response', status: 'completed', model: 'synthetic-only',
+      error: null, incomplete_details: null,
+      output: [{ type: 'message', role: 'assistant', status: 'completed', content: [
+        { type: 'output_text', text: '{"kind":"finish"}', annotations: [] }] }],
+      usage: { input_tokens: 3, output_tokens: 2, total_tokens: 5,
+        input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } };
+    if (calls > 1) delete response.usage;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(response));
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  let mediator;
+  try {
+    const send = createProviderTransport({ endpoint: `http://127.0.0.1:${server.address().port}/v1/responses`, bearer: 'synthetic-test' });
+    mediator = await openRequestMediator({ binary, directory, manifestSha256: 'f'.repeat(64), limits, taskLimits });
+    const invoke = async (body, signal) => {
+      const receipt = decodeResponsesReceipt(await send(body, signal), { model: 'synthetic-only', maxInputTokens: 10, maxOutputTokens: 10 });
+      // Explicit synthetic cost: this is not real provider price reconciliation.
+      return { output: receipt.output, usage: { ...receipt.tokenUsage, microusd: 0 } };
+    };
+    const dispatch = requestId => mediator.dispatch({ taskId: 'task', requestId, payload, allowance, timeoutMs: 2000, invoke });
+    assert.deepEqual(await dispatch('first'), { kind: 'finish' });
+    assert.deepEqual(await dispatch('first'), { kind: 'finish' });
+    assert.equal(calls, 1);
+    await assert.rejects(dispatch('second'), /uncertain/);
+    await assert.rejects(dispatch('third'), /rejected/);
+    assert.equal(calls, 2);
+    assert.deepEqual((await mediator.status()).uncertain_ids, ['second']);
+    await assert.rejects(mediator.audit(), /rejected/);
+  } finally {
+    await mediator?.close();
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    await fs.rm(directory, { recursive: true });
+  }
+});
 
 test('killing the actual budget owner after reservation does not allow a replayed call', { skip: !binary }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-mediator-kill-'));
