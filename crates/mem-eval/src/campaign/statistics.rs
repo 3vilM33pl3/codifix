@@ -264,8 +264,9 @@ fn report_inner(manifest: &Manifest, artifact: &Artifact, allow_pending: bool) -
         (None, None) => {}
         _ => errors.push("missing or unexpected preparation receipt".into()),
     }
-    if execution_microusd.saturating_add(artifact.preparation_microusd.unwrap_or(0))
-        > manifest.limits.microusd
+    if execution_microusd
+        .checked_add(artifact.preparation_microusd.unwrap_or(0))
+        .is_none_or(|n| n > manifest.limits.microusd)
         || tokens
             .checked_add(preparation_tokens)
             .is_none_or(|n| n > manifest.limits.tokens)

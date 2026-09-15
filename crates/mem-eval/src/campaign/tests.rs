@@ -556,6 +556,19 @@ fn preparation_and_execution_share_request_token_and_spend_caps() {
                 .any(|e| e == "campaign limits exceeded")
         );
     }
+    let mut m = fixture();
+    m.preparation_budget = None;
+    m.limits.microusd = u64::MAX;
+    let mut a = artifact(&m);
+    a.offline = true;
+    a.preparation_microusd = Some(u64::MAX);
+    assert!(
+        report(&m, &a)
+            .unwrap()
+            .errors
+            .iter()
+            .any(|e| e == "campaign limits exceeded")
+    );
 }
 
 #[test]
