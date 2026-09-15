@@ -265,6 +265,9 @@ jobs:
           MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_REQUIRE_SNAPSHOT=1 \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_SERVICE_ANSWER=1 \
             node --test evals/r3/snapshot.test.mjs
+          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" \
+            MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_SERVICE_SESSION=1 \
+            node --test evals/r3/isolation/service-session.test.mjs
 
 
   feature-matrix:

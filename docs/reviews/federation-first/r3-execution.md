@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 reusable prepared-service sessions
+
+- Added a trusted-host snapshot session that prepares once and runs each callback
+  against a fresh scoped foreground service/clone. Callbacks receive source
+  bindings and a fixed-project query function, not credentials. Query access
+  closes at callback completion; instances stop before their databases release.
+- The required executable test passes: two independent isolated answers receive
+  identical context from different clones of one unchanged snapshot; concurrent
+  use, unknown projects and stale query closures are rejected. A failed callback
+  is followed by a successful fresh instance. CI now requires this path.
+- Normal owner shutdown cleans its disposable resources. Ambiguous exits retain
+  staging and require reconciliation. This is a driver component, not automatic
+  campaign/controller crash recovery or production deployment isolation.
+
 ## 2026-09-15 representative campaign materialization
 
 - The existing campaign contract now permits smaller whole-family smoke-only

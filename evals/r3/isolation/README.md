@@ -31,6 +31,22 @@ Both CI gates use disposable data and the pinned Node image described below.
 
 ## Container contract
 
+`service-session.mjs` owns one prepared snapshot and starts fresh scoped service
+clones through `withInstance(project, callback)`. Its callback receives only
+opaque instance/source bindings and a fixed-project deterministic query function,
+not database credentials or a service token. The query function stops accepting
+calls when that callback ends. Each callback gets a different read-only clone;
+the host checks its fingerprint before and after work, including callback errors.
+Services stop before clone release. Tests demonstrate independent resets, an
+interrupted callback followed by successful recovery, and isolated answering.
+
+The service processes are trusted host-side test helpers, not the agent boundary.
+Their environment and configuration are isolated from existing deployments. The
+caller must supply an explicitly disposable database. Normal session close
+removes only owned clones/configuration; an ambiguous owner exit retains private
+staging and requires reconciliation. No crash-safe controller or production
+snapshot/recovery claim is implied. Do not pass this session to an agent.
+
 This is a reusable execution component for the existing campaign driver, **not a
 complete driver or evidence that R3 is finished**. It executes explicitly supplied
 synthetic commands without network or provider access. It does not select context,
