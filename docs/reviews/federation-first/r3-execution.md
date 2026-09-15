@@ -1,5 +1,14 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 held-out Unicode-identity knowledge family
+
+- Added five sources and four draft rubrics for explicit normalization rules,
+  original display bytes, stable IDs, conflicting lookup ownership and permission
+  preservation. The fixture does not claim a complete Unicode/security standard.
+- Canonical rubric and four pack/CLI tests pass without skips. Thirty-two held-out
+  questions and seven coding repositories are materialized; seventeen knowledge
+  families and five coding repositories remain. No labels/model runs approved.
+
 ## 2026-09-15 held-out cohort-assignment knowledge family
 
 - Added five sources and four draft rubrics for account-keyed assignment,
