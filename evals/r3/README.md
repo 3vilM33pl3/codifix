@@ -375,6 +375,21 @@ remain diagnostic only. Portable audits establish accounting consistency; the
 CLI additionally checks their actual private journal/result files. They do not
 authenticate a provider's billing claims or authorize a paid run.
 
+### Provider receipt decoding
+
+`responses-receipt.mjs` is a pure decoder for the tool-free text subset of the
+[Responses API](https://developers.openai.com/api/reference/typescript/resources/responses/methods/create).
+It requires the exact resolved model, completed output and bounded, internally
+consistent usage. Unknown billing categories, tool calls, missing usage, provider
+refusals and truncated or malformed output fail closed. Reasoning tokens remain
+part of output usage, not an extra charge; cache counts are retained for later
+price reconciliation. Raw errors and reasoning are not returned to the caller.
+
+This decoder neither invokes a provider nor supplies tokenization, prices or
+approval. Its synthetic fixtures are checked with
+`node --test evals/r3/responses-receipt.test.mjs`. The authenticated transport and
+locked pricing integration remain separate; no live compatibility is claimed.
+
 ## Reusable dispatch results
 
 `ProviderResults` stores bounded outputs in a private directory, separately from

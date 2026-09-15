@@ -1,5 +1,16 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 strict provider receipt decoding
+
+- Added a pure decoder for completed, tool-free Responses text receipts. It
+  rejects changed models, inconsistent or novel usage, tool calls, truncation,
+  refusal and malformed JSON without exposing raw provider errors. Cached input
+  and reasoning usage remain explicit; reasoning is not counted twice.
+- Three synthetic tests pass and are included in CI. This component performs no
+  network calls and does not yet supply authenticated transport or verified prices.
+- A fresh 75-task mediated rehearsal with the new timing/official gates is now
+  running. Earlier passing artifacts are not retroactively timing evidence.
+
 ## 2026-09-15 official provider evidence gate
 
 - Official reports now require the bounded per-call profile, coherent task receipt
