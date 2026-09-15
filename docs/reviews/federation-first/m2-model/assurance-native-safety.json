@@ -1,0 +1,109 @@
+{
+  "regions": [
+    {
+      "region": "london",
+      "modelVersion": "M2-2026-09-15-v3-assurance",
+      "capturedAt": "2026-09-15T20:39:58.959Z",
+      "failure": {
+        "message": "Case deliberate_assurance_failure failed deliberate incorrect expectation",
+        "restoration": {
+          "restored": true,
+          "conflicts": [],
+          "notRestored": []
+        },
+        "published": false
+      },
+      "missing": {
+        "Checks!B5": 1
+      },
+      "staleFee": {
+        "Sensitivity!B3": "STALE — RUN VERIFIED REFRESH"
+      },
+      "staleRole": {
+        "Sensitivity!B3": "STALE — RUN VERIFIED REFRESH"
+      },
+      "restoredInputCount": 371,
+      "baseMatchesLive": true,
+      "baseOutputCount": 25,
+      "incrementalFundingCheck": {
+        "grossDelta": 595790.8163265311,
+        "expectedNetDelta": 583875,
+        "fees": 0.02,
+        "passed": true
+      },
+      "metadata": {
+        "Summary!B22": 3161742.933486625,
+        "Summary!B23": 3226268.299476148,
+        "Summary!B24": 64525.36598952301,
+        "Summary!B25": 504025.0675705,
+        "Summary!B26": 867410.7070280001,
+        "Summary!B27": 924025.0675705001,
+        "Summary!B28": 1062469.065120288,
+        "Summary!B30": 161742.9334866251,
+        "Summary!B31": 0,
+        "Summary!B78": 504025.0675705001,
+        "Summary!B84": 924025.0675705001,
+        "Assumptions!E6": 1,
+        "Sensitivity!B3": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+        "Sensitivity!B4": "2026-09-15T20:38:21.652Z",
+        "Sensitivity!B5": "fnv1a32:0c1db4bc",
+        "Sensitivity!B6": "fnv1a32:d74d6a28"
+      }
+    },
+    {
+      "region": "newyork",
+      "modelVersion": "M2-2026-09-15-v3-assurance",
+      "capturedAt": "2026-09-15T20:39:59.928Z",
+      "failure": {
+        "message": "Case deliberate_assurance_failure failed deliberate incorrect expectation",
+        "restoration": {
+          "restored": true,
+          "conflicts": [],
+          "notRestored": []
+        },
+        "published": false
+      },
+      "missing": {
+        "Checks!B5": 1
+      },
+      "staleFee": {
+        "Sensitivity!B3": "STALE — RUN VERIFIED REFRESH"
+      },
+      "staleRole": {
+        "Sensitivity!B3": "STALE — RUN VERIFIED REFRESH"
+      },
+      "restoredInputCount": 371,
+      "baseMatchesLive": true,
+      "baseOutputCount": 25,
+      "incrementalFundingCheck": {
+        "grossDelta": 891425.6802721098,
+        "expectedNetDelta": 873597.1666666667,
+        "fees": 0.02,
+        "passed": true
+      },
+      "metadata": {
+        "Summary!B22": 4814928.811166576,
+        "Summary!B23": 4913192.66445569,
+        "Summary!B24": 98263.85328911431,
+        "Summary!B25": 743765.2098580056,
+        "Summary!B26": 1254977.3738576004,
+        "Summary!B27": 1309757.2098580068,
+        "Summary!B28": 1238160.2257561013,
+        "Summary!B30": 314928.8111665761,
+        "Summary!B31": 0,
+        "Summary!B78": 743765.2098580068,
+        "Summary!B84": 1309757.2098580056,
+        "Assumptions!E6": 1.3476,
+        "Sensitivity!B3": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+        "Sensitivity!B4": "2026-09-15T20:38:16.635Z",
+        "Sensitivity!B5": "fnv1a32:352e5e9c",
+        "Sensitivity!B6": "fnv1a32:d74d6a28"
+      }
+    }
+  ],
+  "parity": {
+    "commonInputs": 304,
+    "mismatches": [],
+    "excludedRegionalInputs": "Team annual salaries, regional raise reference row33, employment and overhead rows70–83, local counsel fee row126"
+  }
+}
