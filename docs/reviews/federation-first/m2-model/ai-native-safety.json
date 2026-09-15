@@ -1,0 +1,113 @@
+{
+  "london": {
+    "region": "london",
+    "capturedAt": "2026-09-15T19:59:32.315Z",
+    "failure": {
+      "message": "Case deliberate_ai_failure failed deliberate incorrect expectation",
+      "restoration": {
+        "restored": true,
+        "conflicts": [],
+        "notRestored": []
+      },
+      "published": false
+    },
+    "missing": {
+      "error": "Summary!B73: N_A: undefined"
+    },
+    "stale": [
+      {
+        "cell": "Assumptions!B120",
+        "value": 0.75,
+        "state": "STALE — RUN VERIFIED REFRESH"
+      },
+      {
+        "cell": "Team!AQ9",
+        "value": 1,
+        "state": "STALE — RUN VERIFIED REFRESH"
+      }
+    ],
+    "restoredInputCount": 358,
+    "baseMatchesLive": true,
+    "baseOutputCount": 20,
+    "metadataBefore": {
+      "Sensitivity!B3": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+      "Sensitivity!B4": "2026-09-15T19:56:49.378Z",
+      "Sensitivity!B5": "fnv1a32:d23e75cf",
+      "Sensitivity!B6": "fnv1a32:48ad0678"
+    },
+    "metadataAfter": {
+      "Sensitivity!B3": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+      "Sensitivity!B4": "2026-09-15T19:56:49.378Z",
+      "Sensitivity!B5": "fnv1a32:d23e75cf",
+      "Sensitivity!B6": "fnv1a32:48ad0678"
+    },
+    "publishedAI": {
+      "Sensitivity!R8": 365000,
+      "Sensitivity!S8": 365000,
+      "Sensitivity!T8": 605000,
+      "Sensitivity!U8": 1022500,
+      "Sensitivity!V8": 2265500,
+      "Sensitivity!W8": 365000,
+      "Sensitivity!X8": 365000,
+      "Sensitivity!Y8": 7
+    }
+  },
+  "newyork": {
+    "region": "newyork",
+    "capturedAt": "2026-09-15T19:59:53.630Z",
+    "failure": {
+      "message": "Case deliberate_ai_failure failed deliberate incorrect expectation",
+      "restoration": {
+        "restored": true,
+        "conflicts": [],
+        "notRestored": []
+      },
+      "published": false
+    },
+    "missing": {
+      "error": "Summary!B73: N_A: undefined"
+    },
+    "stale": [
+      {
+        "cell": "Assumptions!B120",
+        "value": 0.75,
+        "state": "STALE — RUN VERIFIED REFRESH"
+      },
+      {
+        "cell": "Team!AQ9",
+        "value": 1,
+        "state": "STALE — RUN VERIFIED REFRESH"
+      }
+    ],
+    "restoredInputCount": 358,
+    "baseMatchesLive": true,
+    "baseOutputCount": 20,
+    "metadataBefore": {
+      "Sensitivity!B3": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+      "Sensitivity!B4": "2026-09-15T19:58:25.004Z",
+      "Sensitivity!B5": "fnv1a32:486eab6a",
+      "Sensitivity!B6": "fnv1a32:48ad0678"
+    },
+    "metadataAfter": {
+      "Sensitivity!B3": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+      "Sensitivity!B4": "2026-09-15T19:58:25.004Z",
+      "Sensitivity!B5": "fnv1a32:486eab6a",
+      "Sensitivity!B6": "fnv1a32:48ad0678"
+    },
+    "publishedAI": {
+      "Sensitivity!R8": 491874,
+      "Sensitivity!S8": 491874,
+      "Sensitivity!T8": 815298,
+      "Sensitivity!U8": 1591666.6666666674,
+      "Sensitivity!V8": 3495312.5000000023,
+      "Sensitivity!W8": 365000,
+      "Sensitivity!X8": 365000,
+      "Sensitivity!Y8": 7
+    }
+  },
+  "regionalParity": {
+    "commonInputs": 295,
+    "mismatches": [],
+    "excludedRegionalInputs": "Team annual salaries; regional raise reference Assumptions33; employment and overhead rows70–83"
+  }
+}

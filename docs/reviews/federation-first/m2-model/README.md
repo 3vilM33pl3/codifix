@@ -4,6 +4,10 @@ The [London](https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeK
 
 ## Use and maintain the models
 
+Current specification: [eight-person team and employee AI revision](../m2-employee-ai-revision.md).
+The original M2 specification and unprefixed JSON captures remain historical v1
+evidence. Current revision captures use `ai-`; both workbook URLs are unchanged.
+
 Edit the workbook's Assumptions and Team inputs and select Base, Downside or Upside. The main forecast recalculates immediately. Follow the [refresh guide](refresh-guide.md) to update the captured sensitivity comparisons; their visible stale flag identifies changed inputs.
 
 | Tool | Purpose and write boundary |
@@ -13,6 +17,9 @@ Edit the workbook's Assumptions and Team inputs and select Base, Downside or Ups
 | [refresh.mjs](refresh.mjs) and [connector-adapter.mjs](connector-adapter.mjs) | Run cases through the existing live engine, restore controls and publish one complete capture through the Google Sheets connector |
 | [refresh.test.mjs](refresh.test.mjs) | Tests restoration, concurrent edits, formula drift, stale captures and publication with a fake adapter |
 | [polish_model.py](polish_model.py) | Generates formatting and chart updates locally; does not alter model formulas or input values |
+| [migrate_ai_revision.py](migrate_ai_revision.py) | One-time reviewed v1-to-v2 delta, requiring preflight manifests and current input captures; never a routine refresh |
+| [build_ai_validation.py](build_ai_validation.py) and [AI fixtures](ai-validation-cases.json) | Reproduce 17 AI/staffing fixtures and adapt the original 13 checks without overwriting historical evidence |
+| [Employee AI sources](employee-ai-sources.md) | Dated official rates, vendor usage and strategic ambition, separate from founder budget hypotheses |
 
 Generate the manifests with the actual supported command:
 
@@ -34,16 +41,40 @@ This emits `/tmp/m2-london-polish.json` and `/tmp/m2-newyork-polish.json`. Apply
 
 ## Evidence index
 
+### Current employee AI revision — v2
+
+The revision is complete. Both native workbooks have passed 30 financial
+fixtures and 920 numerical checks per region, including 17 employee AI/staffing
+fixtures and the 13 original cases run under historical staffing with zero
+employee AI allowance. All 25 business comparisons passed 21 reconciliations per
+case and restored inputs; final summaries, safety and publication evidence follow.
+
 | Evidence | Meaning |
 | --- | --- |
-| [London legacy inputs](legacy-london.json), [New York legacy inputs](legacy-newyork.json) | Preserved original workbook cells and formulas used for the audit and regional cost starting points |
-| [London metadata](metadata-london.json), [New York metadata](metadata-newyork.json) | Observed original workbook metadata; new M2 tabs are described by the generated manifests |
-| [validation-cases.json](validation-cases.json) | Explicit fictional financial fixtures and expected values, separate from commercial assumptions |
-| [London validation](london-validation.json), [New York validation](newyork-validation.json) | Native-engine captures for 13 financial fixtures in each region, including check results and restoration evidence |
-| [London scenarios](london-scenarios.json), [New York scenarios](newyork-scenarios.json) | Native-engine captures for 17 commercial scenarios in each region, with original inputs, formula fingerprint and capture time |
-| [Native safety cases](native-safety.json) | Deliberate failed refresh, missing required input, observed stale warning and verified restoration |
-| [London final summary](london-final-summary.json), [New York final summary](newyork-final-summary.json) | Native Base Summary cells captured after restoration; later cosmetic number-format changes do not change these values |
-| [Notion summary source](notion-summary.md) | Published business summary matching the repository dossier |
+| [Pre-revision backups and preflight](ai-pre-revision-backups.json) | Dated native v1 backups and verified formula/input state before the employee AI revision |
+| [AI and staffing fixtures](ai-validation-cases.json), [fixture builder](build_ai_validation.py) | Seventeen fictional cases with 179 independent arithmetic checks; builder adapts the original thirteen cases without changing their 111 expected checks or overwriting v1 evidence |
+| [London revision validation](ai-london-validation.json), [New York revision validation](ai-newyork-validation.json) | Passed native captures for all 30 fixtures and 920 numerical checks per region, including reconciliations and input restoration |
+| [London revision scenarios](ai-london-scenarios.json), [New York revision scenarios](ai-newyork-scenarios.json) | Verified captures for 25 comparisons through the revised live engine, with full input restoration |
+| [Revision safety cases](ai-native-safety.json) | Verified failed-refresh restoration, stale detection, required-input failures, Base parity and shared regional inputs |
+| [London revision final summary](ai-london-final-summary.json), [New York revision final summary](ai-newyork-final-summary.json) | Restored Base captures, including employee AI expense, earmarked cash, payroll savings and revised funding |
+| [Revision Notion summary source](ai-notion-summary.md) | Published matching business summary in the existing Codifix pitch workspace |
+| [Publication and visual review](ai-publication-evidence.json) | Notion readback, native PDF inspection coverage, format corrections and capture timestamps |
+
+### Historical source and original M2 evidence — v1
+
+These unprefixed captures describe the earlier model. They remain available for
+audit and comparison and do not validate the current employee AI formulas.
+
+| Evidence | Historical meaning |
+| --- | --- |
+| [London legacy inputs](legacy-london.json), [New York legacy inputs](legacy-newyork.json) | Original pre-M2 workbook cells and formulas used for the audit and regional cost starting points |
+| [London metadata](metadata-london.json), [New York metadata](metadata-newyork.json) | Original workbook metadata before the initial M2 rebuild; current tabs are described by generated manifests |
+| [Original financial fixtures](validation-cases.json) | Thirteen fictional v1 financial cases and expected values, preserved unchanged |
+| [London v1 validation](london-validation.json), [New York v1 validation](newyork-validation.json) | Original native-engine captures for thirteen financial fixtures in each region |
+| [London v1 scenarios](london-scenarios.json), [New York v1 scenarios](newyork-scenarios.json) | Original captures for seventeen commercial comparisons per region, with recorded inputs, version and capture time |
+| [V1 native safety cases](native-safety.json) | Original failed-refresh, missing-input, stale-warning and restoration evidence |
+| [London v1 final summary](london-final-summary.json), [New York v1 final summary](newyork-final-summary.json) | Original Base captures before the staffing and employee AI revision |
+| [V1 Notion summary source](notion-summary.md) | Historical business summary matching the original M2 dossier |
 
 Captured evidence describes its recorded inputs and version. Later workbook edits do not update these files automatically and may make the native comparison table stale. These captures establish model behaviour; they do not establish customer ROI, pricing acceptance or deployment readiness.
 

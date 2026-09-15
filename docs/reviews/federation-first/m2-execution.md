@@ -1,6 +1,9 @@
 # M2 execution and validation evidence
 
-**Status:** completed financial preparation · approved and delivered 2026-09-15
+**Status:** completed M2 v1 financial preparation · approved and delivered 2026-09-15.
+
+This is the preserved v1 execution record. See the [employee AI revision](m2-employee-ai-revision.md)
+for the current eight-person model, revised funding and subsequent validation.
 
 ## Approved-plan checklist
 

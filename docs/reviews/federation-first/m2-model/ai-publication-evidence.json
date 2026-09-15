@@ -1,0 +1,47 @@
+{
+  "date": "2026-09-15",
+  "modelVersion": "M2-2026-09-15-v2-ai",
+  "notion": [
+    {
+      "url": "https://app.notion.com/p/3dc8990715f4813fb281d4a8175c3d1a?pvs=204",
+      "title": "📊 M2 — Agentic Enterprise financial models",
+      "lastEdited": "2026-09-15T20:03:23.815Z",
+      "readBack": true,
+      "childrenPreserved": 0
+    },
+    {
+      "url": "https://app.notion.com/p/3b38990715f48127970accded279fa63?pvs=204",
+      "title": "🧠 Codifix pitch deck workspace",
+      "lastEdited": "2026-09-15T20:03:46.869Z",
+      "readBack": true,
+      "childrenPreserved": 7
+    }
+  ],
+  "visual": {
+    "method": "Native Google Sheets PDF export rendered with Poppler; browser session unavailable because its auth method was unsupported.",
+    "regions": [
+      "london",
+      "newyork"
+    ],
+    "modifiedAreasInspected": [
+      "Summary and ARR/cash charts including continuation page",
+      "Assumptions AI controls",
+      "Team inclusion and historical controls",
+      "Employee AI schedule and allocation",
+      "Costs delivery AI",
+      "P&L & Cash AI operating expense",
+      "Sensitivity AI output columns",
+      "Checks AI reconciliations"
+    ],
+    "corrections": [
+      "White Employee AI banner/date text",
+      "Wrapped new Summary/assumption/check rows",
+      "Explicit zero/one control display verified by native formatted-value readback"
+    ],
+    "printLimit": "Default export pagination splits charts across pages. These are inspection exports, not a redesigned print deliverable."
+  },
+  "baseCaptureTimes": {
+    "london": "2026-09-15T19:56:49.378Z",
+    "newyork": "2026-09-15T19:58:25.004Z"
+  }
+}

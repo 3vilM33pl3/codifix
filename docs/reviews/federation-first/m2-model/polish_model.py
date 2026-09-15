@@ -17,6 +17,8 @@ def build(region, manifest):
     fmt('Summary',32,33,1,2,'0.00%')
     fmt('Summary',63,64,1,2,'0.000000')
     fmt('Assumptions',108,109,4,5,'0.00%')
+    fmt('Assumptions',117,118,1,5,'0')
+    fmt('Team',4,22,42,47,'0')
     for start,end in [(3,5),(6,9),(11,14),(17,24)]: fmt('Sensitivity',7,40,start,end,money)
     fmt('Sensitivity',7,40,5,6,'0.0%;(0.0%);"–"')
     fmt('Sensitivity',7,40,9,10,'0.00')
@@ -27,6 +29,9 @@ def build(region, manifest):
     req.append({'repeatCell': {'range': {'sheetId':ids['Sensitivity'],'startRowIndex':6,'endRowIndex':40,'startColumnIndex':0,'endColumnIndex':25},'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
     req.append({'updateDimensionProperties': {'range': {'sheetId':ids['Sensitivity'],'dimension':'ROWS','startIndex':6,'endIndex':40},'properties':{'pixelSize':46},'fields':'pixelSize'}})
     teal={'red':0,'green':.42,'blue':.42}; white={'red':1,'green':1,'blue':1}
+    # Apply after new-tab cell writes: formula/reference colours must not obscure headers.
+    for r,end in [(1,12),(3,38)]:
+        req.append({'repeatCell':{'range':{'sheetId':ids['Employee AI'],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':0,'endColumnIndex':end},'cell':{'userEnteredFormat':{'textFormat':{'foregroundColor':white,'bold':True,'fontSize':15 if r==1 else 10}}},'fields':'userEnteredFormat.textFormat'}})
     for sheet,r,c0,c1 in [('Summary',71,0,6),('Sensitivity',7,17,25),('Team',4,38,47)]:
         ran={'sheetId':ids[sheet],'startRowIndex':r-1,'endRowIndex':r,'startColumnIndex':c0,'endColumnIndex':c1}
         req.append({'repeatCell':{'range':ran,'cell':{'userEnteredFormat':{'backgroundColor':teal,'textFormat':{'foregroundColor':white,'bold':True},'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat,userEnteredFormat.wrapStrategy'}})
@@ -37,7 +42,7 @@ def build(region, manifest):
             req.append({'mergeCells':{'range':ran,'mergeType':'MERGE_ALL'}})
             req.append({'repeatCell':{'range':ran,'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
             req.append({'updateDimensionProperties':{'range':{'sheetId':ids[sheet],'dimension':'ROWS','startIndex':r-1,'endIndex':r},'properties':{'pixelSize':62},'fields':'pixelSize'}})
-    for sheet,r0,r1,c0,c1 in [('Summary',71,84,0,2),('Assumptions',117,121,0,10),('Employee AI',4,28,0,1),('Team',3,4,38,47)]:
+    for sheet,r0,r1,c0,c1 in [('Summary',71,84,0,2),('Assumptions',117,121,0,10),('Employee AI',4,28,0,1),('Team',3,4,38,47),('Checks',27,34,0,2)]:
         req.append({'repeatCell':{'range':{'sheetId':ids[sheet],'startRowIndex':r0,'endRowIndex':r1,'startColumnIndex':c0,'endColumnIndex':c1},'cell':{'userEnteredFormat':{'wrapStrategy':'WRAP'}},'fields':'userEnteredFormat.wrapStrategy'}})
         req.append({'updateDimensionProperties':{'range':{'sheetId':ids[sheet],'dimension':'ROWS','startIndex':r0,'endIndex':r1},'properties':{'pixelSize':48},'fields':'pixelSize'}})
     req.append({'updateDimensionProperties':{'range':{'sheetId':ids['Employee AI'],'dimension':'COLUMNS','startIndex':0,'endIndex':1},'properties':{'pixelSize':450},'fields':'pixelSize'}})

@@ -93,7 +93,7 @@ For a local harness, import `refreshModel` and `snapshotWrites` as ES modules an
 
 | Native area | Purpose |
 | --- | --- |
-| `Sensitivity!A8:Q31` | Complete case table; unused result rows are cleared |
+| `Sensitivity!A8:Y40` | Complete v2 case table: 25 cases, including AI and staffing; unused result rows are cleared |
 | `Sensitivity!B4` | Capture timestamp |
 | `Sensitivity!B5` | Captured source-input signature |
 | `Sensitivity!B6` | Verified formula fingerprint |
@@ -105,6 +105,20 @@ For a local harness, import `refreshModel` and `snapshotWrites` as ES modules an
 The writer changes result values, capture values and metadata; it preserves the native stale formulas. Each result shows a concise description of the selected case and changed inputs, using the manifest's human-readable input labels. The complete control values remain in the snapshot evidence and captured input area. A timestamp alone never establishes freshness: changing any supported editable input makes the capture stale until another successful refresh. Formula drift is separately checked against the manifest during refresh; the input stale flag is not a full continuous formula audit.
 
 ## Failure and recovery
+
+Version `M2-2026-09-15-v2-ai` captures 358 inputs and verifies 12,086 formulas
+plus immutable source cells. Employee AI controls are Assumptions B:D118–121;
+lean role inclusion is Team AQ5:AQ22. R:Y adds AI spending, headroom, payroll
+savings, GBP AI amounts and year-one headcount. Capture columns remain AA:AC.
+The 21 mandatory checks include seven AI/staffing/funding reconciliations.
+Comparisons cover utilisation 25/50/100%, allowance GBP2k/5k/10k, historical
+staffing under the same AI policy, and combined delay/support/full-use stress.
+
+For regression validation, `build_ai_validation.py` emits the original 13 cases
+with historical staffing and zero AI allowance plus 17 additional arithmetic
+fixtures. Run them with `adapter.publishSnapshot` omitted; fixture results must
+never replace the business sensitivity table. Keep v1 JSON captures unchanged;
+save revision evidence under the `ai-` prefix.
 
 - A failed case or read prevents publication. `finally` attempts to restore original controls even when a write returned an error after applying its values.
 - Restoration writes only values still recognisable as refresh-owned. A concurrent user edit is left intact; the error reports conflicts, cells not restored and the captured original controls. Reconcile those cells before another run. Do not copy all original inputs over the workbook.

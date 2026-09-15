@@ -1,6 +1,11 @@
 # M2 — Agentic Enterprise financial models
 
-**Status:** completed financial preparation · 2026-09-15
+**Status:** historical M2 v1 specification and captures · 2026-09-15.
+
+The current models include the approved [eight-person team and employee AI
+revision](m2-employee-ai-revision.md). That dossier supersedes the staffing,
+funding, interface counts and Base figures below. This original specification
+and its captures remain intact as the pre-revision audit trail.
 
 [Notion business summary](https://app.notion.com/p/3dc8990715f4813fb281d4a8175c3d1a)
 · [model tooling and evidence](m2-model/README.md)
