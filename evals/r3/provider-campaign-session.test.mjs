@@ -66,6 +66,30 @@ test('changed preparation assets poison the session before any provider or datab
   await owner.close();
 });
 
+test('invalid provider bindings fail preparation without creating a snapshot or invoking a model',
+  { skip: !process.env.MEMORY_R3_BUDGET_BIN }, async t => {
+    const f = await setup(t);
+    let binds = 0;
+    const owner = await openProviderCampaignSession({ ...f.options,
+      // These deliberately nonexistent executables would fail differently if
+      // invalid bindings reached snapshot creation or the service boundary.
+      snapshotBinary: '/unused/r3-invalid-snapshot', memoryBinary: '/unused/r3-invalid-memory',
+      provider: { bind() {
+        binds++;
+        return { prepareRequest() { assert.fail('must not answer'); }, embed() { assert.fail('must not embed'); },
+          embeddingProfile: { provider: 'openai', model: f.manifest.model.embedding_id, dimensions: 16,
+            normalization: 'float32-rounding-v1', document_purpose: 'document', query_purpose: 'query', metric: 'cosine' } };
+      } } });
+    try {
+      const contract = { directory: await f.directoryFor('preparation'), task_id: 'preparation', manifest_sha256: 'a'.repeat(64),
+        limits: f.manifest.preparation_budget, task_limits: f.manifest.preparation_budget };
+      await assert.rejects(owner.prepare(contract), /locked embedding profile/);
+      await assert.rejects(owner.prepare(contract), /cannot be repeated/);
+      await assert.rejects(owner.execute({}, {}), /not ready/);
+      assert.equal(binds, 1);
+    } finally { await owner.close(); }
+  });
+
 test('provider session executes both tracks with an independent model and non-synthetic vector size', { skip: !available, timeout: 180000 }, async t => {
   const f = await setup(t), { manifest } = f;
   let answerCalls = 0, embeddingCalls = 0;
@@ -94,7 +118,10 @@ test('provider session executes both tracks with an independent model and non-sy
   try {
     const prep = { directory: await f.directoryFor('preparation'), task_id: 'preparation', manifest_sha256: 'a'.repeat(64),
       limits: manifest.preparation_budget, task_limits: manifest.preparation_budget };
-    const prepared = await owner.prepare(prep);
+    const preparation = owner.prepare(prep);
+    await assert.rejects(owner.close(), /cancel and await/);
+    await assert.rejects(owner.execute({}, {}), /not ready/);
+    const prepared = await preparation;
     assert.equal(prepared.audit.ledger.requests, embeddingCalls);
     assert.equal(answerCalls, 0);
     await assert.rejects(owner.prepare(prep), /cannot be repeated/);
@@ -103,8 +130,11 @@ test('provider session executes both tracks with an independent model and non-sy
     for (const condition of ['handover', 'lexical', 'vector', 'full-memory', 'no-memory', 'full-memory']) {
       const coding = index === 5, taskId = `work-${String(index++).padStart(5, '0')}`;
       const limits = { requests: 8, tokens: manifest.model.max_input_tokens + manifest.model.max_output_tokens, microusd: 0, task_seconds: manifest.limits.task_seconds };
-      const result = await owner.execute({ case_id: coding ? 'durable-importer' : 'supplier-handover-q1', condition, repeat: 0 },
+      const execution = owner.execute({ case_id: coding ? 'durable-importer' : 'supplier-handover-q1', condition, repeat: 0 },
         { task_id: taskId, directory: await f.directoryFor(taskId), manifest_sha256: 'a'.repeat(64), limits, task_limits: limits });
+      await assert.rejects(owner.close(), /cancel and await/);
+      await assert.rejects(owner.execute({}, {}), /not ready/);
+      const result = await execution;
       assert.equal(result.isolation.before_sha256, prepared.snapshot_sha256);
       assert.equal(result.isolation.after_sha256, prepared.snapshot_sha256);
       assert.equal(result.model.resolved_id, manifest.model.resolved_id);
