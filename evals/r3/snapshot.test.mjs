@@ -9,11 +9,15 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
+import { preparedContext, runOfflineKnowledge } from './isolation/knowledge.mjs';
 
 const snapshot = process.env.MEMORY_R3_SNAPSHOT_BIN;
 const memory = process.env.MEMORY_R3_CLI_BIN;
 const database = process.env.MEMORY_LAYER_TEST_DATABASE_URL;
+const image = process.env.MEMORY_R3_TEST_IMAGE;
+const scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
 if (process.env.MEMORY_R3_REQUIRE_SNAPSHOT === '1' && (!snapshot || !memory || !database)) throw Error('required snapshot/service configuration missing');
+if (process.env.MEMORY_R3_REQUIRE_SERVICE_ANSWER === '1' && (!snapshot || !memory || !database || !image || !scoreBinary)) throw Error('required service/answer configuration missing');
 
 test('snapshot owner rejects arbitrary operations and unsafe source identifiers before database access', { skip: !snapshot }, () => {
   for (const input of [
@@ -124,6 +128,30 @@ test('snapshot helper owns sealed resets and a real foreground Memory service', 
   const answer = await result.json();
   assert.equal(answer.results[0].memory_id, prepared.bindings.find(b => b.project === 'r3-alpha').memory_id);
   assert(!JSON.stringify(answer).includes('BETA_ONLY'));
+  await t.test('service retrieval feeds only bound source bytes to an isolated answering process', { skip: !image || !scoreBinary }, async () => {
+    const sources = [{ id: 'public/alpha.md', text: 'Reconcile settlement acknowledgement before retry. ALPHA_ONLY' }];
+    const context = preparedContext({ condition: 'full-memory', project: 'r3-alpha', sources,
+      retrieval: answer, bindings: prepared.bindings });
+    assert.deepEqual(context, sources);
+    const question = 'What should precede retry?';
+    const result = await runOfflineKnowledge({ image, scoreBinary, question, sources, context,
+      manifestSha256: '1'.repeat(64), work: { case_id: 'service-q1', condition: 'full-memory', repeat: 0 },
+      rubric: { case_id: 'service-q1', question, minimum_citations: 1, citations_critical: true,
+        criteria: ['factual_correctness', 'required_evidence', 'appropriate_refusal'].map((dimension, i) => ({
+          id: `criterion-${i}`, dimension, instruction: 'PRIVATE_LABEL only for synthetic review.', critical: false })) },
+      argv: ['/usr/local/bin/node', '-e', `
+        const fs=require('fs'),assert=require('assert');
+        const raw=fs.readFileSync('input.json','utf8'), input=JSON.parse(raw);
+        for(const forbidden of ['BETA_ONLY','PRIVATE_LABEL','database_url','project_tokens','repo_root']) assert(!raw.includes(forbidden));
+        assert.deepEqual(Object.keys(input).sort(),['context','question']);
+        const source=input.context[0];
+        fs.writeFileSync('answer.json',JSON.stringify({text:source.text,refused:false,
+          citations:[{source_id:source.id,quote:source.text}]}));
+      `] });
+    assert(result.assessment.citations_valid && result.assessment.unresolved && !result.assessment.success);
+    assert.equal(result.answer.citations[0].source_id, 'public/alpha.md');
+    assert.equal((await request({ operation: 'fingerprint', id: first.id })).snapshot_sha256, prepared.snapshot_sha256);
+  });
   const denied = await fetch(url + '/v1/query', { method: 'POST', headers,
     body: JSON.stringify({ project: 'r3-beta', query: 'settlement' }), signal: AbortSignal.timeout(10000) });
   assert.equal(denied.status, 403);

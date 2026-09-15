@@ -1,5 +1,36 @@
 # R3 offline container boundary
 
+## Knowledge answer and adjudication bridge
+
+`knowledge.mjs` connects explicitly selected prepared source chunks to an offline
+answer container and the existing `r3_score` executable. `preparedContext` checks
+baseline source bytes or exact Memory source/version/hash/project bindings. It
+does not forward generated service answers, snippets, paths or debug metadata.
+Selection retains retrieval order and omits whole chunks exceeding the common
+32-KiB/eight-result ceiling; official chunking/preparation parity remains open.
+
+`runOfflineKnowledge` supplies only `input.json` containing question and selected
+context. The approved synthetic agent command must write a bounded structured
+`answer.json`; no rubric, unselected source, credentials or condition label enters
+the container. Full source material and labels remain with the host adjudicator.
+The resulting evidence has no human ballots. Exact valid quotes do not establish
+semantic correctness, and pending judgments never pass. Invalid citations remain
+negative scoring evidence; malformed process output fails execution explicitly.
+
+This is offline-only and does not invoke or account for a model. Answer execution
+and adjudication-preparation timings are separate; neither is represented as
+whole-task latency including retrieval. The caller must preserve evidence and
+measure that outer interval. Hash-locked campaign dispatch, paid mediation,
+embeddings, complete datasets and official execution are still separate work.
+
+The required knowledge test runs actual document/lexical/offline-vector adapters,
+isolated synthetic answering, no-memory refusal and Rust adjudication. The
+required snapshot test additionally runs real sealed Memory HTTP retrieval,
+source binding and isolated answering, then rechecks the database fingerprint.
+Both CI gates use disposable data and the pinned Node image described below.
+
+## Container contract
+
 This is a reusable execution component for the existing campaign driver, **not a
 complete driver or evidence that R3 is finished**. It executes explicitly supplied
 synthetic commands without network or provider access. It does not select context,

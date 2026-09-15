@@ -83,6 +83,12 @@ reference solutions, seed input and suite/hidden-test definitions. Never mount
 
 ## Remaining integration, not approval-dependent
 
+The [knowledge bridge](isolation/knowledge.mjs) now joins actual baseline adapter
+results or prepared Memory version bindings to isolated offline answering and
+Rust blinded adjudication. A disposable-service test verifies that path with an
+unchanged sealed database. It uses synthetic agents and fake vector inputs, not
+real model/provider execution, complete campaign dispatch or quality evidence.
+
 The [offline container component](isolation/README.md) now provides bounded,
 network-disabled execution of explicitly supplied files, with a real Docker
 boundary/reset/timeout test. It is not yet wired to the campaign driver, service

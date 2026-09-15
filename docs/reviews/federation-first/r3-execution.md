@@ -1,5 +1,21 @@
 # R3 execution and evidence ledger
 
+## 2026-09-15 isolated knowledge-answer integration
+
+- Added an offline bridge from actual baseline results or exact prepared Memory
+  version/project/hash bindings to the isolated answer process and Rust blinded
+  adjudicator. Only selected source bytes and the question enter the process;
+  private rubrics, unselected context and service metadata do not.
+- Four required bridge tests pass across handover/lexical/fake-vector retrieval,
+  no-memory refusal, invalid citations, malformed output and tampered bindings.
+  Three required snapshot/service tests pass, including real sealed HTTP
+  retrieval followed by isolated answering and an unchanged database fingerprint.
+  CI now requires both paths without skips; remote CI execution is not claimed.
+- No human ballots are synthesized. Valid quotations remain pending semantic
+  review. Timings distinguish answer execution from adjudication preparation;
+  neither claims complete task latency. Full campaign dispatch, production
+  embedding parity, provider mediation and representative suite remain open.
+
 ## 2026-09-15 dependency-build coding family and grader correction
 
 - Materialized the fourth development repository: five modules, two public
