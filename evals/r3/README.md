@@ -4,6 +4,11 @@ For the current human and technical gates, see the
 [paid-run readiness checklist](paid-readiness.md). The dedicated evaluation key
 is provisioned, but that is not benchmark approval or spending authority.
 
+The [approved launcher runbook](paid-launcher.md) covers draft calibration
+preparation, pinned runtime packaging, exact approvals, execution and interruption
+handling. Its complete paid dispatch path has been exercised with fake providers;
+this is not evidence of real API compatibility or a paid evaluation.
+
 `memory eval campaign check-approvals` verifies existing hash-bound label and
 spend records without provider activity. `approved-credential.mjs` is a
 trusted-host primitive for checking that gate, reading one explicit OpenBao KV
@@ -47,10 +52,11 @@ not automatic reconstruction of a lost prepared database or a paid-run resume.
 Keep it together with the Rust dispatch budget, per-call journals and artifact.
 Receipt payloads are private files; only the inspection summary is metadata-only.
 
-These are **trusted launcher components, not an enabled paid CLI launcher**. The
-CLI paid-run guard stays in place. A successful preflight is point-in-time operator evidence,
-not a signed authorization: the trusted launcher must validate frozen assets,
-model/tokenizer/rates, isolation and live approval before every dispatch.
+`launch-paid.mjs` now connects these components through the CLI's explicit
+`--approved-runtime` gate. Ordinary arbitrary-driver paid execution stays blocked.
+A successful preflight is point-in-time operator evidence, not a signed
+authorization: the launcher validates frozen assets, pinned executables and
+live approval before dispatch; the provider owner rechecks before every call.
 Tests use fake secret executables only; CI also checks real-CLI denial before
 any secret subprocess starts.
 
@@ -83,10 +89,10 @@ verifies frozen assets, and refuses further work after a failed preparation/task
 Its owner must await or cancel active work before cleanup. Legacy offline-only
 rehearsals remain available through their original guarded entrypoint.
 
-This library is not the approved live campaign launcher. It neither discovers
-credentials nor grants spending authority; approval, reviewed real tokenizers and
-transport construction belong to the trusted owner. The CLI's paid-run guard
-remains in place. Tests use fake providers and disposable databases, including an
+This library alone neither discovers credentials nor grants spending authority;
+approval, reviewed input accounting and transport construction belong to the
+trusted launcher and provider owner. Arbitrary-driver paid execution stays
+blocked. Tests use fake providers and disposable databases, including an
 independently named model and a three-dimensional embedding profile.
 
 Mediated rehearsals now declare `preparation_budget` in the locked manifest.
@@ -100,9 +106,9 @@ Reports expose preparation request/token totals separately from execution and
 include both in campaign limits. Legacy offline artifacts remain readable, but
 non-offline evidence without this preparation contract is rejected.
 
-The current synthetic controller prepares Full Memory chunks and baseline corpus
-vectors in this phase. It still does not authorize paid calls or constitute the
-complete approved live-provider driver.
+The synthetic controller and approved launcher share preparation of Full Memory
+chunks and baseline corpus vectors. The synthetic controller remains offline-only;
+it cannot authorize paid calls.
 
 Use `--wire` with the disposable `rehearse.mjs` bootstrap to route the entire
 rehearsal through local fake Responses/embeddings HTTP endpoints. It implies
@@ -450,7 +456,7 @@ invalid dispatches remain unresolved. Its legacy `ledger.json` remains a
 conservative sum of maximum dispatch allowances; the journal records confirmed
 usage separately. Neither artifact is authority to replay an interrupted run.
 Legacy profiles retain the single-request restriction. Explicit mediation is
-described below; it does not remove the unconditional paid-run block. A paid driver must calculate
+described below; paid execution still requires the approved runtime. That path calculates
 conservative allowances from locked model settings/prices, enforce task-level
 limits as well as campaign limits, mediate every provider path, persist results,
 and reconcile confirmed receipts. The journal does not independently verify
@@ -579,7 +585,8 @@ The tests use a clearly named synthetic counter and fake responses, including
 loopback HTTP. A tokenizer ID/hash establishes identity, not correctness or an
 automatic match to a model. A verified tokenizer for the selected provider/model,
 approved prices and the locked campaign authorization remain required before live
-execution. The paid CLI guard remains in place. Do not pass an HTTP token-count
+execution. Alternatively, use the explicit reviewed v2 full-context reservation
+profile described above. Do not pass an HTTP token-count
 request as the local counter or assume such a request is free/unmetered.
 
 Development authorization does not require an already-selected reference baseline:
@@ -615,7 +622,8 @@ directory holds the reconstructed artifact, ledger and report. Keep the output
 at its original absolute path because request identities bind that path.
 An orphan pre-reservation work directory currently requires operator inspection;
 it is never overwritten. This does not mediate every internal provider call.
-The single-request restriction and paid-run block remain.
+Legacy profiles retain the single-request restriction; approved paid sessions
+reject generic resume and use the launcher's stop-and-reconcile policy instead.
 Keep result files outside agent mounts and protect the trusted host from other
 writers. Local receipts establish persistence, not provider authentication or
 billing truth. New result receipts are bounded to 2 MiB.

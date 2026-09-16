@@ -1,7 +1,7 @@
 # R3 paid evaluation: remaining gates
 
 Status checked 2026-09-16. This is a readiness record and **proposal**, not
-approval, an official result, or a claim that paid execution is enabled.
+approval, an official result, or permission to execute a paid campaign.
 
 ## Gate status
 
@@ -13,7 +13,7 @@ approval, an official result, or a claim that paid execution is enabled.
 | Secret/provider owner | Connects the version-pinned key handoff to fixed API destinations, rechecking approvals before every call and cancelling bindings on exit/failure. Tests use fake secrets and mocked OpenAI responses. |
 | Input accounting | Explicit [v2 full-context reservations](context-accounting.md) avoid unverified guesses about message/schema framing. Durable settlement/denial/replay tests pass. This is not exact tokenization or live billing validation. |
 | Real provider configuration | Reviewed v2 model/rates/limits implemented; campaign selection remains unapproved. Pin implementation and evidence into the actual calibration manifest; verify live wire/usage compatibility only after spend approval. |
-| Live launcher | Credential/provider owner connects to the disposable campaign session and supports cancellation with retained uncertain charges. Shared IPC dispatch now persists attempts/results and fences crashed owners; SIGKILL and duplicate/lost-response tests pass. The complete approved command-line launcher, locked runtime packaging and whole-launcher recovery rehearsal remain open; the paid CLI guard stays enabled. |
+| Live launcher | [Approved launcher and packaging](paid-launcher.md) now connect the provider owner, durable controller, disposable session and Rust runner. Generic paid drivers stay blocked; the approved route requires exact label/spend records. Interruption fences the campaign before another key read, rather than rebuilding/repeating uncertain work. See the execution ledger for fake-only validation evidence; no real campaign is approved by this implementation. |
 | Benchmark labels | Awaiting Olivier's review of the [label review pack](label-review.md). No labels frozen or approval files fabricated. |
 | Development spend | Awaiting approval of the exact locked manifest and cap; candidate scope below. |
 | Official campaign | Separate approval after calibration fixes operational budgets and selects the cost/latency reference baseline. No official calls authorized or made. |
@@ -63,6 +63,14 @@ provider/tokenizer and isolation path, and show its SHA-256 plus exact limits.
 The first billable calls then belong to that approved development calibration;
 model-list access alone does not prove those calls will succeed. Do not create
 approval JSON from this proposal or from approval of secret storage.
+
+The launcher increment prepared a local draft at
+`/data/tmp/r3-calibration-20260916/campaign.json`, with draft SHA-256
+`943ce776cd89a00c4b183cba22ed82b36fda8514242b299690bbf59bd4f6af48` and the limits
+above. It has no approvals and has not contacted a provider. Review the two
+development families first. Freezing genuinely approved labels changes the
+manifest hash; the subsequent exact spend request must use that **final** hash,
+not this draft identity. The location-invalid superseded draft is not runnable.
 
 ## Accounting choice and remaining live verification
 

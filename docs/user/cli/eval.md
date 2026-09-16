@@ -18,8 +18,9 @@ before each driver launch and a settlement only after valid evidence is received
 An interrupted or invalid dispatch remains unresolved. `ledger.json` reports
 confirmed execution usage plus unresolved reservations; it releases unused
 allowances only after verified settlement. Keep it with the durable journal.
-Per-call mediation is available for offline verification; paid execution remains
-disabled.
+Per-call mediation is available for offline verification. Paid execution requires
+the [approved runtime launcher](../../../evals/r3/paid-launcher.md), reviewed
+labels and exact hash-bound spending approval; arbitrary paid drivers stay blocked.
 
 A `provider_profile` locks the answer tokenizer and separate embedding model,
 dimensions, input price and tokenizer to hashed configuration assets, alongside
@@ -67,9 +68,10 @@ files must use the existing `compare`/`report` commands instead.
 `campaign run --offline --allow-shell --manifest <campaign.json> --driver <executable>
 --out <new-directory>` is an integration interface for a reviewed isolation driver
 whose bytes are a locked configuration asset. A representative synthetic offline
-controller is available through `evals/r3/rehearse.mjs`; provider-backed execution
-is disabled pending the complete approval-gated live driver and verified provider
-configuration.
+controller is available through `evals/r3/rehearse.mjs`. The approved launcher
+uses `--approved-runtime <pack/private/paid-runtime.json>` with pinned executables,
+the fixed provider profile and matching approvals. That internal option does not
+authorize arbitrary drivers or replace the operator's configuration review.
 It does not use the CLI's ambient service or provider credentials. Output paths
 must be new; interrupted evidence is retained, never overwritten or blindly retried.
 To recover, repeat the same command with `--resume` and the original `--out`.
@@ -84,7 +86,9 @@ shutdown or a crash; do not remove it to trigger another run. Inspect its
 metadata using `node evals/r3/inspect-dispatch.mjs /absolute/pack/private/dispatch`
 and retain the provider journals/artifact for reconciliation. Exit 2 reports an
 uncertain attempt; even exit 0 does not authorize execution or establish quality.
-Reconstructing a prepared service for the complete paid launcher remains open.
+The approved paid launcher deliberately rejects `--resume`: automatic recovery of
+a lost prepared database is unsupported. Its restart policy is stop, retain and
+reconcile, never silently repeat uncertain billed work.
 The runner revalidates the locked manifest and assets after every driver exit,
 including the final task. Changed inputs, model/build mismatches, skipped or
 unbacked pending results, inconsistent token usage and uncertain charges stop further

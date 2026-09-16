@@ -64,5 +64,6 @@ limits or switch to approximate accounting to get past that stop.
 
 Tests use the real durable Rust budget mediator with fake provider responses.
 They establish reservation/settlement and failure behavior, not live model
-compatibility, answer quality or invoice reconciliation. Paid dispatch remains
-disabled until the full launcher and independent approvals are ready.
+compatibility, answer quality or invoice reconciliation. Paid dispatch uses the
+[approved runtime launcher](paid-launcher.md) and still requires independent
+label/model/spend approval; packaging a profile supplies none of those approvals.

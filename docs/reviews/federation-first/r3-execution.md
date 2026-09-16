@@ -1,5 +1,54 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 approved paid launcher
+
+- Resumed and checkpointed the existing approved plan through dev Memory before
+  editing. Added an explicit `--approved-runtime` path to the Rust campaign runner;
+  ordinary arbitrary-driver paid dispatch and automatic paid resume stay blocked.
+- The launcher verifies exact label/spend approvals, locks the module closure,
+  executable copies and container identities, then connects the credential owner,
+  durable controller, disposable services and existing runner. The driver and
+  agents receive neither the key nor private launcher settings. Packs are bound
+  to their absolute location; a subsequent Cargo build cannot replace their binaries.
+- Complete fake-provider execution passed all **75 tasks** with **76 completed
+  controller receipts**, including preparation. All snapshots stayed unchanged;
+  **60 knowledge reviews remain pending**, so execution validity is not harness
+  or quality approval. Evidence: `/data/tmp/r3-paid-T5omqL/pack/run/`, log
+  `/tmp/r3-paid-launcher-tests.log`. The artifact deliberately exercises
+  `offline: false` accounting with mocked HTTP and a synthetic key; it is **not
+  a real paid campaign or measured product-quality result**.
+- Abort, frozen-launcher SIGTERM and SIGKILL rehearsals preserve uncertain
+  preparation and fence relaunch before another credential read. Recovery is
+  explicitly stop-and-reconcile, not automatic reconstruction of lost database
+  state. Logs: `/tmp/r3-paid-launcher-interrupt.log` and
+  `/tmp/r3-paid-launcher-kill.log`.
+- `prepare-paid-calibration.mjs` builds a new draft development-only pack from
+  artifact-origin and configuration-rollout (75 executions). It pins proposed
+  v2 settings and the runtime but creates no approval and reads no key. Its
+  no-overwrite/no-approval regression passed in
+  `/tmp/r3-paid-calibration-test.log`. The [runbook](../../../evals/r3/paid-launcher.md)
+  documents final-hash approval and private settings.
+- Prepared the actual draft at `/data/tmp/r3-calibration-20260916/campaign.json`,
+  SHA-256 `943ce776cd89a00c4b183cba22ed82b36fda8514242b299690bbf59bd4f6af48`.
+  This is a **draft identity, not a spend-approval target**: genuine label approval
+  and the resulting reviewed manifest produce a different identity. Runtime
+  packaging copied the Bao executable, without invoking it. Root disk pressure
+  required regenerating on the data disk; the moved earlier draft under
+  `/data/tmp/r3-calibration-superseded-20260916` is location-invalid and not usable.
+- Required-database workspace validation passed **904 tests** across 54 targets
+  with the one already failing documentation test excluded. Its separate rerun
+  still fails on the machine-local path in `m2-model/refresh-guide.md`, outside
+  this change. Seven approval/provider-owner regressions passed without skips.
+  Workspace Clippy (`-D warnings`), formatting, boundaries, changed-document link
+  checks and the lean CLI build pass (eight existing lean-feature warnings).
+  Logs: `/tmp/r3-launcher-workspace.log`, `/tmp/r3-launcher-doc-links.log`,
+  `/tmp/r3-launcher-owner-regression.log`, `/tmp/r3-launcher-clippy.log`,
+  `/tmp/r3-launcher-boundaries.log`, `/tmp/r3-launcher-lean-build.log`.
+- **R3 remains open:** actual label approval, exact model/spend approval, real
+  provider compatibility/calibration and the separately approved official campaign
+  remain outstanding. No real key read, paid request, credential rotation or
+  existing deployment change occurred in this increment.
+
 ## 2026-09-16 durable controller and cancellation recovery
 
 - Dev Memory is reachable again. Resumed the approved R3 plan and checkpointed
@@ -1608,11 +1657,12 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
     synthetic fallback; verified with fake providers only.
   - [x] Shared controller persists attempts/receipts, fences competing/crashed
     owners and provides metadata-only inspection. Provider cancellation retains
-    uncertain charges. These are component tests, not whole-launcher recovery.
-  - [ ] Complete the approved live-provider driver path; paid dispatch remains
-    disabled pending the complete CLI controller, locked runtime packaging and
-    interrupt/recovery rehearsal. The v2 provider profile is implemented, not
-    approved for a campaign or verified against billable provider responses.
+    uncertain charges. Complete launcher interruption tests now also cover abort,
+    SIGTERM and SIGKILL; automatic paid-session resume remains unsupported.
+  - [x] Complete the approved live-provider driver path, locked runtime packaging
+    and fake-provider full execution/interruption rehearsal. Ordinary arbitrary
+    paid drivers stay blocked. The v2 profile is implemented, not approved for
+    an actual campaign or verified against billable provider responses.
 - [ ] Offline fault/isolation/statistical tests and integration evidence.
   - [x] Real partial CLI rehearsal, pending review export, source/hash fencing,
     independent snapshots and negative coding controls.
