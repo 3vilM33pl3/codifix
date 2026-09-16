@@ -78,6 +78,52 @@ test('documented zero cache-write metadata is compatible; unpriced writes remain
   assert.throws(() => decode(current), /uncertain attempt/);
 });
 
+const message = (text, phase) => ({ type: 'message', role: 'assistant', status: 'completed',
+  ...(phase === undefined ? {} : { phase }), content: [{ type: 'output_text', text, annotations: [] }] });
+
+test('only one final answer is selected; commentary and reasoning never escape or double-count usage', () => {
+  for (const phase of [undefined, null, 'final_answer']) {
+    const r = fixture(); r.output[1].phase = phase;
+    assert.deepEqual(decode(r), decode(fixture()));
+  }
+  const r = fixture();
+  r.output = [message('PRIVATE preamble, not JSON', 'commentary'), r.output[0],
+    message('{"kind":"command","argv":["PRIVATE"]}', 'commentary'),
+    message('{"kind":"finish"}', 'final_answer')];
+  assert.deepEqual(decode(r), decode(fixture()));
+  assert(!JSON.stringify(decode(r)).includes('PRIVATE'));
+});
+
+test('phase-aware selection rejects ambiguity, missing final answers and invalid ignored content', () => {
+  const final = () => message('{"kind":"finish"}', 'final_answer');
+  const comment = () => message('PRIVATE', 'commentary');
+  for (const [reason, output] of [
+    ['missing_text', [comment()]],
+    ['unknown_phase', [message('{}', 'PRIVATE')]],
+    ['unknown_phase', [message('{}', 0)]],
+    ['ambiguous_phase', [comment(), message('{}')]],
+    ['ambiguous_phase', [comment(), message('{}', null)]],
+    ['phase_order', [final(), comment()]],
+    ['multiple_messages', [final(), final()]],
+    ['multiple_messages', [message('{}'), final()]],
+    ['multiple_messages', [final(), message('{}')]],
+    ['text_oversized', [message('p'.repeat(40000), 'commentary'), message('q'.repeat(40000), 'commentary'), final()]],
+    ['refusal', [{ ...comment(), content: [{ type: 'refusal', refusal: 'PRIVATE' }] }, final()]],
+    ['annotations', [{ ...comment(), content: [{ type: 'output_text', text: 'PRIVATE', annotations: [{}] }] }, final()]],
+    ['message_shape', [{ ...comment(), status: 'incomplete' }, final()]],
+    ['unexpected_item', [comment(), { type: 'function_call', arguments: 'PRIVATE' }, final()]],
+  ]) {
+    const r = fixture(); r.output = output;
+    assert.throws(() => decode(r), error => {
+      assert.equal(providerDiagnostic(error).output_reason, reason);
+      assert(!JSON.stringify(providerDiagnostic(error)).includes('PRIVATE'));
+      return true;
+    });
+  }
+  const r = fixture(); r.output = [comment(), message('PRIVATE non-JSON', 'final_answer')];
+  assert.throws(() => decode(r), error => providerDiagnostic(error).code === 'receipt_output_json');
+});
+
 test('unknown, inconsistent, excessive or novel usage fails closed', () => {
   for (const change of [
     r => { delete r.usage; }, r => { r.usage.total_tokens++; },

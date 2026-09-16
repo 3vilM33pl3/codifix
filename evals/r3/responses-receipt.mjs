@@ -54,7 +54,7 @@ export function decodeResponsesReceipt(bytes, contract) {
         || !keys(usage.output_tokens_details, 'reasoning_tokens')) fail();
     stage = 'receipt_output';
     const failOutput = reason => { metadata.output_reason = reason; fail(); };
-    let text;
+    let text, sawCommentary = false, commentaryBytes = 0;
     for (const item of response.output) {
       if (item?.type === 'reasoning') {
         // Reasoning tokens are already included in output_tokens, never added
@@ -64,13 +64,26 @@ export function decodeResponsesReceipt(bytes, contract) {
       }
       if (item?.type !== 'message') failOutput('unexpected_item');
       if (item.role !== 'assistant' || item.status !== 'completed') failOutput('message_shape');
+      // Responses may include intermediate assistant updates before the answer.
+      // Never parse a preamble as an action, concatenate messages, or guess that
+      // the last unlabelled message is final. Legacy single-message receipts
+      // remain supported. See the GPT-5.4 guidance's assistant phase contract.
+      if (item.phase != null && !['commentary', 'final_answer'].includes(item.phase)) failOutput('unknown_phase');
+      if (text !== undefined && item.phase === 'commentary') failOutput('phase_order');
       if (text !== undefined) failOutput('multiple_messages');
+      if (sawCommentary && item.phase == null) failOutput('ambiguous_phase');
       if (!Array.isArray(item.content) || item.content.length !== 1) failOutput('content_shape');
       const part = item.content[0];
       if (part?.type === 'refusal') failOutput('refusal');
       if (part?.type !== 'output_text' || typeof part.text !== 'string') failOutput('text_shape');
       if (Buffer.byteLength(part.text) > 65536) failOutput('text_oversized');
       if (!Array.isArray(part.annotations) || part.annotations.length) failOutput('annotations');
+      if (item.phase === 'commentary') {
+        sawCommentary = true;
+        commentaryBytes += Buffer.byteLength(part.text);
+        if (commentaryBytes > 65536) failOutput('text_oversized');
+        continue;
+      }
       text = part.text;
     }
     if (text === undefined) failOutput('missing_text');

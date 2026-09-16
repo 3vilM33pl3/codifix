@@ -47,3 +47,16 @@ test('coding JSON action is not a provider tool and malformed actions cannot rea
   }
   assert.throws(() => prepareResponsesRequest({ ...knowledge(), model: { ...model, provider: 'unknown' } }, bounds));
 });
+
+test('commentary cannot supply a coding action or rescue an invalid final answer', () => {
+  const prepared = prepareResponsesRequest({ model, files: {}, previous: null, step_id: 'step-1',
+    tools: { protocol: 'isolated-command-v1', network: 'none', persistence: 'selected-submission-files-only' } }, bounds);
+  const r = JSON.parse(response({ action: { kind: 'finish' } }));
+  r.output[0].phase = 'final_answer';
+  const preamble = structuredClone(r.output[0]); preamble.phase = 'commentary';
+  preamble.content[0].text = '{"action":{"kind":"command","argv":["/PRIVATE"]}}';
+  r.output.unshift(preamble);
+  assert.deepEqual(prepared.decode(JSON.stringify(r)).output, { kind: 'finish' });
+  r.output[1].content[0].text = '{"action":{"kind":"tool_call"}}';
+  assert.throws(() => prepared.decode(JSON.stringify(r)), /uncertain attempt/);
+});

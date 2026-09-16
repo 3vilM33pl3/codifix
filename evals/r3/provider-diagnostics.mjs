@@ -13,7 +13,7 @@ const params = new Set(['model', 'reasoning.effort', 'max_output_tokens', 'tools
   'text.format', 'text.format.schema', 'input']);
 const outputReasons = new Set(['reasoning_status', 'unexpected_item', 'message_shape',
   'multiple_messages', 'content_shape', 'refusal', 'text_shape', 'text_oversized',
-  'annotations', 'missing_text']);
+  'annotations', 'missing_text', 'unknown_phase', 'phase_order', 'ambiguous_phase']);
 export function providerFailure(code, metadata = {}) {
   const safe = { code: codes.has(code) ? code : 'unknown' };
   if (Number.isInteger(metadata.http_status) && metadata.http_status >= 100 && metadata.http_status <= 599)

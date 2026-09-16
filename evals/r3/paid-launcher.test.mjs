@@ -82,7 +82,14 @@ function mockProvider(t, onCall) {
         embedding: Array.from({ length: 1536 }, (_, i) => Math.fround(((i * 7919) % 65521 - 32760) / 1000003)) }],
         usage: { prompt_tokens: 1, total_tokens: 1 } }
       : { id: 'resp_synthetic', object: 'response', status: 'completed', model: body.model, error: null, incomplete_details: null,
-        output: [{ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', annotations: [],
+        // Documented multi-message shape: intermediate text is not an answer or
+        // an executable action, even if it resembles a valid command object.
+        output: [{ type: 'message', role: 'assistant', phase: 'commentary', status: 'completed',
+          content: [{ type: 'output_text', annotations: [], text: 'PRIVATE_PHASE_PREAMBLE' }] },
+        { type: 'reasoning', summary: [] },
+        { type: 'message', role: 'assistant', phase: 'commentary', status: 'completed',
+          content: [{ type: 'output_text', annotations: [], text: '{"action":{"kind":"command","argv":["/PRIVATE_PHASE_COMMAND"]}}' }] },
+        { type: 'message', role: 'assistant', phase: 'final_answer', status: 'completed', content: [{ type: 'output_text', annotations: [],
           text: body.text.format.name === 'r3_isolated_action_v1' ? '{"action":{"kind":"finish"}}' : '{"text":"Insufficient evidence","refused":true,"citations":[]}' }] }],
         usage: { input_tokens: 100, output_tokens: 12, total_tokens: 112, input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } };
     return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
@@ -149,6 +156,10 @@ test('approved runtime completes all 75 paid-path tasks with fake responses and 
     assert.equal(journal.entries.length, 76); assert(journal.entries.every(e => e.status === 'completed'));
     await assert.rejects(runPaidCampaign(f.root, f.settings), /already started/);
     assert.equal(await fs.readFile(f.secretRead, 'utf8'), 'read\n');
+    const resultDir = path.join(f.root, 'run/work-00000/provider/results');
+    for (const file of await fs.readdir(resultDir)) {
+      assert(!(await fs.readFile(path.join(resultDir, file), 'utf8')).includes('PRIVATE_PHASE'));
+    }
   });
 
 test('approved owner preserves sanitized HTTP diagnostics and fences uncertain model work',
