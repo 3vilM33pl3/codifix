@@ -77,7 +77,7 @@ local harness defect described in the interrupted-run report. Earlier draft iden
 the location-invalid superseded pack are not spending targets. Any manifest
 change requires rechecking approval bindings. No official campaign is authorized.
 
-### Corrected replacement: new approval required
+### Corrected replacement: approved and launched
 
 The [interrupted-run report](development-20260916.md) records the numeric parser
 fix and its offline evidence. A rebuilt package is prepared at
@@ -86,8 +86,11 @@ fix and its offline evidence. A rebuilt package is prepared at
 All benchmark and label bytes and model settings remain unchanged. Its reduced
 ceilings are **US$9.99 / 462 requests / 9,997,080 tokens**, including preparation,
 so combined accounted usage stays below the original limits. Existing label
-approval is recorded for the unchanged two families; development spending is
-**not approved** for this new identity. No corrected run has been launched.
+approval is recorded for the unchanged two families. Olivier explicitly replied
+“Approve corrected run”; its separate development receipt is dated
+`2026-09-16T13:48:09Z`. The exact runtime and approval preflight passed, and the
+replacement launcher started once on a fresh disposable database. Completion,
+usage and quality remain separate from that authorization.
 
 ## Accounting choice and remaining live verification
 

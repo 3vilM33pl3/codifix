@@ -78,9 +78,9 @@ manifest identity and needs a separately approved replacement campaign. Retain
 the settled usage when setting its cap; do not silently restore the full $10.
 The broader benchmark labels, official run and blinded result review remain open.
 
-## Corrected package awaiting approval
+## Corrected package: approved and launched
 
-Prepared but **not launched**:
+Replacement:
 `/data/tmp/r3-calibration-corrected-20260916/campaign.json`, SHA-256
 `169c57de207ca8ba46cf13443b9fccbfb7da65f51d1cd75c3eac39d6c45c9c9c`.
 
@@ -88,8 +88,8 @@ All 29 non-configuration assets, every source/label/fixture/suite/family-metadat
 asset and the model settings match the approved original. Only the runtime
 descriptor and absolute driver path changed among hashed assets. The existing
 two-family label approval is carried forward with explicit scope metadata; no
-new label decision or spending approval is asserted. The real preflight still
-refuses execution with `missing current Development approval`.
+new label decision was inferred. The labels-only preflight initially refused
+execution with `missing current Development approval`.
 
 Replacement limits are **US$9.99, 462 requests and 9,997,080 tokens**, including
 preparation, with the same 300-second task timeout and no automatic retries.
@@ -97,5 +97,9 @@ Adding the prior 38 calls, 2,920 tokens and 83 accounted microdollars stays with
 the original 500-call, ten-million-token and US$10 ceilings. The original outer
 reservation is retained as historical incomplete evidence, not rewritten.
 
-No development-spend receipt or launcher settings exist for the corrected pack.
-Obtain explicit approval against its new hash before any key read or paid call.
+Olivier subsequently replied “Approve corrected run”. The separate development
+receipt at `2026-09-16T13:48:09Z` binds US$9.99 to this exact identity. Runtime,
+image and approval checks passed, and the pinned launcher started once against a
+fresh disposable database. Outcomes must be recorded separately; launch does not
+establish task completion or quality. The original interrupted evidence remains
+unchanged.

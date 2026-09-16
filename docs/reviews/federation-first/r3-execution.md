@@ -1,5 +1,21 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 corrected development run approved and launched
+
+- Olivier explicitly replied “Approve corrected run” for manifest
+  `169c57de207ca8ba46cf13443b9fccbfb7da65f51d1cd75c3eac39d6c45c9c9c`.
+  Recorded the development receipt at `2026-09-16T13:48:09Z`, with remaining
+  ceilings of US$9.99, 462 requests and 9,997,080 tokens. The same two reviewed
+  families, models, 75 tasks and 300-second task timeout remain frozen. No
+  automatic retry, top-up or held-out execution is authorized.
+- Dev Memory checkpoint, pinned runtime verification, image checks and the real
+  approval preflight passed. Started the pinned launcher once against a fresh
+  loopback-only disposable PostgreSQL instance, using the already approved
+  dedicated secret reference. Existing services and original evidence are
+  unchanged. Corrected evidence lives at
+  `/data/tmp/r3-calibration-corrected-20260916/`; this launch record is not a
+  completed campaign or a quality claim.
+
 ## 2026-09-16 corrected package prepared, not executed
 
 - Rebuilt and pinned the runtime after the numeric parser fix. The replacement at
