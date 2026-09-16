@@ -12,6 +12,11 @@ test('only closed-vocabulary metadata escapes; forged diagnostics and raw errors
   assert.equal(preserveProviderFailure(e), e);
   assert.deepEqual(providerDiagnostic({ code: 'http', message: secret }), { code: 'unknown' });
   assert.deepEqual(providerDiagnostic(providerFailure(secret, { http_status: secret,
-    request_id: secret, response_id: secret, api_code: secret, parameter: secret, reason: secret, status: secret })), { code: 'unknown' });
+    request_id: secret, response_id: secret, api_code: secret, parameter: secret, reason: secret,
+    status: secret, output_reason: secret })), { code: 'unknown' });
+  assert.deepEqual(providerDiagnostic(providerFailure('receipt_output', { output_reason: secret })),
+    { code: 'receipt_output' });
+  assert.deepEqual(providerDiagnostic(providerFailure('http', { output_reason: 'refusal' })),
+    { code: 'http' });
   assert(!JSON.stringify(providerDiagnostic(preserveProviderFailure(Error(secret)))).includes(secret));
 });

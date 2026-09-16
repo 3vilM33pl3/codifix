@@ -53,23 +53,27 @@ export function decodeResponsesReceipt(bytes, contract) {
         || !inputShape
         || !keys(usage.output_tokens_details, 'reasoning_tokens')) fail();
     stage = 'receipt_output';
+    const failOutput = reason => { metadata.output_reason = reason; fail(); };
     let text;
     for (const item of response.output) {
       if (item?.type === 'reasoning') {
         // Reasoning tokens are already included in output_tokens, never added
         // again. Do not return reasoning summaries to the agent or scorer.
-        if (item.status != null && item.status !== 'completed') fail();
+        if (item.status != null && item.status !== 'completed') failOutput('reasoning_status');
         continue;
       }
-      if (item?.type !== 'message' || item.role !== 'assistant' || item.status !== 'completed'
-          || text !== undefined || !Array.isArray(item.content) || item.content.length !== 1) fail();
+      if (item?.type !== 'message') failOutput('unexpected_item');
+      if (item.role !== 'assistant' || item.status !== 'completed') failOutput('message_shape');
+      if (text !== undefined) failOutput('multiple_messages');
+      if (!Array.isArray(item.content) || item.content.length !== 1) failOutput('content_shape');
       const part = item.content[0];
-      if (part?.type !== 'output_text' || typeof part.text !== 'string'
-          || Buffer.byteLength(part.text) > 65536
-          || !Array.isArray(part.annotations) || part.annotations.length) fail();
+      if (part?.type === 'refusal') failOutput('refusal');
+      if (part?.type !== 'output_text' || typeof part.text !== 'string') failOutput('text_shape');
+      if (Buffer.byteLength(part.text) > 65536) failOutput('text_oversized');
+      if (!Array.isArray(part.annotations) || part.annotations.length) failOutput('annotations');
       text = part.text;
     }
-    if (text === undefined) fail();
+    if (text === undefined) failOutput('missing_text');
     stage = 'receipt_output_json';
     const output = JSON.parse(text);
     if (!output || Array.isArray(output) || typeof output !== 'object') fail();

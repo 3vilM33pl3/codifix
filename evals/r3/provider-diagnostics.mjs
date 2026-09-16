@@ -11,6 +11,9 @@ const apiCodes = new Set(['invalid_api_key', 'insufficient_quota', 'rate_limit_e
 const params = new Set(['model', 'reasoning.effort', 'max_output_tokens', 'tools', 'tool_choice',
   'parallel_tool_calls', 'store', 'background', 'stream', 'truncation', 'service_tier',
   'text.format', 'text.format.schema', 'input']);
+const outputReasons = new Set(['reasoning_status', 'unexpected_item', 'message_shape',
+  'multiple_messages', 'content_shape', 'refusal', 'text_shape', 'text_oversized',
+  'annotations', 'missing_text']);
 export function providerFailure(code, metadata = {}) {
   const safe = { code: codes.has(code) ? code : 'unknown' };
   if (Number.isInteger(metadata.http_status) && metadata.http_status >= 100 && metadata.http_status <= 599)
@@ -21,6 +24,8 @@ export function providerFailure(code, metadata = {}) {
   if (params.has(metadata.parameter)) safe.parameter = metadata.parameter;
   if (['completed', 'incomplete', 'failed', 'cancelled', 'in_progress', 'queued'].includes(metadata.status)) safe.status = metadata.status;
   if (['max_output_tokens', 'content_filter'].includes(metadata.reason)) safe.reason = metadata.reason;
+  if (safe.code === 'receipt_output' && outputReasons.has(metadata.output_reason))
+    safe.output_reason = metadata.output_reason;
   const error = Error('invalid or incomplete provider receipt or transport; retain uncertain attempt');
   diagnostics.set(error, Object.freeze(safe));
   return error;

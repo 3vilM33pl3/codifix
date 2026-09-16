@@ -42,6 +42,30 @@ test('preserves usage once, cache detail and exact model without returning reaso
   });
 });
 
+test('output rejection reasons are precise without retaining content or changing acceptance', () => {
+  for (const [reason, change] of [
+    ['reasoning_status', r => { r.output[0].status = 'PRIVATE'; }],
+    ['unexpected_item', r => { r.output.push({ type: 'PRIVATE', arguments: 'PRIVATE' }); }],
+    ['message_shape', r => { r.output[1].status = 'PRIVATE'; }],
+    ['multiple_messages', r => { r.output.push(r.output[1]); }],
+    ['content_shape', r => { r.output[1].content.push({ type: 'PRIVATE' }); }],
+    ['refusal', r => { r.output[1].content[0] = { type: 'refusal', refusal: 'PRIVATE' }; }],
+    ['text_shape', r => { r.output[1].content[0].text = { private: 'PRIVATE' }; }],
+    ['text_oversized', r => { r.output[1].content[0].text = 'PRIVATE'.repeat(10000); }],
+    ['annotations', r => { r.output[1].content[0].annotations.push({ text: 'PRIVATE' }); }],
+    ['missing_text', r => { r.output = [r.output[0]]; }],
+  ]) {
+    const r = fixture(); change(r);
+    assert.throws(() => decode(r), error => {
+      assert.deepEqual(providerDiagnostic(error), {
+        code: 'receipt_output', status: 'completed', output_reason: reason,
+      });
+      assert(!error.message.includes('PRIVATE'));
+      return true;
+    });
+  }
+});
+
 test('documented zero cache-write metadata is compatible; unpriced writes remain rejected', () => {
   const old = fixture(), current = fixture();
   current.usage.input_tokens_details.cache_write_tokens = 0;
