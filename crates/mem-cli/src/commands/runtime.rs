@@ -2404,7 +2404,7 @@ pub(in crate::commands) struct EvalCampaignArgs {
 const EVAL_CAMPAIGN_AFTER_HELP: &str = "Agent notes:
   R3 integration is in progress. Plan/report are file-based and never use ambient services.
   Draft labels and offline artifacts are not product-quality evidence.
-  Run requires an audited hash-locked isolation driver and --allow-shell; paid runs remain disabled.
+  Run requires a hash-locked driver and --allow-shell. Paid dispatch requires the approved runtime launcher and exact approvals.
   Never expose private benchmark labels or graders to execution agents.
 
 Examples:

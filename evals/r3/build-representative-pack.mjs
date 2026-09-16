@@ -9,13 +9,13 @@ import { syntheticEmbeddingModel } from './synthetic-embedding.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const [destination, selection, ...extra] = process.argv.slice(2);
-if (!destination || extra.length || (selection !== undefined && !['--one-family-per-track', '--held-out'].includes(selection))) {
-  throw Error('usage: node build-representative-pack.mjs NEW_DIRECTORY [--one-family-per-track | --held-out]');
+if (!destination || extra.length || (selection !== undefined && !['--one-family-per-track', '--calibration', '--held-out'].includes(selection))) {
+  throw Error('usage: node build-representative-pack.mjs NEW_DIRECTORY [--one-family-per-track | --calibration | --held-out]');
 }
 // Held-out material is never silently copied into a development/calibration pack.
 const split = selection === '--held-out' ? 'held_out' : 'development';
 const splitDirectory = split.replace('_', '-');
-const minimal = selection === '--one-family-per-track';
+const minimal = selection === '--one-family-per-track' || selection === '--calibration';
 const root = path.resolve(destination);
 // Exclusive creation, including an existing empty directory: never overwrite a
 // reviewed pack or silently merge labels from a previous experiment.
@@ -51,7 +51,7 @@ const knowledge = split === 'held_out' ? ['telemetry-units', 'cursor-snapshot', 
   : ['supplier-handover', 'turnover-recovery', 'cache-partition', 'schema-transition', 'capacity-pressure', 'timezone-window', 'artifact-origin', 'retention-hold', 'quota-accounting', 'dns-cutover'];
 const coding = split === 'held_out' ? ['framed-stream', 'interval-calendar', 'path-policy', 'decimal-register', 'identifier-catalog', 'snapshot-pages', 'notice-bundle', 'sensor-matrix', 'circuit-window', 'route-precedence', 'bounded-decoder', 'structured-redaction']
   : ['durable-importer', 'evidence-publication', 'configuration-rollout', 'dependency-build'];
-for (const family of minimal ? knowledge.slice(0, 1) : knowledge) {
+for (const family of selection === '--calibration' ? ['artifact-origin'] : minimal ? knowledge.slice(0, 1) : knowledge) {
   const sources = files(family, 'public').map(relative => {
     const target = `public/sources/${family}/${relative.slice('public/'.length)}`;
     write(target, read(family, relative), 'source');
@@ -73,7 +73,7 @@ for (const family of minimal ? knowledge.slice(0, 1) : knowledge) {
   }
   families.push({ id: family, track: 'knowledge', split, cases: ids, sources });
 }
-for (const family of minimal ? coding.slice(0, 1) : coding) {
+for (const family of selection === '--calibration' ? ['configuration-rollout'] : minimal ? coding.slice(0, 1) : coding) {
   const fixture = `public/fixtures/${family}`;
   const source = `public/sources/${family}/contract.md`;
   write(source, read(family, 'public/contract.md'), 'source');

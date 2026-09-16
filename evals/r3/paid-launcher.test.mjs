@@ -113,6 +113,24 @@ test('draft or missing approval prevents secret access, driver start and provide
   assert.equal(calls.length, 0);
 });
 
+test('calibration preparation creates a locked draft without approving labels or reading a key', { skip: !available }, async t => {
+  const f = await fixture(t, false), inputs = path.join(f.directory, 'runtime-inputs.json');
+  await fs.writeFile(inputs, JSON.stringify({ binaries: Object.fromEntries(Object.entries(f.runtime.binaries)
+    .map(([name, pin]) => [name, path.join(f.root, pin.path)])), images: f.runtime.images }));
+  const out = path.join(f.directory, 'calibration');
+  const result = spawnSync(process.execPath, ['evals/r3/prepare-paid-calibration.mjs', out, inputs], { encoding: 'utf8', timeout: 60000 });
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.approval_created, false); assert.equal(report.provider_called, false);
+  assert.equal(report.task_executions, 75); assert.equal(report.labels, 'draft');
+  const { manifest } = await verifyPaidRuntime(out);
+  assert.deepEqual([...new Set(manifest.cases.map(c => c.cluster))].sort(), ['artifact-origin', 'configuration-rollout']);
+  assert.equal(manifest.label_status, 'draft'); assert.equal(manifest.limits.microusd, 10000000);
+  await assert.rejects(fs.stat(f.secretRead), { code: 'ENOENT' });
+  const again = spawnSync(process.execPath, ['evals/r3/prepare-paid-calibration.mjs', out, inputs], { encoding: 'utf8', timeout: 20000 });
+  assert.equal(again.status, 1, 'never overwrite an existing pack');
+});
+
 test('approved runtime completes all 75 paid-path tasks with fake responses and private reviews pending',
   { skip: !integration, timeout: 1500000 }, async t => {
     const f = await fixture(t), calls = mockProvider(t); f.keep();
@@ -169,4 +187,30 @@ test('frozen launcher CLI handles SIGTERM and preserves uncertain paid-path prep
     const artifact = JSON.parse(await fs.readFile(path.join(f.root, 'run/artifact.json')));
     assert.equal(artifact.completed, false);
     assert.equal(await fs.readFile(f.secretRead, 'utf8'), 'read\n');
+  });
+
+test('SIGKILL of the frozen launcher keeps its fence and never invokes preparation again',
+  { skip: !integration, timeout: 180000 }, async t => {
+    const f = await fixture(t);
+    const loader = new URL('./test-fixtures/interrupt-provider.mjs?signal=SIGKILL', import.meta.url).href;
+    const exit = await new Promise((resolve, reject) => {
+      const child = spawn(path.join(f.root, 'private/executables/node'), ['--import', loader,
+        path.join(f.root, 'runtime/launch-paid.mjs'), f.settings, '--allow-shell'],
+      { env: { PATH: '/usr/bin:/bin', HOME: f.directory }, stdio: 'ignore' });
+      const timer = setTimeout(() => child.kill('SIGKILL'), 150000);
+      child.once('error', reject);
+      child.once('close', (code, signal) => { clearTimeout(timer); resolve({ code, signal }); });
+    });
+    assert.equal(exit.signal, 'SIGKILL');
+    assert.deepEqual((await inspectCampaignDispatch(path.join(f.root, 'private/dispatch'))).entries.map(e => e.status), ['uncertain']);
+    await assert.rejects(runPaidCampaign(f.root, f.settings), /already started/);
+    assert.equal(await fs.readFile(f.secretRead, 'utf8'), 'read\n');
+    // The orphaned runner gets a broken IPC connection and retains incomplete
+    // evidence. Never start a second owner to manufacture a success receipt.
+    let artifact;
+    for (let i = 0; i < 100; i++) {
+      try { artifact = JSON.parse(await fs.readFile(path.join(f.root, 'run/artifact.json'))); break; } catch { /* wait for owned runner */ }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert(artifact); assert.equal(artifact.completed, false);
   });

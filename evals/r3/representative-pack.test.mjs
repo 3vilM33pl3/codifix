@@ -10,6 +10,18 @@ import { spawnSync } from 'node:child_process';
 const binary = process.env.MEMORY_R3_CLI_BIN;
 if (process.env.MEMORY_R3_REQUIRE_REPRESENTATIVE_PACK === '1' && !binary) throw Error('required campaign CLI missing');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+test('calibration selects only the proposed whole development families without approving labels', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-calibration-families-'));
+  t.after(() => fs.rm(directory, { recursive: true }));
+  const root = path.join(directory, 'pack');
+  const result = spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', root, '--calibration'], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const m = JSON.parse(await fs.readFile(path.join(root, 'campaign.json')));
+  assert.deepEqual([...new Set(m.cases.map(c => c.cluster))].sort(), ['artifact-origin', 'configuration-rollout']);
+  assert.equal(m.cases.length, 5);
+  assert(m.cases.every(c => c.split === 'development'));
+  assert.equal(m.label_status, 'draft'); assert.equal(m.smoke_only, true);
+});
 test('representative development packs are reproducible, private, whole-family and hash-locked', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-representative-pack-'));
   t.after(() => fs.rm(directory, { recursive: true }));

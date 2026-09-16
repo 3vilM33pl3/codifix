@@ -7,6 +7,7 @@ globalThis.fetch = async (url, options) => {
   if (/^http:\/\/127\.0\.0\.1:[0-9]+\//.test(String(url))) return native(url, options);
   assert.equal(url, 'https://api.openai.com/v1/embeddings');
   assert.equal(options.headers.Authorization, 'Bearer synthetic-paid-launcher');
-  setImmediate(() => process.kill(process.pid, 'SIGTERM'));
+  const signal = new URL(import.meta.url).searchParams.get('signal') === 'SIGKILL' ? 'SIGKILL' : 'SIGTERM';
+  setImmediate(() => process.kill(process.pid, signal));
   return new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(Error('synthetic interruption')), { once: true }));
 };

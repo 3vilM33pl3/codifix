@@ -39,10 +39,12 @@ pub(super) fn verify(root: &Path, file: &Path, driver: &Path, manifest: &Manifes
     let bytes = std::fs::read(file)?;
     ensure!(bytes.len() <= 65536, "oversized approved runtime");
     ensure!(
-        manifest.assets.iter().any(|a| a.path
-            == std::path::PathBuf::from("private/paid-runtime.json")
-            && a.kind == c::AssetKind::Configuration
-            && a.sha256 == c::digest(&bytes)),
+        manifest
+            .assets
+            .iter()
+            .any(|a| a.path == Path::new("private/paid-runtime.json")
+                && a.kind == c::AssetKind::Configuration
+                && a.sha256 == c::digest(&bytes)),
         "unlocked approved runtime"
     );
     let runtime: Runtime = serde_json::from_slice(&bytes)?;
