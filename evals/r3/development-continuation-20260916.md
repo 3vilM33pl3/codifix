@@ -102,3 +102,42 @@ output = 38,982 tokens, **US$0.098120**. No new uncertain provider allowance;
 the task observation is nevertheless absent, so the campaign remains invalid.
 Next available aggregate caps: **181 calls / 7,452,151 tokens / US$7.747795**.
 Prior six unresolved allowances remain reserved.
+
+## Continuation 3
+
+Pinned pack `/data/tmp/r3-continue3-20260916`, identity
+`8448ed7d1c1422c5aad846bcb1b0680fac3af569028d22a7a1a9e1158db34c7e`.
+The validated guest-error repair is included; models and 29 reviewed source/label
+assets are unchanged. Caps are **181 calls / 7,452,151 tokens / US$7.747795**,
+under the continuing-development authorization. No prior pack is resumed.
+
+### Continuation 3 outcome and task-window correction
+
+The five-minute outer task deadline expired with the seventh model request in
+flight. Retained cancellation and its full allowance; no successful task claimed.
+Settled: **44 calls / 20,963 input + 38,684 output tokens / US$0.179056**.
+Additional uncertain reservation: **416,384 tokens / US$0.373728**. Remaining:
+**136 calls / 6,976,120 tokens / US$7.195011**. Seven older uncertain calls now
+remain in the cumulative ledger.
+
+The agent previously tracked its own time but not elapsed service/retrieval or
+inter-step grading time. For live coding it now subtracts elapsed task time,
+reserves 100 seconds of grading/finalization headroom, uses an absolute monotonic
+deadline across steps, and starts a model call only if its full 120-second window
+plus the 30-second command window fits. Retrieval calls count against the same
+per-task call allowance. Exhausted execution returns an explicit failed submission
+with known usage (including valid zero-model-call cases), not a fabricated success
+or omitted result. This conservative allocation may produce negative coding
+results under the original five-minute budget; report that operational limitation.
+It does not guarantee every external/grading failure becomes recoverable.
+
+A knowledge-only subset was considered but **not run**: the campaign validator
+requires both tracks. The unapproved draft `/data/tmp/r3-knowledge-20260916` remains
+unused. Retain the complete two-track plan and original limits instead of weakening
+the validator or dropping coding failures. Subsequent runs may stop at the original
+call budget before all planned tasks complete; missing observations remain invalid.
+
+Verification: 13 container/agent/sequence tests, ten provider-session/agent tests
+(including disposable PostgreSQL and both tracks), and six final agent tests pass;
+no skips. Logs `/tmp/r3-live-window-{tests,integration,final,boundaries}.log`.
+Formatting and boundaries pass. No live calls were made during this repair.

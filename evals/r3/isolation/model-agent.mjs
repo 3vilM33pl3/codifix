@@ -9,7 +9,8 @@ import { dispatchModel } from './model-dispatch.mjs';
 
 export function createModelAgent(options) {
   const { mediator, invoke, prepareRequest, ...plain } = options;
-  const { taskId, model, allowance, maxCalls = 12, taskTimeoutMs = 60000, modelTimeoutMs } = structuredClone(plain);
+  const { taskId, model, allowance, maxCalls = 12, taskTimeoutMs = 60000, modelTimeoutMs,
+    requireFullModelWindow = false, deadlineMs } = structuredClone(plain);
   if (!mediator || typeof mediator.dispatch !== 'function'
       || (typeof invoke === 'function') === (typeof prepareRequest === 'function')
       || typeof taskId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(taskId)
@@ -17,6 +18,8 @@ export function createModelAgent(options) {
       || Object.values(model).some(v => typeof v !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(v))
       || !Number.isInteger(maxCalls) || maxCalls < 1 || maxCalls > 128
       || !Number.isInteger(taskTimeoutMs) || taskTimeoutMs < 1000 || taskTimeoutMs > 600000
+      || typeof requireFullModelWindow !== 'boolean' || (requireFullModelWindow && modelTimeoutMs === undefined)
+      || (deadlineMs !== undefined && (!Number.isFinite(deadlineMs) || deadlineMs < 0))
       || (modelTimeoutMs !== undefined && (!Number.isInteger(modelTimeoutMs)
         || modelTimeoutMs < 1000 || modelTimeoutMs > 600000))) throw Error('invalid model agent contract');
   let calls = 0, usedMs = 0, busy = false;
@@ -36,8 +39,10 @@ export function createModelAgent(options) {
         .map(p => [p, Buffer.from(files[p]).toString('base64')])) });
     try {
       for (let round = 0; ; round++) {
-        const remaining = Math.floor(taskTimeoutMs - usedMs - (performance.now() - started));
-        if (calls >= maxCalls || remaining < 1000) return result(1);
+        const remaining = Math.floor(Math.min(taskTimeoutMs - usedMs - (performance.now() - started),
+          deadlineMs === undefined ? Infinity : deadlineMs - performance.now()));
+        if (calls >= maxCalls || remaining < 1000
+            || (requireFullModelWindow && remaining < modelTimeoutMs + container.timeoutMs)) return result(1);
         const payload = { model, step_id: stepId, files, previous,
           tools: { protocol: 'isolated-command-v1', command: { kind: 'command', argv: ['absolute-executable', 'arguments'] },
             finish: { kind: 'finish' }, network: 'none', persistence: 'selected-submission-files-only' } };

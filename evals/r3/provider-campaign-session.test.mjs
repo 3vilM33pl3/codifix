@@ -15,6 +15,38 @@ const names = ['MEMORY_LAYER_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMO
 const available = names.every(name => process.env[name]);
 if (process.env.MEMORY_R3_REQUIRE_PROVIDER_SESSION === '1' && !available) throw Error('required provider-session configuration missing');
 
+test('live task window exhaustion is explicit negative evidence with zero model calls', { skip: !available, timeout: 180000 }, async t => {
+  const f = await setup(t), manifest = f.manifest;
+  manifest.limits.task_seconds = 120;
+  await fs.writeFile(path.join(f.root, 'campaign.json'), JSON.stringify(manifest));
+  const counter = manifest.provider_profile.responses_tokenizer;
+  const provider = { bind: (mediator, taskId) => createProviderBindings({ manifest, mediator, taskId,
+    responsesCounter: { id: counter.id, sha256: counter.asset.sha256, countInputTokens: () => 64 },
+    embeddingCounter: { id: counter.id, sha256: counter.asset.sha256, countInputTokens: () => 64 },
+    sendResponses: () => assert.fail('no new model call when a full window cannot fit'),
+    sendEmbeddings: async body => JSON.stringify({ model: body.model, object: 'list',
+      data: [{ object: 'embedding', index: 0, embedding: [1, 0, 0] }], usage: { prompt_tokens: 1, total_tokens: 1 } }),
+  }) };
+  const owner = await openProviderCampaignSession({ ...f.options, offline: false, provider });
+  try {
+    const prepared = await owner.prepare({ directory: await f.directoryFor('preparation'), task_id: 'preparation',
+      manifest_sha256: 'a'.repeat(64), limits: manifest.preparation_budget, task_limits: manifest.preparation_budget });
+    for (const [index, condition] of ['no-memory', 'vector'].entries()) {
+      const taskId = `work-${String(index).padStart(5, '0')}`;
+      const limits = { requests: 8, tokens: manifest.model.max_input_tokens + manifest.model.max_output_tokens,
+        microusd: 0, task_seconds: 120 };
+      const result = await owner.execute({ case_id: 'durable-importer', condition, repeat: 0 },
+        { directory: await f.directoryFor(taskId), task_id: taskId, manifest_sha256: 'a'.repeat(64), limits, task_limits: limits });
+      assert.equal(result.result.success, false);
+      assert(result.result.sub_results.every(s => !s.success));
+      assert.equal(result.provider_requests, index); // vector retrieval is still charged once
+      assert.equal(result.execution_microusd, 0);
+      assert.equal(result.uncertain_charge, false);
+      assert.equal(result.isolation.after_sha256, prepared.snapshot_sha256);
+    }
+  } finally { await owner.close(); }
+});
+
 async function setup(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-provider-session-'));
   t.after(() => fs.rm(directory, { recursive: true }));

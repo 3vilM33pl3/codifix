@@ -36,6 +36,20 @@ test('model deadline is independent from shell timeout and bounded by remaining 
   }
 });
 
+test('full-window mode records a failed task without starting a late provider call', async () => {
+  const run = createModelAgent({ taskId: 'late', model, allowance, taskTimeoutMs: 1000,
+    modelTimeoutMs: 120000, requireFullModelWindow: true, deadlineMs: performance.now() + 500,
+    mediator: { dispatch() { assert.fail('late call must not dispatch'); } }, invoke() {} });
+  const result = await run({ stepId: 'one', image: 'sha256:' + 'a'.repeat(64),
+    argv: ['/bin/true'], files: { 'source.rs': 'fn main() {}' }, exportPaths: ['source.rs'], timeoutMs: 1000 });
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.usage.provider_requests, 0);
+  assert.equal(result.usage.microusd, 0);
+  assert.equal(Buffer.from(result.files['source.rs'], 'base64').toString(), 'fn main() {}');
+  assert.throws(() => createModelAgent({ taskId: 'late', model, allowance,
+    requireFullModelWindow: true, mediator: { dispatch() {} }, invoke() {} }), /invalid model agent/);
+});
+
 function sequence() {
   return { image, timeoutMs: 4000, initialFiles: { 'counter.json': '{"value":0}', 'context.txt': 'Increment once for each current task.' },
     submissionPaths: ['counter.json'], steps: [1, 2, 3].map(n => ({ id: `step-${n}`,

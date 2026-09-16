@@ -208,11 +208,26 @@ async function createExecutor(options, providerOnly) {
         const context = await contextFor(`What is the documented ${family.id} maintenance contract?`);
         // Each stage's prompt is selected in its own invocation; the sequence
         // runner supplies no private grader output or reference implementation.
-        const runAgent = mediator ? createModelAgent({ mediator, model, allowance, taskId: providerContract.task_id,
-          maxCalls: manifest.provider_budget.max_calls_per_task, taskTimeoutMs: manifest.limits.task_seconds * 1000,
+        // Retrieval shares the task's request/time budget. Stop generating before
+        // a full provider window no longer fits; leave bounded headroom for the
+        // three graders and snapshot/final verification. This is a failed task,
+        // not missing usage from an avoidable last-moment provider cancellation.
+        const budgetedLive = providerOnly && !offlineMode;
+        const usedRequests = budgetedLive ? (await mediator.audit()).audit.ledger.requests : 0;
+        const modelCalls = manifest.provider_budget?.max_calls_per_task - usedRequests;
+        const agentMs = Math.floor(manifest.limits.task_seconds * 1000
+          - (budgetedLive ? performance.now() - started + 100000 : 0));
+        const exhaustedAgent = async input => ({ version: 1, image: input.image, exitCode: 1,
+          elapsedMs: 0, stdout: '', stderr: '', files: Object.fromEntries(input.exportPaths
+            .filter(p => Object.hasOwn(input.files, p)).map(p => [p, Buffer.from(input.files[p]).toString('base64')])),
+          usage: { provider_requests: 0, new_provider_requests: 0, input_tokens: 0, output_tokens: 0, microusd: 0 } });
+        const runAgent = mediator ? (modelCalls < 1 || agentMs < 1000 ? exhaustedAgent : createModelAgent({ mediator, model, allowance, taskId: providerContract.task_id,
+          maxCalls: modelCalls, taskTimeoutMs: agentMs,
           modelTimeoutMs: 120000,
+          requireFullModelWindow: budgetedLive,
+          ...(budgetedLive ? { deadlineMs: started + manifest.limits.task_seconds * 1000 - 100000 } : {}),
           ...(wire ? { prepareRequest: wire.prepareRequest } : {
-            invoke: async payload => ({ output: payload.previous ? { kind: 'finish' } : { kind: 'command', argv: noOpAgent }, usage: fakeUsage }) }) }) : undefined;
+            invoke: async payload => ({ output: payload.previous ? { kind: 'finish' } : { kind: 'command', argv: noOpAgent }, usage: fakeUsage }) }) })) : undefined;
         const sequence = await runOfflineSequence({ image: rustImage, initialFiles, submissionPaths: family.submission_paths, runAgent,
           timeoutMs: 30000, steps: stages.map((stage, index) => ({ id: `${family.id}-${stage.id}`, argv: noOpAgent,
             inputFiles: { 'task.json': JSON.stringify({ prompt: stage.prompt, context }) },
@@ -229,7 +244,8 @@ async function createExecutor(options, providerOnly) {
       // remain agent-only diagnostics, not an additional execution charge.
       const audit = mediator ? (await mediator.audit()).audit : undefined;
       if (audit) {
-        const totals = audit.tasks[providerContract.task_id];
+        const totals = audit.tasks[providerContract.task_id] ?? (audit.ledger.requests === 0
+          ? { requests: 0, input_tokens: 0, output_tokens: 0, microusd: 0 } : undefined);
         if (!totals) throw Error('missing task provider totals');
         value.providerUsage = { provider_requests: totals.requests, input_tokens: totals.input_tokens,
           output_tokens: totals.output_tokens, microusd: totals.microusd };

@@ -78,6 +78,15 @@ prepare PostgreSQL snapshots, run Memory retrieval, authorize labels
 or mediate paid calls. The earlier shared Docker eval stacks remain unsuitable
 for R3 isolation and are not modified by this component.
 
+Live coding shares the whole-task request budget with retrieval and uses a
+monotonic cutoff that includes time between steps. It reserves 100 seconds for
+grading/final verification and requires a full provider-plus-command window before
+starting another model call. A budget-exhausted agent returns failed submissions
+with known usage; neither it nor later untouched steps become successful. This
+conservative allocation reduces usable agent time and must accompany development
+results. It does not turn uncertain provider calls or isolation failures into
+valid observations. Offline synthetic agents retain their existing test budgets.
+
 `runOfflineContainer({ image, argv, files, timeoutMs, exportPaths })` accepts an immutable local
 Docker image ID, an absolute executable with argument array, and a map of explicit
 relative filenames to UTF-8 contents. There is no host source-directory mount or
