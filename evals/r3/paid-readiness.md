@@ -5,13 +5,21 @@ development calibration, not an official result or authority for another campaig
 
 ## Gate status
 
-Latest result: the separately approved [single-response diagnostic](development-onecall-20260916.md)
+Current authority: Olivier asked to continue development within the original
+US$10 total. [Budget-bounded continuation](development-continuation-20260916.md)
+preserves all old uncertainty and the original call/token ceilings. Its first
+attempt captured two explicit final messages and stopped. A narrowly tested
+byte-identical-final repair passed all 75 fake-provider tasks; the second
+continuation is running with US$7.845915 / 224 calls / 7,491,133 tokens remaining.
+No official/held-out run is authorized. Read the linked ledger for live outcomes.
+
+Previous result: the separately approved [single-response diagnostic](development-onecall-20260916.md)
 ran once successfully, costing US$0.021234 under its US$0.373728 cap. The exact
 reconstructed request returned acceptable structured output; no commands were
 executed and no benchmark observations were created. This does not explain the
 earlier ambiguous response or establish repeatability. Cumulative settled usage
 is US$0.053530, plus US$1.702752 in unchanged unresolved allowances (not confirmed
-charges). The diagnostic approval is consumed; no new paid run is authorized.
+charges). The diagnostic approval is consumed; it did not itself authorize a new run.
 
 Previous campaign outcome: Olivier approved `df12ab2b…12ac4e86` for one US$8.65
 replacement. It ran once; preparation and its first model call succeeded, but

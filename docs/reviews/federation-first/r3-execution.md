@@ -1,5 +1,23 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 continuing development within the original budget
+
+- Olivier authorized continuing until the budget is exhausted; retained the
+  original US$10 / 500 calls / 10M tokens and all unresolved allowances. No
+  held-out labels, official campaign, credential changes or customer data.
+- Reconciled provider journals, excluding nested task reservations. Continuation
+  1 stopped at two explicit final messages of equal byte length (not proof of
+  equal text). Preserved uncertainty; no old attempt was restarted.
+- Added exact-text deduplication for validated explicit final messages only.
+  Different finals, unphased duplicates, malformed output and invalid usage still
+  fail closed. One action and response-level charge; metadata records duplicates.
+  Same request prompts, models, sources, labels and scoring across conditions.
+- Forty focused tests, four one-shot safety tests, all 75 full fake-provider
+  task executions, formatting and boundaries pass. Continuation 2 has pinned
+  identity `461ccc8f…1968da14` and reconciled caps US$7.845915 / 224 calls /
+  7,491,133 tokens. See [the live ledger](../../../evals/r3/development-continuation-20260916.md)
+  for authority, evidence and outcome. R3 remains incomplete.
+
 ## 2026-09-16 approved single-request diagnostic succeeded
 
 - Olivier approved the US$0.373728 one-call cap at `2026-09-16T22:12:35Z`,
