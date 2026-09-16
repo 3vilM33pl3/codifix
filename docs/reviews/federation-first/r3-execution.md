@@ -1,5 +1,67 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 conservative accounting and approved provider session
+
+- Resumed the approved R3 plan and checkpointed through dev Memory before edits.
+  Added an explicit v2 provider profile using full model-capacity input
+  reservations, rather than claiming exact local tokenization of Responses
+  framing/schema. Actual validated usage settles reservations; unknown usage
+  stays reserved. No separate counting endpoint, real key read or paid call was
+  used. Existing v1 canonical identities and saved artifacts remain compatible.
+- The reviewed v2 profile pins the dated answer model, embedding dimensions,
+  rates and capacity bounds. Per-call limits remain separate from whole-task
+  budgets: a multi-call task reserves capacity for every permitted call. Tests
+  cover insufficient headroom before egress, actual-usage settlement, uncertain
+  charges and rejection of unreviewed counters, models, rates and overrides.
+  [Accounting contract](../../../evals/r3/context-accounting.md).
+- Connected the approved credential/provider owner to the shared disposable
+  campaign session. Rust validates the manifest, frozen assets and exact
+  approvals before secret access and again before each provider disclosure.
+  Exit, approval revocation or uncertain transmission retires the bindings.
+  The complete CLI controller, locked runtime packaging and interrupt/recovery
+  rehearsal remain engineering work; the paid-dispatch guard stays enabled.
+- Five owner/session tests pass without skips. They use synthetic approval
+  records in temporary test packs, a fake secret process and mocked OpenAI
+  responses, never fabricated user approval. The database-backed case prepares
+  1536-dimensional vectors and runs one Full Memory knowledge task and a full
+  three-step coding sequence through isolated services/containers. Both preserve
+  their sealed snapshots. This verifies wiring, not live provider compatibility
+  or real embedding quality/parity.
+- Validation passes: 53 evaluator campaign tests, 10 campaign CLI tests, 25
+  provider/context/credential tests, the five owner/session tests, workspace
+  Clippy with warnings denied, formatting, boundaries and the lean CLI build.
+  The latter retains eight existing dead-code warnings. Required-database
+  workspace tests, including federation regressions, pass with only the existing
+  unrelated M2 `markdown_local_links_and_images_resolve` check excluded. A
+  separate run confirms that check still fails; its document was not changed.
+  A journal fixture's happy-path subprocess timeout was raised from five to
+  thirty seconds after contention exposed a startup flake. Its explicit timeout
+  test and production deadlines are unchanged.
+- Logs: `/tmp/r3-context-eval-tests.log`, `/tmp/r3-context-cli-tests.log`,
+  `/tmp/r3-context-provider-final.log`, `/tmp/r3-approved-session-final.log`,
+  `/tmp/r3-context-workspace-final.log`,
+  `/tmp/r3-context-known-doc-failure.log`,
+  `/tmp/r3-context-workspace-clippy.log`, `/tmp/r3-context-lean-build.log`,
+  and `/tmp/r3-context-boundaries.log`. No new live PDS, Web, Lean theorem or
+  remote CI run is claimed for this increment.
+- The fresh legacy-v1 HTTP rehearsal completes all 75 tasks:
+  `/data/tmp/memory-r3-context-Mah0m2/pack/run/artifact.json`.
+  Its 34 preparation calls and 180 execution calls reconcile with actual fake
+  HTTP requests; all 75 observations retain one unchanged sealed snapshot.
+  The report has `execution_valid: true`, with harness/official/quality gates
+  false and 60 knowledge judgments pending. This is a compatibility rehearsal,
+  not a full v2 owner campaign or measured answer quality. Log:
+  `/tmp/r3-context-rehearsal.log`; report: `/tmp/r3-context-final-report.json`.
+- Removed only the owned tmpfs database `memory-r3-context-20260916` after
+  validation. Synthetic contents can be regenerated; artifacts are retained.
+  Existing dev services, credentials and project data were untouched.
+- **R3 remains incomplete.** The actual locked calibration manifest/launcher,
+  label review, exact development model/spend approval, live verification and
+  separately approved official campaign remain open. The revised ten-million
+  token calibration cap is only a proposal reflecting conservative reservation
+  headroom, not permission to spend. See the
+  [remaining gates](../../../evals/r3/paid-readiness.md).
+
 ## 2026-09-16 approval and secret-read gates
 
 - Resumed/checkpointed the existing R3 plan through dev Memory before edits.
@@ -1458,6 +1520,10 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
       prepared model calls, including isolated coding and private scoring tests.
     - [x] Canonical provider/tokenizer/embedding configuration contract and shared
       prepared-call bindings with distinct response/embedding pricing.
+    - [x] Explicit v2 full-context reservations and multi-call task headroom;
+      fake-provider settlement, uncertainty and pre-egress denial tests.
+    - [x] Approval-gated secret/provider owner connected to disposable services
+      and isolated task execution, verified with synthetic credentials only.
     - [ ] Select and verify the real model/tokenizer/price/egress configuration;
       synthetic counters and fake HTTP receipts are not live-provider evidence.
 - [ ] Equal-information document, lexical, vector and full-Memory baselines.
@@ -1480,7 +1546,9 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
     and baseline embeddings, and isolated knowledge/coding execution without
     synthetic fallback; verified with fake providers only.
   - [ ] Complete the approved live-provider driver path; paid dispatch remains
-    disabled while the real tokenizer/provider profile is unresolved.
+    disabled pending the complete CLI controller, locked runtime packaging and
+    interrupt/recovery rehearsal. The v2 provider profile is implemented, not
+    approved for a campaign or verified against billable provider responses.
 - [ ] Offline fault/isolation/statistical tests and integration evidence.
   - [x] Real partial CLI rehearsal, pending review export, source/hash fencing,
     independent snapshots and negative coding controls.
