@@ -1,5 +1,28 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 expanded output and model-call deadlines approved
+
+- Olivier replied “yes” to 16,384 output tokens, 120-second model calls and the
+  unchanged 300-second whole-task cap, with US$9.04 remaining inside the original
+  US$10 ceiling. Recorded the approval at `2026-09-16T14:53:09Z`; no automatic
+  retry, top-up, model substitution or held-out run is authorized.
+- Separated coding model-call deadlines from container-command deadlines.
+  Model calls use up to 120 seconds, limited by remaining coding-task time;
+  shell commands retain the independent 30-second limit. The knowledge path
+  also receives the 120-second provider deadline; the outer runner retains its
+  300-second whole-task bound. All conditions use identical settings.
+- Eleven focused tests passed with real budget/scoring binaries and disposable
+  containers. They cover deadline separation, task bounds, three-step execution,
+  knowledge parity, usage-schema compatibility and malformed-receipt rejection.
+  Log: `/tmp/r3-limits-focused.log`. Formatting and boundaries also passed.
+- Frozen replacement: `/data/tmp/r3-expanded-20260916/campaign.json`, identity
+  `3cf114f9abd409eab22966d7cc5a1a92bda6d826dc85e168db9687cba2bbd4d4`.
+  All 29 benchmark assets and model identities/reasoning/rates are unchanged.
+  Exact runtime and approval checks pass. Remaining limits: US$9.04 / 345 calls /
+  8,776,032 tokens. Previous 152 settled calls and three uncertain model-call
+  allowances are preserved in full, not refunded. Full fake rehearsal precedes
+  the separately recorded live outcome.
+
 ## 2026-09-16 usage-fixed replacement: output ceiling reached
 
 - After all 75 updated-schema fake tasks passed, launched explicitly approved
