@@ -9,6 +9,11 @@ preparation, pinned runtime packaging, exact approvals, execution and interrupti
 handling. Its complete paid dispatch path has been exercised with fake providers;
 this is not evidence of real API compatibility or a paid evaluation.
 
+For diagnosing a failed response without repeating the campaign, see the
+[single-response diagnostic](response-diagnostic.md). It uses an exact reconstructed
+synthetic request, a one-call journal and separate approval, never executes the
+model's action, and cannot contribute benchmark observations.
+
 `memory eval campaign check-approvals` verifies existing hash-bound label and
 spend records without provider activity. `approved-credential.mjs` is a
 trusted-host primitive for checking that gate, reading one explicit OpenBao KV

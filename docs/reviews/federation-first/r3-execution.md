@@ -1,5 +1,31 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 one-request diagnostic prepared, spending approval requested
+
+- User requested the bounded diagnostic. Reconstructed the exact previously
+  reserved second request (`503b2222…e5a79`, 12,622 wire bytes) from the approved
+  synthetic fixture, second-step prompt and selected source. No provider request,
+  retrieval, database or command execution was needed to recover the input. This
+  does not reconstruct the lost output or refund its uncertain charge.
+- Added a one-shot diagnostic reusing the existing credential, approval and
+  durable budget owners. Actual limits: one request / 416,384 reserved tokens /
+  373,728 micro-USD / 120 seconds. No embeddings, grading, model-command execution,
+  automatic retry, campaign resume or benchmark observation. Exclusive attempt
+  claiming precedes key access; competing/restarted owners cannot call again.
+  Returned actions are discarded; only validated provider metadata or sanitized
+  structural failure diagnostics persist.
+- Four real-CLI/budget tests with fake Bao/providers pass, covering concurrent
+  attempts, ambiguity, cancellation, missing approval, altered inputs and denial
+  through the ordinary launcher. Thirty-seven regressions, formatting and
+  boundaries pass; the preparer guard was retested separately. See the
+  [diagnostic runbook and evidence](../../../evals/r3/response-diagnostic.md).
+- Prepared `/data/tmp/r3-onecall-20260916/campaign.json`, identity
+  `e3c4307af14a7ab18428393a8bf4c1609f4796b8b3ae57b2b7b79130a4a23359`.
+  Runtime and input pins verify. The old label decision is preserved; a separate
+  exact spending decision was requested. No new spend approval or live call has
+  been created by this preparation. Existing six-attempt usage/reservations remain
+  unchanged. R3 and official/product-quality gates remain open.
+
 ## 2026-09-16 phase-aware live outcome: multiple candidate messages
 
 - Launched approved `df12ab2b…12ac4e86` once. Preparation and the first model
