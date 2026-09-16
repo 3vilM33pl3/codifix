@@ -8,6 +8,10 @@ import { createHash } from 'node:crypto';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const key = work => JSON.stringify([work.case_id, work.condition, work.repeat]);
+const validWork = work => work && Object.keys(work).sort().join(',') === 'case_id,condition,repeat'
+  && typeof work.case_id === 'string' && work.case_id.length > 0 && work.case_id.length <= 256
+  && typeof work.condition === 'string' && work.condition.length > 0 && work.condition.length <= 64
+  && Number.isSafeInteger(work.repeat) && work.repeat >= 0;
 const maximum = 16 * 1024 * 1024;
 async function syncDirectory(directory) {
   const handle = await fs.open(directory, 'r');
@@ -26,6 +30,7 @@ export async function openCampaignDispatch(options) {
   const { root, directory, socket, manifestSha256, work, offline, preparation } = structuredClone(plain);
   if (![root, directory, socket].every(p => typeof p === 'string' && path.isAbsolute(p))
       || !/^[a-f0-9]{64}$/.test(manifestSha256) || !Array.isArray(work) || !work.length || work.length > 100000
+      || !work.every(validWork)
       || new Set(work.map(key)).size !== work.length || typeof offline !== 'boolean'
       || typeof preparation !== 'boolean' || typeof execute !== 'function' || typeof verify !== 'function'
       || (preparation && typeof prepare !== 'function') || (onProgress !== undefined && typeof onProgress !== 'function')) {
@@ -57,12 +62,12 @@ export async function openCampaignDispatch(options) {
           || dispatch.manifest !== path.join(root, 'campaign.json')
           || dispatch.manifest_sha256 !== manifestSha256) throw Error('invalid dispatch');
       const preparing = dispatch.phase === 'preparation';
-      if ((!preparing && dispatch.phase !== undefined) || (!preparing && !dispatch.work)) throw Error('invalid phase');
+      if ((!preparing && dispatch.phase !== undefined) || (!preparing && !validWork(dispatch.work))) throw Error('invalid phase');
       const identity = preparing ? 'preparation' : key(dispatch.work), digest = hash(bytes);
       let receipt = receipts.get(identity);
       if (receipt && receipt.digest !== digest) throw Error('changed retry');
       if (!receipt) {
-        if (failed || active || (preparing ? prepared || !preparation : !prepared || key(work[cursor] ?? {}) !== identity)) {
+        if (failed || active || (preparing ? prepared || !preparation : !prepared || cursor >= work.length || key(work[cursor]) !== identity)) {
           throw Error('out of order dispatch');
         }
         const id = preparing ? 'preparation' : `work-${String(cursor).padStart(5, '0')}`;

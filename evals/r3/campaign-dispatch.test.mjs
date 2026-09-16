@@ -57,6 +57,8 @@ test('ordered duplicate delivery reuses durable receipts and inspection omits pa
   assert.deepEqual(await send(0), first);
   assert.equal((await post(f.options.socket, { ...f.request(0), maximum_microusd: 1 })).status, 409);
   assert.equal((await send(1)).status, 200);
+  assert.equal((await post(f.options.socket, { ...f.request(1), work: {} })).status, 409);
+  assert.equal((await post(f.options.socket, { ...f.request(1), work: { ...work[1], repeat: 2 } })).status, 409);
   assert.equal(owner.completed, 2);
   assert.equal(preparations, 1); assert.equal(executions, 2);
   await owner.close();
