@@ -49,6 +49,16 @@ validates asset hashes, suite items, split sizes and deterministic condition
 ordering without querying a service. It reports unresolved label/model/budget
 gates rather than treating a draft as approved.
 
+`memory eval campaign check-approvals --manifest <campaign.json>
+--approval <labels.json> --approval <development-spend.json> [--split development|held-out]`
+checks existing operator approval files against the exact manifest and verified
+assets. Missing/stale approvals, insufficient spending caps and unresolved
+readiness gates fail. Success prints the manifest identity, split, work count
+and limits; it does **not** create approval, read credentials, invoke a provider
+or enable the paid runner. Held-out execution requires its own official-spend
+approval. This point-in-time check must be repeated after configuration changes;
+its JSON output is not a transferable execution authorization.
+
 `memory eval campaign report --manifest <campaign.json> --artifact <artifact.json>`
 validates task-level observations and reports scenario-clustered comparisons.
 Offline results cannot pass the product-quality gate. Incomplete legacy run

@@ -2,6 +2,73 @@
 use super::*;
 mod preparation;
 
+#[test]
+fn approval_preflight_requires_exact_current_labels_and_spend_without_enabling_dispatch() {
+    let (mut manifest, _) = fixture();
+    manifest.model.provider = "openai".into();
+    manifest.label_status = "reviewed".into();
+    manifest.limits.microusd = 10_000_000;
+    let pin = serde_json::json!({"path":"driver.sh", "sha256":c::digest(b"fixture")});
+    manifest.provider_profile = Some(
+        serde_json::from_value(serde_json::json!({
+            "version":1, "protocol":"openai-text-v1",
+            "responses_tokenizer":{"id":"synthetic-responses", "asset":pin},
+            "embedding":{"resolved_id":"fake-vector", "dimensions":2, "max_input_tokens":100,
+                "input_microusd_per_million":0,
+                "tokenizer":{"id":"synthetic-embedding", "asset":pin}},
+            "configuration_evidence":pin
+        }))
+        .unwrap(),
+    );
+    let approvals: Vec<_> = [c::ApprovalPurpose::Labels, c::ApprovalPurpose::Development]
+        .into_iter()
+        .map(|purpose| c::Approval {
+            manifest_sha256: c::digest_value(&manifest).unwrap(),
+            reviewer: "synthetic-test-not-human-approval".into(),
+            approved_at: chrono::Utc::now(),
+            purpose,
+            maximum_microusd: manifest.limits.microusd,
+        })
+        .collect();
+    let check = |manifest: &Manifest, approvals: &[c::Approval]| {
+        approval_check(manifest, Split::Development, approvals)
+    };
+    let report = check(&manifest, &approvals).unwrap();
+    assert_eq!(report["approvals_valid"], true);
+    assert_eq!(report["paid_execution_enabled"], false);
+    assert_eq!(report["work_items"], 660);
+    assert_eq!(report["limits"]["microusd"], 10_000_000);
+    assert!(check(&manifest, &[]).is_err());
+    assert!(check(&manifest, &approvals[..1]).is_err());
+    assert!(check(&manifest, &approvals[1..]).is_err());
+    for modify in [
+        |a: &mut c::Approval| a.maximum_microusd -= 1,
+        |a: &mut c::Approval| a.manifest_sha256 = c::digest(b"other"),
+        |a: &mut c::Approval| a.reviewer.clear(),
+        |a: &mut c::Approval| a.approved_at += chrono::Duration::days(1),
+        |a: &mut c::Approval| a.purpose = c::ApprovalPurpose::Official,
+    ] {
+        let mut invalid = approvals.clone();
+        modify(&mut invalid[1]);
+        assert!(check(&manifest, &invalid).is_err());
+    }
+    assert!(approval_check(&manifest, Split::HeldOut, &approvals).is_err());
+    manifest.label_status = "draft".into();
+    assert!(check(&manifest, &approvals).is_err());
+}
+
+#[tokio::test]
+async fn approval_preflight_rejects_bad_split_before_reading_files() {
+    let error = handle(EvalCampaignCommand::CheckApprovals {
+        manifest: "must-not-read".into(),
+        split: "other".into(),
+        approvals: vec![],
+    })
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("split must be"));
+}
+
 #[tokio::test]
 async fn paid_dispatch_is_rejected_before_reading_files_or_starting_processes() {
     let error = handle(EvalCampaignCommand::Run {

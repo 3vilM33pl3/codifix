@@ -36,6 +36,22 @@ mod tests;
 
 pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
     match command {
+        EvalCampaignCommand::CheckApprovals {
+            manifest,
+            split: requested,
+            approvals,
+        } => {
+            let requested = split(&requested)?;
+            let manifest = Manifest::load(&manifest)?;
+            let approvals = approvals
+                .iter()
+                .map(|path| bounded_json::<c::Approval>(path))
+                .collect::<Result<Vec<_>>>()?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&approval_check(&manifest, requested, &approvals)?)?
+            );
+        }
         EvalCampaignCommand::Review {
             manifest,
             artifact,
@@ -240,6 +256,26 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
         }
     }
     Ok(())
+}
+
+// A point-in-time operator preflight, not a transferable execution capability.
+// The launcher must revalidate the manifest/assets and approvals before dispatch.
+fn approval_check(
+    manifest: &Manifest,
+    requested: Split,
+    approvals: &[c::Approval],
+) -> Result<serde_json::Value> {
+    manifest.authorize(requested, approvals)?;
+    let plan = manifest.plan(requested)?;
+    Ok(serde_json::json!({
+        "version": 1,
+        "manifest_sha256": plan.manifest_sha256,
+        "split": requested,
+        "work_items": plan.work.len(),
+        "limits": manifest.limits,
+        "approvals_valid": true,
+        "paid_execution_enabled": false,
+    }))
 }
 
 fn bounded_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {

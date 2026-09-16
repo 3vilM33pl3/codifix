@@ -2416,6 +2416,17 @@ See also:
 
 #[derive(Debug, Subcommand)]
 pub(in crate::commands) enum EvalCampaignCommand {
+    /// Check exact label/spend approvals without credentials, provider calls or dispatch.
+    #[command(after_help = EVAL_CAMPAIGN_AFTER_HELP)]
+    CheckApprovals {
+        #[arg(long)]
+        manifest: PathBuf,
+        #[arg(long, default_value = "development")]
+        split: String,
+        /// Existing human-authored approvals; this command never creates approval.
+        #[arg(long = "approval")]
+        approvals: Vec<PathBuf>,
+    },
     /// Verify hashes and print deterministic work order, without service calls.
     #[command(after_help = EVAL_CAMPAIGN_AFTER_HELP)]
     Plan {
