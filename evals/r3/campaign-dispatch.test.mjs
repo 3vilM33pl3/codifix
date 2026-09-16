@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { openCampaignDispatch, inspectCampaignDispatch } from './campaign-dispatch.mjs';
 
@@ -64,6 +64,9 @@ test('ordered duplicate delivery reuses durable receipts and inspection omits pa
   await owner.close();
   const audit = await inspectCampaignDispatch(f.options.directory);
   assert.equal(audit.execution_enabled, false);
+  const inspected = spawnSync(process.execPath, ['evals/r3/inspect-dispatch.mjs', f.options.directory], { encoding: 'utf8' });
+  assert.equal(inspected.status, 0);
+  assert.deepEqual(JSON.parse(inspected.stdout), audit);
   assert.deepEqual(audit.entries.map(e => e.status), ['completed', 'completed', 'completed']);
   assert(!JSON.stringify(audit).includes('private answer'));
   for (const name of await fs.readdir(f.options.directory)) {
@@ -138,6 +141,9 @@ test('cancellation retires execution, awaits work and keeps uncertain attempt me
   await entered.promise; await owner.close(); await pending;
   assert(cancelled); assert(owner.signal.aborted);
   assert.equal((await inspectCampaignDispatch(f.options.directory)).entries[0].status, 'uncertain');
+  const inspected = spawnSync(process.execPath, ['evals/r3/inspect-dispatch.mjs', f.options.directory], { encoding: 'utf8' });
+  assert.equal(inspected.status, 2);
+  assert(!inspected.stdout.includes('private provider failure'));
   await assert.rejects(openCampaignDispatch(f.options), { code: 'EEXIST' });
 });
 

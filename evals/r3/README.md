@@ -21,6 +21,31 @@ disclosure. Failures poison the owner; leaving its callback cancels the binding.
 `withApprovedCampaignSession` binds this provider to the existing disposable
 snapshot/preparation/execution lifecycle, enforcing matching manifest/split and
 immutable container identities. Tests mock OpenAI traffic and use a fake key.
+Both owner helpers accept an optional `AbortSignal` as their third argument.
+Cancellation rejects new bindings and aborts in-flight HTTP; an uncertain call
+keeps its reservation. Await active work before closing the disposable session.
+
+The rehearsal now uses `campaign-dispatch.mjs`, the shared trusted-host IPC
+controller. It writes an exclusive private dispatch directory, synchronizes an
+attempt before invoking work and a receipt before replying. Exact duplicate
+delivery shares the same attempt/result; changed retries, concurrent different
+work and out-of-order tasks are rejected. Frozen inputs/authority are checked
+again before redelivery. Failure retires the owner; restoring an asset does not
+revive it. SIGKILL tests cover before claim, during execution and after receipt.
+
+Inspect retained controller metadata without exposing answers or invoking work:
+
+```bash
+node evals/r3/inspect-dispatch.mjs /absolute/pack/private/dispatch
+```
+
+Exit 0 means metadata was read, 2 means an uncertain attempt exists, and 1 means
+invalid/unreadable evidence. None enables execution or proves a complete campaign.
+Never delete this directory to retry: its existence fences a second controller
+even after shutdown/crash. This is conservative stop-and-reconcile recovery,
+not automatic reconstruction of a lost prepared database or a paid-run resume.
+Keep it together with the Rust dispatch budget, per-call journals and artifact.
+Receipt payloads are private files; only the inspection summary is metadata-only.
 
 These are **trusted launcher components, not an enabled paid CLI launcher**. The
 CLI paid-run guard stays in place. A successful preflight is point-in-time operator evidence,

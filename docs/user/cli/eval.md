@@ -78,6 +78,13 @@ and starts only unreserved work. Missing/invalid receipts stop before new work;
 they are not permission to retry an ambiguous provider call. Recovery writes new
 reports under `--out/resume-UUID/`, preserving earlier artifacts. Do not move the
 run directory: saved request identities bind its absolute path.
+This generic runner recovery contract does not restart the disposable rehearsal
+controller. Its `private/dispatch` directory fences a second controller after
+shutdown or a crash; do not remove it to trigger another run. Inspect its
+metadata using `node evals/r3/inspect-dispatch.mjs /absolute/pack/private/dispatch`
+and retain the provider journals/artifact for reconciliation. Exit 2 reports an
+uncertain attempt; even exit 0 does not authorize execution or establish quality.
+Reconstructing a prepared service for the complete paid launcher remains open.
 The runner revalidates the locked manifest and assets after every driver exit,
 including the final task. Changed inputs, model/build mismatches, skipped or
 unbacked pending results, inconsistent token usage and uncertain charges stop further
