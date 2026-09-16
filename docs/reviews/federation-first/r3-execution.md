@@ -1,5 +1,21 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 approved single-request diagnostic succeeded
+
+- Olivier approved the US$0.373728 one-call cap at `2026-09-16T22:12:35Z`,
+  manifest `e3c4307a…a23359`. Dev Memory checkpoint and exact approval preflight
+  passed. Pinned runtime revalidated inputs and enforced one actual dispatch.
+- Exact reconstructed input returned accepted structured output: 2,962 input /
+  4,225 output tokens, US$0.021234 receipt-derived cost. No model action execution,
+  embedding call, database, campaign, retry or benchmark observation. Credentials
+  unchanged; exclusive attempt fence and sanitized evidence retained.
+- This demonstrates one successful response, not the cause of the earlier
+  ambiguous output or repeatability. No relaxed decoder, retrospective settlement
+  or further spending authority. Combined totals: US$0.053530 settled plus
+  US$1.702752 in old uncertain allowances; not a verified invoice.
+  See the [diagnostic report](../../../evals/r3/development-onecall-20260916.md).
+  R3 official and product-quality gates remain open.
+
 ## 2026-09-16 one-request diagnostic prepared, spending approval requested
 
 - User requested the bounded diagnostic. Reconstructed the exact previously

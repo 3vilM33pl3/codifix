@@ -5,13 +5,15 @@ development calibration, not an official result or authority for another campaig
 
 ## Gate status
 
-Next step prepared: a [single-response diagnostic](response-diagnostic.md), not
-another campaign. The exact failed request was reconstructed and hash-verified.
-The proposed hard cap is one call / US$0.373728 / 416,384 reserved tokens /
-120 seconds, with no embeddings or command execution. Tests pass and the package
-is pinned; separate spending approval is requested. No diagnostic call has run.
+Latest result: the separately approved [single-response diagnostic](development-onecall-20260916.md)
+ran once successfully, costing US$0.021234 under its US$0.373728 cap. The exact
+reconstructed request returned acceptable structured output; no commands were
+executed and no benchmark observations were created. This does not explain the
+earlier ambiguous response or establish repeatability. Cumulative settled usage
+is US$0.053530, plus US$1.702752 in unchanged unresolved allowances (not confirmed
+charges). The diagnostic approval is consumed; no new paid run is authorized.
 
-Current live outcome: Olivier approved `df12ab2b…12ac4e86` for one US$8.65
+Previous campaign outcome: Olivier approved `df12ab2b…12ac4e86` for one US$8.65
 replacement. It ran once; preparation and its first model call succeeded, but
 the second completed response had multiple candidate answer messages and was
 rejected. Zero completed tasks; no paid retry. The precise phase arrangement was

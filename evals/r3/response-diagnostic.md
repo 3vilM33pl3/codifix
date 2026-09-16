@@ -80,5 +80,8 @@ Logs: `/tmp/r3-onecall-tests.log`, `/tmp/r3-onecall-final-preparer.log`,
 
 Prepared pack: `/data/tmp/r3-onecall-20260916/`, reviewed manifest identity
 `e3c4307af14a7ab18428393a8bf4c1609f4796b8b3ae57b2b7b79130a4a23359`.
-Existing labels are unchanged. Spending approval is requested separately; this
-preparation record does not claim approval or a live result.
+Existing labels are unchanged. Olivier subsequently approved the exact one-call
+cap at `2026-09-16T22:12:35Z`. The owner ran once successfully for US$0.021234;
+no commands were executed and no benchmark observations were created. See the
+[live diagnostic result and accounting](development-onecall-20260916.md).
+The one-call approval is consumed; the retained fence prevents another launch.
