@@ -171,3 +171,34 @@ authorized. Before proposing one, resolve the strict output-profile compatibilit
 and improve fixture coverage offline; the next step is not another blind retry.
 R3 implementation/evidence, human adjudication and official/product-quality gates
 remain open.
+
+## Offline follow-up: documented phased assistant output
+
+On 2026-09-16, compared the decoder with current official
+[GPT-5.4 phase guidance](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.4)
+and the [Responses API reference](https://developers.openai.com/api/reference/typescript/resources/responses/methods/create).
+The API distinguishes intermediate `commentary` from `final_answer`. The frozen
+expanded-run decoder rejected every multi-message response, including a valid
+synthetic commentary-plus-final response. Running that same fixture through the
+frozen decoder reproduces `receipt_output`; the updated decoder selects the final
+JSON correctly. **This proves a compatibility defect, not that the lost live
+response had this shape.** No rejected live payload was recovered or invented.
+
+The narrow fix supports one legacy unphased/null-phase message or explicitly
+marked commentary followed by one marked final answer. Every message still needs
+the assistant role, completed status, one bounded text part and empty annotations.
+Commentary has a 64 KiB aggregate bound, is discarded rather than executed/scored
+or replayed, and cannot rescue invalid final JSON or an invalid final action.
+Unknown/mixed ambiguous phases, missing/multiple final answers, trailing commentary,
+refusals and tool calls still reject the entire receipt. Usage remains the whole
+response's validated total; no commentary/reasoning tokens disappear or double count.
+
+Validation so far: 12 receipt/request/diagnostic tests, 22 transport/mediator/billing
+tests, and six real-container agent/answer tests pass with zero skips. A three-step
+test embeds a syntactically valid but failing command in commentary, verifies it
+never executes or enters subsequent model inputs, and completes all three steps
+using final actions only. Logs: `/tmp/r3-phase-unit.log`,
+`/tmp/r3-phase-integration.log`, `/tmp/r3-phase-isolation.log`. Formatting and
+boundary checks pass. The complete fake-provider launcher rehearsal is recorded
+separately when it completes. No paid generation, key access, spending approval,
+frozen-run edits or changes to models/labels/budgets were made in this follow-up.

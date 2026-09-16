@@ -56,6 +56,16 @@ Replacement campaigns must subtract previous settled and uncertain allowances
 from aggregate limits before their new approval is recorded. Defaults do not
 authorize a fresh $10 after a failed attempt.
 
+The current decoder understands explicitly phased Responses output: intermediate
+commentary is validated and discarded; only one final JSON answer/action can reach
+the agent or scorer. A single legacy unphased message remains supported. Ambiguous
+phases, missing/multiple final answers, refusals, tool calls and malformed content
+still stop execution. Commentary does not become conversation history, and its
+tokens remain included in response-level billing. This does not repair earlier
+frozen runs or authorize a replacement. See the
+[receipt contract](README.md#provider-receipt-decoding) and
+[offline compatibility evidence](development-diagnostic-20260916.md).
+
 The output stays draft/smoke-only. Sources, labels, runtime modules and executable
 copies are pinned. Executables are private copies, so later Cargo rebuilds cannot
 replace a running campaign. The pack is bound to its absolute location; moving it

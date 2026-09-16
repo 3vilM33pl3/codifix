@@ -550,6 +550,19 @@ refusals and truncated or malformed output fail closed. Reasoning tokens remain
 part of output usage, not an extra charge; cache counts are retained for later
 price reconciliation. Raw errors and reasoning are not returned to the caller.
 
+The documented assistant `phase` distinguishes intermediate `commentary` from
+`final_answer` ([GPT-5.4 guidance](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.4)).
+The decoder accepts one legacy unphased/null-phase message, or explicitly marked
+commentary followed by exactly one marked final answer. It validates all message
+roles, statuses and text parts; commentary is bounded to 64 KiB in aggregate and
+is discarded, not returned, executed, stored in results or replayed as history.
+The final text retains its separate 64 KiB limit and JSON/action/answer validation.
+All token usage, including commentary, is accounted once from the whole response.
+Unknown phases, commentary-only output, multiple final/unphased messages,
+unphased answers after commentary, and commentary after a final answer fail closed.
+Tool calls, annotations and refusals remain prohibited even inside commentary.
+Diagnostics retain closed-vocabulary failure reasons, never provider text.
+
 This decoder neither invokes a provider nor supplies tokenization, prices or
 approval. Its synthetic fixtures are checked with
 `node --test evals/r3/responses-receipt.test.mjs`. The authenticated transport and

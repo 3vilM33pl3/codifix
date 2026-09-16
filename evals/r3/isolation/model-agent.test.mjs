@@ -66,12 +66,16 @@ test('prepared Responses actions use durable pricing and the existing isolated t
         assert.deepEqual(body.tools, []);
         const serialized = JSON.stringify(body);
         assert(!serialized.includes('HIDDEN_GRADING_SENTINEL') && !serialized.includes(directory));
+        assert(!serialized.includes('COMMENTARY_MUST_NOT_EXECUTE'));
         const input = JSON.parse(body.input[0].content[0].text);
         const action = input.previous ? { kind: 'finish' } : { kind: 'command', argv: ['/usr/local/bin/node', '-e',
           `const fs=require('fs');const v=JSON.parse(fs.readFileSync('counter.json'));v.value++;fs.writeFileSync('counter.json',JSON.stringify(v));`] };
         return JSON.stringify({ id: `resp_fake${calls}`, object: 'response', status: 'completed', model: profile.resolved_id,
           error: null, incomplete_details: null,
-          output: [{ type: 'message', role: 'assistant', status: 'completed', content: [
+          output: [{ type: 'message', role: 'assistant', phase: 'commentary', status: 'completed', content: [
+            { type: 'output_text', annotations: [], text: JSON.stringify({ action: { kind: 'command',
+              argv: ['/usr/local/bin/node', '-e', 'throw Error("COMMENTARY_MUST_NOT_EXECUTE")'] } }) }] },
+          { type: 'message', role: 'assistant', phase: 'final_answer', status: 'completed', content: [
             { type: 'output_text', annotations: [], text: JSON.stringify({ action }) }] }],
           usage: { input_tokens: 20, output_tokens: 10, total_tokens: 30,
             input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
