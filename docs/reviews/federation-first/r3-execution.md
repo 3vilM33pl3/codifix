@@ -1,5 +1,25 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 scoped development-label approval
+
+- Olivier replied “Approved” to the request to approve artifact-origin and
+  configuration-rollout labels before a separate exact spending request. Recorded
+  that scope through the dev Memory checkpoint before editing; neither other
+  benchmark families nor spending are inferred as approved.
+- Verified the existing draft identity and all pinned runtime inputs, then changed
+  only the calibration manifest's `label_status` to `reviewed`. Final SHA-256:
+  `40c6f8dd554cb2f6a52575a87133a31edce8003c25a99b969e14dcb48f6b9d3c` at
+  `/data/tmp/r3-calibration-20260916/campaign.json`. The sources, private labels,
+  tests, model settings, limits and runtime bytes are unchanged.
+- Recorded a mode-0600 `private/labels-approval.json` for Olivier, purpose
+  `labels`, timestamp `2026-09-16T11:44:23Z`, maximum spend zero. The pinned CLI
+  validates the 75-task plan. Approval preflight fails as intended with
+  `missing current Development approval`, proving the labels-only receipt does
+  not enable paid dispatch. No secret access or provider calls occurred.
+- Next: obtain explicit approval for this identity, the pinned answer/embedding
+  models and maximum US$10 / 500 calls / ten million tokens, including preparation.
+  Full benchmark label approval and the official campaign remain open.
+
 ## 2026-09-16 approved paid launcher
 
 - Resumed and checkpointed the existing approved plan through dev Memory before

@@ -3,6 +3,14 @@
 No commands or spending are required for this review. You are deciding **what
 counts as a correct answer**, not whether Memory has passed an evaluation.
 
+On 2026-09-16, Olivier approved **only** the artifact-origin and
+configuration-rollout development families for the first calibration. Their
+frozen campaign identity and labels-only receipt are recorded in
+[paid readiness](paid-readiness.md). The other families remain draft, and this
+approval does not authorize spending or the held-out campaign. The fixture
+files retain their original draft wording and hashes; the reviewed calibration
+manifest and receipt record the scoped approval without rewriting its evidence.
+
 The draft contains 140 knowledge questions and 16 three-step coding sequences
 across 51 distinct families. All data is fictional. Synthetic harness passes do
 not establish model quality or customer ROI.

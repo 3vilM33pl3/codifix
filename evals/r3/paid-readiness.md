@@ -14,7 +14,7 @@ approval, an official result, or permission to execute a paid campaign.
 | Input accounting | Explicit [v2 full-context reservations](context-accounting.md) avoid unverified guesses about message/schema framing. Durable settlement/denial/replay tests pass. This is not exact tokenization or live billing validation. |
 | Real provider configuration | Reviewed v2 model/rates/limits implemented; campaign selection remains unapproved. Pin implementation and evidence into the actual calibration manifest; verify live wire/usage compatibility only after spend approval. |
 | Live launcher | [Approved launcher and packaging](paid-launcher.md) now connect the provider owner, durable controller, disposable session and Rust runner. Generic paid drivers stay blocked; the approved route requires exact label/spend records. Interruption fences the campaign before another key read, rather than rebuilding/repeating uncertain work. See the execution ledger for fake-only validation evidence; no real campaign is approved by this implementation. |
-| Benchmark labels | Awaiting Olivier's review of the [label review pack](label-review.md). No labels frozen or approval files fabricated. |
+| Benchmark labels | Olivier approved the artifact-origin and configuration-rollout development families on 2026-09-16. Their calibration manifest is frozen as reviewed with a labels-only receipt. All other families, including held-out labels, remain unapproved; see the [label review pack](label-review.md). |
 | Development spend | Awaiting approval of the exact locked manifest and cap; candidate scope below. |
 | Official campaign | Separate approval after calibration fixes operational budgets and selects the cost/latency reference baseline. No official calls authorized or made. |
 
@@ -22,11 +22,11 @@ The existing offline artifact and its limitations are recorded in the
 [execution ledger](../../docs/reviews/federation-first/r3-execution.md).
 Fake-provider passes are harness evidence, not measured Memory quality.
 
-## Proposed first calibration, not an authorization request yet
+## Frozen first calibration, awaiting spending approval
 
 Use one complete development knowledge family (four questions) and one complete
 three-step coding family, all five conditions and three repeats: **75 task
-executions**, not 75 independent observations. Proposed families:
+executions**, not 75 independent observations. Label-approved families:
 [artifact origin](representative/development/artifact-origin/review.md) and
 [configuration rollout](representative/development/configuration-rollout/review.md).
 No held-out tasks, customer facts, dev-service corpus or host agent history.
@@ -58,19 +58,22 @@ proposal is unchanged. Stop and retain incomplete evidence when any bound is hit
 Taxes/account billing and unknown in-flight charges are not a guarantee supplied
 by the local usage ledger. Do not retry ambiguous charges automatically.
 
-Before asking for spend approval, build the actual locked campaign, verify its
-provider/tokenizer and isolation path, and show its SHA-256 plus exact limits.
+The actual campaign and pinned runtime have been verified without provider calls.
 The first billable calls then belong to that approved development calibration;
 model-list access alone does not prove those calls will succeed. Do not create
 approval JSON from this proposal or from approval of secret storage.
 
-The launcher increment prepared a local draft at
-`/data/tmp/r3-calibration-20260916/campaign.json`, with draft SHA-256
-`943ce776cd89a00c4b183cba22ed82b36fda8514242b299690bbf59bd4f6af48` and the limits
-above. It has no approvals and has not contacted a provider. Review the two
-development families first. Freezing genuinely approved labels changes the
-manifest hash; the subsequent exact spend request must use that **final** hash,
-not this draft identity. The location-invalid superseded draft is not runnable.
+Olivier's “Approved” response to the explicit two-family label-review request
+was recorded on 2026-09-16. Only `label_status` changed from the verified draft.
+The final manifest at `/data/tmp/r3-calibration-20260916/campaign.json` has SHA-256
+`40c6f8dd554cb2f6a52575a87133a31edce8003c25a99b969e14dcb48f6b9d3c`.
+Its `private/labels-approval.json` names Olivier, purpose `labels`, with a zero
+spending allowance. The real preflight accepts that label record and rejects
+execution with `missing current Development approval`. No key was read and no
+provider contacted. Approval of the models and the $10 development limit must
+explicitly bind this final identity; the earlier draft hash and location-invalid
+superseded pack are not valid spending targets. Any manifest change requires
+rechecking the approval bindings. No official campaign is authorized.
 
 ## Accounting choice and remaining live verification
 
