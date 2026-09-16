@@ -10,10 +10,10 @@ approval, an official result, or a claim that paid execution is enabled.
 | Dedicated evaluation credential | Provisioned in the approved OpenBao KV entry, version 1. No key in the repo or `.env`. |
 | Provider authentication | A read-only `GET /v1/models` returned HTTP 200 with the dedicated key. This establishes authentication/model visibility, not billing credit or inference compatibility. |
 | Approval preflight | `memory eval campaign check-approvals` verifies the manifest, assets and matching label/spend records without provider calls. Success does not enable dispatch. |
-| Secret handoff primitive | Checks approvals before a version-pinned Bao read and again before use. Fake-process tests cover denial, changes, sanitization and no ambient provider/proxy fallback. Not yet connected to a live launcher. |
-| Real token accounting | Open. Verify/pin embedding tokenization and account for complete Responses request framing and structured schemas. The synthetic counter is not acceptable. |
-| Real provider configuration | Candidate below; not selected/approved. Pin counter implementations, prices, endpoint, model and dimensions in a complete manifest. Verify live wire/usage compatibility within an approved calibration. |
-| Live launcher | Open. Connect the approved credential/provider owner to the shared campaign session, test startup/crash/cleanup, and retain the paid CLI guard until that path is verified. |
+| Secret/provider owner | Connects the version-pinned key handoff to fixed API destinations, rechecking approvals before every call and cancelling bindings on exit/failure. Tests use fake secrets and mocked OpenAI responses. |
+| Input accounting | Explicit [v2 full-context reservations](context-accounting.md) avoid unverified guesses about message/schema framing. Durable settlement/denial/replay tests pass. This is not exact tokenization or live billing validation. |
+| Real provider configuration | Reviewed v2 model/rates/limits implemented; campaign selection remains unapproved. Pin implementation and evidence into the actual calibration manifest; verify live wire/usage compatibility only after spend approval. |
+| Live launcher | Credential/provider owner now connects to the shared disposable campaign session. The complete command-line controller, locked runtime packaging and recovery/interrupt rehearsal remain open; the paid CLI guard stays enabled. |
 | Benchmark labels | Awaiting Olivier's review of the [label review pack](label-review.md). No labels frozen or approval files fabricated. |
 | Development spend | Awaiting approval of the exact locked manifest and cap; candidate scope below. |
 | Official campaign | Separate approval after calibration fixes operational budgets and selects the cost/latency reference baseline. No official calls authorized or made. |
@@ -46,12 +46,15 @@ $0.02 per million tokens. The documented encoding is `cl100k_base`.
 [embedding guide](https://developers.openai.com/api/docs/guides/embeddings)
 
 Proposed maximum: **US$10 of provider usage**, including preparation, no automatic
-retries or top-up; at most 500 provider calls and two million total tokens.
-Proposed per-request answer bounds are 32,768 input / 4,096 output tokens, with
+retries or top-up; at most 500 provider calls and ten million total tokens.
+The proposed v2 profile reserves 400,000 input / 4,096 output tokens per call, with
 at most 12 provider calls per task and 300 seconds per complete task. These are
 starting operational limits to validate offline, not promises that every task
-will finish. The existing per-task aggregate token allowance must also fit each
-three-step sequence. Stop and retain incomplete evidence when any bound is hit.
+will finish. Whole-task reservations cover all 12 calls and need 4,849,152 token
+headroom / $3.821184 remaining before a task starts. Actual usage releases the
+unused amount after settlement. This replaces the earlier proposed two-million
+token cap, which cannot fit even one such task reservation; the $10 spending
+proposal is unchanged. Stop and retain incomplete evidence when any bound is hit.
 Taxes/account billing and unknown in-flight charges are not a guarantee supplied
 by the local usage ledger. Do not retry ambiguous charges automatically.
 
@@ -61,14 +64,16 @@ The first billable calls then belong to that approved development calibration;
 model-list access alone does not prove those calls will succeed. Do not create
 approval JSON from this proposal or from approval of secret storage.
 
-## Why the token/pricing gates are still real work
+## Accounting choice and remaining live verification
 
 Responses input includes roles, message boundaries and structured-output schema
 formatting. Plain-text tokenization alone is not exact; OpenAI exposes a separate
 input-count endpoint for complete requests. The current R3 counter callback is
 deliberately local/synchronous. Do not hide an unmediated HTTP request inside it.
-Either verify a conservative pinned local counter for the exact supported shape,
-or explicitly implement and account for a separately mediated counting operation.
+The implemented v2 alternative reserves full documented model capacity, then
+settles actual validated usage. No additional counting endpoint is invoked.
+This deliberately trades tighter preflight estimates for conservative budget
+headroom; it does not pretend to measure the exact input before transmission.
 [Official token-counting guidance](https://developers.openai.com/api/docs/guides/token-counting)
 
 The newer GPT-5.6 Sol/Luna documentation includes cache-write pricing that the

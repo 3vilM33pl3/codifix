@@ -19,6 +19,30 @@ function capture(binary, args, env, maxBuffer) {
   });
 }
 
+const ownerEnvironment = () => ({ PATH: '/usr/bin:/bin', ...(process.env.HOME ? { HOME: process.env.HOME } : {}) });
+
+export async function checkApprovedCampaign(options) {
+  const { memoryBinary, manifest, approvals, split, manifestSha256 } = structuredClone(options);
+  if (![memoryBinary, manifest].every(absolute) || !Array.isArray(approvals)
+      || approvals.length < 2 || approvals.length > 8 || !approvals.every(absolute)
+      || !['development', 'held-out'].includes(split) || !/^[a-f0-9]{64}$/.test(manifestSha256)) {
+    throw Error('invalid evaluation approval contract');
+  }
+  const output = await capture(memoryBinary, ['eval', 'campaign', 'check-approvals', '--manifest', manifest,
+    '--split', split, ...approvals.flatMap(file => ['--approval', file])], ownerEnvironment(), 16384);
+  let report;
+  try { report = JSON.parse(output); } catch { throw Error('invalid approval preflight response'); }
+  if (!report || report.version !== 1 || report.manifest_sha256 !== manifestSha256
+      || report.split !== (split === 'held-out' ? 'held_out' : split)
+      || report.approvals_valid !== true || report.paid_execution_enabled !== false
+      || !Number.isSafeInteger(report.work_items) || report.work_items < 1
+      || !report.limits || !['requests', 'tokens', 'microusd', 'task_seconds']
+        .every(key => Number.isSafeInteger(report.limits[key]) && report.limits[key] > 0)) {
+    throw Error('approval preflight identity mismatch');
+  }
+  return report;
+}
+
 export async function withApprovedEvaluationKey(options, use) {
   const { memoryBinary, baoBinary, manifest, approvals, split, manifestSha256, secret } = structuredClone(options);
   if (![memoryBinary, baoBinary, manifest].every(absolute)
@@ -35,22 +59,8 @@ export async function withApprovedEvaluationKey(options, use) {
   // Only the existing user's home is preserved for the Bao token helper. Do not
   // inherit provider credentials, proxy overrides, alternate endpoints or TLS
   // bypass settings. The explicit Bao binary uses the operating-system CA store.
-  const env = { PATH: '/usr/bin:/bin', ...(process.env.HOME ? { HOME: process.env.HOME } : {}) };
-  const check = async () => {
-    const output = await capture(memoryBinary, ['eval', 'campaign', 'check-approvals', '--manifest', manifest,
-      '--split', split, ...approvals.flatMap(file => ['--approval', file])], env, 16384);
-    let report;
-    try { report = JSON.parse(output); } catch { throw Error('invalid approval preflight response'); }
-    if (report.version !== 1 || report.manifest_sha256 !== manifestSha256
-        || report.split !== (split === 'held-out' ? 'held_out' : split)
-        || report.approvals_valid !== true || report.paid_execution_enabled !== false
-        || !Number.isSafeInteger(report.work_items) || report.work_items < 1
-        || !report.limits || !['requests', 'tokens', 'microusd', 'task_seconds']
-          .every(key => Number.isSafeInteger(report.limits[key]) && report.limits[key] > 0)) {
-      throw Error('approval preflight identity mismatch');
-    }
-    return report;
-  };
+  const env = ownerEnvironment();
+  const check = () => checkApprovedCampaign({ memoryBinary, manifest, approvals, split, manifestSha256 });
   const before = await check();
   let key = await capture(baoBinary, ['kv', 'get', `-address=${address.origin}`, '-tls-skip-verify=false',
     `-mount=${secret.mount}`, `-version=${secret.version}`, `-field=${secret.field}`, secret.path],

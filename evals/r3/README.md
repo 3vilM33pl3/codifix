@@ -14,8 +14,16 @@ callback failures are sanitized and never retried. System CA verification and
 redirect denial remain enabled. Existing user-home Bao authentication is used;
 no new credentials are provisioned. JavaScript cannot guarantee key zeroization.
 
-This helper is **not connected to paid campaign dispatch yet**. The CLI paid-run
-guard stays in place. A successful preflight is point-in-time operator evidence,
+`withApprovedProvider` now connects that handoff to fixed Responses/embeddings
+transports and the reviewed v2 reservation implementation. It verifies pinned
+counter bytes and rechecks the Rust approval/asset gate immediately before each
+disclosure. Failures poison the owner; leaving its callback cancels the binding.
+`withApprovedCampaignSession` binds this provider to the existing disposable
+snapshot/preparation/execution lifecycle, enforcing matching manifest/split and
+immutable container identities. Tests mock OpenAI traffic and use a fake key.
+
+These are **trusted launcher components, not an enabled paid CLI launcher**. The
+CLI paid-run guard stays in place. A successful preflight is point-in-time operator evidence,
 not a signed authorization: the trusted launcher must validate frozen assets,
 model/tokenizer/rates, isolation and live approval before every dispatch.
 Tests use fake secret executables only; CI also checks real-CLI denial before
@@ -25,7 +33,10 @@ The optional `provider_profile` manifest field locks the answer tokenizer, separ
 embedding model/dimensions/input price/tokenizer, and a configuration-evidence
 asset. Each tokenizer has an ID and a `{path, sha256}` reference to a configuration
 asset; the normal manifest checks verify those bytes before/after dispatch.
-Version 1 supports the existing `openai-text-v1` wire profile only. The embedding
+Both versions use the existing `openai-text-v1` wire profile. Version 2 adds
+[full-context reservations](context-accounting.md) as an explicit alternative to
+local tokenization, with reviewed model/price limits and whole-sequence headroom.
+No token-counting network call is hidden in a local callback. The embedding
 ID must equal `model.embedding_id`; its price is not copied from the answer model.
 Legacy manifests omit the field without changing canonical bytes, but cannot be
 authorized for paid execution or qualify as non-offline evidence without it.
