@@ -5,6 +5,13 @@ development calibration, not an official result or authority for another campaig
 
 ## Gate status
 
+Latest update: the instrumented retry identified rejection of a completed
+response's usage shape. A narrow compatibility fix accepts the documented
+zero-valued `cache_write_tokens` field. Olivier approved the usage-fixed
+replacement with US$9.36 remaining; both prior uncertain calls stay reserved.
+See the [diagnosis and current approval](development-diagnostic-20260916.md).
+The historical gate rows below describe the earlier two attempts.
+
 | Gate | Status and evidence |
 | --- | --- |
 | Dedicated evaluation credential | Provisioned in the approved OpenBao KV entry, version 1. No key in the repo or `.env`. |

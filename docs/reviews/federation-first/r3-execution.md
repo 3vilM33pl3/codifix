@@ -1,5 +1,24 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 live diagnosis and usage-schema fix
+
+- Instrumented retry `d424e71a…53fe8c9` stopped at its first coding model call.
+  New private evidence confirms a completed expected-model response rejected at
+  `receipt_usage_shape`, after numeric token bounds/consistency checks. A read-only
+  response lookup returned 404; no further model invocation occurred.
+- The current official API reference adds `cache_write_tokens`. Reproduced the
+  old decoder's rejection of its documented zero value. Accept only optional
+  numeric zero; preserve rejection of nonzero/unpriced writes and unknown fields.
+  The exact extra field in the failed live response was not retained, so this
+  schema incompatibility is consistent with, not a recovered copy of, that field.
+- Twenty focused tests pass; the fake launcher fixture now emits the current
+  zero-cache-write shape. See the [diagnostic report](../../../evals/r3/development-diagnostic-20260916.md).
+- Olivier explicitly approved replacement `91524471…1236098` with remaining caps
+  US$9.36 / 384 calls / 9,183,048 tokens. Both unresolved call allowances remain
+  fully reserved, along with all 114 settled embedding calls / 249 micro-USD.
+  No benchmark/model changes or top-up; no held-out approval. Full offline
+  validation precedes the separately recorded launch/outcome.
+
 ## 2026-09-16 diagnostic repair and bounded retry authorization
 
 - Olivier requested diagnosis and another attempt. Added closed-vocabulary
