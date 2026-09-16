@@ -65,6 +65,7 @@ export async function openCampaignDispatch(options) {
       if ((!preparing && dispatch.phase !== undefined) || (!preparing && !validWork(dispatch.work))) throw Error('invalid phase');
       const identity = preparing ? 'preparation' : key(dispatch.work), digest = hash(bytes);
       let receipt = receipts.get(identity);
+      const replaying = !!receipt;
       if (receipt && receipt.digest !== digest) throw Error('changed retry');
       if (!receipt) {
         if (failed || active || (preparing ? prepared || !preparation : !prepared || cursor >= work.length || key(work[cursor]) !== identity)) {
@@ -101,7 +102,7 @@ export async function openCampaignDispatch(options) {
       if (failed) throw Error('dispatch owner retired');
       // Redelivery is still subject to current approval/input checks. A failed
       // check retires this owner, even if the asset is subsequently put back.
-      try { await verify(); }
+      try { if (replaying) await verify(); }
       catch { failed = true; lifetime.abort(); throw Error('changed dispatch authority'); }
       if (stopping) throw Error('stopped before delivery');
       response.writeHead(200, { 'Content-Type': 'application/json' });
