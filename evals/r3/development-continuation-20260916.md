@@ -55,7 +55,23 @@ our bounded compatibility rule, not a claimed upstream guarantee or permission
 to choose the last answer. The retained length-only evidence motivated a test,
 not a conclusion about the lost contents.
 
-Forty focused receipt/request/billing/transport tests pass with no skips. A full
-fake-provider launcher rehearsal is being run before any replacement paid launch.
+Forty focused receipt/request/billing/transport tests and four diagnostic safety
+tests pass with no skips. The full 75-task fake-provider launcher rehearsal passes
+with duplicate finals on every model response, one billing settlement per call,
+unchanged isolation snapshots, 60 pending human reviews and denied restart.
+Evidence: `/data/tmp/r3-paid-urbZEu/pack/run/`, logs
+`/tmp/r3-exact-finals-{tests,diagnostic,launcher,boundaries}.log`.
+Formatting and boundaries pass. These are synthetic harness results, not quality.
+
+## Continuation 2
+
+Pack `/data/tmp/r3-continue2-20260916`, identity
+`461ccc8fae2ffe06dda6e07d91297640bdd434b9e40c1dd4dc5e81701968da14`,
+is pinned with the exact-final repair and **224 calls / 7,491,133 tokens /
+US$7.845915**. The original continuing-development authorization covers this
+reconciled remainder. Same models, prompts, 29 reviewed nonconfiguration assets,
+75-task order and isolation; runtime and approval gates pass. This pack has not
+inherited any success or settled charge from the prior failed pack.
+
 R3 and official/product-quality gates remain open; do not treat budget consumption
 or a successful diagnostic as quality proof.
