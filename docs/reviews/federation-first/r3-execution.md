@@ -1,5 +1,19 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 phase-aware replacement approved for one launch
+
+- Olivier replied “yes” to the exact pinned replacement and remaining caps:
+  US$8.65 / 305 requests / 8,350,086 tokens. Recorded at `2026-09-16T16:31:30Z`,
+  manifest `df12ab2b403b0a18ca82d1c1515671c4ab5dd0a89df751c2cf2f998012ac4e86`.
+  Runtime and exact label/development approval checks pass; the original 29
+  reviewed assets, models and per-task limits are unchanged. All prior settled
+  usage and four uncertain model allowances remain reserved. No automatic retry,
+  top-up, model substitution or official run is authorized.
+- Checkpointed through dev Memory and provisioned only an owned disposable
+  database for the single launch. Reuse the existing dedicated evaluation secret
+  reference without credential changes. Offline prerequisites are recorded below;
+  the live outcome is separate from approval and launch.
+
 ## 2026-09-16 offline output-phase compatibility repair
 
 - Resumed the approved R3 thread and checkpointed offline investigation. Current
