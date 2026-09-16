@@ -209,12 +209,13 @@ async function createExecutor(options, providerOnly) {
         // Each stage's prompt is selected in its own invocation; the sequence
         // runner supplies no private grader output or reference implementation.
         // Retrieval shares the task's request/time budget. Stop generating before
-        // a full provider window no longer fits; leave bounded headroom for the
-        // three graders and snapshot/final verification. This is a failed task,
+        // a full provider window no longer fits; leave explicit headroom for
+        // private grading and snapshot/final verification. This is a failed task,
         // not missing usage from an avoidable last-moment provider cancellation.
         const budgetedLive = providerOnly && !offlineMode;
         const usedRequests = budgetedLive ? (await mediator.audit()).audit.ledger.requests : 0;
-        const modelCalls = manifest.provider_budget?.max_calls_per_task - usedRequests;
+        const modelCalls = (budgetedLive ? providerContract.limits.requests
+          : manifest.provider_budget?.max_calls_per_task) - usedRequests;
         const agentMs = Math.floor(manifest.limits.task_seconds * 1000
           - (budgetedLive ? performance.now() - started + 100000 : 0));
         const exhaustedAgent = async input => ({ version: 1, image: input.image, exitCode: 1,
