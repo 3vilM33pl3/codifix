@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // One text per request, explicit model/dimensions and float32 storage. The
-// caller owns approval, local tokenizer verification and preparation/task caps.
+// caller owns approval, local accounting verification and preparation/task caps.
 // Wire reference: https://developers.openai.com/api/reference/ruby/resources/embeddings/methods/create
 import { checkedVector } from './isolation/embedding-proxy.mjs';
 
@@ -28,7 +28,8 @@ export function prepareEmbeddingsRequest({ model, dimensions, input, maxInputTok
   } };
 }
 
-export function createEmbeddingsPreparation({ mediator, model, dimensions, tokenizer, countInputTokens, send }) {
+export function createEmbeddingsPreparation({ mediator, model, dimensions, tokenizer, countInputTokens, send, inputAccounting }) {
+  if (inputAccounting !== undefined && inputAccounting !== 'full_context_reservation') throw Error('unsupported input accounting');
   const locked = structuredClone(model), tokenContract = structuredClone(tokenizer);
   if (locked?.provider !== 'openai' || typeof mediator?.price !== 'function' || typeof send !== 'function'
       || typeof countInputTokens !== 'function' || !exact(tokenContract, 'id,sha256')
@@ -49,6 +50,7 @@ export function createEmbeddingsPreparation({ mediator, model, dimensions, token
     const allowance = await mediator.price({ model: locked, inputTokens, outputTokens: 0 });
     const contract = { version: 1, protocol: 'r3-embeddings-call-v1', model: locked, dimensions,
       tokenizer: tokenContract, purpose: payload.purpose, input_tokens: inputTokens, request: codec.body };
+    if (inputAccounting) contract.input_accounting = inputAccounting;
     const bytes = JSON.stringify(contract);
     return { payload: JSON.parse(bytes), allowance,
       invoke: async (received, signal) => {

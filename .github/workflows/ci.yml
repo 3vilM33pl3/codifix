@@ -269,7 +269,7 @@ jobs:
           MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" \
             MEMORY_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" MEMORY_R3_REQUIRE_BUDGETED_SERVICE=1 MEMORY_R3_REQUIRE_MEDIATOR=1 MEMORY_R3_REQUIRE_EMBEDDINGS=1 MEMORY_R3_REQUIRE_MODEL_AGENT=1 MEMORY_R3_REQUIRE_MODEL_ANSWER=1 \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_SERVICE_SESSION=1 \
-            node --test evals/r3/isolation/service-session.test.mjs evals/r3/isolation/embedding-proxy.test.mjs evals/r3/request-mediator.test.mjs evals/r3/responses-call.test.mjs evals/r3/embeddings-call.test.mjs evals/r3/provider-profile.test.mjs evals/r3/synthetic-wire-provider.test.mjs evals/r3/isolation/model-agent.test.mjs evals/r3/isolation/model-answer.test.mjs
+            node --test evals/r3/isolation/service-session.test.mjs evals/r3/isolation/embedding-proxy.test.mjs evals/r3/request-mediator.test.mjs evals/r3/responses-call.test.mjs evals/r3/embeddings-call.test.mjs evals/r3/provider-profile.test.mjs evals/r3/context-reservation.test.mjs evals/r3/synthetic-wire-provider.test.mjs evals/r3/isolation/model-agent.test.mjs evals/r3/isolation/model-answer.test.mjs
           cargo build -p mem-eval --example r3_retriever --locked
           docker build --network=none -f evals/r3/isolation/Dockerfile.rust -t memory-r3-rust:offline evals/r3/isolation
           r3_rust_image=$(docker image inspect --format '{{.Id}}' memory-r3-rust:offline)

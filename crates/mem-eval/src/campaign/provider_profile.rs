@@ -41,6 +41,10 @@ pub struct ProviderProfile {
     /// Reviewed model/tokenizer/rate provenance, itself a locked private asset.
     /// A hash establishes identity; it does not make the contents trustworthy.
     pub configuration_evidence: Pin,
+    /// V2 explicitly reserves full documented context capacity, not an exact
+    /// local token count. Omitted for V1 to preserve historical canonical bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_accounting: Option<String>,
 }
 
 impl Pin {
@@ -64,7 +68,9 @@ impl ProviderProfile {
         const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
         let model = &manifest.model;
         ensure!(
-            self.version == 1
+            ((self.version == 1 && self.input_accounting.is_none())
+                || (self.version == 2
+                    && self.input_accounting.as_deref() == Some("full_context_reservation")))
                 && self.protocol == "openai-text-v1"
                 && model.provider == "openai"
                 && identifier(&self.embedding.resolved_id)
@@ -79,6 +85,27 @@ impl ProviderProfile {
                 .contains(&model.reasoning.as_str()),
             "unsupported or mismatched provider profile"
         );
+        if self.version == 2 {
+            ensure!(
+                model.resolved_id == "gpt-5.4-mini-2026-03-17"
+                    && model.max_input_tokens == 400_000
+                    && (1..=128_000).contains(&model.max_output_tokens)
+                    && ["none", "low", "medium", "high", "xhigh"]
+                        .contains(&model.reasoning.as_str())
+                    && self.embedding.resolved_id == "text-embedding-3-small"
+                    && self.embedding.max_input_tokens == 8192
+                    && self.embedding.dimensions == 1536
+                    && manifest.provider_budget.is_some()
+                    && manifest.preparation_budget.is_some()
+                    && model.input_microusd_per_million == 750_000
+                    && model.output_microusd_per_million == 4_500_000
+                    && model.cached_input_microusd_per_million == Some(75_000)
+                    && self.embedding.input_microusd_per_million == 20_000
+                    && self.responses_tokenizer.id == "full-context-responses-v1"
+                    && self.embedding.tokenizer.id == "full-context-embeddings-v1",
+                "unreviewed full-context reservation profile"
+            );
+        }
         ensure!(
             [
                 model.max_input_tokens,

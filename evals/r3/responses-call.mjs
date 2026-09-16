@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Trusted preparation for the existing model adapters. Input counting MUST be
-// local and backed by a reviewed/pinned tokenizer for the chosen model. Hashes
-// identify the operator's contract; they do not prove tokenizer correctness.
+// Trusted preparation: either a reviewed/pinned local tokenizer or the explicit
+// V2 full-context reservation. A capacity reservation is not an exact token count.
+// Hashes identify the contract; they do not establish its correctness.
 import { prepareResponsesRequest } from './responses-request.mjs';
 
-export function createResponsesPreparation({ mediator, model, tokenizer, countInputTokens, send }) {
+export function createResponsesPreparation({ mediator, model, tokenizer, countInputTokens, send, inputAccounting }) {
   const locked = structuredClone(model), tokenContract = structuredClone(tokenizer);
+  if (inputAccounting !== undefined && inputAccounting !== 'full_context_reservation') throw Error('unsupported input accounting');
   if (typeof countInputTokens !== 'function' || typeof send !== 'function' || typeof mediator?.price !== 'function'
       || !locked || ['max_input_tokens', 'max_output_tokens', 'input_microusd_per_million', 'output_microusd_per_million']
         .some(key => !Number.isSafeInteger(locked[key]) || locked[key] < 0)
@@ -20,8 +21,8 @@ export function createResponsesPreparation({ mediator, model, tokenizer, countIn
     if (payload?.model?.provider !== locked.provider || payload.model.resolved_id !== locked.resolved_id
         || payload.model.reasoning !== locked.reasoning) throw Error('model differs from locked provider profile');
     const codec = prepareResponsesRequest(payload, { maxInputTokens: locked.max_input_tokens, maxOutputTokens: locked.max_output_tokens });
-    // Count the exact request including instructions, schema and framing, not
-    // just the question. No network preflight is permitted by this interface.
+    // Count the whole request or reserve the explicit V2 context ceiling.
+    // No network preflight is permitted by this interface.
     let inputTokens;
     try {
       inputTokens = countInputTokens(structuredClone(codec.body));
@@ -38,6 +39,7 @@ export function createResponsesPreparation({ mediator, model, tokenizer, countIn
     const allowance = await mediator.price({ model: locked, inputTokens, outputTokens: locked.max_output_tokens });
     const contract = { version: 1, protocol: 'r3-responses-call-v1', model: locked,
       tokenizer: tokenContract, input_tokens: inputTokens, request: codec.body };
+    if (inputAccounting) contract.input_accounting = inputAccounting;
     const bytes = JSON.stringify(contract);
     return { payload: JSON.parse(bytes), allowance,
       invoke: async (received, signal) => {

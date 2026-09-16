@@ -51,6 +51,63 @@ fn provider_profile_binds_models_counters_rates_and_private_assets() {
 }
 
 #[test]
+fn full_context_profile_is_explicit_model_bound_and_has_sequence_headroom() {
+    let mut manifest = fixture();
+    let legacy = serde_json::to_vec(&manifest).unwrap();
+    assert!(!String::from_utf8_lossy(&legacy).contains("input_accounting"));
+    assert_eq!(
+        serde_json::to_vec(&serde_json::from_slice::<Manifest>(&legacy).unwrap()).unwrap(),
+        legacy
+    );
+    manifest.model.resolved_id = "gpt-5.4-mini-2026-03-17".into();
+    manifest.model.embedding_id = "text-embedding-3-small".into();
+    manifest.model.reasoning = "medium".into();
+    manifest.model.max_input_tokens = 400_000;
+    manifest.model.max_output_tokens = 4096;
+    manifest.model.input_microusd_per_million = 750_000;
+    manifest.model.output_microusd_per_million = 4_500_000;
+    manifest.model.cached_input_microusd_per_million = Some(75_000);
+    manifest
+        .provider_budget
+        .as_mut()
+        .unwrap()
+        .max_calls_per_task = 12;
+    let profile = manifest.provider_profile.as_mut().unwrap();
+    profile.version = 2;
+    profile.input_accounting = Some("full_context_reservation".into());
+    profile.responses_tokenizer.id = "full-context-responses-v1".into();
+    profile.embedding.resolved_id = "text-embedding-3-small".into();
+    profile.embedding.dimensions = 1536;
+    profile.embedding.max_input_tokens = 8192;
+    profile.embedding.input_microusd_per_million = 20_000;
+    profile.embedding.tokenizer.id = "full-context-embeddings-v1".into();
+    manifest.validate().unwrap();
+    let allowance = manifest.task_allowance().unwrap();
+    assert_eq!(allowance.input_tokens, 4_800_000);
+    assert_eq!(allowance.output_tokens, 49_152);
+    assert_eq!(allowance.microusd, 3_821_184);
+    assert_eq!(manifest.task_token_limit().unwrap(), 4_849_152);
+    assert_ne!(digest(&legacy), digest_value(&manifest).unwrap());
+    for mutation in 0..10 {
+        let mut invalid = manifest.clone();
+        let profile = invalid.provider_profile.as_mut().unwrap();
+        match mutation {
+            0 => profile.version = 1,
+            1 => profile.input_accounting = None,
+            2 => invalid.model.resolved_id = "gpt-5.4-mini".into(),
+            3 => invalid.model.max_input_tokens -= 1,
+            4 => profile.embedding.max_input_tokens -= 1,
+            5 => invalid.provider_budget = None,
+            6 => invalid.model.input_microusd_per_million = 0,
+            7 => invalid.model.reasoning = "max".into(),
+            8 => profile.embedding.dimensions = 2,
+            _ => profile.responses_tokenizer.id = "fake-counter".into(),
+        }
+        assert!(invalid.validate().is_err(), "mutation {mutation}");
+    }
+}
+
+#[test]
 fn missing_provider_profile_cannot_qualify_as_official_evidence() {
     let mut manifest = fixture();
     manifest.provider_profile = None;
@@ -130,6 +187,7 @@ pub(super) fn fixture() -> Manifest {
         smoke_only: false,
         provider_profile: Some(provider_profile::ProviderProfile {
             version: 1,
+            input_accounting: None,
             protocol: "openai-text-v1".into(),
             responses_tokenizer: test_tokenizer(),
             embedding: provider_profile::Embedding {

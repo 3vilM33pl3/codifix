@@ -79,7 +79,7 @@ try {
     manifest.assets.push({ path: relative, sha256: createHash('sha256').update(bytes).digest('hex'), kind: 'configuration' });
   };
   for (const relative of ['rehearsal-controller.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'synthetic-embedding.mjs', 'request-mediator.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
-    'synthetic-wire-provider.mjs', 'provider-profile.mjs', 'provider-campaign-session.mjs', 'provider-transport.mjs', 'responses-call.mjs', 'responses-request.mjs', 'responses-receipt.mjs', 'embeddings-call.mjs',
+    'synthetic-wire-provider.mjs', 'provider-profile.mjs', 'context-reservation.mjs', 'provider-campaign-session.mjs', 'provider-transport.mjs', 'responses-call.mjs', 'responses-request.mjs', 'responses-receipt.mjs', 'embeddings-call.mjs',
     'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs', 'isolation/service-session.mjs', 'isolation/embedding-proxy.mjs',
     'isolation/model-agent.mjs', 'isolation/model-answer.mjs', 'isolation/model-dispatch.mjs', 'isolation/rehearsal-task.mjs']) {
     await add(`runtime/${relative}`, await fs.readFile(path.join(here, relative)), relative === 'offline-driver.mjs');

@@ -13,7 +13,7 @@ import { openRequestMediator } from '../request-mediator.mjs';
 import { createModelAgent } from './model-agent.mjs';
 import { runMediatedKnowledge } from './model-answer.mjs';
 import { syntheticVector, syntheticEmbeddingModel } from '../synthetic-embedding.mjs';
-import { validateProviderProfile, validateProviderBinding } from '../provider-profile.mjs';
+import { validateProviderProfile, validateProviderBinding, taskTokenLimit } from '../provider-profile.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const zeroUsage = () => ({ input_tokens: 0, output_tokens: 0, total_tokens: 0 });
@@ -120,7 +120,7 @@ async function createExecutor(options, providerOnly) {
             || !Number.isSafeInteger(p.limits?.microusd) || p.limits.microusd < 0 || p.limits.microusd > manifest.limits.microusd
             || (offlineMode && p.limits.microusd !== 0)
             || !Number.isInteger(p.limits.requests) || p.limits.requests < 1 || p.limits.requests > manifest.provider_budget.max_calls_per_task
-            || p.limits.tokens !== manifest.model.max_input_tokens + manifest.model.max_output_tokens
+            || p.limits.tokens !== taskTokenLimit(manifest)
             || p.limits.task_seconds !== manifest.limits.task_seconds
             || JSON.stringify(p.limits) !== JSON.stringify(p.task_limits)) throw Error('invalid per-task provider contract');
         mediator = await openRequestMediator({ binary: budgetBinary, directory: p.directory,

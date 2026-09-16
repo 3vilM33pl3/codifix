@@ -198,6 +198,50 @@ pub fn relative_path(path: &Path) -> bool {
 }
 
 impl Manifest {
+    /// V1 used a single model-call envelope for the whole task. V2 context
+    /// reservations need headroom for every bounded call in a coding sequence.
+    /// Keep V1 journals and artifacts byte/behavior compatible.
+    pub fn task_allowance(&self) -> Result<budget::Allowance> {
+        let factor = if self
+            .provider_profile
+            .as_ref()
+            .is_some_and(|p| p.version == 2)
+        {
+            self.provider_budget
+                .as_ref()
+                .context("missing task call budget")?
+                .max_calls_per_task
+        } else {
+            1
+        };
+        let call = budget::Allowance::for_model(
+            &self.model,
+            self.model.max_input_tokens,
+            self.model.max_output_tokens,
+        )?;
+        Ok(budget::Allowance {
+            input_tokens: call
+                .input_tokens
+                .checked_mul(factor)
+                .context("task input overflow")?,
+            output_tokens: call
+                .output_tokens
+                .checked_mul(factor)
+                .context("task output overflow")?,
+            microusd: call
+                .microusd
+                .checked_mul(factor)
+                .context("task cost overflow")?,
+        })
+    }
+
+    pub fn task_token_limit(&self) -> Result<u64> {
+        let allowance = self.task_allowance()?;
+        allowance
+            .input_tokens
+            .checked_add(allowance.output_tokens)
+            .context("task token overflow")
+    }
     pub fn load(path: &Path) -> Result<Self> {
         let manifest: Self = serde_json::from_slice(&std::fs::read(path)?)?;
         manifest.validate()?;
@@ -590,17 +634,8 @@ impl Observation {
             .as_ref()
             .context("missing per-call provider audit")?;
         audit.validate()?;
-        let tokens = manifest
-            .model
-            .max_input_tokens
-            .checked_add(manifest.model.max_output_tokens)
-            .context("task token overflow")?;
-        let cost = budget::Allowance::for_model(
-            &manifest.model,
-            manifest.model.max_input_tokens,
-            manifest.model.max_output_tokens,
-        )?
-        .microusd;
+        let tokens = manifest.task_token_limit()?;
+        let cost = manifest.task_allowance()?.microusd;
         ensure!(
             audit.manifest_sha256 == manifest_sha256
                 && audit.limits.requests > 0

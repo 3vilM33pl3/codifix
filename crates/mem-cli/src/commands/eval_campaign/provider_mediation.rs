@@ -32,20 +32,11 @@ pub(super) fn contract(
     ensure!(remaining > 0, "campaign provider request limit exhausted");
     let limits = c::Limits {
         requests: profile.max_calls_per_task.min(remaining),
-        tokens: manifest
-            .model
-            .max_input_tokens
-            .checked_add(manifest.model.max_output_tokens)
-            .context("task token overflow")?,
+        tokens: manifest.task_token_limit()?,
         microusd: if offline {
             0
         } else {
-            Allowance::for_model(
-                &manifest.model,
-                manifest.model.max_input_tokens,
-                manifest.model.max_output_tokens,
-            )?
-            .microusd
+            manifest.task_allowance()?.microusd
         },
         task_seconds: manifest.limits.task_seconds,
     };

@@ -5,6 +5,7 @@
 import { createResponsesPreparation } from './responses-call.mjs';
 import { createEmbeddingsPreparation } from './embeddings-call.mjs';
 import { dispatchModel } from './isolation/model-dispatch.mjs';
+import { createContextReservations, validContextReservation } from './context-reservation.mjs';
 
 const exact = (object, keys) => object && typeof object === 'object' && !Array.isArray(object)
   && Object.keys(object).sort().join(',') === keys.split(',').sort().join(',');
@@ -32,8 +33,10 @@ export function validateProviderProfile(manifest) {
     && /^[a-f0-9]{64}$/.test(value.sha256) && manifest.assets?.some(asset => asset.path === value.path
       && asset.sha256 === value.sha256 && asset.kind === 'configuration');
   const tokenizer = value => exact(value, 'id,asset') && identifier(value.id) && pin(value.asset);
-  if (!exact(profile, 'version,protocol,responses_tokenizer,embedding,configuration_evidence')
-      || profile.version !== 1 || profile.protocol !== 'openai-text-v1' || model?.provider !== 'openai'
+  const fields = 'version,protocol,responses_tokenizer,embedding,configuration_evidence';
+  if (!(exact(profile, fields) && profile.version === 1
+      || exact(profile, fields + ',input_accounting') && profile.version === 2)
+      || profile.protocol !== 'openai-text-v1' || model?.provider !== 'openai'
       || !identifier(model.resolved_id) || !identifier(model.embedding_id)
       || !['none','minimal','low','medium','high','xhigh','max','ultra'].includes(model.reasoning)
       || !tokenizer(profile.responses_tokenizer) || !pin(profile.configuration_evidence)
@@ -46,12 +49,25 @@ export function validateProviderProfile(manifest) {
         profile.embedding.input_microusd_per_million, model.max_input_tokens + model.max_output_tokens].every(integer)
       || model.max_input_tokens < 1 || model.max_output_tokens < 1
       || (model.cached_input_microusd_per_million ?? 0) > model.input_microusd_per_million) throw Error('invalid locked provider profile');
+  if (profile.version === 2 && (!validContextReservation(model, profile)
+      || !manifest.provider_budget || !manifest.preparation_budget)) throw Error('unreviewed full-context reservation profile');
   return { profile, model };
+}
+
+export function taskTokenLimit(manifest) {
+  const multiplier = manifest.provider_profile?.version === 2 ? manifest.provider_budget?.max_calls_per_task : 1;
+  const total = (manifest.model.max_input_tokens + manifest.model.max_output_tokens) * multiplier;
+  if (!Number.isSafeInteger(total) || total < 1) throw Error('invalid task token limit');
+  return total;
 }
 
 export function createProviderBindings({ manifest, mediator, taskId, responsesCounter, embeddingCounter,
   sendResponses, sendEmbeddings, signal }) {
   const { profile, model } = validateProviderProfile(manifest);
+  if (profile.version === 2) {
+    if (responsesCounter !== undefined || embeddingCounter !== undefined) throw Error('cannot override full-context reservations');
+    ({ responsesCounter, embeddingCounter } = createContextReservations(model, profile));
+  }
   if (typeof taskId !== 'string' || !/^(preparation|work-[0-9]{5})$/.test(taskId)
       || typeof sendResponses !== 'function' || typeof sendEmbeddings !== 'function'
       || (signal !== undefined && !(signal instanceof AbortSignal))) throw Error('invalid private provider binding');
@@ -64,12 +80,14 @@ export function createProviderBindings({ manifest, mediator, taskId, responsesCo
   };
   const merge = current => signal ? AbortSignal.any([current, signal]) : current;
   const responsePreparation = createResponsesPreparation({ mediator, model,
+    inputAccounting: profile.input_accounting,
     ...counter(responsesCounter, profile.responses_tokenizer), send: (body, current) => sendResponses(body, merge(current)) });
   const embeddingModel = { provider: model.provider, resolved_id: profile.embedding.resolved_id,
     reasoning: 'none', embedding_id: profile.embedding.resolved_id,
     max_input_tokens: profile.embedding.max_input_tokens, max_output_tokens: 1,
     input_microusd_per_million: profile.embedding.input_microusd_per_million, output_microusd_per_million: 0 };
   const embeddingPreparation = createEmbeddingsPreparation({ mediator, model: embeddingModel,
+    inputAccounting: profile.input_accounting,
     dimensions: profile.embedding.dimensions, ...counter(embeddingCounter, profile.embedding.tokenizer),
     send: (body, current) => sendEmbeddings(body, merge(current)) });
   let embeddingCalls = 0;

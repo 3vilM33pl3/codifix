@@ -369,20 +369,11 @@ async fn execute_tasks(
         execution_limits.clone(),
         c::Limits {
             requests: 1,
-            tokens: manifest
-                .model
-                .max_input_tokens
-                .checked_add(manifest.model.max_output_tokens)
-                .context("task token overflow")?,
+            tokens: manifest.task_token_limit()?,
             microusd: if offline {
                 0
             } else {
-                Allowance::for_model(
-                    &manifest.model,
-                    manifest.model.max_input_tokens,
-                    manifest.model.max_output_tokens,
-                )?
-                .microusd
+                manifest.task_allowance()?.microusd
             },
             task_seconds: manifest.limits.task_seconds,
         },
@@ -417,16 +408,8 @@ async fn execute_tasks(
     for (index, work) in plan.work.iter().enumerate() {
         // Aggregate per-task token ceiling. Driver must enforce this across all
         // its provider requests; reservations remain charged after uncertain exit.
-        let tokens = manifest
-            .model
-            .max_input_tokens
-            .checked_add(manifest.model.max_output_tokens)
-            .context("token bound overflow")?;
-        let priced = Allowance::for_model(
-            &manifest.model,
-            manifest.model.max_input_tokens,
-            manifest.model.max_output_tokens,
-        )?;
+        let tokens = manifest.task_token_limit()?;
+        let priced = manifest.task_allowance()?;
         let cost = if offline { 0 } else { priced.microusd };
         if let Some(observation) = recovered.get(index) {
             if let Some(prepared) = &artifact.preparation_receipt {
@@ -475,8 +458,8 @@ async fn execute_tasks(
             &dispatch_id,
             &request_hash,
             Allowance {
-                input_tokens: manifest.model.max_input_tokens,
-                output_tokens: manifest.model.max_output_tokens,
+                input_tokens: priced.input_tokens,
+                output_tokens: priced.output_tokens,
                 microusd: cost,
             },
         )?;
@@ -628,16 +611,8 @@ fn recover_dispatches(
         .map(str::to_owned)
         .collect();
     ensure!(ids.len() <= plan.work.len(), "unexpected saved dispatches");
-    let tokens = manifest
-        .model
-        .max_input_tokens
-        .checked_add(manifest.model.max_output_tokens)
-        .context("token bound overflow")?;
-    let mut allowance = Allowance::for_model(
-        &manifest.model,
-        manifest.model.max_input_tokens,
-        manifest.model.max_output_tokens,
-    )?;
+    let tokens = manifest.task_token_limit()?;
+    let mut allowance = manifest.task_allowance()?;
     if offline {
         allowance.microusd = 0;
     }
@@ -759,17 +734,18 @@ fn validate_task_evidence(
         .token_usage
         .as_ref()
         .context("unknown task token usage")?;
+    let task_allowance = manifest.task_allowance()?;
     ensure!(
         usage
             .input_tokens
             .checked_add(usage.output_tokens)
             .is_some_and(|sum| sum <= usage.total_tokens)
-            && usage.input_tokens <= manifest.model.max_input_tokens
+            && usage.input_tokens <= task_allowance.input_tokens
             && usage
                 .total_tokens
                 .checked_sub(usage.output_tokens)
-                .is_some_and(|input| input <= manifest.model.max_input_tokens)
-            && usage.output_tokens <= manifest.model.max_output_tokens,
+                .is_some_and(|input| input <= task_allowance.input_tokens)
+            && usage.output_tokens <= task_allowance.output_tokens,
         "inconsistent or excessive task token usage"
     );
     observation.isolation.validate(manifest)?;
