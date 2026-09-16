@@ -7,9 +7,11 @@ development calibration, not an official result or authority for another campaig
 
 Latest update: the instrumented retry identified rejection of a completed
 response's usage shape. A narrow compatibility fix accepts the documented
-zero-valued `cache_write_tokens` field. Olivier approved the usage-fixed
-replacement with US$9.36 remaining; both prior uncertain calls stay reserved.
-See the [diagnosis and current approval](development-diagnostic-20260916.md).
+zero-valued `cache_write_tokens` field and passed all 75 updated-schema fake tasks.
+The explicitly approved US$9.36 replacement then stopped on a different explicit
+failure: its first coding response was incomplete at the 4,096 output-token cap.
+Zero accepted observations; three uncertain model allowances remain reserved.
+See the [diagnosis, accounting and next decision](development-diagnostic-20260916.md).
 The historical gate rows below describe the earlier two attempts.
 
 | Gate | Status and evidence |

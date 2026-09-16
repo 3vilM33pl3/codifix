@@ -1,5 +1,25 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 usage-fixed replacement: output ceiling reached
+
+- After all 75 updated-schema fake tasks passed, launched explicitly approved
+  `91524471…1236098` once. Live preparation passed. The first coding response was
+  `incomplete` with reason `max_output_tokens` at the approved 4,096 output-token
+  limit. The decoder rejected it before usage-shape validation; this is not yet
+  live verification of the cache-write compatibility fix. Zero observations were
+  accepted, and the pinned report fails closed. No automatic retry/limit increase.
+- Across the four retained attempts, 152 embedding calls / 11,680 tokens /
+  332 micro-USD settled; three model-call allowances totalling 955,296 micro-USD
+  remain unresolved. All reservations/fences remain. Both owned disposable
+  databases were removed after process exit; existing services were untouched.
+- Offline evidence: `/data/tmp/r3-paid-MZpLZW/pack/` and
+  `/tmp/r3-cache-write-launcher.log`; live evidence:
+  `/data/tmp/r3-usage-fixed-20260916/`. The
+  [diagnostic report](../../../evals/r3/development-diagnostic-20260916.md) separates
+  observed failures, schema inference, settled usage and proposed next limits.
+  A larger output allowance and aligned model-call deadlines require a new
+  approved runtime; R3 and official/product-quality gates remain open.
+
 ## 2026-09-16 live diagnosis and usage-schema fix
 
 - Instrumented retry `d424e71a…53fe8c9` stopped at its first coding model call.

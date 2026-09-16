@@ -67,3 +67,53 @@ Manifest: `/data/tmp/r3-usage-fixed-20260916/campaign.json`, SHA-256
 `91524471c8c325b4e3c4e296ed1ee6f481063f0a0fe00abfaac2244e91236098`.
 Runtime verification and offline validation precede launch; outcome is separate
 from approval. R3 and official/product-quality gates remain open.
+
+## Approved usage-fixed run: explicit output-limit failure
+
+The updated-schema full fake-provider rehearsal passed all 75 tasks, with valid
+execution evidence and 60 pending human reviews. Evidence:
+`/data/tmp/r3-paid-MZpLZW/pack/`, log `/tmp/r3-cache-write-launcher.log`.
+Formatting and boundary checks also passed. This fake run does not demonstrate
+measured model quality. The exact runtime and approval preflight passed, then
+the approved usage-fixed live launcher ran once on its own disposable database.
+
+Live preparation succeeded, but the first coding call returned
+**`status: incomplete`, `incomplete_details.reason: max_output_tokens`**. The
+model reached the approved 4,096 output-token ceiling. The decoder correctly
+rejected this truncated response before checking usage shape; this attempt does
+**not** establish live acceptance of the cache-write fix. Zero of the 75 tasks
+produced accepted observations. The pinned report rejects the artifact as
+incomplete/invalid R3 evidence. No automatic retry or limit increase occurred.
+
+The run's private diagnostic is under
+`/data/tmp/r3-usage-fixed-20260916/run/work-00000/provider/` and records the safe
+status and reason. Its per-call journal retains the uncertain model reservation.
+Report-check output: `/tmp/r3-usage-fixed-report-check.log`.
+
+This fourth attempt settled another 38 embedding calls / 2,920 input tokens /
+83 micro-USD. Across all four attempts: **152 settled embedding calls, 11,680
+tokens and 332 micro-USD (US$0.000332)**. Three unresolved model-call allowances
+remain, totalling **955,296 micro-USD (US$0.955296)** and 1,212,288 tokens. Including
+settled usage, the conservatively retained amount is US$0.955628, not an invoice.
+There are 155 reserved call identities, not 155 confirmed provider executions.
+
+The owned live and test databases were removed after their processes exited;
+all frozen artifacts and reservations remain. Existing dev services and secrets
+are unchanged.
+
+### Next decision
+
+Another live attempt needs revised output/deadline settings and explicit approval,
+not replay of any frozen pack. The current medium-reasoning coding call exhausted
+4,096 output tokens. Review a larger allowance (for example 16,384) together with
+the model-call deadlines: the current implementation also has a 30-second coding
+call deadline and a 10-second knowledge-call default underneath the 300-second
+task cap. More tokens alone does not guarantee completion before those limits.
+Keep container-command limits separate from model-call time, apply identical
+settings across conditions, and test changes offline before another paid run.
+
+Under current conservative accounting, a future cap of US$9.04 / 345 calls /
+8,776,032 tokens would remain below the original combined ceilings. This is a
+proposal, **not approval or a prepared spending receipt**. Unresolved calls cannot
+be marked free, missing observations cannot be dropped, and these development
+attempts establish no quality, superiority, cost/latency or ROI result.
