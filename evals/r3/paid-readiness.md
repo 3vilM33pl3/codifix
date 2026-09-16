@@ -5,6 +5,17 @@ development calibration, not an official result or authority for another campaig
 
 ## Gate status
 
+Offline follow-up: official Responses phase documentation exposed a reproducible
+decoder incompatibility. Explicit commentary followed by one final answer now
+decodes correctly, without executing/scoring/persisting commentary. Ambiguous
+phases and invalid output still fail closed. This is a demonstrated fixture fix,
+not proof of the missing live response's exact shape. Focused tests and packaging
+gates pass; full fake-launcher evidence is in the linked diagnostic report.
+Proposed replacement `df12ab2b…12ac4e86` preserves the same reviewed benchmark and
+models with US$8.65 / 305 requests / 8,350,086 tokens remaining. It is pinned but
+has **no development-spend approval and has not launched**. Its preflight rejects
+the missing approval. No additional evaluation-provider calls were made.
+
 Latest update: the separately approved US$9.04 expanded-profile replacement
 (16,384 output tokens; 120-second model calls) passed a 75-task fake rehearsal,
 then accepted and settled its first real model response. Its second completed

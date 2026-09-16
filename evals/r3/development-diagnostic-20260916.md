@@ -199,6 +199,37 @@ test embeds a syntactically valid but failing command in commentary, verifies it
 never executes or enters subsequent model inputs, and completes all three steps
 using final actions only. Logs: `/tmp/r3-phase-unit.log`,
 `/tmp/r3-phase-integration.log`, `/tmp/r3-phase-isolation.log`. Formatting and
-boundary checks pass. The complete fake-provider launcher rehearsal is recorded
-separately when it completes. No paid generation, key access, spending approval,
-frozen-run edits or changes to models/labels/budgets were made in this follow-up.
+boundary checks pass. The complete fake-provider launcher rehearsal then passed
+all 75 tasks in 619 seconds using explicitly phased synthetic responses. Execution
+is valid; 60 human reviews remain pending and the product-quality gate remains
+false as expected for synthetic results. The test also verifies commentary markers
+are absent from persisted provider results. Evidence:
+`/data/tmp/r3-paid-pJeeC0/pack/`, log `/tmp/r3-phase-launcher.log`.
+Three runtime-packaging/approval tests also pass without skips, including prevention
+of key access when approval is absent; log `/tmp/r3-phase-packaging.log`.
+The approved-owner HTTP-failure regression also passes, preserving sanitized
+diagnostics and preventing replay of uncertain work; evidence:
+`/data/tmp/r3-paid-WwyaDt/pack/`. Both selected launcher tests pass with zero skips.
+Removed only the owned `memory-r3-phase-tests-20260916` disposable database after
+test exit; retained evidence packs and left existing services untouched.
+No evaluation-provider call, evaluation-key access,
+spending approval, frozen-run edits or changes to models/labels/per-task limits
+were made in this follow-up.
+
+### Proposed replacement held at the spending gate
+
+Prepared `/data/tmp/r3-phase-fixed-20260916/campaign.json`, identity
+`df12ab2b403b0a18ca82d1c1515671c4ab5dd0a89df751c2cf2f998012ac4e86`.
+All 29 nonconfiguration benchmark assets match the approved expanded pack byte
+for byte; every top-level contract field other than asset pins and remaining
+limits matches as well. The original two-family label decision is carried forward
+with its actual timestamp, not presented as a new human review. Runtime/binary
+verification and the 75-work-item plan pass.
+
+Proposed caps are **US$8.65 / 305 requests / 8,350,086 tokens**. Adding all prior
+settled usage and full uncertain allowances gives ceilings of US$9.998225,
+500 requests and 10,000,000 tokens. No charges/reservations are refunded. This is
+not an invoice or spending approval. There is no development-spend receipt,
+launcher configuration or running live database for this package. Preflight
+correctly fails with `missing current Development approval`. Any actual launch
+requires Olivier's separate approval after offline verification completes.

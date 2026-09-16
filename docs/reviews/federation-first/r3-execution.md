@@ -1,5 +1,37 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 offline output-phase compatibility repair
+
+- Resumed the approved R3 thread and checkpointed offline investigation. Current
+  official OpenAI guidance documents intermediate `commentary` and `final_answer`
+  assistant messages. A synthetic pair reproduces `receipt_output` against the
+  frozen expanded decoder; the narrow replacement selects only the final JSON.
+  This does not recover the missing live response or establish its exact cause.
+- Preserve one-message legacy/null-phase compatibility. Validate and discard
+  bounded commentary, never execute it, score it, persist it as a result or replay
+  it as history. Reject unknown/ambiguous phases, missing/multiple final answers,
+  trailing commentary, refusals, tools and invalid final actions. Response-level
+  token accounting and replay/uncertainty fencing are unchanged.
+- Forty focused receipt/request/transport/mediator/real-container tests and three
+  runtime-packaging/approval tests pass with zero skips. A three-step real-container
+  test verifies a command embedded in commentary never executes or enters later
+  model input. Formatting and boundaries pass. All 75 fake-provider launcher tasks
+  then passed with phased output, valid execution evidence and 60 pending human
+  reviews. No commentary marker reached saved results. Evidence:
+  `/data/tmp/r3-paid-pJeeC0/pack/`, log `/tmp/r3-phase-launcher.log`.
+  The approved-owner HTTP-failure/fencing regression also passes. Both selected
+  launcher tests have zero skips. Removed the owned disposable test database
+  after exit, retaining evidence and leaving existing services untouched.
+  None of these tests measures real model quality.
+- Proposed replacement `/data/tmp/r3-phase-fixed-20260916/campaign.json`, identity
+  `df12ab2b403b0a18ca82d1c1515671c4ab5dd0a89df751c2cf2f998012ac4e86`,
+  preserves all 29 reviewed benchmark assets and model/per-task settings. Caps
+  US$8.65 / 305 calls / 8,350,086 tokens retain all prior settled and uncertain
+  usage. Runtime verifies; spending preflight correctly fails without Development
+  approval. No spend receipt, live launcher configuration or paid call created.
+  R3 and official/product-quality gates remain open. See the
+  [compatibility and proposed-run report](../../../evals/r3/development-diagnostic-20260916.md).
+
 ## 2026-09-16 expanded run: first model receipt settles; second output rejected
 
 - Approved replacement `3cf114f9…bbd4d4` ran once. Preparation and its first model
