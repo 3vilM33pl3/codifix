@@ -18,7 +18,7 @@ const model = { provider: 'openai', resolved_id: 'synthetic-model-v1', reasoning
 const payload = { model: { provider: model.provider, resolved_id: model.resolved_id, reasoning: model.reasoning },
   input: { question: 'Synthetic question', context: [] }, response_schema: 'r3-grounded-answer-v1', tools: [] };
 
-for (const scenario of ['success', 'phased-success', 'commentary-only', 'undercount', 'unknown-cache-price']) {
+for (const scenario of ['success', 'phased-success', 'commentary-only', 'multiple-finals', 'undercount', 'unknown-cache-price']) {
   test(`prepared wire request ${scenario} binds exact bytes and durable billing evidence`, { skip: !binary }, async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-responses-call-'));
     const limits = { requests: 3, tokens: 300, microusd: 1000, task_seconds: 10 };
@@ -38,6 +38,9 @@ for (const scenario of ['success', 'phased-success', 'commentary-only', 'underco
         output.unshift({ type: 'message', role: 'assistant', phase: 'commentary', status: 'completed',
           content: [{ type: 'output_text', annotations: [], text: 'PRIVATE_COMMENTARY_NOT_AN_ANSWER' }] });
         if (scenario === 'commentary-only') output.pop();
+      }
+      if (scenario === 'multiple-finals') {
+        output[0].phase = 'final_answer'; output.push(structuredClone(output[0]));
       }
       res.end(JSON.stringify({ id: 'resp_synthetic', object: 'response', status: 'completed', model: model.resolved_id,
         error: null, incomplete_details: null,
@@ -70,12 +73,16 @@ for (const scenario of ['success', 'phased-success', 'commentary-only', 'underco
         await assert.rejects(dispatch('second'), /rejected/);
         assert.equal(calls, 1);
         assert.deepEqual((await mediator.status()).uncertain_ids, ['first']);
-        if (scenario === 'commentary-only') {
+        if (scenario === 'commentary-only' || scenario === 'multiple-finals') {
           const failures = (await fs.readdir(directory)).filter(n => n.startsWith('failure-'));
           assert.equal(failures.length, 1);
           const bytes = await fs.readFile(path.join(directory, failures[0]), 'utf8');
-          assert.equal(JSON.parse(bytes).output_reason, 'missing_text');
+          const failure = JSON.parse(bytes);
+          assert.equal(failure.output_reason, scenario === 'commentary-only' ? 'missing_text' : 'multiple_messages');
+          assert.deepEqual(failure.output_shape.map(i => i.phase),
+            scenario === 'commentary-only' ? ['commentary'] : ['final_answer', 'final_answer']);
           assert(!bytes.includes('PRIVATE_COMMENTARY'));
+          assert(!bytes.includes('Insufficient evidence'));
         }
       }
       const invalid = createResponsesPreparation({ mediator, model, tokenizer: { id: 'fake', sha256: 'b'.repeat(64) },

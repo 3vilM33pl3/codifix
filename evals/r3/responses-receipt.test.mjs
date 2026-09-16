@@ -57,10 +57,29 @@ test('output rejection reasons are precise without retaining content or changing
   ]) {
     const r = fixture(); change(r);
     assert.throws(() => decode(r), error => {
-      assert.deepEqual(providerDiagnostic(error), {
+      const { output_shape, ...diagnostic } = providerDiagnostic(error);
+      assert(Array.isArray(output_shape));
+      assert(!JSON.stringify(output_shape).includes('PRIVATE'));
+      assert.deepEqual(diagnostic, {
         code: 'receipt_output', status: 'completed', output_reason: reason,
       });
       assert(!error.message.includes('PRIVATE'));
+      return true;
+    });
+  }
+});
+
+test('multiple answer diagnostics retain phase arrangement but never answer content', () => {
+  for (const phases of [[undefined, undefined], [null, 'final_answer'], ['final_answer', 'final_answer']]) {
+    const r = fixture();
+    r.output = phases.map(phase => message('{"PRIVATE":"answer"}', phase));
+    assert.throws(() => decode(r), error => {
+      const d = providerDiagnostic(error);
+      assert.equal(d.output_reason, 'multiple_messages');
+      assert.deepEqual(d.output_shape.map(i => i.phase), phases.map(p => p === undefined ? 'absent' : p === null ? 'null' : p));
+      assert(d.output_shape.every(i => i.type === 'message' && i.status === 'completed'
+        && i.role === 'assistant' && i.content_count === 1 && i.content[0].type === 'output_text'));
+      assert(!JSON.stringify(d).includes('PRIVATE'));
       return true;
     });
   }

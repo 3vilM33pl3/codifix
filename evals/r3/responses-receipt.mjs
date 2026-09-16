@@ -53,6 +53,7 @@ export function decodeResponsesReceipt(bytes, contract) {
         || !inputShape
         || !keys(usage.output_tokens_details, 'reasoning_tokens')) fail();
     stage = 'receipt_output';
+    metadata.output_items = response.output;
     const failOutput = reason => { metadata.output_reason = reason; fail(); };
     let text, sawCommentary = false, commentaryBytes = 0;
     for (const item of response.output) {
