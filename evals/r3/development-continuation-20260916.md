@@ -141,3 +141,18 @@ Verification: 13 container/agent/sequence tests, ten provider-session/agent test
 (including disposable PostgreSQL and both tracks), and six final agent tests pass;
 no skips. Logs `/tmp/r3-live-window-{tests,integration,final,boundaries}.log`.
 Formatting and boundaries pass. No live calls were made during this repair.
+
+## Continuation 4
+
+Pack `/data/tmp/r3-continue4-20260916`, identity
+`6152f952c472810588fd9f81fef40f7ff2ef3f28d6a634c25b27798763f7da9b`.
+Caps: **136 calls / 6,976,120 tokens / US$7.195011**, under the existing
+continuation approval. Same 75 tasks, order, models, prompts, source/label assets
+and five-minute deadline. Runtime pins and approval gates verify; the live-window
+correction is included. The unapproved knowledge-only draft is not used.
+
+The first coding task now produces a complete **failed** observation with known
+usage rather than interrupting the campaign. The run subsequently reaches 12
+completed task records. This is progress evidence only: the run is still active,
+knowledge judgments require human review, and incomplete/capped execution cannot
+pass the campaign or product-quality gate. Final accounting follows on exit.
