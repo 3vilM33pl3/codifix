@@ -1,5 +1,25 @@
 # R3 execution and evidence ledger
 
+## 2026-09-17 original call ceiling exhausted; partial development evidence retained
+
+- Continued within the original US$10 / 500-call / 10M-token envelope, including
+  previous uncertainty. Final cumulative provider journals: **493 settled calls /
+  US$1.009572**, plus **seven uncertain calls / US$2.450208 reserved**, not confirmed
+  charges. Exactly 500 calls used/reserved; US$6.540220 remains unallocated but
+  the call allowance is exhausted. No further paid calls or automatic top-up.
+- Fixed and tested exact repeated-final decoding, ordinary missing guest-command
+  feedback, and conservative task-window/request allocation. Old immutable packs
+  and evidence are unchanged. Labels, prompts, models and retrieval remain fixed.
+- Final pinned run `6152f952…63f7da9b` retained **57/75 observations** (47 knowledge
+  pending review, ten failed coding executions). All 136 provider calls in this
+  run settled; no new uncertain call. The last query embedding consumed the final
+  call slot and the model request was refused before transmission.
+- Report and blinded-review preflight correctly reject the incomplete campaign.
+  No passing artifact, quality percentage or ROI claim. See the
+  [full outcome, caveats and accounting](../../../evals/r3/development-continuation-20260916.md).
+  Further development needs renewed call authority and a review of operational
+  coding limits; official labels, execution and product-quality gates remain open.
+
 ## 2026-09-16 continuing development within the original budget
 
 - Olivier authorized continuing until the budget is exhausted; retained the

@@ -5,13 +5,17 @@ development calibration, not an official result or authority for another campaig
 
 ## Gate status
 
-Current authority: Olivier asked to continue development within the original
-US$10 total. [Budget-bounded continuation](development-continuation-20260916.md)
-preserves all old uncertainty and the original call/token ceilings. Its first
-attempt captured two explicit final messages and stopped. A narrowly tested
-byte-identical-final repair passed all 75 fake-provider tasks; the second
-continuation is running with US$7.845915 / 224 calls / 7,491,133 tokens remaining.
-No official/held-out run is authorized. Read the linked ledger for live outcomes.
+Current status (2026-09-17 London time): the
+[budget-bounded continuation](development-continuation-20260916.md) exhausted the
+original **500-call** ceiling. Cumulative: 493 settled calls / US$1.009572, plus
+seven uncertain allowances / US$2.450208 (not confirmed charges). US$6.540220
+remains conservatively unallocated, but no calls remain authorized. Four bounded
+continuations diagnosed exact repeated finals, missing guest executables and late
+task calls. Fixes and offline evidence are recorded in the linked ledger.
+The final run retained **57/75 observations**; its report and review gate correctly
+reject incompleteness. 47 knowledge executions remain unreviewed and ten completed
+coding executions failed under the conservative limits. No official/held-out run
+is authorized, and no product-quality conclusion is established.
 
 Previous result: the separately approved [single-response diagnostic](development-onecall-20260916.md)
 ran once successfully, costing US$0.021234 under its US$0.373728 cap. The exact

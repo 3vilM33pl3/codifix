@@ -153,6 +153,85 @@ correction is included. The unapproved knowledge-only draft is not used.
 
 The first coding task now produces a complete **failed** observation with known
 usage rather than interrupting the campaign. The run subsequently reaches 12
-completed task records. This is progress evidence only: the run is still active,
-knowledge judgments require human review, and incomplete/capped execution cannot
-pass the campaign or product-quality gate. Final accounting follows on exit.
+completed task records (intermediate checkpoint). Final outcome follows.
+
+## Final outcome — 2026-09-17 London time
+
+Stopped at the **original aggregate 500-call ceiling**, not the US$10 money ceiling.
+Continuation 4 settled all **136** available calls with **zero** new uncertain
+provider calls. It retained **57 of 75** complete observations: **47 knowledge**
+executions awaiting human judgments and **10 coding** executions that failed under
+the conservative task limits. These are repeated executions of only two scenario
+families, not 57 independent samples. No quality percentage or superiority claim
+is justified. Automated critical flags occur in 42 knowledge observations and
+need examination alongside the rubrics; unresolved review is not a passing result.
+
+The next task had one call left. Its query embedding settled, and the mediator
+refused the model request before transmission. No fabricated answer, free retry
+or budget extension followed. The incomplete task's one micro-USD belongs in
+provider-ledger totals even though it has no observation.
+
+Continuation 4 provider totals: **135,954 input + 134,710 output = 270,664 tokens**,
+**654,791 micro-USD (US$0.654791)**. Four repeated explicit finals were accepted
+only after exact text equality, yielding one action/answer each. Preparation was
+37 calls / 2,910 tokens / 82 micro-USD. Completed observation execution totals
+are 654,708 micro-USD; the additional settled incomplete-task embedding is one
+micro-USD. Do not use the incomplete artifact alone as the spending ledger.
+
+### Cumulative reconciliation
+
+All eleven used packs (six earlier campaigns, one diagnostic, four continuations)
+were reconciled through provider-level journals, not nested task reservations:
+
+| Category | Calls | Tokens | Micro-USD |
+| --- | ---: | ---: | ---: |
+| Validated settled receipts | 493 | 416,720 | 1,009,572 |
+| Seven retained uncertain allowances | 7 | 2,877,824 | 2,450,208 |
+| Conservatively used/reserved | **500** | **3,294,544** | **3,459,780** |
+
+Unallocated ceilings: **0 calls / 6,705,456 tokens / US$6.540220**. This is
+receipt-based accounting with worst-case reservations, **not a verified invoice**.
+No uncertain charge was refunded or rewritten, and no additional provider request
+is authorized under the exhausted original call limit.
+
+### Report and review gate
+
+Pinned `memory eval campaign report` rejects this artifact with `execution_valid`,
+`harness_valid`, `official_evidence` and `quality_passed` all false: incomplete
+execution, missing observations and 47 unresolved knowledge reviews. The normal
+blinded review command also refuses the incomplete artifact: human review cannot
+repair missing execution. No bypass or alternate passing artifact was generated.
+
+Evidence under `/data/tmp/r3-continue4-20260916/`: `run/artifact.json`, per-task
+provider journals/results and observations, `private/final-report.json`,
+`private/report-status.log`, `private/run-diagnostic.txt` and the retained dispatch
+fence. Reconciliation: `/tmp/r3-continuation-final-budget.json`; failed review
+preflight: `/tmp/r3-partial-review.log`. All packs and receipts remain intact.
+
+After the run, the coding adapter was tightened to honor a reduced per-task
+request allocation, not just the manifest's maximum, after charging retrieval.
+This is an offline follow-up for future runs; it does not rewrite this frozen run
+or make an unanswered knowledge task complete. No further paid calls were made.
+
+### Final verification and cleanup
+
+The two reduced-allocation/window tests pass with no skips. Final assertions
+verify frozen runtime pins, all 57 observations' unchanged before/after database
+hashes, the fail-closed report and the original aggregate ceilings. Boundary
+checks, Rust formatting and whitespace checks pass. This scoped verification does
+not claim a new full-workspace test run.
+
+The owned disposable PostgreSQL container `memory-r3-continue1-20260916` was
+removed after checking its exact identity and ownership label. No disposable
+evaluation guest containers remain. Frozen packs, journals and receipts are
+retained; existing services, customer/project data and credentials were untouched.
+
+### What remains
+
+R3 is **not complete**. A new complete development run needs renewed call-count
+authority; it need not raise the original dollar ceiling. Revisit the conservative
+coding time allocation as an explicitly versioned development configuration before
+claiming the coding results measure unrestricted model competence. Preserve all
+failed/partial evidence. Then complete development adjudication and operational
+calibration. Broader labels, official held-out spend/execution, statistically valid
+quality conclusions and customer ROI remain separate gates.
