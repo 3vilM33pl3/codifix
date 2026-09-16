@@ -87,6 +87,13 @@ The image must supply `/usr/bin/env` and `/usr/local/bin/node`, contain no impli
 volumes, and be reviewed separately. Mutable image tags and automatic pulls are
 rejected by the component.
 
+An unavailable or non-executable guest command (spawn `ENOENT`/`EACCES`) returns
+exit 127/126, a fixed bounded diagnostic and the selected files. This is task
+feedback, not a host fallback or a successful task. A model may correct its next
+command only within its remaining task/call budget. Other startup failures,
+timeouts, excessive output, unsafe exports and supervisor/container failures
+continue to abort execution. Raw spawn errors are not exposed.
+
 Optional `exportPaths` is an exact list of relative regular-file paths (at most
 256, no duplicates or ancestor conflicts). Omission preserves bounded whole-tree
 export; an empty list exports no files. Selected missing files remain missing.

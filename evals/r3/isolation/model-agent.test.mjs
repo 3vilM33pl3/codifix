@@ -149,3 +149,32 @@ test('malformed model command cannot become a host command or pass hidden scorin
     assert.deepEqual(JSON.parse(result.submission['counter.json']), { value: 0 });
   } finally { await mediator.close(); await fs.rm(directory, { recursive: true }); }
 });
+
+test('missing guest executable is recoverable feedback without a free model retry', { skip: !binary || !image, timeout: 60000 }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-model-agent-missing-'));
+  const limits = { requests: 3, tokens: 1000, microusd: 50, task_seconds: 30 };
+  const mediator = await openRequestMediator({ binary, directory, manifestSha256: '2'.repeat(64), limits, taskLimits: limits });
+  let calls = 0;
+  try {
+    const run = createModelAgent({ mediator, taskId: 'missing', model, allowance, maxCalls: 3,
+      invoke: async payload => {
+        calls++;
+        if (calls === 1) return { output: { kind: 'command', argv: ['/does-not-exist-r3'] }, usage };
+        if (calls === 2) {
+          assert.equal(payload.previous.exit_code, 127);
+          assert.equal(payload.previous.stderr, 'command executable not found\n');
+          assert.equal(payload.files['source.txt'], 'unchanged');
+          return { output: { kind: 'command', argv: ['/usr/local/bin/node', '-e',
+            "require('fs').writeFileSync('source.txt','corrected')"] }, usage };
+        }
+        assert.equal(payload.previous.exit_code, 0);
+        return { output: { kind: 'finish' }, usage };
+      } });
+    const result = await run({ stepId: 'one', image, argv: ['/bin/true'],
+      files: { 'source.txt': 'unchanged' }, exportPaths: ['source.txt'], timeoutMs: 4000 });
+    assert.equal(result.exitCode, 0);
+    assert.equal(Buffer.from(result.files['source.txt'], 'base64').toString(), 'corrected');
+    assert.equal(calls, 3); assert.equal(result.usage.provider_requests, 3);
+    assert.equal((await mediator.audit()).audit.ledger.microusd, 6);
+  } finally { await mediator.close(); await fs.rm(directory, { recursive: true }); }
+});

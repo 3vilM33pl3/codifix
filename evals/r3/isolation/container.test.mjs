@@ -59,6 +59,20 @@ test('guest output remains untrusted and bounded before submission import', () =
   ]) assert.throws(() => validateResult({ ...result, ...change }));
 });
 
+test('unavailable guest executables return bounded command errors and preserve selected files', { skip: !image, timeout: 30000 }, async () => {
+  for (const [executable, code, message] of [
+    ['/does-not-exist-r3', 127, 'command executable not found\n'],
+    ['/work/source.txt', 126, 'command executable not permitted\n'],
+  ]) {
+    const result = await runOfflineContainer({ image, files: { 'source.txt': 'unchanged' },
+      exportPaths: ['source.txt'], argv: [executable, 'PRIVATE_ARGUMENT'] });
+    assert.equal(result.exitCode, code);
+    assert.equal(result.stdout, ''); assert.equal(result.stderr, message);
+    assert.deepEqual(result.files, { 'source.txt': Buffer.from('unchanged').toString('base64') });
+    assert(!JSON.stringify(result).includes('PRIVATE_ARGUMENT'));
+  }
+});
+
 test('offline container: boundary, reset, submission transfer, timeout and symlink rejection', { skip: !image, timeout: 90000 }, async t => {
   const hidden = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-hidden-grader-'));
   await fs.writeFile(path.join(hidden, 'answers.json'), 'synthetic hidden scoring answers');

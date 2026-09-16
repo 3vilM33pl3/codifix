@@ -25,7 +25,18 @@ const exitCode = await new Promise((resolve, reject) => {
       else output.push(value);
     });
   }
-  child.on('error', () => { clearTimeout(timer); reject(Error('command startup failed')); });
+  child.on('error', error => {
+    clearTimeout(timer);
+    // A model choosing a missing/non-executable guest path is an ordinary
+    // command error, not broken isolation. Return bounded feedback so it may
+    // correct the command within the same task/call budget. Never expose raw
+    // spawn errors or convert resource/supervisor failures into valid results.
+    const code = error.code === 'ENOENT' ? 127 : error.code === 'EACCES' ? 126 : undefined;
+    if (code === undefined) { reject(Error('command startup failed')); return; }
+    const message = Buffer.from(code === 127 ? 'command executable not found\n' : 'command executable not permitted\n');
+    if (bytes + message.length > cap) { reject(Error('command output limit exceeded')); return; }
+    stderr.push(message); bytes += message.length; resolve(code);
+  });
   child.on('close', code => { clearTimeout(timer); stop(); resolve(code); });
 });
 // Only regular, singly linked files cross the container boundary. No tar extraction,

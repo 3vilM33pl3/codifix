@@ -75,3 +75,30 @@ inherited any success or settled charge from the prior failed pack.
 
 R3 and official/product-quality gates remain open; do not treat budget consumption
 or a successful diagnostic as quality proof.
+
+### Continuation 2 outcome and ordinary command-error repair
+
+The exact-final repair was exercised live: one settled response records
+`duplicate_final_messages: 1`. Five model calls were accepted, with one action
+per response and no duplicated billing. The task then stopped after an action
+selected `/usr/bin/cargo`, which does not exist in the pinned Rust image. The
+guest rejected `spawn` ENOENT, causing the supervisor/campaign to abort. Reproduced
+offline with that exact executable path; no further provider call was required.
+
+The guest now returns bounded exit 127/126 feedback for ENOENT/EACCES, preserving
+selected files so the agent can correct its command within the existing call and
+time budget. Other spawn errors, timeout, excessive output, unsafe exports and
+container failures still fail closed. No host fallback, PATH broadening, command
+rewriting, added tool access or free model retry. Twelve container/agent/sequence
+tests pass, including three-step hidden grading, error recovery, accounting,
+missing/non-executable paths, timeout and boundary failures.
+Four additional real-Rust grading tests pass. The exact missing `/usr/bin/cargo`
+path now produces exit 127 on the pinned Rust image without losing selected files.
+Logs: `/tmp/r3-guest-errors-tests.log`, `/tmp/r3-guest-rust-tests.log`;
+formatting and boundary checks also pass.
+
+All provider calls in this attempt settled: **43 calls**, 17,886 input + 21,096
+output = 38,982 tokens, **US$0.098120**. No new uncertain provider allowance;
+the task observation is nevertheless absent, so the campaign remains invalid.
+Next available aggregate caps: **181 calls / 7,452,151 tokens / US$7.747795**.
+Prior six unresolved allowances remain reserved.
