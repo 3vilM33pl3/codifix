@@ -36,6 +36,7 @@ export async function runPaidCampaign(root, settingsPath, signal = new AbortCont
   if (!['postgres:', 'postgresql:'].includes(db.protocol) || !['127.0.0.1', 'localhost'].includes(db.hostname)
       || !db.port || !/^\/(memory_test|memory_r3_[a-z0-9_-]+)$/.test(db.pathname) || db.search || db.hash) throw Error('explicit local disposable evaluation database required');
   const { runtime, manifest } = await verifyPaidRuntime(root);
+  if (manifest.assets.some(a => a.path === 'private/response-diagnostic.json')) throw Error('diagnostic pack cannot run a campaign');
   if (path.join(root, 'private/dispatch.sock').length > 100) throw Error('use a shorter private pack path');
   // Existing evidence, even an empty abandoned owner directory, fences launch
   // before approval/key access. Never delete it or restart a charged campaign.
