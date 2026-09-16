@@ -562,6 +562,10 @@ Unknown phases, commentary-only output, multiple final/unphased messages,
 unphased answers after commentary, and commentary after a final answer fail closed.
 Tool calls, annotations and refusals remain prohibited even inside commentary.
 Diagnostics retain closed-vocabulary failure reasons, never provider text.
+Rejected output also retains a bounded structural description (type, phase,
+status, role, content kinds/counts and byte lengths), not message IDs, summaries,
+text, annotations or provider extra fields. This distinguishes ambiguous phase
+arrangements without exposing content or changing result/billing acceptance.
 
 This decoder neither invokes a provider nor supplies tokenization, prices or
 approval. Its synthetic fixtures are checked with

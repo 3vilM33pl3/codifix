@@ -5,6 +5,16 @@ development calibration, not an official result or authority for another campaig
 
 ## Gate status
 
+Current live outcome: Olivier approved `df12ab2b…12ac4e86` for one US$8.65
+replacement. It ran once; preparation and its first model call succeeded, but
+the second completed response had multiple candidate answer messages and was
+rejected. Zero completed tasks; no paid retry. The precise phase arrangement was
+not retained. New offline structural diagnostics address that evidence gap without
+choosing among ambiguous answers. Six-attempt totals: US$0.032296 settled plus
+US$1.702752 in unresolved allowances, not confirmed charges. See the
+[current failure and accounting report](development-phase-20260916.md).
+The proposal and gate history below precede this latest launch/outcome.
+
 Offline follow-up: official Responses phase documentation exposed a reproducible
 decoder incompatibility. Explicit commentary followed by one final answer now
 decodes correctly, without executing/scoring/persisting commentary. Ambiguous

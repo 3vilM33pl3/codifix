@@ -1,5 +1,26 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 phase-aware live outcome: multiple candidate messages
+
+- Launched approved `df12ab2b…12ac4e86` once. Preparation and the first model
+  response settled; the second completed response failed `receipt_output` /
+  `multiple_messages`. Zero completed tasks; pinned report fails closed. Exact
+  phase labels and text were not retained, so no claim that selecting a last
+  message would be safe. No further paid calls or automatic retry.
+- Added only offline, bounded content-free output-shape diagnostics: closed
+  type/phase/status/role/content-kind categories and bounded counts/byte lengths.
+  No answer selection or billing relaxation. Fourteen focused codec/diagnostic
+  and 23 transport/mediator tests pass with no skips; formatting/boundaries pass.
+  This does not recover lost live payloads or modify frozen evidence.
+- Six-attempt provider totals: 230 settled calls / 29,521 tokens / US$0.032296,
+  plus five unresolved model allowances / 2,045,056 tokens / US$1.702752. These
+  allowances are not confirmed charges, and nested task reservations are not
+  additional charges. Removed the owned live database after exit; all evidence
+  retained, existing services and credentials untouched. See the
+  [phase-aware attempt report](../../../evals/r3/development-phase-20260916.md).
+  Further paid work needs a bounded diagnostic strategy and separate approval,
+  not another blind full-campaign retry. R3 remains incomplete.
+
 ## 2026-09-16 phase-aware replacement approved for one launch
 
 - Olivier replied “yes” to the exact pinned replacement and remaining caps:

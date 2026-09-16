@@ -1,5 +1,11 @@
 # R3 diagnostic retry and usage-schema repair
 
+Latest outcome: the subsequently approved phase-aware replacement also stopped,
+now with `output_reason: multiple_messages`. See the
+[phase-aware run report](development-phase-20260916.md) for the observed failure,
+diagnostic limits and six-attempt usage reconciliation. The proposals below are
+historical, not standing permission to launch again.
+
 ## Instrumented attempt
 
 Olivier requested diagnosis and another attempt. The replacement
