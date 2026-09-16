@@ -22,6 +22,12 @@
   8,776,032 tokens. Previous 152 settled calls and three uncertain model-call
   allowances are preserved in full, not refunded. Full fake rehearsal precedes
   the separately recorded live outcome.
+- Full 75-task fake-provider rehearsal then passed with the expanded profile,
+  retained at `/data/tmp/r3-paid-fS4a4x/pack/`, log
+  `/tmp/r3-limits-launcher.log`. This is execution evidence, not model quality.
+  Launched the exact approved replacement once on a separate disposable database;
+  removed the owned test database after completion. Live outcome remains separate
+  from this launch record.
 
 ## 2026-09-16 usage-fixed replacement: output ceiling reached
 
