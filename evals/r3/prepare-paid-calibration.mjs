@@ -14,7 +14,7 @@ try {
   if (generated.status !== 0) throw Error('pack preparation failed');
   const file = path.join(root, 'campaign.json'), manifest = JSON.parse(await regular(file));
   manifest.model = { provider: 'openai', resolved_id: 'gpt-5.4-mini-2026-03-17', reasoning: 'medium', embedding_id: 'text-embedding-3-small',
-    max_input_tokens: 400000, max_output_tokens: 4096, input_microusd_per_million: 750000,
+    max_input_tokens: 400000, max_output_tokens: 16384, input_microusd_per_million: 750000,
     output_microusd_per_million: 4500000, cached_input_microusd_per_million: 75000 };
   manifest.provider_budget = { max_calls_per_task: 12 };
   manifest.limits = { requests: 500, tokens: 10000000, microusd: 10000000, task_seconds: 300 };

@@ -187,6 +187,7 @@ async function createExecutor(options, providerOnly) {
           const answerOptions = { image: nodeImage, scoreBinary, sources, context, question: rubric.question,
             rubric, manifestSha256, work: selected, argv: excerptAgent };
           const answer = mediator ? await runMediatedKnowledge({ ...answerOptions, mediator, model, allowance,
+            timeoutMs: Math.min(120000, manifest.limits.task_seconds * 1000),
             taskId: providerContract.task_id, requestId: 'answer', ...(wire ? { prepareRequest: wire.prepareRequest } : { invoke: async payload => {
               const source = payload.input.context[0];
               return { output: source ? { text: source.text, refused: false, citations: [{ source_id: source.id, quote: source.text }] }
@@ -209,6 +210,7 @@ async function createExecutor(options, providerOnly) {
         // runner supplies no private grader output or reference implementation.
         const runAgent = mediator ? createModelAgent({ mediator, model, allowance, taskId: providerContract.task_id,
           maxCalls: manifest.provider_budget.max_calls_per_task, taskTimeoutMs: manifest.limits.task_seconds * 1000,
+          modelTimeoutMs: 120000,
           ...(wire ? { prepareRequest: wire.prepareRequest } : {
             invoke: async payload => ({ output: payload.previous ? { kind: 'finish' } : { kind: 'command', argv: noOpAgent }, usage: fakeUsage }) }) }) : undefined;
         const sequence = await runOfflineSequence({ image: rustImage, initialFiles, submissionPaths: family.submission_paths, runAgent,

@@ -46,6 +46,16 @@ proposed model/profile and limits in [paid readiness](paid-readiness.md): $10,
 500 requests and ten million tokens, including preparation. These remain
 **proposals**, not a spending authorization. No held-out cases are copied.
 
+Following the explicitly approved 2026-09-16 calibration correction, the preparer
+uses 16,384 maximum output tokens. The pinned executor gives model calls up to
+120 seconds (bounded by remaining task time for coding) while container commands
+retain their independent 30-second bound. The outer runner still enforces the
+300-second whole-task deadline. These settings are identical across conditions;
+the earlier immutable packs retain their original settings and evidence.
+Replacement campaigns must subtract previous settled and uncertain allowances
+from aggregate limits before their new approval is recorded. Defaults do not
+authorize a fresh $10 after a failed attempt.
+
 The output stays draft/smoke-only. Sources, labels, runtime modules and executable
 copies are pinned. Executables are private copies, so later Cargo rebuilds cannot
 replace a running campaign. The pack is bound to its absolute location; moving it

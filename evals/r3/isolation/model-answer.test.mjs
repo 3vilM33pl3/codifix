@@ -21,7 +21,7 @@ const allowance = { input_tokens: 100, output_tokens: 100, microusd: 10 };
 
 test('prepared Responses knowledge retains private adjudication and exact priced receipts', { skip: !binary || !scoreBinary }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-prepared-answer-'));
-  const limits = { requests: 5, tokens: 2000, microusd: 1000, task_seconds: 20 };
+  const limits = { requests: 5, tokens: 2000, microusd: 1000, task_seconds: 300 };
   const mediator = await openRequestMediator({ binary, directory, manifestSha256: 'b'.repeat(64), limits, taskLimits: limits });
   const profile = { provider: 'openai', resolved_id: 'synthetic-answer-v1', reasoning: 'none' };
   const inputs = [];
@@ -45,7 +45,10 @@ test('prepared Responses knowledge retains private adjudication and exact priced
             input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
       } });
     for (const condition of ['handover', 'lexical', 'vector', 'full-memory', 'no-memory']) {
-      const result = await runMediatedKnowledge({ mediator, prepareRequest, model: profile,
+      const result = await runMediatedKnowledge({ mediator: { ...mediator, dispatch: request => {
+        assert(request.timeoutMs > 119000 && request.timeoutMs <= 120000);
+        return mediator.dispatch(request);
+      } }, prepareRequest, model: profile, timeoutMs: 120000,
         taskId: condition, requestId: condition, scoreBinary, sources, rubric, question: rubric.question,
         context: condition === 'no-memory' ? [] : [sources[0]], manifestSha256: 'b'.repeat(64),
         work: { case_id: rubric.case_id, condition, repeat: 0 } });

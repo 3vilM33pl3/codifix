@@ -15,6 +15,27 @@ const model = { provider: 'synthetic', resolved_id: 'fake-command-v1', reasoning
 const allowance = { input_tokens: 100, output_tokens: 100, microusd: 10 };
 const usage = { input_tokens: 20, output_tokens: 10, microusd: 2 };
 
+test('model deadline is independent from shell timeout and bounded by remaining task time', async () => {
+  for (const taskTimeoutMs of [300000, 5000]) {
+    let seen;
+    const run = createModelAgent({ taskId: 'deadline', model, allowance, taskTimeoutMs,
+      modelTimeoutMs: 120000, invoke: async () => {},
+      mediator: { dispatch: async request => {
+        seen = request.timeoutMs;
+        return { output: { kind: 'finish' }, usage, invoked: true };
+      } } });
+    const result = await run({ stepId: 'one', image: 'sha256:' + 'a'.repeat(64), timeoutMs: 1000,
+      argv: ['/bin/true'], files: { 'source.rs': 'fn main() {}' }, exportPaths: ['source.rs'] });
+    assert.equal(result.exitCode, 0);
+    assert(seen > 1000 && seen <= Math.min(120000, taskTimeoutMs));
+    if (taskTimeoutMs === 300000) assert.equal(seen, 120000);
+  }
+  for (const modelTimeoutMs of [0, -1, 120000.5, 600001, '120000']) {
+    assert.throws(() => createModelAgent({ taskId: 'deadline', model, allowance,
+      modelTimeoutMs, mediator: { dispatch() {} }, invoke() {} }), /invalid model agent/);
+  }
+});
+
 function sequence() {
   return { image, timeoutMs: 4000, initialFiles: { 'counter.json': '{"value":0}', 'context.txt': 'Increment once for each current task.' },
     submissionPaths: ['counter.json'], steps: [1, 2, 3].map(n => ({ id: `step-${n}`,

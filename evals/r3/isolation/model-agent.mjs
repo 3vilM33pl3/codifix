@@ -9,14 +9,16 @@ import { dispatchModel } from './model-dispatch.mjs';
 
 export function createModelAgent(options) {
   const { mediator, invoke, prepareRequest, ...plain } = options;
-  const { taskId, model, allowance, maxCalls = 12, taskTimeoutMs = 60000 } = structuredClone(plain);
+  const { taskId, model, allowance, maxCalls = 12, taskTimeoutMs = 60000, modelTimeoutMs } = structuredClone(plain);
   if (!mediator || typeof mediator.dispatch !== 'function'
       || (typeof invoke === 'function') === (typeof prepareRequest === 'function')
       || typeof taskId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(taskId)
       || !model || Object.keys(model).sort().join(',') !== 'provider,reasoning,resolved_id'
       || Object.values(model).some(v => typeof v !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(v))
       || !Number.isInteger(maxCalls) || maxCalls < 1 || maxCalls > 128
-      || !Number.isInteger(taskTimeoutMs) || taskTimeoutMs < 1000 || taskTimeoutMs > 600000) throw Error('invalid model agent contract');
+      || !Number.isInteger(taskTimeoutMs) || taskTimeoutMs < 1000 || taskTimeoutMs > 600000
+      || (modelTimeoutMs !== undefined && (!Number.isInteger(modelTimeoutMs)
+        || modelTimeoutMs < 1000 || modelTimeoutMs > 600000))) throw Error('invalid model agent contract');
   let calls = 0, usedMs = 0, busy = false;
   return async input => {
     if (busy) throw Error('sequence agent already running');
@@ -42,7 +44,9 @@ export function createModelAgent(options) {
         const requestId = 'call-' + createHash('sha256').update(JSON.stringify([taskId, stepId, round])).digest('hex');
         calls++;
         const receipt = await dispatchModel({ mediator, prepareRequest, taskId, requestId, payload, allowance, withReceipt: true,
-          timeoutMs: Math.min(remaining, container.timeoutMs), invoke });
+          // Provider generation and isolated shell execution have independent
+          // deadlines. Neither may exceed the remaining whole-task allowance.
+          timeoutMs: Math.min(remaining, modelTimeoutMs ?? container.timeoutMs), invoke });
         const increments = { provider_requests: 1, new_provider_requests: receipt.invoked ? 1 : 0, ...receipt.usage };
         for (const key of Object.keys(usage)) {
           if (!Number.isSafeInteger(increments[key]) || increments[key] < 0
