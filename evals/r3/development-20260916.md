@@ -58,9 +58,17 @@ Offline evidence:
 
 Focused validation: 75 evaluator tests, three JavaScript retriever tests,
 evaluator Clippy, formatting and boundaries pass. The launcher test's fake
-vectors now use varied decimal components. See the
-[execution ledger](../../docs/reviews/federation-first/r3-execution.md) for the
-complete post-fix rehearsal status and retained paths.
+vectors now use varied decimal components, and the complete 75-task regression
+passed with 76 controller receipts. This separate run used synthetic credentials
+and fake provider responses, not another paid attempt. Its 60 pending knowledge
+reviews cannot be treated as quality evidence. See the
+[execution ledger](../../docs/reviews/federation-first/r3-execution.md) for retained paths.
+
+The required-database workspace rerun passed 905 tests with four test threads;
+the first unrestricted run hit the disposable PostgreSQL connection limit. One
+pre-existing unrelated documentation test remains excluded. The lean CLI build
+passed with its eight existing warnings. Full-workspace Clippy was stopped during
+a second cold native rebuild, so only the changed crate's Clippy pass is claimed.
 
 ## Next gate
 
@@ -69,3 +77,25 @@ them, clear their fences or invoke paid resume. A corrected runtime changes the
 manifest identity and needs a separately approved replacement campaign. Retain
 the settled usage when setting its cap; do not silently restore the full $10.
 The broader benchmark labels, official run and blinded result review remain open.
+
+## Corrected package awaiting approval
+
+Prepared but **not launched**:
+`/data/tmp/r3-calibration-corrected-20260916/campaign.json`, SHA-256
+`169c57de207ca8ba46cf13443b9fccbfb7da65f51d1cd75c3eac39d6c45c9c9c`.
+
+All 29 non-configuration assets, every source/label/fixture/suite/family-metadata
+asset and the model settings match the approved original. Only the runtime
+descriptor and absolute driver path changed among hashed assets. The existing
+two-family label approval is carried forward with explicit scope metadata; no
+new label decision or spending approval is asserted. The real preflight still
+refuses execution with `missing current Development approval`.
+
+Replacement limits are **US$9.99, 462 requests and 9,997,080 tokens**, including
+preparation, with the same 300-second task timeout and no automatic retries.
+Adding the prior 38 calls, 2,920 tokens and 83 accounted microdollars stays within
+the original 500-call, ten-million-token and US$10 ceilings. The original outer
+reservation is retained as historical incomplete evidence, not rewritten.
+
+No development-spend receipt or launcher settings exist for the corrected pack.
+Obtain explicit approval against its new hash before any key read or paid call.

@@ -1,5 +1,35 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 corrected package prepared, not executed
+
+- Rebuilt and pinned the runtime after the numeric parser fix. The replacement at
+  `/data/tmp/r3-calibration-corrected-20260916/campaign.json` has final identity
+  `169c57de207ca8ba46cf13443b9fccbfb7da65f51d1cd75c3eac39d6c45c9c9c`.
+- Verified every benchmark, label, fixture, suite and family-metadata asset and
+  model setting against the original. Only the runtime descriptor and absolute
+  driver path changed among hashed assets. Recorded the existing scoped label
+  approval with a zero spending allowance and explicit provenance; no new human
+  approval is inferred. The real preflight rejects missing Development approval.
+- Set conservative replacement ceilings of US$9.99, 462 calls and 9,997,080 tokens,
+  accounting for the original 83 micro-USD, 38 calls and 2,920 tokens. The original
+  attempt, task reservation and receipts are untouched. The corrected pack has
+  no spending receipt, settings or execution state; do not launch without new
+  explicit hash-bound authority.
+- Post-fix validation: **905 required-database workspace tests** pass across
+  54 targets with four test threads; the one existing M2 machine-local-path
+  documentation failure remains explicitly excluded. An earlier unrestricted
+  concurrency run exhausted the disposable database's default connection limit;
+  its failure was retained, then the complete suite rerun with bounded concurrency.
+  Logs: `/tmp/r3-float-workspace.log` and `/tmp/r3-float-workspace-bounded.log`.
+- All 75 evaluator tests, three cross-language retriever tests, formatting,
+  boundaries and evaluator Clippy pass. The lean CLI build passes with eight
+  existing warnings. Full-workspace Clippy was interrupted when it started a
+  second cold native-library build; it is **not claimed as passed** for this
+  increment. Logs: `/tmp/r3-float-clippy.log`, `/tmp/r3-float-workspace-clippy.log`,
+  `/tmp/r3-float-lean-build.log`. Both original and corrected runtime pins verify;
+  the corrected packaged retriever accepts the retained decimal-vector diagnosis
+  without any provider call.
+
 ## 2026-09-16 first paid attempt: local numeric-integrity failure
 
 - The authorized calibration completed preparation and stopped at its first
@@ -14,8 +44,11 @@
   breaking the exact embedding digest. The exact-binary fake control passed.
   Enabled exact parsing in `mem-eval` and added Rust/cross-language regressions;
   the old binary fails the new regression and the corrected retriever passes,
-  including retained live vectors and tamper rejection. Full fake rehearsal with
-  varied decimal vectors is being checked separately; it is not a paid retry.
+  including retained live vectors and tamper rejection. The complete fake
+  rehearsal with varied decimal vectors passed all 75 tasks and 76 controller
+  receipts. Sixty knowledge reviews remain pending, as expected for fake output;
+  this is not a paid retry or quality evidence. Retained at
+  `/data/tmp/r3-paid-hzIGPn/pack/run/`, log `/tmp/r3-decimal-paid-rehearsal.log`.
 - No conclusion about model quality is possible. A corrected campaign needs a
   new hash-bound approval, accounting for usage already settled by this attempt.
 

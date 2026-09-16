@@ -12,7 +12,7 @@ development calibration, not an official result or authority for another campaig
 | Approval preflight | `memory eval campaign check-approvals` verifies the manifest, assets and matching label/spend records without provider calls. Success does not enable dispatch. |
 | Secret/provider owner | Connects the version-pinned key handoff to fixed API destinations, rechecking approvals before every call and cancelling bindings on exit/failure. Tests use fake secrets and mocked OpenAI responses. |
 | Input accounting | Explicit [v2 full-context reservations](context-accounting.md) avoid unverified guesses about message/schema framing. Durable settlement/denial/replay tests pass. This is not exact tokenization or live billing validation. |
-| Real provider configuration | Reviewed v2 model/rates/limits implemented; campaign selection remains unapproved. Pin implementation and evidence into the actual calibration manifest; verify live wire/usage compatibility only after spend approval. |
+| Real provider configuration | The original v2 model/rates/limits were approved for the specific calibration. Thirty-eight real embedding calls returned valid receipts. No answer-model call was reached, so Responses compatibility remains unverified. A corrected runtime requires a new campaign identity and approval. |
 | Live launcher | [Approved launcher and packaging](paid-launcher.md) now connect the provider owner, durable controller, disposable session and Rust runner. Generic paid drivers stay blocked; the approved route requires exact label/spend records. Interruption fences the campaign before another key read, rather than rebuilding/repeating uncertain work. See the execution ledger for fake-only validation evidence; no real campaign is approved by this implementation. |
 | Benchmark labels | Olivier approved the artifact-origin and configuration-rollout development families on 2026-09-16. Their calibration manifest is frozen as reviewed with a labels-only receipt. All other families, including held-out labels, remain unapproved; see the [label review pack](label-review.md). |
 | Development spend | Olivier approved the identity below and US$10 cap. The run stopped at its first task on a local vector-decoding integrity failure, after 38 settled embedding calls (83 micro-USD accounted); no answer-model calls. See the [interrupted-run report](development-20260916.md). A rebuilt runtime needs a new approval, not reuse of this one. |
@@ -31,14 +31,14 @@ executions**, not 75 independent observations. Label-approved families:
 [configuration rollout](representative/development/configuration-rollout/review.md).
 No held-out tasks, customer facts, dev-service corpus or host agent history.
 
-Candidate answer/agent model: **`gpt-5.4-mini-2026-03-17`**, medium reasoning,
+Original approved answer/agent model: **`gpt-5.4-mini-2026-03-17`**, medium reasoning,
 identical settings across conditions. Its dated snapshot is documented and was
 visible to the dedicated key. Published standard text rates are $0.75 input,
 $0.075 cached input and $4.50 output per million tokens. This is a reproducible,
 cost-bounded starting candidate, not a finding that it is the best evaluator.
 [Official model specification](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
 
-Candidate embeddings: **`text-embedding-3-small`**, explicitly 1536 dimensions,
+Original approved embeddings: **`text-embedding-3-small`**, explicitly 1536 dimensions,
 same provider/model/dimensions for vector baseline and Full Memory; document
 preparation and task queries accounted separately. Published input price is
 $0.02 per million tokens. The documented encoding is `cl100k_base`.
@@ -76,6 +76,18 @@ US$10 to this identity; the combined preflight passed. Execution stopped on the
 local harness defect described in the interrupted-run report. Earlier draft identities and
 the location-invalid superseded pack are not spending targets. Any manifest
 change requires rechecking approval bindings. No official campaign is authorized.
+
+### Corrected replacement: new approval required
+
+The [interrupted-run report](development-20260916.md) records the numeric parser
+fix and its offline evidence. A rebuilt package is prepared at
+`/data/tmp/r3-calibration-corrected-20260916/campaign.json`, final SHA-256
+`169c57de207ca8ba46cf13443b9fccbfb7da65f51d1cd75c3eac39d6c45c9c9c`.
+All benchmark and label bytes and model settings remain unchanged. Its reduced
+ceilings are **US$9.99 / 462 requests / 9,997,080 tokens**, including preparation,
+so combined accounted usage stays below the original limits. Existing label
+approval is recorded for the unchanged two families; development spending is
+**not approved** for this new identity. No corrected run has been launched.
 
 ## Accounting choice and remaining live verification
 
