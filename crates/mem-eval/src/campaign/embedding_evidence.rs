@@ -127,6 +127,19 @@ pub fn validate(
 mod tests {
     use super::*;
 
+    #[test]
+    fn json_preserves_float32_vectors_promoted_to_binary64() {
+        // Hashes bind exact binary64 values, including promoted float32 storage
+        // values whose shortest JSON decimal is not exactly representable.
+        for bits in 0x3b00_0001..0x3b00_1001 {
+            let value = f64::from(f32::from_bits(bits));
+            let json = serde_json::to_string(&value).expect("finite vector value");
+            let decoded: f64 = serde_json::from_str(&json).expect("vector JSON");
+            assert_eq!(decoded.to_bits(), value.to_bits(), "changed {json}");
+            assert_eq!(vector_digest(&[decoded]), vector_digest(&[value]));
+        }
+    }
+
     pub(super) fn profile() -> Profile {
         Profile {
             provider: "synthetic".into(),

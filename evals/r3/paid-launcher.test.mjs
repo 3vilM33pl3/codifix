@@ -78,7 +78,9 @@ function mockProvider(t, onCall) {
     if (onCall) await onCall(options, calls.length);
     const body = JSON.parse(options.body);
     const result = url === 'https://api.openai.com/v1/embeddings'
-      ? { model: body.model, object: 'list', data: [{ object: 'embedding', index: 0, embedding: Array(1536).fill(0.5) }], usage: { prompt_tokens: 1, total_tokens: 1 } }
+      ? { model: body.model, object: 'list', data: [{ object: 'embedding', index: 0,
+        embedding: Array.from({ length: 1536 }, (_, i) => Math.fround(((i * 7919) % 65521 - 32760) / 1000003)) }],
+        usage: { prompt_tokens: 1, total_tokens: 1 } }
       : { id: 'resp_synthetic', object: 'response', status: 'completed', model: body.model, error: null, incomplete_details: null,
         output: [{ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', annotations: [],
           text: body.text.format.name === 'r3_isolated_action_v1' ? '{"action":{"kind":"finish"}}' : '{"text":"Insufficient evidence","refused":true,"citations":[]}' }] }],

@@ -9,6 +9,29 @@ import { bindCorpus, bindQuery, syntheticProfile, vectorDigest } from './embeddi
 
 const binary = process.env.MEMORY_R3_RETRIEVER_BIN;
 if (process.env.MEMORY_R3_REQUIRE_RETRIEVER === '1' && !binary) throw Error('required retriever binary missing');
+test('decimal float32 vectors preserve exact bindings across the JavaScript/Rust boundary', { skip: !binary }, async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-decimal-vectors-'));
+  t.after(() => fs.rm(directory, { recursive: true }));
+  // Synthetic, non-dyadic decimal encodings; constant 0.5 vectors missed this
+  // boundary. No provider output or benchmark labels are needed to reproduce it.
+  const vector = Array.from({ length: 1536 }, (_, i) => Math.fround(((i * 7919) % 65521 - 32760) / 1000003));
+  const profile = { ...syntheticProfile(vector.length, 'decimal-fixture-r1'), normalization: 'float32-rounding-v1' };
+  const documents = [{ id: 'runbook', text: 'synthetic source' }];
+  const file = path.join(directory, 'configuration.json');
+  await fs.writeFile(file, JSON.stringify({ project: 'synthetic', condition: 'external-retriever', mode: 'vector',
+    documents, embeddings: [vector], embedding_corpus: bindCorpus(profile, documents, [vector]), top_k: 8, bytes: 1024 }));
+  const request = { schema_version: 1, project: 'synthetic', condition: 'external-retriever', query: 'synthetic question',
+    limit: 8, item_id: 'q1', context: { fixture_path: '', hidden_facts: [] }, query_embedding: vector,
+    embedding_query: bindQuery(profile, 'synthetic question', vector) };
+  const invoke = input => spawnSync(binary, [file], { input: JSON.stringify(input), encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin' }, timeout: 5000 });
+  const result = invoke(request);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout).results.map(hit => hit.id), ['runbook']);
+  const changed = structuredClone(request);
+  changed.query_embedding[0] = Math.fround(changed.query_embedding[0] + 0.000001);
+  assert.equal(invoke(changed).status, 1, 'do not weaken digest checks to accept changed vectors');
+});
 test('embedding bindings are strict, bounded and do not mutate caller profiles', () => {
   const profile = syntheticProfile(2, 'unit-vectors-r1');
   const docs = [{ id: 'a', text: 'source' }];
