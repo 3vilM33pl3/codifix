@@ -1,5 +1,36 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 diagnostic repair and bounded retry authorization
+
+- Olivier requested diagnosis and another attempt. Added closed-vocabulary
+  provider diagnostics: transport/HTTP, receipt status/model/usage/output and
+  deadline/cancellation categories. Failed reserved calls write private,
+  exclusively created, manifest/payload-bound metadata files. No raw provider
+  text, prompts, answers, credentials or stack traces are persisted there.
+  Uncertainty and replay fences are unchanged; diagnostics never refund usage.
+- Validation: 22 focused transport/receipt/mediator tests, 14 provider/profile/
+  call tests (one separate integration skipped in that focused invocation),
+  three runtime/approval packaging tests and the real disposable-database fake
+  HTTP-failure test passed. Full 75-task fake-provider launcher rehearsal passed
+  with valid execution evidence and 60 pending human reviews; fake output is
+  not quality evidence. Formatting and boundary checks passed. Logs:
+  `/tmp/r3-diagnostic-focused.log`, `/tmp/r3-diagnostic-packaging-tests.log`,
+  `/tmp/r3-diagnostic-http-e2e.log`, `/tmp/r3-diagnostic-launcher-tests.log`.
+  Full fake evidence: `/data/tmp/r3-paid-XcCGOg/pack/`.
+- Replacement manifest at `/data/tmp/r3-diagnostic-retry-20260916/campaign.json`:
+  `d424e71ad19473266d7c3305574a9b73491bcf67b55b2fb1fcab719aa53fe8c9`.
+  The 29 benchmark assets, model/settings, cases, semantic clock and per-task
+  budgets are unchanged. The existing two-family label decision is carried
+  forward; the user's explicit retry request is bound to this instrumented
+  replacement, not to a new benchmark or model.
+- Remaining ceilings: **US$9.68, 423 calls, 9,590,064 tokens**. This deducts both
+  attempts' 76 settled calls / 5,840 tokens / 166 micro-USD and reserves the full
+  uncertain model-call allowance of one call / 404,096 tokens / 318,432 micro-USD.
+  Combined maximum is US$9.998598, not an increase to the original US$10 cap.
+  Original receipts and nested outer task reservations remain untouched. Exact
+  approval preflight and runtime verification passed; no held-out work or
+  further automatic retries are authorized. Run outcome is recorded separately.
+
 ## 2026-09-16 corrected paid attempt: unresolved first model operation
 
 - Preparation and the corrected embedding boundary passed. The first coding
