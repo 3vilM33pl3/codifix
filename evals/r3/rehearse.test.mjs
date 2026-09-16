@@ -71,6 +71,12 @@ test(`existing campaign CLI completes a real 75-dispatch ${wire ? 'HTTP-mediated
   const artifact = JSON.parse(await fs.readFile(summary.artifact));
   assert(artifact.completed && artifact.offline);
   assert.equal(artifact.observations.length, 75);
+  const { inspectCampaignDispatch } = await import('./campaign-dispatch.mjs');
+  const dispatch = await inspectCampaignDispatch(path.join(root, 'private/dispatch'));
+  assert.equal(dispatch.manifest_sha256, artifact.manifest_sha256);
+  assert.equal(dispatch.entries.length, mediated ? 76 : 75);
+  assert(dispatch.entries.every(entry => entry.status === 'completed'));
+  assert.equal(dispatch.execution_enabled, false);
   assert.equal(new Set(artifact.observations.map(row => JSON.stringify(row.work))).size, 75);
   assert(artifact.observations.every(row => row.execution_microusd === 0));
   if (mediated) {

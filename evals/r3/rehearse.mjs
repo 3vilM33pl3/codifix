@@ -78,7 +78,7 @@ try {
     await fs.writeFile(target, bytes, { flag: 'wx', mode: executable ? 0o700 : 0o600 });
     manifest.assets.push({ path: relative, sha256: createHash('sha256').update(bytes).digest('hex'), kind: 'configuration' });
   };
-  for (const relative of ['rehearsal-controller.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'synthetic-embedding.mjs', 'request-mediator.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
+  for (const relative of ['rehearsal-controller.mjs', 'campaign-dispatch.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'synthetic-embedding.mjs', 'request-mediator.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
     'synthetic-wire-provider.mjs', 'provider-profile.mjs', 'context-reservation.mjs', 'provider-campaign-session.mjs', 'provider-transport.mjs', 'responses-call.mjs', 'responses-request.mjs', 'responses-receipt.mjs', 'embeddings-call.mjs',
     'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs', 'isolation/service-session.mjs', 'isolation/embedding-proxy.mjs',
     'isolation/model-agent.mjs', 'isolation/model-answer.mjs', 'isolation/model-dispatch.mjs', 'isolation/rehearsal-task.mjs']) {
