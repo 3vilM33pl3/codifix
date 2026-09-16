@@ -351,7 +351,7 @@ jobs:
           MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_SCORE=1 \
             node --test evals/r3/scoring.test.mjs
           MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_REVIEW=1 \
-            node --test evals/r3/review.test.mjs evals/r3/label-review.test.mjs evals/r3/responses-receipt.test.mjs evals/r3/responses-request.test.mjs evals/r3/provider-transport.test.mjs evals/r3/synthetic-embedding.test.mjs
+            node --test evals/r3/review.test.mjs evals/r3/label-review.test.mjs evals/r3/responses-receipt.test.mjs evals/r3/responses-request.test.mjs evals/r3/provider-transport.test.mjs evals/r3/synthetic-embedding.test.mjs evals/r3/approved-credential.test.mjs
       - name: Verify R3 retrieved context and isolated knowledge answering
         run: |
           r3_container_image=$(docker image inspect --format '{{.Id}}' ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12)

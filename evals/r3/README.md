@@ -1,5 +1,26 @@
 # R3 engineering evaluation — implementation in progress
 
+For the current human and technical gates, see the
+[paid-run readiness checklist](paid-readiness.md). The dedicated evaluation key
+is provisioned, but that is not benchmark approval or spending authority.
+
+`memory eval campaign check-approvals` verifies existing hash-bound label and
+spend records without provider activity. `approved-credential.mjs` is a
+trusted-host primitive for checking that gate, reading one explicit OpenBao KV
+version, and rechecking before a trusted callback receives the key. It never
+returns the key or callback output, creates a key file, inherits provider/proxy
+environment configuration, rotates credentials or calls a model. Subprocess and
+callback failures are sanitized and never retried. System CA verification and
+redirect denial remain enabled. Existing user-home Bao authentication is used;
+no new credentials are provisioned. JavaScript cannot guarantee key zeroization.
+
+This helper is **not connected to paid campaign dispatch yet**. The CLI paid-run
+guard stays in place. A successful preflight is point-in-time operator evidence,
+not a signed authorization: the trusted launcher must validate frozen assets,
+model/tokenizer/rates, isolation and live approval before every dispatch.
+Tests use fake secret executables only; CI also checks real-CLI denial before
+any secret subprocess starts.
+
 The optional `provider_profile` manifest field locks the answer tokenizer, separate
 embedding model/dimensions/input price/tokenizer, and a configuration-evidence
 asset. Each tokenizer has an ID and a `{path, sha256}` reference to a configuration
