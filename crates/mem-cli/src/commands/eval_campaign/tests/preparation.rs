@@ -90,6 +90,10 @@ async fn preparation_is_budgeted_before_tasks_and_verified_without_rerunning_on_
     use std::os::unix::fs::PermissionsExt;
     let root = Scratch::new();
     let (mut manifest, mut observation) = fixture();
+    // This verifies journal/phase accounting, not startup latency. Loading the
+    // large test executable alongside required-database suites can exceed the
+    // tiny default fixture timeout. The separate deadline test keeps its 1s cap.
+    manifest.limits.task_seconds = 30;
     manifest.provider_budget = Some(c::ProviderBudget {
         max_calls_per_task: 1,
     });
@@ -97,7 +101,7 @@ async fn preparation_is_budgeted_before_tasks_and_verified_without_rerunning_on_
         requests: 2,
         tokens: 100,
         microusd: 0,
-        task_seconds: 10,
+        task_seconds: 30,
     });
     // Preparation consumes two requests and ten tokens; exactly two task
     // requests remain. Unused preparation tokens are released after verification.
