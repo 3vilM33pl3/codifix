@@ -1,5 +1,22 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 development spending approval and launch
+
+- Olivier explicitly replied “Approve the $10 development run” to the final
+  identity `40c6f8dd554cb2f6a52575a87133a31edce8003c25a99b969e14dcb48f6b9d3c`.
+  Recorded a development receipt at `2026-09-16T12:23:59Z` with a US$10 ceiling,
+  in addition to the existing separate labels receipt. This authorizes only the
+  75-task two-family development calibration, with preparation included, 500
+  provider requests and ten million tokens; no retries, top-ups or held-out run.
+- Dev Memory checkpoint succeeded. The frozen runtime and both image identities
+  were reverified, no prior execution existed, and the pinned CLI approval
+  preflight passed for exactly that manifest and limits.
+- Launched the pinned runtime against a fresh disposable PostgreSQL instance,
+  using the previously approved version-pinned OpenBao evaluation key reference.
+  No existing service, data, credential or frozen benchmark asset was changed.
+  Private artifacts remain at `/data/tmp/r3-calibration-20260916/`; execution
+  outcomes must be read separately from this authorization record.
+
 ## 2026-09-16 scoped development-label approval
 
 - Olivier replied “Approved” to the request to approve artifact-origin and

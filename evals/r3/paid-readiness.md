@@ -1,7 +1,7 @@
 # R3 paid evaluation: remaining gates
 
-Status checked 2026-09-16. This is a readiness record and **proposal**, not
-approval, an official result, or permission to execute a paid campaign.
+Status checked 2026-09-16. This records the explicit approval of one bounded
+development calibration, not an official result or authority for another campaign.
 
 ## Gate status
 
@@ -15,14 +15,14 @@ approval, an official result, or permission to execute a paid campaign.
 | Real provider configuration | Reviewed v2 model/rates/limits implemented; campaign selection remains unapproved. Pin implementation and evidence into the actual calibration manifest; verify live wire/usage compatibility only after spend approval. |
 | Live launcher | [Approved launcher and packaging](paid-launcher.md) now connect the provider owner, durable controller, disposable session and Rust runner. Generic paid drivers stay blocked; the approved route requires exact label/spend records. Interruption fences the campaign before another key read, rather than rebuilding/repeating uncertain work. See the execution ledger for fake-only validation evidence; no real campaign is approved by this implementation. |
 | Benchmark labels | Olivier approved the artifact-origin and configuration-rollout development families on 2026-09-16. Their calibration manifest is frozen as reviewed with a labels-only receipt. All other families, including held-out labels, remain unapproved; see the [label review pack](label-review.md). |
-| Development spend | Awaiting approval of the exact locked manifest and cap; candidate scope below. |
+| Development spend | Olivier explicitly approved the final identity below and US$10 cap on 2026-09-16. Both approval receipts pass preflight. The pinned development launcher has been started; see the execution ledger for its outcome. No retries, top-ups or official run are authorized. |
 | Official campaign | Separate approval after calibration fixes operational budgets and selects the cost/latency reference baseline. No official calls authorized or made. |
 
 The existing offline artifact and its limitations are recorded in the
 [execution ledger](../../docs/reviews/federation-first/r3-execution.md).
 Fake-provider passes are harness evidence, not measured Memory quality.
 
-## Frozen first calibration, awaiting spending approval
+## Approved first development calibration
 
 Use one complete development knowledge family (four questions) and one complete
 three-step coding family, all five conditions and three repeats: **75 task
@@ -45,7 +45,7 @@ $0.02 per million tokens. The documented encoding is `cl100k_base`.
 [Model pricing](https://developers.openai.com/api/docs/models/text-embedding-3-small),
 [embedding guide](https://developers.openai.com/api/docs/guides/embeddings)
 
-Proposed maximum: **US$10 of provider usage**, including preparation, no automatic
+Approved maximum: **US$10 of provider usage**, including preparation, no automatic
 retries or top-up; at most 500 provider calls and ten million total tokens.
 The proposed v2 profile reserves 400,000 input / 4,096 output tokens per call, with
 at most 12 provider calls per task and 300 seconds per complete task. These are
@@ -68,12 +68,14 @@ was recorded on 2026-09-16. Only `label_status` changed from the verified draft.
 The final manifest at `/data/tmp/r3-calibration-20260916/campaign.json` has SHA-256
 `40c6f8dd554cb2f6a52575a87133a31edce8003c25a99b969e14dcb48f6b9d3c`.
 Its `private/labels-approval.json` names Olivier, purpose `labels`, with a zero
-spending allowance. The real preflight accepts that label record and rejects
-execution with `missing current Development approval`. No key was read and no
-provider contacted. Approval of the models and the $10 development limit must
-explicitly bind this final identity; the earlier draft hash and location-invalid
-superseded pack are not valid spending targets. Any manifest change requires
-rechecking the approval bindings. No official campaign is authorized.
+spending allowance. Initially the labels-only preflight correctly rejected
+execution with `missing current Development approval`. Olivier subsequently
+replied “Approve the $10 development run” to this final identity, model settings
+and limits. The separate development receipt at `2026-09-16T12:23:59Z` binds
+US$10 to this identity; the combined preflight passes. Execution has been launched,
+with outcomes recorded in the execution ledger. Earlier draft identities and
+the location-invalid superseded pack are not spending targets. Any manifest
+change requires rechecking approval bindings. No official campaign is authorized.
 
 ## Accounting choice and remaining live verification
 
