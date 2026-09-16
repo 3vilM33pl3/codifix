@@ -15,7 +15,7 @@ development calibration, not an official result or authority for another campaig
 | Real provider configuration | Reviewed v2 model/rates/limits implemented; campaign selection remains unapproved. Pin implementation and evidence into the actual calibration manifest; verify live wire/usage compatibility only after spend approval. |
 | Live launcher | [Approved launcher and packaging](paid-launcher.md) now connect the provider owner, durable controller, disposable session and Rust runner. Generic paid drivers stay blocked; the approved route requires exact label/spend records. Interruption fences the campaign before another key read, rather than rebuilding/repeating uncertain work. See the execution ledger for fake-only validation evidence; no real campaign is approved by this implementation. |
 | Benchmark labels | Olivier approved the artifact-origin and configuration-rollout development families on 2026-09-16. Their calibration manifest is frozen as reviewed with a labels-only receipt. All other families, including held-out labels, remain unapproved; see the [label review pack](label-review.md). |
-| Development spend | Olivier explicitly approved the final identity below and US$10 cap on 2026-09-16. Both approval receipts pass preflight. The pinned development launcher has been started; see the execution ledger for its outcome. No retries, top-ups or official run are authorized. |
+| Development spend | Olivier approved the identity below and US$10 cap. The run stopped at its first task on a local vector-decoding integrity failure, after 38 settled embedding calls (83 micro-USD accounted); no answer-model calls. See the [interrupted-run report](development-20260916.md). A rebuilt runtime needs a new approval, not reuse of this one. |
 | Official campaign | Separate approval after calibration fixes operational budgets and selects the cost/latency reference baseline. No official calls authorized or made. |
 
 The existing offline artifact and its limitations are recorded in the
@@ -72,8 +72,8 @@ spending allowance. Initially the labels-only preflight correctly rejected
 execution with `missing current Development approval`. Olivier subsequently
 replied “Approve the $10 development run” to this final identity, model settings
 and limits. The separate development receipt at `2026-09-16T12:23:59Z` binds
-US$10 to this identity; the combined preflight passes. Execution has been launched,
-with outcomes recorded in the execution ledger. Earlier draft identities and
+US$10 to this identity; the combined preflight passed. Execution stopped on the
+local harness defect described in the interrupted-run report. Earlier draft identities and
 the location-invalid superseded pack are not spending targets. Any manifest
 change requires rechecking approval bindings. No official campaign is authorized.
 

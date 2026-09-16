@@ -1,5 +1,24 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 first paid attempt: local numeric-integrity failure
+
+- The authorized calibration completed preparation and stopped at its first
+  task, before any answer-model request. Thirty-eight embedding calls settled:
+  2,920 input tokens and 83 micro-USD under the frozen rounded-up price accounting.
+  Zero task observations were accepted. The report correctly rejects the incomplete
+  artifact. See the [development report](../../../evals/r3/development-20260916.md).
+- Kept the original `40c6f8dd…f6b9d3c` pack, all journals and its outer task
+  reservation unchanged. No paid retry was attempted; no new credential created.
+- Offline reproduction isolated `serde_json` binary64 parsing: nine components
+  of a retained 1,536-dimensional vector changed without `float_roundtrip`,
+  breaking the exact embedding digest. The exact-binary fake control passed.
+  Enabled exact parsing in `mem-eval` and added Rust/cross-language regressions;
+  the old binary fails the new regression and the corrected retriever passes,
+  including retained live vectors and tamper rejection. Full fake rehearsal with
+  varied decimal vectors is being checked separately; it is not a paid retry.
+- No conclusion about model quality is possible. A corrected campaign needs a
+  new hash-bound approval, accounting for usage already settled by this attempt.
+
 ## 2026-09-16 development spending approval and launch
 
 - Olivier explicitly replied “Approve the $10 development run” to the final
