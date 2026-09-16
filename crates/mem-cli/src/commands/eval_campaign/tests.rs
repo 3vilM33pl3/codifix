@@ -78,6 +78,7 @@ async fn paid_dispatch_is_rejected_before_reading_files_or_starting_processes() 
         split: "held-out".into(),
         allow_shell: true,
         offline: false,
+        approved_runtime: None,
         resume: false,
         approvals: vec![],
     })
@@ -99,6 +100,7 @@ async fn offline_driver_requires_explicit_shell_consent() {
         split: "development".into(),
         allow_shell: false,
         offline: true,
+        approved_runtime: None,
         resume: false,
         approvals: vec![],
     })

@@ -2452,6 +2452,10 @@ pub(in crate::commands) enum EvalCampaignCommand {
         /// Fake-provider harness evidence only; never product-quality evidence.
         #[arg(long)]
         offline: bool,
+        /// Locked approved-provider runtime; required for non-offline dispatch.
+        /// Use the trusted launcher, not an arbitrary paid driver.
+        #[arg(long)]
+        approved_runtime: Option<PathBuf>,
         /// Explicitly recover durable results in --out and dispatch only unstarted work.
         /// Ambiguous attempts stop recovery; no automatic provider retry.
         #[arg(long)]

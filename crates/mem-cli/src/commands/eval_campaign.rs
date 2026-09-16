@@ -29,6 +29,7 @@ fn exclusive_json<T: serde::Serialize>(path: &Path, data: &T) -> Result<()> {
     Ok(())
 }
 
+mod paid_runtime;
 mod preparation;
 mod provider_mediation;
 #[cfg(test)]
@@ -144,15 +145,17 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
             split: requested,
             allow_shell,
             offline,
+            approved_runtime,
             resume,
             approvals,
         } => {
-            // Fail before dispatch until the multi-request provider budget proxy
-            // and live isolation driver are independently verified. Approval
-            // files alone must not unlock incomplete paid-execution machinery.
             ensure!(
-                offline,
-                "paid campaign execution remains unavailable pending provider-budget mediation and live isolation verification"
+                offline || approved_runtime.is_some(),
+                "paid campaign execution remains unavailable for arbitrary drivers; use the approved runtime launcher"
+            );
+            ensure!(
+                !offline || approved_runtime.is_none(),
+                "approved runtime cannot run as offline evidence"
             );
             ensure!(
                 allow_shell,
@@ -171,6 +174,17 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
             let driver = driver.canonicalize()?;
             let driver_hash = c::digest(&std::fs::read(&driver)?);
             let root = manifest_path.parent().context("campaign directory")?;
+            if let Some(runtime) = approved_runtime {
+                ensure!(
+                    !resume,
+                    "approved runtime restart requires reconciliation; no automatic prepared-service reconstruction"
+                );
+                ensure!(
+                    out == root.join("run"),
+                    "approved runtime requires its bound run directory"
+                );
+                paid_runtime::verify(root, &runtime, &driver, &manifest)?;
+            }
             ensure!(
                 manifest
                     .assets
