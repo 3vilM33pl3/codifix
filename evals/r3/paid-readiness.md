@@ -5,12 +5,14 @@ development calibration, not an official result or authority for another campaig
 
 ## Gate status
 
-Latest update: the instrumented retry identified rejection of a completed
-response's usage shape. A narrow compatibility fix accepts the documented
-zero-valued `cache_write_tokens` field and passed all 75 updated-schema fake tasks.
-The explicitly approved US$9.36 replacement then stopped on a different explicit
-failure: its first coding response was incomplete at the 4,096 output-token cap.
-Zero accepted observations; three uncertain model allowances remain reserved.
+Latest update: the separately approved US$9.04 expanded-profile replacement
+(16,384 output tokens; 120-second model calls) passed a 75-task fake rehearsal,
+then accepted and settled its first real model response. Its second completed
+response failed strict output validation (`receipt_output`); the exact branch was
+not retained. Zero completed observations; no further paid invocation. New offline
+tests provide precise sanitized output-failure categories without relaxing checks.
+Across five attempts, validated receipts total US$0.019201; four uncertain model
+allowances retain US$1.329024. These allowances are not confirmed charges.
 See the [diagnosis, accounting and next decision](development-diagnostic-20260916.md).
 The historical gate rows below describe the earlier two attempts.
 

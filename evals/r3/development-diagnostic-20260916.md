@@ -101,7 +101,7 @@ The owned live and test databases were removed after their processes exited;
 all frozen artifacts and reservations remain. Existing dev services and secrets
 are unchanged.
 
-### Next decision
+### Next decision at the end of the usage-fixed attempt
 
 Another live attempt needs revised output/deadline settings and explicit approval,
 not replay of any frozen pack. The current medium-reasoning coding call exhausted
@@ -117,3 +117,57 @@ Under current conservative accounting, a future cap of US$9.04 / 345 calls /
 proposal, **not approval or a prepared spending receipt**. Unresolved calls cannot
 be marked free, missing observations cannot be dropped, and these development
 attempts establish no quality, superiority, cost/latency or ROI result.
+
+## Approved expanded run: completed output rejected
+
+Olivier subsequently approved the proposed expanded profile: 16,384 maximum
+output tokens, 120-second model-call deadlines, unchanged 300-second task cap,
+US$9.04 / 345 calls / 8,776,032 tokens. No model, benchmark, rate or reasoning
+change. The immutable replacement is `/data/tmp/r3-expanded-20260916/`, manifest
+`3cf114f9abd409eab22966d7cc5a1a92bda6d826dc85e168db9687cba2bbd4d4`.
+Approval was recorded at `2026-09-16T14:53:09Z`; exact runtime and approval checks
+passed before the single launch.
+
+Eleven focused deadline/receipt/agent tests and the full 75-task fake-provider
+rehearsal passed first. Fake evidence: `/data/tmp/r3-paid-fS4a4x/pack/`, logs
+`/tmp/r3-limits-focused.log` and `/tmp/r3-limits-launcher.log`.
+
+Live preparation passed. The **first model response was accepted and settled**:
+2,961 input tokens, 3,681 output tokens and 18,786 micro-USD. This verifies a real
+successful traversal of the usage/output decoder. The second response was
+`completed` but rejected at **`receipt_output`**, after identity, model and usage
+validation. No task completed. The pinned report correctly returns
+`execution_valid: false`, `harness_valid: false`, `quality_passed: false`, with
+interrupted/missing-observation errors. This is not evidence of model quality.
+
+The retained diagnostic cannot distinguish multiple messages, refusal, message
+shape/status, annotations, oversized text or absent text. Raw rejected output was
+not retained. Do not claim a specific cause or silently relax output validation.
+The subsequent local change splits these branches into closed-vocabulary
+`output_reason` metadata without accepting new shapes or retaining provider text.
+Twelve receipt/diagnostic/transport tests pass, with zero skips, including all ten
+output-reason categories and unknown-field non-disclosure. Log:
+`/tmp/r3-output-diagnostics-tests.log`. This change is **not** applied to the frozen
+run and cannot recover its missing diagnostic detail. No further paid call ran.
+
+### Final accounting and cleanup
+
+This attempt settled 39 calls (38 embedding, one model): 5,881 input tokens,
+3,681 output tokens and 18,869 micro-USD. Its second model operation retains the
+full unresolved 416,384-token / 373,728-micro-USD allowance.
+
+Across all five attempts, the provider journals contain **191 settled calls**
+(190 embedding, one model), **17,561 input + 3,681 output tokens**, and
+**19,201 micro-USD (US$0.019201)**. Four unresolved model-call allowances total
+**1,628,672 tokens / 1,329,024 micro-USD (US$1.329024)**. The combined conservative
+amount is **US$1.348225**, not an invoice. Nested task allowances are not extra
+charges. The incomplete campaign report lacks the interrupted task's observations
+and therefore does not replace these provider journals for spending reconciliation.
+
+The owned live database was removed after launcher exit; frozen packs, private
+diagnostics, receipts, replay fences and reservations remain. Existing dev
+services and credentials were not changed. Another paid invocation is not
+authorized. Before proposing one, resolve the strict output-profile compatibility
+and improve fixture coverage offline; the next step is not another blind retry.
+R3 implementation/evidence, human adjudication and official/product-quality gates
+remain open.

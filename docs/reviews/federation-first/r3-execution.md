@@ -1,5 +1,26 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 expanded run: first model receipt settles; second output rejected
+
+- Approved replacement `3cf114f9…bbd4d4` ran once. Preparation and its first model
+  response passed; the second was completed but rejected at `receipt_output`.
+  No task completed. The pinned campaign report rejects missing/interrupted
+  observations; no quality or official evidence is claimed.
+- The saved diagnostic cannot identify the specific output shape. Added closed
+  output-reason categories locally, preserving strict acceptance and private
+  content handling. Twelve offline receipt/diagnostic/transport tests pass with
+  no skips. This cannot retroactively diagnose the frozen response, and no further
+  paid request was made. Log: `/tmp/r3-output-diagnostics-tests.log`.
+- Five-attempt provider-journal reconciliation: 191 settled calls, 21,242 total
+  tokens and US$0.019201; four unresolved model allowances retain 1,628,672 tokens
+  and US$1.329024. Nested task reservations are not additional charges. The
+  incomplete observation report is not the provider spending ledger.
+- Removed this run's owned disposable database after exit; retained all packs,
+  journals and replay fences. Existing dev services and credentials untouched.
+  See [full evidence and limitations](../../../evals/r3/development-diagnostic-20260916.md).
+  Next work is offline output-profile compatibility/fixture coverage, not another
+  blind paid retry. R3 and official/product-quality gates remain open.
+
 ## 2026-09-16 expanded output and model-call deadlines approved
 
 - Olivier replied “yes” to 16,384 output tokens, 120-second model calls and the
