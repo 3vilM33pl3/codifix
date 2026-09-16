@@ -1,5 +1,62 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 durable controller and cancellation recovery
+
+- Dev Memory is reachable again. Resumed the approved R3 plan and checkpointed
+  before editing; no credential changes, paid requests or deployment changes.
+- Extracted the shared host IPC controller into `campaign-dispatch.mjs` and wired
+  it into the existing rehearsal. Attempts are synced before execution and
+  receipts before reply. Exact duplicate requests share work/results; altered,
+  concurrent and out-of-order requests are rejected. The exclusive journal
+  directory fences a second owner, including after SIGKILL. A failed owner
+  cannot be revived by restoring changed inputs. Locked work-list bounds and
+  response locations are validated independently of the task executor.
+- Added read-only `inspect-dispatch.mjs`: metadata only, no provider invocation,
+  answers or automatic repair. Partial/corrupt receipts fail closed. An uncertain
+  attempt yields exit 2; successful inspection never enables execution. Keep
+  this journal with the Rust outer/per-call budget journals and artifacts.
+- Approved provider/session helpers now accept controller cancellation. An
+  in-flight fake HTTP request aborts, its maximum charge stays reserved, and
+  subsequent calls/bindings are denied. No key or provider error body is exposed.
+- Nine controller fault tests and seven approved-owner/session tests pass without
+  skips. Tests cover duplicate/lost responses, receipt-write failure, cancellation,
+  changed inputs, inspection sanitization and SIGKILL before claim, during effect
+  and after receipt. The owner suite includes actual disposable PostgreSQL/service
+  preparation and a complete isolated coding sequence, with fake credentials and
+  mocked provider responses. Logs: `/tmp/r3-dispatch-faults-final.log` and
+  `/tmp/r3-dispatch-owner.log`.
+- Focused regressions pass: 53 evaluator campaign tests, 10 CLI campaign tests and
+  22 provider/review tests, without skips. Workspace Clippy, formatting and
+  boundaries pass. Logs: `/tmp/r3-dispatch-eval-tests.log`,
+  `/tmp/r3-dispatch-cli-tests.log`, `/tmp/r3-dispatch-regressions-final.log`,
+  `/tmp/r3-dispatch-clippy.log` and `/tmp/r3-dispatch-boundaries.log`.
+  The lean CLI build also passes with eight existing dead-code warnings:
+  `/tmp/r3-dispatch-lean-build.log`.
+- Required-database workspace tests, including federation regressions, pass with
+  the known unrelated M2 `markdown_local_links_and_images_resolve` test excluded.
+  A separate run confirms that check still fails on its machine-local path;
+  no M2 document was edited. Logs: `/tmp/r3-dispatch-workspace.log` and
+  `/tmp/r3-dispatch-known-doc-failure.log`. No new Web, live PDS or Lean theorem
+  run is claimed for these host-controller changes.
+- Both complete rehearsal tests pass without skips in 722 seconds. The frozen
+  legacy-v1 HTTP run completes 75 tasks, retaining 76 controller receipts and
+  reconciling 34 preparation plus 180 execution calls. All snapshots remain
+  unchanged. `execution_valid` is true; harness/official/quality gates remain
+  false, with 60 knowledge judgments pending. Every provider response is fake.
+  Artifact: `/data/tmp/memory-r3-rehearsal-cli-WmD3Co/pack/run/artifact.json`;
+  controller journal: the same pack's `private/dispatch/`; log:
+  `/tmp/r3-dispatch-rehearsal.log`. The run executes its frozen runtime copy;
+  subsequent work-list/inspection refinements are covered by the final nine
+  controller tests. This is not a complete v2 approved-owner campaign.
+- Removed only the owned tmpfs database `memory-r3-dispatch-20260916` after all
+  database validation. Synthetic contents are regenerable; artifacts remain.
+  Existing dev services, credentials and project databases were untouched.
+- **R3 is not complete.** These are durable dispatch and cancellation components,
+  not the complete approved paid launcher. Restart deliberately stops for
+  reconciliation rather than reconstructing a lost prepared service or repeating
+  uncertain calls. Locked live runtime packaging, whole-launcher recovery,
+  campaign approval/calibration and official evidence remain open.
+
 ## 2026-09-16 conservative accounting and approved provider session
 
 - Resumed the approved R3 plan and checkpointed through dev Memory before edits.
@@ -1549,6 +1606,9 @@ Approved plan checkpoint: `r3-isolated-evaluation`, plan memory
   - [x] Shared provider-only preparation/task lifecycle, profile-derived snapshot
     and baseline embeddings, and isolated knowledge/coding execution without
     synthetic fallback; verified with fake providers only.
+  - [x] Shared controller persists attempts/receipts, fences competing/crashed
+    owners and provides metadata-only inspection. Provider cancellation retains
+    uncertain charges. These are component tests, not whole-launcher recovery.
   - [ ] Complete the approved live-provider driver path; paid dispatch remains
     disabled pending the complete CLI controller, locked runtime packaging and
     interrupt/recovery rehearsal. The v2 provider profile is implemented, not
