@@ -1,5 +1,46 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 approval and secret-read gates
+
+- Resumed/checkpointed the existing R3 plan through dev Memory before edits.
+  Dedicated-key provisioning had already succeeded in the approved OpenBao entry;
+  no new credential, rotation, `.env`, deployment or existing service change was
+  made. A read-only model-list request authenticated successfully. No generation
+  or embedding request was made; billing/inference availability is not established.
+- Added `memory eval campaign check-approvals`. It uses the existing Rust
+  manifest/asset and approval validator, reports exact identity/limits, and never
+  enables paid dispatch or invents approval. The rebuilt command rejects the
+  retained draft rehearsal for unapproved labels and spending.
+- Added the trusted-owner `approved-credential.mjs` primitive. Exact approvals
+  are checked before a pinned-version Bao read and again before a host callback
+  receives the key. No secret or callback result is returned; subprocess errors
+  are sanitized, TLS verification stays enabled, redirects are disabled, and
+  provider/proxy environment variables do not propagate. JavaScript string
+  zeroization is not claimed. This primitive is not yet a live campaign launcher.
+- All five credential tests pass, including real CLI denial before the fake
+  secret executable starts. Fake-process cases cover stale/missing approvals,
+  mid-read changes, malformed/oversized keys, error-body sanitization and ambient
+  environment isolation. The CI offline group now includes these tests; remote
+  CI execution is not claimed.
+- Validation: 10 campaign CLI tests and 52 evaluator campaign tests pass. The
+  provider/review/credential offline group passes all 18 tests without skips.
+  Broader CLI verification passes 236 tests, excluding the previously recorded
+  unrelated M2 documentation-link check. CLI all-target Clippy, Rust formatting,
+  boundaries and lean CLI build pass (existing lean dead-code warnings remain).
+  Logs: `/tmp/r3-gates-cli-tests.log`, `/tmp/r3-gates-eval-tests.log`,
+  `/tmp/r3-gates-offline-tests.log`, `/tmp/r3-gates-cli-all.log`,
+  `/tmp/r3-gates-clippy.log`, `/tmp/r3-gates-boundaries.log`, and
+  `/tmp/r3-gates-lean-build.log`. No new full workspace/database, federation/PDS,
+  Web, Lean theorem or complete campaign run is claimed for this increment.
+- The [paid-readiness checklist](../../../evals/r3/paid-readiness.md) consolidates
+  remaining gates and a proposed development-only calibration. Official model
+  documentation and account model visibility were checked; the proposal is not
+  model/spend approval. Complete Responses token accounting and the live launcher
+  remain engineering work, not tasks hidden behind pending human approval.
+  Fixture tree `198d202a976298539e51219da0b015b6cb9658cb` is unchanged.
+- **R3 remains incomplete.** Label approval, exact locked development spending,
+  and the later official campaign remain separate. Paid CLI dispatch is disabled.
+
 ## 2026-09-16 shared provider campaign session
 
 - Added a trusted-owner session for mediated preparation and isolated task
