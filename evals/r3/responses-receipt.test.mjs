@@ -42,6 +42,18 @@ test('preserves usage once, cache detail and exact model without returning reaso
   });
 });
 
+test('documented zero cache-write metadata is compatible; unpriced writes remain rejected', () => {
+  const old = fixture(), current = fixture();
+  current.usage.input_tokens_details.cache_write_tokens = 0;
+  assert.deepEqual(decode(current), decode(old));
+  for (const value of [1, -1, 0.5, '0', null, false]) {
+    current.usage.input_tokens_details.cache_write_tokens = value;
+    assert.throws(() => decode(current), error => providerDiagnostic(error).code === 'receipt_usage_shape');
+  }
+  current.usage.input_tokens_details = { cached_tokens: 5, cache_write_tokens: 0, unknown_billable_tokens: 0 };
+  assert.throws(() => decode(current), /uncertain attempt/);
+});
+
 test('unknown, inconsistent, excessive or novel usage fails closed', () => {
   for (const change of [
     r => { delete r.usage; }, r => { r.usage.total_tokens++; },

@@ -43,8 +43,14 @@ export function decodeResponsesReceipt(bytes, contract) {
     // billing categories can silently disappear from the receipt.
     stage = 'receipt_usage_shape';
     const keys = (value, expected) => Object.keys(value).sort().join(',') === expected;
+    // The current Responses schema adds cache_write_tokens. Zero introduces no
+    // unpriced usage; nonzero writes need a separately approved pricing profile.
+    // Keep rejecting all other new billing fields and preserve old receipts.
+    const inputDetails = usage.input_tokens_details;
+    const inputShape = keys(inputDetails, 'cached_tokens')
+      || (keys(inputDetails, 'cache_write_tokens,cached_tokens') && inputDetails.cache_write_tokens === 0);
     if (!keys(usage, 'input_tokens,input_tokens_details,output_tokens,output_tokens_details,total_tokens')
-        || !keys(usage.input_tokens_details, 'cached_tokens')
+        || !inputShape
         || !keys(usage.output_tokens_details, 'reasoning_tokens')) fail();
     stage = 'receipt_output';
     let text;

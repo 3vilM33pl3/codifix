@@ -84,7 +84,7 @@ function mockProvider(t, onCall) {
       : { id: 'resp_synthetic', object: 'response', status: 'completed', model: body.model, error: null, incomplete_details: null,
         output: [{ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', annotations: [],
           text: body.text.format.name === 'r3_isolated_action_v1' ? '{"action":{"kind":"finish"}}' : '{"text":"Insufficient evidence","refused":true,"citations":[]}' }] }],
-        usage: { input_tokens: 100, output_tokens: 12, total_tokens: 112, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } };
+        usage: { input_tokens: 100, output_tokens: 12, total_tokens: 112, input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } };
     return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
   });
   return calls;

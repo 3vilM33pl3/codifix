@@ -36,7 +36,7 @@ for (const scenario of ['success', 'undercount', 'unknown-cache-price']) {
         output: [{ type: 'message', role: 'assistant', status: 'completed', content: [
           { type: 'output_text', annotations: [], text: '{"text":"Insufficient evidence","refused":true,"citations":[]}' }] }],
         usage: { input_tokens: input, output_tokens: 10, total_tokens: input + 10,
-          input_tokens_details: { cached_tokens: 5 }, output_tokens_details: { reasoning_tokens: 4 } } }));
+          input_tokens_details: { cached_tokens: 5, cache_write_tokens: 0 }, output_tokens_details: { reasoning_tokens: 4 } } }));
     });
     server.listen(0, '127.0.0.1'); await once(server, 'listening');
     try {
