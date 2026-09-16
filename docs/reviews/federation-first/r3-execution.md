@@ -55,6 +55,10 @@
 - Removed only the owned tmpfs database `memory-r3-context-20260916` after
   validation. Synthetic contents can be regenerated; artifacts are retained.
   Existing dev services, credentials and project data were untouched.
+- The final `remember-task` attempt could not reach dev Memory at
+  `127.0.0.1:4250` (connection refused). No completion memory was stored and no
+  service was restarted. This committed ledger preserves the handoff evidence;
+  the successful pre-edit plan checkpoint is unaffected.
 - **R3 remains incomplete.** The actual locked calibration manifest/launcher,
   label review, exact development model/spend approval, live verification and
   separately approved official campaign remain open. The revised ten-million
