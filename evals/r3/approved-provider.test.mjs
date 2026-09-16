@@ -143,6 +143,40 @@ test('approval revocation between calls poisons the owner and retains an uncerta
   } finally { await mediator.close(); }
 });
 
+test('controller cancellation aborts in-flight transport and retains the charge without retry', { skip: !available }, async t => {
+  const f = await setup(t), directory = path.join(f.root, 'budget'), stop = new AbortController();
+  await fs.mkdir(directory, { mode: 0o700 });
+  let entered; const started = new Promise(resolve => { entered = resolve; });
+  let calls = 0, aborted = false;
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    assert.equal(url, 'https://api.openai.com/v1/responses');
+    calls++; entered();
+    return new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => { aborted = true; reject(Error('private response body')); }, { once: true });
+    });
+  });
+  const limits = { requests: 3, tokens: taskTokenLimit(f.manifest), microusd: 1000000, task_seconds: 30 };
+  const mediator = await openRequestMediator({ binary: budget, directory, manifestSha256: f.options.manifestSha256, limits, taskLimits: limits });
+  try {
+    await withApprovedProvider(f.options, async provider => {
+      const binding = provider.bind(mediator, 'work-00000');
+      const result = dispatchModel({ mediator, prepareRequest: binding.prepareRequest, taskId: 'work-00000',
+        requestId: 'interrupted', payload: payload(f.manifest), timeoutMs: 10000 });
+      const rejected = assert.rejects(result, /uncertain/);
+      await started; stop.abort(); await rejected;
+      assert(aborted);
+      assert.throws(() => provider.bind(mediator, 'work-00001'), /closed/);
+      assert.deepEqual((await mediator.status()).uncertain_ids, ['interrupted']);
+      assert.equal((await mediator.status()).ledger.microusd, 318432);
+    }, stop.signal);
+    assert.equal(calls, 1);
+  } finally { await mediator.close(); }
+});
+
+test('already cancelled owner does not inspect configuration or read credentials', async () => {
+  await assert.rejects(withApprovedProvider({}, () => assert.fail('owner entered'), AbortSignal.abort()), /cancelled/);
+});
+
 const sessionNames = ['MEMORY_LAYER_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN',
   'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE'];
 const sessionAvailable = available && process.env.MEMORY_LAYER_TEST_REQUIRE_DB === '1' && sessionNames.every(name => process.env[name]);

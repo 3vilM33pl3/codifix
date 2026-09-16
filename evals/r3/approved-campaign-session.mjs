@@ -6,7 +6,7 @@ import path from 'node:path';
 import { withApprovedProvider } from './approved-provider.mjs';
 import { openProviderCampaignSession } from './provider-campaign-session.mjs';
 
-export async function withApprovedCampaignSession(options, use) {
+export async function withApprovedCampaignSession(options, use, signal) {
   const { credential, session } = structuredClone(options);
   if (typeof use !== 'function' || !credential || !session
       || session.offline !== false || session.provider !== undefined
@@ -19,5 +19,5 @@ export async function withApprovedCampaignSession(options, use) {
     const active = await openProviderCampaignSession({ ...session, provider });
     try { await use(active); }
     finally { await active.close(); }
-  });
+  }, signal);
 }
