@@ -1,5 +1,25 @@
 # R3 execution and evidence ledger
 
+## 2026-09-16 corrected paid attempt: unresolved first model operation
+
+- Preparation and the corrected embedding boundary passed. The first coding
+  task reserved its Responses operation but produced no settled model receipt;
+  the launcher stopped with zero accepted observations. No paid retry followed.
+  See the [corrected-run report](../../../evals/r3/development-corrected-20260916.md).
+- Corrected settled usage is 38 embedding calls, 2,920 tokens and 83 micro-USD.
+  One model-call allowance of US$0.318432 remains unresolved. Combined settled
+  usage from both attempts is US$0.000166, plus that uncertainty. Parent task
+  reservations remain intact and are not additional charges.
+- Existing sanitized errors do not identify HTTP status or failure stage; no
+  exact cause can be claimed from retained evidence. Next diagnostics must be
+  offline-tested and metadata-only. The frozen campaign cannot be resumed or
+  modified; another live attempt needs reconciled usage and separate approval.
+- The pinned report rejects the incomplete artifact. Its observation-only
+  uncertainty/cost counters do not include the failed task's journal; the
+  private per-call journal is authoritative for partial usage and uncertainty.
+  The owned temporary database is discarded after process exit; all artifacts
+  and fences remain. Existing services and original evidence are untouched.
+
 ## 2026-09-16 corrected development run approved and launched
 
 - Olivier explicitly replied “Approve corrected run” for manifest

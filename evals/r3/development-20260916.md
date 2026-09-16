@@ -78,7 +78,7 @@ manifest identity and needs a separately approved replacement campaign. Retain
 the settled usage when setting its cap; do not silently restore the full $10.
 The broader benchmark labels, official run and blinded result review remain open.
 
-## Corrected package: approved and launched
+## Corrected package: approved, launched and interrupted
 
 Replacement:
 `/data/tmp/r3-calibration-corrected-20260916/campaign.json`, SHA-256
@@ -101,5 +101,7 @@ Olivier subsequently replied “Approve corrected run”. The separate developme
 receipt at `2026-09-16T13:48:09Z` binds US$9.99 to this exact identity. Runtime,
 image and approval checks passed, and the pinned launcher started once against a
 fresh disposable database. Outcomes must be recorded separately; launch does not
-establish task completion or quality. The original interrupted evidence remains
-unchanged.
+establish task completion or quality. The replacement subsequently stopped on
+its first model operation with unresolved usage; see the separate
+[corrected-run report](development-corrected-20260916.md). The original
+interrupted evidence remains unchanged.

@@ -12,10 +12,10 @@ development calibration, not an official result or authority for another campaig
 | Approval preflight | `memory eval campaign check-approvals` verifies the manifest, assets and matching label/spend records without provider calls. Success does not enable dispatch. |
 | Secret/provider owner | Connects the version-pinned key handoff to fixed API destinations, rechecking approvals before every call and cancelling bindings on exit/failure. Tests use fake secrets and mocked OpenAI responses. |
 | Input accounting | Explicit [v2 full-context reservations](context-accounting.md) avoid unverified guesses about message/schema framing. Durable settlement/denial/replay tests pass. This is not exact tokenization or live billing validation. |
-| Real provider configuration | The original v2 model/rates/limits were approved for the specific calibration. Thirty-eight real embedding calls returned valid receipts. No answer-model call was reached, so Responses compatibility remains unverified. A corrected runtime requires a new campaign identity and approval. |
+| Real provider configuration | Across the two approved attempts, 76 embedding calls returned valid receipts. The corrected attempt reserved its first Responses operation without a settled receipt; live Responses compatibility and its billing remain unresolved. |
 | Live launcher | [Approved launcher and packaging](paid-launcher.md) now connect the provider owner, durable controller, disposable session and Rust runner. Generic paid drivers stay blocked; the approved route requires exact label/spend records. Interruption fences the campaign before another key read, rather than rebuilding/repeating uncertain work. See the execution ledger for fake-only validation evidence; no real campaign is approved by this implementation. |
 | Benchmark labels | Olivier approved the artifact-origin and configuration-rollout development families on 2026-09-16. Their calibration manifest is frozen as reviewed with a labels-only receipt. All other families, including held-out labels, remain unapproved; see the [label review pack](label-review.md). |
-| Development spend | Olivier approved the identity below and US$10 cap. The run stopped at its first task on a local vector-decoding integrity failure, after 38 settled embedding calls (83 micro-USD accounted); no answer-model calls. See the [interrupted-run report](development-20260916.md). A rebuilt runtime needs a new approval, not reuse of this one. |
+| Development spend | Both explicitly approved attempts stopped with zero accepted observations. Combined settled usage is 166 micro-USD, plus one unresolved model-call reservation of US$0.318432. See the [original report](development-20260916.md) and [corrected report](development-corrected-20260916.md). No further paid retry is authorized. |
 | Official campaign | Separate approval after calibration fixes operational budgets and selects the cost/latency reference baseline. No official calls authorized or made. |
 
 The existing offline artifact and its limitations are recorded in the
@@ -77,7 +77,7 @@ local harness defect described in the interrupted-run report. Earlier draft iden
 the location-invalid superseded pack are not spending targets. Any manifest
 change requires rechecking approval bindings. No official campaign is authorized.
 
-### Corrected replacement: approved and launched
+### Corrected replacement: approved, launched and interrupted
 
 The [interrupted-run report](development-20260916.md) records the numeric parser
 fix and its offline evidence. A rebuilt package is prepared at
@@ -89,8 +89,11 @@ so combined accounted usage stays below the original limits. Existing label
 approval is recorded for the unchanged two families. Olivier explicitly replied
 “Approve corrected run”; its separate development receipt is dated
 `2026-09-16T13:48:09Z`. The exact runtime and approval preflight passed, and the
-replacement launcher started once on a fresh disposable database. Completion,
-usage and quality remain separate from that authorization.
+replacement launcher started once on a fresh disposable database. Preparation
+completed and the corrected vector binding passed, but the first Responses
+operation has no settled receipt. The run stopped with zero accepted observations.
+The [corrected report](development-corrected-20260916.md) records uncertainty and
+the diagnostic limitation. No further live retry is authorized by this approval.
 
 ## Accounting choice and remaining live verification
 
