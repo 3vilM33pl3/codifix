@@ -60,3 +60,17 @@ test('commentary cannot supply a coding action or rescue an invalid final answer
   r.output[1].content[0].text = '{"action":{"kind":"tool_call"}}';
   assert.throws(() => prepared.decode(JSON.stringify(r)), /uncertain attempt/);
 });
+
+test('repeated explicit final commands yield one action, never an action list', () => {
+  const prepared = prepareResponsesRequest({ model, files: {}, previous: null, step_id: 'step-1',
+    tools: { protocol: 'isolated-command-v1', network: 'none', persistence: 'selected-submission-files-only' } }, bounds);
+  const action = { kind: 'command', argv: ['/usr/bin/true'] };
+  const r = JSON.parse(response({ action })); r.output[0].phase = 'final_answer';
+  r.output.push(structuredClone(r.output[0]));
+  const decoded = prepared.decode(JSON.stringify(r));
+  assert.deepEqual(decoded.output, action);
+  assert.equal(decoded.duplicateFinalMessages, 1);
+  assert.equal(decoded.tokenUsage.output_tokens, 5);
+  r.output[1].content[0].text = JSON.stringify({ action: { kind: 'finish' } });
+  assert.throws(() => prepared.decode(JSON.stringify(r)), /uncertain attempt/);
+});

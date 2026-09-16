@@ -72,7 +72,7 @@ test('output rejection reasons are precise without retaining content or changing
 test('multiple answer diagnostics retain phase arrangement but never answer content', () => {
   for (const phases of [[undefined, undefined], [null, 'final_answer'], ['final_answer', 'final_answer']]) {
     const r = fixture();
-    r.output = phases.map(phase => message('{"PRIVATE":"answer"}', phase));
+    r.output = phases.map((phase, i) => message(`{"PRIVATE":"answer${i}"}`, phase));
     assert.throws(() => decode(r), error => {
       const d = providerDiagnostic(error);
       assert.equal(d.output_reason, 'multiple_messages');
@@ -123,7 +123,7 @@ test('phase-aware selection rejects ambiguity, missing final answers and invalid
     ['ambiguous_phase', [comment(), message('{}')]],
     ['ambiguous_phase', [comment(), message('{}', null)]],
     ['phase_order', [final(), comment()]],
-    ['multiple_messages', [final(), final()]],
+    ['multiple_messages', [final(), message('{"kind":"other"}', 'final_answer')]],
     ['multiple_messages', [message('{}'), final()]],
     ['multiple_messages', [final(), message('{}')]],
     ['text_oversized', [message('p'.repeat(40000), 'commentary'), message('q'.repeat(40000), 'commentary'), final()]],
@@ -141,6 +141,32 @@ test('phase-aware selection rejects ambiguity, missing final answers and invalid
   }
   const r = fixture(); r.output = [comment(), message('PRIVATE non-JSON', 'final_answer')];
   assert.throws(() => decode(r), error => providerDiagnostic(error).code === 'receipt_output_json');
+});
+
+test('exact explicit finals collapse once; every duplicate still passes all safety checks', () => {
+  const r = fixture();
+  r.output[1].phase = 'final_answer';
+  const single = decode(r);
+  r.output.push(structuredClone(r.output[0]), structuredClone(r.output[1]));
+  assert.deepEqual(decode(r), { ...single, duplicateFinalMessages: 1 });
+  r.output.push(structuredClone(r.output[1]));
+  assert.deepEqual(decode(r), { ...single, duplicateFinalMessages: 2 });
+  for (const change of [
+    m => { m.content[0].text += ' '; }, // even JSON-equivalent strings differ
+    m => { m.content[0].text = '{"kind":"command"}'; },
+    m => { m.phase = undefined; }, m => { m.phase = null; },
+    m => { m.phase = 'commentary'; }, m => { m.role = 'user'; },
+    m => { m.status = 'incomplete'; }, m => { m.content[0].annotations.push({}); },
+    m => { m.content.push(structuredClone(m.content[0])); },
+    m => { m.content[0] = { type: 'refusal', refusal: 'PRIVATE' }; },
+    m => { m.content[0].text = 'x'.repeat(65537); },
+  ]) {
+    const bad = structuredClone(r); change(bad.output.at(-1));
+    assert.throws(() => decode(bad), /uncertain attempt/);
+  }
+  const malformed = fixture();
+  malformed.output = [message('not JSON', 'final_answer'), message('not JSON', 'final_answer')];
+  assert.throws(() => decode(malformed), error => providerDiagnostic(error).code === 'receipt_output_json');
 });
 
 test('unknown, inconsistent, excessive or novel usage fails closed', () => {

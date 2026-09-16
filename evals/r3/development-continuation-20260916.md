@@ -29,5 +29,33 @@ Dedicated disposable PostgreSQL uses loopback port 55439; no existing service or
 data is modified. Strict output decoding remains unchanged. Further attempts may
 only consume the re-reconciled remainder under the same user authorization.
 
-Live outcome will be recorded below. R3 and official/product-quality gates remain
-open; do not treat budget consumption or a successful diagnostic as quality proof.
+The run stopped at the second coding call, with zero completed observations.
+The structural diagnostic shows reasoning / explicit final / reasoning / explicit
+final, both final texts 3,861 bytes. That does not establish equality; raw text
+was not retained. The failure remains uncertain, not retrospectively settled.
+This attempt settled 39 calls (38 embedding, one model), 10,719 tokens and
+US$0.024075; one unresolved call retains 416,384 tokens / US$0.373728.
+
+Remaining aggregate authority: **224 calls / 7,491,133 tokens / US$7.845915**.
+
+## Exact-final compatibility repair
+
+The local decoder now accepts multiple explicit finals only when every message
+passes existing role/status/content/annotation/size checks and every text is
+byte-for-byte identical. It emits a single action/answer, settles response-level
+usage once, and records the duplicate count. Different text (even equivalent JSON
+with different whitespace), unphased duplicates, trailing commentary, refusals,
+malformed content and invalid JSON remain rejected. No model/prompt, source,
+label, scoring or retrieval change. Old frozen runs remain untouched.
+
+[Official phase guidance](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.4)
+distinguishes commentary from finals; it does not establish that these previous
+finals were identical or promise repeated-final semantics. Exact deduplication is
+our bounded compatibility rule, not a claimed upstream guarantee or permission
+to choose the last answer. The retained length-only evidence motivated a test,
+not a conclusion about the lost contents.
+
+Forty focused receipt/request/billing/transport tests pass with no skips. A full
+fake-provider launcher rehearsal is being run before any replacement paid launch.
+R3 and official/product-quality gates remain open; do not treat budget consumption
+or a successful diagnostic as quality proof.

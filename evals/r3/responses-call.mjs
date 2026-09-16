@@ -52,7 +52,8 @@ export function createResponsesPreparation({ mediator, model, tokenizer, countIn
         const usage = await mediator.price({ model: locked, inputTokens: receipt.tokenUsage.input_tokens,
           outputTokens: receipt.tokenUsage.output_tokens, cachedInputTokens: receipt.cachedInputTokens });
         return { output: { version: 1, answer: receipt.output, provider: { response_id: receipt.responseId, model: receipt.model,
-          ...receipt.tokenUsage, cached_input_tokens: receipt.cachedInputTokens, reasoning_output_tokens: receipt.reasoningOutputTokens } }, usage };
+          ...receipt.tokenUsage, cached_input_tokens: receipt.cachedInputTokens, reasoning_output_tokens: receipt.reasoningOutputTokens,
+          ...(receipt.duplicateFinalMessages ? { duplicate_final_messages: receipt.duplicateFinalMessages } : {}) } }, usage };
       },
       decodeStored: stored => {
         if (!stored || Object.keys(stored).sort().join(',') !== 'answer,provider,version' || stored.version !== 1

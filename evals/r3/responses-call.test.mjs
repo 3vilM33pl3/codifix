@@ -18,7 +18,7 @@ const model = { provider: 'openai', resolved_id: 'synthetic-model-v1', reasoning
 const payload = { model: { provider: model.provider, resolved_id: model.resolved_id, reasoning: model.reasoning },
   input: { question: 'Synthetic question', context: [] }, response_schema: 'r3-grounded-answer-v1', tools: [] };
 
-for (const scenario of ['success', 'phased-success', 'commentary-only', 'multiple-finals', 'undercount', 'unknown-cache-price']) {
+for (const scenario of ['success', 'phased-success', 'duplicate-finals', 'commentary-only', 'multiple-finals', 'undercount', 'unknown-cache-price']) {
   test(`prepared wire request ${scenario} binds exact bytes and durable billing evidence`, { skip: !binary }, async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-responses-call-'));
     const limits = { requests: 3, tokens: 300, microusd: 1000, task_seconds: 10 };
@@ -39,8 +39,9 @@ for (const scenario of ['success', 'phased-success', 'commentary-only', 'multipl
           content: [{ type: 'output_text', annotations: [], text: 'PRIVATE_COMMENTARY_NOT_AN_ANSWER' }] });
         if (scenario === 'commentary-only') output.pop();
       }
-      if (scenario === 'multiple-finals') {
+      if (scenario === 'multiple-finals' || scenario === 'duplicate-finals') {
         output[0].phase = 'final_answer'; output.push(structuredClone(output[0]));
+        if (scenario === 'multiple-finals') output[1].content[0].text += ' ';
       }
       res.end(JSON.stringify({ id: 'resp_synthetic', object: 'response', status: 'completed', model: model.resolved_id,
         error: null, incomplete_details: null,
@@ -57,7 +58,7 @@ for (const scenario of ['success', 'phased-success', 'commentary-only', 'multipl
         countInputTokens: body => { counted = body; return 30; },
         send: createProviderTransport({ endpoint: `http://127.0.0.1:${server.address().port}/v1/responses`, bearer: 'synthetic-test' }) });
       const dispatch = requestId => dispatchModel({ mediator, prepareRequest, taskId: 'task', requestId, payload, timeoutMs: 2000 });
-      if (scenario === 'success' || scenario === 'phased-success') {
+      if (scenario === 'success' || scenario === 'phased-success' || scenario === 'duplicate-finals') {
         const result = await dispatch('first');
         assert.equal(result.output.refused, true);
         assert.deepEqual(result.usage, { input_tokens: 20, output_tokens: 10, microusd: 73 });
@@ -66,6 +67,7 @@ for (const scenario of ['success', 'phased-success', 'commentary-only', 'multipl
         const saved = await mediator.recover('first');
         assert.equal(saved.output.provider.cached_input_tokens, 5);
         assert.equal(saved.output.provider.reasoning_output_tokens, 4);
+        assert.equal(saved.output.provider.duplicate_final_messages, scenario === 'duplicate-finals' ? 1 : undefined);
         assert(!JSON.stringify(saved).includes('PRIVATE_COMMENTARY'));
         assert.equal((await mediator.audit()).audit.ledger.microusd, 73);
       } else {

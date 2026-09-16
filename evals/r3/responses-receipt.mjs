@@ -55,7 +55,7 @@ export function decodeResponsesReceipt(bytes, contract) {
     stage = 'receipt_output';
     metadata.output_items = response.output;
     const failOutput = reason => { metadata.output_reason = reason; fail(); };
-    let text, sawCommentary = false, commentaryBytes = 0;
+    let text, selectedPhase, duplicateFinalMessages = 0, sawCommentary = false, commentaryBytes = 0;
     for (const item of response.output) {
       if (item?.type === 'reasoning') {
         // Reasoning tokens are already included in output_tokens, never added
@@ -71,7 +71,7 @@ export function decodeResponsesReceipt(bytes, contract) {
       // remain supported. See the GPT-5.4 guidance's assistant phase contract.
       if (item.phase != null && !['commentary', 'final_answer'].includes(item.phase)) failOutput('unknown_phase');
       if (text !== undefined && item.phase === 'commentary') failOutput('phase_order');
-      if (text !== undefined) failOutput('multiple_messages');
+      if (text !== undefined && (selectedPhase !== 'final_answer' || item.phase !== 'final_answer')) failOutput('multiple_messages');
       if (sawCommentary && item.phase == null) failOutput('ambiguous_phase');
       if (!Array.isArray(item.content) || item.content.length !== 1) failOutput('content_shape');
       const part = item.content[0];
@@ -85,7 +85,16 @@ export function decodeResponsesReceipt(bytes, contract) {
         if (commentaryBytes > 65536) failOutput('text_oversized');
         continue;
       }
+      if (text !== undefined) {
+        // Only exact repeated explicit finals are idempotent. Validate every
+        // message above, compare bytes without parsing/normalizing/concatenating,
+        // and produce one action. Different or unphased candidates still fail.
+        if (part.text !== text) failOutput('multiple_messages');
+        duplicateFinalMessages++;
+        continue;
+      }
       text = part.text;
+      selectedPhase = item.phase;
     }
     if (text === undefined) failOutput('missing_text');
     stage = 'receipt_output_json';
@@ -96,6 +105,7 @@ export function decodeResponsesReceipt(bytes, contract) {
       tokenUsage: { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens },
       cachedInputTokens: usage.input_tokens_details.cached_tokens,
       reasoningOutputTokens: usage.output_tokens_details.reasoning_tokens,
+      ...(duplicateFinalMessages ? { duplicateFinalMessages } : {}),
     };
   } catch (error) { throw preserveProviderFailure(error, stage); }
 }

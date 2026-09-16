@@ -59,12 +59,20 @@ authorize a fresh $10 after a failed attempt.
 The current decoder understands explicitly phased Responses output: intermediate
 commentary is validated and discarded; only one final JSON answer/action can reach
 the agent or scorer. A single legacy unphased message remains supported. Ambiguous
-phases, missing/multiple final answers, refusals, tool calls and malformed content
+phases, missing/different final answers, refusals, tool calls and malformed content
 still stop execution. Commentary does not become conversation history, and its
 tokens remain included in response-level billing. This does not repair earlier
 frozen runs or authorize a replacement. See the
 [receipt contract](README.md#provider-receipt-decoding) and
 [offline compatibility evidence](development-diagnostic-20260916.md).
+
+The budget-bounded continuation additionally collapses byte-identical explicit
+`final_answer` text after validating every message. It never normalizes JSON,
+chooses between different answers, combines commands or accepts unphased duplicates.
+One action and one response-level usage settlement result; metadata records
+`duplicate_final_messages` when nonzero. This is a local compatibility rule, not
+an upstream guarantee of duplicate delivery. See the
+[continuation evidence](development-continuation-20260916.md).
 
 The output stays draft/smoke-only. Sources, labels, runtime modules and executable
 copies are pinned. Executables are private copies, so later Cargo rebuilds cannot

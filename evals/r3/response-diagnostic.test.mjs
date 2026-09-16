@@ -66,7 +66,7 @@ function mock(t,mode,abort){
     const msg={type:'message',role:'assistant',phase:'final_answer',status:'completed',content:[{type:'output_text',annotations:[],
       text:'{"action":{"kind":"command","argv":["/PRIVATE_NEVER_EXECUTE"]}}'}]};
     return new Response(JSON.stringify({id:'resp_synthetic',object:'response',status:'completed',model:body.model,
-      error:null,incomplete_details:null,output:mode==='multiple'?[msg,msg]:[msg],
+      error:null,incomplete_details:null,output:mode==='multiple'?[msg,{...msg,content:[{...msg.content[0],text:msg.content[0].text+' '}]}]:[msg],
       usage:{input_tokens:100,output_tokens:20,total_tokens:120,input_tokens_details:{cached_tokens:0,cache_write_tokens:0},
         output_tokens_details:{reasoning_tokens:10}}}),{headers:{'Content-Type':'application/json'}});
   });

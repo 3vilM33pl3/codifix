@@ -92,6 +92,7 @@ function mockProvider(t, onCall) {
         { type: 'message', role: 'assistant', phase: 'final_answer', status: 'completed', content: [{ type: 'output_text', annotations: [],
           text: body.text.format.name === 'r3_isolated_action_v1' ? '{"action":{"kind":"finish"}}' : '{"text":"Insufficient evidence","refused":true,"citations":[]}' }] }],
         usage: { input_tokens: 100, output_tokens: 12, total_tokens: 112, input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } };
+    if (url === 'https://api.openai.com/v1/responses') result.output.push(structuredClone(result.output.at(-1)));
     return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
   });
   return calls;
@@ -158,7 +159,10 @@ test('approved runtime completes all 75 paid-path tasks with fake responses and 
     assert.equal(await fs.readFile(f.secretRead, 'utf8'), 'read\n');
     const resultDir = path.join(f.root, 'run/work-00000/provider/results');
     for (const file of await fs.readdir(resultDir)) {
-      assert(!(await fs.readFile(path.join(resultDir, file), 'utf8')).includes('PRIVATE_PHASE'));
+      const bytes = await fs.readFile(path.join(resultDir, file), 'utf8');
+      assert(!bytes.includes('PRIVATE_PHASE'));
+      const result = JSON.parse(bytes);
+      if (result.output?.provider?.response_id) assert.equal(result.output.provider.duplicate_final_messages, 1);
     }
   });
 
