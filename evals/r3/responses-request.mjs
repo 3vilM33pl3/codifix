@@ -2,6 +2,7 @@
 // Pure tool-free request codec. The caller must quote input tokens and reserve
 // the exact returned body before sending it; this module makes no network call.
 import { decodeResponsesReceipt } from './responses-receipt.mjs';
+import { providerFailure } from './provider-diagnostics.mjs';
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const string = { type: 'string' };
 const answerSchema = object({ text: string, refused: { type: 'boolean' },
@@ -62,14 +63,14 @@ export function prepareResponsesRequest(payload, bounds) {
       if (!keys(value, 'citations,refused,text') || typeof value.text !== 'string' || typeof value.refused !== 'boolean'
           || !Array.isArray(value.citations) || value.citations.length > 8
           || value.citations.some(c => !keys(c, 'quote,source_id') || typeof c.quote !== 'string' || typeof c.source_id !== 'string')) {
-        throw Error('invalid structured provider answer');
+        throw providerFailure('structured_output');
       }
     } else {
       const action = value?.action;
       if (!keys(value, 'action') || !(keys(action, 'kind') && action.kind === 'finish')
           && !(keys(action, 'argv,kind') && action.kind === 'command' && Array.isArray(action.argv)
             && action.argv.length > 0 && action.argv.length <= 64 && action.argv.every(a => typeof a === 'string'))) {
-        throw Error('invalid structured provider action');
+        throw providerFailure('structured_output');
       }
       receipt.output = action;
     }

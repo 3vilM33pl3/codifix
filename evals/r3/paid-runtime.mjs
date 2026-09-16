@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 
 export const runtimeFiles = ['launch-paid.mjs', 'paid-runtime.mjs', 'approved-driver.mjs', 'campaign-dispatch.mjs',
   'approved-campaign-session.mjs', 'approved-provider.mjs', 'approved-credential.mjs', 'provider-campaign-session.mjs',
-  'provider-profile.mjs', 'context-reservation.mjs', 'provider-transport.mjs', 'request-mediator.mjs', 'responses-call.mjs',
+  'provider-profile.mjs', 'context-reservation.mjs', 'provider-transport.mjs', 'provider-diagnostics.mjs', 'request-mediator.mjs', 'responses-call.mjs',
   'responses-request.mjs', 'responses-receipt.mjs', 'embeddings-call.mjs', 'embedding-evidence.mjs', 'synthetic-embedding.mjs',
   'isolation/container.mjs', 'isolation/guest.mjs', 'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs',
   'isolation/service-session.mjs', 'isolation/embedding-proxy.mjs', 'isolation/model-agent.mjs', 'isolation/model-answer.mjs',

@@ -151,6 +151,39 @@ test('approved runtime completes all 75 paid-path tasks with fake responses and 
     assert.equal(await fs.readFile(f.secretRead, 'utf8'), 'read\n');
   });
 
+test('approved owner preserves sanitized HTTP diagnostics and fences uncertain model work',
+  { skip: !integration, timeout: 180000 }, async t => {
+    const f = await fixture(t); f.keep();
+    const native = globalThis.fetch.bind(globalThis);
+    let responses = 0;
+    t.mock.method(globalThis, 'fetch', async (url, options) => {
+      if (String(url) === 'https://api.openai.com/v1/responses') {
+        responses++;
+        return new Response(JSON.stringify({ error: { code: 'invalid_json_schema',
+          param: 'text.format.schema', message: 'PRIVATE_PROVIDER_MESSAGE' } }),
+        { status: 400, headers: { 'Content-Type': 'application/json', 'x-request-id': 'req_12345678' } });
+      }
+      if (String(url) === 'https://api.openai.com/v1/embeddings') {
+        const body = JSON.parse(options.body);
+        return new Response(JSON.stringify({ model: body.model, object: 'list', data: [{ object: 'embedding',
+          index: 0, embedding: Array.from({ length: 1536 }, (_, i) => Math.fround((i + 1) / 1000003)) }],
+          usage: { prompt_tokens: 1, total_tokens: 1 } }), { headers: { 'Content-Type': 'application/json' } });
+      }
+      return native(url, options);
+    });
+    await assert.rejects(runPaidCampaign(f.root, f.settings));
+    assert.equal(responses, 1);
+    const directory = path.join(f.root, 'run/work-00000/provider');
+    const failures = (await fs.readdir(directory)).filter(n => n.startsWith('failure-'));
+    assert.equal(failures.length, 1);
+    const bytes = await fs.readFile(path.join(directory, failures[0]), 'utf8');
+    assert(!bytes.includes('PRIVATE_PROVIDER_MESSAGE'));
+    assert.equal(JSON.parse(bytes).api_code, 'invalid_json_schema');
+    assert.equal(JSON.parse(bytes).http_status, 400);
+    await assert.rejects(runPaidCampaign(f.root, f.settings), /already started/);
+    assert.equal(responses, 1);
+  });
+
 test('interrupting provider preparation aborts transport and refuses restart before a second secret read',
   { skip: !integration, timeout: 180000 }, async t => {
     const f = await fixture(t), abort = new AbortController();

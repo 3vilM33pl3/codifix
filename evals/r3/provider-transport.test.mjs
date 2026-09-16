@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
 import { createProviderTransport } from './provider-transport.mjs';
+import { providerDiagnostic } from './provider-diagnostics.mjs';
 
 async function server(t, handler) {
   const instance = http.createServer(handler);
@@ -13,6 +14,23 @@ async function server(t, handler) {
   return `http://127.0.0.1:${instance.address().port}/v1/responses`;
 }
 const active = () => new AbortController().signal;
+
+test('HTTP diagnostics distinguish schema and quota errors without retaining raw text', async t => {
+  for (const [status, code, param] of [[400, 'invalid_json_schema', 'text.format.schema'],
+    [429, 'insufficient_quota', 'PRIVATE_PARAMETER']]) {
+    const endpoint = await server(t, (_req, res) => {
+      res.writeHead(status, { 'Content-Type': 'application/json', 'x-request-id': 'req_12345678' });
+      res.end(JSON.stringify({ error: { code, param, message: 'PRIVATE_PROVIDER_BODY' } }));
+    });
+    const send = createProviderTransport({ endpoint, bearer: 'synthetic-test' });
+    await assert.rejects(send({}, active()), error => {
+      assert.deepEqual(providerDiagnostic(error), { code: 'http', http_status: status,
+        request_id: 'req_12345678', api_code: code, ...(status === 400 ? { parameter: param } : {}) });
+      assert(!JSON.stringify(error).includes('PRIVATE'));
+      return true;
+    });
+  }
+});
 
 test('only explicit bounded JSON reaches the fixed loopback destination', async t => {
   let calls = 0;

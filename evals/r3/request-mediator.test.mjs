@@ -10,6 +10,7 @@ import http from 'node:http';
 import { openRequestMediator } from './request-mediator.mjs';
 import { createProviderTransport } from './provider-transport.mjs';
 import { decodeResponsesReceipt } from './responses-receipt.mjs';
+import { providerFailure } from './provider-diagnostics.mjs';
 
 const binary = process.env.MEMORY_R3_BUDGET_BIN;
 if (process.env.MEMORY_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
@@ -18,6 +19,24 @@ const taskLimits = { ...limits, requests: 2 };
 const allowance = { input_tokens: 10, output_tokens: 10, microusd: 10 };
 const usage = { input_tokens: 3, output_tokens: 2, microusd: 2 };
 const payload = { model: 'synthetic-only', purpose: 'answer', input: 'PRIVATE_SYNTHETIC_INPUT' };
+
+test('uncertain calls retain metadata-only diagnostics without releasing reservations', { skip: !binary }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-diagnostics-'));
+  const mediator = await openRequestMediator({ binary, directory, manifestSha256: 'c'.repeat(64), limits, taskLimits });
+  try {
+    await assert.rejects(mediator.dispatch({ taskId: 'task', requestId: 'first', payload, allowance, timeoutMs: 500,
+      invoke: async () => { throw providerFailure('http', { http_status: 400, api_code: 'invalid_json_schema',
+        parameter: 'text.format.schema', message: 'PRIVATE_ERROR' }); } }), /outcome uncertain/);
+    const files = (await fs.readdir(directory)).filter(name => name.startsWith('failure-'));
+    assert.equal(files.length, 1);
+    const bytes = await fs.readFile(path.join(directory, files[0]), 'utf8');
+    assert(!bytes.includes('PRIVATE'));
+    assert.equal(JSON.parse(bytes).api_code, 'invalid_json_schema');
+    assert.equal((await fs.stat(path.join(directory, files[0]))).mode & 0o077, 0);
+    assert.deepEqual((await mediator.status()).uncertain_ids, ['first']);
+    assert.equal((await mediator.status()).ledger.microusd, 10);
+  } finally { await mediator.close(); await fs.rm(directory, { recursive: true }); }
+});
 
 test('task cancellation stops new calls and retains an uncertain reservation for an in-flight call', { skip: !binary }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-cancelled-mediator-'));

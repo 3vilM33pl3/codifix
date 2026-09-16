@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeResponsesReceipt } from './responses-receipt.mjs';
+import { providerDiagnostic } from './provider-diagnostics.mjs';
 
 const contract = { model: 'synthetic-model-v1', maxInputTokens: 100, maxOutputTokens: 50 };
 const fixture = () => ({
@@ -17,6 +18,22 @@ const fixture = () => ({
     input_tokens_details: { cached_tokens: 5 }, output_tokens_details: { reasoning_tokens: 7 } },
 });
 const decode = value => decodeResponsesReceipt(JSON.stringify(value), contract);
+
+test('receipt diagnostics identify status, model and usage shape without output text', () => {
+  for (const [code, change] of [
+    ['receipt_status', r => { r.status = 'incomplete'; r.incomplete_details = { reason: 'max_output_tokens' }; }],
+    ['receipt_model', r => { r.model = 'PRIVATE_MODEL'; }],
+    ['receipt_usage_shape', r => { r.usage.PRIVATE_FIELD = 'PRIVATE_VALUE'; }],
+    ['receipt_output_json', r => { r.output[1].content[0].text = 'PRIVATE_BROKEN_JSON'; }],
+  ]) {
+    const r = fixture(); change(r);
+    assert.throws(() => decode(r), error => {
+      assert.equal(providerDiagnostic(error).code, code);
+      assert(!JSON.stringify(providerDiagnostic(error)).includes('PRIVATE'));
+      return true;
+    });
+  }
+});
 
 test('preserves usage once, cache detail and exact model without returning reasoning', () => {
   assert.deepEqual(decode(fixture()), {

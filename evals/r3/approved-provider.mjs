@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { checkApprovedCampaign, withApprovedEvaluationKey } from './approved-credential.mjs';
 import { createProviderTransport } from './provider-transport.mjs';
+import { preserveProviderFailure } from './provider-diagnostics.mjs';
 import { createProviderBindings, validateProviderProfile } from './provider-profile.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -52,15 +53,17 @@ export async function withApprovedProvider(options, use, stopSignal = new AbortC
       const transport = createProviderTransport({ endpoint: `https://api.openai.com/v1/${api}`, api, bearer: key, offline: false });
       return async (body, signal) => {
         if (!open || ownerSignal.aborted || signal?.aborted) throw Error('provider owner closed or cancelled');
+        let verified = false;
         try {
           await verify();
+          verified = true;
           if (!open || ownerSignal.aborted || signal?.aborted) throw Error('provider owner closed or cancelled');
           return await transport(body, AbortSignal.any([signal, ownerSignal]));
-        } catch {
+        } catch (error) {
           // Poison after any failed verification or uncertain transmission. The
           // durable mediator keeps reservations; opening a new task is not retry.
           open = false; lifetime.abort();
-          throw Error('approved provider stopped; retain private journals');
+          throw preserveProviderFailure(error, verified ? 'transport' : 'approval');
         }
       };
     };

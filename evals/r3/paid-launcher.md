@@ -129,6 +129,15 @@ node evals/r3/inspect-dispatch.mjs /absolute/pack/private/dispatch
 ```
 
 Inspection is metadata-only: exit 2 flags uncertainty, not permission to retry.
+New runtimes also retain `run/<task>/provider/failure-<payload-sha256>.json`
+for failed reserved calls. These mode-0600, exclusively created diagnostic files
+bind the manifest and payload digest to a closed-vocabulary failure category.
+HTTP status, strictly bounded provider request/response identifiers, allowlisted
+error codes/parameter names and incomplete-response reasons may be included.
+Credentials, prompts, model output, raw error bodies/messages and stacks are never
+written there. Unknown exceptions stay `unknown`. Diagnostics do not settle or
+refund a reservation, authorize retries, or retroactively recover an old failure.
+
 Existing `run`, dispatch journal or socket paths block relaunch **before another
 credential read**. Do not delete them, move the pack, or pass generic `--resume`
 to restart a paid session. Automatic reconstruction of a lost prepared database

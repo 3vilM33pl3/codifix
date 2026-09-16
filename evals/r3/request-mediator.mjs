@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { createHash, randomUUID } from 'node:crypto';
+import { providerDiagnostic, providerFailure } from './provider-diagnostics.mjs';
 
 function counters(value, keys) {
   return value && Object.keys(value).sort().join(',') === [...keys].sort().join(',')
@@ -114,9 +115,9 @@ export async function openRequestMediator(options) {
               return invoke(frozenPayload, abort.signal);
             }),
             new Promise((_, reject) => { timer = setTimeout(() => {
-              abort.abort(); reject(Error('deadline'));
+              reject(providerFailure('deadline')); abort.abort();
             }, timeoutMs);
-            abort.signal.addEventListener('abort', () => reject(Error('cancelled')), { once: true }); }),
+            abort.signal.addEventListener('abort', () => reject(providerFailure('cancelled')), { once: true }); }),
           ]);
           if (abort.signal.aborted) throw Error('cancelled provider outcome');
           if (!receipt || !Object.hasOwn(receipt, 'output')
@@ -124,7 +125,17 @@ export async function openRequestMediator(options) {
           const result = await request({ operation: 'complete', ...identity, output: receipt.output, usage: receipt.usage });
           if (!counters(result.usage, ['input_tokens', 'output_tokens', 'microusd'])) throw Error('invalid confirmed usage');
           return withReceipt ? { output: result.output, usage: result.usage, invoked: true } : result.output;
-        } catch { throw Error('provider outcome uncertain; retain journal and reconcile before further calls'); }
+        } catch (error) {
+          // Diagnostic evidence never settles/refunds an uncertain reservation.
+          // Use the trusted payload digest, not an arbitrary request ID as path.
+          const failure = await fs.open(path.join(directory, `failure-${identity.payload_sha256}.json`), 'wx', 0o600);
+          try {
+            await failure.writeFile(JSON.stringify({ version: 1, manifest_sha256: manifestSha256,
+              payload_sha256: identity.payload_sha256, ...providerDiagnostic(error) }) + '\n');
+            await failure.sync();
+          } finally { await failure.close(); }
+          throw Error('provider outcome uncertain; retain journal and reconcile before further calls');
+        }
       } finally {
         clearTimeout(timer);
         signal?.removeEventListener('abort', cancel);

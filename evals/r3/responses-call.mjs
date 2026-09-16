@@ -3,6 +3,7 @@
 // V2 full-context reservation. A capacity reservation is not an exact token count.
 // Hashes identify the contract; they do not establish its correctness.
 import { prepareResponsesRequest } from './responses-request.mjs';
+import { providerFailure } from './provider-diagnostics.mjs';
 
 export function createResponsesPreparation({ mediator, model, tokenizer, countInputTokens, send, inputAccounting }) {
   const locked = structuredClone(model), tokenContract = structuredClone(tokenizer);
@@ -47,7 +48,7 @@ export function createResponsesPreparation({ mediator, model, tokenizer, countIn
         const receipt = codec.decode(await send(received.request, signal));
         // Reject a tokenizer undercount before claiming a confirmed bill. The
         // outer mediator retains the complete uncertain reservation on failure.
-        if (receipt.tokenUsage.input_tokens > inputTokens) throw Error('input token count exceeded quote');
+        if (receipt.tokenUsage.input_tokens > inputTokens) throw providerFailure('receipt_usage');
         const usage = await mediator.price({ model: locked, inputTokens: receipt.tokenUsage.input_tokens,
           outputTokens: receipt.tokenUsage.output_tokens, cachedInputTokens: receipt.cachedInputTokens });
         return { output: { version: 1, answer: receipt.output, provider: { response_id: receipt.responseId, model: receipt.model,
