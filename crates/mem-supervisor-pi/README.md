@@ -213,7 +213,16 @@ adds the date even with an explicit system prompt.
 The diagnostic intentionally supplies only a fixed text response, never a tool
 call. It proves these declarations exist, **not** that a particular privileged
 effect was executed. Production `provider_execution_gate()` remains closed.
-A request to approve a narrowly patched, separately hashed Pi build was sent
-to Olivier; no new upstream pin, patched artifact or authority is assumed.
+Olivier approved a narrowly patched, separately hashed Pi build on 2026-09-17.
+The approval was checkpointed before fetching the complete pinned source.
+Inspection then found its
+[nonstandard licence rider](https://github.com/Dicklesworthstone/pi_agent_rust/blob/7c018475d54d4e09c907691e47a520f1f09e3288/LICENSE),
+which expressly restricts OpenAI/Anthropic-related use and includes modification,
+testing and distribution. Do not describe this as plain MIT licensing. The
+applicability to this Codex-assisted work has not been resolved; clarification
+was requested. No source modification, new Pi build or redistribution followed
+this finding, and further Pi work is held pending clarification. Original
+artifacts are retained without silent substitution. Do not rerun the historical
+diagnostics as if licence clearance had been established.
 Even a corrected tool flag will not replace the external sandbox, exact input
 consent, per-request admission, response validation or budget checks.

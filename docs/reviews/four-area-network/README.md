@@ -15,8 +15,20 @@ network-disabled sandbox reproduces an **open tool-isolation defect**.
 `manage_skill`/`submit_plan`. Synthetic success and HTTP 429 each make one local
 request; failure is explicit without retry. The ordinary 11 Pi tests and strict
 Clippy pass, but this diagnostic is not a passed activation gate. A separately
-hashed patch requires the requested approval. No real key or paid call was used.
+hashed patch was approved and checkpointed at 13:36 UTC (plan memory
+`03320fec-9b3f-4fed-afb2-21c5eb4a2c93`). Before modification, the complete pinned
+source exposed a nonstandard licence rider restricting OpenAI/Anthropic-related
+use. Its applicability to this assisted work needs clarification; no patched
+source/binary was produced or distributed. The original pins are retained and
+Pi modification/testing/redistribution is held pending clarification. No real
+key or paid call was used.
 See [reproduction and evidence](../../../crates/mem-supervisor-pi/README.md#real-fake-provider-diagnostic-tool-isolation-blocked).
+
+The native rc.1 binaries and Web UI compiled at source `5827aeb`, but packaging
+failed because a private umask left the Debian control directory mode 0700.
+Commit `7c988fab` normalizes only the public package payload, leaving its staging
+parent private. Both architecture fixture builds now test umask 077. No failed
+package was installed, and actual corrected artifacts remain pending.
 
 The [approved execution contract](contract.md) is the source of scope and gates.
 Trust runs on the console-administered CA; Homelab, Workshop and General run on
