@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, readdir, stat, rm, chmod } from 'node:fs/promises';
+import { mkdtemp, mkdir, symlink, readFile, readdir, stat, rm, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -148,5 +148,21 @@ test('private output is mode 0600, exclusive and no incomplete file is published
     assert.deepEqual(await readdir(directory), ['inventory.json']);
     await chmod(directory, 0o750);
     await assert.rejects(privateArtifact(join(directory, 'unsafe.json'), async write => write('private')), /mode 0700/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('private output refuses symlinked or shared-writable non-sticky ancestors', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'memory-area-ancestor-test-'));
+  try {
+    const real = join(directory, 'real');
+    const link = join(directory, 'alias');
+    const child = join(real, 'child');
+    await mkdir(real, { mode: 0o700 });
+    await mkdir(child, { mode: 0o700 });
+    await symlink(real, link);
+    await assert.rejects(privateArtifact(join(link, 'child', 'unsafe.json'), async write => write('private')), /ancestry/);
+    await chmod(real, 0o777);
+    await assert.rejects(privateArtifact(join(child, 'unsafe.json'), async write => write('private')), /ancestry/);
+    assert.deepEqual(await readdir(child), []);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

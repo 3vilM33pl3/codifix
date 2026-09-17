@@ -103,8 +103,33 @@ reports and unresolved drafts private. On the real source, the inventory is
 approximately 1 GB; do not open or parse the whole file in a browser. Collector
 streaming is bounded, but the Rust planner still materializes its input and
 requires enough memory. Structural validity is not a reviewed area assignment,
-and no importer is implemented in this slice. Opaque links embedded in content
+and is not permission to import. Opaque links embedded in content
 or JSON require separate review; catalog FK coverage alone cannot prove them.
+
+## Exact row payloads and protected preparation
+
+`payload.mjs` uses the same pinned isolated restore and private-file controls.
+It exports every original row as bounded NDJSON, ordered by table and exact
+UTF-8 primary-key text. Complete PostgreSQL JSON bytes are retained without
+JavaScript numeric conversion. The stream includes empty tables and a final
+count marker only after PostgreSQL exits successfully.
+
+```sh
+node scripts/areas/payload.mjs \
+  --source-instance OBSERVED_SOURCE_INSTANCE_UUID \
+  --snapshot-id INVENTORY_SNAPSHOT_UUID \
+  --inventory-sha256 NORMALIZED_INVENTORY_SHA256 \
+  --output /protected/new-baseline/partition-payload.ndjson
+```
+
+The digest is a claimed source binding, not a verification result. The protected
+[`memory-area-import` workflow](../../crates/mem-area-ops/README.md) independently
+verifies all row identities, hashes, ownership decisions and reviewed provenance
+before preparing an archive or connecting to an explicit inactive local target.
+Do not expose the payload/archive to retrieval, source control or model inputs.
+Same-user/root processes remain trusted; directory ancestry is checked and shared
+writable non-sticky or symlink ancestors are refused. File and parent-directory
+synchronization precede successful publication. No live service is touched.
 
 ## Tests
 

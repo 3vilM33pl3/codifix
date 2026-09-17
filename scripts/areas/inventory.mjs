@@ -268,14 +268,14 @@ async function bufferedCommand(args) {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw Error('Docker sandbox metadata is invalid'); }
 }
 
-async function inspectSandbox() {
+export async function inspectSandbox() {
   const metadata = await bufferedCommand(['inspect', '--format', '{{json .}}', CONTAINER]);
   validateSandbox(metadata, CONTAINER);
   if (!/^[0-9a-f]{64}$/.test(metadata.Id)) throw Error('Collector requires a pinned sandbox identity');
   return { container: CONTAINER, container_id: metadata.Id, image: metadata.Image, network: 'none', read_only_root: true, published_ports: false };
 }
 
-function psqlSession(containerId) {
+export function psqlSession(containerId) {
   const child = spawn('docker', ['exec', '-i', containerId, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-h', '/var/run/postgresql', '-U', 'postgres', '-d', DATABASE], { stdio: ['pipe', 'pipe', 'pipe'] });
   child.stderr.resume();
   child.stdin.on('error', () => {}); // Failure is reported by the exit event, without SQL/body text.
@@ -316,6 +316,17 @@ export async function* streamLines(input, maxBytes = MAX_ENVELOPE_BYTES) {
 }
 
 export async function privateArtifact(output, body) {
+  // A private leaf alone is insufficient under a renameable shared ancestor.
+  // Same-user/root mutation remains outside this operator-file boundary.
+  let ancestor = dirname(output);
+  for (;;) {
+    const entry = await lstat(ancestor);
+    const trusted = entry.uid === 0 || entry.uid === process.getuid();
+    if (!entry.isDirectory() || !trusted || ((entry.mode & 0o022) !== 0 && (entry.mode & 0o1000) === 0)) throw Error('Output ancestry must be trusted and non-symlinked');
+    const parent = dirname(ancestor);
+    if (parent === ancestor) break;
+    ancestor = parent;
+  }
   const directory = await lstat(dirname(output));
   if (!directory.isDirectory() || directory.uid !== process.getuid() || (directory.mode & 0o777) !== 0o700) throw Error('Output parent must be owned by the current user with mode 0700');
   try { await stat(output); throw Error('Output already exists; refusing overwrite'); }
@@ -337,6 +348,8 @@ export async function privateArtifact(output, body) {
     await file.close();
     await link(temporary, output); // Exclusive publish: link cannot replace an existing destination.
     await unlink(temporary);
+    const parent = await open(dirname(output), 'r');
+    try { await parent.sync(); } finally { await parent.close(); }
     return result;
   } catch (error) {
     await file.close().catch(() => {});
