@@ -1,0 +1,33 @@
+{
+  "ok": true,
+  "helper": "finish-plan-execution",
+  "report": {
+    "completed_item_texts": [
+      "Create dated native backup of compact v2 before editing its existing URL; retain the current PDF snapshot and record source revision.",
+      "Replace slide 5 with native Prioritize \u2192 Gather evidence \u2192 Decide diagram, reconfirm / uncertainty / reviewed correction outcomes, usage and volatility explanation, visible future human notification, implemented/configurable mechanism and unmeasured quality.",
+      "Replace slide 6 with connected retrieval, portable memory and traceable corrections; carry displaced integration/pilot milestones into slide 8.",
+      "Verify and cite current implementation; notes cover volatility definition, opt-in/dry-run/budgets, bounded evidence, flags versus proposals, rewording exceptions, populated embeddings and extracted graph. Preserve Databricks proposed, Neuralese research and R3 limits.",
+      "Render and inspect all ten slides; verify editability, notes, links, order, preserved branding and original deck. Validate supported / insufficient / correction / high-volatility ineligible narratives.",
+      "Update claim register, repository dossier, PDF and linked Notion summary; add validation accuracy, missed changes, review effort, validation token costs and correction reuse to M3/M5 handoff.",
+      "Record final verification and complete plan checkpoint using small documentation commits, without runtime, API, configuration or financial changes."
+    ],
+    "completed_items": 7,
+    "plan_title": "Compact v2 \u2014 Self-improving knowledge and product differentiators",
+    "project": "memory",
+    "remaining_items": [],
+    "thread_key": "compact-v2---self-improving-knowledge-and-product-differentiators",
+    "total_items": 7,
+    "verified_complete": true
+  },
+  "archivedPlan": {
+    "archived": true,
+    "memory_id": "8b50c510-a797-43a5-92f3-af5d8a3e1b9c",
+    "project": "memory",
+    "summary": "Compact v2 \u2014 Self-improving knowledge and product differentiators"
+  },
+  "implementationRecorded": true,
+  "implementationMemoryIds": [
+    "877cb056-31f8-42f9-b66a-a8a178300743"
+  ],
+  "nativeRevision": "PpuOu-E_XqasQg"
+}
