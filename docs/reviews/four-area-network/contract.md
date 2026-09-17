@@ -2,6 +2,13 @@
 
 Approved by Olivier on 2026-09-17; subsequent model correction selects OpenAI GPT-5.6 Sol (`gpt-5.6-sol`), not GPT-5.4. Target 16:00 Europe/London internal demo, conditional on safety gates. R3 is paused, not complete.
 
+Approved amendment, 2026-09-17: Olivier authorized a narrowly patched Pi
+v0.5.1 build after the real fake-provider diagnostic showed that `--no-tools`
+and explicit off tiers leave extra tools registered. Preserve the upstream
+source/artifact pins and record the exact patch, separate build identity and
+artifact hashes. No silent substitution for the official artifact; paid calls
+and live activation remain disabled while the patch is tested.
+
 ## Agreed operating model
 
 Four independently running Memory installations with separate databases, credentials, storage and Pi Rust supervisors: Trust (CA knowledge, on the console-only CA); Homelab (infrastructure, on Monolith); Workshop (Memory development and releases, on Monolith); General (other genuine knowledge retaining project boundaries, on Monolith). Trust contains procedures and configuration knowledge, never private keys.
@@ -16,7 +23,7 @@ Today's demo: four actual areas, selected real knowledge, discovery, governed qu
 - Dedicated company gateway/database/private PDS on Monolith; no participant raw PDS, gateway DB or shared credentials. Approved private ATProto profile, not native Spaces/public Bluesky/direct peer HTTP. Reviewed publications and advertisements use ordered outbox; private Q&A uses addressed mailbox.
 - Default deny; enrollment alone grants no knowledge. Exact collection, requester, model and onward destination grants. Preserve original project subdivisions; one federation-facing project per instance initially, with deliberately prepared General exchange summaries.
 - Valid TLS, separate private hostnames/cookie scopes and Authentik bindings. Existing DNS is not verified TLS.
-- Pin Pi Rust v0.5.1 source/artifact hashes for Linux AMD64/ARM64. Integrate local stdio RPC, not an embedded runtime. Disable inherited skills/extensions/context and unrestricted tools. Only explicitly bound Memory tools and narrow adapters.
+- Pin Pi Rust v0.5.1 source/artifact hashes for Linux AMD64/ARM64, with the explicitly approved tool-isolation patch separately identified and hashed. Integrate local stdio RPC, not an embedded runtime. Disable inherited skills/extensions/context and unrestricted tools. Only explicitly bound Memory tools and narrow adapters.
 - No Pi DB password, signing key, Docker socket, general privileged shell or broad filesystem access. On CA also deny step-ca secrets, OpenBao administration and signing/service controls. Sandbox failure blocks activation.
 - Dedicated Rust supervisor runtime with persisted schedules, observations, decisions, attempts, approvals and outcomes; stable IDs, leases and fencing. Not a timer over existing synchronous loops.
 - Deterministic checks every five minutes; coalesced event work and one daily stale-knowledge review. Budget admission outside Pi before each provider request, reserve worst-case usage, retain uncertain usage, stop when caps cannot fit.
