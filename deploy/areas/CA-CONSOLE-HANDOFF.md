@@ -7,7 +7,7 @@ credential file, rotates a credential, or changes the existing CA services.
 
 **Current stop point:** a read-only inventory and, only when its independent
 inputs are available, authenticated local release staging. There is no completed
-area importer or privileged selected-instance installer/rollback helper. A staged
+live-validated CA migration or privileged selected-instance installer/rollback helper. A staged
 package or a successful preflight is not installation permission. The package's
 legacy singleton compatibility is not a completed Trust-area deployment.
 
@@ -19,8 +19,8 @@ procedure. The release owner must provide the exact reviewed revision and its
 integrity evidence independently. This runbook does not invent a published
 release URL, assume the current checkout is trusted, or fetch/run an installer.
 
-The preflight is a standalone shell file from this snapshot. It is **not** yet
-installed by the Debian package. From the snapshot's repository root, the exact
+The preflight is a standalone shell file from this snapshot and is also included
+in the new candidate package. From the snapshot's repository root, the exact
 read-only console command is:
 
 ```bash
@@ -165,6 +165,14 @@ The remaining required evidence is not produced by this handoff:
 - Separate Pi sandbox/proxy-only admission and authoritative per-area budget
   binding; no provider/CA/DB key is given to Pi. One authoritative ledger per area
   is required; cloned databases cannot be treated as a second spending budget.
+
+The software now provides `memory-area-import schema-plan` and explicitly
+confirmed `initialize-schema` for an already provisioned empty dedicated local
+database. See the [schema-only preparation guide](../../crates/mem-area-ops/README.md#schema-only-preparation-before-importing).
+Do not start the Memory service to obtain that schema: it also bootstraps
+administration and makes fresh import ineligible. This available operator tool
+does not authorize running migrations on the CA before its target, backup,
+release and writer-fencing gates are resolved.
 
 Do not create `activation-reviewed`, enable/start `memory-layer@trust.service`,
 run a migration, or install the staged package solely because the preceding

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Explicit offline preparation and local-only target import. No configuration
-//! discovery, migrations, credential creation, service startup or source writes.
+//! discovery, credential creation, service startup or source writes. Schema-only
+//! initialization is a separate explicitly confirmed fresh-database operation.
 mod private;
+pub mod schema;
 use mem_area::{AREAS, AreaId, Inventory, Manifest, MaterializedMigration};
 use private::{Directory, Input};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -46,6 +48,14 @@ pub enum Failure {
     Environment,
     #[error("local target connection failed; credentials and database details suppressed")]
     Connection,
+    #[error(
+        "schema preparation requires an empty dedicated database with no other client connections"
+    )]
+    NotEmpty,
+    #[error(
+        "schema preparation was not confirmed; inspect the target before retrying; SQL details suppressed"
+    )]
+    Schema,
     #[error(transparent)]
     Import(#[from] mem_area_store::ImportError),
     #[error("metadata output failed; inspect existing receipts before retry")]

@@ -7,6 +7,8 @@ This is not completion of the four-area foundation or permission to cut over.
 
 - Strict, lossless area inventory and reviewed-partition tooling; protected local
   importer with immutable reconciliation receipts and retired runtime authority.
+- Explicit schema-only preparation for fresh local targets, separate from
+  service bootstrap and confirmed by a reviewed compiled migration digest.
 - Opt-in named-instance packaging with fixed executables, clean environments,
   disabled staging automation and separately scoped private configuration.
 - Private federation gateway binary, existing reviewed knowledge/expertise

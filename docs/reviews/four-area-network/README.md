@@ -30,6 +30,18 @@ Commit `7c988fab` normalizes only the public package payload, leaving its stagin
 parent private. Both architecture fixture builds now test umask 077. No failed
 package was installed, and actual corrected artifacts remain pending.
 
+Fresh-target preparation now has an explicit `schema-plan` and
+`initialize-schema` operator path. A reviewed compiled migration digest and
+protected local target descriptor are required; an existing schema or other
+connected client is refused. All migrations/history commit together, without
+application administration, loop definitions, credentials, jobs or supervisor
+binding. The 76 focused area/planner/store/operator tests pass with required
+disposable PostgreSQL, including a late migration-55 fault rolling back every
+schema/history/extension write and a real CLI-created target accepting exact
+version/tombstone/provenance import and reconciliation. Strict operator Clippy,
+formatting and boundaries pass. No real target was initialized or imported; CA
+operator/environment gates are unchanged.
+
 The [approved execution contract](contract.md) is the source of scope and gates.
 Trust runs on the console-administered CA; Homelab, Workshop and General run on
 Monolith, each with independent application/database boundaries. Supervisors use

@@ -40,6 +40,23 @@ impl From<Source> for Inputs {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Inspect the exact compiled schema preparation digest; no DB connection.
+    SchemaPlan,
+    /// Initialize schema only in a fresh empty local DB; never start a service.
+    InitializeSchema {
+        #[arg(long)]
+        target: PathBuf,
+        #[arg(long)]
+        target_sha256: String,
+        #[arg(long)]
+        schema_sha256: String,
+        #[arg(long)]
+        execute: bool,
+        #[arg(long)]
+        writers_stopped: bool,
+        #[arg(long)]
+        fresh_database: bool,
+    },
     /// Independently verify every exported row; no ownership review, writes or DB connection.
     VerifyPayload {
         #[arg(long)]
@@ -92,6 +109,25 @@ fn print(value: &impl serde::Serialize) -> Result<(), Failure> {
 }
 async fn run(cli: Cli) -> Result<(), Failure> {
     match cli.command {
+        Command::SchemaPlan => print(&mem_area_ops::schema::plan()?),
+        Command::InitializeSchema {
+            target,
+            target_sha256,
+            schema_sha256,
+            execute,
+            writers_stopped,
+            fresh_database,
+        } => print(
+            &mem_area_ops::schema::initialize(&mem_area_ops::schema::Initialization {
+                target,
+                target_sha256,
+                schema_sha256,
+                execute,
+                writers_stopped,
+                fresh_database,
+            })
+            .await?,
+        ),
         Command::VerifyPayload {
             inventory,
             payload,

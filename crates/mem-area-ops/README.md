@@ -2,7 +2,9 @@
 
 `memory-area-import` is an opt-in local operator executable, not a service route
 or an automatic deployment. It never discovers configuration, connects to a
-source database, runs migrations, creates credentials or starts workers.
+source database, creates credentials or starts workers. `initialize-schema` is
+a separate explicit operation for an empty, independently provisioned target;
+ordinary inspection/preparation/import never runs migrations.
 
 ## Inputs and preparation
 
@@ -89,7 +91,48 @@ authentication. An explicit Unix socket is also supported with
 Remote hosts, URLs, `.pgpass`, application configuration and all `PG*`
 environment overrides are excluded. Loopback/socket authentication and process
 isolation must already be secured by the operator. Hash the descriptor with
-`sha256sum`; do not print its contents. Then run:
+`sha256sum`; do not print its contents.
+
+### Schema-only preparation, before importing
+
+Do **not** start Memory merely to apply migrations: normal service startup also
+creates administration and loop definitions, which correctly makes a target
+ineligible for fresh import. For a newly provisioned **empty** dedicated database,
+use the reviewed executable's `memory-area-import schema-plan` first. It makes
+no connection and prints the exact compiled schema digest and fixed head 0057.
+Review that digest against the selected release, then explicitly run:
+
+```sh
+memory-area-import initialize-schema \
+  --target /protected/target.json --target-sha256 TARGET_FILE_SHA \
+  --schema-sha256 REVIEWED_SCHEMA_SHA \
+  --execute --writers-stopped --fresh-database
+```
+
+The flags are operator attestations, not proof of fencing or target ownership.
+All application clients must be disconnected; the command does not kill them.
+It refuses existing tables (even empty), functions/types/views, other user
+schemas, large objects, event triggers, foreign servers and non-default
+extensions. The PostgreSQL server must already support pgcrypto, pgvector and
+pg_trgm; installing server extensions or creating database roles is a separate
+operator step. Standard `plpgsql` in an otherwise empty database is allowed.
+
+All 57 migrations and their history run in one transaction with bounded waits;
+the established migration-4 pgvector compatibility rule retains its original
+checksum. Required-DB tests inject a failure at migration 55 and confirm that
+earlier tables, history and extension creation roll back. No credentials, loop
+definitions, jobs, imports or supervisor identities are bootstrapped.
+
+Expected status: `fresh_schema_initialized_only_not_imported_or_activated`.
+This is not a target identity binding or permission to start the service. After
+an interrupted/ambiguous result, inspect the target: an initialized database is
+deliberately refused on replay. Never drop/reinitialize it to force a retry. A
+confirmed pristine supported schema may proceed to the separately reviewed
+import below. No existing database is upgraded by this command.
+
+### Reviewed import
+
+Once the target schema and archive are independently verified, run:
 
 ```sh
 memory-area-import import \

@@ -75,6 +75,10 @@ rechecks, background work and automated model/embedding work. Do not start the
 application to perform a supposedly inert import: normal service startup runs
 migrations and bootstraps local administration. Perform import with writers
 stopped, using the protected importer, before the separately authorized startup.
+Use the explicit `memory-area-import schema-plan` / `initialize-schema` workflow
+from the [operator guide](../../crates/mem-area-ops/README.md#schema-only-preparation-before-importing)
+to prepare an already provisioned empty dedicated local target. It does not
+create a database/role, upgrade an existing schema or activate an instance.
 
 ### Explicit federation credentials, after enrollment review
 
