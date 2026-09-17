@@ -8,6 +8,8 @@ mod plan;
 mod policy;
 mod types;
 
-pub use plan::{draft_manifest, inventory_digest, verify_inventory, verify_manifest};
+pub use plan::{
+    draft_manifest, inspect_inventory, inventory_digest, verify_inventory, verify_manifest,
+};
 pub use policy::{KNOWN_TABLES, table_strategy};
 pub use types::*;

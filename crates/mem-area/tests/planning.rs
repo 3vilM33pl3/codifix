@@ -448,12 +448,16 @@ fn historical_project_provenance_is_schema_local() {
     )
     .rows[0]
         .source_project_id = Some(id(1));
-    assert_blocked(
-        &inventory,
-        &reviewed(&inventory),
-        "unknown historical source project",
+    let validation = inspect_inventory(&inventory);
+    assert!(validation.blockers.is_empty());
+    assert_eq!(validation.notices.len(), 1);
+    assert_eq!(validation.notices[0].source_project_id, id(1));
+    assert_eq!(
+        validation.notices[0].project_table,
+        format!("{HISTORICAL_SCHEMA}.projects")
     );
-    // A public UUID cannot substitute for an absent historical source project.
+    // A public UUID cannot substitute for an absent historical source project;
+    // its original unresolved local reference remains visible in the archive.
     assert!(inventory.projects.iter().any(|project| project.id == id(1)));
     let mut invalid = historical_fixture();
     table_mut(&mut invalid, &format!("{HISTORICAL_SCHEMA}.projects")).rows[0].key =

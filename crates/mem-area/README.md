@@ -46,13 +46,29 @@ not an identity. Preserve project IDs, slugs, names, root paths and creation
 timestamps in the separate project catalog.
 
 The top-level project catalog describes `public.projects` only. Historical
-`source_project_id` metadata, when present, must identify a UUID row in
+`source_project_id` metadata, when present, is resolved against
 `mab_full_20260516_150014.projects`, even if the same UUID also occurs in public.
 Historical project provenance is retained in the complete hashed project row and
 protected snapshot (and the collector's bound per-schema project sidecar); it
 creates no public ownership or area-project binding. Historical rows need not
 satisfy the modern public canonical-state/version layout. Declared historical
 foreign keys and every original row hash still require complete accounting.
+
+An unresolved `source_project_id` on a table with mandatory `historical_archive`
+or `retire_runtime` policy produces an explicit `retained_unresolved_project_reference`
+notice. The notice preserves the table, original row key, unchanged project UUID
+(including nil UUIDs), schema-local project table and mandatory retention policy.
+It records a target absent from this snapshot; it does not infer why it is absent.
+Inventory and verification output expose `notices`; draft manifests include
+`inventory_notices`. Verification derives notices again from the hash-bound
+inventory and rejects suppressed or altered manifest notices, including omission
+through a deserialization default. Original IDs and row hashes are never rewritten.
+
+This retention rule does not apply to owned knowledge, project provenance,
+derived data or unknown tables. Missing project metadata targets there remain
+blockers. Every declared FK and explicit logical reference still requires an
+inventoried target, even on historical or retired rows. No notice authorizes
+retrieval, runtime reactivation or promotion of the archived record.
 
 For every row, list each declared foreign key once, including `target: null`
 for SQL NULL. A non-null target identifies an inventoried table and key.

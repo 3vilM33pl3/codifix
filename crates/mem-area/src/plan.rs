@@ -133,7 +133,14 @@ pub fn inventory_digest(inventory: &Inventory) -> Result<String, serde_json::Err
 /// Check structural completeness against the supported table catalog. This
 /// does not replace a trusted snapshot collector or independently counted DB.
 pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
+    inspect_inventory(inventory).blockers
+}
+
+/// Retention notices preserve unresolved historical metadata without treating
+/// it as live ownership. Catalog FK and explicit logical references stay strict.
+pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
     let mut errors = Vec::new();
+    let mut notices = Vec::new();
     if inventory.format_version != FORMAT_VERSION {
         errors.push("unsupported inventory format version".into());
     }
@@ -250,15 +257,20 @@ pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
                 ));
             }
             if let Some(project) = row.source_project_id {
-                if let Some(project_table) = historical_project_table(&table.table) {
-                    if !historical_projects.contains(&project) {
-                        errors.push(format!("unknown historical source project {project} in {project_table} for {}:{}", table.table, row.key));
+                let known = if historical_project_table(&table.table).is_some() {
+                    historical_projects.contains(&project)
+                } else {
+                    projects.contains_key(&project)
+                };
+                if !known {
+                    if let Some(notice) = retained_project_notice(&table.table, &row.key, project) {
+                        notices.push(notice);
+                    } else {
+                        errors.push(format!(
+                            "unknown source project {project} for {}:{}",
+                            table.table, row.key
+                        ));
                     }
-                } else if !projects.contains_key(&project) {
-                    errors.push(format!(
-                        "unknown source project {project} for {}:{}",
-                        table.table, row.key
-                    ));
                 }
             }
             if lineage_table(&table.table) {
@@ -449,7 +461,72 @@ pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
             }
         }
     }
-    errors
+    notices.sort_by(|a, b| a.record.cmp(&b.record));
+    InventoryValidation {
+        blockers: errors,
+        notices,
+    }
+}
+
+fn retained_project_notice(table: &str, key: &str, project: Uuid) -> Option<InventoryNotice> {
+    let strategy = table_strategy(table)?;
+    if !matches!(
+        strategy,
+        TableStrategy::HistoricalArchive | TableStrategy::RetireRuntime
+    ) {
+        return None;
+    }
+    Some(InventoryNotice {
+        kind: InventoryNoticeKind::RetainedUnresolvedProjectReference,
+        record: RecordRef {
+            table: table.into(),
+            key: key.into(),
+        },
+        source_project_id: project,
+        project_table: historical_project_table(table)
+            .unwrap_or("public.projects")
+            .into(),
+        mandatory_strategy: strategy,
+    })
+}
+
+fn retained_project_notices(inventory: &Inventory) -> Vec<InventoryNotice> {
+    let public: BTreeSet<_> = inventory
+        .projects
+        .iter()
+        .map(|project| project.id)
+        .collect();
+    let historical: BTreeSet<_> = inventory
+        .tables
+        .iter()
+        .filter(|table| table.table == HISTORICAL_PROJECT_TABLE)
+        .flat_map(|table| &table.rows)
+        .filter_map(|row| Uuid::parse_str(&row.key).ok().filter(|id| !id.is_nil()))
+        .collect();
+    let mut notices = Vec::new();
+    for table in &inventory.tables {
+        if !matches!(
+            table_strategy(&table.table),
+            Some(TableStrategy::HistoricalArchive | TableStrategy::RetireRuntime)
+        ) {
+            continue;
+        }
+        let projects = if historical_project_table(&table.table).is_some() {
+            &historical
+        } else {
+            &public
+        };
+        for row in &table.rows {
+            if let Some(project) = row.source_project_id
+                && !projects.contains(&project)
+                && let Some(notice) = retained_project_notice(&table.table, &row.key, project)
+            {
+                notices.push(notice);
+            }
+        }
+    }
+    notices.sort_by(|a, b| a.record.cmp(&b.record));
+    notices
 }
 
 fn required_logical_refs(table: &str) -> &'static [(&'static str, &'static str, bool)] {
@@ -516,6 +593,7 @@ pub fn draft_manifest(inventory: &Inventory) -> Result<Manifest, serde_json::Err
         source_instance: inventory.source_instance,
         snapshot_id: inventory.snapshot_id,
         inventory_sha256: inventory_digest(inventory)?,
+        inventory_notices: retained_project_notices(inventory),
         areas: AREAS.to_vec(),
         table_policies,
         lineages,
@@ -563,7 +641,11 @@ fn reviewed_destination(
 /// Validate a reviewed partition against its pinned source inventory. A valid
 /// plan is only an offline planning result, never permission to import or run.
 pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verification {
-    let mut errors = verify_inventory(inventory);
+    let validation = inspect_inventory(inventory);
+    let mut errors = validation.blockers;
+    if manifest.inventory_notices != validation.notices {
+        errors.push("inventory notices mismatch; original historical project references must remain visible".into());
+    }
     if manifest.format_version != FORMAT_VERSION
         || manifest.source_instance != inventory.source_instance
         || manifest.snapshot_id != inventory.snapshot_id
@@ -782,6 +864,7 @@ pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verificati
         plan_valid,
         import_supported: false,
         blockers: errors,
+        notices: validation.notices,
         records: if plan_valid {
             actions.into_values().collect()
         } else {

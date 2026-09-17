@@ -138,6 +138,10 @@ pub struct Manifest {
     pub snapshot_id: Uuid,
     /// Binds all source row hashes, schema, counts and provenance to this plan.
     pub inventory_sha256: String,
+    /// Retained unresolved historical references, copied exactly from inventory
+    /// validation. These are evidence, never permission to restore authority.
+    #[serde(default)]
+    pub inventory_notices: Vec<InventoryNotice>,
     pub areas: Vec<AreaId>,
     pub table_policies: Vec<TablePolicy>,
     pub lineages: Vec<LineageDecision>,
@@ -238,5 +242,31 @@ pub struct Verification {
     pub plan_valid: bool,
     pub import_supported: bool,
     pub blockers: Vec<String>,
+    pub notices: Vec<InventoryNotice>,
     pub records: Vec<PlannedRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InventoryValidation {
+    pub blockers: Vec<String>,
+    pub notices: Vec<InventoryNotice>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InventoryNotice {
+    pub kind: InventoryNoticeKind,
+    pub record: RecordRef,
+    /// Original value, including a nil UUID if present in historical source.
+    pub source_project_id: Uuid,
+    /// Exact schema-local project catalog in which the value was absent.
+    pub project_table: String,
+    /// Only historical_archive or retire_runtime can produce this notice.
+    pub mandatory_strategy: TableStrategy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InventoryNoticeKind {
+    RetainedUnresolvedProjectReference,
 }

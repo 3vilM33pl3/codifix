@@ -10,7 +10,7 @@ use std::{
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use mem_area::{
-    Inventory, Manifest, draft_manifest, inventory_digest, verify_inventory, verify_manifest,
+    Inventory, Manifest, draft_manifest, inspect_inventory, inventory_digest, verify_manifest,
 };
 use serde::de::DeserializeOwned;
 
@@ -62,22 +62,22 @@ fn run(cli: Cli) -> Result<bool> {
     match cli.command {
         Command::Inventory { input } => {
             let inventory: Inventory = read(&input)?;
-            let blockers = verify_inventory(&inventory);
+            let validation = inspect_inventory(&inventory);
             print_json(&serde_json::json!({
-                "inventory_valid": blockers.is_empty(), "import_supported": false,
+                "inventory_valid": validation.blockers.is_empty(), "import_supported": false,
                 "inventory_sha256": inventory_digest(&inventory)?,
                 "table_count": inventory.tables.len(), "project_count": inventory.projects.len(),
                 "record_count": inventory.tables.iter().map(|table| table.rows.len()).sum::<usize>(),
-                "blockers": blockers,
+                "blockers": validation.blockers, "notices": validation.notices,
             }))?;
-            Ok(blockers.is_empty())
+            Ok(validation.blockers.is_empty())
         }
         Command::Plan { inventory } => {
             let inventory: Inventory = read(&inventory)?;
-            let blockers = verify_inventory(&inventory);
-            if !blockers.is_empty() {
+            let validation = inspect_inventory(&inventory);
+            if !validation.blockers.is_empty() {
                 print_json(
-                    &serde_json::json!({ "inventory_valid": false, "import_supported": false, "blockers": blockers }),
+                    &serde_json::json!({ "inventory_valid": false, "import_supported": false, "blockers": validation.blockers, "notices": validation.notices }),
                 )?;
                 return Ok(false);
             }
