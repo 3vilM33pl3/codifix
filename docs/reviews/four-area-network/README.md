@@ -2,6 +2,13 @@
 
 Status: implementation started 2026-09-17. Not deployed; no release published.
 
+Packaging follow-up: the Debian builder includes the opt-in gateway and uses a
+host-native lean CLI for cross-build completions, never the ARM64 target binary.
+Synthetic AMD64/ARM64 packaging tests pass, including immutable output paths,
+explicit build-volume output and Debian prerelease ordering (`2.1.0~rc.1` before
+`2.1.0`). The three clean-launcher tests also pass. These are build-path tests,
+not actual architecture artifacts, signing, installation or CA runtime evidence.
+
 The [approved execution contract](contract.md) is the source of scope and gates.
 Trust runs on the console-administered CA; Homelab, Workshop and General run on
 Monolith, each with independent application/database boundaries. Supervisors use

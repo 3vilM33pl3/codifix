@@ -164,7 +164,7 @@ printf 'Fixture\n' > "$fixture/.agents/skills/SKILL.md"
 printf 'Fixture\n' > "$fixture/web/dist/index.html"
 printf '#!/usr/bin/env bash\nprintf "fixture completion\\n"\n' > "$test_root/binaries/x86_64-unknown-linux-gnu/release/memory"
 chmod +x "$test_root/binaries/x86_64-unknown-linux-gnu/release/memory"
-for operator in memory-area memory-area-import; do
+for operator in memory-area memory-area-import memory-federation-gateway; do
     printf '#!/usr/bin/env bash\nexit 99 # package build must never execute an importer\n' > "$test_root/binaries/x86_64-unknown-linux-gnu/release/$operator"
     chmod +x "$test_root/binaries/x86_64-unknown-linux-gnu/release/$operator"
 done
@@ -174,9 +174,17 @@ ln -s "$test_root/unrelated-build" "$fixture/target/debian/memory-layer-amd64"
 
 cargo() { log_command "cargo $*"; }
 npm() { log_command "npm $*"; }
+rustc() { [[ "$1" == -vV ]] || return 99; printf 'host: x86_64-unknown-linux-gnu\n'; }
 dpkg-deb() {
     [[ "$1" == --root-owner-group && "$2" == --build ]] || return 90
-    local staging="$3"
+    local staging="$3" architecture rust_target
+    architecture="$(sed -n 's/^Architecture: //p' "$staging/DEBIAN/control")"
+    case "$architecture" in
+        amd64) rust_target=x86_64-unknown-linux-gnu ;;
+        arm64) rust_target=aarch64-unknown-linux-gnu ;;
+        *) return 90 ;;
+    esac
+    grep -Fxq 'Version: 2.1.0~rc.1' "$staging/DEBIAN/control" || return 90
     [[ -f "$staging/lib/systemd/system/memory-layer@.service" ]] || return 91
     [[ -x "$staging/usr/libexec/memory-layer/verify-instance-release" ]] || return 92
     [[ -x "$staging/usr/libexec/memory-layer/run-instance" ]] || return 92
@@ -184,9 +192,12 @@ dpkg-deb() {
     [[ ! -e "$staging/opt/memory-layer" ]] || return 94
     [[ ! -e "$staging/etc/memory-layer/instances" ]] || return 95
     [[ ! -e "$staging/var/lib/memory-layer" ]] || return 96
-    for operator in memory-area memory-area-import; do
+    for operator in memory memory-area memory-area-import memory-federation-gateway; do
         [[ -x "$staging/usr/bin/$operator" ]] || return 97
-        cmp "$staging/usr/bin/$operator" "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/$operator" || return 97
+        cmp "$staging/usr/bin/$operator" "$CARGO_TARGET_DIR/$rust_target/release/$operator" || return 97
+    done
+    for completion in bash-completion/completions/memory zsh/vendor-completions/_memory fish/vendor_completions.d/memory.fish; do
+        [[ "$(< "$staging/usr/share/$completion")" == 'fixture completion' ]] || return 97
     done
     [[ -x "$staging/usr/libexec/memory-layer/ca-preflight" ]] || return 98
     [[ -f "$staging/usr/libexec/memory-layer/area-release.py" ]] || return 98
@@ -196,7 +207,7 @@ dpkg-deb() {
     printf 'fixture deb\n' > "$4"
     log_command "dpkg-deb $*"
 }
-export -f cargo npm dpkg-deb
+export -f cargo npm rustc dpkg-deb
 export CARGO_TARGET_DIR="$test_root/binaries"
 : > "$PACKAGING_TEST_LOG"
 bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null
@@ -207,6 +218,10 @@ if compgen -G "$fixture/target/debian/.memory-layer-amd64.*" >/dev/null; then
 fi
 grep -q '^dpkg-deb ' "$PACKAGING_TEST_LOG" || fail "builder did not assemble the expected package"
 grep -q '^cargo build --release --locked -p mem-area -p mem-area-ops .*--target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "operators were not built with locked dependencies and selected architecture"
+grep -q '^cargo build --release --locked -p mem-federation-runtime .*--bin memory-federation-gateway --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "gateway was not built with locked dependencies and selected architecture"
+if grep -q 'cargo build --locked -p mem-cli' "$PACKAGING_TEST_LOG"; then
+    fail "native packaging unnecessarily rebuilt a lean CLI"
+fi
 : > "$PACKAGING_TEST_LOG"
 if bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null 2>&1; then
     fail "builder overwrote an existing release artifact"
@@ -215,7 +230,23 @@ fi
 [[ "$(< "$fixture/target/debian/memory-layer_2.1.0-rc.1_amd64.deb")" == 'fixture deb' ]] ||
     fail "existing artifact contents changed"
 
-for arguments in '--arch' '--target' '--arch mips' '--arch amd64 --target aarch64-unknown-linux-gnu' '--target ../../other'; do
+# Model a non-executable ARM64 target: running it for completions fails the test.
+# Only the separately built host CLI may execute. Explicit output stays off root.
+mkdir -p "$test_root/binaries/aarch64-unknown-linux-gnu/release" "$test_root/binaries/x86_64-unknown-linux-gnu/debug"
+cp "$test_root/binaries/x86_64-unknown-linux-gnu/release/memory" "$test_root/binaries/x86_64-unknown-linux-gnu/debug/memory"
+for operator in memory memory-area memory-area-import memory-federation-gateway; do
+    printf '#!/usr/bin/env bash\nexit 99 # target binaries must not execute during cross packaging\n' > "$test_root/binaries/aarch64-unknown-linux-gnu/release/$operator"
+    chmod +x "$test_root/binaries/aarch64-unknown-linux-gnu/release/$operator"
+done
+: > "$PACKAGING_TEST_LOG"
+bash "$fixture/packaging/build-deb.sh" --arch arm64 --output-dir "$test_root/release output" >/dev/null
+[[ -s "$test_root/release output/memory-layer_2.1.0-rc.1_arm64.deb" ]] || fail "cross package missing from explicit output directory"
+grep -q '^cargo build --locked -p mem-cli --no-default-features --features tui .*--bin memory --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross completions did not build the host-native lean CLI"
+grep -q '^cargo build --release --locked -p mem-federation-runtime .*--target aarch64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross gateway targeted the wrong architecture"
+dpkg --compare-versions 2.1.0~rc.1 lt 2.1.0 || fail "Debian candidate does not sort before stable"
+dpkg --compare-versions 2.1.0~rc.1 gt 2.0.0 || fail "Debian candidate does not sort after the prior stable"
+
+for arguments in '--arch' '--target' '--output-dir' '--arch mips' '--arch amd64 --target aarch64-unknown-linux-gnu' '--target ../../other'; do
     : > "$PACKAGING_TEST_LOG"
     # Intentional word splitting of fixed, test-owned argument fixtures.
     # shellcheck disable=SC2086
