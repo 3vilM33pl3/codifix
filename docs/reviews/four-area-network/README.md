@@ -62,6 +62,15 @@ Read-only health checks still show the existing production/development instances
 on 2.0.0 / 2.0.0-dev, databases up and no pending offline items; no deployment
 restart or configuration change was made.
 
+The Web build reported seven dependency audit findings (three high, four
+moderate), all in development/build tooling; production-only audit was clear.
+The affected development lock entries and Vitest minimum were updated, without
+changing any production dependency version. A clean temporary checkout install
+(one transient registry reset, then successful bounded retry) reports zero npm
+audit findings, passes all 109 Web tests and builds successfully. Existing Web
+assets/services were not replaced by this test. Audit results are point-in-time
+dependency evidence, not a whole-product security certification.
+
 The [approved execution contract](contract.md) is the source of scope and gates.
 Trust runs on the console-administered CA; Homelab, Workshop and General run on
 Monolith, each with independent application/database boundaries. Supervisors use
