@@ -1,0 +1,33 @@
+{
+  "date": "2026-09-17",
+  "nativeDeckId": "1dMosQKiMjTx1k9yztYfiURaxQTj_HtOSgrmDYW9Ot_g",
+  "nativeRevision": "eo7sVBXZEaBxxA",
+  "createdAt": "2026-09-17T12:40:38.601Z",
+  "folderId": "1Q0Bz-71eKFYwLYYGMoYjBhPxKgLI9BP5",
+  "sharing": {
+    "sourceAndCopy": "owner only",
+    "owner": "olivier@robotmotel.com",
+    "expanded": false
+  },
+  "sourceDeckId": "1RtPlKvSxf3Z3dmLRHoIaiaKN3n8xtr6WGWJAzeWXCIY",
+  "sourceRevisionBefore": "_ojXdF-794TMog",
+  "sourceRevisionAfter": "_ojXdF-794TMog",
+  "sourceSlideCount": 18,
+  "sourceUnchanged": true,
+  "notionPageId": "3de8990715f48198a8f3f9a4ac34092d",
+  "notionReadbackComplete": true,
+  "pitchWorkspaceLinked": true,
+  "firstEditionSummaryLinked": true,
+  "pdfAttached": true,
+  "pdfFileUploadId": "3de89907-15f4-818a-a64d-00b2731590ff",
+  "pdfBytes": 213210,
+  "pdfSha256": "9dc523cef67345949eb0719f0d88e55fc3a3ce375dcd9cfb7a8ee9fe871ca42b",
+  "implementationCommits": [
+    "9a49e09",
+    "54e6d16",
+    "06c70c3"
+  ],
+  "runtimeChanges": false,
+  "modelChanges": false,
+  "investorOutreach": false
+}

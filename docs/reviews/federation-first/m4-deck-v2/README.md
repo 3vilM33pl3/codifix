@@ -32,6 +32,8 @@ Technical evidence was re-read at `54195f4`. Controlled federation/private-Q&A e
 
 **M5:** founder-led discovery, sponsorship, independent owners, sharing boundary, deployment readiness, agreed thresholds and sufficient comparable cases; measure quality, correct action, interruptions, correction reuse and full delivery cost.
 
+The [completion checkpoint](completion-checkpoint.json) verified all eight approved items, archived the plan and recorded the implementation. [Publication verification](publication-verification.json) records the unchanged source, native copy and Notion/PDF delivery.
+
 ## Native preservation and verification
 
 A single native copy was created on 17 September at 12:40:38 UTC in Drive/ChatGPT. Both source and copy have the same sole owner and no access expansion. No investor outreach was performed.
