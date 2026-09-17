@@ -3199,6 +3199,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mem-supervisor-runtime"
+version = "2.0.0"
+dependencies = [
+ "mem-supervisor",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "mem-test-support"
 version = "2.0.0"
 dependencies = [

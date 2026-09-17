@@ -12,6 +12,7 @@ members = [
   "crates/mem-record",
   "crates/mem-store",
   "crates/mem-supervisor",
+  "crates/mem-supervisor-runtime",
   "crates/mem-config",
   "crates/mem-watch",
   "crates/mem-cli",
