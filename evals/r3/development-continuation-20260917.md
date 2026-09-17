@@ -121,6 +121,12 @@ checks: `private/final-verification.json`, `/tmp/r3-continue5-verify.mjs`,
 
 ## Next gates
 
+Follow-up: the [offline coding diagnosis](coding-diagnosis-20260917.md) reproduced
+all 45 submitted grader inputs. It found deadline starvation, missing agent-side
+tools and 29 code-passing steps rejected by the strict completion protocol, plus
+eight genuine code-test failures. Original outcomes and receipts remain unchanged;
+no fix or paid rerun has been performed.
+
 1. Collect genuine human judgments for the 60 knowledge answers. The completed
    execution now permits the ordinary review flow; do not bypass it.
 2. Diagnose the coding failures and conservative time allocation offline before
