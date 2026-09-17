@@ -1,11 +1,26 @@
 # R3 paid evaluation: remaining gates
 
-Status checked 2026-09-16. This records the explicit approval of one bounded
-development calibration, not an official result or authority for another campaign.
+Status checked 2026-09-17. This records bounded development authorization and
+execution evidence, not an official result or open-ended spending authority.
 
 ## Gate status
 
-Current status (2026-09-17 London time): the
+Current status: following Olivier's increased-call authorization, the
+[new development continuation](development-continuation-20260917.md) completed
+**75/75 executions**, with `execution_valid: true`. Its 167 calls all settled,
+costing **US$0.959797**, with no new uncertain charge. Sixty knowledge answers
+await genuine human review; all 15 coding sequence executions failed under the
+current conservative limits. The normal blinded review export succeeded.
+`harness_valid`, `official_evidence` and `quality_passed` remain false.
+
+The aggregate call cap is now **1,000**; the original US$10 and 10M-token caps
+remain unchanged. Across all attempts: **660 settled calls / US$1.969369** plus
+**seven uncertain allowances / US$2.450208**, not confirmed charges. Remaining:
+**333 calls / 6,335,921 tokens / US$5.580423**. No further run was started after
+this complete execution. Human adjudication and development calibration decisions
+are next; official held-out execution still needs separate approval.
+
+Previous status (2026-09-17 London time): the
 [budget-bounded continuation](development-continuation-20260916.md) exhausted the
 original **500-call** ceiling. Cumulative: 493 settled calls / US$1.009572, plus
 seven uncertain allowances / US$2.450208 (not confirmed charges). US$6.540220

@@ -1,5 +1,25 @@
 # R3 execution and evidence ledger
 
+## 2026-09-17 increased call allowance; complete live development execution
+
+- Olivier authorized continuing with an increased call count. Checkpointed a
+  bounded 500-call increment (1,000 aggregate), retaining the original US$10 and
+  10M-token ceilings and all historical uncertain allowances.
+- Manifest `b43cd095…ee979f7` preserves the reviewed two-family calibration,
+  models, labels, prompts, 75-task order, deadlines and isolation. Runtime and
+  approval gates passed before dispatch; sixteen focused tests passed, no skips.
+- The run completed **75/75 executions**; **167 calls / US$0.959797**, all settled.
+  `execution_valid: true`; all snapshots unchanged and usage reconciled. The
+  normal review export produced 60 blinded packets and blank ballots.
+- Sixty knowledge answers still require genuine human review. **0/15 coding
+  sequences succeeded** under the conservative task limits. No quality pass,
+  statistical superiority, official evidence or completed-R3 claim.
+- Cumulative **660 settled calls / US$1.969369** plus **seven uncertain calls /
+  US$2.450208 reserved**. Remaining: 333 calls / 6,335,921 tokens / US$5.580423.
+  No further paid run after completion. Human review and offline calibration
+  diagnosis come next; held-out execution remains separately gated.
+- See [complete outcome and evidence](../../../evals/r3/development-continuation-20260917.md).
+
 ## 2026-09-17 original call ceiling exhausted; partial development evidence retained
 
 - Continued within the original US$10 / 500-call / 10M-token envelope, including
