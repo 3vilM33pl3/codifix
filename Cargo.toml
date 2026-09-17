@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/mem-area",
+  "crates/mem-area-store",
   "crates/mem-agenttop",
   "crates/mem-analyze",
   "crates/mem-atproto",

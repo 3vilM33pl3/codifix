@@ -2802,6 +2802,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mem-area-store"
+version = "2.0.0"
+dependencies = [
+ "mem-area",
+ "mem-test-support",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "mem-atproto"
 version = "2.0.0"
 dependencies = [
