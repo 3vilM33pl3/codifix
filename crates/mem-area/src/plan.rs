@@ -630,7 +630,259 @@ pub fn draft_manifest(inventory: &Inventory) -> Result<Manifest, serde_json::Err
         lineages,
         records,
         projects: Vec::new(),
+        provenance_projections: Vec::new(),
     })
+}
+
+impl ProvenanceProjection {
+    /// Deterministic binding for an external reviewer. Computing this digest
+    /// does not create, authenticate or grant approval.
+    pub fn decision_digest(&self) -> Result<String, serde_json::Error> {
+        #[derive(serde::Serialize)]
+        struct Decision<'a> {
+            format_version: u32,
+            decision_id: Uuid,
+            binding: &'a ProvenanceBinding,
+            content: &'a ProjectedSourceContent,
+        }
+        let mut hash = Sha256::new();
+        hash.update(b"mem-area-provenance-projection-v1\n");
+        hash.update(serde_json::to_vec(&Decision {
+            format_version: self.format_version,
+            decision_id: self.decision_id,
+            binding: &self.binding,
+            content: &self.content,
+        })?);
+        Ok(format!("{:x}", hash.finalize()))
+    }
+}
+
+fn declared_single_fk(
+    table: &TableInventory,
+    constraint: &str,
+    column: &str,
+    target: &str,
+) -> bool {
+    table.foreign_keys.iter().any(|fk| {
+        fk.name == constraint
+            && fk.columns == [column]
+            && fk.target_table == target
+            && fk.target_columns == ["id"]
+    })
+}
+
+/// The only v2 exception is a safe projection of a memory_sources row whose
+/// task context remains archived. Unknown edge kinds keep the v1 fail-closed
+/// behavior. No source bytes, paths or context bodies are materialized here.
+fn reviewed_projections<'a>(
+    inventory: &Inventory,
+    manifest: &'a Manifest,
+    actions: &mut BTreeMap<RecordRef, PlannedRecord>,
+    errors: &mut Vec<String>,
+) -> BTreeMap<RecordRef, &'a ProvenanceProjection> {
+    let mut accepted = BTreeMap::new();
+    if manifest.provenance_projections.is_empty() {
+        return accepted;
+    }
+    if manifest.format_version != PROVENANCE_MANIFEST_VERSION {
+        errors.push("provenance projections require manifest format 2".into());
+        return accepted;
+    }
+    let tables: BTreeMap<_, _> = inventory
+        .tables
+        .iter()
+        .map(|table| (table.table.as_str(), table))
+        .collect();
+    let mut rows = BTreeMap::new();
+    for name in [
+        "public.memory_sources",
+        "public.memory_entries",
+        "public.tasks",
+    ] {
+        if let Some(table) = tables.get(name) {
+            for row in &table.rows {
+                rows.insert((name, row.key.as_str()), row);
+            }
+        }
+    }
+    let lookup = |record: &RecordRef| {
+        rows.get(&(record.table.as_str(), record.key.as_str()))
+            .copied()
+    };
+    let mut decision_ids = BTreeSet::new();
+    let mut approval_ids = BTreeSet::new();
+    let mut sources = BTreeSet::new();
+    for projection in &manifest.provenance_projections {
+        let before = errors.len();
+        let binding = &projection.binding;
+        let attestation = &projection.operator_attestation;
+        // Error text deliberately contains identifiers, never reviewed excerpts.
+        let label = projection.decision_id;
+        if projection.format_version != PROVENANCE_PROJECTION_VERSION
+            || projection.decision_id.is_nil()
+            || !decision_ids.insert(projection.decision_id)
+            || !sources.insert(&binding.source.record)
+        {
+            errors.push(format!(
+                "unsupported/duplicate provenance projection {label}"
+            ));
+        }
+        if !attestation.explicitly_approved
+            || attestation.operator.trim().is_empty()
+            || attestation.approval_record_id.is_nil()
+            || !approval_ids.insert(attestation.approval_record_id)
+            || attestation.reviewed_at.trim().is_empty()
+            || attestation.source_evidence.trim().is_empty()
+            || attestation.destination_evidence.trim().is_empty()
+            || attestation.content_evidence.trim().is_empty()
+            || projection.decision_digest().ok().as_ref() != Some(&attestation.decision_sha256)
+        {
+            errors.push(format!(
+                "missing/replayed/mismatched operator attestation {label}"
+            ));
+        }
+        if let ProjectedSourceContent::ReviewedExcerpt { text, text_sha256 } = &projection.content
+            && (text.trim().is_empty()
+                || text.len() > MAX_REVIEWED_EXCERPT_BYTES
+                || text.contains('\0')
+                || format!("{:x}", Sha256::digest(text.as_bytes())) != *text_sha256)
+        {
+            errors.push(format!("invalid reviewed excerpt bytes/digest {label}"));
+        }
+        if binding.source_instance != inventory.source_instance
+            || binding.snapshot_id != inventory.snapshot_id
+            || binding.inventory_sha256 != manifest.inventory_sha256
+            || binding.source.record.table != "public.memory_sources"
+            || binding.memory_version.record.table != "public.memory_entries"
+            || binding.archived_task.record.table != "public.tasks"
+        {
+            errors.push(format!(
+                "projection source/snapshot/table binding mismatch {label}"
+            ));
+        }
+        for bound in [
+            &binding.source,
+            &binding.memory_version,
+            &binding.archived_task,
+        ] {
+            if !Uuid::parse_str(&bound.record.key).is_ok_and(|id| !id.is_nil())
+                || !lookup(&bound.record).is_some_and(|row| row.row_sha256 == bound.row_sha256)
+            {
+                errors.push(format!("projection record identity/hash mismatch {label}"));
+            }
+        }
+        let source = lookup(&binding.source.record);
+        let version = lookup(&binding.memory_version.record);
+        let source_table = tables.get("public.memory_sources");
+        if !source.is_some_and(|row| {
+            row.canonical_id == Some(binding.canonical_id)
+                && row.references.iter().any(|reference| {
+                    reference.target.as_ref() == Some(&binding.memory_version.record)
+                        && source_table.is_some_and(|table| {
+                            declared_single_fk(
+                                table,
+                                &reference.constraint,
+                                "memory_entry_id",
+                                "public.memory_entries",
+                            )
+                        })
+                })
+                && row.references.iter().any(|reference| {
+                    reference.constraint == binding.task_constraint
+                        && reference.target.as_ref() == Some(&binding.archived_task.record)
+                        && source_table.is_some_and(|table| {
+                            declared_single_fk(
+                                table,
+                                &reference.constraint,
+                                "task_id",
+                                "public.tasks",
+                            )
+                        })
+                })
+        }) || !version.is_some_and(|row| {
+            row.canonical_id == Some(binding.canonical_id)
+                && row.version.as_ref() == Some(&binding.version)
+        }) {
+            errors.push(format!(
+                "projection lineage/version/declared edge mismatch {label}"
+            ));
+        }
+        for record in [&binding.source.record, &binding.memory_version.record] {
+            if !actions.get(record).is_some_and(|action| {
+                action.destination == Destination::Area(binding.destination_area)
+            }) {
+                errors.push(format!("projection destination ownership mismatch {label}"));
+            }
+        }
+        if !actions
+            .get(&binding.archived_task.record)
+            .is_some_and(|action| action.destination == Destination::ProtectedArchive)
+        {
+            errors.push(format!(
+                "projection task must remain protected archive {label}"
+            ));
+        }
+        let task_table = tables.get("public.tasks");
+        if !lookup(&binding.archived_task.record).is_some_and(|task| {
+            task.references.iter().any(|reference| {
+                task_table.is_some_and(|table| {
+                    declared_single_fk(
+                        table,
+                        &reference.constraint,
+                        "session_id",
+                        "public.sessions",
+                    )
+                }) && reference.target.as_ref().is_some_and(|target| {
+                    actions
+                        .get(target)
+                        .is_some_and(|action| action.destination == Destination::ProtectedArchive)
+                })
+            })
+        }) {
+            errors.push(format!(
+                "projection task session must remain protected archive {label}"
+            ));
+        }
+        if errors.len() == before {
+            accepted.insert(binding.source.record.clone(), projection);
+        }
+    }
+    for (source, projection) in &accepted {
+        if let Some(action) = actions.get_mut(source) {
+            action.destination =
+                Destination::ArchiveAndProjectProvenance(projection.binding.destination_area);
+        }
+    }
+    // Original checks describe the original source, not its safe replacement.
+    // Preserve their IDs/hashes as historical evidence instead of copying stale
+    // verification claims or resolved paths into an area.
+    if let Some(checks) = tables.get("public.memory_source_checks") {
+        for row in &checks.rows {
+            for reference in &row.references {
+                if reference
+                    .target
+                    .as_ref()
+                    .is_some_and(|target| accepted.contains_key(target))
+                {
+                    if !declared_single_fk(
+                        checks,
+                        &reference.constraint,
+                        "source_id",
+                        "public.memory_sources",
+                    ) {
+                        errors.push("unsupported dependent source-check projection edge".into());
+                    }
+                    if let Some(action) = actions.get_mut(&RecordRef {
+                        table: checks.table.clone(),
+                        key: row.key.clone(),
+                    }) {
+                        action.destination = Destination::ProtectedArchive;
+                    }
+                }
+            }
+        }
+    }
+    accepted
 }
 
 fn reviewed_destination(
@@ -677,8 +929,10 @@ pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verificati
     if manifest.inventory_notices != validation.notices {
         errors.push("inventory notices mismatch; original historical project references must remain visible".into());
     }
-    if manifest.format_version != FORMAT_VERSION
-        || manifest.source_instance != inventory.source_instance
+    if !matches!(
+        manifest.format_version,
+        FORMAT_VERSION | PROVENANCE_MANIFEST_VERSION
+    ) || manifest.source_instance != inventory.source_instance
         || manifest.snapshot_id != inventory.snapshot_id
     {
         errors.push("manifest format/source/snapshot mismatch".into());
@@ -860,6 +1114,7 @@ pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verificati
             ));
         }
     }
+    let projections = reviewed_projections(inventory, manifest, &mut actions, &mut errors);
     for table in &inventory.tables {
         for row in &table.rows {
             let record = RecordRef {
@@ -867,7 +1122,8 @@ pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verificati
                 key: row.key.clone(),
             };
             if let Some(PlannedRecord {
-                destination: Destination::Area(area),
+                destination:
+                    Destination::Area(area) | Destination::ArchiveAndProjectProvenance(area),
                 ..
             }) = actions.get(&record)
             {
@@ -878,7 +1134,13 @@ pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verificati
                             && Uuid::parse_str(&target.key)
                                 .ok()
                                 .is_some_and(|id| bindings.contains_key(&(*area, id)));
+                        let reviewed_archive_reference =
+                            projections.get(&record).is_some_and(|projection| {
+                                projection.binding.task_constraint == reference.constraint
+                                    && projection.binding.archived_task.record == *target
+                            });
                         if !project_binding
+                            && !reviewed_archive_reference
                             && !target_action.is_some_and(|action| {
                                 action.destination == Destination::Area(*area)
                             })
@@ -898,6 +1160,11 @@ pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verificati
         notices: validation.notices,
         records: if plan_valid {
             actions.into_values().collect()
+        } else {
+            Vec::new()
+        },
+        provenance_projections: if plan_valid {
+            projections.into_values().cloned().collect()
         } else {
             Vec::new()
         },

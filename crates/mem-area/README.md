@@ -18,13 +18,17 @@ draft still has unresolved ownership. Every verification report states
 
 ## Snapshot inventory contract
 
-The serde types in [src/types.rs](src/types.rs) define format version 1. Collect
+The serde types in [src/types.rs](src/types.rs) define inventory format version 1
+and manifest formats 1 and 2. Collect
 the inventory from one consistent source snapshot. Include every user table in
 every schema, including empty tables and `public._sqlx_migrations`. The policy
 catalog covers the 93 active tables of the public migration-0052 schema, plus
 an exact ten-table supervisor extension at migration 0053 and the optional
 historical evaluation schema `mab_full_20260516_150014`. Head 0052 must not contain
-0053 tables; head 0053 requires all ten, including empty tables. Other heads and
+0053 tables; head 0053 requires all ten, including empty tables. Head 0054 requires
+those ten plus exactly `public.supervisor_proposals`, which must be absent at
+heads 0052 and 0053. Private supervisor proposal bodies remain historical archive,
+never retrievable knowledge or executable/approved work. Other heads and
 unknown additional tables remain blocked. Supervisor authorities, policies,
 actions, budget days, attempt states and journal heads are retired runtime;
 attempts, settlements, action results and journal rows are historical archive.
@@ -113,12 +117,76 @@ in an operator-only, non-retrievable archive. Runtime state, jobs, tokens, grant
 subscriptions and pending actions are retained as evidence and marked retired;
 table-policy overrides cannot reactivate them.
 
-An area row referencing another area or an archived row blocks planning. A
-future importer must implement reviewed provenance references/excerpts for mixed
-sessions; this slice does not silently drop, rewrite or copy those references.
+An area row referencing another area or an archived row blocks planning, except
+for the narrowly reviewed format-2 provenance projection described below.
 The planner only permits references to original project metadata when an explicit
 binding exists for that area. Authorship and timestamps are covered by complete
-source row hashes; no row transformation is implemented here.
+source row hashes. No database row transformation or importer is implemented here.
+
+## Opt-in reviewed provenance projections (manifest 2)
+
+Inventories and generated drafts remain format 1. Existing format-1 JSON stays
+byte-compatible: the new `provenance_projections` field is omitted when empty.
+Format 1 still rejects archive-reference transformations. An operator may
+explicitly opt into manifest `format_version: 2` and supply per-source decisions;
+the draft generator never fabricates projections or approval attestations.
+
+The current supported boundary is only the declared
+`public.memory_sources.task_id -> public.tasks.id` foreign key. The task and its
+declared session must remain `protected_archive`. Other edge kinds, null/unknown
+targets, another area's records, arbitrary logical references and unreviewed
+edges remain blocked. Ordinary reference validation also prevents area-owned raw
+captures from retaining a foreign key to that archived task.
+
+Each `ProvenanceProjection` has its own format version (currently 1), unique
+decision UUID and exact `ProvenanceBinding`: source instance, snapshot, inventory
+digest, destination area, canonical lineage, original version record and hash,
+version number/tombstone flag, source record and hash, task constraint, and
+archived task record and hash. The source's declared `memory_entry_id` FK must
+identify that exact historical version, not merely another version in the same
+lineage. Duplicate source decisions and approval-record reuse within a manifest
+fail validation.
+
+The complete allowed projection content is one of:
+
+- `{"kind":"archive_reference_only"}`: only the bound provenance identities and
+  hashes, without any source excerpt or original context fields.
+- `{"kind":"reviewed_excerpt","text":"...","text_sha256":"..."}`: exactly the
+  operator-reviewed UTF-8 text and its SHA-256, nonempty and at most 16 KiB.
+
+Unknown payload fields are rejected. Original source file paths, task titles,
+prompts, session/capture bodies, and original source excerpts are never inherited
+by a projection. A reviewed excerpt is separately supplied content; the planner
+cannot prove its derivation or absence of sensitive information from opaque row
+hashes. That substantive check belongs to the external reviewer.
+
+`operator_attestation` requires explicit approval, an operator label, non-nil
+approval-record UUID, review time, source/destination/content evidence and exact
+`decision_sha256`. The `decision_digest()` method hashes the domain prefix
+`mem-area-provenance-projection-v1\n` followed by compact serde JSON containing,
+in order, `format_version`, `decision_id`, `binding` and `content`. It excludes
+the attestation. Changing the snapshot, destination, source/version bytes or
+excerpt invalidates that binding. Computing a digest is not approval. These
+strings and digests **do not authenticate a human**, prove an external approval
+record exists, or establish a persistent global anti-replay ledger. Re-verifying
+the same unchanged reviewed manifest is intentionally deterministic/idempotent;
+reusing its decision for another snapshot/version/destination is rejected.
+
+Valid output marks the original source row `archive_and_project_provenance` with
+its one target area and emits its reviewed projection separately. That is never
+an instruction to copy the original source row. The original row ID/hash remains
+accounted for in protected storage. All dependent `memory_source_checks` records
+retain their IDs/hashes in protected archive: old observations cannot attest a
+different projected source or expose original resolved paths. All canonical
+versions/tombstones retain their single lineage owner unchanged. No original row
+is dropped, and any blocker suppresses both planned rows and projection output.
+
+The existing `verify` CLI validates both formats; its JSON output may contain
+reviewed excerpt text. Keep inputs/output in protected storage and do not send
+them to operational logs. `import_supported` remains false. A future importer
+must implement a safe projection representation and archive-reference storage,
+fresh target checks, reconciliation and transactional/idempotent application;
+this offline contract does not claim an existing target SQL schema can store it.
 
 ## Evidence boundary
 
@@ -130,7 +198,7 @@ references. A forged inventory and freshly forged matching manifest are not
 detectable without independently trusted source evidence.
 
 This slice does not collect/export a database, write an archive/import journal,
-verify target bytes/counts, import idempotently, transform mixed provenance,
+verify target bytes/counts, import idempotently, apply mixed-provenance projections,
 restore a backup, establish isolation, or approve a live cutover. Those remain
 separate implementation and operational gates. A valid plan is not migration or
 demo completion evidence.

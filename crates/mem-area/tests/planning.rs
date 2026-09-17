@@ -130,6 +130,7 @@ fn assert_blocked(inventory: &Inventory, manifest: &Manifest, needle: &str) {
         report.records.is_empty(),
         "invalid plans cannot expose partial executable actions"
     );
+    assert!(report.provenance_projections.is_empty());
     assert!(
         report
             .blockers
@@ -138,6 +139,535 @@ fn assert_blocked(inventory: &Inventory, manifest: &Manifest, needle: &str) {
         "missing {needle}: {:?}",
         report.blockers
     );
+}
+
+fn foreign_key(inventory: &mut Inventory, table: &str, name: &str, column: &str, target: &str) {
+    let table = table_mut(inventory, table);
+    table.columns.push(Column {
+        name: column.into(),
+        data_type: "uuid".into(),
+        nullable: false,
+    });
+    table.foreign_keys.push(ForeignKey {
+        name: name.into(),
+        columns: vec![column.into()],
+        target_table: target.into(),
+        target_columns: vec!["id".into()],
+    });
+}
+
+fn reference(constraint: &str, table: &str, key: u128) -> RowReference {
+    RowReference {
+        constraint: constraint.into(),
+        target: Some(RecordRef {
+            table: table.into(),
+            key: id(key).to_string(),
+        }),
+    }
+}
+
+fn bind_record(inventory: &Inventory, table: &str, key: u128) -> HashedRecordRef {
+    let row = inventory
+        .tables
+        .iter()
+        .find(|item| item.table == table)
+        .expect("synthetic fixture")
+        .rows
+        .iter()
+        .find(|row| row.key == id(key).to_string())
+        .expect("synthetic fixture");
+    HashedRecordRef {
+        record: RecordRef {
+            table: table.into(),
+            key: row.key.clone(),
+        },
+        row_sha256: row.row_sha256.clone(),
+    }
+}
+
+fn attest(projection: &mut ProvenanceProjection) {
+    // Synthetic externally supplied attestation, never produced by a draft.
+    projection.operator_attestation.decision_sha256 =
+        projection.decision_digest().expect("synthetic fixture");
+}
+
+fn projection_fixture() -> (Inventory, Manifest) {
+    let mut inventory = fixture();
+    foreign_key(
+        &mut inventory,
+        "public.tasks",
+        "task_session",
+        "session_id",
+        "public.sessions",
+    );
+    foreign_key(
+        &mut inventory,
+        "public.raw_captures",
+        "capture_task",
+        "task_id",
+        "public.tasks",
+    );
+    foreign_key(
+        &mut inventory,
+        "public.memory_sources",
+        "source_version",
+        "memory_entry_id",
+        "public.memory_entries",
+    );
+    foreign_key(
+        &mut inventory,
+        "public.memory_sources",
+        "source_task",
+        "task_id",
+        "public.tasks",
+    );
+    foreign_key(
+        &mut inventory,
+        "public.memory_source_checks",
+        "check_source",
+        "source_id",
+        "public.memory_sources",
+    );
+    push(
+        &mut inventory,
+        "public.sessions",
+        row(id(20).to_string(), Some(id(1)), None, None),
+    );
+    let mut task = row(id(21).to_string(), Some(id(1)), None, None);
+    task.references
+        .push(reference("task_session", "public.sessions", 20));
+    push(&mut inventory, "public.tasks", task);
+    let mut capture = row(id(22).to_string(), Some(id(1)), None, None);
+    capture
+        .references
+        .push(reference("capture_task", "public.tasks", 21));
+    push(&mut inventory, "public.raw_captures", capture);
+    let mut source = row(id(23).to_string(), Some(id(1)), Some(id(10)), None);
+    source.row_sha256 = "b".repeat(64);
+    source.references = vec![
+        reference("source_version", "public.memory_entries", 11),
+        reference("source_task", "public.tasks", 21),
+        RowReference {
+            constraint: "logical:target_memory_id".into(),
+            target: None,
+        },
+    ];
+    push(&mut inventory, "public.memory_sources", source);
+    let mut check = row(id(24).to_string(), Some(id(1)), Some(id(10)), None);
+    check
+        .references
+        .push(reference("check_source", "public.memory_sources", 23));
+    push(&mut inventory, "public.memory_source_checks", check);
+    assert!(verify_inventory(&inventory).is_empty());
+    let mut manifest = reviewed(&inventory);
+    manifest.format_version = PROVENANCE_MANIFEST_VERSION;
+    for decision in &mut manifest.records {
+        decision.disposition = Disposition::ProtectedArchive {
+            reason: "Mixed raw context remains non-retrievable".into(),
+            review: review(SourceClassification::Mixed),
+        };
+    }
+    let mut projection = ProvenanceProjection {
+        format_version: PROVENANCE_PROJECTION_VERSION,
+        decision_id: id(30),
+        binding: ProvenanceBinding {
+            source_instance: inventory.source_instance,
+            snapshot_id: inventory.snapshot_id,
+            inventory_sha256: manifest.inventory_sha256.clone(),
+            destination_area: AreaId::General,
+            canonical_id: id(10),
+            memory_version: bind_record(&inventory, "public.memory_entries", 11),
+            version: VersionIdentity { version_no: 2, is_tombstone: false },
+            source: bind_record(&inventory, "public.memory_sources", 23),
+            task_constraint: "source_task".into(),
+            archived_task: bind_record(&inventory, "public.tasks", 21),
+        },
+        content: ProjectedSourceContent::ArchiveReferenceOnly {},
+        operator_attestation: OperatorReviewAttestation {
+            explicitly_approved: true,
+            operator: "Synthetic operator, not a real human approval".into(),
+            approval_record_id: id(31),
+            reviewed_at: "2026-09-17T12:00:00Z".into(),
+            decision_sha256: String::new(),
+            source_evidence: "Reviewed fixture source and mixed task context".into(),
+            destination_evidence: "This exact version belongs to General".into(),
+            content_evidence: "Only bound reference metadata may be projected; old checks and raw context remain archived".into(),
+        },
+    };
+    attest(&mut projection);
+    manifest.provenance_projections.push(projection);
+    (inventory, manifest)
+}
+
+#[test]
+fn v2_reference_projection_preserves_every_original_row_and_archives_raw_context_and_checks() {
+    let (inventory, manifest) = projection_fixture();
+    let report = verify_manifest(&inventory, &manifest);
+    assert!(report.plan_valid, "{:?}", report.blockers);
+    assert!(!report.import_supported);
+    assert_eq!(
+        report.records.len(),
+        inventory
+            .tables
+            .iter()
+            .map(|table| table.rows.len())
+            .sum::<usize>()
+    );
+    assert_eq!(
+        report.provenance_projections,
+        manifest.provenance_projections
+    );
+    for action in &report.records {
+        let original = inventory
+            .tables
+            .iter()
+            .find(|table| table.table == action.record.table)
+            .expect("synthetic fixture")
+            .rows
+            .iter()
+            .find(|row| row.key == action.record.key)
+            .expect("synthetic fixture");
+        assert_eq!(action.source_sha256, original.row_sha256);
+        assert_eq!(action.source_project_id, original.source_project_id);
+        assert_eq!(action.canonical_id, original.canonical_id);
+        match action.record.table.as_str() {
+            "public.memory_sources" => assert_eq!(
+                action.destination,
+                Destination::ArchiveAndProjectProvenance(AreaId::General)
+            ),
+            "public.tasks"
+            | "public.sessions"
+            | "public.raw_captures"
+            | "public.memory_source_checks" => {
+                assert_eq!(action.destination, Destination::ProtectedArchive)
+            }
+            "public.memory_entries" => {
+                assert_eq!(action.destination, Destination::Area(AreaId::General))
+            }
+            _ => {}
+        }
+    }
+    // Pure verification is deterministic/idempotent; no persistent consumption
+    // or global replay database is claimed by this offline facility.
+    assert_eq!(report, verify_manifest(&inventory, &manifest));
+}
+
+#[test]
+fn v1_wire_format_and_archive_reference_rejection_remain_unchanged() {
+    // Frozen pre-extension field order and shape, independent of the new type.
+    #[derive(serde::Serialize)]
+    struct LegacyManifest<'a> {
+        format_version: u32,
+        source_instance: Uuid,
+        snapshot_id: Uuid,
+        inventory_sha256: &'a str,
+        inventory_notices: &'a [InventoryNotice],
+        areas: &'a [AreaId],
+        table_policies: &'a [TablePolicy],
+        lineages: &'a [LineageDecision],
+        records: &'a [RecordDecision],
+        projects: &'a [ProjectBinding],
+    }
+    let inventory = fixture();
+    let manifest = draft_manifest(&inventory).expect("synthetic fixture");
+    let legacy = LegacyManifest {
+        format_version: manifest.format_version,
+        source_instance: manifest.source_instance,
+        snapshot_id: manifest.snapshot_id,
+        inventory_sha256: &manifest.inventory_sha256,
+        inventory_notices: &manifest.inventory_notices,
+        areas: &manifest.areas,
+        table_policies: &manifest.table_policies,
+        lineages: &manifest.lineages,
+        records: &manifest.records,
+        projects: &manifest.projects,
+    };
+    assert_eq!(
+        serde_json::to_vec(&manifest).expect("v1 manifest bytes"),
+        serde_json::to_vec(&legacy).expect("legacy manifest bytes")
+    );
+    assert_eq!(manifest.format_version, 1);
+    let serialized = serde_json::to_value(&manifest).expect("synthetic fixture");
+    assert!(serialized.get("provenance_projections").is_none());
+    assert_eq!(
+        serde_json::from_value::<Manifest>(serialized.clone()).expect("synthetic fixture"),
+        manifest
+    );
+    let report = verify_manifest(&inventory, &reviewed(&inventory));
+    assert!(
+        serde_json::to_value(report)
+            .expect("synthetic fixture")
+            .get("provenance_projections")
+            .is_none()
+    );
+    let (inventory, mut manifest) = projection_fixture();
+    manifest.format_version = 1;
+    assert_blocked(&inventory, &manifest, "require manifest format 2");
+    manifest.provenance_projections.clear();
+    assert_blocked(&inventory, &manifest, "requires reviewed transformation");
+}
+
+#[test]
+fn v2_unknown_versions_and_projection_fields_fail_closed() {
+    let (inventory, mut manifest) = projection_fixture();
+    manifest.format_version = 99;
+    assert_blocked(&inventory, &manifest, "format/source/snapshot mismatch");
+    manifest.format_version = PROVENANCE_MANIFEST_VERSION;
+    manifest.provenance_projections[0].format_version = 99;
+    attest(&mut manifest.provenance_projections[0]);
+    assert_blocked(
+        &inventory,
+        &manifest,
+        "unsupported/duplicate provenance projection",
+    );
+    let mut json = serde_json::to_value(&manifest).expect("synthetic fixture");
+    json["provenance_projections"][0]["content"]["raw_capture_payload"] =
+        serde_json::json!("must not be accepted");
+    assert!(serde_json::from_value::<Manifest>(json).is_err());
+}
+
+#[test]
+fn projections_require_explicit_complete_operator_attestation_and_exact_decision_digest() {
+    let (inventory, manifest) = projection_fixture();
+    for mutate in [
+        (|p: &mut ProvenanceProjection| p.operator_attestation.explicitly_approved = false)
+            as fn(&mut ProvenanceProjection),
+        |p| p.operator_attestation.operator.clear(),
+        |p| p.operator_attestation.approval_record_id = Uuid::nil(),
+        |p| p.operator_attestation.reviewed_at.clear(),
+        |p| p.operator_attestation.source_evidence.clear(),
+        |p| p.operator_attestation.destination_evidence.clear(),
+        |p| p.operator_attestation.content_evidence.clear(),
+        |p| p.operator_attestation.decision_sha256 = "c".repeat(64),
+        |p| p.binding.destination_area = AreaId::Trust,
+        |p| p.decision_id = id(999),
+    ] {
+        let mut changed = manifest.clone();
+        mutate(&mut changed.provenance_projections[0]);
+        assert_blocked(&inventory, &changed, "operator attestation");
+    }
+}
+
+#[test]
+fn attested_binding_mismatch_unknown_edge_and_wrong_historical_version_are_rejected() {
+    let (inventory, manifest) = projection_fixture();
+    for mutate in [
+        (|p: &mut ProvenanceProjection| p.binding.source_instance = id(99))
+            as fn(&mut ProvenanceProjection),
+        |p| p.binding.snapshot_id = id(99),
+        |p| p.binding.inventory_sha256 = "c".repeat(64),
+        |p| p.binding.source.row_sha256 = "c".repeat(64),
+        |p| p.binding.archived_task.row_sha256 = "c".repeat(64),
+        |p| p.binding.memory_version.row_sha256 = "c".repeat(64),
+        |p| p.binding.destination_area = AreaId::Trust,
+        |p| p.binding.canonical_id = id(999),
+        |p| p.binding.memory_version.record.key = id(10).to_string(),
+        |p| {
+            p.binding.memory_version.record.key = id(10).to_string();
+            p.binding.version.version_no = 1;
+        },
+        |p| p.binding.version.version_no = 1,
+        |p| p.binding.version.is_tombstone = true,
+        |p| p.binding.source.record.key = id(999).to_string(),
+        |p| p.binding.task_constraint = "logical:target_memory_id".into(),
+        |p| p.binding.archived_task.record.table = "public.raw_captures".into(),
+    ] {
+        let mut changed = manifest.clone();
+        mutate(&mut changed.provenance_projections[0]);
+        attest(&mut changed.provenance_projections[0]);
+        assert_blocked(&inventory, &changed, "projection");
+    }
+}
+
+#[test]
+fn duplicate_source_decisions_and_replayed_approval_records_are_rejected() {
+    let (inventory, mut manifest) = projection_fixture();
+    manifest
+        .provenance_projections
+        .push(manifest.provenance_projections[0].clone());
+    assert_blocked(
+        &inventory,
+        &manifest,
+        "unsupported/duplicate provenance projection",
+    );
+    manifest.provenance_projections[1].decision_id = id(99);
+    attest(&mut manifest.provenance_projections[1]);
+    assert_blocked(&inventory, &manifest, "operator attestation");
+}
+
+#[test]
+fn reviewed_excerpt_is_exact_bounded_content_and_never_leaks_in_blockers() {
+    use sha2::{Digest, Sha256};
+    let (inventory, mut manifest) = projection_fixture();
+    let text = "Only this synthetic fact, not the unrelated original task context.".to_owned();
+    manifest.provenance_projections[0].content = ProjectedSourceContent::ReviewedExcerpt {
+        text: text.clone(),
+        text_sha256: format!("{:x}", Sha256::digest(text.as_bytes())),
+    };
+    attest(&mut manifest.provenance_projections[0]);
+    assert!(verify_manifest(&inventory, &manifest).plan_valid);
+    for bad in [
+        String::new(),
+        "PRIVATE-TEST-SENTINEL".into(),
+        "é".repeat(MAX_REVIEWED_EXCERPT_BYTES / 2 + 1),
+        "bad\0excerpt".into(),
+    ] {
+        let mut changed = manifest.clone();
+        let text_sha256 = if bad == "PRIVATE-TEST-SENTINEL" {
+            "c".repeat(64)
+        } else {
+            format!("{:x}", Sha256::digest(bad.as_bytes()))
+        };
+        changed.provenance_projections[0].content = ProjectedSourceContent::ReviewedExcerpt {
+            text: bad,
+            text_sha256,
+        };
+        attest(&mut changed.provenance_projections[0]);
+        assert_blocked(&inventory, &changed, "excerpt bytes/digest");
+        assert!(
+            !verify_manifest(&inventory, &changed)
+                .blockers
+                .join(" ")
+                .contains("PRIVATE-TEST-SENTINEL")
+        );
+    }
+}
+
+#[test]
+fn null_task_and_unknown_source_check_edges_do_not_gain_a_projection_exception() {
+    let (mut inventory, mut manifest) = projection_fixture();
+    table_mut(&mut inventory, "public.memory_sources")
+        .columns
+        .iter_mut()
+        .find(|column| column.name == "task_id")
+        .expect("task column")
+        .nullable = true;
+    table_mut(&mut inventory, "public.memory_sources").rows[0]
+        .references
+        .iter_mut()
+        .find(|reference| reference.constraint == "source_task")
+        .expect("task reference")
+        .target = None;
+    assert!(verify_inventory(&inventory).is_empty());
+    manifest.inventory_sha256 = inventory_digest(&inventory).expect("inventory digest");
+    manifest.provenance_projections[0].binding.inventory_sha256 = manifest.inventory_sha256.clone();
+    attest(&mut manifest.provenance_projections[0]);
+    assert_blocked(&inventory, &manifest, "declared edge mismatch");
+
+    let (mut inventory, mut manifest) = projection_fixture();
+    let checks = table_mut(&mut inventory, "public.memory_source_checks");
+    checks
+        .columns
+        .iter_mut()
+        .find(|column| column.name == "source_id")
+        .expect("source column")
+        .name = "unreviewed_source_link".into();
+    checks.foreign_keys[0].columns = vec!["unreviewed_source_link".into()];
+    assert!(verify_inventory(&inventory).is_empty());
+    manifest.inventory_sha256 = inventory_digest(&inventory).expect("inventory digest");
+    manifest.provenance_projections[0].binding.inventory_sha256 = manifest.inventory_sha256.clone();
+    attest(&mut manifest.provenance_projections[0]);
+    assert_blocked(&inventory, &manifest, "unsupported dependent source-check");
+}
+
+#[test]
+fn cli_validates_v2_projection_and_still_reports_no_import_support() {
+    let (inventory, manifest) = projection_fixture();
+    let temp = std::env::temp_dir().join(format!("mem-area-v2-test-{}", Uuid::new_v4()));
+    std::fs::create_dir(&temp).expect("temporary synthetic fixture directory");
+    let inventory_path = temp.join("inventory.json");
+    let manifest_path = temp.join("manifest.json");
+    std::fs::write(
+        &inventory_path,
+        serde_json::to_vec(&inventory).expect("inventory JSON"),
+    )
+    .expect("write synthetic inventory");
+    std::fs::write(
+        &manifest_path,
+        serde_json::to_vec(&manifest).expect("manifest JSON"),
+    )
+    .expect("write synthetic manifest");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_memory-area"))
+        .args(["verify", "--inventory"])
+        .arg(&inventory_path)
+        .arg("--manifest")
+        .arg(&manifest_path)
+        .output()
+        .expect("run offline CLI");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: Verification = serde_json::from_slice(&output.stdout).expect("verification JSON");
+    assert!(report.plan_valid);
+    assert!(!report.import_supported);
+    assert_eq!(
+        report.provenance_projections,
+        manifest.provenance_projections
+    );
+    std::fs::remove_file(inventory_path).expect("remove synthetic inventory");
+    std::fs::remove_file(manifest_path).expect("remove synthetic manifest");
+    std::fs::remove_dir(temp).expect("remove empty synthetic fixture directory");
+}
+
+#[test]
+fn projection_cannot_copy_task_session_or_bypass_another_cross_area_reference() {
+    let (inventory, manifest) = projection_fixture();
+    for key in [20, 21] {
+        let mut changed = manifest.clone();
+        changed
+            .records
+            .iter_mut()
+            .find(|decision| decision.record.key == id(key).to_string())
+            .expect("synthetic fixture")
+            .disposition = Disposition::Area {
+            area: AreaId::General,
+            review: review(SourceClassification::Knowledge),
+        };
+        assert_blocked(&inventory, &changed, "must remain protected archive");
+    }
+    let mut inventory = inventory;
+    push(
+        &mut inventory,
+        "public.memory_entries",
+        row(
+            id(40).to_string(),
+            Some(id(1)),
+            Some(id(40)),
+            Some(VersionIdentity {
+                version_no: 1,
+                is_tombstone: false,
+            }),
+        ),
+    );
+    push(
+        &mut inventory,
+        "public.memory_canonical_state",
+        row(id(40).to_string(), Some(id(1)), Some(id(40)), None),
+    );
+    table_mut(&mut inventory, "public.memory_sources").rows[0]
+        .references
+        .iter_mut()
+        .find(|reference| reference.constraint == "logical:target_memory_id")
+        .expect("synthetic fixture")
+        .target = Some(RecordRef {
+        table: "public.memory_entries".into(),
+        key: id(40).to_string(),
+    });
+    let mut changed = manifest;
+    changed.inventory_sha256 = inventory_digest(&inventory).expect("synthetic fixture");
+    changed.lineages.push(LineageDecision {
+        canonical_id: id(40),
+        source_project_ids: vec![id(1)],
+        disposition: Disposition::ProtectedArchive {
+            reason: "Other archived lineage".into(),
+            review: review(SourceClassification::Ambiguous),
+        },
+    });
+    changed.provenance_projections[0].binding.inventory_sha256 = changed.inventory_sha256.clone();
+    attest(&mut changed.provenance_projections[0]);
+    assert_blocked(&inventory, &changed, "requires reviewed transformation");
 }
 
 #[test]
