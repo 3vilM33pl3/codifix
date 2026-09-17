@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/mem-area",
   "crates/mem-agenttop",
   "crates/mem-analyze",
   "crates/mem-atproto",
@@ -10,6 +11,7 @@ members = [
   "crates/mem-federation-runtime",
   "crates/mem-record",
   "crates/mem-store",
+  "crates/mem-supervisor",
   "crates/mem-config",
   "crates/mem-watch",
   "crates/mem-cli",

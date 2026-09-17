@@ -2790,6 +2790,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "mem-area"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde",
+ "serde_json",
+ "sha2",
+ "uuid",
+]
+
+[[package]]
 name = "mem-atproto"
 version = "2.0.0"
 dependencies = [
@@ -3175,6 +3187,15 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "mem-supervisor"
+version = "2.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

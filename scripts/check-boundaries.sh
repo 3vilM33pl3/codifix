@@ -49,6 +49,16 @@ if grep -RInE 'atrium(_|::)|atrium-' crates/mem-federation/src --include='*.rs';
   err "mem-federation source references Atrium"
 fi
 
+# Area planning and supervisor policy are independent of live service machinery.
+for crate in mem-area mem-supervisor; do
+  pure_tree=$(cargo tree -p "$crate" -e normal --prefix none | awk '{print $1}' | sort -u)
+  for dep in tokio config sqlx axum duckdb reqwest atrium-api atrium-xrpc mem-service mem-platform; do
+    if echo "$pure_tree" | grep -qx "$dep"; then
+      err "$crate depends on $dep"
+    fi
+  done
+done
+
 # 3b. Transactional storage may use SQL/runtime, but must not become a network
 # Local jobs/events obey the same boundary independently of federation.
 store_tree=$(cargo tree -p mem-store -e normal --prefix none | awk '{print $1}' | sort -u)

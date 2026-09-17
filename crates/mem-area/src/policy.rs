@@ -1,0 +1,260 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+use crate::TableStrategy;
+
+/// Explicit policy catalog for migration 0052. New or removed tables require
+/// a code review; prefixes are never sufficient to classify an unknown table.
+pub const KNOWN_TABLES: &[(&str, TableStrategy)] = &[
+    ("public._sqlx_migrations", TableStrategy::HistoricalArchive),
+    ("public.projects", TableStrategy::ProjectProvenance),
+    ("public.sessions", TableStrategy::Owned),
+    ("public.tasks", TableStrategy::Owned),
+    ("public.raw_captures", TableStrategy::Owned),
+    ("public.memory_entries", TableStrategy::Owned),
+    ("public.memory_canonical_state", TableStrategy::Owned),
+    ("public.memory_sources", TableStrategy::Owned),
+    ("public.memory_source_checks", TableStrategy::Owned),
+    ("public.memory_tags", TableStrategy::Owned),
+    ("public.memory_relations", TableStrategy::Owned),
+    ("public.project_commits", TableStrategy::Owned),
+    ("public.memory_chunks", TableStrategy::RebuildDerived),
+    (
+        "public.memory_chunk_embeddings",
+        TableStrategy::RebuildDerived,
+    ),
+    (
+        "public.graph_extraction_runs",
+        TableStrategy::HistoricalArchive,
+    ),
+    ("public.graph_nodes", TableStrategy::RebuildDerived),
+    ("public.graph_edges", TableStrategy::RebuildDerived),
+    ("public.graph_evidence", TableStrategy::HistoricalArchive),
+    ("public.code_symbols", TableStrategy::RebuildDerived),
+    ("public.code_references", TableStrategy::RebuildDerived),
+    ("public.curation_runs", TableStrategy::HistoricalArchive),
+    (
+        "public.memory_bundle_imports",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.imported_memory_entries",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.project_timeline_events",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.memory_replacement_proposals",
+        TableStrategy::HistoricalArchive,
+    ),
+    ("public.loop_definitions", TableStrategy::RetireRuntime),
+    ("public.loop_global_state", TableStrategy::RetireRuntime),
+    ("public.loop_settings", TableStrategy::RetireRuntime),
+    (
+        "public.loop_setting_audit",
+        TableStrategy::HistoricalArchive,
+    ),
+    ("public.trigger_events", TableStrategy::RetireRuntime),
+    ("public.loop_runs", TableStrategy::HistoricalArchive),
+    ("public.approval_requests", TableStrategy::RetireRuntime),
+    ("public.memory_proposals", TableStrategy::HistoricalArchive),
+    ("public.learned_skills", TableStrategy::HistoricalArchive),
+    ("public.run_traces", TableStrategy::HistoricalArchive),
+    ("public.agent_workspaces", TableStrategy::RetireRuntime),
+    ("public.memory_scores", TableStrategy::HistoricalArchive),
+    (
+        "public.memory_access_events",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.memory_score_audit",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.memory_validation_runs",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.memory_validation_evidence",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.procedural_utility",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.procedural_utility_audit",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.loop_produced_memory",
+        TableStrategy::HistoricalArchive,
+    ),
+    ("public.auth_principals", TableStrategy::HistoricalArchive),
+    ("public.auth_service_tokens", TableStrategy::RetireRuntime),
+    (
+        "public.auth_project_memberships",
+        TableStrategy::RetireRuntime,
+    ),
+    ("public.auth_web_sessions", TableStrategy::RetireRuntime),
+    ("public.auth_oidc_flows", TableStrategy::RetireRuntime),
+    ("public.auth_audit_events", TableStrategy::HistoricalArchive),
+    ("public.timeline_position", TableStrategy::RetireRuntime),
+    (
+        "public.timeline_retention_watermarks",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.background_project_slots",
+        TableStrategy::RetireRuntime,
+    ),
+    ("public.background_jobs", TableStrategy::RetireRuntime),
+    (
+        "public.background_job_dependencies",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.background_job_attempts",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.background_job_retry_receipts",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.background_work_versions",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.background_job_outputs",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.background_synthesis_inputs",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.background_daily_budget",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.proposal_creation_receipts",
+        TableStrategy::HistoricalArchive,
+    ),
+    ("public.external_effects", TableStrategy::HistoricalArchive),
+    (
+        "public.external_effect_outcomes",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.foreground_executions",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_gateway_spaces",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.federation_source_outbox",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.federation_accepted",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_publish_outbox",
+        TableStrategy::RetireRuntime,
+    ),
+    ("public.federation_replicas", TableStrategy::RetireRuntime),
+    ("public.federation_inbox", TableStrategy::RetireRuntime),
+    (
+        "public.federation_local_grants",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.federation_publication_reviews",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_source_subscriptions",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.federation_source_changes",
+        TableStrategy::RetireRuntime,
+    ),
+    ("public.federation_security", TableStrategy::RetireRuntime),
+    ("public.federation_audit", TableStrategy::HistoricalArchive),
+    (
+        "public.federation_replica_receipts",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_replica_trust",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.federation_retention_decisions",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_review_requests",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_action_requests",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.federation_expertise_collections",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.federation_expertise_reviews",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_expertise_collection_grants",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.federation_expertise_collection_audit",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_expertise_mailbox",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.federation_expertise_attempts",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_expertise_daily_budget",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_expertise_deliveries",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_expertise_requests",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_expertise_request_audit",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_expertise_origin_results",
+        TableStrategy::HistoricalArchive,
+    ),
+];
+
+pub fn table_strategy(table: &str) -> Option<TableStrategy> {
+    KNOWN_TABLES
+        .iter()
+        .find_map(|(name, strategy)| (*name == table).then_some(*strategy))
+}
