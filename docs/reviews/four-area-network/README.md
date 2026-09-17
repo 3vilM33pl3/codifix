@@ -89,7 +89,8 @@ Monolith, each with independent application/database boundaries. Supervisors use
   optional eleven-table historical evaluation catalog, never a schema wildcard.
   Baseline migration 0052 and the opt-in supervisor schema are explicitly
   distinguished; runtime authority stays retired and private outcomes archived.
-  No live importer yet; unknown tables and unresolved ownership block planning.
+  No operator import command or live import yet; unknown tables and unresolved
+  ownership block planning. The library implementation is recorded below.
 - Debian install hooks no longer rotate credentials or restart unrelated
   services; opt-in named-instance units have separate protected configuration
   and pinned verified executables. Lifecycle regression tests pass. Actual-host
@@ -97,9 +98,14 @@ Monolith, each with independent application/database boundaries. Supervisors use
 - Pure supervisor action/policy/budget contracts plus bounded private proposals:
   23 tests pass. These are not a running Pi agent, persistent scheduler, API, or
   deployed maintenance authority.
-- CA console preflight: eight stub tests pass. A real non-root run on Monolith
+- CA console preflight: twelve stub tests pass. A real non-root run on Monolith
   correctly reports database inspection as permission-denied and binding as
   unknown; this is not a CA observation. The CA console report remains required.
+  The [console handoff](../../../deploy/areas/CA-CONSOLE-HANDOFF.md) now gives
+  exact read-only preflight and authenticated-staging instructions with stop/
+  recovery conditions. It reports libc, namespace/cgroup metadata and anonymous
+  DB-client counts without reading configs, secrets or source rows. These are
+  observations, not proof of database binding or sandbox enforcement.
 - Release manifest/signature/staging tool: 17 offline tests pass, including
   disposable signing-subkey fixtures and staging-directory substitution tests.
   An independent reviewer reproduced a cleanup race in the initial code; the
@@ -124,15 +130,25 @@ Monolith, each with independent application/database boundaries. Supervisors use
   private result. These are trusted in-process APIs: pre-send project/source/
   destination authorization still needs service integration. Neither migration
   was applied to a running Memory instance.
+- Migration 0055 adds immutable local instance/area binding and pre-dispatch
+  project/request/evidence context. Seven additional required-database tests
+  prove exact binding, duplicate input, current project existence, revocation,
+  renewal fencing, corruption and journal-failure rollback. All **24 store
+  tests** pass. These checks prevent relabeling model input; they neither grant
+  source disclosure permission nor detect another independent/cloned ledger.
+  Migration 0055 has only been exercised in disposable databases.
 - `mem-supervisor-runtime` now admits one-shot provider calls through that store.
   It fixes Sol, counts the exact bounded input, reserves worst-case cost, commits
   an attempt before sending and retains uncertain charges without automatic
   retries. Its private-persistence wrapper commits a validated proposal with the
   completed action. Health checks and privileged installation cannot invoke this
-  model path. Private suggestions are not approvals. Twenty-four tests use
+  model path. Private suggestions are not approvals. Twenty-seven tests use
   synthetic inputs/local HTTP providers; no actual model request has been made.
-  The fleet allocation requires one authoritative budget ledger per area;
-  instance binding and cloned-ledger/stale-writer fencing remain deployment gates.
+  Exact instance/project/input context is now committed before token counting;
+  wrong instance or project and changed bound input cannot reach that endpoint.
+  Revocation during counting prevents generation. The fleet allocation still
+  requires one authoritative budget ledger per area and deployment/recovery
+  fencing of duplicate or stale writers.
 - The pinned AMD64/ARM64 Pi archives and exact executable hashes were checked.
   Eleven process/protocol tests pass. Two separate real AMD64 diagnostics passed
   in a pinned Ubuntu 26.04 container with no network, read-only root, no host
@@ -143,8 +159,9 @@ Monolith, each with independent application/database boundaries. Supervisors use
   reaped the process. Provider execution stayed disabled. This is local control
   compatibility, not authenticated model availability or agent activation.
   [Reproduction and limitations](../../../crates/mem-supervisor-pi/README.md).
-- The upstream AMD64 Pi artifact requires **glibc 2.43**. Bookworm/Ubuntu 24.04
-  could not run it; Ubuntu 26.04 did. ARM64 was hash-verified, not executed.
+- The upstream AMD64 and ARM64 Pi artifacts require **glibc 2.43**. Bookworm/Ubuntu 24.04
+  could not run AMD64; Ubuntu 26.04 did. The checksum-matched ARM64 binary's
+  AArch64 ELF and glibc requirement were inspected statically, not executed.
   Actual CA architecture/runtime compatibility remains a console gate.
 - Content/provenance classifier v2 prepared a mode-0600 review pack from the
   isolated restore: 3,107 histories / 3,368 versions, 2,830 area candidates and
@@ -170,6 +187,29 @@ Monolith, each with independent application/database boundaries. Supervisors use
   gates. Review attestations are external assertions, not authenticated human
   identity. No real decision was auto-approved; no target projection schema or
   database importer is implemented by this slice.
+- The subsequent `mem-area` materializer consumes a complete bounded NDJSON
+  payload stream with exact inventory/hash/order/count checks. It retains every
+  original row in a provisional protected archive and returns opaque area
+  partitions only on success. Original JSON numeric bytes are not round-tripped
+  through floating point. Materializable row IDs, declared/logical references,
+  versions and inherited task/capture project ownership must match the reviewed
+  inventory. Mixed sources yield only explicitly reviewed note/reference fields;
+  original task/path/context and prior source checks stay archived.
+- `mem-area-store` and additive migration 0056 implement a **trusted in-process
+  fresh-target importer**, not a deployment CLI. Rows, immutable import/provenance
+  receipts, canonical state, source-check sequence and the disabled-automation
+  state commit together. Nine required-database synthetic tests pass, including
+  exact history/tombstones with reverse UUID insertion order, safe reviewed
+  projections, schema/identity/row corruption rejection, retry on a still-inactive
+  target, and insertion/verification/deferred-commit rollback. Independent review
+  found and closed missing replay-inactivity and payload/receipt-ID checks;
+  payload FK/logical/ownership checks were strengthened alongside them.
+  See [import boundaries](../../../crates/mem-area-store/README.md).
+  No real-data payload stream has been materialized or imported. Operator review,
+  archive durability, protected CLI, release packaging and writer fencing remain
+  open. Current collector relation rows lack project provenance: they stay blocked
+  from area import until ownership is reviewed; populated relationship migration
+  is not covered by this synthetic test slice.
 - R1/federation regression run: 13 `mem-store` and 26 `mem-federation-store`
   database tests pass. A test-only race was fixed by waiting for PostgreSQL
   backend termination before asserting stale-owner fencing; production fencing
@@ -181,9 +221,22 @@ Monolith, each with independent application/database boundaries. Supervisors use
   classification tooling passed 36 Node tests. Workspace formatting, focused
   strict Clippy and boundary checks passed. This is not a full workspace,
   browser, PDS, Lean or release-gate run.
+- The current follow-up passes **181 focused Rust tests**: 48 area planning/
+  materialization, nine target-import, 23 pure supervisor, 24 supervisor-store,
+  27 supervisor-runtime, 11 Pi-control, 13 local-store and 26 federation-store.
+  Database tests required the dedicated disposable PostgreSQL server; two
+  environment-dependent real Pi sandbox diagnostics remain explicitly ignored
+  in this run (the earlier AMD64 evidence is separate). Strict focused Clippy,
+  workspace formatting, boundary checks, 36 Node data-tool tests, 17 release-tool
+  tests and 12 CA-preflight tests pass. Twenty-two failed-run synthetic fixture
+  databases were removed from that verified test server; no real-data database
+  or protected restore was changed. Both existing services still report their
+  original identities and versions with database-up health. No supervisor model
+  calls, real-data imports, CA changes, release publication or activation occurred.
 
-Next: review and classify the protected source by content/provenance; implement
-and test lossless import/reconciliation and mixed-source handling; obtain the CA
+Next: review and classify the protected source by content/provenance; connect
+the tested import library to a protected payload/export/operator workflow and
+complete relationship ownership handling; obtain the CA
 console inventory and complete the writer-stop/host/offline backup gates. Model
 integration still needs current collection/destination consent and Pi proxy-only
 egress; credential selection is resolved. Durable scheduling and supervision,
