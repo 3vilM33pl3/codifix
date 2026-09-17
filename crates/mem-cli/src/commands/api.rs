@@ -51,6 +51,49 @@ pub(crate) struct ApiClient {
 }
 
 impl ApiClient {
+    pub(crate) async fn supervisor_policy(
+        &self,
+        request: &mem_record::SupervisorPolicyRequest,
+    ) -> Result<mem_record::SupervisorPolicyResponse> {
+        let response = self
+            .client
+            .post(service_url(&self.config, "/v1/supervisor/policy"))
+            .headers(write_headers(&self.config)?)
+            .json(request)
+            .send()
+            .await
+            .map_err(|_| {
+                anyhow::anyhow!(
+                    "Supervisor outcome unconfirmed; inspect or retry the same request ID"
+                )
+            })?;
+        match response.status().as_u16() {
+            200 => {
+                let receipt: mem_record::SupervisorPolicyResponse =
+                    response.json().await.map_err(|_| {
+                        anyhow::anyhow!("Supervisor receipt unreadable; retry the same request ID")
+                    })?;
+                anyhow::ensure!(
+                    receipt.request_id == request.request_id
+                        && receipt.instance_id == request.instance_id
+                        && receipt.policy_revision == request.policy_revision
+                        && receipt.enabled == request.enabled,
+                    "Supervisor receipt mismatch; inspect history before further changes"
+                );
+                Ok(receipt)
+            }
+            400 => anyhow::bail!("Invalid supervisor control request"),
+            401 | 403 => anyhow::bail!(
+                "Denied: current global system_admin, writable service and valid credential required"
+            ),
+            409 => anyhow::bail!(
+                "Conflict: inspect current supervisor identity/policy; request IDs cannot change terms"
+            ),
+            _ => anyhow::bail!(
+                "Supervisor outcome unconfirmed; inspect or retry the same request ID"
+            ),
+        }
+    }
     pub(crate) async fn supervisor(
         &self,
         after: &str,

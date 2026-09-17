@@ -30,6 +30,63 @@ impl PolicyRecord {
 }
 
 impl SupervisorStore {
+    /// Caller owns authentication, request-id reconciliation and protected audit
+    /// in this same transaction. No bootstrap, limit change, or model consent.
+    pub async fn set_enabled_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        instance: Uuid,
+        area: Area,
+        revision: Uuid,
+        expected_enabled: bool,
+        enabled: bool,
+    ) -> Result<()> {
+        non_nil(instance)?;
+        non_nil(revision)?;
+        if expected_enabled == enabled {
+            return Err(StoreError::InvalidInput);
+        }
+        sqlx::query("SELECT area FROM supervisor_authorities WHERE area=$1 FOR UPDATE")
+            .bind(area_name(area))
+            .fetch_one(&mut **tx)
+            .await?;
+        let binding = contexts::read_binding(tx)
+            .await?
+            .ok_or(StoreError::Binding)?;
+        if binding.instance_id != instance || binding.area != area {
+            return Err(StoreError::Binding);
+        }
+        let policy = read_policy(tx, area).await?;
+        if policy.revision != revision {
+            return Err(PolicyError::StaleRevision.into());
+        }
+        if policy.revoked {
+            return Err(PolicyError::Revoked.into());
+        }
+        if policy.enabled != expected_enabled {
+            return Err(StoreError::Conflict);
+        }
+        sqlx::query("UPDATE supervisor_policies SET enabled=$3 WHERE area=$1 AND revision=$2")
+            .bind(area_name(area))
+            .bind(revision)
+            .bind(enabled)
+            .execute(&mut **tx)
+            .await?;
+        journal(
+            tx,
+            area,
+            revision,
+            None,
+            None,
+            if enabled {
+                "policy_enabled"
+            } else {
+                "policy_paused"
+            },
+            None,
+        )
+        .await?;
+        Ok(())
+    }
     /// Explicit operator rotation: old revision is permanently revoked, new
     /// revision starts disabled. Existing/revoked revisions cannot be reinstalled.
     pub async fn install_policy(&self, area: Area, revision: Uuid) -> Result<PolicyRecord> {

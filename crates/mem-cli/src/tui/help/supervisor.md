@@ -3,9 +3,10 @@
 ## Purpose
 
 This view is local and instance-wide, not scoped by the project selector. It
-requires global memory_read. It never enrolls peers, changes policy or calls a
-model. An enabled policy is not evidence of an active worker: this build reports
-execution not integrated.
+requires global memory_read. Inspection never enrolls peers, changes policy or
+calls a model. Explicit policy controls require separate global administration.
+An enabled policy is not evidence of an active agent: this build reports full
+Pi/model execution not integrated, separately from deterministic observations.
 
 ## Layout
 
@@ -18,6 +19,9 @@ and committed metadata history. It never shows private prompts or source text.
 - `PageDown`: read the next committed history page, if available.
 - `Home`: return to the first history page.
 - `j` / `k` or down/up arrows: scroll.
+- `p` / `e`: prepare pause/resume if this caller may control the exact policy.
+- `Enter`: confirm the displayed request, or retry that same ID after failure.
+- `c`: close confirmation and inspect fresh history; it does not undo a sent request.
 - `h` / `Esc`: shared help controls; Tab/Shift+Tab change tabs.
 
 ## Workflows
@@ -26,3 +30,8 @@ The journal contains IDs, event codes and timestamps, not private questions,
 sources, prompts or proposal contents. Budgets show UTC accounting days and exact
 millionths of USD; uncertain provider charges remain reserved. Read-only,
 unconfigured, forbidden, offline and identity-mismatch states remain distinct.
+Controls require current global `system_admin`. They never create an identity,
+grant disclosure permission, reset budgets or launch Pi. The exact instance and
+policy revision are shown before confirmation. Pausing prevents future work under
+the policy but cannot recall already transmitted bytes. An uncertain request ID
+is retained until confirmed or explicitly dismissed for history inspection.

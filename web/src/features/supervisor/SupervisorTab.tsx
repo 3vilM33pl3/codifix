@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { supervisorStatus } from "../../api";
 import { dollars, EVENT_LABELS, type SupervisorResponse } from "./types";
+import { SupervisorControls } from "./SupervisorControls";
 
 export function SupervisorTab() {
   const [data, setData] = useState<SupervisorResponse | null>(null);
   const [after, setAfter] = useState("0");
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
+  const [controlPending, setControlPending] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     setData(null); setError("");
@@ -28,7 +30,7 @@ export function SupervisorTab() {
   return <section aria-label="Area supervisor">
     <h2>Area supervisor</h2>
     <p>This installation only. The project selector does not change this instance-wide view. Other areas are not contacted.</p>
-    <button onClick={() => refresh(after)}>Refresh supervisor</button>
+    <button disabled={controlPending} onClick={() => refresh(after)}>Refresh supervisor</button>
     {error ? <p role="alert">{error}</p> : null}
     {!data && !error ? <p role="status">Loading supervisor…</p> : null}
     {data ? <>
@@ -45,6 +47,7 @@ export function SupervisorTab() {
             <p>Model {snapshot.policy.model}; daily ceiling {dollars(snapshot.policy.daily_usd_micros)} and {snapshot.policy.daily_calls} calls.</p>
           </> : <p>No supervisor policy installed.</p>}
           {snapshot.budget ? <p>UTC accounting day {snapshot.budget.day}: {snapshot.budget.calls} calls; charged {dollars(snapshot.budget.charged_usd_micros)}; reserved or uncertain {dollars(snapshot.budget.reserved_usd_micros)}. Uncertain charges remain reserved.</p> : null}
+          <SupervisorControls data={data} onInspect={() => refresh("0")} onPendingChange={setControlPending} />
           <h3>Recorded actions</h3>
           {snapshot.last_health_observation ? <section aria-label="Last operational observation">
             <p>Observed {snapshot.last_health_observation.observed_at}; next due {snapshot.last_health_observation.next_due_at}.</p>
@@ -61,8 +64,8 @@ export function SupervisorTab() {
               <td>{item.sequence}</td><td>{item.recorded_at}</td><td>{EVENT_LABELS[item.event] ?? "Unrecognized event"}</td>
               <td>{item.action_id ?? "—"}</td><td>{item.attempt_id ?? "—"}</td>
             </tr>)}</tbody></table> : <p>No newer history entries on this page.</p>}
-          <button disabled={after === "0"} onClick={() => refresh("0")}>First history page</button>
-          <button disabled={!snapshot.has_more} onClick={() => refresh(snapshot.next_after)}>Next history page</button>
+          <button disabled={controlPending || after === "0"} onClick={() => refresh("0")}>First history page</button>
+          <button disabled={controlPending || !snapshot.has_more} onClick={() => refresh(snapshot.next_after)}>Next history page</button>
         </>}
     </> : null}
   </section>;

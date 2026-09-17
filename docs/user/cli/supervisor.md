@@ -42,8 +42,35 @@ making a request so denied/offline state is not shown as current healthy state.
 
 These surfaces do not expose questions, private proposals, source text, evidence
 bytes, model prompts or provider bodies. They never invoke a model or mutate
-policy. Pause/resume, approvals, supervisor chat and model scheduling remain
-separate implementation work, not implied by this read-only panel.
+policy merely by inspecting it. Approvals, supervisor chat and model scheduling
+remain separate implementation work.
+
+## Explicit pause and resume
+
+An existing policy can be paused/resumed by a current **global `system_admin`**,
+not a project administrator. Read-only and evaluation services deny changes.
+Controls do not create identities/policies, change limits, authorize new data
+disclosure or start Pi. A pause cannot recall already transmitted bytes.
+
+Web provides **Pause supervisor / Resume supervisor**, then a confirmation with
+the exact instance, policy and request ID. TUI uses `p` / `e` to prepare and
+`Enter` to confirm; `c` closes and refreshes without undoing a sent request.
+
+```sh
+memory supervisor --json
+memory supervisor pause --instance INSTANCE_UUID --policy POLICY_UUID --request-id NEW_REQUEST_UUID
+# Review the preview, then repeat the identical command with --confirm.
+memory supervisor pause --instance INSTANCE_UUID --policy POLICY_UUID --request-id NEW_REQUEST_UUID --confirm
+memory supervisor
+```
+
+Replace `pause` with `resume` only after inspecting a currently paused policy.
+No-op or stale-state requests fail. Preserve the request UUID: after a lost
+response, retry the **identical** request to reconcile its receipt. Replaying an
+old resume never undoes a later pause. The receipt describes that request, not
+current worker health; inspect afterwards. Policy/history and a metadata-only,
+actor-attributed protected auth audit commit atomically. Errors omit raw storage
+and provider diagnostics. Browser changes require normal CSRF/Origin checks.
 
 ## Deterministic operational checks
 

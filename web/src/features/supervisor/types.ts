@@ -11,6 +11,7 @@ export const EVENT_LABELS = {
 export interface SupervisorResponse {
   read_only: boolean;
   execution: "not_integrated";
+  can_control?: boolean;
   deterministic_checks_configured?: boolean;
   snapshot: null | {
     instance_id: string;

@@ -54,6 +54,17 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
     let mut table = matchit::Router::new();
     let entries: &[(&str, &[(Method, RoutePolicy)])] = &[
         (
+            "/v1/supervisor/policy",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
             "/v1/supervisor",
             &[(
                 Method::GET,
@@ -1405,6 +1416,18 @@ pub(crate) async fn authorization_guard(
                 return ApiError::unauthorized("authentication required").into_response();
             }
             Err(error) => {
+                let error = if matches!(
+                    request.uri().path(),
+                    "/v1/supervisor" | "/v1/supervisor/policy"
+                ) {
+                    if error.status.is_server_error() {
+                        ApiError::service_unavailable("supervisor authentication unavailable")
+                    } else {
+                        ApiError::unauthorized("valid supervisor authentication is required")
+                    }
+                } else {
+                    error
+                };
                 crate::auth::record_denied_audit(
                     &state,
                     None,

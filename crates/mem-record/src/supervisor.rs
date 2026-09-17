@@ -14,6 +14,9 @@ pub struct SupervisorResponse {
     /// Operator opt-in, not proof that a check succeeded or a Pi agent is active.
     #[serde(default)]
     pub deterministic_checks_configured: bool,
+    /// UI hint only; every mutation independently rechecks current authority.
+    #[serde(default)]
+    pub can_control: bool,
     /// Absent when no durable supervisor identity is configured.
     pub snapshot: Option<SupervisorSnapshot>,
 }
@@ -22,6 +25,26 @@ pub struct SupervisorResponse {
 #[serde(rename_all = "snake_case")]
 pub enum SupervisorExecution {
     NotIntegrated,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SupervisorPolicyRequest {
+    pub request_id: Uuid,
+    pub instance_id: Uuid,
+    pub policy_revision: Uuid,
+    pub expected_enabled: bool,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorPolicyResponse {
+    pub request_id: Uuid,
+    pub instance_id: Uuid,
+    pub policy_revision: Uuid,
+    /// Outcome of this request, not a fresh policy snapshot on replay.
+    pub enabled: bool,
+    pub replayed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

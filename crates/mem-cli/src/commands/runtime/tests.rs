@@ -296,6 +296,39 @@ fn supervisor_help_and_read_only_arguments_are_explicit() {
         .is_ok()
     );
     assert!(Cli::try_parse_from(["memory", "supervisor", "--enable"]).is_err());
+    let id = "00000000-0000-0000-0000-000000000001";
+    assert!(Cli::try_parse_from(["memory", "supervisor", "resume"]).is_err());
+    for action in ["pause", "resume"] {
+        assert!(
+            Cli::try_parse_from([
+                "memory",
+                "supervisor",
+                action,
+                "--instance",
+                id,
+                "--policy",
+                id,
+                "--request-id",
+                id
+            ])
+            .is_ok()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "memory",
+                "supervisor",
+                action,
+                "--instance",
+                id,
+                "--policy",
+                id,
+                "--request-id",
+                id,
+                "--confirm"
+            ])
+            .is_ok()
+        );
+    }
 }
 
 fn repo_root_for_tests() -> PathBuf {

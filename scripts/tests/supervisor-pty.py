@@ -28,7 +28,10 @@ class RehearsalFailure(Exception):
 
 
 def main():
-    binary, config, instance = sys.argv[1:]
+    binary, config, instance = sys.argv[1:4]
+    controls = sys.argv[4:] == ["controls"]
+    if sys.argv[4:] and not controls:
+        raise RehearsalFailure("unknown rehearsal mode")
     if not os.path.isabs(binary) or not os.path.isabs(config):
         raise RehearsalFailure("explicit rehearsal paths required")
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "C.UTF-8",
@@ -36,7 +39,7 @@ def main():
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(os.path.dirname(config))
-        os.execve(binary, [binary, "--config", config, "tui", "--project", "memory"], env)
+        os.execve(binary, [binary, "--config", config, "tui", "--project", "synthetic" if controls else "memory"], env)
     fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 55, 180, 0, 0))
     screen = ANSI(55, 180)
     output_bytes = 0
@@ -82,6 +85,22 @@ def main():
         for label, required in [("identity", instance), ("area", "Workshop"), ("policy", "paused"), ("activation", "Execution not integrated"), ("history", "PolicyInstalled")]:
             if required not in rendered:
                 raise RehearsalFailure(f"supervisor {label} did not render")
+        if controls:
+            for key, confirm, expected in [(b"e", "CONFIRM RESUME", "enabled (activation separate)"), (b"p", "CONFIRM PAUSE", "paused")]:
+                os.write(master, key)
+                for _ in range(30):
+                    drain(0.1)
+                    if confirm in text() and "Enter confirms/retries" in text():
+                        break
+                else:
+                    raise RehearsalFailure(f"{confirm}: exact supervisor confirmation was not visible")
+                os.write(master, b"\r")
+                for _ in range(30):
+                    drain(0.2)
+                    if "CONFIRM " not in text() and expected in text():
+                        break
+                else:
+                    raise RehearsalFailure("confirmed policy outcome was not visible")
         os.write(master, b"\x03")
         drain(0.5)
         for _ in range(20):
@@ -94,7 +113,7 @@ def main():
             drain(0.1)
         if not exited:
             raise RehearsalFailure("terminal did not stop")
-        print(json.dumps({"tui_pty": "passed", "identity": "matched", "mutations": False}))
+        print(json.dumps({"tui_pty": "passed", "identity": "matched", "mutations": controls}))
     finally:
         if not exited:
             try:

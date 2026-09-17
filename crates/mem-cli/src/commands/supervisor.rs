@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use super::api::ApiClient;
 use anyhow::Result;
-use clap::Args;
+use clap::{Args, Subcommand};
 use mem_record::SupervisorResponse;
 
-pub(crate) const HELP: &str = "Agent notes:\nRead-only local instance inspection. Requires global memory_read, not a project role. No provider call, bootstrap, activation or policy mutation. Enabled policy does not prove worker health. History contains metadata only. See docs/user/cli/supervisor.md.";
+pub(crate) const HELP: &str = "Agent notes:\nRead-only local instance inspection by default. Requires global memory_read, not a project role. Explicit pause/resume require current global system_admin, exact instance/policy/request UUIDs and --confirm. No provider call or bootstrap. Enabled policy does not prove worker health or authorize new disclosure. History contains metadata only. See docs/user/cli/supervisor.md.";
 
 #[derive(Debug, Args)]
 pub(crate) struct SupervisorArgs {
+    #[command(subcommand)]
+    command: Option<SupervisorCommand>,
     #[arg(long, default_value = "0")]
     after: String,
     #[arg(long, default_value_t = 50)]
@@ -15,7 +17,58 @@ pub(crate) struct SupervisorArgs {
     #[arg(long)]
     json: bool,
 }
+#[derive(Debug, Subcommand)]
+enum SupervisorCommand {
+    /// Pause the exact currently enabled policy; in-flight bytes cannot be recalled.
+    Pause(ControlArgs),
+    /// Resume the exact currently paused policy, without granting new permissions.
+    Resume(ControlArgs),
+}
+#[derive(Debug, Args)]
+struct ControlArgs {
+    #[arg(long)]
+    instance: uuid::Uuid,
+    #[arg(long)]
+    policy: uuid::Uuid,
+    /// Reuse this UUID only when retrying the exact same operation.
+    #[arg(long)]
+    request_id: uuid::Uuid,
+    /// Required action-time confirmation; without it only print the request.
+    #[arg(long)]
+    confirm: bool,
+}
 pub(crate) async fn handle(args: SupervisorArgs, api: &ApiClient) -> Result<()> {
+    if let Some(command) = args.command {
+        let (control, enabled) = match command {
+            SupervisorCommand::Pause(c) => (c, false),
+            SupervisorCommand::Resume(c) => (c, true),
+        };
+        let request = mem_record::SupervisorPolicyRequest {
+            request_id: control.request_id,
+            instance_id: control.instance,
+            policy_revision: control.policy,
+            expected_enabled: !enabled,
+            enabled,
+        };
+        if !control.confirm {
+            println!(
+                "Preview only; no mutation sent. Review this exact request, then repeat with --confirm:\n{}",
+                serde_json::to_string_pretty(&request)?
+            );
+            println!(
+                "Existing policy only; no new disclosure, Pi activation or model request. A pause cannot recall already transmitted bytes."
+            );
+            return Ok(());
+        }
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&api.supervisor_policy(&request).await?)?
+        );
+        println!(
+            "Receipt confirms this request, not current worker health. Run memory supervisor to inspect fresh state."
+        );
+        return Ok(());
+    }
     let response = api.supervisor(&args.after, args.limit).await?;
     if args.json {
         println!("{}", serde_json::to_string_pretty(&response)?);
@@ -119,6 +172,7 @@ mod tests {
             read_only: true,
             execution: SupervisorExecution::NotIntegrated,
             deterministic_checks_configured: false,
+            can_control: false,
             snapshot: None,
         };
         let text = lines(&response).join("\n");

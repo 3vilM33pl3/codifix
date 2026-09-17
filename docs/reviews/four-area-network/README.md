@@ -303,6 +303,31 @@ Monolith, each with independent application/database boundaries. Supervisors use
   The importer supports exact schema heads 0056 and 0057; a new required-DB test
   proves an old receipt survives additive upgrade unchanged but cannot authorize
   replay at a different head. No live schema or configuration was changed.
+- Explicit pause/resume now runs through `/v1/supervisor/policy`, Web confirmation,
+  CLI preview/`--confirm`, and TUI `p`/`e` then Enter. Current global system_admin
+  and credential validity are locked through commit, separately from project
+  permissions. Instance/revision/expected-state checks prevent stale changes;
+  same-actor exact request replay returns a receipt without undoing a later pause.
+  Policy, metadata journal and protected actor audit are atomic. Required-DB
+  tests cover competing identical requests, changed retries, CSRF/Origin,
+  read-only mode, revoked credentials and deferred audit failure rollback.
+  Controls grant no new disclosure consent and do not activate Pi.
+- A second **real browser/CLI/PTY control rehearsal** completed six confirmed
+  synthetic policy changes, reconciled CLI retries, and finished paused with six
+  audit records and zero provider attempts. It caught and fixed a missing Web
+  JSON content type; PTY verification now waits for a bounded rendered state
+  rather than assuming a fixed render delay. Web passes **109 tests** and build;
+  six focused CLI/TUI tests, OpenAPI parity, strict store/lean-CLI Clippy and
+  boundaries pass. Service Clippy reports only the existing offline-stub warnings.
+
+## 14:00 Europe/London checkpoint, 2026-09-17
+
+The verified software slices do **not** constitute the real four-area deployment.
+CA console inventory/database binding/runtime compatibility, approved complete
+ownership decisions, final host/offline backups/writer fencing, signed releases,
+actual enrollment, and sandboxed Pi/admission integration remain open. A verified
+16:00 four-host demo is not promised. Existing live services stay unchanged while
+implementation continues; no simulation is labelled as a deployed Trust host.
 
 Next: review and classify the protected source by content/provenance; obtain the CA
 console inventory and complete the writer-stop/host/offline backup gates. Model

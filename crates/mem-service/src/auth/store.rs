@@ -453,6 +453,76 @@ async fn principal_from_row(
     })
 }
 
+/// Global administration only: project grants cannot authorize an instance
+/// policy change. Hold the principal and presented credential through commit.
+pub(crate) async fn lock_supervisor_administrator(
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    principal: &AuthenticatedPrincipal,
+) -> Result<(), ApiError> {
+    use mem_record::Permission;
+    if state.config.service.read_only || state.config.evaluation.active() || !state.is_primary() {
+        return Err(ApiError::forbidden(
+            "supervisor controls are disabled on this service",
+        ));
+    }
+    let row =
+        sqlx::query("SELECT * FROM auth_principals WHERE id=$1 AND disabled_at IS NULL FOR SHARE")
+            .bind(principal.id)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(ApiError::sql)?
+            .ok_or_else(|| ApiError::forbidden("current global administration is required"))?;
+    let kind: String = row.try_get("kind").map_err(ApiError::sql)?;
+    let role = if kind == "human_oidc" {
+        None
+    } else {
+        row.try_get::<Option<String>, _>("global_role")
+            .map_err(ApiError::sql)?
+            .as_deref()
+            .and_then(parse_role)
+    };
+    let mut permissions = permission_set_override(
+        row.try_get("global_permissions_json")
+            .map_err(ApiError::sql)?,
+    )?
+    .unwrap_or_else(|| {
+        role.map(AuthRole::permissions)
+            .unwrap_or(PermissionSet::EMPTY)
+    });
+    let groups: Vec<String> =
+        serde_json::from_value(row.try_get("groups_json").map_err(ApiError::sql)?)
+            .map_err(|_| ApiError::internal("invalid principal groups"))?;
+    for rule in &state.config.auth.group_mappings.rules {
+        if rule.global && groups.contains(&rule.group) {
+            permissions = permissions.union(rule.role.permissions());
+        }
+    }
+    if !permissions.contains(Permission::SystemAdmin) {
+        return Err(ApiError::forbidden(
+            "current global administration is required",
+        ));
+    }
+    let live = match principal.credential_source {
+        CredentialSource::LocalApiToken => state.config.auth.mode == AuthMode::SingleUser && principal.id == local_owner_id(),
+        CredentialSource::ServiceToken => {
+            sqlx::query_scalar::<_, bool>("SELECT true FROM auth_service_tokens WHERE id=$1 AND principal_id=$2 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>clock_timestamp()) FOR SHARE")
+                .bind(principal.token_id).bind(principal.id).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?.unwrap_or(false)
+        }
+        CredentialSource::BrowserSession => {
+            sqlx::query_scalar::<_, bool>("SELECT true FROM auth_web_sessions WHERE id=$1 AND principal_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR SHARE")
+                .bind(principal.session_id).bind(principal.id).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?.unwrap_or(false)
+        }
+        CredentialSource::LegacyServiceToken | CredentialSource::AnonymousSingleUser => false,
+    };
+    if !live {
+        return Err(ApiError::forbidden(
+            "current authenticated credential is required",
+        ));
+    }
+    Ok(())
+}
+
 /// Background federation reuses the service's current membership/group policy,
 /// rather than inventing a role-to-remote-capability mapping or caching a role.
 pub(crate) async fn federation_local_access(

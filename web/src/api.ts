@@ -63,6 +63,26 @@ export async function supervisorStatus(after: string, signal?: AbortSignal): Pro
   }));
 }
 
+export type SupervisorPolicyRequest = { request_id: string; instance_id: string; policy_revision: string; expected_enabled: boolean; enabled: boolean };
+export async function supervisorPolicy(request: SupervisorPolicyRequest): Promise<void> {
+  let response: Response;
+  try { response = await apiFetch("/v1/supervisor/policy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) }); }
+  catch { throw new Error("Outcome unconfirmed. Inspect history or retry this same request ID."); }
+  if (response.ok) {
+    let receipt: unknown;
+    try { receipt = await response.json(); } catch { throw new Error("Receipt unreadable. Retry this same request ID."); }
+    if (!receipt || typeof receipt !== "object" || !("request_id" in receipt) || receipt.request_id !== request.request_id
+      || !("instance_id" in receipt) || receipt.instance_id !== request.instance_id
+      || !("policy_revision" in receipt) || receipt.policy_revision !== request.policy_revision
+      || !("enabled" in receipt) || receipt.enabled !== request.enabled
+      || !("replayed" in receipt) || typeof receipt.replayed !== "boolean") throw new Error("Receipt mismatch. Inspect history before further changes.");
+    return;
+  }
+  throw new Error(response.status === 401 || response.status === 403 ? "Denied. Current global administration and a writable service are required."
+    : response.status === 409 ? "Conflict. Inspect the current identity and policy; do not change terms under this request ID."
+    : "Outcome unconfirmed. Inspect history or retry this same request ID.");
+}
+
 /** True when the service reported read-only (student) mode on token bootstrap. */
 export function isServiceReadOnly(): boolean {
   return serviceReadOnly;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::{ApiError, AppState};
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Query, State},
     http::{StatusCode, header},
     response::IntoResponse,
@@ -10,6 +10,8 @@ use mem_record::{SupervisorExecution, SupervisorResponse};
 use mem_supervisor_store::{StoreError, SupervisorStore};
 use serde::Deserialize;
 
+#[cfg(test)]
+mod control_tests;
 #[cfg(test)]
 mod tests;
 
@@ -22,6 +24,7 @@ pub(crate) struct Filters {
 
 pub(crate) async fn inspect(
     State(state): State<AppState>,
+    Extension(principal): Extension<crate::AuthenticatedPrincipal>,
     Query(filters): Query<Filters>,
 ) -> Result<impl IntoResponse, ApiError> {
     let cursor = filters.after.as_deref().unwrap_or("0");
@@ -66,7 +69,17 @@ pub(crate) async fn inspect(
                 .supervisor
                 .as_ref()
                 .is_some_and(|s| s.deterministic_checks),
+            can_control: principal.has_global(mem_record::Permission::SystemAdmin)
+                && !state.config.service.read_only
+                && !state.config.evaluation.active()
+                && state.is_primary()
+                && snapshot.as_ref().is_some_and(|s| {
+                    s.area.is_some() && s.policy.as_ref().is_some_and(|p| !p.revoked)
+                }),
             snapshot,
         }),
     ))
 }
+
+mod control;
+pub(crate) use control::control;

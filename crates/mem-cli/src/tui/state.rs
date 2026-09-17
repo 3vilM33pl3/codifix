@@ -406,6 +406,7 @@ pub(super) struct ProjectRefreshResult {
 
 pub(super) enum BackgroundEvent {
     Supervisor(Result<mem_record::SupervisorResponse, String>),
+    SupervisorControlled(Result<mem_record::SupervisorResponse, String>),
     Jobs {
         project: String,
         result: Result<super::tabs::jobs::JobsResult, String>,

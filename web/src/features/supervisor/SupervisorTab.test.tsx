@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { supervisorStatus } from "../../api";
+import { supervisorPolicy, supervisorStatus } from "../../api";
 import { SupervisorTab } from "./SupervisorTab";
 import { dollars, type SupervisorResponse } from "./types";
-vi.mock("../../api", () => ({ supervisorStatus: vi.fn() }));
+vi.mock("../../api", () => ({ supervisorStatus: vi.fn(), supervisorPolicy: vi.fn() }));
 const fixture: SupervisorResponse = {
   read_only: true, execution: "not_integrated", snapshot: {
     instance_id: "synthetic-instance", area: "workshop", observed_at: "2026-09-17T12:00:00Z",
@@ -14,8 +14,37 @@ const fixture: SupervisorResponse = {
     next_after: "9007199254740993", has_more: true,
   },
 };
-beforeEach(() => { vi.mocked(supervisorStatus).mockReset(); });
+beforeEach(() => { vi.mocked(supervisorStatus).mockReset(); vi.mocked(supervisorPolicy).mockReset(); });
 afterEach(cleanup);
+
+it("confirms exact policy terms and preserves the request ID across an uncertain retry", async () => {
+  const mutable = { ...fixture, read_only: false, can_control: true };
+  vi.mocked(supervisorStatus).mockResolvedValue(mutable);
+  vi.mocked(supervisorPolicy).mockRejectedValueOnce(new Error("Outcome unconfirmed. Retry this same request ID.")).mockResolvedValueOnce();
+  render(<SupervisorTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Pause supervisor" }));
+  const dialog = screen.getByRole("dialog", { name: "Confirm supervisor policy change" });
+  expect(dialog).toHaveTextContent("synthetic-instance");
+  expect(dialog).toHaveTextContent("synthetic-policy");
+  expect(supervisorPolicy).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Refresh supervisor" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm policy change" }));
+  await screen.findByRole("button", { name: "Retry same request" });
+  const first = vi.mocked(supervisorPolicy).mock.calls[0][0];
+  expect(first).toMatchObject({ instance_id: "synthetic-instance", policy_revision: "synthetic-policy", expected_enabled: true, enabled: false });
+  fireEvent.click(screen.getByRole("button", { name: "Retry same request" }));
+  await waitFor(() => expect(supervisorStatus).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(supervisorPolicy).mock.calls[1][0]).toEqual(first);
+});
+
+it("canceling confirmation never sends a policy mutation", async () => {
+  vi.mocked(supervisorStatus).mockResolvedValue({ ...fixture, read_only: false, can_control: true });
+  render(<SupervisorTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Pause supervisor" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(supervisorStatus).toHaveBeenCalledTimes(2));
+  expect(supervisorPolicy).not.toHaveBeenCalled();
+});
 
 it("shows actual policy and reserved charges without claiming an active agent", async () => {
   vi.mocked(supervisorStatus).mockResolvedValue(fixture);

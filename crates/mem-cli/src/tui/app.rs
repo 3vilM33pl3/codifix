@@ -1054,6 +1054,7 @@ impl App {
                 }
             }
             BackgroundEvent::Supervisor(result) => self.supervisor.receive(result),
+            BackgroundEvent::SupervisorControlled(result) => self.supervisor.controlled(result),
             BackgroundEvent::ProjectRefreshLoaded(result) => {
                 self.apply_project_refresh(*result);
             }
