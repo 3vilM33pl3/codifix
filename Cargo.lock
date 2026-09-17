@@ -2802,6 +2802,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "mem-area-ops"
+version = "2.0.0"
+dependencies = [
+ "clap",
+ "mem-area",
+ "mem-area-store",
+ "mem-test-support",
+ "percent-encoding",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "mem-area-store"
 version = "2.0.0"
 dependencies = [

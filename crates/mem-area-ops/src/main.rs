@@ -1,0 +1,141 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+use clap::{Args, Parser, Subcommand};
+use mem_area_ops::{Execution, Failure, Inputs};
+use std::{io::Write, path::PathBuf, process::ExitCode};
+use uuid::Uuid;
+#[derive(Parser)]
+#[command(
+    name = "memory-area-import",
+    about = "Explicit private migration preparation/import; never discovers databases or activates services"
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+#[derive(Args)]
+struct Source {
+    #[arg(long)]
+    inventory: PathBuf,
+    #[arg(long)]
+    manifest: PathBuf,
+    #[arg(long)]
+    payload: PathBuf,
+    /// Normalized digest printed by memory-area inventory.
+    #[arg(long)]
+    inventory_sha256: String,
+    /// SHA-256 of compact serde manifest JSON, not file whitespace.
+    #[arg(long)]
+    manifest_sha256: String,
+}
+impl From<Source> for Inputs {
+    fn from(s: Source) -> Self {
+        Self {
+            inventory: s.inventory,
+            manifest: s.manifest,
+            payload: s.payload,
+            inventory_sha256: s.inventory_sha256,
+            manifest_sha256: s.manifest_sha256,
+        }
+    }
+}
+#[derive(Subcommand)]
+enum Command {
+    /// Print normalized review digests and blocker count, without writing or connecting.
+    Inspect {
+        #[arg(long)]
+        inventory: PathBuf,
+        #[arg(long)]
+        manifest: PathBuf,
+    },
+    /// Validate reviewed inputs, durably publish a full archive and metadata receipt.
+    Prepare {
+        #[command(flatten)]
+        source: Source,
+        #[arg(long)]
+        output_dir: PathBuf,
+    },
+    /// Import only into an explicitly selected local, migrated, inactive target.
+    Import {
+        #[command(flatten)]
+        source: Source,
+        #[arg(long)]
+        prepared: PathBuf,
+        #[arg(long)]
+        prepared_sha256: String,
+        #[arg(long)]
+        target: PathBuf,
+        #[arg(long)]
+        target_sha256: String,
+        #[arg(long)]
+        operation_id: Uuid,
+        #[arg(long)]
+        execute: bool,
+        #[arg(long)]
+        writers_stopped: bool,
+        #[arg(long)]
+        archive_backed_up: bool,
+    },
+}
+fn print(value: &impl serde::Serialize) -> Result<(), Failure> {
+    let mut output = std::io::stdout().lock();
+    serde_json::to_writer(&mut output, value).map_err(|_| Failure::Output)?;
+    writeln!(output).map_err(|_| Failure::Output)
+}
+async fn run(cli: Cli) -> Result<(), Failure> {
+    match cli.command {
+        Command::Inspect {
+            inventory,
+            manifest,
+        } => print(&mem_area_ops::inspect(&inventory, &manifest)?),
+        Command::Prepare { source, output_dir } => {
+            print(&mem_area_ops::prepare(&source.into(), &output_dir)?)
+        }
+        Command::Import {
+            source,
+            prepared,
+            prepared_sha256,
+            target,
+            target_sha256,
+            operation_id,
+            execute,
+            writers_stopped,
+            archive_backed_up,
+        } => {
+            let execution = Execution {
+                prepared,
+                prepared_sha256,
+                target,
+                target_sha256,
+                operation_id,
+                execute,
+                writers_stopped,
+                archive_backed_up,
+            };
+            print(&mem_area_ops::import(&source.into(), &execution).await?)
+        }
+    }
+}
+#[tokio::main]
+async fn main() -> ExitCode {
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(error) => {
+            if matches!(
+                error.kind(),
+                clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
+            ) {
+                let _ = error.print();
+                return ExitCode::SUCCESS;
+            }
+            eprintln!("invalid migration arguments; use --help (supplied values suppressed)");
+            return ExitCode::from(2);
+        }
+    };
+    match run(cli).await {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::from(1)
+        }
+    }
+}

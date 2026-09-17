@@ -61,11 +61,13 @@ done
 
 # Offline target import must not acquire live configuration, network clients,
 # application services, provider execution or filesystem snapshot discovery.
-area_store_tree=$(cargo tree -p mem-area-store -e normal --prefix none | awk '{print $1}' | sort -u)
+for crate in mem-area-store mem-area-ops; do
+area_store_tree=$(cargo tree -p "$crate" -e normal --prefix none | awk '{print $1}' | sort -u)
 for dep in reqwest axum mem-config mem-service mem-platform mem-supervisor-runtime mem-supervisor-pi atrium-api; do
   if echo "$area_store_tree" | grep -qx "$dep"; then
-    err "mem-area-store depends on $dep"
+    err "$crate depends on $dep"
   fi
+done
 done
 
 # Supervisor persistence is not a provider client. Pi process control has no

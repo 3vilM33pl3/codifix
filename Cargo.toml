@@ -2,6 +2,7 @@
 members = [
   "crates/mem-area",
   "crates/mem-area-store",
+  "crates/mem-area-ops",
   "crates/mem-agenttop",
   "crates/mem-analyze",
   "crates/mem-atproto",
