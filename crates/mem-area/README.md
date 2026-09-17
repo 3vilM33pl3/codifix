@@ -21,9 +21,15 @@ draft still has unresolved ownership. Every verification report states
 The serde types in [src/types.rs](src/types.rs) define format version 1. Collect
 the inventory from one consistent source snapshot. Include every user table in
 every schema, including empty tables and `public._sqlx_migrations`. The policy
-catalog currently covers the 93 active tables of the public migration-0052
-schema. Unknown tables, including historical evaluation schemas, block planning;
-they need an explicit reviewed policy implementation before migration can proceed.
+catalog covers the 93 active tables of the public migration-0052 schema, plus
+the optional historical evaluation schema `mab_full_20260516_150014`. The exact
+historical catalog is `_sqlx_migrations`, `curation_runs`, `memory_chunks`,
+`memory_entries`, `memory_relations`, `memory_sources`, `memory_tags`, `projects`,
+`raw_captures`, `sessions`, and `tasks`. If any member is present, all eleven
+tables must be inventoried, including empty tables. Every historical row receives
+`protected_archive`; historical chunks are not rebuilt into retrievable areas.
+Additional tables or other schemas still block planning and require an explicit
+reviewed policy implementation. There is no historical-schema wildcard.
 Do not filter a whole-database inventory to `public` to hide these blockers.
 
 Each table carries its columns and foreign-key catalog, independently observed
@@ -38,6 +44,15 @@ Use a plain UUID string as the record key for `projects`, `memory_entries`, and
 key, including every component of composite keys. A positional row number is
 not an identity. Preserve project IDs, slugs, names, root paths and creation
 timestamps in the separate project catalog.
+
+The top-level project catalog describes `public.projects` only. Historical
+`source_project_id` metadata, when present, must identify a UUID row in
+`mab_full_20260516_150014.projects`, even if the same UUID also occurs in public.
+Historical project provenance is retained in the complete hashed project row and
+protected snapshot (and the collector's bound per-schema project sidecar); it
+creates no public ownership or area-project binding. Historical rows need not
+satisfy the modern public canonical-state/version layout. Declared historical
+foreign keys and every original row hash still require complete accounting.
 
 For every row, list each declared foreign key once, including `target: null`
 for SQL NULL. A non-null target identifies an inventoried table and key.
@@ -98,3 +113,16 @@ demo completion evidence.
 
 Synthetic tests exercise the planner and actual binary, with a regression that
 compares the explicit policy catalog against the repository's SQL migrations.
+
+## Large inventories
+
+The restored baseline contains approximately 2.33 million rows. Format 1 still
+loads every row into memory, builds reference indexes and materializes every
+planned record during verification; successful small tests do not prove a full
+baseline run will fit. Inventory hashing now sorts borrowed references and streams
+the normalized JSON directly into SHA-256, preserving format-1 digests without
+cloning all source rows or constructing another full JSON buffer. Reference
+validation also indexes borrowed table/key strings. These changes reduce
+avoidable allocation but do not make the planner fully streaming. Measure peak
+memory, elapsed time and output size on the isolated snapshot before treating it
+as migration-ready; keep sensitive inventories and build caches on `/data`.

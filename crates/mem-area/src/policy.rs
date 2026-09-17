@@ -253,8 +253,34 @@ pub const KNOWN_TABLES: &[(&str, TableStrategy)] = &[
     ),
 ];
 
+/// Optional, observed historical evaluation snapshot. Presence of any member
+/// requires the whole catalog, including empty tables. Never match a prefix or
+/// apply the public schema's ownership/rebuild policy to these archived rows.
+pub(crate) const HISTORICAL_TABLES: &[&str] = &[
+    "mab_full_20260516_150014._sqlx_migrations",
+    "mab_full_20260516_150014.curation_runs",
+    "mab_full_20260516_150014.memory_chunks",
+    "mab_full_20260516_150014.memory_entries",
+    "mab_full_20260516_150014.memory_relations",
+    "mab_full_20260516_150014.memory_sources",
+    "mab_full_20260516_150014.memory_tags",
+    "mab_full_20260516_150014.projects",
+    "mab_full_20260516_150014.raw_captures",
+    "mab_full_20260516_150014.sessions",
+    "mab_full_20260516_150014.tasks",
+];
+
+pub(crate) const HISTORICAL_PROJECT_TABLE: &str = "mab_full_20260516_150014.projects";
+
+pub(crate) fn historical_project_table(table: &str) -> Option<&'static str> {
+    HISTORICAL_TABLES
+        .contains(&table)
+        .then_some(HISTORICAL_PROJECT_TABLE)
+}
+
 pub fn table_strategy(table: &str) -> Option<TableStrategy> {
     KNOWN_TABLES
         .iter()
         .find_map(|(name, strategy)| (*name == table).then_some(*strategy))
+        .or_else(|| historical_project_table(table).map(|_| TableStrategy::HistoricalArchive))
 }

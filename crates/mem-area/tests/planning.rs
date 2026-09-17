@@ -318,24 +318,273 @@ fn unknown_tables_cannot_be_manually_whitelisted() {
     );
 }
 
-#[test]
-fn historical_nonpublic_evaluation_schemas_are_not_silently_omitted() {
+const HISTORICAL_SCHEMA: &str = "mab_full_20260516_150014";
+const HISTORICAL_NAMES: &[&str] = &[
+    "_sqlx_migrations",
+    "curation_runs",
+    "memory_chunks",
+    "memory_entries",
+    "memory_relations",
+    "memory_sources",
+    "memory_tags",
+    "projects",
+    "raw_captures",
+    "sessions",
+    "tasks",
+];
+
+fn historical_fixture() -> Inventory {
     let mut inventory = fixture();
-    let mut table = table_mut(&mut inventory, "public.memory_entries").clone();
-    table.table = "mab_full_20260516_150014.memory_entries".into();
-    inventory.tables.push(table);
+    for name in HISTORICAL_NAMES {
+        let key = if *name == "projects" {
+            id(501)
+        } else {
+            id(502)
+        };
+        inventory.tables.push(TableInventory {
+            table: format!("{HISTORICAL_SCHEMA}.{name}"),
+            columns: vec![Column {
+                name: "id".into(),
+                data_type: "uuid".into(),
+                nullable: false,
+            }],
+            foreign_keys: vec![],
+            row_count: 1,
+            rows: vec![row(
+                key.to_string(),
+                (*name != "projects").then_some(id(501)),
+                None,
+                None,
+            )],
+        });
+    }
+    inventory
+}
+
+#[test]
+fn exact_historical_catalog_is_optional_and_archives_every_row() {
+    assert!(
+        verify_inventory(&fixture()).is_empty(),
+        "historical schema is optional"
+    );
+    let inventory = historical_fixture();
+    assert_eq!(verify_inventory(&inventory), Vec::<String>::new());
     let manifest = reviewed(&inventory);
+    assert_eq!(
+        manifest.lineages.len(),
+        1,
+        "historical rows create no public lineage decisions"
+    );
+    assert!(
+        manifest.records.is_empty(),
+        "historical tables need no area ownership reviews"
+    );
+    let report = verify_manifest(&inventory, &manifest);
+    assert!(report.plan_valid, "{:?}", report.blockers);
+    let archived: Vec<_> = report
+        .records
+        .iter()
+        .filter(|record| record.record.table.starts_with(HISTORICAL_SCHEMA))
+        .collect();
+    assert_eq!(archived.len(), 11);
+    assert!(
+        archived
+            .iter()
+            .all(|record| record.destination == Destination::ProtectedArchive)
+    );
+    for name in HISTORICAL_NAMES {
+        assert_eq!(
+            table_strategy(&format!("{HISTORICAL_SCHEMA}.{name}")),
+            Some(TableStrategy::HistoricalArchive)
+        );
+    }
+}
+
+#[test]
+fn partial_historical_catalog_and_new_tables_or_schemas_stay_blocked() {
+    let mut inventory = historical_fixture();
+    inventory
+        .tables
+        .retain(|table| table.table != format!("{HISTORICAL_SCHEMA}.tasks"));
     assert_blocked(
         &inventory,
-        &manifest,
-        "unclassified table mab_full_20260516_150014.memory_entries",
+        &reviewed(&inventory),
+        "missing historical table inventory mab_full_20260516_150014.tasks",
     );
-    let policy = manifest
+    for unknown in [
+        "mab_full_20260516_150014.new_table",
+        "mab_full_20260516_150015.memory_entries",
+        "mab_full_20260516_150014_extra.projects",
+    ] {
+        let mut inventory = historical_fixture();
+        let mut table = inventory.tables.last().expect("table").clone();
+        table.table = unknown.into();
+        inventory.tables.push(table);
+        assert_eq!(table_strategy(unknown), None);
+        assert_blocked(
+            &inventory,
+            &reviewed(&inventory),
+            &format!("unclassified table {unknown}"),
+        );
+    }
+}
+
+#[test]
+fn historical_project_provenance_is_schema_local() {
+    let mut inventory = historical_fixture();
+    assert!(
+        !inventory
+            .projects
+            .iter()
+            .any(|project| project.id == id(501))
+    );
+    assert!(
+        verify_inventory(&inventory).is_empty(),
+        "historical-only UUID is valid locally"
+    );
+    table_mut(
+        &mut inventory,
+        &format!("{HISTORICAL_SCHEMA}.memory_entries"),
+    )
+    .rows[0]
+        .source_project_id = Some(id(1));
+    assert_blocked(
+        &inventory,
+        &reviewed(&inventory),
+        "unknown historical source project",
+    );
+    // A public UUID cannot substitute for an absent historical source project.
+    assert!(inventory.projects.iter().any(|project| project.id == id(1)));
+    let mut invalid = historical_fixture();
+    table_mut(&mut invalid, &format!("{HISTORICAL_SCHEMA}.projects")).rows[0].key =
+        "not-a-uuid".into();
+    assert_blocked(
+        &invalid,
+        &reviewed(&invalid),
+        "invalid historical project identity",
+    );
+}
+
+#[test]
+fn historical_foreign_keys_remain_accounted_and_cannot_be_promoted() {
+    let mut inventory = historical_fixture();
+    let entries = table_mut(
+        &mut inventory,
+        &format!("{HISTORICAL_SCHEMA}.memory_entries"),
+    );
+    entries.columns.push(Column {
+        name: "project_id".into(),
+        data_type: "uuid".into(),
+        nullable: false,
+    });
+    entries.foreign_keys.push(ForeignKey {
+        name: "historical_project_fk".into(),
+        columns: vec!["project_id".into()],
+        target_table: format!("{HISTORICAL_SCHEMA}.projects"),
+        target_columns: vec!["id".into()],
+    });
+    entries.rows[0].references.push(RowReference {
+        constraint: "historical_project_fk".into(),
+        target: Some(RecordRef {
+            table: format!("{HISTORICAL_SCHEMA}.projects"),
+            key: id(501).to_string(),
+        }),
+    });
+    let manifest = reviewed(&inventory);
+    assert!(verify_manifest(&inventory, &manifest).plan_valid);
+    let mut changed = manifest.clone();
+    changed
         .table_policies
-        .iter()
-        .find(|policy| policy.table == "mab_full_20260516_150014.memory_entries")
-        .expect("explicit unresolved policy");
-    assert!(policy.strategy.is_none());
+        .iter_mut()
+        .find(|policy| policy.table == format!("{HISTORICAL_SCHEMA}.memory_entries"))
+        .expect("historical policy")
+        .strategy = Some(TableStrategy::Owned);
+    assert_blocked(&inventory, &changed, "invalid or unclassified table policy");
+    let mut overridden = manifest.clone();
+    overridden.records.push(RecordDecision {
+        record: RecordRef {
+            table: format!("{HISTORICAL_SCHEMA}.memory_entries"),
+            key: id(502).to_string(),
+        },
+        disposition: Disposition::Area {
+            area: AreaId::General,
+            review: review(SourceClassification::Knowledge),
+        },
+    });
+    assert_blocked(&inventory, &overridden, "extraneous record decision");
+    table_mut(
+        &mut inventory,
+        &format!("{HISTORICAL_SCHEMA}.memory_entries"),
+    )
+    .rows[0]
+        .references[0]
+        .target
+        .as_mut()
+        .expect("target")
+        .key = id(999).to_string();
+    assert_blocked(&inventory, &reviewed(&inventory), "dangling reference");
+}
+
+#[test]
+fn streamed_inventory_digest_preserves_format_one_bytes() {
+    use sha2::{Digest, Sha256};
+    let mut inventory = historical_fixture();
+    inventory.projects[0].name = "Name with unicode £ and \"quoted\" text\n".into();
+    inventory.tables.reverse();
+    let entries = table_mut(&mut inventory, "public.memory_entries");
+    entries.rows.reverse();
+    entries.columns.push(Column {
+        name: "a_first".into(),
+        data_type: "text".into(),
+        nullable: true,
+    });
+    entries.foreign_keys.push(ForeignKey {
+        name: "z_last".into(),
+        columns: vec!["id".into(), "a_first".into()],
+        target_table: "public.projects".into(),
+        target_columns: vec!["id".into(), "slug".into()],
+    });
+    entries.foreign_keys.push(ForeignKey {
+        name: "a_first".into(),
+        columns: vec!["id".into()],
+        target_table: "public.projects".into(),
+        target_columns: vec!["id".into()],
+    });
+    entries.rows[0].references = vec![
+        RowReference {
+            constraint: "z_last".into(),
+            target: None,
+        },
+        RowReference {
+            constraint: "a_first".into(),
+            target: Some(RecordRef {
+                table: "public.projects".into(),
+                key: id(1).to_string(),
+            }),
+        },
+    ];
+    // Reference implementation is the original format-v1 normalization. Keep
+    // this comparison so reducing allocations never invalidates reviewed hashes.
+    let mut normalized = inventory.clone();
+    normalized.projects.sort_by_key(|project| project.id);
+    normalized.tables.sort_by(|a, b| a.table.cmp(&b.table));
+    for table in &mut normalized.tables {
+        table.columns.sort_by(|a, b| a.name.cmp(&b.name));
+        table.foreign_keys.sort_by(|a, b| a.name.cmp(&b.name));
+        table.rows.sort_by(|a, b| a.key.cmp(&b.key));
+        for row in &mut table.rows {
+            row.references
+                .sort_by(|a, b| a.constraint.cmp(&b.constraint));
+        }
+    }
+    let legacy = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&normalized).expect("legacy serialization"))
+    );
+    assert_eq!(
+        inventory_digest(&inventory).expect("streamed digest"),
+        legacy
+    );
 }
 
 #[test]

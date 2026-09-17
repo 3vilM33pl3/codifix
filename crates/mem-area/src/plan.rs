@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use crate::policy::{HISTORICAL_PROJECT_TABLE, HISTORICAL_TABLES, historical_project_table};
 use crate::*;
 
 fn lineage_table(table: &str) -> bool {
@@ -39,22 +40,94 @@ fn source_lineages(inventory: &Inventory) -> BTreeMap<Uuid, BTreeSet<Uuid>> {
 /// A stable digest of the complete supplied evidence. Vector ordering is
 /// normalized except FK column order, which carries SQL semantics.
 pub fn inventory_digest(inventory: &Inventory) -> Result<String, serde_json::Error> {
-    let mut normalized = inventory.clone();
-    normalized.projects.sort_by_key(|project| project.id);
-    normalized.tables.sort_by(|a, b| a.table.cmp(&b.table));
-    for table in &mut normalized.tables {
-        table.columns.sort_by(|a, b| a.name.cmp(&b.name));
-        table.foreign_keys.sort_by(|a, b| a.name.cmp(&b.name));
-        table.rows.sort_by(|a, b| a.key.cmp(&b.key));
-        for row in &mut table.rows {
-            row.references
-                .sort_by(|a, b| a.constraint.cmp(&b.constraint));
+    use serde::ser::{SerializeSeq, SerializeStruct};
+
+    // Preserve format-v1 field order and normalized bytes exactly, while holding
+    // only sorted references rather than a cloned inventory plus full JSON buffer.
+    struct NormalizedTable<'a>(&'a TableInventory);
+    struct NormalizedRows<'a>(&'a [RowInventory]);
+    impl serde::Serialize for NormalizedTable<'_> {
+        fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            let table = self.0;
+            let mut columns: Vec<_> = table.columns.iter().collect();
+            columns.sort_by(|a, b| a.name.cmp(&b.name));
+            let mut foreign_keys: Vec<_> = table.foreign_keys.iter().collect();
+            foreign_keys.sort_by(|a, b| a.name.cmp(&b.name));
+            let mut state = serializer.serialize_struct("TableInventory", 5)?;
+            state.serialize_field("table", &table.table)?;
+            state.serialize_field("columns", &columns)?;
+            state.serialize_field("foreign_keys", &foreign_keys)?;
+            state.serialize_field("row_count", &table.row_count)?;
+            state.serialize_field("rows", &NormalizedRows(&table.rows))?;
+            state.end()
         }
     }
-    Ok(format!(
-        "{:x}",
-        Sha256::digest(serde_json::to_vec(&normalized)?)
-    ))
+    impl serde::Serialize for NormalizedRows<'_> {
+        fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            #[derive(serde::Serialize)]
+            struct NormalizedRow<'a> {
+                key: &'a str,
+                row_sha256: &'a str,
+                source_project_id: Option<Uuid>,
+                canonical_id: Option<Uuid>,
+                version: &'a Option<VersionIdentity>,
+                references: Vec<&'a RowReference>,
+            }
+            let mut rows: Vec<_> = self.0.iter().collect();
+            rows.sort_by(|a, b| a.key.cmp(&b.key));
+            let mut sequence = serializer.serialize_seq(Some(rows.len()))?;
+            for row in rows {
+                let mut references: Vec<_> = row.references.iter().collect();
+                references.sort_by(|a, b| a.constraint.cmp(&b.constraint));
+                sequence.serialize_element(&NormalizedRow {
+                    key: &row.key,
+                    row_sha256: &row.row_sha256,
+                    source_project_id: row.source_project_id,
+                    canonical_id: row.canonical_id,
+                    version: &row.version,
+                    references,
+                })?;
+            }
+            sequence.end()
+        }
+    }
+    #[derive(serde::Serialize)]
+    struct NormalizedInventory<'a> {
+        format_version: u32,
+        source_instance: Uuid,
+        snapshot_id: Uuid,
+        captured_at: &'a str,
+        migration_version: u32,
+        projects: Vec<&'a ProjectProvenance>,
+        tables: Vec<NormalizedTable<'a>>,
+    }
+    struct HashWriter(Sha256);
+    impl std::io::Write for HashWriter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.update(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut projects: Vec<_> = inventory.projects.iter().collect();
+    projects.sort_by_key(|project| project.id);
+    let mut tables: Vec<_> = inventory.tables.iter().map(NormalizedTable).collect();
+    tables.sort_by(|a, b| a.0.table.cmp(&b.0.table));
+    let normalized = NormalizedInventory {
+        format_version: inventory.format_version,
+        source_instance: inventory.source_instance,
+        snapshot_id: inventory.snapshot_id,
+        captured_at: &inventory.captured_at,
+        migration_version: inventory.migration_version,
+        projects,
+        tables,
+    };
+    let mut writer = HashWriter(Sha256::new());
+    serde_json::to_writer(&mut writer, &normalized)?;
+    Ok(format!("{:x}", writer.0.finalize()))
 }
 
 /// Check structural completeness against the supported table catalog. This
@@ -92,14 +165,31 @@ pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
     }
     let mut tables = BTreeMap::new();
     let mut rows = BTreeMap::new();
+    let mut historical_projects = BTreeSet::new();
+    for table in &inventory.tables {
+        if table.table == HISTORICAL_PROJECT_TABLE {
+            for row in &table.rows {
+                match Uuid::parse_str(&row.key) {
+                    Ok(id) if !id.is_nil() => {
+                        historical_projects.insert(id);
+                    }
+                    _ => errors.push(format!(
+                        "invalid historical project identity {}:{}",
+                        table.table, row.key
+                    )),
+                }
+            }
+        }
+    }
     let mut versions = BTreeSet::new();
     let lineages = source_lineages(inventory);
     let mut state_ids = BTreeSet::new();
     for table in &inventory.tables {
+        let strategy = table_strategy(&table.table);
         if tables.insert(table.table.as_str(), table).is_some() {
             errors.push(format!("duplicate table {}", table.table));
         }
-        if table_strategy(&table.table).is_none() {
+        if strategy.is_none() {
             errors.push(format!("unclassified table {}", table.table));
         }
         if table.row_count != table.rows.len() as u64 {
@@ -141,10 +231,7 @@ pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
             }
         }
         for row in &table.rows {
-            let record = RecordRef {
-                table: table.table.clone(),
-                key: row.key.clone(),
-            };
+            let record = (table.table.as_str(), row.key.as_str());
             if row.key.trim().is_empty() || rows.insert(record, row).is_some() {
                 errors.push(format!(
                     "missing or duplicate row key {}:{}",
@@ -162,13 +249,17 @@ pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
                     table.table, row.key
                 ));
             }
-            if let Some(project) = row.source_project_id
-                && !projects.contains_key(&project)
-            {
-                errors.push(format!(
-                    "unknown source project {project} for {}:{}",
-                    table.table, row.key
-                ));
+            if let Some(project) = row.source_project_id {
+                if let Some(project_table) = historical_project_table(&table.table) {
+                    if !historical_projects.contains(&project) {
+                        errors.push(format!("unknown historical source project {project} in {project_table} for {}:{}", table.table, row.key));
+                    }
+                } else if !projects.contains_key(&project) {
+                    errors.push(format!(
+                        "unknown source project {project} for {}:{}",
+                        table.table, row.key
+                    ));
+                }
             }
             if lineage_table(&table.table) {
                 if row.canonical_id.is_none() || row.source_project_id.is_none() {
@@ -186,9 +277,7 @@ pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
                         table.table, row.key
                     ));
                 }
-            } else if table_strategy(&table.table) == Some(TableStrategy::Owned)
-                && row.canonical_id.is_some()
-            {
+            } else if strategy == Some(TableStrategy::Owned) && row.canonical_id.is_some() {
                 errors.push(format!(
                     "supporting record needs its own review {}:{}",
                     table.table, row.key
@@ -292,16 +381,26 @@ pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
             errors.push(format!("missing table inventory {table}"));
         }
     }
-    for (record, row) in &rows {
+    if HISTORICAL_TABLES
+        .iter()
+        .any(|table| tables.contains_key(table))
+    {
+        for table in HISTORICAL_TABLES {
+            if !tables.contains_key(table) {
+                errors.push(format!("missing historical table inventory {table}"));
+            }
+        }
+    }
+    for ((table, key), row) in &rows {
         for reference in &row.references {
             if let Some(target) = &reference.target {
-                match rows.get(target) {
+                match rows.get(&(target.table.as_str(), target.key.as_str())) {
                     None => errors.push(format!(
                         "dangling reference {}:{}:{}",
-                        record.table, record.key, reference.constraint
+                        table, key, reference.constraint
                     )),
                     Some(target_row)
-                        if lineage_table(&record.table)
+                        if lineage_table(table)
                             && lineage_table(&target.table)
                             && !reference.constraint.starts_with("logical:")
                             && (row.canonical_id != target_row.canonical_id
@@ -309,18 +408,15 @@ pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
                     {
                         errors.push(format!(
                             "inconsistent lineage metadata {}:{}:{}",
-                            record.table, record.key, reference.constraint
+                            table, key, reference.constraint
                         ));
                     }
                     _ => {}
                 }
             }
         }
-        if record.table == "public.memory_entries" && !state_ids.contains(&row.canonical_id) {
-            errors.push(format!(
-                "memory version missing canonical state {}",
-                record.key
-            ));
+        if *table == "public.memory_entries" && !state_ids.contains(&row.canonical_id) {
+            errors.push(format!("memory version missing canonical state {}", key));
         }
     }
     for table in &inventory.tables {
@@ -335,11 +431,8 @@ pub fn verify_inventory(inventory: &Inventory) -> Vec<String> {
         }
     }
     for (id, project) in &projects {
-        let key = RecordRef {
-            table: "public.projects".into(),
-            key: id.to_string(),
-        };
-        if !rows.contains_key(&key) {
+        let project_key = id.to_string();
+        if !rows.contains_key(&("public.projects", project_key.as_str())) {
             errors.push(format!(
                 "project provenance missing source row {} ({})",
                 id, project.slug
@@ -573,12 +666,13 @@ pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verificati
     let mut consumed_decisions = BTreeSet::new();
     let mut required_bindings = BTreeSet::new();
     for table in &inventory.tables {
+        let strategy = table_strategy(&table.table);
         for row in &table.rows {
             let record = RecordRef {
                 table: table.table.clone(),
                 key: row.key.clone(),
             };
-            let destination = match table_strategy(&table.table) {
+            let destination = match strategy {
                 Some(TableStrategy::Owned) if lineage_table(&table.table) => row
                     .canonical_id
                     .and_then(|id| owners.get(&id))
