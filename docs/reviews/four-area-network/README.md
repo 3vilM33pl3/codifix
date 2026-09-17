@@ -53,6 +53,15 @@ approval. PostgreSQL provisioning is no longer an implicit hard package
 dependency. Synthetic native/cross and dependency-failure tests pass; actual
 rebuilt artifacts are still pending.
 
+Offline federation regression rerun passes 76 Rust tests across `mem-federation`
+and `mem-atproto`, including shared Rust/Lean traces, expertise policy, replay,
+serialization and MST checks. Pinned Lean 4.33.1 `lake build && lake test` also
+passes, with existing proof-linter warnings retained. This is scoped model and
+adapter evidence, not PDS/network/cryptography/deployed-authentication proof.
+Read-only health checks still show the existing production/development instances
+on 2.0.0 / 2.0.0-dev, databases up and no pending offline items; no deployment
+restart or configuration change was made.
+
 The [approved execution contract](contract.md) is the source of scope and gates.
 Trust runs on the console-administered CA; Homelab, Workshop and General run on
 Monolith, each with independent application/database boundaries. Supervisors use
