@@ -6,6 +6,7 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
+mem-record = { path = "../mem-record" }
 mem-supervisor = { path = "../mem-supervisor" }
 chrono.workspace = true
 serde.workspace = true

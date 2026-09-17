@@ -93,6 +93,9 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         ])
     } else {
         let mut spans = match app.active_tab {
+            TabKind::Supervisor => vec![Span::raw(
+                "r refresh  PgDn next history  Home first page  j/k scroll",
+            )],
             TabKind::Jobs => vec![Span::raw(
                 "r refresh  s filter  j/k select  Enter inspect  R retry  PgDn next  d scroll",
             )],
@@ -304,6 +307,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         let tab_ctx = TabRenderContext::new(app);
         match app.active_tab {
             TabKind::Jobs => super::tabs::jobs::draw(frame, app, chunks[2]),
+            TabKind::Supervisor => super::tabs::supervisor::draw(frame, app, chunks[2]),
             TabKind::Resume => draw_resume_tab(frame, &tab_ctx, chunks[2]),
             TabKind::Memories => draw_memories_tab(frame, &tab_ctx, chunks[2]),
             TabKind::Agents => draw_agents_tab(frame, &tab_ctx, chunks[2]),

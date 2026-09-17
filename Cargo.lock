@@ -3090,6 +3090,7 @@ version = "2.0.0"
 dependencies = [
  "chrono",
  "humantime-serde",
+ "mem-supervisor",
  "serde",
  "serde_json",
  "sha2",
@@ -3171,6 +3172,7 @@ dependencies = [
  "mem-search",
  "mem-skills",
  "mem-store",
+ "mem-supervisor-store",
  "mem-test-support",
  "mem-watch",
  "openidconnect",
@@ -3271,6 +3273,7 @@ name = "mem-supervisor-store"
 version = "2.0.0"
 dependencies = [
  "chrono",
+ "mem-record",
  "mem-supervisor",
  "mem-test-support",
  "serde",

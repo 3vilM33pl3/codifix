@@ -405,7 +405,11 @@ async fn lock_day(conn: &mut PgConnection, area: Area, day: NaiveDate) -> Result
         .await?;
     Ok(())
 }
-async fn totals(conn: &mut PgConnection, area: Area, day: NaiveDate) -> Result<BudgetTotals> {
+pub(crate) async fn totals(
+    conn: &mut PgConnection,
+    area: Area,
+    day: NaiveDate,
+) -> Result<BudgetTotals> {
     let row = sqlx::query("SELECT coalesce(sum(CASE WHEN s.state='settled' THEN u.actual_usd_micros ELSE 0 END),0)::text AS charged,coalesce(sum(CASE WHEN s.state IN ('reserved','in_flight','uncertain') THEN a.worst_usd_micros ELSE 0 END),0)::text AS reserved,count(*) FILTER (WHERE s.state<>'released_before_send') AS calls FROM supervisor_attempts a JOIN supervisor_attempt_states s ON s.attempt_id=a.id LEFT JOIN supervisor_settlements u ON u.attempt_id=a.id WHERE a.area=$1 AND a.day=$2")
         .bind(area_name(area)).bind(day).fetch_one(conn).await?;
     Ok(BudgetTotals {

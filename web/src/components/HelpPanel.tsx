@@ -7,6 +7,13 @@ const SHARED_CONTROLS = [
 ];
 
 const WEB_HELP: Record<Tab, { title: string; purpose: string; layout: string[]; controls: string[]; workflows: string[] }> = {
+  supervisor: {
+    title: "Supervisor Help",
+    purpose: "Inspect this instance's durable supervisor policy, budget and metadata-only history.",
+    layout: ["Instance-wide scope; the project selector does not change this view.", "An enabled policy is not an active worker; this build reports execution not integrated."],
+    controls: ["Refresh supervisor clears stale results before reloading.", "First/Next history page use committed sequence cursors."],
+    workflows: ["Requires global memory_read; project access alone is insufficient.", "Uncertain provider charges remain reserved.", "No work is started and no private questions, sources or prompts appear here."],
+  },
   jobs: {
     title: "Jobs Help",
     purpose: "Inspect durable background stages and act on sanitized failures.",

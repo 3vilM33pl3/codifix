@@ -27,6 +27,32 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/supervisor:
+    get:
+      operationId: inspectLocalSupervisor
+      summary: Instance-wide metadata-only supervisor policy, budget and journal.
+      x-stability: internal
+      description: |
+        Requires global memory_read; project-scoped access is insufficient.
+        Does not enroll, enable, claim work or call a model. An enabled persisted
+        policy does not establish worker health. This build reports execution
+        not_integrated. Missing explicit durable identity returns snapshot null;
+        a configured identity must match the database binding. Private proposals,
+        questions, prompts, source context and provider bodies are never returned.
+      parameters:
+        - { name: after, in: query, schema: { type: string, pattern: '^[0-9]+$', default: '0' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: Consistent read-only snapshot; Cache-Control no-store.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupervisorResponse' }
+        '400': { description: Invalid cursor or page bounds. }
+        '401': { description: Authentication required. }
+        '403': { description: Global memory_read required. }
+        '409': { description: Durable identity mismatch. }
+        '503': { description: Supervisor database unavailable; diagnostics sanitized. }
   /v1/projects/{slug}/jobs:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
@@ -2343,6 +2369,68 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    SupervisorResponse:
+      type: object
+      required: [read_only, execution, snapshot]
+      properties:
+        read_only: { type: boolean }
+        execution: { type: string, enum: [not_integrated] }
+        snapshot:
+          oneOf:
+            - { type: 'null' }
+            - { $ref: '#/components/schemas/SupervisorSnapshot' }
+    SupervisorSnapshot:
+      type: object
+      required: [instance_id, area, observed_at, policy, budget, action_counts, journal, next_after, has_more]
+      properties:
+        instance_id: { type: string, format: uuid }
+        area: { type: [string, 'null'], enum: [trust, homelab, workshop, general, null] }
+        observed_at: { type: string, format: date-time }
+        policy:
+          oneOf:
+            - { type: 'null' }
+            - type: object
+              required: [revision, enabled, revoked, model, daily_usd_micros, daily_calls]
+              properties:
+                revision: { type: string, format: uuid }
+                enabled: { type: boolean }
+                revoked: { type: boolean }
+                model: { type: string, const: gpt-5.6-sol }
+                daily_usd_micros: { type: string, pattern: '^[0-9]+$' }
+                daily_calls: { type: integer, minimum: 0 }
+        budget:
+          oneOf:
+            - { type: 'null' }
+            - type: object
+              required: [day, charged_usd_micros, reserved_usd_micros, calls]
+              properties:
+                day: { type: string, format: date }
+                charged_usd_micros: { type: string, pattern: '^[0-9]+$' }
+                reserved_usd_micros: { type: string, pattern: '^[0-9]+$' }
+                calls: { type: integer, minimum: 0 }
+        action_counts:
+          type: array
+          items:
+            type: object
+            required: [state, count]
+            properties:
+              state: { type: string, enum: [observed, proposed, authorized, queued, running, verified, denied, failed, expired, cancelled, uncertain] }
+              count: { type: string, pattern: '^[0-9]+$' }
+        journal:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [sequence, action_id, attempt_id, policy_revision, event, recorded_at]
+            properties:
+              sequence: { type: string, pattern: '^[0-9]+$' }
+              action_id: { type: [string, 'null'], format: uuid }
+              attempt_id: { type: [string, 'null'], format: uuid }
+              policy_revision: { type: string, format: uuid }
+              event: { type: string, enum: [policy_installed, policy_enabled, policy_paused, policy_revoked, policy_reduced, observed, proposed, authorized, queued, claimed, renewed, verified, failed, denied, expired, cancelled, uncertain, reserved, begun, released_before_send, settled, settled_over_bound, model_context_bound] }
+              recorded_at: { type: string, format: date-time }
+        next_after: { type: string, pattern: '^[0-9]+$' }
+        has_more: { type: boolean }
     JobStatus:
       type: string
       enum: [queued, running, retry_wait, blocked, failed, succeeded, skipped]

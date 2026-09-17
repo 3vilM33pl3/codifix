@@ -50,6 +50,7 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
     let web_assets = state.web_root.clone();
     let mcp_config = state.config.mcp.clone();
     let mut app = Router::new()
+        .route("/v1/supervisor", get(crate::handlers::supervisor::inspect))
         .route("/v1/projects/{slug}/jobs", get(crate::handlers::jobs::list))
         .route(
             "/v1/projects/{slug}/jobs/{id}",

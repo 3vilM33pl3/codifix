@@ -40,6 +40,9 @@ pub struct TelemetryConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    /// Explicit durable identity; does not enroll, bind or activate a supervisor.
+    #[serde(default)]
+    pub supervisor: Option<SupervisorIdentityConfig>,
     /// Operator-only measurement settings, never accepted in a query request.
     #[serde(default)]
     pub evaluation: EvaluationConfig,
@@ -90,6 +93,13 @@ pub struct AppConfig {
     /// Path of the dev overlay if one was applied.
     #[serde(skip)]
     pub resolved_dev_overlay_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SupervisorIdentityConfig {
+    pub instance_id: Uuid,
+    pub area: SupervisorArea,
 }
 
 /// Setting a semantic timestamp opts a dedicated service into measurement mode.

@@ -171,7 +171,7 @@ pub(crate) async fn lock_policy(conn: &mut PgConnection, area: Area) -> Result<P
         .await?;
     read_policy(conn, area).await
 }
-async fn read_policy(conn: &mut PgConnection, area: Area) -> Result<PolicyRecord> {
+pub(crate) async fn read_policy(conn: &mut PgConnection, area: Area) -> Result<PolicyRecord> {
     let row = sqlx::query("SELECT p.* FROM supervisor_policies p JOIN supervisor_authorities a ON (p.area=a.area AND p.revision=a.current_revision) WHERE a.area=$1")
         .bind(area_name(area)).fetch_optional(conn).await?.ok_or(StoreError::NotFound)?;
     Ok(PolicyRecord {

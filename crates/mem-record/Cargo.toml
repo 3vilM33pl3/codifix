@@ -6,6 +6,7 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
+mem-supervisor = { path = "../mem-supervisor" }
 chrono.workspace = true
 humantime-serde.workspace = true
 sha2.workspace = true

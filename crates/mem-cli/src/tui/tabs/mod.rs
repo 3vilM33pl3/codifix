@@ -12,6 +12,7 @@ pub(super) mod query;
 pub(super) mod resume;
 pub(super) mod review;
 pub(super) mod skills;
+pub(in crate::tui) mod supervisor;
 pub(super) mod watchers;
 
 use crossterm::event::Event;
@@ -73,5 +74,6 @@ pub(in crate::tui) fn dispatch_update(
         TabKind::Embeddings => embeddings::update(event, &mut app.embeddings, &mut ctx),
         TabKind::Resume => resume::update(event, &mut app.resume, &mut ctx),
         TabKind::Jobs => TabAction::None,
+        TabKind::Supervisor => TabAction::None,
     }
 }

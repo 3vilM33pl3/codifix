@@ -51,6 +51,41 @@ pub(crate) struct ApiClient {
 }
 
 impl ApiClient {
+    pub(crate) async fn supervisor(
+        &self,
+        after: &str,
+        limit: u32,
+    ) -> Result<mem_record::SupervisorResponse> {
+        anyhow::ensure!(
+            !after.is_empty()
+                && after.bytes().all(|byte| byte.is_ascii_digit())
+                && after.parse::<i64>().is_ok()
+                && (1..=100).contains(&limit),
+            "invalid supervisor page bounds"
+        );
+        let response = self
+            .client
+            .get(service_url(&self.config, "/v1/supervisor"))
+            .query(&[("after", after.to_owned()), ("limit", limit.to_string())])
+            .headers(write_headers(&self.config)?)
+            .header(reqwest::header::CACHE_CONTROL, "no-store")
+            .send()
+            .await
+            .map_err(|_| anyhow::anyhow!("Offline: supervisor request failed"))?;
+        match response.status().as_u16() {
+            200 => response
+                .json()
+                .await
+                .map_err(|_| anyhow::anyhow!("Invalid supervisor metadata response")),
+            401 => anyhow::bail!("Signed out: authenticate to inspect the supervisor"),
+            403 => anyhow::bail!("Forbidden: instance-wide memory_read is required"),
+            409 => {
+                anyhow::bail!("Identity mismatch: configured supervisor and database need review")
+            }
+            503 => anyhow::bail!("Offline: supervisor storage unavailable"),
+            _ => anyhow::bail!("Supervisor request rejected; response details suppressed"),
+        }
+    }
     pub(crate) async fn jobs(
         &self,
         project: &str,

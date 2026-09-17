@@ -57,6 +57,12 @@ let sessionBootstrapPromise: Promise<void> | null = null;
 let authMePromise: Promise<AuthMeResponse> | null = null;
 let serviceReadOnly = false;
 
+export async function supervisorStatus(after: string, signal?: AbortSignal): Promise<import("./features/supervisor/types").SupervisorResponse> {
+  return parseJson(await apiFetch(`/v1/supervisor?${new URLSearchParams({ after, limit: "50" })}`, {
+    signal, cache: "no-store",
+  }));
+}
+
 /** True when the service reported read-only (student) mode on token bootstrap. */
 export function isServiceReadOnly(): boolean {
   return serviceReadOnly;

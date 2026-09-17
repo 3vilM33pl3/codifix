@@ -7,6 +7,7 @@ Use this map to find the right PR boundary before opening the large files.
 - `crates/mem-record`: shared request/response and domain record types (pure serde, no I/O).
 - `crates/mem-area`: offline, hash-bound four-area inventory, review planner and strict payload materializer. No database access or implicit project-name classification; unknown tables and unresolved ownership block migration.
 - `crates/mem-area-store`: trusted fresh-target PostgreSQL import of opaque reviewed partitions; atomic source rows and immutable reconciliation/provenance receipts. No database discovery, migrations, credentials, live cutover or operator CLI.
+- `crates/mem-area-ops`: protected `memory-area-import inspect/prepare/import` operator, explicit local target and exact artifact bindings. Never discovers databases, runs migrations or activates services.
 - `crates/mem-supervisor`: pure supervisor policy, action, budget and fencing contracts. No provider/process/runtime access; adapters must establish durable admission and verified effects. See the [four-area execution ledger](../../reviews/four-area-network/README.md).
 - `crates/mem-supervisor-store`: opt-in supervisor policies, fenced actions, immutable instance/project/model-input binding, physical attempts, daily accounting and commit-ordered metadata journal. Private typed proposals use a separate exact-project store; no service authorization or scheduler.
 - `crates/mem-supervisor-runtime`: bounded text-only Sol requests, exact token counting and one-shot provider sends admitted by the supervisor store. No ordinary query context, Pi integration or running worker; source/disclosure consent remains a service-boundary obligation.
@@ -77,7 +78,7 @@ audit. The real-client, independent-database fake-model/game rehearsal is
 ## Common Change Paths
 
 - Add a CLI command: update `crates/mem-cli/src/main.rs` or `crates/mem-cli/src/commands/`, add help metadata, add a `docs/user/cli/*.md` page, and extend command-help tests.
-- Add a service endpoint: add types in `mem-api`, route/service logic in `mem-service`, tests in the touched crate, and client wiring where needed.
+- Add a service endpoint: add shared types in `mem-record`, route/service logic in `mem-service`, tests in the touched crate, and client wiring where needed.
 - Change authentication: update shared contracts in `mem-api`, central policy and stores under `mem-service/src/auth/`, the OpenAPI spec, and transport-specific credential propagation. Never authorize independently in a leaf handler.
 - Change query ranking: update `mem-search`, preserve diagnostics, and add tests for result ordering or explanation fields.
 - Change memory curation: update `mem-curate`, replacement proposal behavior, memory type docs, and database tests when persistence changes.

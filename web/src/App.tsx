@@ -20,6 +20,7 @@ import { SkillsTab } from "./features/skills/SkillsTab";
 import { AccessTab } from "./features/access/AccessTab";
 import { FederationTab } from "./features/federation/FederationTab";
 import { JobsTab } from "./features/jobs/JobsTab";
+import { SupervisorTab } from "./features/supervisor/SupervisorTab";
 import { useAppShell } from "./hooks/useAppShell";
 import { MORE_TABS, PRIMARY_TABS, type Tab } from "./tabs";
 import type { AuthMeResponse } from "./types";
@@ -557,6 +558,7 @@ export default function App() {
       ) : null}
       {tab === "federation" ? <FederationTab project={project} /> : null}
       {tab === "jobs" ? <JobsTab project={project} readOnly={serviceReadOnly} /> : null}
+      {tab === "supervisor" ? <SupervisorTab key={authMe?.principal.id ?? "signed-out"} /> : null}
       <footer className="statusbar">{statusMessage}</footer>
     </div>
   );

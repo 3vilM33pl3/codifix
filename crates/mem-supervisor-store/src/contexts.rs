@@ -214,7 +214,7 @@ fn sanitize(error: StoreError) -> StoreError {
         other => other,
     }
 }
-async fn read_binding(conn: &mut PgConnection) -> Result<Option<InstanceBinding>> {
+pub(crate) async fn read_binding(conn: &mut PgConnection) -> Result<Option<InstanceBinding>> {
     let Some(row) = sqlx::query(
         "SELECT instance_id,area,created_at FROM supervisor_instance_binding WHERE singleton",
     )

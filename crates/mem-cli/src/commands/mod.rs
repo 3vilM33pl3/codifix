@@ -46,6 +46,7 @@ pub(crate) mod skill_support;
 mod status;
 pub(crate) mod status_support;
 mod structure;
+pub(crate) mod supervisor;
 mod tour;
 #[cfg(feature = "tui")]
 mod tui;

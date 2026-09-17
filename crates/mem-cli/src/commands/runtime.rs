@@ -1353,6 +1353,8 @@ pub(in crate::commands) enum Command {
     Curate(CurateArgs),
     #[command(about = "Inspect and explicitly retry durable project background work.", after_help = crate::commands::jobs::HELP)]
     Jobs(crate::commands::jobs::JobsArgs),
+    #[command(about = "Inspect this instance's supervisor policy, budget and action history.", after_help = crate::commands::supervisor::HELP)]
+    Supervisor(crate::commands::supervisor::SupervisorArgs),
     #[command(about = "Scan a repository for candidate durable memories.", after_help = SCAN_AFTER_HELP)]
     Scan(ScanArgs),
     #[command(about = "Ingest documents from any directory — no git required.", after_help = INGEST_AFTER_HELP)]
@@ -3742,6 +3744,10 @@ pub(super) async fn run() -> Result<()> {
         Command::Jobs(args) => {
             let api = ApiClient::new(client, config);
             crate::commands::jobs::handle(args, &api).await?;
+        }
+        Command::Supervisor(args) => {
+            let api = ApiClient::new(client, config);
+            crate::commands::supervisor::handle(args, &api).await?;
         }
         Command::Embeddings(args) => {
             crate::commands::embeddings::handle(args, client, config).await?

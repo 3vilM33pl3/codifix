@@ -47,6 +47,7 @@ pub(super) struct App {
     pub(in crate::tui) automations: AutomationsTabState,
     pub(in crate::tui) embeddings: EmbeddingsTabState,
     pub(in crate::tui) jobs: super::tabs::jobs::JobsState,
+    pub(in crate::tui) supervisor: super::tabs::supervisor::SupervisorState,
     pub(in crate::tui) filters: Filters,
     pub(in crate::tui) background_tx: mpsc::UnboundedSender<BackgroundEvent>,
 }
@@ -404,6 +405,7 @@ pub(super) struct ProjectRefreshResult {
 }
 
 pub(super) enum BackgroundEvent {
+    Supervisor(Result<mem_record::SupervisorResponse, String>),
     Jobs {
         project: String,
         result: Result<super::tabs::jobs::JobsResult, String>,
@@ -518,9 +520,10 @@ pub(super) enum TabKind {
     Embeddings,
     Resume,
     Jobs,
+    Supervisor,
 }
 
-pub(super) const VISIBLE_TABS: [TabKind; 13] = [
+pub(super) const VISIBLE_TABS: [TabKind; 14] = [
     TabKind::Memories,
     TabKind::Agents,
     TabKind::Query,
@@ -534,6 +537,7 @@ pub(super) const VISIBLE_TABS: [TabKind; 13] = [
     TabKind::Embeddings,
     TabKind::Resume,
     TabKind::Jobs,
+    TabKind::Supervisor,
 ];
 
 impl TabKind {
@@ -552,6 +556,7 @@ impl TabKind {
             Self::Embeddings => "Embeddings",
             Self::Resume => "Resume",
             Self::Jobs => "Jobs",
+            Self::Supervisor => "Supervisor",
         }
     }
 
@@ -569,13 +574,14 @@ impl TabKind {
             Self::Automations => Self::Embeddings,
             Self::Embeddings => Self::Resume,
             Self::Resume => Self::Jobs,
-            Self::Jobs => Self::Memories,
+            Self::Jobs => Self::Supervisor,
+            Self::Supervisor => Self::Memories,
         }
     }
 
     pub(in crate::tui) fn prev(self) -> Self {
         match self {
-            Self::Memories => Self::Jobs,
+            Self::Memories => Self::Supervisor,
             Self::Agents => Self::Memories,
             Self::Query => Self::Agents,
             Self::Activity => Self::Query,
@@ -588,6 +594,7 @@ impl TabKind {
             Self::Embeddings => Self::Automations,
             Self::Resume => Self::Embeddings,
             Self::Jobs => Self::Resume,
+            Self::Supervisor => Self::Jobs,
         }
     }
 
@@ -606,6 +613,7 @@ impl TabKind {
             Self::Embeddings => 10,
             Self::Resume => 11,
             Self::Jobs => 12,
+            Self::Supervisor => 13,
         }
     }
 }

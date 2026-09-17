@@ -560,6 +560,7 @@ impl App {
                 detail_scroll: 0,
             },
             jobs: super::tabs::jobs::JobsState::default(),
+            supervisor: super::tabs::supervisor::SupervisorState::default(),
             embeddings: EmbeddingsTabState {
                 embedding_backends_snapshot: None,
                 embedding_backends_error: None,
@@ -1052,6 +1053,7 @@ impl App {
                     self.jobs.receive(result);
                 }
             }
+            BackgroundEvent::Supervisor(result) => self.supervisor.receive(result),
             BackgroundEvent::ProjectRefreshLoaded(result) => {
                 self.apply_project_refresh(*result);
             }
@@ -1580,6 +1582,15 @@ impl App {
         if self.active_tab == TabKind::Jobs && self.jobs_key(key, api) {
             self.chrome.needs_redraw = true;
             return Ok(false);
+        }
+        if self.active_tab == TabKind::Supervisor {
+            if key.code == KeyCode::Char('r') && !self.service.health_ok {
+                self.request_refresh(api, RefreshMode::Full);
+            }
+            if self.supervisor_key(key, api) {
+                self.chrome.needs_redraw = true;
+                return Ok(false);
+            }
         }
         let tab_action = super::tabs::dispatch_update(self.active_tab, &Event::Key(key), self);
         if !tab_action.handled() {

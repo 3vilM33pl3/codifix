@@ -3,6 +3,10 @@
 The **Jobs** tab inspects durable background stages and provides confirmed retry
 with stable request IDs. See [Background jobs](../cli/jobs.md) for keys and policy.
 
+The **Supervisor** tab provides instance-wide metadata-only inspection, separate
+from local coding sessions in Agents. See [Supervisor inspection](../cli/supervisor.md)
+for permissions, cursor controls and explicit inactive-worker limitations.
+
 For private federation, launch `memory federation --project <slug> tui`. This
 focused workspace supports membership, exact publication review, shared citations,
 proposals, approval/rejection and synchronization through the same authenticated

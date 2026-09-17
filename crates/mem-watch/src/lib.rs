@@ -1062,6 +1062,7 @@ mod tests {
 
     fn test_app_config() -> AppConfig {
         AppConfig {
+            supervisor: None,
             evaluation: Default::default(),
             background_work: Default::default(),
             service: mem_config::ServiceConfig {

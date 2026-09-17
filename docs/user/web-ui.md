@@ -121,6 +121,12 @@ cargo run --bin memory -- service run
 
 ## Tabs
 
+**More → Supervisor** shows this instance's supervisor policy, exact budget
+amounts and bounded action history. It requires global `memory_read` and is not
+scoped by the project selector. This build explicitly reports execution **not
+integrated**, even if a policy is enabled. Viewing never starts work or exposes
+private question/model/source bodies. See [Supervisor inspection](cli/supervisor.md).
+
 The main tabs match the TUI order:
 
 | Tab | What it shows |

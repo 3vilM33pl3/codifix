@@ -16,6 +16,7 @@ mem-agenttop = { path = "../mem-agenttop" }
 mem-config = { path = "../mem-config" }
 mem-record = { path = "../mem-record" }
 mem-store = { path = "../mem-store" }
+mem-supervisor-store = { path = "../mem-supervisor-store" }
 mem-federation = { path = "../mem-federation" }
 mem-federation-store = { path = "../mem-federation-store" }
 mem-federation-runtime = { path = "../mem-federation-runtime" }

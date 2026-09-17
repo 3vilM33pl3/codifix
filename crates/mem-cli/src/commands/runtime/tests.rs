@@ -280,6 +280,24 @@ fn all_public_commands_have_help_metadata() {
     assert_command_metadata(&command, "memory");
 }
 
+#[test]
+fn supervisor_help_and_read_only_arguments_are_explicit() {
+    let help = rendered_help(&["memory", "supervisor", "--help"]);
+    assert!(help.contains("instance") && help.contains("global memory_read"));
+    assert!(help.contains("--after") && help.contains("--limit") && help.contains("--json"));
+    assert!(
+        Cli::try_parse_from([
+            "memory",
+            "supervisor",
+            "--after",
+            "9007199254740993",
+            "--json"
+        ])
+        .is_ok()
+    );
+    assert!(Cli::try_parse_from(["memory", "supervisor", "--enable"]).is_err());
+}
+
 fn repo_root_for_tests() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -2706,6 +2724,7 @@ fn write_file_if_changed_skips_identical_content() {
 
 fn test_app_config() -> AppConfig {
     AppConfig {
+        supervisor: None,
         evaluation: Default::default(),
         background_work: Default::default(),
         service: mem_config::ServiceConfig {
