@@ -58,6 +58,13 @@ Focused strict Clippy, formatting and boundaries pass. This validates separately
 the Pi wire and database/provider path; it is not yet an authenticated running
 proxy, current source/destination consent implementation, live agent, ARM64
 runtime or four-area deployment. Provider activation remains closed.
+The combined `mem-supervisor`, `mem-supervisor-store`,
+`mem-supervisor-runtime` and `mem-supervisor-pi` all-targets regression rerun
+passes **101 tests**, with required disposable PostgreSQL and five explicitly
+ignored environment-bound diagnostics. Both patched-AMD64 diagnostics were
+also exercised separately: the original three-case no-tools regression and the
+new two-case exact-input admission check. No live migrations, provider calls,
+credential changes, imports or service restarts were performed.
 
 The native rc.1 binaries and Web UI compiled at source `5827aeb`, but packaging
 failed because a private umask left the Debian control directory mode 0700.
