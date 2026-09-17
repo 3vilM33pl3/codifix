@@ -3,7 +3,7 @@
 Status: **build candidate only**. Not signed, published, installed or activated.
 This is not completion of the four-area foundation or permission to cut over.
 
-## Local build status, 2026-09-17 14:08 UTC
+## Local build status, verified 2026-09-17 20:19 UTC
 
 - Source `5827aeb`: native and ARM64 CLI/operator/gateway compilation completed;
   both Debian assemblies failed under the private umask. The ARM64 CLI was
@@ -11,10 +11,10 @@ This is not completion of the four-area foundation or permission to cut over.
 - Source `a1c5e4ee`: an unsigned AMD64 package assembled successfully in
   `/data/tmp/memory-four-area-rc1-artifacts-a1c5e4ee/`. It predates the runtime
   dependency and Web-tooling fixes and is **superseded; do not install/sign it**.
-- Source `57dd6a77c218bc641bc41258b22aad29154074b0`: corrected builds are in progress.
+- Source `57dd6a77c218bc641bc41258b22aad29154074b0`: both corrected builds completed.
   Outputs are `/data/tmp/memory-four-area-rc1-amd64-artifacts-57dd6a77/` and
-  `/data/tmp/memory-four-area-rc1-arm64-artifacts-57dd6a77/`. Completion, package
-  metadata, checksums and extracted-artifact verification remain to be recorded.
+  `/data/tmp/memory-four-area-rc1-arm64-artifacts-57dd6a77/`. Actual package
+  metadata, payload/control permissions and ELF architectures were verified.
   Their logs are `/data/tmp/memory-four-area-rc1-57dd6a77-amd64-build.log` and
   `/data/tmp/memory-four-area-rc1-57dd6a77-arm64-build.log`.
 
@@ -23,6 +23,29 @@ The corrected build checkouts retain their original directory names
 `/data/tmp/memory-four-area-rc1-5827aeb` (ARM64); both were cleanly fast-forwarded
 to the exact `57dd6a77` revision only after their previous commands exited.
 Directory names are not source identity. No original artifact was overwritten.
+
+Both packages report version `2.1.0~rc.1`. SHA-256:
+
+| Architecture | Debian artifact SHA-256 | Required runtime packages |
+| --- | --- | --- |
+| AMD64 | `441ab7f25ae1c187b8ed0b2b0eeded890e12b5b19bf0651da4a7244732edc7e5` | libc6 >= 2.39, libgcc-s1 >= 4.2, libstdc++6 >= 14, python3, gpg |
+| ARM64 | `071276c21edca40dbfdb55d3266836e760824d9bd85f90c8ae4f52f9716a64a7` | libc6:arm64 >= 2.43, libgcc-s1:arm64 >= 4.2, libstdc++6:arm64 >= 14, python3, gpg |
+
+The build used Rust 1.98.1 (`48a229cea`, LLVM 22.1.8), the locked workspace,
+native GCC and the configured `aarch64-linux-gnu` cross toolchain. PostgreSQL
+is suggested, not implicitly provisioned. Extracted directories, including
+`DEBIAN`, are 0755; all regular files are 0644 or 0755. Debian maintainer hooks
+were inspected, not executed. No installation/start/restart took place.
+
+The actual corrected AMD64 package's four executables passed bounded launch
+checks in image
+`ubuntu@sha256:cd21a4f68a617580279d4b091cb18e3af9fa8a87500665f0ae5f7f757d17d367`,
+with no network, a read-only root, non-root UID, no capabilities and no database
+or credentials mounted. CLI version and planner help succeed; schema planning
+reports the digest below without connecting. The gateway deliberately rejects
+missing configuration before any database access. It does **not** implement
+`--help`: an initial attempt treated it as a filename and failed; that is not a
+successful gateway-service test. No ARM64 execution or CA compatibility is claimed.
 
 The real native `memory --version` and `memory-area-import schema-plan` smoke
 checks passed in a non-root, network-none, read-only container. The latter binds
@@ -57,8 +80,8 @@ migrations extend the source snapshot's head 0052 through 0057. Normal app start
 runs migrations and bootstraps administration; do not start against an existing
 database as a package smoke test. No automatic database downgrade is supported.
 
-Focused software evidence is in the [execution ledger](README.md). Full release
-validation, actual AMD64/ARM64 artifacts, independent signing trust, CA runtime
+Focused software evidence is in the [execution ledger](README.md). Actual
+AMD64/ARM64 artifacts now exist; full release validation, independent signing trust, CA runtime
 compatibility, reviewed real-data partitioning, complete restore/writer fencing,
 host isolation and four-instance enrollment are separate open gates. Existing
 services remain unchanged. The upstream Pi artifacts require glibc 2.43; a

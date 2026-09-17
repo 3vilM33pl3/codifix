@@ -7,7 +7,10 @@ host-native lean CLI for cross-build completions, never the ARM64 target binary.
 Synthetic AMD64/ARM64 packaging tests pass, including immutable output paths,
 explicit build-volume output and Debian prerelease ordering (`2.1.0~rc.1` before
 `2.1.0`). The three clean-launcher tests also pass. These are build-path tests,
-not actual architecture artifacts, signing, installation or CA runtime evidence.
+not signing, installation or CA runtime evidence. The corrected real AMD64 and
+ARM64 packages subsequently completed at `57dd6a77`; exact hashes, dependencies,
+permission checks and bounded extracted-AMD64 checks are recorded in the
+[candidate ledger](rc1-candidate.md). ARM64 is statically inspected only.
 
 Pi follow-up: a real AMD64 RPC/fake-provider diagnostic in the pinned,
 network-disabled sandbox reproduces an **open tool-isolation defect**.
@@ -29,7 +32,7 @@ The native rc.1 binaries and Web UI compiled at source `5827aeb`, but packaging
 failed because a private umask left the Debian control directory mode 0700.
 Commit `7c988fab` normalizes only the public package payload, leaving its staging
 parent private. Both architecture fixture builds now test umask 077. No failed
-package was installed, and actual corrected artifacts remain pending.
+package was installed. Both actual corrected packages now assemble successfully.
 
 Fresh-target preparation now has an explicit `schema-plan` and
 `initialize-schema` operator path. A reviewed compiled migration digest and
@@ -52,7 +55,7 @@ native requirements are libc6 >= 2.39 and libstdc++6 >= 14; the cross sysroot
 metadata conservatively requires libc6:arm64 >= 2.43. These are not CA runtime
 approval. PostgreSQL provisioning is no longer an implicit hard package
 dependency. Synthetic native/cross and dependency-failure tests pass; actual
-rebuilt artifacts are still pending.
+rebuilt artifacts confirm the same runtime bounds and remain unsigned/uninstalled.
 
 Offline federation regression rerun passes 76 Rust tests across `mem-federation`
 and `mem-atproto`, including shared Rust/Lean traces, expertise policy, replay,
