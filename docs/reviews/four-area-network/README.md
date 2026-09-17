@@ -89,8 +89,8 @@ Monolith, each with independent application/database boundaries. Supervisors use
   optional eleven-table historical evaluation catalog, never a schema wildcard.
   Baseline migration 0052 and the opt-in supervisor schema are explicitly
   distinguished; runtime authority stays retired and private outcomes archived.
-  No operator import command or live import yet; unknown tables and unresolved
-  ownership block planning. The library implementation is recorded below.
+  The protected operator command is now implemented and tested below; no live
+  import yet. Unknown tables and unresolved ownership still block planning.
 - Debian install hooks no longer rotate credentials or restart unrelated
   services; opt-in named-instance units have separate protected configuration
   and pinned verified executables. Lifecycle regression tests pass. Actual-host
@@ -205,11 +205,10 @@ Monolith, each with independent application/database boundaries. Supervisors use
   found and closed missing replay-inactivity and payload/receipt-ID checks;
   payload FK/logical/ownership checks were strengthened alongside them.
   See [import boundaries](../../../crates/mem-area-store/README.md).
-  No real-data payload stream has been materialized or imported. Operator review,
-  archive durability, protected CLI, release packaging and writer fencing remain
-  open. Current collector relation rows lack project provenance: they stay blocked
-  from area import until ownership is reviewed; populated relationship migration
-  is not covered by this synthetic test slice.
+  This original slice did not cover populated relationships or an operator CLI;
+  the later evidence below closes those software gaps. No real-data partition
+  has been approved, materialized or imported. Operator review, archive durability,
+  actual release artifacts and writer fencing remain open.
 - R1/federation regression run: 13 `mem-store` and 26 `mem-federation-store`
   database tests pass. A test-only race was fixed by waiting for PostgreSQL
   backend termination before asserting stale-owner fencing; production fencing
@@ -234,15 +233,70 @@ Monolith, each with independent application/database boundaries. Supervisors use
   original identities and versions with database-up health. No supervisor model
   calls, real-data imports, CA changes, release publication or activation occurred.
 
-Next: review and classify the protected source by content/provenance; connect
-the tested import library to a protected payload/export/operator workflow and
-complete relationship ownership handling; obtain the CA
+- Exact private payload export (`0436b17`) now reads the pinned isolated restore
+  in a read-only transaction, preserving every original JSON byte inside bounded
+  NDJSON envelopes. The protected `partition-payload.ndjson` is 1,695,135,398
+  bytes, mode 0600, SHA-256
+  `1e9ba6e6740599dbe2d00e6b16b32bc6d4463c312045f43d9ce4d90105ba837f`.
+  Export alone was not reported as inventory verification.
+- The new read-only `memory-area-import verify-payload` (`d1dc9ab`) independently
+  **verified all 104 tables and 2,331,495 rows against the unchanged inventory**,
+  including exact file hashes, schema columns, owned row identities, references,
+  ordering, counts and complete-stream termination. It retained all 100 notices.
+  The real run took 351.23 seconds and peaked at 1,892,852 KiB RSS. It required no
+  ownership manifest, fabricated approval, archive rewrite or database connection.
+- The protected `memory-area-import` operator (`3983f01`) implements inspection,
+  preparation and explicit local-only import. Input descriptors and artifacts
+  are hash-bound through pinned private file handles; no configuration/credential
+  discovery or automatic migrations/startup occurs. Five tests use synthetic
+  databases/private files, the actual binary, interruption/tampering, safe
+  provenance projections, inactive-target reconciliation and sanitised failures.
+- Manifest-v2 reviewed relationships (`639df89`) retain both endpoint projects
+  without inventing a single project owner or changing inventory bytes. Each
+  edge requires its own review and both endpoints in one destination area;
+  cross-area/archive edges remain blocked. A populated PostgreSQL migration
+  test preserves exact edges/attribution and rejects changed replay. Together
+  the latest planner/materializer/operator/import tests pass **70 tests** with
+  required disposable PostgreSQL; strict focused Clippy and boundaries pass.
+- Supervisor inspection (`edb0d1d`) now works through the authenticated service,
+  Web, CLI and TUI. A separate durable configured instance UUID is checked
+  against the database binding, never confused with the service boot UUID.
+  Instance-wide metadata requires global `memory_read`; a project role is
+  insufficient. Reads create no jobs, policies, claims or provider calls.
+  Policy, budgets, counts and ordered journal IDs are shown without private
+  contents. The UI explicitly reports **execution not integrated**, including
+  when a stored policy is enabled. Refresh clears stale/denied results.
+- The disposable real browser/CLI/PTY rehearsal (`4304047`) passed against the
+  same synthetic read-only service and independent test database: durable
+  identity matched, paused policy/history rendered, terminal exited cleanly,
+  and no work was created. The browser screenshot at
+  `/data/tmp/memory-supervisor-inspection-E9ct4l/supervisor.png` was visually
+  inspected. No screenshot contains real knowledge or credentials. All **99 Web
+  tests**, Web build, OpenAPI/router parity, global-access HTTP test, supervisor
+  store inspection and lean CLI build pass. The React review kept requests
+  abortable with explicit signed-out/forbidden/offline/identity states.
+- Wider verification passes **241 lean CLI/TUI tests** and **22 required-database
+  service repository tests**. One pre-existing documentation portability check
+  was first run and failed on machine-local paths in the concurrent M2 financial
+  review; it was excluded from the subsequent focused run, not reported passed.
+  The unrelated M2/M4 work was preserved. The no-default-feature service build
+  still emits existing offline-stub warnings; no workspace-wide Clippy or release
+  gate pass is claimed. TUI help/navigation expectations and the old Debian
+  restart-all test were corrected to the approved opt-in behavior.
+- The Debian builder now packages the two locked, architecture-specific migration
+  operators, read-only CA preflight, release-staging tool and operator guides.
+  Stubbed lifecycle/staging tests prove they are included but never executed
+  by a package hook; no package was built for release, signed, installed or
+  activated by this test. No Pi binary, secret or private dataset is bundled.
+
+Next: review and classify the protected source by content/provenance; obtain the CA
 console inventory and complete the writer-stop/host/offline backup gates. Model
 integration still needs current collection/destination consent and Pi proxy-only
 egress; credential selection is resolved. Durable scheduling and supervision,
-Web/TUI agent workflows, real releases, enrollment and the live four-area demo
-remain unimplemented or unverified. No full-workspace/database/browser/Lean
-release-gate pass is claimed from the focused tests above.
+Web/TUI agent actions/chat, real releases, enrollment and the live four-area demo
+remain unimplemented or unverified. The inspection-only browser/terminal rehearsal
+does not satisfy those gates or prove actual agent execution. No full-workspace,
+PDS/Lean or release-gate pass is claimed from the focused tests above.
 
 Every release and live activation requires evidence in this ledger. Do not mark
 the contract complete based on scaffolding or synthetic tests alone. CA console
