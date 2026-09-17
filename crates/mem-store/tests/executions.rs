@@ -56,11 +56,15 @@ async fn live_foreground_owner_is_not_recovered_and_lost_owner_cannot_commit() {
         .await
         .unwrap();
     // Only the session created above on the disposable database is terminated.
-    sqlx::query("SELECT pg_terminate_backend($1)")
+    // timeout=0 only acknowledges SIGTERM delivery; the backend may still own
+    // its advisory lock when finish_tx runs. Wait for actual termination, not
+    // an arbitrary sleep, before asserting that the owner has lost its fence.
+    let terminated: bool = sqlx::query_scalar("SELECT pg_terminate_backend($1, 5000)")
         .bind(pid)
-        .execute(&pool)
+        .fetch_one(&pool)
         .await
         .unwrap();
+    assert!(terminated, "disposable execution backend must terminate");
     drop(owner);
     assert!(matches!(
         finish_tx(&mut phase, id).await,
