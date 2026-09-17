@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "helper": "finish-plan-execution",
+  "report": {
+    "completed_item_texts": [
+      "Back up the current native compact deck and retain its PDF before updating the existing URL.",
+      "Retitle slide 8 \u201cEnterprise experience. A network to open doors.\u201d and add concise Enterprise delivery / Established relationships sections: BAE Systems client engagement, Shell engineering leadership, McKinsey technology consulting; a route to introductions, insight into enterprise buyers, founder-led discovery.",
+      "Retain Olivier Van Acker as founder and creator of Memory Layer, supported shipped-product credibility, repeatable integration / measured pilot / validated delivery-economics proof points, planned-team qualification and invitation to discuss financing without a fixed ask. Use company names as text.",
+      "Source Shell/McKinsey to the existing CV/archive; record BAE as founder-confirmed client engagement without invented specifics. Qualify established relationships without current buyer/pilot interest or company endorsement. Notes explain discovery, procurement and adoption advantages.",
+      "Inspect the revised slide and verify all ten slides, native editability, notes, links and order; preserve original 18-slide presentation, financial content and open M3/M5 gates.",
+      "Publish updated PDF, linked Notion summary, claim register and repository dossier with small commits; complete plan verification. No runtime, API, configuration or financial-model changes."
+    ],
+    "completed_items": 6,
+    "plan_title": "Compact v2 \u2014 Make the founder advantage explicit",
+    "project": "memory",
+    "remaining_items": [],
+    "thread_key": "compact-v2---make-the-founder-advantage-explicit",
+    "total_items": 6,
+    "verified_complete": true
+  },
+  "archivedPlan": {
+    "archived": true,
+    "memory_id": "73c599e2-8f5c-4acb-a0b4-cb71cd9c9684",
+    "project": "memory",
+    "summary": "Compact v2 \u2014 Make the founder advantage explicit"
+  },
+  "implementationRecorded": true,
+  "implementationMemoryIds": [
+    "a1b8fd6e-653b-493e-9210-75259bedd9ee"
+  ],
+  "nativeRevision": "mGEM-zCad9anRw"
+}
