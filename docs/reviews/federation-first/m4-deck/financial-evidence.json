@@ -1,0 +1,1600 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-09-17T11:47:38Z",
+  "liveReadWindowUtc": {
+    "started": "2026-09-17T11:43:36Z",
+    "completed": "2026-09-17T11:45:28Z"
+  },
+  "scope": "Read-only live M2 Base verification for M4 deck. No source input, formula, refresh, publication, or model mutation.",
+  "modelVersion": "M2-2026-09-15-v3-assurance",
+  "modelBasis": "Alternative London and New York company bases for one commercial forecast; not additive. Pre-tax planning hypotheses. No fixed fundraising ask.",
+  "sourceCode": {
+    "gitHead": "3983f0124160e7e124fbc8377159672d14e0e73b",
+    "generator": "docs/reviews/federation-first/m2-model/build_model.py",
+    "generatorSha256": "b5dbde6491e23982a09d0c7cc674a950803c2bb6bc4fa9c286f904f0acd3db5e",
+    "fingerprintImplementation": "docs/reviews/federation-first/m2-model/refresh.mjs",
+    "fingerprintImplementationSha256": "42c3ff20ad9ede24a5254742ab7b72182a5fdafe8bb90c179884793cad6c07bc",
+    "manifestGeneration": "python3 docs/reviews/federation-first/m2-model/build_model.py --region both --output-dir /tmp/m4-financial-evidence",
+    "fingerprintMethod": "FNV-1a32 of JSON.stringify of address-key-sorted formula map. A deterministic drift detector, not a cryptographic guarantee."
+  },
+  "regionalParity": {
+    "count": 304,
+    "mismatches": [],
+    "regionalExclusions": "Team annual salaries; Assumptions B:D rows 33, 70–83, 126.",
+    "sharedInputRanges": [
+      "Assumptions!B3",
+      "Assumptions!B10:D32",
+      "Assumptions!B34:D69",
+      "Assumptions!B84:D90 (editable cells; 86–87 immutable)",
+      "Assumptions!B95:D106",
+      "Assumptions!B118:D121",
+      "Assumptions!B127:D128",
+      "Team!AM5:AN22",
+      "Team!AQ5:AQ22",
+      "Team!AM46:AN46",
+      "Team!AQ46"
+    ]
+  },
+  "workbooks": {
+    "london": {
+      "spreadsheetId": "1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0",
+      "url": "https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit?ouid=117996706485490200256",
+      "title": "Codifix — London — M2 financial model",
+      "currency": "GBP",
+      "driveModifiedTime": "2026-09-15T20:52:45.765Z",
+      "formulaCount": 12354,
+      "formulaFingerprint": "fnv1a32:d74d6a28",
+      "expectedFormulaFingerprint": "fnv1a32:d74d6a28",
+      "formulaFingerprintMatches": true,
+      "inputCount": 371,
+      "inputFingerprint": "fnv1a32:0c1db4bc",
+      "expectedInputFingerprint": "fnv1a32:0c1db4bc",
+      "inputMismatchCount": 0,
+      "mismatches": [],
+      "checks": {
+        "Checks!B5": 0,
+        "Checks!B6": 0,
+        "Checks!B7": 0,
+        "Checks!B8": 1.8480932340025902e-9,
+        "Checks!B9": 1.1641532182693481e-10,
+        "Checks!B10": 6.828031473560259e-10,
+        "Checks!B11": 3.1977833714336157e-9,
+        "Checks!B12": 4.656612873077393e-10,
+        "Checks!B13": 4.656612873077393e-10,
+        "Checks!B14": 8.913048077374697e-11,
+        "Checks!B15": 0,
+        "Checks!B16": 5.820766091346741e-11,
+        "Checks!B17": 0,
+        "Checks!B18": 0,
+        "Checks!B28": 0,
+        "Checks!B29": 0,
+        "Checks!B30": 0,
+        "Checks!B31": 0,
+        "Checks!B32": 0,
+        "Checks!B33": 0,
+        "Checks!B34": 0,
+        "Checks!B35": 0,
+        "Checks!B36": 0
+      },
+      "outputs": {
+        "arr36": {
+          "range": "Summary!E6",
+          "value": 2240301,
+          "formula": "=Revenue!AL21"
+        },
+        "accounts36": {
+          "range": "Summary!E7",
+          "value": 22.38,
+          "formula": "=Revenue!AL10"
+        },
+        "deployments36": {
+          "range": "Summary!E8",
+          "value": 60.76,
+          "formula": "=Revenue!AL11"
+        },
+        "revenue36": {
+          "range": "Summary!B50",
+          "value": 2198035.2625,
+          "formula": "=SUM(C9:E9)"
+        },
+        "grossMargin36": {
+          "range": "Summary!B51",
+          "value": 0.6568736265365819,
+          "formula": "=IF(B50=0,\"\",SUM(C10:E10)/B50)"
+        },
+        "requiredGrossFunding": {
+          "range": "Summary!B23",
+          "value": 3226268.299476148,
+          "formula": "=B22/(1-Assumptions!$E$31)"
+        },
+        "minCash24": {
+          "range": "Summary!B26",
+          "value": 867410.7070280001,
+          "formula": "=MIN('P&L & Cash'!C31:Z31)"
+        },
+        "endingCash36": {
+          "range": "Summary!B28",
+          "value": 1062469.065120288,
+          "formula": "='P&L & Cash'!AL31"
+        },
+        "staff36": {
+          "range": "Summary!E18",
+          "value": 9,
+          "formula": "=Team!AL27"
+        },
+        "totalSpend24": {
+          "range": "Summary!B42",
+          "value": 3298117.865916125,
+          "formula": "=SUM(B35:B41)+B47+B48"
+        },
+        "gbpFunding": {
+          "range": "Summary!B32",
+          "value": 3226268.299476148,
+          "formula": "=B23/Assumptions!E6"
+        },
+        "gbpARR36": {
+          "range": "Summary!B52",
+          "value": 2240301,
+          "formula": "=E6/Assumptions!E6"
+        },
+        "aiSpend24": {
+          "range": "Summary!B73",
+          "value": 420000,
+          "formula": "=SUM('Employee AI'!C17:Z17)"
+        },
+        "aiReserve24": {
+          "range": "Summary!B74",
+          "value": 420000,
+          "formula": "=SUM('Employee AI'!C18:Z18)"
+        },
+        "aiSpend36": {
+          "range": "Summary!B76",
+          "value": 690000,
+          "formula": "=SUM('Employee AI'!C17:AL17)"
+        },
+        "payrollSavings24": {
+          "range": "Summary!B79",
+          "value": 736500,
+          "formula": "=SUM(Team!C42:Z42)"
+        },
+        "payrollSavings36": {
+          "range": "Summary!B80",
+          "value": 1823500,
+          "formula": "=SUM(Team!C42:AL42)"
+        },
+        "gbpAISpend24": {
+          "range": "Summary!B81",
+          "value": 420000,
+          "formula": "=B73/Assumptions!E6"
+        },
+        "gbpAIReserve24": {
+          "range": "Summary!B82",
+          "value": 420000,
+          "formula": "=B74/Assumptions!E6"
+        },
+        "staff12": {
+          "range": "Summary!C18",
+          "value": 8,
+          "formula": "=Team!N27"
+        },
+        "counselFees24": {
+          "range": "Summary!B58",
+          "value": 120000,
+          "formula": "=-SUM('P&L & Cash'!C39:Z39)"
+        },
+        "gaPayroll24": {
+          "range": "Summary!B48",
+          "value": 286000,
+          "formula": "=SUM(Team!C33:Z33)"
+        },
+        "gaAISpend24": {
+          "range": "Summary!B59",
+          "value": 55000,
+          "formula": "=SUM('Employee AI'!C29:Z29)"
+        },
+        "assuranceLead24": {
+          "range": "Summary!B68",
+          "value": 1,
+          "formula": "=IF(Team!Z2>=Team!AT46+Assumptions!E69,Team!AU46,0)"
+        },
+        "staff24": {
+          "range": "Summary!B69",
+          "value": 9,
+          "formula": "=Team!Z27"
+        }
+      },
+      "activeCase": "Base",
+      "modelVersion": "M2-2026-09-15-v3-assurance",
+      "captureTimestamp": "2026-09-15T20:38:21.652Z",
+      "captureStaleStatus": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+      "capturedFormulaFingerprint": "fnv1a32:d74d6a28",
+      "baseCaptureComparison": {
+        "matched": 25,
+        "total": 25,
+        "mismatches": []
+      },
+      "finalCaptureComparison": {
+        "matched": 25,
+        "total": 25,
+        "mismatches": []
+      },
+      "checksPass": true,
+      "formulaReadRanges": [
+        "'Assumptions'!A1:J130",
+        "'Team'!A1:AU48",
+        "'Employee AI'!A1:AL34",
+        "'Cohorts'!A1:AL291",
+        "'Revenue'!A1:AL43",
+        "'Costs'!A1:AL42",
+        "'P&L & Cash'!A1:AL41",
+        "'Summary'!A1:E88",
+        "'Checks'!A1:AL469",
+        "'Sensitivity'!A1:AC378",
+        "'README'!A1:B41"
+      ],
+      "captureMetadataRanges": [
+        "Summary!B3:B4",
+        "Assumptions!B3:B4",
+        "Sensitivity!B3:B6",
+        "Sensitivity!O8:P8",
+        "Sensitivity!AA8:AC378"
+      ],
+      "annualPeriodRange": "Summary!C5:E5",
+      "annualPeriods": [
+        "Oct-26 to Sep-27",
+        "Oct-27 to Sep-28",
+        "Oct-28 to Sep-29"
+      ],
+      "annualForecasts": {
+        "Ending recurring ARR": {
+          "range": "Summary!C6:E6",
+          "values": [
+            160000,
+            900400,
+            2240301
+          ]
+        },
+        "Ending paying accounts (expected)": {
+          "range": "Summary!C7:E7",
+          "values": [
+            2,
+            10.4,
+            22.38
+          ]
+        },
+        "Ending live deployments including pilots": {
+          "range": "Summary!C8:E8",
+          "values": [
+            12,
+            30.8,
+            60.76
+          ]
+        },
+        "Recognised revenue": {
+          "range": "Summary!C9:E9",
+          "values": [
+            42000,
+            551855,
+            1604180.2625000002
+          ]
+        },
+        "Gross profit": {
+          "range": "Summary!C10:E10",
+          "values": [
+            -33936.57614999999,
+            287396.71023387497,
+            1190371.2600497878
+          ]
+        },
+        "Gross margin on recognised revenue": {
+          "range": "Summary!C11:E11",
+          "values": [
+            -0.8080137178571427,
+            0.5207830140777469,
+            0.7420433275962885
+          ]
+        },
+        "Cost of sales": {
+          "range": "Summary!C12:E12",
+          "values": [
+            75936.57615000001,
+            264458.28976612503,
+            413809.0024502122
+          ]
+        },
+        "Operating expense": {
+          "range": "Summary!C13:E13",
+          "values": [
+            -1243678,
+            -1714045,
+            -1688048
+          ]
+        },
+        "Operating result before tax": {
+          "range": "Summary!C14:E14",
+          "values": [
+            -1277614.57615,
+            -1426648.2897661247,
+            -497676.7399502122
+          ]
+        },
+        "Customer cash receipts": {
+          "range": "Summary!C15:E15",
+          "values": [
+            160000,
+            900400,
+            2240301
+          ]
+        },
+        "Operating and capital cash outflows": {
+          "range": "Summary!C16:E16",
+          "values": [
+            1319614.5761499999,
+            1978503.289766125,
+            2101857.002450212
+          ]
+        },
+        "Ending funded cash": {
+          "range": "Summary!C17:E17",
+          "values": [
+            2002128.3573366252,
+            924025.0675705001,
+            1062469.065120288
+          ]
+        },
+        "Ending paid headcount": {
+          "range": "Summary!C18:E18",
+          "values": [
+            8,
+            9,
+            9
+          ]
+        },
+        "Employee AI expected spending": {
+          "range": "Summary!C19:E19",
+          "values": [
+            157500,
+            262500,
+            270000
+          ]
+        }
+      },
+      "fundingBridge": {
+        "Required net financing": {
+          "range": "Summary!B22",
+          "value": 3161742.933486625,
+          "formula": "=MAX(0,-MIN('P&L & Cash'!C27:Z27),B25+B74-'P&L & Cash'!Z27)"
+        },
+        "Required gross financing": {
+          "range": "Summary!B23",
+          "value": 3226268.299476148,
+          "formula": "=B22/(1-Assumptions!$E$31)"
+        },
+        "Financing fees": {
+          "range": "Summary!B24",
+          "value": 64525.36598952301,
+          "formula": "=B23-B22"
+        },
+        "Months 25–27 cash-spend buffer": {
+          "range": "Summary!B25",
+          "value": 504025.0675705,
+          "formula": "=SUM('P&L & Cash'!AA25:AC25)+SUM('P&L & Cash'!AA23:AC23)"
+        },
+        "Minimum funded cash through month 24": {
+          "range": "Summary!B26",
+          "value": 867410.7070280001,
+          "formula": "=MIN('P&L & Cash'!C31:Z31)"
+        },
+        "Closing cash at month 24": {
+          "range": "Summary!B46",
+          "value": 924025.0675705001,
+          "formula": "='P&L & Cash'!Z31"
+        },
+        "Closing cash at month 36": {
+          "range": "Summary!B28",
+          "value": 1062469.065120288,
+          "formula": "='P&L & Cash'!AL31"
+        },
+        "Historical net raise reference": {
+          "range": "Summary!B29",
+          "value": 3000000,
+          "formula": "=Assumptions!$E$33"
+        },
+        "Required net financing less historical reference": {
+          "range": "Summary!B30",
+          "value": 161742.9334866251,
+          "formula": "=B22-B29"
+        },
+        "Months with a cash deficit before financing": {
+          "range": "Summary!B31",
+          "value": 0,
+          "formula": "=COUNTIFS('P&L & Cash'!C2:AL2,\"<\"&Assumptions!$E$30,'P&L & Cash'!C27:AL27,\"<0\")"
+        },
+        "Required gross financing (GBP comparison)": {
+          "range": "Summary!B32",
+          "value": 3226268.299476148,
+          "formula": "=B23/Assumptions!E6"
+        },
+        "Derived annual net revenue retention": {
+          "range": "Summary!B33",
+          "value": 1.3775,
+          "formula": "=Assumptions!E109"
+        },
+        "Total cash uses": {
+          "range": "Summary!B42",
+          "value": 3298117.865916125,
+          "formula": "=SUM(B35:B41)+B47+B48"
+        },
+        "Customer collections": {
+          "range": "Summary!B43",
+          "value": 1060400,
+          "formula": "=SUM(Revenue!C32:Z32)"
+        },
+        "Opening unrestricted cash": {
+          "range": "Summary!B44",
+          "value": 0,
+          "formula": "=Assumptions!$E$32"
+        },
+        "Net financing received through month 24": {
+          "range": "Summary!B45",
+          "value": 3161742.933486625,
+          "formula": "=SUM('P&L & Cash'!C28:Z29)"
+        },
+        "Funded runway (months from start)": {
+          "range": "Summary!B65",
+          "value": ">36",
+          "formula": "=IF(COUNTIF('P&L & Cash'!C31:AL31,\"<0\")=0,\">36\",MINIFS('P&L & Cash'!C2:AL2,'P&L & Cash'!C31:AL31,\"<0\")-1)"
+        },
+        "Month24 closing cash excluding AI earmark": {
+          "range": "Summary!B78",
+          "value": 504025.0675705001,
+          "formula": "=B27-B74"
+        },
+        "Required month 24 cash: operating buffer + AI": {
+          "range": "Summary!B84",
+          "value": 924025.0675705001,
+          "formula": "=B25+B74"
+        }
+      },
+      "controls": {
+        "Forecast start": {
+          "range": "Assumptions!E10",
+          "value": 46296,
+          "unit": "date"
+        },
+        "USD per GBP": {
+          "range": "Assumptions!E11",
+          "value": 1.3476,
+          "unit": "USD / GBP"
+        },
+        "Annual platform package": {
+          "range": "Assumptions!E12",
+          "value": 80000,
+          "unit": "GBP / account / year"
+        },
+        "Deployments included in package": {
+          "range": "Assumptions!E13",
+          "value": 2,
+          "unit": "deployments / account"
+        },
+        "Actual independently administered deployments": {
+          "range": "Assumptions!E14",
+          "value": 2,
+          "unit": "deployments / active account"
+        },
+        "Additional deployment annual fee": {
+          "range": "Assumptions!E15",
+          "value": 10000,
+          "unit": "GBP / deployment / year"
+        },
+        "Onboarding fee at paid conversion": {
+          "range": "Assumptions!E16",
+          "value": 0,
+          "unit": "GBP / new paying account"
+        },
+        "Pilot fee billed at pilot start": {
+          "range": "Assumptions!E17",
+          "value": 0,
+          "unit": "GBP / pilot"
+        },
+        "Included service questions": {
+          "range": "Assumptions!E18",
+          "value": 1000,
+          "unit": "questions / paid account / month"
+        },
+        "Eligible service questions per paid account": {
+          "range": "Assumptions!E19",
+          "value": 500,
+          "unit": "questions / account / month"
+        },
+        "Uncommitted question overage price": {
+          "range": "Assumptions!E20",
+          "value": 0,
+          "unit": "GBP / question"
+        },
+        "Earliest pilot start month": {
+          "range": "Assumptions!E21",
+          "value": 5,
+          "unit": "month index"
+        },
+        "Additional launch delay": {
+          "range": "Assumptions!E22",
+          "value": 0,
+          "unit": "months"
+        },
+        "Readiness permission for scenario (0 / 1)": {
+          "range": "Assumptions!E23",
+          "value": 1,
+          "unit": "0 or 1"
+        },
+        "Pilot service duration": {
+          "range": "Assumptions!E24",
+          "value": 2,
+          "unit": "months"
+        },
+        "Pilot to paid conversion": {
+          "range": "Assumptions!E25",
+          "value": 0.5,
+          "unit": "ratio"
+        },
+        "Annual logo churn at renewal": {
+          "range": "Assumptions!E26",
+          "value": 0.05,
+          "unit": "annual ratio"
+        },
+        "Retained account commitment expansion": {
+          "range": "Assumptions!E27",
+          "value": 0.45,
+          "unit": "annual ratio"
+        },
+        "Pilot start volume multiplier": {
+          "range": "Assumptions!E28",
+          "value": 1,
+          "unit": "multiplier"
+        },
+        "Invoice to receipt delay": {
+          "range": "Assumptions!E29",
+          "value": 1,
+          "unit": "whole months"
+        },
+        "Financing arrival month": {
+          "range": "Assumptions!E30",
+          "value": 1,
+          "unit": "month index"
+        },
+        "Financing fee": {
+          "range": "Assumptions!E31",
+          "value": 0.02,
+          "unit": "ratio"
+        },
+        "Opening unrestricted cash": {
+          "range": "Assumptions!E32",
+          "value": 0,
+          "unit": "GBP"
+        },
+        "Annual service workload growth": {
+          "range": "Assumptions!E34",
+          "value": 0.45,
+          "unit": "annual ratio"
+        },
+        "Initial question failure/refusal share": {
+          "range": "Assumptions!E35",
+          "value": 0.1,
+          "unit": "share"
+        },
+        "Additional attempts per initial failure": {
+          "range": "Assumptions!E36",
+          "value": 1,
+          "unit": "attempts / failed question"
+        },
+        "Memory inference tokens per attempt": {
+          "range": "Assumptions!E37",
+          "value": 4000,
+          "unit": "tokens / attempt"
+        },
+        "Blended Memory inference cost": {
+          "range": "Assumptions!E38",
+          "value": 2.5,
+          "unit": "GBP / million tokens"
+        },
+        "Additional stored replicas per origin collection": {
+          "range": "Assumptions!E44",
+          "value": 1,
+          "unit": "copies / collection"
+        },
+        "Delivery capacity per allocated FTE": {
+          "range": "Assumptions!E61",
+          "value": 120,
+          "unit": "hours / FTE / month"
+        },
+        "Codifix share of Memory service costs": {
+          "range": "Assumptions!E62",
+          "value": 1,
+          "unit": "share"
+        },
+        "Customer agent runtime reference spend": {
+          "range": "Assumptions!E63",
+          "value": "PENDING",
+          "unit": "GBP / active account / month"
+        },
+        "Codifix share of customer runtime spending": {
+          "range": "Assumptions!E64",
+          "value": 0,
+          "unit": "share"
+        },
+        "Delivery effort multiplier": {
+          "range": "Assumptions!E67",
+          "value": 1,
+          "unit": "multiplier"
+        },
+        "Regional salary multiplier": {
+          "range": "Assumptions!E68",
+          "value": 1,
+          "unit": "multiplier"
+        },
+        "Hiring delay versus source schedule": {
+          "range": "Assumptions!E69",
+          "value": 0,
+          "unit": "months"
+        },
+        "Loaded salary factor": {
+          "range": "Assumptions!E70",
+          "value": 1.2,
+          "unit": "multiplier"
+        },
+        "Accounting and payroll, excluding counsel": {
+          "range": "Assumptions!E78",
+          "value": 2500,
+          "unit": "GBP / month"
+        },
+        "Initial external assurance budget (historical SOC 2)": {
+          "range": "Assumptions!E79",
+          "value": 45000,
+          "unit": "GBP"
+        },
+        "Initial external assurance budget month": {
+          "range": "Assumptions!E80",
+          "value": 14,
+          "unit": "month index"
+        },
+        "Staffing profile: 0 lean / 1 historical": {
+          "range": "Assumptions!E118",
+          "value": 0,
+          "unit": "0 or 1"
+        },
+        "Employee AI allowance": {
+          "range": "Assumptions!E119",
+          "value": 5000,
+          "unit": "GBP / employee / month"
+        },
+        "Employee AI expected utilisation": {
+          "range": "Assumptions!E120",
+          "value": 0.5,
+          "unit": "share"
+        },
+        "Employee AI subscription allocation ceiling": {
+          "range": "Assumptions!E121",
+          "value": 250,
+          "unit": "GBP / employee / month"
+        },
+        "Fractional legal counsel monthly retainer": {
+          "range": "Assumptions!E126",
+          "value": 5000,
+          "unit": "GBP / month"
+        },
+        "Fractional legal counsel start month": {
+          "range": "Assumptions!E127",
+          "value": 1,
+          "unit": "month index"
+        },
+        "Fractional legal counsel included (0 / 1)": {
+          "range": "Assumptions!E128",
+          "value": 1,
+          "unit": "0 or 1"
+        },
+        "pilotStarts": {
+          "range": "Assumptions!E95:E106",
+          "values": [
+            0,
+            1,
+            3,
+            4,
+            4,
+            4,
+            5,
+            5,
+            6,
+            7,
+            7,
+            8
+          ],
+          "unit": "expected pilots per quarter"
+        }
+      },
+      "employeeAI": {
+        "perEmployee": {
+          "allowanceGBP": {
+            "range": "'Employee AI'!C6",
+            "value": 5000
+          },
+          "expectedSpendGBP": {
+            "range": "'Employee AI'!C9",
+            "value": 2500
+          },
+          "subscriptionGBP": {
+            "range": "'Employee AI'!C10",
+            "value": 250
+          },
+          "meteredGBP": {
+            "range": "'Employee AI'!C11",
+            "value": 2250
+          },
+          "unusedGBP": {
+            "range": "'Employee AI'!C12",
+            "value": 2500
+          }
+        },
+        "totals": {
+          "months1to24": {
+            "employeeMonths": {
+              "range": "'Employee AI'!C5:Z5",
+              "sum": 168
+            },
+            "allowanceGBP": {
+              "range": "'Employee AI'!C28:Z28",
+              "sum": 840000
+            },
+            "expectedSpendingGBP": {
+              "range": "'Employee AI'!C26:Z26",
+              "sum": 420000
+            },
+            "earmarkedUnusedGBP": {
+              "range": "'Employee AI'!C27:Z27",
+              "sum": 420000
+            }
+          },
+          "months1to36": {
+            "employeeMonths": {
+              "range": "'Employee AI'!C5:AL5",
+              "sum": 276
+            },
+            "allowanceGBP": {
+              "range": "'Employee AI'!C28:AL28",
+              "sum": 1380000
+            },
+            "expectedSpendingGBP": {
+              "range": "'Employee AI'!C26:AL26",
+              "sum": 690000
+            },
+            "earmarkedUnusedGBP": {
+              "range": "'Employee AI'!C27:AL27",
+              "sum": 690000
+            }
+          }
+        }
+      },
+      "assuranceLead": {
+        "Team!A46": "Head of Security & AI Governance",
+        "Team!B46": 130000,
+        "Team!AM46": 3,
+        "Team!AN46": 0,
+        "Team!AO46": "G&A",
+        "Team!AQ46": 1,
+        "Team!AT46": 3,
+        "Team!AU46": 1
+      },
+      "assuranceCoverage": {
+        "range": "Summary!B70",
+        "text": "Leadership and counsel are included. Total external ISO27001/ISO42001/SOC 2 Type II audit-budget coverage is UNVALIDATED; M3 must scope initial and recurring independent assurance fees."
+      },
+      "capturedCombinedStress": {
+        "definitionRange": "Sensitivity!A32:C32",
+        "label": "Launch delay 3 / support 2× / AI 100%",
+        "grossFunding": {
+          "range": "Sensitivity!G32",
+          "value": 3734376.9932817607
+        },
+        "endingCash36": {
+          "range": "Sensitivity!I32",
+          "value": -120768.11571637364
+        },
+        "capturedVersion": {
+          "range": "Sensitivity!O32",
+          "value": "M2-2026-09-15-v3-assurance"
+        },
+        "status": {
+          "range": "Sensitivity!P32",
+          "value": "Verified at capture; see live stale flag"
+        }
+      }
+    },
+    "newyork": {
+      "spreadsheetId": "1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es",
+      "url": "https://docs.google.com/spreadsheets/d/1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es/edit?ouid=117996706485490200256",
+      "title": "Codifix — New York — M2 financial model",
+      "currency": "USD",
+      "driveModifiedTime": "2026-09-15T20:52:47.691Z",
+      "formulaCount": 12354,
+      "formulaFingerprint": "fnv1a32:d74d6a28",
+      "expectedFormulaFingerprint": "fnv1a32:d74d6a28",
+      "formulaFingerprintMatches": true,
+      "inputCount": 371,
+      "inputFingerprint": "fnv1a32:352e5e9c",
+      "expectedInputFingerprint": "fnv1a32:352e5e9c",
+      "inputMismatchCount": 0,
+      "mismatches": [],
+      "checks": {
+        "Checks!B5": 0,
+        "Checks!B6": 0,
+        "Checks!B7": 4.729372449219227e-11,
+        "Checks!B8": 3.1723175197839737e-9,
+        "Checks!B9": 1.4551915228366852e-10,
+        "Checks!B10": 1.1432348401285708e-9,
+        "Checks!B11": 2.2118911147117615e-9,
+        "Checks!B12": 0,
+        "Checks!B13": 9.313225746154785e-10,
+        "Checks!B14": 1.8189894035458565e-10,
+        "Checks!B15": 0,
+        "Checks!B16": 1.4551915228366852e-11,
+        "Checks!B17": 0,
+        "Checks!B18": 0,
+        "Checks!B28": 7.639755494892597e-11,
+        "Checks!B29": 0,
+        "Checks!B30": 1.4551915228366852e-11,
+        "Checks!B31": 0,
+        "Checks!B32": 0,
+        "Checks!B33": 0,
+        "Checks!B34": 7.639755494892597e-11,
+        "Checks!B35": 2.1100277081131935e-10,
+        "Checks!B36": 0
+      },
+      "outputs": {
+        "arr36": {
+          "range": "Summary!E6",
+          "value": 3019029.6276000002,
+          "formula": "=Revenue!AL21"
+        },
+        "accounts36": {
+          "range": "Summary!E7",
+          "value": 22.38,
+          "formula": "=Revenue!AL10"
+        },
+        "deployments36": {
+          "range": "Summary!E8",
+          "value": 60.76,
+          "formula": "=Revenue!AL11"
+        },
+        "revenue36": {
+          "range": "Summary!B50",
+          "value": 2962072.3197450005,
+          "formula": "=SUM(C9:E9)"
+        },
+        "grossMargin36": {
+          "range": "Summary!B51",
+          "value": 0.6320713793023467,
+          "formula": "=IF(B50=0,\"\",SUM(C10:E10)/B50)"
+        },
+        "requiredGrossFunding": {
+          "range": "Summary!B23",
+          "value": 4913192.66445569,
+          "formula": "=B22/(1-Assumptions!$E$31)"
+        },
+        "minCash24": {
+          "range": "Summary!B26",
+          "value": 1254977.3738576004,
+          "formula": "=MIN('P&L & Cash'!C31:Z31)"
+        },
+        "endingCash36": {
+          "range": "Summary!B28",
+          "value": 1238160.2257561013,
+          "formula": "='P&L & Cash'!AL31"
+        },
+        "staff36": {
+          "range": "Summary!E18",
+          "value": 9,
+          "formula": "=Team!AL27"
+        },
+        "totalSpend24": {
+          "range": "Summary!B42",
+          "value": 4934166.641308569,
+          "formula": "=SUM(B35:B41)+B47+B48"
+        },
+        "gbpFunding": {
+          "range": "Summary!B32",
+          "value": 3645883.5444165114,
+          "formula": "=B23/Assumptions!E6"
+        },
+        "gbpARR36": {
+          "range": "Summary!B52",
+          "value": 2240301.0000000005,
+          "formula": "=E6/Assumptions!E6"
+        },
+        "aiSpend24": {
+          "range": "Summary!B73",
+          "value": 565992,
+          "formula": "=SUM('Employee AI'!C17:Z17)"
+        },
+        "aiReserve24": {
+          "range": "Summary!B74",
+          "value": 565992,
+          "formula": "=SUM('Employee AI'!C18:Z18)"
+        },
+        "aiSpend36": {
+          "range": "Summary!B76",
+          "value": 929844,
+          "formula": "=SUM('Employee AI'!C17:AL17)"
+        },
+        "payrollSavings24": {
+          "range": "Summary!B79",
+          "value": 1156250.0000000007,
+          "formula": "=SUM(Team!C42:Z42)"
+        },
+        "payrollSavings36": {
+          "range": "Summary!B80",
+          "value": 2822395.833333334,
+          "formula": "=SUM(Team!C42:AL42)"
+        },
+        "gbpAISpend24": {
+          "range": "Summary!B81",
+          "value": 420000,
+          "formula": "=B73/Assumptions!E6"
+        },
+        "gbpAIReserve24": {
+          "range": "Summary!B82",
+          "value": 420000,
+          "formula": "=B74/Assumptions!E6"
+        },
+        "staff12": {
+          "range": "Summary!C18",
+          "value": 8,
+          "formula": "=Team!N27"
+        },
+        "counselFees24": {
+          "range": "Summary!B58",
+          "value": 180000,
+          "formula": "=-SUM('P&L & Cash'!C39:Z39)"
+        },
+        "gaPayroll24": {
+          "range": "Summary!B48",
+          "value": 435416.6666666668,
+          "formula": "=SUM(Team!C33:Z33)"
+        },
+        "gaAISpend24": {
+          "range": "Summary!B59",
+          "value": 74118,
+          "formula": "=SUM('Employee AI'!C29:Z29)"
+        },
+        "assuranceLead24": {
+          "range": "Summary!B68",
+          "value": 1,
+          "formula": "=IF(Team!Z2>=Team!AT46+Assumptions!E69,Team!AU46,0)"
+        },
+        "staff24": {
+          "range": "Summary!B69",
+          "value": 9,
+          "formula": "=Team!Z27"
+        }
+      },
+      "activeCase": "Base",
+      "modelVersion": "M2-2026-09-15-v3-assurance",
+      "captureTimestamp": "2026-09-15T20:38:16.635Z",
+      "captureStaleStatus": "CURRENT INPUTS / FORMULAS VERIFIED AT REFRESH",
+      "capturedFormulaFingerprint": "fnv1a32:d74d6a28",
+      "baseCaptureComparison": {
+        "matched": 25,
+        "total": 25,
+        "mismatches": []
+      },
+      "finalCaptureComparison": {
+        "matched": 25,
+        "total": 25,
+        "mismatches": []
+      },
+      "checksPass": true,
+      "formulaReadRanges": [
+        "'Assumptions'!A1:J130",
+        "'Team'!A1:AU48",
+        "'Employee AI'!A1:AL34",
+        "'Cohorts'!A1:AL291",
+        "'Revenue'!A1:AL43",
+        "'Costs'!A1:AL42",
+        "'P&L & Cash'!A1:AL41",
+        "'Summary'!A1:E88",
+        "'Checks'!A1:AL469",
+        "'Sensitivity'!A1:AC378",
+        "'README'!A1:B41"
+      ],
+      "captureMetadataRanges": [
+        "Summary!B3:B4",
+        "Assumptions!B3:B4",
+        "Sensitivity!B3:B6",
+        "Sensitivity!O8:P8",
+        "Sensitivity!AA8:AC378"
+      ],
+      "annualPeriodRange": "Summary!C5:E5",
+      "annualPeriods": [
+        "Oct-26 to Sep-27",
+        "Oct-27 to Sep-28",
+        "Oct-28 to Sep-29"
+      ],
+      "annualForecasts": {
+        "Ending recurring ARR": {
+          "range": "Summary!C6:E6",
+          "values": [
+            215616,
+            1213379.04,
+            3019029.6276000002
+          ]
+        },
+        "Ending paying accounts (expected)": {
+          "range": "Summary!C7:E7",
+          "values": [
+            2,
+            10.4,
+            22.38
+          ]
+        },
+        "Ending live deployments including pilots": {
+          "range": "Summary!C8:E8",
+          "values": [
+            12,
+            30.8,
+            60.76
+          ]
+        },
+        "Recognised revenue": {
+          "range": "Summary!C9:E9",
+          "values": [
+            56599.2,
+            743679.7980000001,
+            2161793.3217450003
+          ]
+        },
+        "Gross profit": {
+          "range": "Summary!C10:E10",
+          "values": [
+            -57400.88001973998,
+            357090.70671117003,
+            1572551.310043094
+          ]
+        },
+        "Gross margin on recognised revenue": {
+          "range": "Summary!C11:E11",
+          "values": [
+            -1.0141641581460512,
+            0.4801672812297773,
+            0.72742907206954
+          ]
+        },
+        "Cost of sales": {
+          "range": "Summary!C12:E12",
+          "values": [
+            114000.08001973998,
+            386589.09128883004,
+            589242.0117019059
+          ]
+        },
+        "Operating expense": {
+          "range": "Summary!C13:E13",
+          "values": [
+            -1895598.9300000002,
+            -2537978.54,
+            -2501384.5999999996
+          ]
+        },
+        "Operating result before tax": {
+          "range": "Summary!C14:E14",
+          "values": [
+            -1952999.8100197397,
+            -2180887.8332888293,
+            -928833.2899569056
+          ]
+        },
+        "Customer cash receipts": {
+          "range": "Summary!C15:E15",
+          "values": [
+            215616,
+            1213379.04,
+            3019029.6276000002
+          ]
+        },
+        "Operating and capital cash outflows": {
+          "range": "Summary!C16:E16",
+          "values": [
+            2009599.0100197399,
+            2924567.63128883,
+            3090626.6117019057
+          ]
+        },
+        "Ending funded cash": {
+          "range": "Summary!C17:E17",
+          "values": [
+            3020945.801146837,
+            1309757.2098580068,
+            1238160.2257561013
+          ]
+        },
+        "Ending paid headcount": {
+          "range": "Summary!C18:E18",
+          "values": [
+            8,
+            9,
+            9
+          ]
+        },
+        "Employee AI expected spending": {
+          "range": "Summary!C19:E19",
+          "values": [
+            212247,
+            353745,
+            363851.99999999994
+          ]
+        }
+      },
+      "fundingBridge": {
+        "Required net financing": {
+          "range": "Summary!B22",
+          "value": 4814928.811166576,
+          "formula": "=MAX(0,-MIN('P&L & Cash'!C27:Z27),B25+B74-'P&L & Cash'!Z27)"
+        },
+        "Required gross financing": {
+          "range": "Summary!B23",
+          "value": 4913192.66445569,
+          "formula": "=B22/(1-Assumptions!$E$31)"
+        },
+        "Financing fees": {
+          "range": "Summary!B24",
+          "value": 98263.85328911431,
+          "formula": "=B23-B22"
+        },
+        "Months 25–27 cash-spend buffer": {
+          "range": "Summary!B25",
+          "value": 743765.2098580056,
+          "formula": "=SUM('P&L & Cash'!AA25:AC25)+SUM('P&L & Cash'!AA23:AC23)"
+        },
+        "Minimum funded cash through month 24": {
+          "range": "Summary!B26",
+          "value": 1254977.3738576004,
+          "formula": "=MIN('P&L & Cash'!C31:Z31)"
+        },
+        "Closing cash at month 24": {
+          "range": "Summary!B46",
+          "value": 1309757.2098580068,
+          "formula": "='P&L & Cash'!Z31"
+        },
+        "Closing cash at month 36": {
+          "range": "Summary!B28",
+          "value": 1238160.2257561013,
+          "formula": "='P&L & Cash'!AL31"
+        },
+        "Historical net raise reference": {
+          "range": "Summary!B29",
+          "value": 4500000,
+          "formula": "=Assumptions!$E$33"
+        },
+        "Required net financing less historical reference": {
+          "range": "Summary!B30",
+          "value": 314928.8111665761,
+          "formula": "=B22-B29"
+        },
+        "Months with a cash deficit before financing": {
+          "range": "Summary!B31",
+          "value": 0,
+          "formula": "=COUNTIFS('P&L & Cash'!C2:AL2,\"<\"&Assumptions!$E$30,'P&L & Cash'!C27:AL27,\"<0\")"
+        },
+        "Required gross financing (GBP comparison)": {
+          "range": "Summary!B32",
+          "value": 3645883.5444165114,
+          "formula": "=B23/Assumptions!E6"
+        },
+        "Derived annual net revenue retention": {
+          "range": "Summary!B33",
+          "value": 1.3775,
+          "formula": "=Assumptions!E109"
+        },
+        "Total cash uses": {
+          "range": "Summary!B42",
+          "value": 4934166.641308569,
+          "formula": "=SUM(B35:B41)+B47+B48"
+        },
+        "Customer collections": {
+          "range": "Summary!B43",
+          "value": 1428995.04,
+          "formula": "=SUM(Revenue!C32:Z32)"
+        },
+        "Opening unrestricted cash": {
+          "range": "Summary!B44",
+          "value": 0,
+          "formula": "=Assumptions!$E$32"
+        },
+        "Net financing received through month 24": {
+          "range": "Summary!B45",
+          "value": 4814928.811166577,
+          "formula": "=SUM('P&L & Cash'!C28:Z29)"
+        },
+        "Funded runway (months from start)": {
+          "range": "Summary!B65",
+          "value": ">36",
+          "formula": "=IF(COUNTIF('P&L & Cash'!C31:AL31,\"<0\")=0,\">36\",MINIFS('P&L & Cash'!C2:AL2,'P&L & Cash'!C31:AL31,\"<0\")-1)"
+        },
+        "Month24 closing cash excluding AI earmark": {
+          "range": "Summary!B78",
+          "value": 743765.2098580068,
+          "formula": "=B27-B74"
+        },
+        "Required month 24 cash: operating buffer + AI": {
+          "range": "Summary!B84",
+          "value": 1309757.2098580056,
+          "formula": "=B25+B74"
+        }
+      },
+      "controls": {
+        "Forecast start": {
+          "range": "Assumptions!E10",
+          "value": 46296,
+          "unit": "date"
+        },
+        "USD per GBP": {
+          "range": "Assumptions!E11",
+          "value": 1.3476,
+          "unit": "USD / GBP"
+        },
+        "Annual platform package": {
+          "range": "Assumptions!E12",
+          "value": 80000,
+          "unit": "GBP / account / year"
+        },
+        "Deployments included in package": {
+          "range": "Assumptions!E13",
+          "value": 2,
+          "unit": "deployments / account"
+        },
+        "Actual independently administered deployments": {
+          "range": "Assumptions!E14",
+          "value": 2,
+          "unit": "deployments / active account"
+        },
+        "Additional deployment annual fee": {
+          "range": "Assumptions!E15",
+          "value": 10000,
+          "unit": "GBP / deployment / year"
+        },
+        "Onboarding fee at paid conversion": {
+          "range": "Assumptions!E16",
+          "value": 0,
+          "unit": "GBP / new paying account"
+        },
+        "Pilot fee billed at pilot start": {
+          "range": "Assumptions!E17",
+          "value": 0,
+          "unit": "GBP / pilot"
+        },
+        "Included service questions": {
+          "range": "Assumptions!E18",
+          "value": 1000,
+          "unit": "questions / paid account / month"
+        },
+        "Eligible service questions per paid account": {
+          "range": "Assumptions!E19",
+          "value": 500,
+          "unit": "questions / account / month"
+        },
+        "Uncommitted question overage price": {
+          "range": "Assumptions!E20",
+          "value": 0,
+          "unit": "GBP / question"
+        },
+        "Earliest pilot start month": {
+          "range": "Assumptions!E21",
+          "value": 5,
+          "unit": "month index"
+        },
+        "Additional launch delay": {
+          "range": "Assumptions!E22",
+          "value": 0,
+          "unit": "months"
+        },
+        "Readiness permission for scenario (0 / 1)": {
+          "range": "Assumptions!E23",
+          "value": 1,
+          "unit": "0 or 1"
+        },
+        "Pilot service duration": {
+          "range": "Assumptions!E24",
+          "value": 2,
+          "unit": "months"
+        },
+        "Pilot to paid conversion": {
+          "range": "Assumptions!E25",
+          "value": 0.5,
+          "unit": "ratio"
+        },
+        "Annual logo churn at renewal": {
+          "range": "Assumptions!E26",
+          "value": 0.05,
+          "unit": "annual ratio"
+        },
+        "Retained account commitment expansion": {
+          "range": "Assumptions!E27",
+          "value": 0.45,
+          "unit": "annual ratio"
+        },
+        "Pilot start volume multiplier": {
+          "range": "Assumptions!E28",
+          "value": 1,
+          "unit": "multiplier"
+        },
+        "Invoice to receipt delay": {
+          "range": "Assumptions!E29",
+          "value": 1,
+          "unit": "whole months"
+        },
+        "Financing arrival month": {
+          "range": "Assumptions!E30",
+          "value": 1,
+          "unit": "month index"
+        },
+        "Financing fee": {
+          "range": "Assumptions!E31",
+          "value": 0.02,
+          "unit": "ratio"
+        },
+        "Opening unrestricted cash": {
+          "range": "Assumptions!E32",
+          "value": 0,
+          "unit": "USD"
+        },
+        "Annual service workload growth": {
+          "range": "Assumptions!E34",
+          "value": 0.45,
+          "unit": "annual ratio"
+        },
+        "Initial question failure/refusal share": {
+          "range": "Assumptions!E35",
+          "value": 0.1,
+          "unit": "share"
+        },
+        "Additional attempts per initial failure": {
+          "range": "Assumptions!E36",
+          "value": 1,
+          "unit": "attempts / failed question"
+        },
+        "Memory inference tokens per attempt": {
+          "range": "Assumptions!E37",
+          "value": 4000,
+          "unit": "tokens / attempt"
+        },
+        "Blended Memory inference cost": {
+          "range": "Assumptions!E38",
+          "value": 2.5,
+          "unit": "GBP / million tokens"
+        },
+        "Additional stored replicas per origin collection": {
+          "range": "Assumptions!E44",
+          "value": 1,
+          "unit": "copies / collection"
+        },
+        "Delivery capacity per allocated FTE": {
+          "range": "Assumptions!E61",
+          "value": 120,
+          "unit": "hours / FTE / month"
+        },
+        "Codifix share of Memory service costs": {
+          "range": "Assumptions!E62",
+          "value": 1,
+          "unit": "share"
+        },
+        "Customer agent runtime reference spend": {
+          "range": "Assumptions!E63",
+          "value": "PENDING",
+          "unit": "GBP / active account / month"
+        },
+        "Codifix share of customer runtime spending": {
+          "range": "Assumptions!E64",
+          "value": 0,
+          "unit": "share"
+        },
+        "Delivery effort multiplier": {
+          "range": "Assumptions!E67",
+          "value": 1,
+          "unit": "multiplier"
+        },
+        "Regional salary multiplier": {
+          "range": "Assumptions!E68",
+          "value": 1,
+          "unit": "multiplier"
+        },
+        "Hiring delay versus source schedule": {
+          "range": "Assumptions!E69",
+          "value": 0,
+          "unit": "months"
+        },
+        "Loaded salary factor": {
+          "range": "Assumptions!E70",
+          "value": 1.25,
+          "unit": "multiplier"
+        },
+        "Accounting and payroll, excluding counsel": {
+          "range": "Assumptions!E78",
+          "value": 3500,
+          "unit": "USD / month"
+        },
+        "Initial external assurance budget (historical SOC 2)": {
+          "range": "Assumptions!E79",
+          "value": 60000,
+          "unit": "USD"
+        },
+        "Initial external assurance budget month": {
+          "range": "Assumptions!E80",
+          "value": 14,
+          "unit": "month index"
+        },
+        "Staffing profile: 0 lean / 1 historical": {
+          "range": "Assumptions!E118",
+          "value": 0,
+          "unit": "0 or 1"
+        },
+        "Employee AI allowance": {
+          "range": "Assumptions!E119",
+          "value": 5000,
+          "unit": "GBP / employee / month"
+        },
+        "Employee AI expected utilisation": {
+          "range": "Assumptions!E120",
+          "value": 0.5,
+          "unit": "share"
+        },
+        "Employee AI subscription allocation ceiling": {
+          "range": "Assumptions!E121",
+          "value": 250,
+          "unit": "GBP / employee / month"
+        },
+        "Fractional legal counsel monthly retainer": {
+          "range": "Assumptions!E126",
+          "value": 7500,
+          "unit": "USD / month"
+        },
+        "Fractional legal counsel start month": {
+          "range": "Assumptions!E127",
+          "value": 1,
+          "unit": "month index"
+        },
+        "Fractional legal counsel included (0 / 1)": {
+          "range": "Assumptions!E128",
+          "value": 1,
+          "unit": "0 or 1"
+        },
+        "pilotStarts": {
+          "range": "Assumptions!E95:E106",
+          "values": [
+            0,
+            1,
+            3,
+            4,
+            4,
+            4,
+            5,
+            5,
+            6,
+            7,
+            7,
+            8
+          ],
+          "unit": "expected pilots per quarter"
+        }
+      },
+      "employeeAI": {
+        "perEmployee": {
+          "allowanceGBP": {
+            "range": "'Employee AI'!C6",
+            "value": 5000
+          },
+          "expectedSpendGBP": {
+            "range": "'Employee AI'!C9",
+            "value": 2500
+          },
+          "subscriptionGBP": {
+            "range": "'Employee AI'!C10",
+            "value": 250
+          },
+          "meteredGBP": {
+            "range": "'Employee AI'!C11",
+            "value": 2250
+          },
+          "unusedGBP": {
+            "range": "'Employee AI'!C12",
+            "value": 2500
+          }
+        },
+        "totals": {
+          "months1to24": {
+            "employeeMonths": {
+              "range": "'Employee AI'!C5:Z5",
+              "sum": 168
+            },
+            "allowanceGBP": {
+              "range": "'Employee AI'!C28:Z28",
+              "sum": 840000
+            },
+            "expectedSpendingGBP": {
+              "range": "'Employee AI'!C26:Z26",
+              "sum": 420000
+            },
+            "earmarkedUnusedGBP": {
+              "range": "'Employee AI'!C27:Z27",
+              "sum": 420000
+            }
+          },
+          "months1to36": {
+            "employeeMonths": {
+              "range": "'Employee AI'!C5:AL5",
+              "sum": 276
+            },
+            "allowanceGBP": {
+              "range": "'Employee AI'!C28:AL28",
+              "sum": 1380000
+            },
+            "expectedSpendingGBP": {
+              "range": "'Employee AI'!C26:AL26",
+              "sum": 690000
+            },
+            "earmarkedUnusedGBP": {
+              "range": "'Employee AI'!C27:AL27",
+              "sum": 690000
+            }
+          }
+        }
+      },
+      "assuranceLead": {
+        "Team!A46": "Head of Security & AI Governance",
+        "Team!B46": 190000,
+        "Team!AM46": 3,
+        "Team!AN46": 0,
+        "Team!AO46": "G&A",
+        "Team!AQ46": 1,
+        "Team!AT46": 3,
+        "Team!AU46": 1
+      },
+      "assuranceCoverage": {
+        "range": "Summary!B70",
+        "text": "Leadership and counsel are included. Total external ISO27001/ISO42001/SOC 2 Type II audit-budget coverage is UNVALIDATED; M3 must scope initial and recurring independent assurance fees."
+      },
+      "capturedCombinedStress": {
+        "definitionRange": "Sensitivity!A32:C32",
+        "label": "Launch delay 3 / support 2× / AI 100%",
+        "grossFunding": {
+          "range": "Sensitivity!G32",
+          "value": 5597919.940228133
+        },
+        "endingCash36": {
+          "range": "Sensitivity!I32",
+          "value": -356370.1991393852
+        },
+        "capturedVersion": {
+          "range": "Sensitivity!O32",
+          "value": "M2-2026-09-15-v3-assurance"
+        },
+        "status": {
+          "range": "Sensitivity!P32",
+          "value": "Verified at capture; see live stale flag"
+        }
+      }
+    }
+  },
+  "presentationRules": [
+    "Label forecasts and prices conditional/unvalidated, not traction, contracts, customer ROI or readiness evidence.",
+    "Present gross funding approximately GBP3.23m London or USD4.91m New York, including 2% financing fees. No fixed raise ask.",
+    "Unused AI allowance is earmarked cash, not another expense; do not add it twice.",
+    "Year-end 8/9/9 is employee headcount; fractional counsel is separate and has no employee AI allowance.",
+    "External ISO27001/ISO42001/SOC2 Type II full initial and recurring fees remain unvalidated; the historical allowance does not prove coverage.",
+    "The 24-month funding objective does not guarantee positive cash for every 36-month stress case.",
+    "Captures are dated 15 September 2026, independently checked live on 17 September. They were not refreshed during this verification."
+  ],
+  "discrepancies": [],
+  "limitations": [
+    "Native outputs and reconciliations were read, not rerun by changing inputs. Full 42-fixture/28-scenario suites remain historical evidence.",
+    "Financial hypotheses were verified for internal consistency and capture freshness, not commercially validated.",
+    "This artifact supplies source traceability; the final deck needs a separate transcription/layout check against these figures."
+  ]
+}
+

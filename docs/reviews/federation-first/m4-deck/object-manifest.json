@@ -1,0 +1,3980 @@
+[
+  {
+    "number": 1,
+    "pageId": "p1",
+    "elements": [
+      {
+        "id": "p1_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Codifix",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p1_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Knowledge and governance\nfor the Agentic Enterprise",
+        "bounds": [
+          48,
+          144,
+          850,
+          130
+        ],
+        "fontSize": 36
+      },
+      {
+        "id": "p1_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Help teams find trusted expertise across boundaries\nand reuse what they learn — with local control.",
+        "bounds": [
+          48,
+          320,
+          836,
+          95
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "m4_s1_text_1",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Starting with incident handover between application and platform teams.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s1_text_2",
+        "action": "create",
+        "role": "source link",
+        "text": "Commercial foundation · M1",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s1_text_3",
+        "action": "create",
+        "role": "slide number",
+        "text": "01",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p1_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 2,
+    "pageId": "p2",
+    "elements": [
+      {
+        "id": "p2_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "The incident moves. The context does not.",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p2_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Illustrative incident · payment latency after a deployment",
+        "bounds": [
+          48,
+          115,
+          864,
+          42
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s2_box_1",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          189,
+          358,
+          166
+        ]
+      },
+      {
+        "id": "p2_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Application team",
+        "bounds": [
+          66,
+          207,
+          324,
+          39
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "m4_s2_text_2",
+        "action": "create",
+        "role": "body",
+        "text": "Knows the change and symptoms.\nHands over a ticket and partial logs.",
+        "bounds": [
+          66,
+          256,
+          324,
+          90
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s2_box_3",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          554,
+          189,
+          358,
+          166
+        ]
+      },
+      {
+        "id": "m4_s2_text_4",
+        "action": "create",
+        "role": "body",
+        "text": "Platform team",
+        "bounds": [
+          572,
+          207,
+          324,
+          39
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "m4_s2_text_5",
+        "action": "create",
+        "role": "body",
+        "text": "Knows the infrastructure history.\nRebuilds the missing context.",
+        "bounds": [
+          572,
+          256,
+          324,
+          90
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s2_text_7",
+        "action": "create",
+        "role": "body",
+        "text": "handover",
+        "bounds": [
+          417,
+          226,
+          123,
+          32
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "m4_s2_text_8",
+        "action": "create",
+        "role": "body",
+        "text": "Repeated investigation",
+        "bounds": [
+          48,
+          398,
+          300,
+          49
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s2_text_9",
+        "action": "create",
+        "role": "body",
+        "text": "Interrupted experts",
+        "bounds": [
+          352,
+          398,
+          260,
+          49
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s2_text_10",
+        "action": "create",
+        "role": "body",
+        "text": "Corrections stay local",
+        "bounds": [
+          654,
+          398,
+          285,
+          49
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s2_text_11",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Pain and outcomes to validate in discovery; this is not a customer case study.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s2_text_12",
+        "action": "create",
+        "role": "source link",
+        "text": "Pilot preparation · M1",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s2_text_13",
+        "action": "create",
+        "role": "slide number",
+        "text": "02",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p2_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 3,
+    "pageId": "p3",
+    "elements": [
+      {
+        "id": "p3_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "From agentic work to an Agentic Enterprise",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "m4_s3_box_1",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          149,
+          252,
+          276
+        ]
+      },
+      {
+        "id": "p3_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "01",
+        "bounds": [
+          64,
+          164,
+          200,
+          31
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p3_i5",
+        "action": "reuse",
+        "role": "body",
+        "text": "Agentic\nEngineering",
+        "bounds": [
+          64,
+          209,
+          220,
+          78
+        ],
+        "fontSize": 23
+      },
+      {
+        "id": "p3_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "Agents help people\nbuild software.",
+        "bounds": [
+          64,
+          309,
+          220,
+          104
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "m4_s3_box_2",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          354,
+          149,
+          252,
+          276
+        ]
+      },
+      {
+        "id": "p3_i8",
+        "action": "reuse",
+        "role": "body",
+        "text": "02",
+        "bounds": [
+          370,
+          164,
+          200,
+          31
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p3_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Agentic OS",
+        "bounds": [
+          370,
+          209,
+          220,
+          78
+        ],
+        "fontSize": 23
+      },
+      {
+        "id": "p3_i11",
+        "action": "reuse",
+        "role": "body",
+        "text": "An environment\nfor agentic work.\nOmarchy is an analogy.",
+        "bounds": [
+          370,
+          309,
+          220,
+          104
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "m4_s3_box_3",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          660,
+          149,
+          252,
+          276
+        ]
+      },
+      {
+        "id": "p3_i12",
+        "action": "reuse",
+        "role": "body",
+        "text": "03",
+        "bounds": [
+          676,
+          164,
+          200,
+          31
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p3_i13",
+        "action": "reuse",
+        "role": "body",
+        "text": "Agentic\nEnterprise",
+        "bounds": [
+          676,
+          209,
+          220,
+          78
+        ],
+        "fontSize": 23
+      },
+      {
+        "id": "m4_s3_text_4",
+        "action": "create",
+        "role": "body",
+        "text": "Business units exchange\nselected expertise\nunder local authority.",
+        "bounds": [
+          676,
+          309,
+          220,
+          104
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "m4_s3_text_7",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Broader vision: a network of business units. Current scope: governed knowledge exchange.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s3_text_8",
+        "action": "create",
+        "role": "source link",
+        "text": "Omarchy reference · no affiliation or dependency",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s3_text_9",
+        "action": "create",
+        "role": "slide number",
+        "text": "03",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p3_i3",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p3_i6",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p3_i9",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p3_i14",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p3_i15",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p3_i16",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p3_i17",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p3_i18",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p3_i19",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 4,
+    "pageId": "p4",
+    "elements": [
+      {
+        "id": "p4_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Every unit owns its knowledge and authority",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "m4_s4_box_1",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          145,
+          326,
+          270
+        ]
+      },
+      {
+        "id": "p4_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Application business unit",
+        "bounds": [
+          65,
+          162,
+          292,
+          65
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p4_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Knowledge collections\nLocal agents\nIndependent administration",
+        "bounds": [
+          65,
+          259,
+          292,
+          121
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s4_box_2",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          586,
+          145,
+          326,
+          270
+        ]
+      },
+      {
+        "id": "p4_i5",
+        "action": "reuse",
+        "role": "body",
+        "text": "Platform business unit",
+        "bounds": [
+          603,
+          162,
+          292,
+          65
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p4_i6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Knowledge collections\nLocal agents\nIndependent administration",
+        "bounds": [
+          603,
+          259,
+          292,
+          121
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s4_text_3",
+        "action": "create",
+        "role": "body",
+        "text": "Authorized\nconnection",
+        "bounds": [
+          384,
+          173,
+          193,
+          70
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "m4_s4_text_6",
+        "action": "create",
+        "role": "body",
+        "text": "Selected expertise\n+ cited answers",
+        "bounds": [
+          384,
+          322,
+          193,
+          80
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "m4_s4_text_7",
+        "action": "create",
+        "role": "evidence label",
+        "text": "ATProto provides identity and signed records; Memory governs access and private Q&A.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s4_text_8",
+        "action": "create",
+        "role": "source link",
+        "text": "Architecture decision · AT Protocol foundation",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s4_text_9",
+        "action": "create",
+        "role": "slide number",
+        "text": "04",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p4_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i11",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i12",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 5,
+    "pageId": "p5",
+    "elements": [
+      {
+        "id": "p5_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "One handover becomes reusable expertise",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p5_i3",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          143,
+          254,
+          134
+        ]
+      },
+      {
+        "id": "p5_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "1  Handover",
+        "bounds": [
+          60,
+          155,
+          233,
+          35
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p5_i5",
+        "action": "reuse",
+        "role": "body",
+        "text": "Responder identifies\nthe incident context.",
+        "bounds": [
+          60,
+          196,
+          232,
+          76
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p5_i8",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          352,
+          143,
+          254,
+          134
+        ]
+      },
+      {
+        "id": "p5_i6",
+        "action": "reuse",
+        "role": "body",
+        "text": "2  Discover",
+        "bounds": [
+          364,
+          155,
+          233,
+          35
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p5_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "Find permitted expertise\nacross the connection.",
+        "bounds": [
+          364,
+          196,
+          232,
+          76
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p5_i11",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          656,
+          143,
+          254,
+          134
+        ]
+      },
+      {
+        "id": "p5_i9",
+        "action": "reuse",
+        "role": "body",
+        "text": "3  Cited answer",
+        "bounds": [
+          668,
+          155,
+          233,
+          35
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p5_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Source team returns an answer\nwith source citations.",
+        "bounds": [
+          668,
+          196,
+          232,
+          76
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p5_i15",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          307,
+          254,
+          134
+        ]
+      },
+      {
+        "id": "p5_i12",
+        "action": "reuse",
+        "role": "body",
+        "text": "6  Reuse later",
+        "bounds": [
+          60,
+          319,
+          233,
+          35
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p5_i13",
+        "action": "reuse",
+        "role": "body",
+        "text": "A later eligible incident\nretrieves the correction.",
+        "bounds": [
+          60,
+          360,
+          232,
+          76
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p5_i18",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          352,
+          307,
+          254,
+          134
+        ]
+      },
+      {
+        "id": "p5_i14",
+        "action": "reuse",
+        "role": "body",
+        "text": "5  Review at origin",
+        "bounds": [
+          364,
+          319,
+          233,
+          35
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p5_i16",
+        "action": "reuse",
+        "role": "body",
+        "text": "The owning team approves\nthe corrected knowledge.",
+        "bounds": [
+          364,
+          360,
+          232,
+          76
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p5_i22",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          656,
+          307,
+          254,
+          134
+        ]
+      },
+      {
+        "id": "p5_i17",
+        "action": "reuse",
+        "role": "body",
+        "text": "4  Human action",
+        "bounds": [
+          668,
+          319,
+          233,
+          35
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p5_i19",
+        "action": "reuse",
+        "role": "body",
+        "text": "Responder checks, acts,\nand records corrections.",
+        "bounds": [
+          668,
+          360,
+          232,
+          76
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p5_i20",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Components implemented; end-to-end customer improvement still requires a measured pilot.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "p5_i21",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Federation / private Q&A evidence · 11 September 2026",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p5_i23",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "05",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p5_i24",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "plugs into the agents teams already run\n"
+      },
+      {
+        "id": "p5_i25",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p5_i26",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "Vendor & language agnostic\n"
+      },
+      {
+        "id": "p5_i27",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "no walled garden, no lock-in\n"
+      },
+      {
+        "id": "p5_i28",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "Measured, in public:  agent task success 0% → 18.1% · retrieval recall@k 1.000 · 41% fewer tokens (open eval harness, May ’26).\n"
+      },
+      {
+        "id": "p5_i29",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i30",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i31",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i32",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i33",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i34",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 6,
+    "pageId": "p6",
+    "elements": [
+      {
+        "id": "p6_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Measure better handovers, not activity volume",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p6_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Faster correct action",
+        "bounds": [
+          48,
+          135,
+          339,
+          74
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "p6_i5",
+        "action": "reuse",
+        "role": "body",
+        "text": "Handover → first correct action\nand accepted resolution.",
+        "bounds": [
+          430,
+          135,
+          476,
+          74
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p6_i6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Fewer expert interruptions",
+        "bounds": [
+          48,
+          234,
+          339,
+          74
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "p6_i8",
+        "action": "reuse",
+        "role": "body",
+        "text": "Interruptions and expert minutes\nper eligible incident.",
+        "bounds": [
+          430,
+          234,
+          476,
+          74
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p6_i9",
+        "action": "reuse",
+        "role": "body",
+        "text": "Learning that survives",
+        "bounds": [
+          48,
+          333,
+          339,
+          74
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "p6_i11",
+        "action": "reuse",
+        "role": "body",
+        "text": "Approved-correction reuse\nand recurrence of corrected errors.",
+        "bounds": [
+          430,
+          333,
+          476,
+          74
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p6_i7",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          439,
+          865,
+          30
+        ]
+      },
+      {
+        "id": "p6_i12",
+        "action": "reuse",
+        "role": "body",
+        "text": "Recovered capacity becomes cash savings only when spending actually changes.",
+        "bounds": [
+          58,
+          441,
+          842,
+          26
+        ],
+        "fontSize": 17
+      },
+      {
+        "id": "p6_i14",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Agree thresholds and comparable cases before declaring success. Retain failures and refusals.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "p6_i15",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Measurement definitions, denominators and owners · M1",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p6_i17",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "06",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p6_i3",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p6_i10",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p6_i13",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p6_i16",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p6_i18",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "SLAs held by adding people, not leverage\n"
+      },
+      {
+        "id": "p6_i19",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "WITH CODIFIX\n"
+      },
+      {
+        "id": "p6_i20",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p6_i21",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "Title-scoped memory survives churn\n"
+      },
+      {
+        "id": "p6_i22",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "expertise stays when people move on\n"
+      },
+      {
+        "id": "p6_i23",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p6_i24",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "Minutes to brief\n"
+      },
+      {
+        "id": "p6_i25",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "humans and agents ‘get up to speed’ on demand\n"
+      },
+      {
+        "id": "p6_i26",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p6_i27",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "Grounded agents\n"
+      },
+      {
+        "id": "p6_i28",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "triage cites real repro steps and build quirks\n"
+      },
+      {
+        "id": "p6_i29",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p6_i30",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "Reversible automation\n"
+      },
+      {
+        "id": "p6_i31",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "try AI on a workflow; the knowledge stays either way\n"
+      },
+      {
+        "id": "p6_i32",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "*In active discussions. Dune Technology provides player support and QA services to AAA game studios.\n"
+      },
+      {
+        "id": "p6_i33",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i34",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i35",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i36",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i37",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i38",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 7,
+    "pageId": "p7",
+    "elements": [
+      {
+        "id": "p7_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Implemented software; customer proof still ahead",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p7_i8",
+        "action": "reuse",
+        "role": "native table",
+        "values": [
+          [
+            "Capability",
+            "Evidence today",
+            "Remaining proof"
+          ],
+          [
+            "Governed federation",
+            "Signed, reviewed\nknowledge exchange",
+            "Customer deployment\nand recovery gates"
+          ],
+          [
+            "Private gateway Q&A",
+            "Bounded request/answer\nand source citations",
+            "Answer quality and\noperational impact"
+          ],
+          [
+            "Origin-owned corrections",
+            "Versioned publication\nand re-review controls",
+            "Measured correction\nreuse in later incidents"
+          ]
+        ],
+        "bounds": [
+          48,
+          133,
+          864,
+          253
+        ]
+      },
+      {
+        "id": "p7_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Controlled demonstrations used synthetic data and isolated services on one host.",
+        "bounds": [
+          48,
+          407,
+          865,
+          58
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "m4_s7_text_1",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Implementation is not validated quality, customer readiness or a production deployment.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s7_text_2",
+        "action": "create",
+        "role": "source link",
+        "text": "F1 completion evidence · 11 September 2026; R3 development · 17 September",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s7_text_3",
+        "action": "create",
+        "role": "slide number",
+        "text": "07",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p7_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p7_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p7_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p7_g13",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p7_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p7_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 8,
+    "pageId": "p8",
+    "elements": [
+      {
+        "id": "p8_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Land with two units. Expand through trusted links.",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p8_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Economic buyer",
+        "bounds": [
+          48,
+          132,
+          356,
+          34
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p8_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "CIO / CTO or technology-\noperations leadership",
+        "bounds": [
+          48,
+          181,
+          378,
+          83
+        ],
+        "fontSize": 25
+      },
+      {
+        "id": "p8_i8",
+        "action": "reuse",
+        "role": "body",
+        "text": "Operational champions",
+        "bounds": [
+          48,
+          306,
+          370,
+          34
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p8_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Application and platform leaders\nwith named owners on both sides",
+        "bounds": [
+          48,
+          353,
+          389,
+          77
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p8_i9",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          479,
+          127,
+          432,
+          87
+        ]
+      },
+      {
+        "id": "p8_i11",
+        "action": "reuse",
+        "role": "body",
+        "text": "Start",
+        "bounds": [
+          495,
+          135,
+          400,
+          29
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p8_i12",
+        "action": "reuse",
+        "role": "body",
+        "text": "Two independently administered units",
+        "bounds": [
+          495,
+          169,
+          400,
+          37
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p8_i13",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          479,
+          231,
+          432,
+          87
+        ]
+      },
+      {
+        "id": "p8_i14",
+        "action": "reuse",
+        "role": "body",
+        "text": "Expand internally",
+        "bounds": [
+          495,
+          239,
+          400,
+          29
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p8_i16",
+        "action": "reuse",
+        "role": "body",
+        "text": "Divisions and acquired entities",
+        "bounds": [
+          495,
+          273,
+          400,
+          37
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p8_i15",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          479,
+          335,
+          432,
+          87
+        ]
+      },
+      {
+        "id": "p8_i18",
+        "action": "reuse",
+        "role": "body",
+        "text": "Extend the network",
+        "bounds": [
+          495,
+          343,
+          400,
+          29
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p8_i19",
+        "action": "reuse",
+        "role": "body",
+        "text": "Authorized external partners",
+        "bounds": [
+          495,
+          377,
+          400,
+          37
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "m4_s8_text_1",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Buyer and expansion logic are hypotheses to test; no customer or partner commitments claimed.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s8_text_2",
+        "action": "create",
+        "role": "source link",
+        "text": "Buyer definition and qualification · M1",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s8_text_3",
+        "action": "create",
+        "role": "slide number",
+        "text": "08",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p8_i3",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p8_i5",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p8_i6",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p8_i17",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p8_i20",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i21",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i22",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i23",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i24",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i25",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 9,
+    "pageId": "p9",
+    "elements": [
+      {
+        "id": "p9_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Compete on controlled exchange and ownership",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p9_i5",
+        "action": "reuse",
+        "role": "body",
+        "text": "Enterprise search & workplace agents",
+        "bounds": [
+          48,
+          136,
+          864,
+          36
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p9_i6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Glean and Rovo already offer connectors,\npermission-aware access and answers.",
+        "bounds": [
+          48,
+          181,
+          862,
+          65
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p9_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "Agent memory platforms",
+        "bounds": [
+          48,
+          253,
+          864,
+          36
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p9_i8",
+        "action": "reuse",
+        "role": "body",
+        "text": "Mem0, Zep and Letta offer persistent memory;\nshared memory and governance are established capabilities.",
+        "bounds": [
+          48,
+          298,
+          862,
+          65
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s9_box_1",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          383,
+          865,
+          76
+        ]
+      },
+      {
+        "id": "p9_i9",
+        "action": "reuse",
+        "role": "body",
+        "text": "Codifix focus: exchange across independent administrations,\nwith corrections reviewed and owned by the originating team.",
+        "bounds": [
+          62,
+          393,
+          833,
+          67
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "p9_i10",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Defensibility must be earned through workflow adoption, governed history and delivery experience.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "p9_i11",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Official competitor documentation · sources and scope in notes",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p9_i12",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "09",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p9_i3",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p9_i4",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p9_i13",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "£0.50 / 1k OPS\n"
+      },
+      {
+        "id": "p9_i14",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "ENTERPRISE\n"
+      },
+      {
+        "id": "p9_i15",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "committed usage · VPC or on-prem · SSO, RBAC, audit\n"
+      },
+      {
+        "id": "p9_i16",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "FROM £80K / YR\n"
+      },
+      {
+        "id": "p9_i17",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p9_i18",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "£0.7M\n"
+      },
+      {
+        "id": "p9_i19",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "YEAR 1 ARR\n8 customers\n"
+      },
+      {
+        "id": "p9_i20",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p9_i21",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "£2.9M\n"
+      },
+      {
+        "id": "p9_i22",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "YEAR 2 ARR\n25 customers\n"
+      },
+      {
+        "id": "p9_i23",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p9_i24",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "£7.0M\n"
+      },
+      {
+        "id": "p9_i25",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "YEAR 3 ARR\n51 customers · EBITDA+\n"
+      },
+      {
+        "id": "p9_i26",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "NRR 140% — usage compounds as agents multiply memory operations\n"
+      },
+      {
+        "id": "p9_i27",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "A memory op = capture, curation, retrieval or validation event. Bottom-up 36-month model attached: cohort billings, 90% enterprise gross margin, EBITDA-positive in year 3.\n"
+      },
+      {
+        "id": "p9_i28",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p9_i29",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p9_i30",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p9_i31",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p9_i32",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p9_i33",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 10,
+    "pageId": "p10",
+    "elements": [
+      {
+        "id": "p10_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "An enterprise platform commitment",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p10_i3",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          144,
+          376,
+          272
+        ]
+      },
+      {
+        "id": "p10_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "£80,000 / year",
+        "bounds": [
+          64,
+          175,
+          343,
+          56
+        ],
+        "fontSize": 32
+      },
+      {
+        "id": "p10_i5",
+        "action": "reuse",
+        "role": "body",
+        "text": "One enterprise account\nTwo independently\nadministered deployments",
+        "bounds": [
+          64,
+          258,
+          343,
+          112
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "p10_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "Separate commercial components",
+        "bounds": [
+          475,
+          143,
+          437,
+          63
+        ],
+        "fontSize": 23
+      },
+      {
+        "id": "p10_i9",
+        "action": "reuse",
+        "role": "body",
+        "text": "Additional deployments\nOnboarding\nUsage overages",
+        "bounds": [
+          475,
+          236,
+          428,
+          117
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p10_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Replicated copies do not become\nseparately billable new knowledge.",
+        "bounds": [
+          475,
+          379,
+          432,
+          75
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p10_i12",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Pricing hypothesis. Initial Base includes no pilot, onboarding or overage receipts.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "p10_i14",
+        "action": "reuse",
+        "role": "source link",
+        "text": "M2 Base commercial assumptions",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p10_i15",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "10",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p10_i6",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p10_i8",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p10_i11",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p10_i13",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p10_i16",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p10_i17",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "REVENUE\n"
+      },
+      {
+        "id": "p10_i18",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p10_i19",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p10_i20",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p10_i21",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p10_i22",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p10_i23",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 11,
+    "pageId": "p11",
+    "elements": [
+      {
+        "id": "p11_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Founder-led discovery, then a qualified pilot",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p11_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Qualify the buyer and boundary",
+        "bounds": [
+          48,
+          132,
+          864,
+          42
+        ],
+        "fontSize": 23
+      },
+      {
+        "id": "p11_i5",
+        "action": "reuse",
+        "role": "body",
+        "text": "Recurring pain · sponsor and budget access · independent control\nNamed owners · approved sharing · observable baseline",
+        "bounds": [
+          48,
+          184,
+          862,
+          81
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p11_i3",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          294,
+          254,
+          146
+        ]
+      },
+      {
+        "id": "p11_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "2 weeks",
+        "bounds": [
+          60,
+          306,
+          230,
+          32
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p11_i8",
+        "action": "reuse",
+        "role": "body",
+        "text": "Baseline",
+        "bounds": [
+          60,
+          346,
+          230,
+          37
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p11_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Current handover workflow",
+        "bounds": [
+          60,
+          389,
+          230,
+          44
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p11_i6",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          352,
+          294,
+          254,
+          146
+        ]
+      },
+      {
+        "id": "p11_i11",
+        "action": "reuse",
+        "role": "body",
+        "text": "4 weeks",
+        "bounds": [
+          364,
+          306,
+          230,
+          32
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p11_i13",
+        "action": "reuse",
+        "role": "body",
+        "text": "Assisted operation",
+        "bounds": [
+          364,
+          346,
+          230,
+          37
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p11_i14",
+        "action": "reuse",
+        "role": "body",
+        "text": "Comparable eligible incidents",
+        "bounds": [
+          364,
+          389,
+          230,
+          44
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p11_i9",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          656,
+          294,
+          254,
+          146
+        ]
+      },
+      {
+        "id": "p11_i15",
+        "action": "reuse",
+        "role": "body",
+        "text": "2 weeks",
+        "bounds": [
+          660.8,
+          302.4,
+          230,
+          32
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s11_text_1",
+        "action": "create",
+        "role": "body",
+        "text": "Analysis",
+        "bounds": [
+          660.8,
+          338.8,
+          230,
+          37
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "m4_s11_text_2",
+        "action": "create",
+        "role": "body",
+        "text": "Quality, value and full cost",
+        "bounds": [
+          660.8,
+          381.8,
+          230,
+          44
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "m4_s11_text_3",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Commercial qualification cannot override deployment, security, recovery or evaluation gates.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s11_text_4",
+        "action": "create",
+        "role": "source link",
+        "text": "M1 scorecard and eight-week pilot charter",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s11_text_5",
+        "action": "create",
+        "role": "slide number",
+        "text": "11",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p11_i12",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p11_i16",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p11_i17",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p11_i18",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p11_i19",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p11_i20",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p11_i21",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 12,
+    "pageId": "p12",
+    "elements": [
+      {
+        "id": "p12_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Advance when the evidence supports it",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p12_i5",
+        "action": "reuse",
+        "role": "body",
+        "text": "1",
+        "bounds": [
+          48,
+          133,
+          46,
+          49
+        ],
+        "fontSize": 28
+      },
+      {
+        "id": "p12_i6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Deployment readiness",
+        "bounds": [
+          113,
+          133,
+          784,
+          35
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p12_i8",
+        "action": "reuse",
+        "role": "body",
+        "text": "Security, authorization, recovery and evaluation gates.",
+        "bounds": [
+          113,
+          171,
+          791,
+          41
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p12_i9",
+        "action": "reuse",
+        "role": "body",
+        "text": "2",
+        "bounds": [
+          48,
+          214,
+          46,
+          49
+        ],
+        "fontSize": 28
+      },
+      {
+        "id": "p12_i11",
+        "action": "reuse",
+        "role": "body",
+        "text": "Measured pilot outcome",
+        "bounds": [
+          113,
+          214,
+          784,
+          35
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p12_i12",
+        "action": "reuse",
+        "role": "body",
+        "text": "Correctness, handover time, interruptions and correction reuse.",
+        "bounds": [
+          113,
+          252,
+          791,
+          41
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p12_i14",
+        "action": "reuse",
+        "role": "body",
+        "text": "3",
+        "bounds": [
+          48,
+          295,
+          46,
+          49
+        ],
+        "fontSize": 28
+      },
+      {
+        "id": "p12_i15",
+        "action": "reuse",
+        "role": "body",
+        "text": "Validated delivery economics",
+        "bounds": [
+          113,
+          295,
+          784,
+          35
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p12_i17",
+        "action": "reuse",
+        "role": "body",
+        "text": "Observed inference, support, curation and assurance costs.",
+        "bounds": [
+          113,
+          333,
+          791,
+          41
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p12_i18",
+        "action": "reuse",
+        "role": "body",
+        "text": "4",
+        "bounds": [
+          48,
+          376,
+          46,
+          49
+        ],
+        "fontSize": 28
+      },
+      {
+        "id": "p12_i20",
+        "action": "reuse",
+        "role": "body",
+        "text": "Repeatable onboarding",
+        "bounds": [
+          113,
+          376,
+          784,
+          35
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p12_i21",
+        "action": "reuse",
+        "role": "body",
+        "text": "Independent teams onboard within measured effort and limits.",
+        "bounds": [
+          113,
+          414,
+          791,
+          41
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "p12_i23",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Readiness shifts the pipeline. There is no unconditional GA date or committed customer count.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "p12_i24",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Evidence gates and commercial workstream handoffs",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p12_i26",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "12",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p12_i3",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p12_i4",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p12_i7",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p12_i10",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p12_i13",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p12_i16",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p12_i19",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p12_i22",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p12_i25",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p12_i27",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "Self-serve usage billing · SOC 2 programme\n"
+      },
+      {
+        "id": "p12_i28",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": "Timeline set by the founder’s plan: enterprise-ready in months 3–6, installed in multiple organisations by month 9.\n"
+      },
+      {
+        "id": "p12_i29",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i30",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i31",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i32",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i33",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i34",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 13,
+    "pageId": "p13",
+    "elements": [
+      {
+        "id": "p13_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Founder-led, with explicit assurance ownership",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p13_i5",
+        "action": "reuse",
+        "role": "body",
+        "text": "Olivier Van Acker",
+        "bounds": [
+          48,
+          136,
+          352,
+          42
+        ],
+        "fontSize": 25
+      },
+      {
+        "id": "p13_i6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Founder · creator of Memory Layer",
+        "bounds": [
+          48,
+          188,
+          374,
+          55
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "p13_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "Built the Rust memory platform,\ncode-graph retrieval, MCP\nintegration and evaluation tooling.",
+        "bounds": [
+          48,
+          268,
+          375,
+          117
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p13_i8",
+        "action": "reuse",
+        "role": "body",
+        "text": "Planned organization",
+        "bounds": [
+          471,
+          133,
+          438,
+          35
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p13_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Nine employees, including founder,\n+ fractional counsel\nEngineering, deployment, commercial,\nsupport and an assurance lead.",
+        "bounds": [
+          471,
+          184,
+          439,
+          111
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "p13_i11",
+        "action": "reuse",
+        "role": "body",
+        "text": "Assurance lead owns the programme:\nISO 27001 · ISO 42001 · SOC 2 Type II",
+        "bounds": [
+          471,
+          316,
+          439,
+          78
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "m4_s13_text_1",
+        "action": "create",
+        "role": "body",
+        "text": "Employee AI per person, per month:\n£5k allowance · £2.5k expected spend.",
+        "bounds": [
+          48,
+          413,
+          856,
+          54
+        ],
+        "fontSize": 20
+      },
+      {
+        "id": "m4_s13_text_2",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Hiring, AI utilization and throughput are hypotheses. Certifications are not completed.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s13_text_3",
+        "action": "create",
+        "role": "source link",
+        "text": "Current M2 staffing and employee AI schedules",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s13_text_4",
+        "action": "create",
+        "role": "slide number",
+        "text": "13",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p13_i3",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p13_i4",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p13_i9",
+        "action": "delete",
+        "reason": "Superseded claim, decoration or layout not used in approved narrative",
+        "old_text": ""
+      },
+      {
+        "id": "p13_i12",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p13_i13",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p13_i14",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p13_i15",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p13_i16",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p13_i17",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 14,
+    "pageId": "p14",
+    "elements": [
+      {
+        "id": "p14_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Fund the next proof points",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "p14_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Capital should demonstrate",
+        "bounds": [
+          48,
+          128,
+          864,
+          49
+        ],
+        "fontSize": 29
+      },
+      {
+        "id": "p14_i5",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          201,
+          865,
+          67
+        ]
+      },
+      {
+        "id": "p14_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "A trustworthy deployment",
+        "bounds": [
+          61,
+          211,
+          312,
+          49
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "p14_i6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Pass security, recovery and evaluation gates.",
+        "bounds": [
+          391,
+          211,
+          507,
+          49
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "p14_i8",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          278,
+          865,
+          67
+        ]
+      },
+      {
+        "id": "p14_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "A valuable workflow",
+        "bounds": [
+          61,
+          288,
+          312,
+          49
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "p14_i9",
+        "action": "reuse",
+        "role": "body",
+        "text": "Measure quality and operational outcomes in a qualified pilot.",
+        "bounds": [
+          391,
+          288,
+          507,
+          49
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "p14_i11",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          355,
+          865,
+          67
+        ]
+      },
+      {
+        "id": "p14_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "A repeatable business",
+        "bounds": [
+          61,
+          365,
+          312,
+          49
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "p14_i12",
+        "action": "reuse",
+        "role": "body",
+        "text": "Validate delivery cost, packaging and onboarding effort.",
+        "bounds": [
+          391,
+          365,
+          507,
+          49
+        ],
+        "fontSize": 19
+      },
+      {
+        "id": "p14_i13",
+        "action": "reuse",
+        "role": "body",
+        "text": "Discuss milestones and financing structure.",
+        "bounds": [
+          48,
+          445,
+          864,
+          31
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "p14_i14",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Round size follows the evidence, scope and runway required. No fixed fundraising ask.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "p14_i15",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Provisional financial scenarios in the appendix",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s14_text_1",
+        "action": "create",
+        "role": "slide number",
+        "text": "14",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "p14_i16",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i17",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i18",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i19",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i20",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i21",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 15,
+    "pageId": "m4_appendix_15",
+    "elements": [
+      {
+        "id": "m4_a15_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Appendix · architecture and trust boundaries",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "m4_s15_box_1",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          133,
+          422,
+          175
+        ]
+      },
+      {
+        "id": "m4_a15_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "AT Protocol foundation",
+        "bounds": [
+          61,
+          146,
+          396,
+          36
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "m4_a15_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Stable identity (DIDs)\nLexicon record schemas\nSigned repositories and sync",
+        "bounds": [
+          61,
+          197,
+          396,
+          99
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "m4_s15_box_2",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          490,
+          133,
+          422,
+          175
+        ]
+      },
+      {
+        "id": "m4_s15_text_3",
+        "action": "create",
+        "role": "body",
+        "text": "Memory governance",
+        "bounds": [
+          503,
+          146,
+          396,
+          36
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "m4_s15_text_4",
+        "action": "create",
+        "role": "body",
+        "text": "Authorization and publication history\nReviewed, versioned knowledge\nPrivate Q&A through the gateway",
+        "bounds": [
+          503,
+          197,
+          396,
+          99
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "m4_s15_text_5",
+        "action": "create",
+        "role": "body",
+        "text": "Trust and disclosure limits",
+        "bounds": [
+          48,
+          330,
+          861,
+          35
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "m4_s15_text_6",
+        "action": "create",
+        "role": "body",
+        "text": "Gateway availability and enforcement are trusted dependencies.\nAuthorized recipients can read and retain copies; revocation cannot recall bytes.\nSigned records prove authenticity, not the truth of the content.",
+        "bounds": [
+          48,
+          377,
+          865,
+          87
+        ],
+        "fontSize": 17
+      },
+      {
+        "id": "m4_s15_text_7",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Native Spaces and broader delegated execution remain future work.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s15_text_8",
+        "action": "create",
+        "role": "source link",
+        "text": "ADR 0011 · ATProto overview and Spaces alpha in notes",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s15_text_9",
+        "action": "create",
+        "role": "slide number",
+        "text": "15",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_a15_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 16,
+    "pageId": "m4_appendix_16",
+    "elements": [
+      {
+        "id": "m4_a16_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Appendix · evidence without a quality claim",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "m4_s16_box_1",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          140,
+          410,
+          184
+        ]
+      },
+      {
+        "id": "m4_a16_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "60",
+        "bounds": [
+          65,
+          157,
+          372,
+          72
+        ],
+        "fontSize": 48
+      },
+      {
+        "id": "m4_a16_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Knowledge answers\nawaiting genuine blinded review",
+        "bounds": [
+          65,
+          248,
+          372,
+          65
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "m4_s16_box_2",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          502,
+          140,
+          410,
+          184
+        ]
+      },
+      {
+        "id": "m4_s16_text_3",
+        "action": "create",
+        "role": "body",
+        "text": "0 / 15",
+        "bounds": [
+          519,
+          157,
+          372,
+          72
+        ],
+        "fontSize": 48
+      },
+      {
+        "id": "m4_s16_text_4",
+        "action": "create",
+        "role": "body",
+        "text": "Successful complete\ncoding sequences",
+        "bounds": [
+          519,
+          248,
+          372,
+          65
+        ],
+        "fontSize": 21
+      },
+      {
+        "id": "m4_s16_text_5",
+        "action": "create",
+        "role": "body",
+        "text": "R3 development run · 17 September 2026",
+        "bounds": [
+          48,
+          349,
+          865,
+          37
+        ],
+        "fontSize": 22
+      },
+      {
+        "id": "m4_s16_text_6",
+        "action": "create",
+        "role": "body",
+        "text": "All 75 executions completed. Harness validity and quality did not pass.\nNo validated quality improvement, perfect recall or token-saving claim.",
+        "bounds": [
+          48,
+          401,
+          865,
+          64
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "m4_s16_text_7",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Controlled federation demonstrations establish bounded behavior, not customer ROI.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s16_text_8",
+        "action": "create",
+        "role": "source link",
+        "text": "R3 development continuation and coding diagnosis",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s16_text_9",
+        "action": "create",
+        "role": "slide number",
+        "text": "16",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_a16_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a16_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a16_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a16_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a16_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a16_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 17,
+    "pageId": "m4_appendix_17",
+    "elements": [
+      {
+        "id": "m4_a17_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Appendix · Base commercial forecast",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "m4_s17_table_1",
+        "action": "create",
+        "role": "native table",
+        "values": [
+          [
+            "Shared economics · GBP",
+            "Year 1",
+            "Year 2",
+            "Year 3"
+          ],
+          [
+            "Year-end ARR",
+            "£160k",
+            "£900k",
+            "£2.24m"
+          ],
+          [
+            "Recognized revenue",
+            "£42k",
+            "£552k",
+            "£1.60m"
+          ],
+          [
+            "Paying accounts (expected)",
+            "2.00",
+            "10.40",
+            "22.38"
+          ],
+          [
+            "London / NY gross margin",
+            "−80.8% / −101.4%",
+            "52.1% / 48.0%",
+            "74.2% / 72.7%"
+          ]
+        ],
+        "bounds": [
+          48,
+          130,
+          864,
+          240
+        ]
+      },
+      {
+        "id": "m4_a17_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Pilot funnel: starts from month 5, two pilot months, 50% conversion.\nNet revenue retention: (1 − 5% churn) × (1 + 45% expansion) = 137.75%.",
+        "bounds": [
+          48,
+          393,
+          866,
+          70
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "m4_a17_i4",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "36 months from 1 October 2026. Fractional accounts are expected values, not signed customers.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s17_text_2",
+        "action": "create",
+        "role": "source link",
+        "text": "M2 v3-assurance · Base · live source check 17 September 2026",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s17_text_3",
+        "action": "create",
+        "role": "slide number",
+        "text": "17",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_a17_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a17_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a17_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a17_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a17_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a17_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 18,
+    "pageId": "m4_appendix_18",
+    "elements": [
+      {
+        "id": "m4_a18_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Appendix · alternative operating bases",
+        "bounds": [
+          48,
+          37,
+          864,
+          76
+        ],
+        "fontSize": 30
+      },
+      {
+        "id": "m4_s18_table_1",
+        "action": "create",
+        "role": "native table",
+        "values": [
+          [
+            "24-month funding objective",
+            "London · GBP",
+            "New York · USD"
+          ],
+          [
+            "Gross funding requirement",
+            "£3.23m",
+            "$4.91m"
+          ],
+          [
+            "Expected employee AI spend",
+            "£420k",
+            "$566k"
+          ],
+          [
+            "AI headroom retained as cash",
+            "£420k",
+            "$566k"
+          ],
+          [
+            "M25–27 operating buffer",
+            "£504k",
+            "$744k"
+          ]
+        ],
+        "bounds": [
+          48,
+          127,
+          864,
+          231
+        ]
+      },
+      {
+        "id": "m4_a18_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "New York gross funding in common GBP: £3.65m at $1.3476/£.",
+        "bounds": [
+          48,
+          376,
+          864,
+          35
+        ],
+        "fontSize": 18
+      },
+      {
+        "id": "m4_a18_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Fund to month 24; retain AI headroom plus months 25–27 operating outflows.\nAlternative bases, never combined. External assurance costs remain unquoted.",
+        "bounds": [
+          48,
+          423,
+          864,
+          47
+        ],
+        "fontSize": 17
+      },
+      {
+        "id": "m4_s18_text_2",
+        "action": "create",
+        "role": "evidence label",
+        "text": "AI headroom is cash, not a second expense. These scenarios do not determine a round size.",
+        "bounds": [
+          48,
+          470,
+          864,
+          29
+        ],
+        "fontSize": 14
+      },
+      {
+        "id": "m4_s18_text_3",
+        "action": "create",
+        "role": "source link",
+        "text": "M2 Summary, Employee AI and funding schedules · details in notes",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_s18_text_4",
+        "action": "create",
+        "role": "slide number",
+        "text": "18",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10
+      },
+      {
+        "id": "m4_a18_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  }
+]

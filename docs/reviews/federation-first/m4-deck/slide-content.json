@@ -1,0 +1,333 @@
+[
+  {
+    "number": 1,
+    "pageId": "p1",
+    "text": [
+      "Codifix",
+      "Knowledge and governance\nfor the Agentic Enterprise",
+      "Help teams find trusted expertise across boundaries\nand reuse what they learn — with local control.",
+      "Starting with incident handover between application and platform teams.",
+      "Commercial foundation · M1",
+      "01"
+    ],
+    "notes": "Codifix is positioned as the knowledge and governance network for the Agentic Enterprise. The first commercial proof is incident handover between independently administered application and platform/operations teams. Customer value remains a hypothesis; no customer traction is implied.\nSource: Repository evidence at 89104dd: docs/reviews/federation-first/m1-execution.md\nPrepared 17 September 2026. Reusable investor deck; no fixed fundraising ask. The Tom briefing is pre-meeting research, not feedback, endorsement or investment interest.\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 2,
+    "pageId": "p2",
+    "text": [
+      "The incident moves. The context does not.",
+      "Illustrative incident · payment latency after a deployment",
+      "Application team",
+      "Knows the change and symptoms.\nHands over a ticket and partial logs.",
+      "Platform team",
+      "Knows the infrastructure history.\nRebuilds the missing context.",
+      "handover",
+      "Repeated investigation",
+      "Interrupted experts",
+      "Corrections stay local",
+      "Pain and outcomes to validate in discovery; this is not a customer case study.",
+      "Pilot preparation · M1",
+      "02"
+    ],
+    "notes": "This payment-latency incident is fictional and illustrates a cross-unit handover problem. No incident timings, savings or customer outcomes are claimed. Discovery must establish frequency, operational cost, missing context and access to a sponsor.\nSource: Repository evidence at 89104dd: docs/reviews/federation-first/m1-execution.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 3,
+    "pageId": "p3",
+    "text": [
+      "From agentic work to an Agentic Enterprise",
+      "01",
+      "Agentic\nEngineering",
+      "Agents help people\nbuild software.",
+      "02",
+      "Agentic OS",
+      "An environment\nfor agentic work.\nOmarchy is an analogy.",
+      "03",
+      "Agentic\nEnterprise",
+      "Business units exchange\nselected expertise\nunder local authority.",
+      "Broader vision: a network of business units. Current scope: governed knowledge exchange.",
+      "Omarchy reference · no affiliation or dependency",
+      "03"
+    ],
+    "notes": "Agentic Engineering → Agentic OS → Agentic Enterprise is our narrative analogy, not a formal technical maturity model. Omarchy describes itself as agentic Linux. No affiliation or runtime dependency is implied. The current Memory implementation supports governed knowledge exchange and private Q&A; broader cross-unit delegated execution remains future work.\nSources: https://omarchy.org/\nRepository evidence at 89104dd: docs/developer/adr/0011-atproto-federation-adapter.md\nRepository evidence at 89104dd: docs/reviews/federation-first/README.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 4,
+    "pageId": "p4",
+    "text": [
+      "Every unit owns its knowledge and authority",
+      "Application business unit",
+      "Knowledge collections\nLocal agents\nIndependent administration",
+      "Platform business unit",
+      "Knowledge collections\nLocal agents\nIndependent administration",
+      "Authorized\nconnection",
+      "Selected expertise\n+ cited answers",
+      "ATProto provides identity and signed records; Memory governs access and private Q&A.",
+      "Architecture decision · AT Protocol foundation",
+      "04"
+    ],
+    "notes": "Each vertex is an independently governed business unit with its own knowledge, administrators and agents. The edge represents explicitly authorized collaboration, not unrestricted data replication or agent execution. The illustration has two units; additional divisions and partners are expansion hypotheses. AT Protocol supplies identity, Lexicon schemas and signed repositories. Memory supplies authorization, publication history, recipient and version controls, and private Q&A through its gateway. Repository signatures establish authenticity and integrity within the verified scope; they do not prove factual truth, original human authorship or human review.\nSources: Repository evidence at 89104dd: docs/developer/adr/0011-atproto-federation-adapter.md\nhttps://atproto.com/guides/overview\nRepository evidence at 89104dd: docs/reviews/federation-first/f1-execution.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 5,
+    "pageId": "p5",
+    "text": [
+      "One handover becomes reusable expertise",
+      "1  Handover",
+      "Responder identifies\nthe incident context.",
+      "2  Discover",
+      "Find permitted expertise\nacross the connection.",
+      "3  Cited answer",
+      "Source team returns an answer\nwith source citations.",
+      "6  Reuse later",
+      "A later eligible incident\nretrieves the correction.",
+      "5  Review at origin",
+      "The owning team approves\nthe corrected knowledge.",
+      "4  Human action",
+      "Responder checks, acts,\nand records corrections.",
+      "Components implemented; end-to-end customer improvement still requires a measured pilot.",
+      "Federation / private Q&A evidence · 11 September 2026",
+      "05"
+    ],
+    "notes": "The sequence is the bounded pilot workflow: handover → permitted expertise discovery → cited answer → human action → origin-reviewed correction → later reuse. Current components include reviewed publication/import, provenance and private gateway Q&A. Human action, correctness and approved-correction reuse must be observed in the customer pilot; this diagram does not claim a measured full customer workflow. Correction reuse requires local curation and renewed collection review; count that effort. Changes to approved collection versions require review at the origin. Failed/refused exchanges remain in the denominator.\nSources: Repository evidence at 89104dd: docs/reviews/federation-first/f1-execution.md\nRepository evidence at 89104dd: docs/reviews/federation-first/m1-execution.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 6,
+    "pageId": "p6",
+    "text": [
+      "Measure better handovers, not activity volume",
+      "Faster correct action",
+      "Handover → first correct action\nand accepted resolution.",
+      "Fewer expert interruptions",
+      "Interruptions and expert minutes\nper eligible incident.",
+      "Learning that survives",
+      "Approved-correction reuse\nand recurrence of corrected errors.",
+      "Recovered capacity becomes cash savings only when spending actually changes.",
+      "Agree thresholds and comparable cases before declaring success. Retain failures and refusals.",
+      "Measurement definitions, denominators and owners · M1",
+      "06"
+    ],
+    "notes": "Compare against current handover documents/search with comparable information and resources. Match severity, service, novelty and responder familiarity. Every metric needs a definition, denominator, evidence source, owner and customer-agreed threshold. Missing thresholds or insufficient comparable cases prevent success declaration. Include correctness, useful completion, disclosure, refusals/failures, onboarding and infrastructure/inference/curation/admin/support costs. Recovered staff capacity is not automatically a cash saving. Avoid counting expert interruption savings twice.\nSource: Repository evidence at 89104dd: docs/reviews/federation-first/m1-execution.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 7,
+    "pageId": "p7",
+    "text": [
+      "Implemented software; customer proof still ahead",
+      "Capability | Evidence today | Remaining proof",
+      "Governed federation | Signed, reviewed\nknowledge exchange | Customer deployment\nand recovery gates",
+      "Private gateway Q&A | Bounded request/answer\nand source citations | Answer quality and\noperational impact",
+      "Origin-owned corrections | Versioned publication\nand re-review controls | Measured correction\nreuse in later incidents",
+      "Controlled demonstrations used synthetic data and isolated services on one host.",
+      "Implementation is not validated quality, customer readiness or a production deployment.",
+      "F1 completion evidence · 11 September 2026; R3 development · 17 September",
+      "07"
+    ],
+    "notes": "F1 covers two-way answers, restart behavior, third-instance consent and private TLS gateway/PDS isolation. It uses independent databases and real HTTP service applications/workers in one test process; the accompanying E gate separately starts service executables. Both are controlled synthetic evidence on one host, with fake provider synthesis in F1, not customer SSO or multi-host deployment. C supplies transactional federation outboxes/inboxes and receiver cursors; R1 supplies durable local jobs, leases, fencing and operator-visible failures. Broad recovery/release gates remain. As of 17 September, four-area work includes a materializer, atomic inactive-target importer and pre-dispatch input binding, but no activated or released four-area demonstration. Do not imply implementation alone establishes quality improvement.\nSources: Repository evidence at 89104dd: docs/reviews/federation-first/f1-execution.md\nRepository evidence at 89104dd: docs/reviews/federation-first/README.md\nRepository evidence at 89104dd: evals/r3/development-continuation-20260917.md\nRepository evidence at 89104dd: docs/reviews/four-area-network/README.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 8,
+    "pageId": "p8",
+    "text": [
+      "Land with two units. Expand through trusted links.",
+      "Economic buyer",
+      "CIO / CTO or technology-\noperations leadership",
+      "Operational champions",
+      "Application and platform leaders\nwith named owners on both sides",
+      "Start",
+      "Two independently administered units",
+      "Expand internally",
+      "Divisions and acquired entities",
+      "Extend the network",
+      "Authorized external partners",
+      "Buyer and expansion logic are hypotheses to test; no customer or partner commitments claimed.",
+      "Buyer definition and qualification · M1",
+      "08"
+    ],
+    "notes": "Initial economic buyers are CIO/CTO or technology-operations leadership. Operational champions own application/platform workflows and approvals. Qualification requires independently administered instances, owners on both sides, an approved sharing boundary and observable baseline, plus commercial and technical gates. Expansion through divisions, acquired entities and partners follows authorized edges; it is a strategy, not a commitment or network effect already measured.\nSource: Repository evidence at 89104dd: docs/reviews/federation-first/m1-execution.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 9,
+    "pageId": "p9",
+    "text": [
+      "Compete on controlled exchange and ownership",
+      "Enterprise search & workplace agents",
+      "Glean and Rovo already offer connectors,\npermission-aware access and answers.",
+      "Agent memory platforms",
+      "Mem0, Zep and Letta offer persistent memory;\nshared memory and governance are established capabilities.",
+      "Codifix focus: exchange across independent administrations,\nwith corrections reviewed and owned by the originating team.",
+      "Defensibility must be earned through workflow adoption, governed history and delivery experience.",
+      "Official competitor documentation · sources and scope in notes",
+      "09"
+    ],
+    "notes": "Competitor documentation reviewed 17 September 2026. Acknowledging adjacent capabilities is essential: Glean has permission-aware APIs and verified/deprecated content; Rovo honors source permissions and offers memory management; Mem0 markets persistent memory and governance; Zep documents RBAC/ABAC and audit logging; Letta documents shared memory and organization permissions. This review does not establish complete feature equivalence or absence of Codifix's focus elsewhere. Defensibility through adopted workflows, reviewed correction history and deployment expertise remains a hypothesis, not proof of moat.\nSources:\nhttps://www.glean.com/platform/api\nhttps://docs.glean.com/get-started/golive/populate-content\nhttps://www.atlassian.com/software/rovo/guides/admin-guide/rovo-connectors\nhttps://support.atlassian.com/rovo/docs/what-is-rovo-memory-management/\nhttps://mem0.ai/\nhttps://help.getzep.com/governance\nhttps://help.getzep.com/audit-logging\nhttps://docs.letta.com/concepts/shared-memory\nhttps://docs.letta.com/teams/permissions\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 10,
+    "pageId": "p10",
+    "text": [
+      "An enterprise platform commitment",
+      "£80,000 / year",
+      "One enterprise account\nTwo independently\nadministered deployments",
+      "Separate commercial components",
+      "Additional deployments\nOnboarding\nUsage overages",
+      "Replicated copies do not become\nseparately billable new knowledge.",
+      "Pricing hypothesis. Initial Base includes no pilot, onboarding or overage receipts.",
+      "M2 Base commercial assumptions",
+      "10"
+    ],
+    "notes": "£80,000 annual platform package is a founder-selected, unvalidated price anchor for one enterprise account with two independently administered deployments. Other components remain separately adjustable hypotheses. Accounts, deployments, usage and replicated storage are tracked separately. Undefined legacy operations are not customer questions or provider tokens. Initial Base includes no pilot, onboarding or overage receipts. Commercial economics match across locations at planning FX $1.3476/£, dated 14 September 2026.\nSources: London Assumptions!E12:E27 (pricing, deployments, receipts and funnel), E11 (FX) https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit\nNew York https://docs.google.com/spreadsheets/d/1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es/edit\nRepository evidence at 89104dd: docs/reviews/federation-first/m2-legal-assurance-revision.md\nM3 validates costs and packaging; M5 provides customer evidence.\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 11,
+    "pageId": "p11",
+    "text": [
+      "Founder-led discovery, then a qualified pilot",
+      "Qualify the buyer and boundary",
+      "Recurring pain · sponsor and budget access · independent control\nNamed owners · approved sharing · observable baseline",
+      "2 weeks",
+      "Baseline",
+      "Current handover workflow",
+      "4 weeks",
+      "Assisted operation",
+      "Comparable eligible incidents",
+      "2 weeks",
+      "Analysis",
+      "Quality, value and full cost",
+      "Commercial qualification cannot override deployment, security, recovery or evaluation gates.",
+      "M1 scorecard and eight-week pilot charter",
+      "11"
+    ],
+    "notes": "Use the six-dimension 0–2 scorecard: recurring pain, measurable operational cost, independent control, sponsor/budget access, measurement feasibility and expansion potential. 9/12 is a provisional internal discovery-priority hypothesis, not a proven cutoff. Pilot qualification requires two independently administered instances, named owners, approved sharing boundaries and an observable baseline. The illustrative schedule is two baseline weeks, four assisted and two analysis weeks. Match comparable cases and retain failures/refusals. The eight-week illustration begins after deployment readiness and charter approval; inadequate case counts do not become success when the calendar ends. No pilot starts are customer commitments.\nSource: Repository evidence at 89104dd: docs/reviews/federation-first/m1-execution.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 12,
+    "pageId": "p12",
+    "text": [
+      "Advance when the evidence supports it",
+      "1",
+      "Deployment readiness",
+      "Security, authorization, recovery and evaluation gates.",
+      "2",
+      "Measured pilot outcome",
+      "Correctness, handover time, interruptions and correction reuse.",
+      "3",
+      "Validated delivery economics",
+      "Observed inference, support, curation and assurance costs.",
+      "4",
+      "Repeatable onboarding",
+      "Independent teams onboard within measured effort and limits.",
+      "Readiness shifts the pipeline. There is no unconditional GA date or committed customer count.",
+      "Evidence gates and commercial workstream handoffs",
+      "12"
+    ],
+    "notes": "Milestones are evidence-based rather than unconditional dates: deployment/security/recovery and evaluation readiness; customer-agreed pilot outcomes; actual delivery economics; repeatable onboarding. M2 models pilot starts in month five conditional on readiness, but delays shift the pipeline. M3 cost and packaging validation and M5 customer evidence remain open. Native Spaces, broader delegated execution and a production four-area supervisor are future work.\nSources: Repository evidence at 89104dd: docs/reviews/federation-first/README.md\nRepository evidence at 89104dd: docs/reviews/federation-first/m1-execution.md\nRepository evidence at 89104dd: docs/reviews/federation-first/m2-legal-assurance-revision.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 13,
+    "pageId": "p13",
+    "text": [
+      "Founder-led, with explicit assurance ownership",
+      "Olivier Van Acker",
+      "Founder · creator of Memory Layer",
+      "Built the Rust memory platform,\ncode-graph retrieval, MCP\nintegration and evaluation tooling.",
+      "Planned organization",
+      "Nine employees, including founder,\n+ fractional counsel\nEngineering, deployment, commercial,\nsupport and an assurance lead.",
+      "Assurance lead owns the programme:\nISO 27001 · ISO 42001 · SOC 2 Type II",
+      "Employee AI per person, per month:\n£5k allowance · £2.5k expected spend.",
+      "Hiring, AI utilization and throughput are hypotheses. Certifications are not completed.",
+      "Current M2 staffing and employee AI schedules",
+      "13"
+    ],
+    "notes": "Founder shipped work is supported by the repository: Rust memory platform, code-graph retrieval, MCP integration and evaluation tooling. No unsupported release count, employer logo, candidate pipeline or cofounder commitment is included. Planned organization is nine employees at steady state (8/9/9 year-end headcount) plus fractional legal counsel, not nine employees already hired. The assurance lead owns the ISO 27001 and ISO 42001 certification programme and SOC 2 Type II attestation programme. Certification/attestation has not been completed; external audit/advisory costs are unquoted. SOC 2 Type II is an attestation, not an ISO certification. Employee AI budget is £5,000/month allowance at 50% utilization: £250 subscriptions plus £2,250 metered spending, with the other £2,500 retained as cash headroom. Assumptions!E119:E120 defines the allowance/utilization; Employee AI!C9:C12 defines per-employee spending/headroom; Team!B46 and AM46:AQ46 defines assurance leadership. These are operating hypotheses, not proven productivity or equivalent output from fewer people. M3 must measure AI spending, throughput, review/rework and delivery capacity.\nSources: Repository evidence at 89104dd: README.md\nRepository evidence at 89104dd: docs/reviews/federation-first/m2-legal-assurance-revision.md\nhttps://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit\nhttps://docs.google.com/spreadsheets/d/1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es/edit\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 14,
+    "pageId": "p14",
+    "text": [
+      "Fund the next proof points",
+      "Capital should demonstrate",
+      "A trustworthy deployment",
+      "Pass security, recovery and evaluation gates.",
+      "A valuable workflow",
+      "Measure quality and operational outcomes in a qualified pilot.",
+      "A repeatable business",
+      "Validate delivery cost, packaging and onboarding effort.",
+      "Discuss milestones and financing structure.",
+      "Round size follows the evidence, scope and runway required. No fixed fundraising ask.",
+      "Provisional financial scenarios in the appendix",
+      "14"
+    ],
+    "notes": "This deck makes no fixed monetary fundraising ask. Discuss the proof points, sequencing, resources, financing structure and operating location first. The M2 London and New York figures in the appendix are alternative planning scenarios under a 24-month funding objective, not an approved round, spending plan or guarantee. M3 must validate costs, staffing capacity and assurance quotes; M5 supplies customer evidence. The Tom briefing anticipates investor questions but the conversation has not happened, so it supplies no feedback, endorsement or investment interest.\nSources: Repository evidence at 89104dd: docs/reviews/federation-first/m2-legal-assurance-revision.md\nRepository evidence at 89104dd: docs/reviews/federation-first/README.md\nhttps://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit\nhttps://docs.google.com/spreadsheets/d/1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es/edit\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 15,
+    "pageId": "m4_appendix_15",
+    "text": [
+      "Appendix · architecture and trust boundaries",
+      "AT Protocol foundation",
+      "Stable identity (DIDs)\nLexicon record schemas\nSigned repositories and sync",
+      "Memory governance",
+      "Authorization and publication history\nReviewed, versioned knowledge\nPrivate Q&A through the gateway",
+      "Trust and disclosure limits",
+      "Gateway availability and enforcement are trusted dependencies.\nAuthorized recipients can read and retain copies; revocation cannot recall bytes.\nSigned records prove authenticity, not the truth of the content.",
+      "Native Spaces and broader delegated execution remain future work.",
+      "ADR 0011 · ATProto overview and Spaces alpha in notes",
+      "15"
+    ],
+    "notes": "The selected adapter uses AT Protocol identity, schemas and signed repositories for authenticated publication/distribution. Memory governs reviewed publication, disclosure, authorization, approved recipients/versions, ordering/history and private Q&A. Private questions and answers use Memory’s addressed gateway mailbox. They never enter the PDS, shared publication log, general project timeline or retrieval corpus. The deployment trusts gateway policy enforcement and availability. Authorized administrators/recipients can see plaintext and retain copies; revocation denies subsequent gateway operations; already authorized in-flight work may complete. Previously delivered copies remain readable while local authorization permits and cannot be recalled. Identity signatures do not guarantee factual accuracy. The selected gateway architecture does not depend on experimental native Spaces. Spaces is alpha and broader delegated execution/F2 remains future work.\nSources: Repository evidence at 89104dd: docs/developer/adr/0011-atproto-federation-adapter.md\nRepository evidence at 89104dd: docs/reviews/federation-first/f1-execution.md\nhttps://atproto.com/guides/overview\nhttps://atproto.com/blog/atproto-spaces-alpha\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 16,
+    "pageId": "m4_appendix_16",
+    "text": [
+      "Appendix · evidence without a quality claim",
+      "60",
+      "Knowledge answers\nawaiting genuine blinded review",
+      "0 / 15",
+      "Successful complete\ncoding sequences",
+      "R3 development run · 17 September 2026",
+      "All 75 executions completed. Harness validity and quality did not pass.\nNo validated quality improvement, perfect recall or token-saving claim.",
+      "Controlled federation demonstrations establish bounded behavior, not customer ROI.",
+      "R3 development continuation and coding diagnosis",
+      "16"
+    ],
+    "notes": "Latest R3 development continuation dated 17 September 2026 completed 75/75 executions. Sixty knowledge answers await genuine blinded review; successful complete coding sequences are 0/15. These are three repeats of one coding repository family under five conditions, not 15 independent tasks. Report flags: execution_valid=true, harness_valid=false, official_evidence=false, quality_passed=false. Execution completion is not task success or validated accuracy. Coding diagnosis identifies harness/tool/budget issues as well as actual coding failures; this does not change the 0/15 result. Old headline claims of 18.1% task success, perfect recall and 41% fewer tokens are removed. No quality improvement or customer operational gain has been validated.\nSources: Repository evidence at 89104dd: evals/r3/development-continuation-20260917.md\nRepository evidence at 89104dd: evals/r3/coding-diagnosis-20260917.md\nRepository evidence at 89104dd: docs/reviews/federation-first/f1-execution.md\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 17,
+    "pageId": "m4_appendix_17",
+    "text": [
+      "Appendix · Base commercial forecast",
+      "Shared economics · GBP | Year 1 | Year 2 | Year 3",
+      "Year-end ARR | £160k | £900k | £2.24m",
+      "Recognized revenue | £42k | £552k | £1.60m",
+      "Paying accounts (expected) | 2.00 | 10.40 | 22.38",
+      "London / NY gross margin | −80.8% / −101.4% | 52.1% / 48.0% | 74.2% / 72.7%",
+      "Pilot funnel: starts from month 5, two pilot months, 50% conversion.\nNet revenue retention: (1 − 5% churn) × (1 + 45% expansion) = 137.75%.",
+      "36 months from 1 October 2026. Fractional accounts are expected values, not signed customers.",
+      "M2 v3-assurance · Base · live source check 17 September 2026",
+      "17"
+    ],
+    "notes": "Financial preparation, not a validated commercial forecast. Year 1 Oct 2026–Sep 2027; Year 2 Oct 2027–Sep 2028; Year 3 Oct 2028–Sep 2029. Shared £80,000 annual commitment with two deployments, no Base pilot/onboarding/overage receipts; annual cash invoicing at start/renewal and service-year revenue recognition. The original provisional quarterly acquisition volumes are pilot-start hypotheses, starting month five conditional on readiness, with two pilot months and 50% conversion. Annual churn5% and retained-account expansion45% imply 137.75% NRR. Fractional customer counts represent expected values. London and New York share commercial economics, converted at planning FX $1.3476/£, 14 September 2026; margins differ due to regional costs and are calculated, not preset.\nLondon Summary!C6:E11 and B33; Assumptions!E21:E27, E95:E109 (pilot volumes and NRR): https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit\nNew York Summary!C6:E11 and B33: https://docs.google.com/spreadsheets/d/1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es/edit\nModel M2-2026-09-15-v3-assurance; fingerprint fnv1a32:d74d6a28. Captures dated 15 September 2026; live inputs, formulas and Base selection rechecked 17 September 2026. See M4 financial-evidence register for precise captured values and ranges.\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  },
+  {
+    "number": 18,
+    "pageId": "m4_appendix_18",
+    "text": [
+      "Appendix · alternative operating bases",
+      "24-month funding objective | London · GBP | New York · USD",
+      "Gross funding requirement | £3.23m | $4.91m",
+      "Expected employee AI spend | £420k | $566k",
+      "AI headroom retained as cash | £420k | $566k",
+      "M25–27 operating buffer | £504k | $744k",
+      "New York gross funding in common GBP: £3.65m at $1.3476/£.",
+      "Fund to month 24; retain AI headroom plus months 25–27 operating outflows.\nAlternative bases, never combined. External assurance costs remain unquoted.",
+      "AI headroom is cash, not a second expense. These scenarios do not determine a round size.",
+      "M2 Summary, Employee AI and funding schedules · details in notes",
+      "18"
+    ],
+    "notes": "Base gross funding: London £3,226,268.299476148; NY $4,913,192.66445569, equivalent £3,645,883.5444165114 at planning FX1.3476. Net funding £3,161,742.933486625 / $4,814,928.811166576; fees £64,525.365989523 / $98,263.853289114. The objective avoids negative cash through month24 and ends month24 with months25–27 operating outflows plus unused first24month employee AI allowance. London required month24 cash £924,025.0675705 = £504,025.0675705 buffer + £420,000 AI headroom. NY $1,309,757.209858 = $743,765.209858 buffer + $565,992 AI headroom. Expected first24month AI spending is separately £420,000 / $565,992. Full36month AI spending and unused allowance are each £690,000 / $929,844. Headroom stays cash, not a provision or supplier expense.\nSources: London Summary!B22:B29 (funding), B32 (common GBP), B73:B74 (24-month AI expense/headroom), Summary!C19:E19 (annual AI); Employee AI!C26:AL28 (36-month totals): https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit\nNew York same ranges: https://docs.google.com/spreadsheets/d/1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es/edit\nRepository evidence at 89104dd: docs/reviews/federation-first/m2-legal-assurance-revision.md\nAssurance lead and fractional counsel are included. Full external ISO27001/ISO42001 certification and SOC2TypeII audit/advisory costs remain unquoted; retained legacy one-off amounts do not cover their full scope. This is a 24-month funding objective, not guaranteed36month runway or profitability. Combined launch-delay/doubled-support/full-AI stress can produce negative month36 cash. Models are alternative company bases, never summed. No fixed fundraising ask. M3 validates actual costs, capacity and assurance quotes; M5 supplies customer evidence.\nDated evidence dossier: https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4"
+  }
+]
