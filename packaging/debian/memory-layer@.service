@@ -21,14 +21,10 @@ RuntimeDirectoryMode=0700
 WorkingDirectory=/var/lib/memory-layer/instances/%i/service
 LoadCredential=memory-layer.toml:/etc/memory-layer/instances/%i/memory-layer.toml
 LoadCredential=memory.sha256:/etc/memory-layer/instances/%i/memory.sha256
-Environment=MEMORY_LAYER_PROFILE=prod
-Environment=XDG_CONFIG_HOME=/var/lib/memory-layer/instances/%i/service/config
-Environment=XDG_STATE_HOME=/var/lib/memory-layer/instances/%i/service/state
-Environment=XDG_DATA_HOME=/var/lib/memory-layer/instances/%i/service/data
-Environment=XDG_CACHE_HOME=/var/cache/memory-layer/instances/%i/service
-UnsetEnvironment=OPENAI_API_KEY ANTHROPIC_API_KEY MEMORY_LAYER_DEV MEMORY_LAYER__DATABASE__URL MEMORY_LAYER__SERVICE__API_TOKEN
-ExecStartPre=/usr/libexec/memory-layer/verify-instance-release %i %d/memory.sha256
-ExecStart=/opt/memory-layer/instances/%i/release/bin/memory --config %d/memory-layer.toml service run
+# A finite environment is built by the launcher. Partial UnsetEnvironment lists
+# cannot prevent arbitrary MEMORY_LAYER__ overrides or inherited federation.
+ExecStartPre=/usr/bin/env -i PATH=/usr/bin:/bin /usr/libexec/memory-layer/verify-instance-release %i %d/memory.sha256
+ExecStart=/usr/libexec/memory-layer/run-instance %i %d
 Restart=on-failure
 RestartSec=5
 UMask=0077

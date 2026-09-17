@@ -14,6 +14,15 @@ url = "postgresql://REVIEW:REVIEW@127.0.0.1:5432/REVIEW"
 [cluster]
 enabled = false
 
+[offline]
+enabled = false
+
+[reinforcement]
+enabled = false
+
+[provenance]
+reverify_enabled = false
+
 [mcp]
 enabled = false
 http_enabled = false

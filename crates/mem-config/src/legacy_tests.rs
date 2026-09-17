@@ -20,6 +20,25 @@ use crate::*;
 use mem_record::*;
 
 #[test]
+fn named_instance_staging_template_explicitly_disables_autonomous_work_and_offline_replay() {
+    let config: AppConfig =
+        toml::from_str(include_str!("../../../deploy/areas/instance.toml.example"))
+            .expect("parse actual named-instance staging template");
+    assert!(config.service.read_only);
+    assert!(config.service.api_token.is_empty());
+    assert!(config.database.url.contains("REVIEW"));
+    assert!(!config.cluster.enabled && !config.offline.enabled);
+    assert!(!config.reinforcement.enabled && !config.provenance.reverify_enabled);
+    assert!(!config.background_work.enabled && !config.background_work.internal_automation);
+    assert!(!config.automation.enabled && !config.features.llm_curation);
+    assert!(!config.embeddings.enabled && !config.embeddings.create_enabled);
+    assert!(!config.consolidation.enabled && !config.procedural.enabled);
+    assert!(!config.mcp.enabled && !config.mcp.http_enabled);
+    assert!(config.mcp.read_only && config.mcp.require_token);
+    assert!(config.supervisor.is_none());
+}
+
+#[test]
 fn auth_defaults_preserve_single_user_installations() {
     let config: AppConfig =
         toml::from_str("[service]\n\n[database]\nurl = \"postgresql://memory\"\n")

@@ -64,8 +64,8 @@ for required in \
     'StateDirectoryMode=0700' \
     'ConditionPathExists=/etc/memory-layer/instances/%i/activation-reviewed' \
     'LoadCredential=memory-layer.toml:/etc/memory-layer/instances/%i/memory-layer.toml' \
-    'ExecStartPre=/usr/libexec/memory-layer/verify-instance-release %i %d/memory.sha256' \
-    'ExecStart=/opt/memory-layer/instances/%i/release/bin/memory --config %d/memory-layer.toml service run' \
+    'ExecStartPre=/usr/bin/env -i PATH=/usr/bin:/bin /usr/libexec/memory-layer/verify-instance-release %i %d/memory.sha256' \
+    'ExecStart=/usr/libexec/memory-layer/run-instance %i %d' \
     'ProtectSystem=strict' \
     'ProtectHome=true' \
     'IPAddressDeny=any'; do
@@ -179,6 +179,7 @@ dpkg-deb() {
     local staging="$3"
     [[ -f "$staging/lib/systemd/system/memory-layer@.service" ]] || return 91
     [[ -x "$staging/usr/libexec/memory-layer/verify-instance-release" ]] || return 92
+    [[ -x "$staging/usr/libexec/memory-layer/run-instance" ]] || return 92
     [[ -f "$staging/usr/share/doc/memory-layer/areas/instance.toml.example" ]] || return 93
     [[ ! -e "$staging/opt/memory-layer" ]] || return 94
     [[ ! -e "$staging/etc/memory-layer/instances" ]] || return 95

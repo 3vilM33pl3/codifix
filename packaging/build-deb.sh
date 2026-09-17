@@ -114,6 +114,7 @@ install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer.service" "$PKG_ROOT/lib
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-watch.service" "$PKG_ROOT/lib/systemd/system/memory-watch.service"
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer@.service" "$PKG_ROOT/lib/systemd/system/memory-layer@.service"
 install -m 0755 "$ROOT_DIR/packaging/debian/verify-instance-release" "$PKG_ROOT/usr/libexec/memory-layer/verify-instance-release"
+install -m 0755 "$ROOT_DIR/packaging/debian/run-instance" "$PKG_ROOT/usr/libexec/memory-layer/run-instance"
 install -m 0755 "$ROOT_DIR/deploy/areas/ca-preflight.sh" "$PKG_ROOT/usr/libexec/memory-layer/ca-preflight"
 install -m 0644 "$ROOT_DIR/scripts/areas/releases/release.py" "$PKG_ROOT/usr/libexec/memory-layer/area-release.py"
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer.env" "$PKG_ROOT/etc/memory-layer/memory-layer.env"

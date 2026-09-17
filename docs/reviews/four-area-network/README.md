@@ -319,6 +319,15 @@ Monolith, each with independent application/database boundaries. Supervisors use
   rather than assuming a fixed render delay. Web passes **109 tests** and build;
   six focused CLI/TUI tests, OpenAPI parity, strict store/lean-CLI Clippy and
   boundaries pass. Service Clippy reports only the existing offline-stub warnings.
+- Named-instance staging now uses a finite clean environment, not a partial
+  ambient-variable denylist. Synthetic launcher tests prove host API keys,
+  arbitrary Memory configuration overrides, proxies, SSH agent and shell startup
+  files do not reach the child. Federation requires a deliberate launcher flag
+  and the exact instance's systemd credential; an ambient config cannot enable
+  it. The staging TOML also explicitly disables offline replay, reinforcement and
+  provenance schedulers. Package lifecycle/staging tests pass without installing
+  a package or changing services. These are launcher tests, not real host sandbox
+  enforcement or CA activation evidence.
 
 ## 14:00 Europe/London checkpoint, 2026-09-17
 

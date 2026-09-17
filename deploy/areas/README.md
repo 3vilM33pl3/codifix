@@ -54,6 +54,39 @@ or executable. State/cache/runtime directories have mode 0700 and separate
 dynamic identities. Each instance's XDG paths point inside its own state. No
 shared global environment file is loaded. Put the independent database and API
 credentials in the selected TOML. Provider credentials are deliberately absent.
+The fixed launcher clears **all** inherited environment variables, then supplies
+only the production profile, fixed executable path and area-local XDG paths.
+It ignores shell startup files and refuses the wrong instance credential
+directory. Arbitrary `MEMORY_LAYER__` overrides, provider keys, proxy settings,
+SSH agents and an ambient `MEMORY_LAYER_FEDERATION_CONFIG` cannot reach the app.
+This is not an OS isolation proof; the unit sandbox remains independently required.
+
+The staging TOML explicitly disables offline replay, reinforcement, provenance
+rechecks, background work and automated model/embedding work. Do not start the
+application to perform a supposedly inert import: normal service startup runs
+migrations and bootstraps local administration. Perform import with writers
+stopped, using the protected importer, before the separately authorized startup.
+
+### Explicit federation credentials, after enrollment review
+
+Federation stays off unless the operator adds both a named systemd credential
+and the launcher's `--federation` flag. The only accepted file is `federation.json`
+beside this instance's loaded TOML. The JSON must follow the current runtime
+contract and reference only separately scoped credentials. A reviewed drop-in
+for the selected instance can use:
+
+```ini
+[Service]
+LoadCredential=federation.json:/etc/memory-layer/instances/homelab/federation.json
+ExecStart=
+ExecStart=/usr/libexec/memory-layer/run-instance homelab %d --federation
+```
+
+This is an inactive example, not permission to enroll or start a service. Replace
+the instance consistently, review exact TLS/gateway/receipt-key and collection
+grants, and test egress/isolation before enabling it. An existing credential
+without the flag does nothing; the flag with a missing/symlink credential fails.
+The Memory credential directory must not be exposed to Pi.
 
 ## Activation gates
 
@@ -117,6 +150,10 @@ Run `bash packaging/tests/test-debian-lifecycle.sh`. The tests stub lifecycle
 commands and execute the real hooks; they never install a package or change host
 services. A real on-host namespace/identity/network isolation test is a separate
 activation gate and is not implied by those tests passing.
+Run `python3 packaging/tests/test-instance-launcher.py` for synthetic launch tests:
+they rebase paths into temporary storage, execute a fake app, and verify clean
+environment, disabled implicit federation, exact credential paths and denied
+shell-startup injection without touching `/opt`, host credentials or services.
 
 The Debian builder uses a fresh private staging directory and refuses to
 overwrite an existing `target/debian/memory-layer_<version>_<arch>.deb` artifact,

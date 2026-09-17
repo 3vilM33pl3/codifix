@@ -1,0 +1,41 @@
+#!/bin/bash -p
+# SPDX-License-Identifier: AGPL-3.0-or-later
+set -euo pipefail
+
+# Privileged bash mode ignores BASH_ENV, exported functions and shell options.
+# This is an unprivileged service launcher, not a credential provisioner. Never
+# forward the manager's ambient overrides, proxy settings, model keys or agents.
+if [[ $# != 2 && $# != 3 ]] || [[ ! "$1" =~ ^[a-z][a-z0-9-]{0,18}$ ]]; then
+    printf '%s\n' 'Expected an instance name, its systemd credential directory and optional --federation.' >&2
+    exit 1
+fi
+instance="$1"
+credential_dir="$2"
+if [[ "$credential_dir" != "/run/credentials/memory-layer@$instance.service" ]] ||
+   [[ "$(/usr/bin/realpath -e -- "$credential_dir")" != "$credential_dir" ]]; then
+    printf '%s\n' 'The instance requires its exact non-symlink systemd credential directory.' >&2
+    exit 1
+fi
+config="$credential_dir/memory-layer.toml"
+if [[ ! -f "$config" || ! -r "$config" || -L "$config" ]]; then
+    printf '%s\n' 'The selected instance configuration credential is unavailable.' >&2
+    exit 1
+fi
+runtime_env=(
+    'PATH=/usr/bin:/bin'
+    'LANG=C.UTF-8'
+    'MEMORY_LAYER_PROFILE=prod'
+    "XDG_CONFIG_HOME=/var/lib/memory-layer/instances/$instance/service/config"
+    "XDG_STATE_HOME=/var/lib/memory-layer/instances/$instance/service/state"
+    "XDG_DATA_HOME=/var/lib/memory-layer/instances/$instance/service/data"
+    "XDG_CACHE_HOME=/var/cache/memory-layer/instances/$instance/service"
+)
+if [[ $# == 3 ]]; then
+    if [[ "$3" != '--federation' ]] || [[ ! -f "$credential_dir/federation.json" || ! -r "$credential_dir/federation.json" || -L "$credential_dir/federation.json" ]]; then
+        printf '%s\n' 'Federation needs an explicit flag and this instance federation.json credential.' >&2
+        exit 1
+    fi
+    runtime_env+=("MEMORY_LAYER_FEDERATION_CONFIG=$credential_dir/federation.json")
+fi
+exec /usr/bin/env -i "${runtime_env[@]}" "/opt/memory-layer/instances/$instance/release/bin/memory" \
+    --config "$config" service run
