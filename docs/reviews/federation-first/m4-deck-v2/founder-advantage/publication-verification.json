@@ -1,0 +1,95 @@
+{
+  "verifiedAt": "2026-09-17T13:57:05.569Z",
+  "sourceRevision": "PpuOu-E_XqasQg",
+  "currentRevision": "mGEM-zCad9anRw",
+  "deckId": "1dMosQKiMjTx1k9yztYfiURaxQTj_HtOSgrmDYW9Ot_g",
+  "backup": {
+    "success": true,
+    "id": "1PAwruketfqTJNWbZooPq_DDTiJ5hOTWo5ERTaK9OvCc",
+    "title": "Codifix compact v2 \u2014 backup before founder revision \u2014 2026-09-17 13:49 UTC",
+    "mimeType": "application/vnd.google-apps.presentation",
+    "url": "https://docs.google.com/presentation/d/1PAwruketfqTJNWbZooPq_DDTiJ5hOTWo5ERTaK9OvCc/edit?usp=drivesdk",
+    "made_private": false
+  },
+  "backupMetadata": {
+    "id": "1PAwruketfqTJNWbZooPq_DDTiJ5hOTWo5ERTaK9OvCc",
+    "title": "Codifix compact v2 \u2014 backup before founder revision \u2014 2026-09-17 13:49 UTC",
+    "mime_type": null,
+    "size": null,
+    "url": null,
+    "file_or_folder": null,
+    "created_time": "2026-09-17T13:50:12.952Z",
+    "modified_time": null,
+    "parent_ids": [
+      "1Q0Bz-71eKFYwLYYGMoYjBhPxKgLI9BP5"
+    ],
+    "drive_id": null,
+    "current_user_can_share": null,
+    "has_augmented_permissions": null,
+    "shared": null,
+    "permissions": [
+      {
+        "type": "user",
+        "role": "owner",
+        "emailAddress": "olivier@robotmotel.com",
+        "domain": null,
+        "displayName": "Olivier Van Acker",
+        "allowFileDiscovery": null
+      }
+    ],
+    "source_visibility_status": "permission_metadata_available"
+  },
+  "permissionsBefore": [
+    {
+      "type": "user",
+      "role": "owner",
+      "emailAddress": "olivier@robotmotel.com",
+      "domain": null,
+      "displayName": "Olivier Van Acker",
+      "allowFileDiscovery": null
+    }
+  ],
+  "permissionsAfter": [
+    {
+      "type": "user",
+      "role": "owner",
+      "emailAddress": "olivier@robotmotel.com",
+      "domain": null,
+      "displayName": "Olivier Van Acker",
+      "allowFileDiscovery": null
+    }
+  ],
+  "original18": {
+    "revision": "_ojXdF-794TMog",
+    "slideCount": 18,
+    "unchanged": true
+  },
+  "notion": {
+    "verified": true,
+    "checkedAt": "2026-09-17T13:55:31.799Z",
+    "pageUrl": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d?pvs=204",
+    "pdfCount": 3,
+    "hasCurrentRevision": true,
+    "hasBAEClient": true,
+    "hasFounderConfirmation": true,
+    "hasCareerLink": true,
+    "hasBackup": true,
+    "hasCurrentPDF": true,
+    "uploaded": {
+      "file_upload_id": "3de89907-15f4-81b9-8898-00b250a58cac",
+      "filename": "codifix-infrastructure-v2-founder-2026-09-17.pdf",
+      "content_type": "application/pdf",
+      "content_length": 213508,
+      "status": "uploaded",
+      "markdown_source": "file-upload://3de89907-15f4-81b9-8898-00b250a58cac",
+      "suggested_markdown": "<pdf src=\"file-upload://3de89907-15f4-81b9-8898-00b250a58cac\"></pdf>"
+    }
+  },
+  "visual": {
+    "allTenInspected": true,
+    "repairPasses": 1,
+    "finalSlide8": "pass",
+    "otherNineByteIdenticalToInspectedRender": true
+  },
+  "previousPdfSha256": "d2e10286c472c115d662b8ac4b86cdd7e39dffed6a5e3358e56bd47fa54de606"
+}

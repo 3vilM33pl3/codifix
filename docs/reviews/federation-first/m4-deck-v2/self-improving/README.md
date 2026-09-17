@@ -2,6 +2,8 @@
 
 **Delivered and verified 17 September 2026.** Eight core slides and two appendices at the existing URL. Slides 5–6 present knowledge maintenance and three implemented product strengths; slide 8 retains integration and pilot proof points. No runtime, configuration or financial-model changes.
 
+This is the preserved knowledge-maintenance snapshot. The [founder-advantage revision](../founder-advantage/README.md) is now current and retains these product changes.
+
 ## Deliverables
 
 - [Editable deck](https://docs.google.com/presentation/d/1dMosQKiMjTx1k9yztYfiURaxQTj_HtOSgrmDYW9Ot_g/edit)

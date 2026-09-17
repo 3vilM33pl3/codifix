@@ -2095,7 +2095,7 @@
         "text": "Measured pilots",
         "bounds": [
           364,
-          401,
+          397.4,
           233,
           33
         ],
@@ -2109,7 +2109,7 @@
         "text": "Validated delivery economics",
         "bounds": [
           611,
-          401,
+          397.4,
           303,
           33
         ],

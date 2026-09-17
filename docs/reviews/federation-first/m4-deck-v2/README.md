@@ -1,24 +1,32 @@
 # Codifix compact v2 — Infrastructure for the Agentic Enterprise
 
-**Updated and verified 17 September 2026, including self-improving knowledge.** Eight core slides and two appendix slides present Codifix as the plumbing and electrical wiring for the Agentic Enterprise. The core promise is “Your platforms keep their interfaces. Codifix does the integration.”
+**Updated and verified 17 September 2026, including self-improving knowledge and founder advantage.** Eight core slides and two appendix slides present Codifix as the plumbing and electrical wiring for the Agentic Enterprise. The core promise is “Your platforms keep their interfaces. Codifix does the integration.”
 
 ## Deliverables
 
 - [Editable native compact v2](https://docs.google.com/presentation/d/1dMosQKiMjTx1k9yztYfiURaxQTj_HtOSgrmDYW9Ot_g/edit)
-- [Current PDF](self-improving/codifix-infrastructure-v2-self-improving-2026-09-17.pdf)
+- [Current PDF](founder-advantage/codifix-infrastructure-v2-founder-2026-09-17.pdf)
+- [Previous self-improving PDF](self-improving/codifix-infrastructure-v2-self-improving-2026-09-17.pdf)
 - [Preserved initial compact PDF](codifix-infrastructure-v2-2026-09-17.pdf)
 - [Notion summary and PDF](https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d), linked from the pitch workspace and M4 first-edition summary
-- [Claim register](claim-register.md), [current slide content and speaker notes](self-improving/slide-content.json), [financial verification](financial-verification.json)
-- [Current revision dossier](self-improving/README.md), [native validation](self-improving/native-validation.json), [object manifest](self-improving/object-manifest.json), [approved checklist](self-improving/approved-plan.md)
+- [Claim register](claim-register.md), [current slide content and speaker notes](founder-advantage/slide-content.json), [financial verification](financial-verification.json)
+- [Current founder revision dossier](founder-advantage/README.md), [native validation](founder-advantage/native-validation.json), [object manifest](founder-advantage/object-manifest.json), [approved checklist](founder-advantage/approved-plan.md)
+- [Previous knowledge-maintenance revision](self-improving/README.md)
 - [Initial publication validation](native-validation.json) and [visual review](visual-review.md) remain historical evidence.
 
 The [original 18-slide M4 deck](https://docs.google.com/presentation/d/1RtPlKvSxf3Z3dmLRHoIaiaKN3n8xtr6WGWJAzeWXCIY/edit) is preserved unchanged, at source revision `_ojXdF-794TMog`. Its [dossier](../m4-deck/README.md) remains the longer first edition.
 
-## Current knowledge-maintenance revision
+## Current founder revision
+
+Slide 8 now makes enterprise delivery and established relationships explicit: BAE Systems client engagement, Shell engineering leadership and McKinsey technology consulting; a route to introductions, buyer insight and founder-led discovery. [Evidence and relationship boundaries](founder-advantage/design-and-evidence.md) preserve the distinction between prior experience, founder assertions and commercial results still to demonstrate. Shipped-product credibility, planned staffing and the financing proof points remain.
+
+Current revision: `mGEM-zCad9anRw`. All ten slides passed native/rendered checks; only slide 8 changed. [Native backup](https://docs.google.com/presentation/d/1PAwruketfqTJNWbZooPq_DDTiJ5hOTWo5ERTaK9OvCc/edit) and previous PDF retained.
+
+## Knowledge-maintenance revision
 
 Slides 5–6 now show eligible volatility-based rechecking, bounded supporting evidence, reconfirmation, uncertainty flags and reviewed correction/version/reuse paths. Proactive human notification is explicitly **Planned outreach**. Connected retrieval, portable canonical memory and traceable corrections are implemented within the prerequisites in [the evidence and handoff](self-improving/evidence-and-handoff.md); improved quality and customer value remain unmeasured. Integration and pilot milestones remain on slide 8.
 
-The current revision is `PpuOu-E_XqasQg`. All ten slides passed rendering/readback review. A [dated native backup](https://docs.google.com/presentation/d/1rVYE6pdmJXEi9l9ZGz9UmtG6dJVA3JmUY8BNLpd6p9c/edit) preserves the pre-revision compact deck. The original 18-slide presentation and financial appendix are unchanged.
+The preceding knowledge-maintenance revision was `PpuOu-E_XqasQg`. All ten slides passed rendering/readback review. A [dated native backup](https://docs.google.com/presentation/d/1rVYE6pdmJXEi9l9ZGz9UmtG6dJVA3JmUY8BNLpd6p9c/edit) preserves the pre-revision compact deck. The original 18-slide presentation and financial appendix are unchanged.
 
 ## Narrative and boundaries
 
@@ -42,7 +50,7 @@ Additional M3/M5 evidence: validation accuracy, missed changes, review effort, v
 
 **M5:** founder-led discovery, sponsorship, independent owners, sharing boundary, deployment readiness, agreed thresholds and sufficient comparable cases; measure quality, correct action, interruptions, correction reuse and full delivery cost.
 
-The [initial completion checkpoint](completion-checkpoint.json) verified the eight original compact-edition items. The [current revision checkpoint](self-improving/completion-checkpoint.json) covers the seven self-improving revision items. [Publication verification](publication-verification.json) records the unchanged source, native copy and Notion/PDF delivery.
+The [initial completion checkpoint](completion-checkpoint.json) verified the eight original compact-edition items. The [knowledge-maintenance checkpoint](self-improving/completion-checkpoint.json) covers its seven items; the [current founder checkpoint](founder-advantage/completion-checkpoint.json) covers the six founder-revision items. [Publication verification](publication-verification.json) records the unchanged source, native copy and Notion/PDF delivery.
 
 ## Initial compact edition: historical preservation and verification
 

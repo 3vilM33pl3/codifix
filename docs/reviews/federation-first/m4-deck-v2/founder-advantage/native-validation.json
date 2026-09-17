@@ -1,0 +1,54 @@
+{
+  "verified": true,
+  "revision": "mGEM-zCad9anRw",
+  "presentationId": "1dMosQKiMjTx1k9yztYfiURaxQTj_HtOSgrmDYW9Ot_g",
+  "sourceCopySha256": "65cfaf38c1b643a5f58d6b98a28db50a4cf2bbe7e4f239601e1a9c7b528b6653",
+  "nativeJsonSha256": "445c92fabf1f7e2fb8c18565f0b43cd9fd291893a8d2e2d5d388e2fda9c60346",
+  "counts": {
+    "textFrames": 122,
+    "notes": 10,
+    "sourceLinks": 10,
+    "noteLinks": 33,
+    "logos": 60,
+    "tables": 1,
+    "connectorsAndRules": 17,
+    "nativeShapes": 181
+  },
+  "unchangedInspectedRenders": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    9,
+    10
+  ],
+  "backgroundCheck": "Stable native properties plus ten empty-edge pixel samples per slide; temporary provider contentUrl excluded",
+  "slideOrder": [
+    "p1",
+    "p2",
+    "p4",
+    "p5",
+    "p6",
+    "p12",
+    "p8",
+    "p14",
+    "m4_appendix_15",
+    "m4_appendix_18"
+  ],
+  "errors": [],
+  "preservedSlides": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    9,
+    10
+  ],
+  "financialAppendixUnchanged": true
+}

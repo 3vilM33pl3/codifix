@@ -1,0 +1,32 @@
+{
+  "pass": 1,
+  "change": "Shift two proof-point text frames up 3.6pt to align inherited baselines",
+  "requests": [
+    {
+      "updatePageElementTransform": {
+        "objectId": "p14_i14",
+        "applyMode": "ABSOLUTE",
+        "transform": {
+          "scaleX": 0.9864,
+          "scaleY": 0.1397,
+          "translateX": 4622800,
+          "translateY": 5046980.0,
+          "unit": "EMU"
+        }
+      }
+    },
+    {
+      "updatePageElementTransform": {
+        "objectId": "p14_i15",
+        "applyMode": "ABSOLUTE",
+        "transform": {
+          "scaleX": 1.2827,
+          "scaleY": 0.1397,
+          "translateX": 7759700,
+          "translateY": 5046980.0,
+          "unit": "EMU"
+        }
+      }
+    }
+  ]
+}
