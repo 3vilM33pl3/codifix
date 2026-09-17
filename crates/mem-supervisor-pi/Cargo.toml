@@ -1,0 +1,19 @@
+[package]
+name = "mem-supervisor-pi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+mem-supervisor = { path = "../mem-supervisor" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tempfile = "3.27.0"
+rustix = { version = "1.1.4", features = ["fs", "process"] }
+
+[lints]
+workspace = true

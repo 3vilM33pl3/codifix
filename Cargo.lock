@@ -3199,6 +3199,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "mem-supervisor-pi"
+version = "2.0.0"
+dependencies = [
+ "mem-supervisor",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "mem-supervisor-runtime"
 version = "2.0.0"
 dependencies = [
