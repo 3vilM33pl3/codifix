@@ -36,7 +36,7 @@ Before you install or run the wizard, have these ready:
 - PostgreSQL with `pgvector` installed and `CREATE EXTENSION vector` enabled in the Memory Layer database
 - `go` on `PATH` if you plan to use the repo-local Memory Layer skills through `go run`
 
-You do not need to invent a Memory Layer service token yourself for normal installs. Setup generates a machine-local token automatically in `memory-layer.env`, and local write-capable tools use that token to authenticate to `mem-service`.
+You do not need to invent a Memory Layer service token yourself for normal installs. The setup wizard provisions a machine-local token in `memory-layer.env`, and local write-capable tools use that token to authenticate to `mem-service`. Debian package installation only stages files: it does not provision or rotate credentials, or start/restart services. Review configuration and explicitly start only the intended instance after setup.
 
 ## PostgreSQL Requirement
 
@@ -292,7 +292,7 @@ psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 've
 memory wizard --global
 ```
 
-This is where you set the shared database URL. The shared service API token is provisioned automatically if it is missing or still using the development placeholder. A writer ID is optional; if you do not set one, Memory Layer derives a stable writer identity automatically.
+This is where you set the shared database URL and explicitly provision the shared service API token. The Debian installation hook does not generate or rotate a token. For a manually configured system service, use `sudo memory --config /etc/memory-layer/memory-layer.toml service ensure-api-token --json` after reviewing that configuration; replacing an existing credential is a separate operator action. A writer ID is optional; if you do not set one, Memory Layer derives a stable writer identity automatically.
 
 5. Go to the project you want to use:
 

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-systemctl stop memory-layer.service || true
+# An upgrade stages files only. Named instances use independently staged,
+# pinned executables; neither they nor user/development services belong to this
+# package hook. The legacy singleton alone depends on the removed /usr/bin file.
+case "${1:-}" in
+    remove|deconfigure)
+        systemctl stop memory-watch.service memory-layer.service || true
+        ;;
+esac

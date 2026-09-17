@@ -16,10 +16,12 @@ RUST_TARGET=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --arch)
+      [[ $# -ge 2 ]] || { echo "--arch requires a value" >&2; exit 1; }
       DEB_ARCH="$2"
       shift 2
       ;;
     --target)
+      [[ $# -ge 2 ]] || { echo "--target requires a value" >&2; exit 1; }
       RUST_TARGET="$2"
       shift 2
       ;;
@@ -57,16 +59,37 @@ case "$DEB_ARCH" in
     ;;
 esac
 
-PKG_ROOT="$ROOT_DIR/target/debian/memory-layer-$DEB_ARCH"
+case "$DEB_ARCH:$RUST_TARGET" in
+  amd64:x86_64-unknown-linux-gnu|arm64:aarch64-unknown-linux-gnu) ;;
+  *) echo "Rust target does not match a supported Debian architecture: $DEB_ARCH:$RUST_TARGET" >&2; exit 1 ;;
+esac
+if [[ ! "$VERSION" =~ ^[0-9][0-9A-Za-z.+:~-]*$ ]]; then
+  echo "Invalid Debian package version: $VERSION" >&2
+  exit 1
+fi
+
+# Each build owns a fresh staging directory. Never recursively delete the old
+# predictable path: it might contain another build or be an operator symlink.
+mkdir -p "$ROOT_DIR/target/debian"
+DEB_PATH="$ROOT_DIR/target/debian/memory-layer_${VERSION}_${DEB_ARCH}.deb"
+if [[ -e "$DEB_PATH" || -L "$DEB_PATH" ]]; then
+  echo "Refusing to overwrite an existing release artifact: $DEB_PATH" >&2
+  echo "Preserve or explicitly remove that exact artifact before rebuilding." >&2
+  exit 1
+fi
+BUILD_ROOT="$(mktemp -d "$ROOT_DIR/target/debian/.memory-layer-$DEB_ARCH.XXXXXX")"
+trap 'rm -rf -- "$BUILD_ROOT"' EXIT
+PKG_ROOT="$BUILD_ROOT/package"
 BIN_PATH="$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory"
 
-rm -rf "$PKG_ROOT"
 mkdir -p \
   "$PKG_ROOT/DEBIAN" \
   "$PKG_ROOT/usr/bin" \
+  "$PKG_ROOT/usr/libexec/memory-layer" \
   "$PKG_ROOT/etc/memory-layer" \
   "$PKG_ROOT/lib/systemd/system" \
   "$PKG_ROOT/usr/share/doc/memory-layer" \
+  "$PKG_ROOT/usr/share/doc/memory-layer/areas" \
   "$PKG_ROOT/usr/share/memory-layer/skill-template" \
   "$PKG_ROOT/usr/share/memory-layer/web" \
   "$PKG_ROOT/usr/share/bash-completion/completions" \
@@ -85,9 +108,13 @@ install -m 0755 "$BIN_PATH" "$PKG_ROOT/usr/bin/memory"
 "$PKG_ROOT/usr/bin/memory" completion fish > "$PKG_ROOT/usr/share/fish/vendor_completions.d/memory.fish"
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer.service" "$PKG_ROOT/lib/systemd/system/memory-layer.service"
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-watch.service" "$PKG_ROOT/lib/systemd/system/memory-watch.service"
+install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer@.service" "$PKG_ROOT/lib/systemd/system/memory-layer@.service"
+install -m 0755 "$ROOT_DIR/packaging/debian/verify-instance-release" "$PKG_ROOT/usr/libexec/memory-layer/verify-instance-release"
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer.env" "$PKG_ROOT/etc/memory-layer/memory-layer.env"
 install -m 0644 "$ROOT_DIR/memory-layer.toml.example" "$PKG_ROOT/etc/memory-layer/memory-layer.toml"
 install -m 0644 "$ROOT_DIR/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/README.md"
+install -m 0644 "$ROOT_DIR/deploy/areas/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/README.md"
+install -m 0644 "$ROOT_DIR/deploy/areas/instance.toml.example" "$PKG_ROOT/usr/share/doc/memory-layer/areas/instance.toml.example"
 cp -R "$ROOT_DIR/.agents/skills/." "$PKG_ROOT/usr/share/memory-layer/skill-template/"
 find "$PKG_ROOT/usr/share/memory-layer/skill-template" -type f -name '*.sh' -exec chmod 0755 {} +
 cp -R "$ROOT_DIR/web/dist/." "$PKG_ROOT/usr/share/memory-layer/web/"
@@ -100,7 +127,10 @@ install -m 0644 "$ROOT_DIR/packaging/debian/conffiles" "$PKG_ROOT/DEBIAN/conffil
 install -m 0755 "$ROOT_DIR/packaging/debian/postinst" "$PKG_ROOT/DEBIAN/postinst"
 install -m 0755 "$ROOT_DIR/packaging/debian/prerm" "$PKG_ROOT/DEBIAN/prerm"
 
-DEB_PATH="$ROOT_DIR/target/debian/memory-layer_${VERSION}_${DEB_ARCH}.deb"
-dpkg-deb --root-owner-group --build "$PKG_ROOT" "$DEB_PATH"
+BUILT_DEB="$BUILD_ROOT/memory-layer.deb"
+dpkg-deb --root-owner-group --build "$PKG_ROOT" "$BUILT_DEB"
+# Publish without following or overwriting an existing output path, even if one
+# appeared while the build was running. Both files are on the same filesystem.
+ln -T -- "$BUILT_DEB" "$DEB_PATH"
 
 echo "Built $DEB_PATH"

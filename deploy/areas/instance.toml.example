@@ -1,0 +1,44 @@
+# Staging template, not an activation-ready configuration. Replace all fields
+# marked REVIEW. Keep this root-owned file mode 0600: it contains DB credentials.
+# Assign separate database/role/token/port per instance; no inherited global env.
+[service]
+bind_addr = "127.0.0.1:4140" # REVIEW: unique loopback port on this host
+api_token = "" # REVIEW: independent, explicitly provisioned strong credential
+read_only = true
+# REVIEW: stage web assets from the same verified release alongside bin/memory.
+web_root = "/opt/memory-layer/instances/REVIEW/release/web"
+
+[database]
+url = "postgresql://REVIEW:REVIEW@127.0.0.1:5432/REVIEW"
+
+[cluster]
+enabled = false
+
+[mcp]
+enabled = false
+http_enabled = false
+require_token = true
+read_only = true
+
+[features]
+llm_curation = false
+
+[background_work]
+enabled = false
+internal_automation = false
+
+[automation]
+enabled = false
+
+[embeddings]
+enabled = false
+create_enabled = false
+
+[consolidation]
+enabled = false
+
+[procedural]
+enabled = false
+
+[telemetry]
+enabled = false

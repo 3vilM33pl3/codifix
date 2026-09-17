@@ -41,10 +41,12 @@ memory doctor
 pg_dump "$DATABASE_URL" > memory-layer-before-upgrade.sql
 ```
 
-After upgrading:
+Debian installation does not start/restart services or rotate credentials. After
+reviewing schema compatibility, restart only the selected installation. For the
+legacy system singleton (not a user service or named instance):
 
 ```bash
-memory service restart-all
+sudo systemctl restart memory-layer.service
 memory doctor
 memory health
 memory status --project <project-slug>
@@ -53,6 +55,12 @@ memory upgrade --dry-run
 
 Run `memory upgrade` only after reviewing the dry run because it can refresh
 repo-local `.agents/` skills and instructions.
+
+For independently pinned named instances, package installation does not change
+their executable. Follow the [named-instance staging contract](../../deploy/areas/README.md)
+and the selected-instance release procedure; never use `restart-all` as an
+implicit package-upgrade step. A database migration can require a coordinated
+writer stop and cannot be undone by blindly selecting an older executable.
 
 ## Release artifacts
 

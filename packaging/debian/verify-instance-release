@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This runs inside the selected instance's unprivileged service sandbox. The
+# digest is a systemd credential, never a shell fragment or executable manifest.
+if [[ $# != 2 || ! "$1" =~ ^[a-z][a-z0-9-]{0,18}$ ]]; then
+    echo "Expected an instance name (1-19 lowercase letters, digits or hyphens) and digest credential." >&2
+    exit 1
+fi
+
+release_root="/opt/memory-layer/instances/$1/release"
+executable="$release_root/bin/memory"
+expected_digest="$(< "$2")"
+if [[ ! "$expected_digest" =~ ^[a-f0-9]{64}$ ]]; then
+    echo "Expected exactly one lowercase SHA-256 digest." >&2
+    exit 1
+fi
+if [[ ! -f "$executable" || ! -x "$executable" || -L "$executable" ]] ||
+    [[ "$(realpath -- "$executable")" != "$executable" ]]; then
+    echo "The selected release executable must be a regular, executable file with no symlink ancestors." >&2
+    exit 1
+fi
+for path in /opt /opt/memory-layer /opt/memory-layer/instances \
+    "/opt/memory-layer/instances/$1" "$release_root" "$release_root/bin" "$executable"; do
+    owner="$(stat -c '%u' -- "$path")"
+    mode="$(stat -c '%a' -- "$path")"
+    if [[ "$owner" != 0 ]] || (( (8#$mode & 0022) != 0 )); then
+        echo "Release paths must be root-owned and not writable by group or others: $path" >&2
+        exit 1
+    fi
+done
+printf '%s  %s\n' "$expected_digest" "$executable" | sha256sum --check --status
