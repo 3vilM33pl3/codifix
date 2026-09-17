@@ -100,6 +100,14 @@ standard socket, or empty recognized tables never prove there is no other data.
 
 ## 3. Optional authenticated staging once inputs are supplied
 
+When a separately verified new Debian package has already been installed, its
+read-only helper is `/usr/libexec/memory-layer/ca-preflight`, and its staging tool
+is `/usr/libexec/memory-layer/area-release.py` (invoke with `python3 -I -S`).
+The `memory-area` and `memory-area-import` commands and offline guides are also
+included. The commands below use the transferred repository paths so preflight
+and authentication remain possible **before** installing any new package.
+Tool presence does not satisfy installation or migration gates.
+
 Stop here if there is no real release bundle, independently trusted full signing
 fingerprint, reviewed source revision/schema compatibility, or resolved target
 architecture. Do not invent those values or copy a fingerprint from the supplied

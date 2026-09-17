@@ -149,10 +149,14 @@ fi
 # cargo/npm/dpkg-deb stubbed. Nothing is built, installed, published or started.
 fixture="$test_root/repo"
 mkdir -p "$fixture/packaging" "$fixture/deploy/areas" "$fixture/.agents/skills" \
+    "$fixture/crates/mem-area-ops" "$fixture/scripts/areas/releases" \
     "$fixture/web/dist" "$fixture/target/debian" "$test_root/binaries/x86_64-unknown-linux-gnu/release"
 cp "$repo_root/packaging/build-deb.sh" "$fixture/packaging/"
 cp -R "$repo_root/packaging/debian" "$fixture/packaging/"
 cp "$repo_root/deploy/areas/README.md" "$repo_root/deploy/areas/instance.toml.example" "$fixture/deploy/areas/"
+cp "$repo_root/deploy/areas/ca-preflight.sh" "$repo_root/deploy/areas/CA-CONSOLE-HANDOFF.md" "$fixture/deploy/areas/"
+cp "$repo_root/crates/mem-area-ops/README.md" "$fixture/crates/mem-area-ops/"
+cp "$repo_root/scripts/areas/releases/release.py" "$repo_root/scripts/areas/releases/README.md" "$fixture/scripts/areas/releases/"
 printf '[workspace.package]\nversion = "2.1.0-rc.1"\n' > "$fixture/Cargo.toml"
 printf 'Fixture README\n' > "$fixture/README.md"
 printf '[service]\n' > "$fixture/memory-layer.toml.example"
@@ -160,6 +164,10 @@ printf 'Fixture\n' > "$fixture/.agents/skills/SKILL.md"
 printf 'Fixture\n' > "$fixture/web/dist/index.html"
 printf '#!/usr/bin/env bash\nprintf "fixture completion\\n"\n' > "$test_root/binaries/x86_64-unknown-linux-gnu/release/memory"
 chmod +x "$test_root/binaries/x86_64-unknown-linux-gnu/release/memory"
+for operator in memory-area memory-area-import; do
+    printf '#!/usr/bin/env bash\nexit 99 # package build must never execute an importer\n' > "$test_root/binaries/x86_64-unknown-linux-gnu/release/$operator"
+    chmod +x "$test_root/binaries/x86_64-unknown-linux-gnu/release/$operator"
+done
 mkdir "$test_root/unrelated-build"
 printf 'preserve\n' > "$test_root/unrelated-build/evidence"
 ln -s "$test_root/unrelated-build" "$fixture/target/debian/memory-layer-amd64"
@@ -175,6 +183,15 @@ dpkg-deb() {
     [[ ! -e "$staging/opt/memory-layer" ]] || return 94
     [[ ! -e "$staging/etc/memory-layer/instances" ]] || return 95
     [[ ! -e "$staging/var/lib/memory-layer" ]] || return 96
+    for operator in memory-area memory-area-import; do
+        [[ -x "$staging/usr/bin/$operator" ]] || return 97
+        cmp "$staging/usr/bin/$operator" "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/$operator" || return 97
+    done
+    [[ -x "$staging/usr/libexec/memory-layer/ca-preflight" ]] || return 98
+    [[ -f "$staging/usr/libexec/memory-layer/area-release.py" ]] || return 98
+    for guide in CA-CONSOLE-HANDOFF.md area-import.md release-staging.md; do
+        [[ -s "$staging/usr/share/doc/memory-layer/areas/$guide" ]] || return 98
+    done
     printf 'fixture deb\n' > "$4"
     log_command "dpkg-deb $*"
 }
@@ -188,6 +205,7 @@ if compgen -G "$fixture/target/debian/.memory-layer-amd64.*" >/dev/null; then
     fail "private build staging directory was not cleaned up"
 fi
 grep -q '^dpkg-deb ' "$PACKAGING_TEST_LOG" || fail "builder did not assemble the expected package"
+grep -q '^cargo build --release --locked -p mem-area -p mem-area-ops .*--target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "operators were not built with locked dependencies and selected architecture"
 : > "$PACKAGING_TEST_LOG"
 if bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null 2>&1; then
     fail "builder overwrote an existing release artifact"

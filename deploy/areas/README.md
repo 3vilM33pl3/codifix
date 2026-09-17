@@ -11,6 +11,15 @@ The new template is a foundation, not evidence of four deployed areas. No named
 instance, database, identity, gateway, TLS binding, watcher, supervisor or Pi
 runtime is created by package installation. The CA remains console-only.
 
+Linux packages additionally carry `memory-area` (offline planning) and
+`memory-area-import` (protected verification/preparation/explicit local import).
+Both are built for the selected architecture with locked dependencies and are
+never executed by package hooks. Read-only CA preflight and authenticated staging
+tools are under `/usr/libexec/memory-layer/`; their operator guides are under
+`/usr/share/doc/memory-layer/areas/`. These are staged tools, not an automatic
+installer, database provisioner or approval to migrate. No Pi binary, provider
+key, source data or reviewed ownership manifest is bundled.
+
 ## Files and identities
 
 Use lowercase names of 1–19 characters beginning with a letter, for example

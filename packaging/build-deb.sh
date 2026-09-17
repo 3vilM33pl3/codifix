@@ -97,12 +97,16 @@ mkdir -p \
   "$PKG_ROOT/usr/share/fish/vendor_completions.d"
 
 echo "Building release binary for $DEB_ARCH ($RUST_TARGET)..."
-cargo build --release --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory --target "$RUST_TARGET"
+cargo build --release --locked -p mem-cli --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory --target "$RUST_TARGET"
+echo "Building explicit offline area migration operators..."
+cargo build --release --locked -p mem-area -p mem-area-ops --manifest-path "$ROOT_DIR/Cargo.toml" --bins --target "$RUST_TARGET"
 echo "Building web UI..."
 npm --prefix "$ROOT_DIR/web" ci
 npm --prefix "$ROOT_DIR/web" run build
 
 install -m 0755 "$BIN_PATH" "$PKG_ROOT/usr/bin/memory"
+install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory-area" "$PKG_ROOT/usr/bin/memory-area"
+install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory-area-import" "$PKG_ROOT/usr/bin/memory-area-import"
 "$PKG_ROOT/usr/bin/memory" completion bash > "$PKG_ROOT/usr/share/bash-completion/completions/memory"
 "$PKG_ROOT/usr/bin/memory" completion zsh > "$PKG_ROOT/usr/share/zsh/vendor-completions/_memory"
 "$PKG_ROOT/usr/bin/memory" completion fish > "$PKG_ROOT/usr/share/fish/vendor_completions.d/memory.fish"
@@ -110,11 +114,16 @@ install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer.service" "$PKG_ROOT/lib
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-watch.service" "$PKG_ROOT/lib/systemd/system/memory-watch.service"
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer@.service" "$PKG_ROOT/lib/systemd/system/memory-layer@.service"
 install -m 0755 "$ROOT_DIR/packaging/debian/verify-instance-release" "$PKG_ROOT/usr/libexec/memory-layer/verify-instance-release"
+install -m 0755 "$ROOT_DIR/deploy/areas/ca-preflight.sh" "$PKG_ROOT/usr/libexec/memory-layer/ca-preflight"
+install -m 0644 "$ROOT_DIR/scripts/areas/releases/release.py" "$PKG_ROOT/usr/libexec/memory-layer/area-release.py"
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer.env" "$PKG_ROOT/etc/memory-layer/memory-layer.env"
 install -m 0644 "$ROOT_DIR/memory-layer.toml.example" "$PKG_ROOT/etc/memory-layer/memory-layer.toml"
 install -m 0644 "$ROOT_DIR/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/README.md"
 install -m 0644 "$ROOT_DIR/deploy/areas/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/README.md"
 install -m 0644 "$ROOT_DIR/deploy/areas/instance.toml.example" "$PKG_ROOT/usr/share/doc/memory-layer/areas/instance.toml.example"
+install -m 0644 "$ROOT_DIR/deploy/areas/CA-CONSOLE-HANDOFF.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/CA-CONSOLE-HANDOFF.md"
+install -m 0644 "$ROOT_DIR/crates/mem-area-ops/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/area-import.md"
+install -m 0644 "$ROOT_DIR/scripts/areas/releases/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/release-staging.md"
 cp -R "$ROOT_DIR/.agents/skills/." "$PKG_ROOT/usr/share/memory-layer/skill-template/"
 find "$PKG_ROOT/usr/share/memory-layer/skill-template" -type f -name '*.sh' -exec chmod 0755 {} +
 cp -R "$ROOT_DIR/web/dist/." "$PKG_ROOT/usr/share/memory-layer/web/"
