@@ -3,7 +3,7 @@
 Status: **build candidate only**. Not signed, published, installed or activated.
 This is not completion of the four-area foundation or permission to cut over.
 
-## Local build status, verified 2026-09-17 20:19 UTC
+## Local build status, verified 2026-09-17
 
 - Source `5827aeb`: native and ARM64 CLI/operator/gateway compilation completed;
   both Debian assemblies failed under the private umask. The ARM64 CLI was
