@@ -27,6 +27,16 @@ without claiming standard MIT terms or legal clearance. Original pins remain
 unchanged; separately identified local patch/testing may proceed, with no Pi
 publication, paid calls or live activation. No real key or paid call was used.
 See [reproduction and evidence](../../../crates/mem-supervisor-pi/README.md#real-fake-provider-diagnostic-tool-isolation-blocked).
+The narrow internal `0.5.1+memory.no-tools.1` patch subsequently built on AMD64
+and passed the network-none synthetic diagnostic: both settings profiles
+advertise no tools; success/HTTP 429 each make exactly one local request. The
+original production pin rejects this separately hashed artifact. Source, patch,
+licence, compiler and binary identity are in the
+[patch evidence](../../../crates/mem-supervisor-pi/patches/README.md).
+Thirteen ordinary tests, strict adapter Clippy, formatting and boundaries pass.
+ARM64 compilation remains separate; neither that platform nor the CA has a
+patched runtime result. Provider activation/admission and disclosure gates remain
+closed. Nothing was installed into an existing service.
 
 The native rc.1 binaries and Web UI compiled at source `5827aeb`, but packaging
 failed because a private umask left the Debian control directory mode 0700.

@@ -223,8 +223,23 @@ applicability to this Codex-assisted work has not been legally established.
 Olivier subsequently confirmed continuation of the internal narrow patch;
 that authorization was checkpointed at 20:06 UTC. The complete upstream notice
 is retained, with no claim of standard MIT terms or maintainer clearance. This
-permits the agreed local work, not publication or redistribution. Original
+is scoped to local work, not publication or redistribution. Original
 artifacts remain pinned without silent substitution, and patched diagnostics
 must record their own exact source, patch and executable hashes.
 Even a corrected tool flag will not replace the external sandbox, exact input
 consent, per-request admission, response validation or budget checks.
+
+## Separately pinned internal no-tools.1 experiment
+
+The approved two-site RPC-startup patch now builds on AMD64 and passes the
+network-none synthetic diagnostic: no tools are advertised with either default
+or explicit-off settings; success returns the exact supplied text; HTTP 429
+fails without an automatic second request. The original artifact still
+reproduces the defect. Its production hash is unchanged and rejects the patched
+binary, whose fixed digest exists only inside the diagnostic test module.
+
+See [patch, complete notice, identity and evidence](patches/README.md). The
+13 ordinary tests pass; four environment-bound diagnostics remain ignored by
+default, including the patched test that was explicitly exercised separately.
+This is not a live agent, general FTUI/SDK certification, an ARM64/CA runtime
+result, an admission proxy or a production provider grant.
