@@ -22,7 +22,15 @@ The serde types in [src/types.rs](src/types.rs) define format version 1. Collect
 the inventory from one consistent source snapshot. Include every user table in
 every schema, including empty tables and `public._sqlx_migrations`. The policy
 catalog covers the 93 active tables of the public migration-0052 schema, plus
-the optional historical evaluation schema `mab_full_20260516_150014`. The exact
+an exact ten-table supervisor extension at migration 0053 and the optional
+historical evaluation schema `mab_full_20260516_150014`. Head 0052 must not contain
+0053 tables; head 0053 requires all ten, including empty tables. Other heads and
+unknown additional tables remain blocked. Supervisor authorities, policies,
+actions, budget days, attempt states and journal heads are retired runtime;
+attempts, settlements, action results and journal rows are historical archive.
+None can be imported as active authority or retrievable knowledge. The 0052
+catalog, inventory/manifest wire format and normalized hashes are unchanged.
+The exact
 historical catalog is `_sqlx_migrations`, `curation_runs`, `memory_chunks`,
 `memory_entries`, `memory_relations`, `memory_sources`, `memory_tags`, `projects`,
 `raw_captures`, `sessions`, and `tasks`. If any member is present, all eleven

@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub const FORMAT_VERSION: u32 = 1;
+/// Retained baseline head; changing this would silently alter existing fixtures.
 pub const SUPPORTED_MIGRATION: u32 = 52;
+pub const SUPERVISOR_MIGRATION: u32 = 53;
 
 /// Stable wire identities. Display names must not become routing identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

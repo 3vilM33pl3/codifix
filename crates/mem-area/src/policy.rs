@@ -253,6 +253,45 @@ pub const KNOWN_TABLES: &[(&str, TableStrategy)] = &[
     ),
 ];
 
+/// Exact additive migration-0053 catalog. No authority, lease, policy or pending
+/// action is imported as live state; accounting/effect history remains archived.
+pub const SUPERVISOR_TABLES_0053: &[(&str, TableStrategy)] = &[
+    (
+        "public.supervisor_authorities",
+        TableStrategy::RetireRuntime,
+    ),
+    ("public.supervisor_policies", TableStrategy::RetireRuntime),
+    ("public.supervisor_actions", TableStrategy::RetireRuntime),
+    (
+        "public.supervisor_budget_days",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.supervisor_attempt_states",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.supervisor_journal_heads",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.supervisor_attempts",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.supervisor_settlements",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.supervisor_action_results",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.supervisor_journal",
+        TableStrategy::HistoricalArchive,
+    ),
+];
+
 /// Optional, observed historical evaluation snapshot. Presence of any member
 /// requires the whole catalog, including empty tables. Never match a prefix or
 /// apply the public schema's ownership/rebuild policy to these archived rows.
@@ -281,6 +320,7 @@ pub(crate) fn historical_project_table(table: &str) -> Option<&'static str> {
 pub fn table_strategy(table: &str) -> Option<TableStrategy> {
     KNOWN_TABLES
         .iter()
+        .chain(SUPERVISOR_TABLES_0053)
         .find_map(|(name, strategy)| (*name == table).then_some(*strategy))
         .or_else(|| historical_project_table(table).map(|_| TableStrategy::HistoricalArchive))
 }

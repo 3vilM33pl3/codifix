@@ -144,9 +144,12 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
     if inventory.format_version != FORMAT_VERSION {
         errors.push("unsupported inventory format version".into());
     }
-    if inventory.migration_version != SUPPORTED_MIGRATION {
+    if !matches!(
+        inventory.migration_version,
+        SUPPORTED_MIGRATION | SUPERVISOR_MIGRATION
+    ) {
         errors.push(format!(
-            "unsupported migration version {}; expected {SUPPORTED_MIGRATION}",
+            "unsupported migration version {}; expected {SUPPORTED_MIGRATION} or {SUPERVISOR_MIGRATION}",
             inventory.migration_version
         ));
     }
@@ -391,6 +394,15 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
     for (table, _) in KNOWN_TABLES {
         if !tables.contains_key(table) {
             errors.push(format!("missing table inventory {table}"));
+        }
+    }
+    for (table, _) in SUPERVISOR_TABLES_0053 {
+        if inventory.migration_version == SUPERVISOR_MIGRATION && !tables.contains_key(table) {
+            errors.push(format!("missing migration 0053 table inventory {table}"));
+        } else if inventory.migration_version == SUPPORTED_MIGRATION && tables.contains_key(table) {
+            errors.push(format!(
+                "migration 0053 table present at migration 0052 head: {table}"
+            ));
         }
     }
     if HISTORICAL_TABLES

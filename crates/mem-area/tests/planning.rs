@@ -764,12 +764,114 @@ fn reviewed_schema_catalog_matches_every_current_repository_table() {
     }
     let catalog: BTreeSet<_> = KNOWN_TABLES
         .iter()
+        .chain(SUPERVISOR_TABLES_0053)
         .map(|(name, _)| name.to_string())
         .collect();
-    assert_eq!(catalog.len(), KNOWN_TABLES.len(), "duplicate table policy");
+    assert_eq!(
+        catalog.len(),
+        KNOWN_TABLES.len() + SUPERVISOR_TABLES_0053.len(),
+        "duplicate table policy"
+    );
     assert_eq!(
         catalog, active,
         "schema changes require explicit policy review"
+    );
+}
+
+#[test]
+fn migration_0053_is_exact_version_gated_and_cannot_reactivate_supervisor_state() {
+    let baseline = fixture();
+    assert_eq!(SUPPORTED_MIGRATION, 52);
+    assert_eq!(KNOWN_TABLES.len(), 93);
+    assert!(verify_inventory(&baseline).is_empty());
+    let baseline_digest = inventory_digest(&baseline).expect("baseline digest");
+    let baseline_manifest = serde_json::to_vec(&reviewed(&baseline)).expect("baseline manifest");
+    assert_eq!(SUPERVISOR_TABLES_0053.len(), 10);
+    let mut inventory = baseline.clone();
+    for (table, _) in SUPERVISOR_TABLES_0053 {
+        inventory.tables.push(TableInventory {
+            table: (*table).into(),
+            columns: vec![Column {
+                name: "id".into(),
+                data_type: "uuid".into(),
+                nullable: false,
+            }],
+            foreign_keys: vec![],
+            row_count: 1,
+            rows: vec![row(id(99).to_string(), None, None, None)],
+        });
+    }
+    let mixed = verify_inventory(&inventory);
+    assert_eq!(
+        mixed
+            .iter()
+            .filter(
+                |error| error.starts_with("migration 0053 table present at migration 0052 head:")
+            )
+            .count(),
+        10
+    );
+    inventory.migration_version = SUPERVISOR_MIGRATION;
+    assert!(verify_inventory(&inventory).is_empty());
+    let manifest = reviewed(&inventory);
+    let report = verify_manifest(&inventory, &manifest);
+    assert!(report.plan_valid, "{:?}", report.blockers);
+    for (table, strategy) in SUPERVISOR_TABLES_0053 {
+        let planned = report
+            .records
+            .iter()
+            .find(|record| record.record.table == *table)
+            .expect("retained supervisor record");
+        assert_eq!(
+            planned.destination,
+            match strategy {
+                TableStrategy::HistoricalArchive => Destination::ProtectedArchive,
+                TableStrategy::RetireRuntime => Destination::ArchiveAndRetire,
+                _ => panic!("supervisor tables cannot be active knowledge"),
+            }
+        );
+    }
+    for (missing, _) in SUPERVISOR_TABLES_0053 {
+        let mut incomplete = inventory.clone();
+        incomplete.tables.retain(|table| table.table != *missing);
+        assert!(
+            verify_inventory(&incomplete)
+                .iter()
+                .any(|error| error == &format!("missing migration 0053 table inventory {missing}"))
+        );
+    }
+    let mut unknown = inventory.clone();
+    let mut table = unknown.tables.last().expect("table").clone();
+    table.table = "public.supervisor_future_authority".into();
+    unknown.tables.push(table);
+    assert!(
+        verify_inventory(&unknown)
+            .iter()
+            .any(|error| error.contains("unclassified table public.supervisor_future_authority"))
+    );
+    for unsupported in [51, 54, 999] {
+        let mut future = inventory.clone();
+        future.migration_version = unsupported;
+        assert!(
+            verify_inventory(&future)
+                .iter()
+                .any(|error| error.starts_with("unsupported migration version"))
+        );
+    }
+    inventory.tables.retain(|table| {
+        !SUPERVISOR_TABLES_0053
+            .iter()
+            .any(|(name, _)| *name == table.table)
+    });
+    inventory.migration_version = SUPPORTED_MIGRATION;
+    assert_eq!(inventory, baseline);
+    assert_eq!(
+        inventory_digest(&inventory).expect("same digest"),
+        baseline_digest
+    );
+    assert_eq!(
+        serde_json::to_vec(&reviewed(&inventory)).expect("same manifest"),
+        baseline_manifest
     );
 }
 
