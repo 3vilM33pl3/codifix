@@ -114,3 +114,46 @@ overwrite an existing `target/debian/memory-layer_<version>_<arch>.deb` artifact
 including symlinks. Preserve or explicitly remove that exact output before an
 intentional rebuild of the same version. Builds never delete a previous staging
 directory or write through its symlink.
+
+## Read-only CA console preflight
+
+After placing this reviewed repository snapshot on the CA using an existing
+approved transfer path, open the CA's local root console in the repository root
+and run this single command:
+
+```bash
+bash deploy/areas/ca-preflight.sh
+```
+
+The command prints redacted JSON directly to the console; the JSON is suitable
+to share for migration planning. It requires Python 3 and neither invokes sudo
+nor enables SSH. It makes no service, package, configuration or credential
+changes, and does not contact a provider or remote database. It reads OS metadata,
+filesystem capacity, service active states and listener port/scope metadata.
+Service logs, command lines, network addresses, config/env content, secret paths
+and application records are excluded. It does not inspect CA keys or OpenBao.
+
+When run as root with `psql` and `runuser` available, it inventories up to four
+local PostgreSQL sockets in the standard runtime directory and 16 databases per
+socket. It uses passwordless local peer authentication as `postgres`, with
+startup/password/service files disabled, read-only transactions and query
+timeouts. Output includes database names/sizes, recognized Memory table counts
+and SQLx schema head. It only selects fixed aggregate/catalog metadata from
+ordinary base tables, excluding views, foreign/partitioned tables and inherited
+children. Memory
+entry counts include all versions and tombstones; they are not a content review.
+The subprocess time budget is 60 seconds; partial checks are labelled.
+
+An unavailable, denied, missing or custom socket never proves there is no data.
+Custom locations, containers, remote/shared databases and bindings are explicitly
+unverified. The script deliberately does not read the application's database
+configuration, so **shared versus unique local data remains unresolved** even
+when a local database has Memory-shaped tables. A separate reviewed binding and
+content reconciliation is required before migration. Table counts are live
+observations across separate queries, not a consistent backup or restore proof.
+
+Test without inspecting a host or database:
+
+```bash
+python3 packaging/tests/test-ca-preflight.py
+```
