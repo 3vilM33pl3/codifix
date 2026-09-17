@@ -178,6 +178,9 @@ rustc() { [[ "$1" == -vV ]] || return 99; printf 'host: x86_64-unknown-linux-gnu
 dpkg-deb() {
     [[ "$1" == --root-owner-group && "$2" == --build ]] || return 90
     local staging="$3" architecture rust_target
+    [[ "$(stat -c %a "$(dirname "$staging")")" == 700 ]] || return 89
+    [[ -z "$(find "$staging" -type d ! -perm 0755 -print -quit)" ]] || return 89
+    [[ -z "$(find "$staging" -type f ! -perm 0644 ! -perm 0755 -print -quit)" ]] || return 89
     architecture="$(sed -n 's/^Architecture: //p' "$staging/DEBIAN/control")"
     case "$architecture" in
         amd64) rust_target=x86_64-unknown-linux-gnu ;;
@@ -210,7 +213,7 @@ dpkg-deb() {
 export -f cargo npm rustc dpkg-deb
 export CARGO_TARGET_DIR="$test_root/binaries"
 : > "$PACKAGING_TEST_LOG"
-bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null
+(umask 077; bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null)
 [[ "$(< "$test_root/unrelated-build/evidence")" == preserve ]] || fail "build deleted unrelated staging files"
 [[ -L "$fixture/target/debian/memory-layer-amd64" ]] || fail "build replaced an unrelated staging symlink"
 if compgen -G "$fixture/target/debian/.memory-layer-amd64.*" >/dev/null; then
@@ -239,7 +242,7 @@ for operator in memory memory-area memory-area-import memory-federation-gateway;
     chmod +x "$test_root/binaries/aarch64-unknown-linux-gnu/release/$operator"
 done
 : > "$PACKAGING_TEST_LOG"
-bash "$fixture/packaging/build-deb.sh" --arch arm64 --output-dir "$test_root/release output" >/dev/null
+(umask 077; bash "$fixture/packaging/build-deb.sh" --arch arm64 --output-dir "$test_root/release output" >/dev/null)
 [[ -s "$test_root/release output/memory-layer_2.1.0-rc.1_arm64.deb" ]] || fail "cross package missing from explicit output directory"
 grep -q '^cargo build --locked -p mem-cli --no-default-features --features tui .*--bin memory --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross completions did not build the host-native lean CLI"
 grep -q '^cargo build --release --locked -p mem-federation-runtime .*--target aarch64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross gateway targeted the wrong architecture"

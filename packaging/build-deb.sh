@@ -164,6 +164,14 @@ install -m 0644 "$ROOT_DIR/packaging/debian/conffiles" "$PKG_ROOT/DEBIAN/conffil
 install -m 0755 "$ROOT_DIR/packaging/debian/postinst" "$PKG_ROOT/DEBIAN/postinst"
 install -m 0755 "$ROOT_DIR/packaging/debian/prerm" "$PKG_ROOT/DEBIAN/prerm"
 
+# Release payloads are public files, even when the builder has a private umask.
+# Normalize only this fresh package tree; the staging parent remains private.
+# Otherwise Debian rejects DEBIAN/0700 and installed assets/completions can be
+# unreadable to the service's DynamicUser.
+find "$PKG_ROOT" -type d -exec chmod 0755 {} +
+find "$PKG_ROOT" -type f ! -perm /111 -exec chmod 0644 {} +
+find "$PKG_ROOT" -type f -perm /111 -exec chmod 0755 {} +
+
 BUILT_DEB="$BUILD_ROOT/memory-layer.deb"
 dpkg-deb --root-owner-group --build "$PKG_ROOT" "$BUILT_DEB"
 # Publish without following or overwriting an existing output path, even if one
