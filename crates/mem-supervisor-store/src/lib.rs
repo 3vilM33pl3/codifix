@@ -4,6 +4,7 @@
 mod actions;
 mod attempts;
 mod policy;
+mod proposals;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use mem_supervisor::{
@@ -16,6 +17,7 @@ use uuid::Uuid;
 pub use actions::{ActionSubmission, ReadyTransition};
 pub use attempts::{AttemptRecord, Reservation, SendPermit};
 pub use policy::PolicyRecord;
+pub use proposals::PrivateProposal;
 
 pub type Result<T> = std::result::Result<T, StoreError>;
 pub type EvidenceDigest = [u8; 32];
@@ -42,6 +44,12 @@ pub enum StoreError {
     Unsettled,
     #[error("stored supervisor contract is inconsistent")]
     Corrupt,
+    #[error("private proposal storage operation failed")]
+    PrivateStorage,
+    #[error("private proposal exceeds allowed content or evidence bounds")]
+    InvalidProposal,
+    #[error("verified model work requires its matching durable private proposal")]
+    UnpersistedProposal,
 }
 
 #[derive(Clone)]

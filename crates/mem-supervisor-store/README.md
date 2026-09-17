@@ -42,7 +42,51 @@ provider attempts to be settled/released; verified reconciliation still needs
 current policy, while a trusted reconciler may record failure after revocation.
 `publish` records only an immutable outcome and evidence hash: the caller must
 durably preserve and validate the actual private result before calling it.
-This crate does not store proposal bodies or establish their atomic durability.
+Use `publish_proposal` below for atomic typed private proposal persistence.
+Generic verified publication/reconciliation rejects any action with provider-
+attempt history unless its matching private proposal is already persisted in
+the same transaction. Hash-only completion cannot bypass private persistence.
+
+## Private model proposals
+
+Additive migration 0054 introduces `supervisor_proposals` and an immutable-body
+guard; it seeds/enables nothing and does not change migration 0053. The retained
+project UUID deliberately has no `projects` foreign key, preserving existing
+project deletion behavior. A **new** publication checks that the project exists
+under `FOR KEY SHARE` in the publication transaction. Historical retention never
+confers current project access or source eligibility.
+
+`publish_proposal(claim, &attempt_id, project_id, &Proposal, &evidence_digests)`
+validates the shared typed shape: nonempty summary of at most 4 KiB, at most eight
+evidence digests and bounded unique reference indices. Health checks and automatic
+installation actions cannot publish model proposals. The selected attempt must
+be settled and match the action, area, policy revision and exact lease fence.
+Current policy and live lease are required for every new write, including a
+recheck after any wait for the journal lock.
+
+The private row, immutable verified outcome and metadata-only journal entry
+commit in the **same transaction**. Any error rolls all three back. A domain-
+separated SHA-256 binds the original immutable request digest, area, action,
+attempt, policy, fence, project, complete typed proposal and ordered evidence
+digests. The proposal is still only a suggestion, never an approval, source
+mutation, installation or executable instruction.
+Here `verified` means the required result was validated and durably recorded,
+not that the model's factual claims or suggested actions were approved.
+
+`private_proposal(area, project_id, action_id)` retrieves only an exact scope and
+revalidates the private digest against the verified action/outcome and settled
+attempt. It has no cross-project listing or fallback. `PrivateProposal` and the
+neutral `Proposal` have no `Debug` implementation. The service must authorize
+every read and revalidate current source eligibility itself; these methods are
+trusted in-process APIs, not new service authorization. Bodies never appear in
+action/attempt/journal metadata reads, and private storage errors discard all
+SQL/JSON diagnostic context that could contain a failing private row.
+
+Restart reads recover the complete typed body. An exact publication retry can
+return the immutable historical row after lease expiry, revocation or project
+deletion, but it never changes authority, emits a new event, creates a send or
+authorizes access. Changed project, body, kind, references, evidence digests or
+attempt bindings are rejected; corruption is not returned as a valid proposal.
 
 ## Physical provider attempt protocol
 
@@ -68,6 +112,11 @@ This crate does not store proposal bodies or establish their atomic durability.
 Admission reserves at most $2.50 and 20 calls per area per **PostgreSQL UTC day**,
 not per revision. Four isolated area limits allocate at most $10/80 calls for
 the fleet. No area borrowing, client-supplied clock or day reset is available.
+This fleet bound requires exactly one authoritative ledger per area and a single
+area binding across installations. This crate does not establish distributed
+uniqueness across databases or clones; admitting the same area in two independent
+databases would duplicate its budget. Deployment must fence replicas/restores
+and bind every physical send to the selected authoritative area ledger.
 Requests use integer micro-USD. Settlement uses exact `numeric(20,0)` to preserve
 the pure contract's entire `u64` range; aggregates use `u128`. Charges above an
 admitted bound are incident evidence, not proof that the provider was capped.
@@ -119,4 +168,7 @@ Integration coverage includes exclusive concurrent claims, hard call/cost caps,
 cross-area independence, stable duplicates and digest conflicts, renewal fences,
 reductions/rotation/revocation, begin-before-send replay denial, expiry and restart
 recovery, immutable full-width charges, over-bound automatic revocation, a
-commit-order journal barrier, delayed-begin expiry and UTC day rollover.
+commit-order journal barrier, delayed-begin expiry and UTC day rollover. Private
+proposal tests cover atomic publication and journal-failure rollback, restart
+reads, exact scope, immutable bodies, revocation/expiry, altered retries, matching
+attempt fences, bounded references, corruption and sanitized database errors.

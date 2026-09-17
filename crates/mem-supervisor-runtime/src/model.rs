@@ -24,6 +24,7 @@ pub struct PreparedRequest {
     body: Value,
     digest: String,
     evidence_count: usize,
+    evidence_digests: Vec<[u8; 32]>,
 }
 
 impl PreparedRequest {
@@ -62,6 +63,10 @@ impl PreparedRequest {
             body,
             digest,
             evidence_count: evidence.len(),
+            evidence_digests: evidence
+                .iter()
+                .map(|text| Sha256::digest(text.as_bytes()).into())
+                .collect(),
         })
     }
 
@@ -71,6 +76,11 @@ impl PreparedRequest {
     }
     pub fn digest(&self) -> &str {
         &self.digest
+    }
+    /// Ordered hashes of the exact supplied evidence bytes. These bind indices
+    /// to reviewed inputs; they do not establish source identity or truth.
+    pub fn evidence_digests(&self) -> &[[u8; 32]] {
+        &self.evidence_digests
     }
 
     /// Only fields accepted by /responses/input_tokens. The input, instructions,

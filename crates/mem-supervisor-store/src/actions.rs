@@ -294,7 +294,7 @@ async fn make_uncertain(
     sqlx::query("UPDATE supervisor_actions SET state='uncertain',fence=fence+1,worker=NULL,lease_until=NULL WHERE id=$1").bind(id).execute(&mut *conn).await?;
     journal(conn, area, revision, Some(id), None, "uncertain", evidence).await
 }
-async fn finish(
+pub(crate) async fn finish(
     conn: &mut PgConnection,
     row: &PgRow,
     outcome: KnownOutcome,
@@ -305,6 +305,24 @@ async fn finish(
         .bind(id).fetch_one(&mut *conn).await?;
     if pending != 0 {
         return Err(StoreError::Unsettled);
+    }
+    if outcome == KnownOutcome::Verified {
+        let had_attempt: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM supervisor_attempts WHERE action_id=$1)",
+        )
+        .bind(id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if had_attempt {
+            // A generic hash-only completion must not bypass atomic private
+            // result persistence. publish_proposal inserts this row before us.
+            let persisted: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM supervisor_proposals p JOIN supervisor_attempts a ON a.id=p.attempt_id JOIN supervisor_attempt_states s ON s.attempt_id=a.id WHERE p.action_id=$1 AND p.area=$2 AND p.policy_revision=$3 AND p.fence=$4 AND p.proposal_digest=$5 AND a.action_id=p.action_id AND a.area=p.area AND a.policy_revision=p.policy_revision AND a.fence=p.fence AND a.request_digest=p.request_digest AND s.state='settled')")
+                .bind(id).bind(row.try_get::<String,_>("area")?).bind(row.try_get::<Uuid,_>("policy_revision")?)
+                .bind(row.try_get::<i64,_>("fence")?).bind(evidence.to_vec()).fetch_one(&mut *conn).await?;
+            if !persisted {
+                return Err(StoreError::UnpersistedProposal);
+            }
+        }
     }
     let state = match outcome {
         KnownOutcome::Verified => "verified",

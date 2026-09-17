@@ -19,6 +19,7 @@ uuid.workspace = true
 [dev-dependencies]
 axum.workspace = true
 mem-test-support = { path = "../mem-test-support" }
+sqlx.workspace = true
 tokio.workspace = true
 
 [lints]

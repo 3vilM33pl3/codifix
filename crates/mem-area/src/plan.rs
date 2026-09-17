@@ -146,10 +146,10 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
     }
     if !matches!(
         inventory.migration_version,
-        SUPPORTED_MIGRATION | SUPERVISOR_MIGRATION
+        SUPPORTED_MIGRATION | SUPERVISOR_MIGRATION | SUPERVISOR_PROPOSAL_MIGRATION
     ) {
         errors.push(format!(
-            "unsupported migration version {}; expected {SUPPORTED_MIGRATION} or {SUPERVISOR_MIGRATION}",
+            "unsupported migration version {}; expected {SUPPORTED_MIGRATION}, {SUPERVISOR_MIGRATION} or {SUPERVISOR_PROPOSAL_MIGRATION}",
             inventory.migration_version
         ));
     }
@@ -397,11 +397,30 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         }
     }
     for (table, _) in SUPERVISOR_TABLES_0053 {
-        if inventory.migration_version == SUPERVISOR_MIGRATION && !tables.contains_key(table) {
+        if matches!(
+            inventory.migration_version,
+            SUPERVISOR_MIGRATION | SUPERVISOR_PROPOSAL_MIGRATION
+        ) && !tables.contains_key(table)
+        {
             errors.push(format!("missing migration 0053 table inventory {table}"));
         } else if inventory.migration_version == SUPPORTED_MIGRATION && tables.contains_key(table) {
             errors.push(format!(
                 "migration 0053 table present at migration 0052 head: {table}"
+            ));
+        }
+    }
+    for (table, _) in SUPERVISOR_TABLES_0054 {
+        if inventory.migration_version == SUPERVISOR_PROPOSAL_MIGRATION
+            && !tables.contains_key(table)
+        {
+            errors.push(format!("missing migration 0054 table inventory {table}"));
+        } else if matches!(
+            inventory.migration_version,
+            SUPPORTED_MIGRATION | SUPERVISOR_MIGRATION
+        ) && tables.contains_key(table)
+        {
+            errors.push(format!(
+                "migration 0054 table present before migration 0054 head: {table}"
             ));
         }
     }

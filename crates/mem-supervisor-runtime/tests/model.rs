@@ -1,6 +1,7 @@
 use mem_supervisor::{DEFAULT_MODEL, UnixSeconds, UsdMicros};
 use mem_supervisor_runtime::model::*;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 
 fn request() -> PreparedRequest {
     PreparedRequest::new("What changed?", &["Reviewed release evidence".into()]).expect("request")
@@ -52,6 +53,24 @@ fn fixed_request_disables_tools_storage_and_hidden_continuation() {
             .expect("request")
             .digest()
     );
+}
+
+#[test]
+fn proposal_indices_bind_exact_ordered_evidence_bytes() {
+    let evidence = vec![
+        "first reviewed input".into(),
+        "second reviewed input".into(),
+    ];
+    let r = PreparedRequest::new("Question", &evidence).expect("request");
+    assert_eq!(r.evidence_digests().len(), 2);
+    for (text, digest) in evidence.iter().zip(r.evidence_digests()) {
+        let expected: [u8; 32] = Sha256::digest(text.as_bytes()).into();
+        assert_eq!(*digest, expected);
+    }
+    let reversed = PreparedRequest::new("Question", &[evidence[1].clone(), evidence[0].clone()])
+        .expect("request");
+    assert_ne!(r.digest(), reversed.digest());
+    assert_ne!(r.evidence_digests(), reversed.evidence_digests());
 }
 
 #[test]

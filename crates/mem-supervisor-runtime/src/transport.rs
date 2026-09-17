@@ -30,7 +30,51 @@ pub struct OpenAiTransport {
     semantic_model_time: Option<UnixSeconds>,
 }
 
+/// Trusted caller's stable execution binding, not a disclosure capability.
+pub struct ProposalExecution {
+    pub policy_revision: Uuid,
+    pub attempt_id: Uuid,
+    pub project_id: Uuid,
+}
+
 impl OpenAiTransport {
+    /// Execute once, then persist the private suggestion and its completed
+    /// action together. The caller must authorize this exact project and retain
+    /// reviewed source/version bindings independently of the metadata journal.
+    /// A crash after billing but before persistence leaves Running/Uncertain,
+    /// never Verified. Recover completed bodies via `private_proposal`; an
+    /// existing attempt never authorizes another model call.
+    pub async fn execute_and_persist(
+        &self,
+        store: &SupervisorStore,
+        lease: &LeaseClaim,
+        execution: &ProposalExecution,
+        request: &PreparedRequest,
+    ) -> Result<mem_supervisor_store::PrivateProposal, TransportError> {
+        if execution.project_id.is_nil() {
+            return Err(TransportError::Authority);
+        }
+        let proposal = self
+            .execute(
+                store,
+                lease,
+                execution.policy_revision,
+                execution.attempt_id,
+                request,
+            )
+            .await?;
+        store
+            .publish_proposal(
+                lease,
+                &execution.attempt_id,
+                execution.project_id,
+                &proposal,
+                request.evidence_digests(),
+            )
+            .await
+            .map_err(|_| TransportError::Journal)
+    }
+
     pub fn from_environment() -> Result<Self, TransportError> {
         let secret =
             std::env::var("OPENAI_API_KEY").map_err(|_| TransportError::CredentialUnavailable)?;

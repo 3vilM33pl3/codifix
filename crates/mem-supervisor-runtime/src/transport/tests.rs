@@ -182,6 +182,72 @@ fn request() -> PreparedRequest {
 }
 
 #[tokio::test]
+async fn returned_proposal_and_completed_action_are_durable_and_project_scoped() {
+    let Some((db, store, lease, revision, fake, client, server)) = fixture(Mode::Good).await else {
+        return;
+    };
+    let project_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,'supervisor-synthetic','Synthetic','/synthetic')")
+        .bind(project_id).execute(&db.pool).await.expect("project");
+    let execution = ProposalExecution {
+        policy_revision: revision,
+        attempt_id: Uuid::new_v4(),
+        project_id,
+    };
+    let request = request();
+    let output = client
+        .execute_and_persist(&store, &lease, &execution, &request)
+        .await
+        .expect("persisted");
+    assert_eq!(output.proposal.summary, "Ask a human to review");
+    assert_eq!(
+        store
+            .action(Area::Workshop, lease.action_id())
+            .await
+            .expect("action")
+            .state,
+        ActionState::Verified
+    );
+    let restarted = SupervisorStore::new(db.pool.clone());
+    let recovered = restarted
+        .private_proposal(Area::Workshop, project_id, lease.action_id())
+        .await
+        .expect("recover");
+    assert_eq!(recovered.proposal.summary, output.proposal.summary);
+    assert!(matches!(
+        restarted
+            .private_proposal(Area::Workshop, Uuid::new_v4(), lease.action_id())
+            .await,
+        Err(StoreError::NotFound)
+    ));
+    assert!(matches!(
+        restarted
+            .private_proposal(Area::Trust, project_id, lease.action_id())
+            .await,
+        Err(StoreError::NotFound)
+    ));
+    assert!(
+        client
+            .execute_and_persist(&restarted, &lease, &execution, &request)
+            .await
+            .is_err()
+    );
+    assert_eq!(fake.count.load(Ordering::SeqCst), 1);
+    assert_eq!(fake.generated.load(Ordering::SeqCst), 1);
+    let audit = serde_json::to_string(
+        &restarted
+            .journal(Area::Workshop, 0, 500)
+            .await
+            .expect("journal"),
+    )
+    .expect("JSON");
+    assert!(!audit.contains("Ask a human"));
+    assert!(!audit.contains("Fake reviewed"));
+    server.abort();
+    db.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
 async fn deterministic_health_and_privileged_installs_never_disclose_to_a_model() {
     for kind in [ActionKind::HealthCheck, ActionKind::InstallMaintenance] {
         let Some((db, store, lease, revision, fake, client, server)) =

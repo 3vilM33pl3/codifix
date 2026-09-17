@@ -765,11 +765,12 @@ fn reviewed_schema_catalog_matches_every_current_repository_table() {
     let catalog: BTreeSet<_> = KNOWN_TABLES
         .iter()
         .chain(SUPERVISOR_TABLES_0053)
+        .chain(SUPERVISOR_TABLES_0054)
         .map(|(name, _)| name.to_string())
         .collect();
     assert_eq!(
         catalog.len(),
-        KNOWN_TABLES.len() + SUPERVISOR_TABLES_0053.len(),
+        KNOWN_TABLES.len() + SUPERVISOR_TABLES_0053.len() + SUPERVISOR_TABLES_0054.len(),
         "duplicate table policy"
     );
     assert_eq!(
@@ -849,7 +850,7 @@ fn migration_0053_is_exact_version_gated_and_cannot_reactivate_supervisor_state(
             .iter()
             .any(|error| error.contains("unclassified table public.supervisor_future_authority"))
     );
-    for unsupported in [51, 54, 999] {
+    for unsupported in [51, 55, 999] {
         let mut future = inventory.clone();
         future.migration_version = unsupported;
         assert!(
@@ -873,6 +874,96 @@ fn migration_0053_is_exact_version_gated_and_cannot_reactivate_supervisor_state(
         serde_json::to_vec(&reviewed(&inventory)).expect("same manifest"),
         baseline_manifest
     );
+}
+
+#[test]
+fn migration_0054_requires_exact_additive_catalog_and_archives_private_proposals() {
+    assert_eq!(SUPERVISOR_TABLES_0054.len(), 1);
+    assert_eq!(SUPERVISOR_PROPOSAL_MIGRATION, 54);
+    let baseline = fixture();
+    let mut inventory = baseline.clone();
+    for (table, _) in SUPERVISOR_TABLES_0053.iter().chain(SUPERVISOR_TABLES_0054) {
+        inventory.tables.push(TableInventory {
+            table: (*table).into(),
+            columns: vec![Column {
+                name: "id".into(),
+                data_type: "uuid".into(),
+                nullable: false,
+            }],
+            foreign_keys: vec![],
+            row_count: 1,
+            rows: vec![row(id(990).to_string(), None, None, None)],
+        });
+    }
+    for old_head in [SUPPORTED_MIGRATION, SUPERVISOR_MIGRATION] {
+        inventory.migration_version = old_head;
+        assert!(
+            verify_inventory(&inventory)
+                .iter()
+                .any(|error| error.contains("migration 0054 table present before"))
+        );
+    }
+    inventory.migration_version = SUPERVISOR_PROPOSAL_MIGRATION;
+    assert!(verify_inventory(&inventory).is_empty());
+    let manifest = reviewed(&inventory);
+    let report = verify_manifest(&inventory, &manifest);
+    assert!(report.plan_valid, "{:?}", report.blockers);
+    assert_eq!(
+        report
+            .records
+            .iter()
+            .find(|record| record.record.table == "public.supervisor_proposals")
+            .expect("synthetic fixture")
+            .destination,
+        Destination::ProtectedArchive
+    );
+    for (name, _) in SUPERVISOR_TABLES_0053.iter().chain(SUPERVISOR_TABLES_0054) {
+        let mut missing = inventory.clone();
+        missing.tables.retain(|table| table.table != *name);
+        assert!(
+            verify_inventory(&missing)
+                .iter()
+                .any(|error| error.starts_with("missing migration"))
+        );
+    }
+    let mut forbidden = manifest.clone();
+    forbidden
+        .table_policies
+        .iter_mut()
+        .find(|policy| policy.table == "public.supervisor_proposals")
+        .expect("synthetic fixture")
+        .strategy = Some(TableStrategy::Owned);
+    assert_blocked(
+        &inventory,
+        &forbidden,
+        "invalid or unclassified table policy",
+    );
+    forbidden = manifest;
+    forbidden.records.push(RecordDecision {
+        record: RecordRef {
+            table: "public.supervisor_proposals".into(),
+            key: id(990).to_string(),
+        },
+        disposition: Disposition::Area {
+            area: AreaId::Workshop,
+            review: review(SourceClassification::Knowledge),
+        },
+    });
+    assert_blocked(
+        &inventory,
+        &forbidden,
+        "cannot override lineage/runtime policy",
+    );
+    let mut unknown = inventory.clone();
+    let mut extra = unknown.tables.last().expect("synthetic fixture").clone();
+    extra.table = "public.supervisor_proposals_future".into();
+    unknown.tables.push(extra);
+    assert!(
+        verify_inventory(&unknown)
+            .iter()
+            .any(|error| error.contains("unclassified table public.supervisor_proposals_future"))
+    );
+    assert!(verify_inventory(&baseline).is_empty());
 }
 
 #[test]

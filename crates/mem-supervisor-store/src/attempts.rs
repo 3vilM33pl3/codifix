@@ -417,12 +417,15 @@ async fn set_state(conn: &mut PgConnection, id: Uuid, state: &str) -> Result<()>
         .bind(id).bind(state).execute(conn).await?;
     Ok(())
 }
-struct StoredAttempt {
-    record: AttemptRecord,
-    fence: i64,
+pub(crate) struct StoredAttempt {
+    pub(crate) record: AttemptRecord,
+    pub(crate) fence: i64,
     settlement_digest: Option<Vec<u8>>,
 }
-async fn read_attempt(conn: &mut PgConnection, id: Uuid) -> Result<Option<StoredAttempt>> {
+pub(crate) async fn read_attempt(
+    conn: &mut PgConnection,
+    id: Uuid,
+) -> Result<Option<StoredAttempt>> {
     let Some(row) = sqlx::query("SELECT a.*,s.state,u.actual_usd_micros::text AS actual,u.evidence_digest AS settlement_digest FROM supervisor_attempts a JOIN supervisor_attempt_states s ON s.attempt_id=a.id LEFT JOIN supervisor_settlements u ON u.attempt_id=a.id WHERE a.id=$1")
         .bind(id).fetch_optional(conn).await? else { return Ok(None); };
     let state = match row.try_get::<String, _>("state")?.as_str() {

@@ -11,5 +11,5 @@ mod types;
 pub use plan::{
     draft_manifest, inspect_inventory, inventory_digest, verify_inventory, verify_manifest,
 };
-pub use policy::{KNOWN_TABLES, SUPERVISOR_TABLES_0053, table_strategy};
+pub use policy::{KNOWN_TABLES, SUPERVISOR_TABLES_0053, SUPERVISOR_TABLES_0054, table_strategy};
 pub use types::*;
