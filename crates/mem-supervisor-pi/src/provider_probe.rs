@@ -26,6 +26,16 @@ const SYSTEM: &str = "This is a synthetic local transport test. No tools or exte
 // accept a caller/environment-provided digest to make an arbitrary binary pass.
 const PATCHED_AMD64_SHA256: &str =
     "912366d4178bd7c12ccf4401b6241b1dcb6f8cdbd66302bc1764a1cec9dfe88c";
+const PATCHED_ARM64_SHA256: &str =
+    "c2d51cd7b0683c85477eed8c03be3562fc0d89a9915f085c0608740b8704363b";
+
+fn native_architecture() -> LinuxArchitecture {
+    if cfg!(target_arch = "x86_64") {
+        LinuxArchitecture::Amd64
+    } else {
+        LinuxArchitecture::Arm64
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ArtifactProfile {
@@ -248,19 +258,18 @@ async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile
         #[allow(unreachable_code)]
         Ok::<(), &'static str>(())
     });
-    let architecture = if cfg!(target_arch = "x86_64") {
-        LinuxArchitecture::Amd64
-    } else {
-        LinuxArchitecture::Arm64
-    };
+    let architecture = native_architecture();
     let mut config = ProbeConfig::new(
         PathBuf::from("/scratch/pi"),
         PathBuf::from("/scratch"),
         architecture,
     );
     if profile == ArtifactProfile::NoTools1 {
-        assert_eq!(architecture, LinuxArchitecture::Amd64);
-        config.expected_digest = PATCHED_AMD64_SHA256.to_owned();
+        config.expected_digest = match architecture {
+            LinuxArchitecture::Amd64 => PATCHED_AMD64_SHA256,
+            LinuxArchitecture::Arm64 => PATCHED_ARM64_SHA256,
+        }
+        .to_owned();
     }
     let prepared = artifact::prepare(&config).await.unwrap();
     if explicit_tool_off {
@@ -404,7 +413,7 @@ async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile
     assert!(crate::provider_execution_gate().is_err());
     println!(
         "{}",
-        json!({"case_status":status,"explicit_tool_off":explicit_tool_off,"artifact_profile":profile.label(),"synthetic_provider_calls":1,"external_network":false,"real_credentials":false,"production_provider_gate":"closed","tool_free_gate":if profile == ArtifactProfile::NoTools1 {"request_schema_verified"} else {"blocked"}})
+        json!({"case_status":status,"explicit_tool_off":explicit_tool_off,"artifact_profile":profile.label(),"artifact_sha256":config.expected_digest,"architecture":match architecture {LinuxArchitecture::Amd64 => "amd64", LinuxArchitecture::Arm64 => "arm64"},"synthetic_provider_calls":1,"external_network":false,"real_credentials":false,"production_provider_gate":"closed","tool_free_gate":if profile == ArtifactProfile::NoTools1 {"request_schema_verified"} else {"blocked"}})
     );
 }
 
@@ -418,14 +427,14 @@ async fn sandboxed_real_fake_provider_exposes_unrequested_tool() {
 }
 
 #[tokio::test]
-#[ignore = "requires the separately pinned AMD64 no-tools.1 artifact inside the network-none read-only-root sandbox"]
+#[ignore = "requires the separately pinned native-architecture no-tools.1 artifact inside the network-none read-only-root sandbox"]
 async fn sandboxed_patched_fake_provider_has_no_tools() {
     require_sandbox();
     // A local patch must not silently pass as the official artifact.
     let official = ProbeConfig::new(
         PathBuf::from("/scratch/pi"),
         PathBuf::from("/scratch"),
-        LinuxArchitecture::Amd64,
+        native_architecture(),
     );
     assert_eq!(
         artifact::prepare(&official).await.err(),

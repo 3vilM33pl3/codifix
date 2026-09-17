@@ -96,6 +96,35 @@ project contents or database were mounted.
 
 The upstream build reports an existing duplicate example/bench target warning
 and future-compatibility warnings in `nix 0.28.0` and `proc-macro-error2 2.0.1`;
-they were not hidden or fixed by an unrelated dependency update. ARM64 compilation
-is a separate pending experiment, not covered by the AMD64 result. Do not bundle
+they were not hidden or fixed by an unrelated dependency update. Do not bundle
 the patch/binary into a public release without an explicit licensing review.
+
+### ARM64 build evidence, 2026-09-17
+
+The same patch and locked dependencies cross-compiled successfully with the
+pinned Rust nightly and `aarch64-linux-gnu-gcc` 15.2.0. Cargo reported 21m 38s including
+the initial shared-build lock wait. The preserved artifact is
+`/data/tmp/memory-pi-no-tools-1-arm64.9CL9AlUH/pi` (41,472,040 bytes), SHA-256
+`c2d51cd7b0683c85477eed8c03be3562fc0d89a9915f085c0608740b8704363b`.
+Its log is `/data/tmp/memory-pi-no-tools-1-arm64-build.log`. ELF inspection
+confirms AArch64, `/lib/ld-linux-aarch64.so.1` and a glibc 2.43 requirement. Source,
+patch, lockfile and licence hashes were rechecked after both builds.
+
+**No ARM64 executable was run.** The diagnostic now pins both architectures so
+the same test can later be built and exercised on an explicitly prepared ARM64
+host; adding that pin is not a passing ARM64 test or permission to use the CA.
+The original ARM64 production pin remains unchanged. No system libc upgrade,
+CA installation, provider call or service activation occurred.
+
+After adding the ARM64 diagnostic pin, the 13 ordinary tests, strict Clippy,
+formatting and boundary checks passed again. The AMD64 sandbox diagnostic was
+rerun successfully in 7.73s, explicitly reporting its architecture and binary
+digest for each of the three cases. The existing 4040/4250 services remained
+on 2.0.0 / 2.0.0-dev, with healthy databases and zero pending offline items in
+read-only checks. The full four-area deployment contract remains incomplete.
+
+To reproduce the patched diagnostic, use the exact sandbox command in the
+[parent README](../README.md#focused-checks), mount the separately pinned
+candidate for the test driver's native architecture, and select
+`provider_probe::sandboxed_patched_fake_provider_has_no_tools`. Never replace
+the test pin with an arbitrary hash to accept an unidentified rebuild.

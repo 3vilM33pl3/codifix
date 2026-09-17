@@ -34,8 +34,10 @@ original production pin rejects this separately hashed artifact. Source, patch,
 licence, compiler and binary identity are in the
 [patch evidence](../../../crates/mem-supervisor-pi/patches/README.md).
 Thirteen ordinary tests, strict adapter Clippy, formatting and boundaries pass.
-ARM64 compilation remains separate; neither that platform nor the CA has a
-patched runtime result. Provider activation/admission and disclosure gates remain
+ARM64 also compiled successfully and has its own preserved binary hash and
+static ELF evidence; neither that platform nor the CA has a patched runtime
+result. Both patched binaries still require glibc 2.43. Provider
+activation/admission and disclosure gates remain
 closed. Nothing was installed into an existing service.
 
 The native rc.1 binaries and Web UI compiled at source `5827aeb`, but packaging
