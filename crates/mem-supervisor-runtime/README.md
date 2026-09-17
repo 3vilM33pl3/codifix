@@ -44,7 +44,9 @@ HTTP retries, redirects and inherited proxies are disabled. The private alternat
 base URL is used only by in-crate synthetic localhost tests.
 
 `execute` needs a currently claimed, authorized action and input already approved
-for this model destination. It rechecks common area policy before and after
+for this model destination. Before counting it immutably binds the instance,
+area, project, policy, action, complete request and ordered evidence hashes in
+PostgreSQL. It rechecks that exact context and current authority before and after
 counting, reserves the exact request digest/cost in PostgreSQL, commits `begin`,
 and consumes its one-shot send permit. Response reads are bounded to 64 KiB and
 the lease deadline. Non-2xx responses, missing usage and transport ambiguity
@@ -55,7 +57,7 @@ a proposal. These local checks cannot recall a dispatched request or substitute
 for current source eligibility and collection/model-destination consent.
 
 The lower-level `execute` returns a proposal without marking work complete.
-`execute_and_persist` adds an exact project/attempt binding at publication and atomically stores
+`execute_and_persist` retains that pre-dispatch project/attempt binding and atomically stores
 the private structured proposal, ordered hashes of supplied evidence, its digest
 and the Verified action outcome. Recovery reads use the store's exact
 area/project/action scope and do not repeat the model call. A lost response before
@@ -65,9 +67,9 @@ API claims that an in-memory suggestion is a durable completed decision.
 Workers must retain the reviewed source/version-to-input mapping independently:
 evidence-byte hashes bind indices but are not source identities or proof of truth.
 Current source eligibility, project existence/authorization and disclosure
-consent remain caller obligations **before dispatch**. The current action/attempt
-schema binds area, not project; passing a project UUID to this trusted wrapper
-does not establish pre-send project authorization. A scheduler, Pi admission proxy, service authorization and
+consent remain caller obligations **before dispatch**. The stored instance/project
+binding prevents relabeling work after dispatch; it does not establish source
+authorization. A scheduler, Pi admission proxy, service authorization and
 Web/TUI views remain integration work. No paid provider result is claimed from
 these tests. The intended $10 fleet allocation requires exactly one authoritative
 $2.50 ledger per area and a verified instance-to-area binding. Duplicate/cloned
@@ -79,4 +81,6 @@ Focused tests use a required disposable PostgreSQL database and fake HTTP
 providers. They prove begin-before-send accounting, duplicate denial, no hidden
 redirect/rate-limit retries, uncertain reservations, billing of invalid answers,
 result denial after revocation, durable private recovery and wrong-project/area
-read denial. No real credential or provider is used.
+read denial. Missing projects, wrong instance IDs, attempts to rebind a project's
+input and revocation during token counting fail closed. No real credential or
+provider is used.

@@ -70,6 +70,31 @@ async fn setup(store: &SupervisorStore, area: Area, ttl: u32) -> (Uuid, LeaseCla
     )
 }
 
+async fn bind_work(
+    db: &IsolatedDatabase,
+    store: &SupervisorStore,
+    claim: &LeaseClaim,
+    digest: [u8; 32],
+) {
+    let instance = match store.instance_binding().await.expect("binding") {
+        Some(binding) => binding.instance_id,
+        None => {
+            store
+                .bind_instance(Uuid::new_v4(), claim.area())
+                .await
+                .expect("bind instance")
+                .instance_id
+        }
+    };
+    let project = Uuid::new_v4();
+    sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,'synthetic budget fixture','/synthetic')")
+        .bind(project).bind(project.to_string()).execute(&db.pool).await.expect("project");
+    store
+        .bind_model_work(claim, instance, project, digest, &[])
+        .await
+        .expect("bind model work");
+}
+
 #[tokio::test]
 async fn defaults_idempotency_exclusive_claim_fences_and_immutable_results() {
     let Some(db) = IsolatedDatabase::new().await else {
@@ -173,6 +198,7 @@ async fn concurrent_admission_caps_are_area_local_and_duplicate_begin_cannot_res
             .await
             .expect("claim");
         let request = request(&lease, revision, 100_000);
+        bind_work(&db, &store, &lease, [2; 32]).await;
         let cloned = store.clone();
         jobs.push(tokio::spawn(async move {
             cloned.reserve(&lease, &request, [2; 32]).await
@@ -190,27 +216,31 @@ async fn concurrent_admission_caps_are_area_local_and_duplicate_begin_cannot_res
     let (_, totals) = store.current_budget(Area::Homelab).await.expect("budget");
     assert_eq!(totals.calls, 20);
     assert_eq!(totals.reserved_usd_micros, 2_000_000);
-    let (other_revision, other) = setup(&store, Area::General, 120).await;
+    // Each model-dispatch database has exactly one local instance/area identity.
+    let other_db = IsolatedDatabase::new().await.expect("second area database");
+    let other_store = SupervisorStore::new(other_db.pool.clone());
+    let (other_revision, other) = setup(&other_store, Area::General, 120).await;
+    bind_work(&other_db, &other_store, &other, [3; 32]).await;
     let request = request(&other, other_revision, 2_500_000);
     assert!(matches!(
-        store
+        other_store
             .reserve(&other, &request, [3; 32])
             .await
             .expect("reserve"),
         Reservation::Reserved(_)
     ));
     assert!(matches!(
-        store
+        other_store
             .reserve(&other, &request, [3; 32])
             .await
             .expect("duplicate"),
         Reservation::Existing(_)
     ));
     assert!(matches!(
-        store.reserve(&other, &request, [4; 32]).await,
+        other_store.reserve(&other, &request, [4; 32]).await,
         Err(StoreError::Conflict)
     ));
-    let permit = store
+    let permit = other_store
         .begin(&other, attempt_id(&request))
         .await
         .expect("begin");
@@ -219,15 +249,16 @@ async fn concurrent_admission_caps_are_area_local_and_duplicate_begin_cannot_res
     assert_eq!(permit.expires_at(), other.expires_at());
     assert!(permit.admitted_at() < permit.expires_at());
     assert!(matches!(
-        store.begin(&other, attempt_id(&request)).await,
+        other_store.begin(&other, attempt_id(&request)).await,
         Err(StoreError::Transition)
     ));
     let next = request_with_new_id(request.clone());
     assert!(matches!(
-        store.reserve(&other, &next, [3; 32]).await,
+        other_store.reserve(&other, &next, [3; 32]).await,
         Err(StoreError::Budget(BudgetError::CostLimit))
     ));
     assert!(store.check_current(&claim).await.is_ok());
+    other_db.cleanup().await.expect("cleanup other area");
     db.cleanup().await.expect("cleanup");
 }
 fn request_with_new_id(mut request: ProviderRequest) -> ProviderRequest {
@@ -242,6 +273,7 @@ async fn reduced_limits_release_rotation_and_revocation_do_not_reset_accounting(
     };
     let store = SupervisorStore::new(db.pool.clone());
     let (revision, claim) = setup(&store, Area::Workshop, 120).await;
+    bind_work(&db, &store, &claim, [3; 32]).await;
     let first = request(&claim, revision, 500_000);
     store
         .reserve(&claim, &first, [3; 32])
@@ -287,7 +319,7 @@ async fn reduced_limits_release_rotation_and_revocation_do_not_reset_accounting(
     ));
     let second = request(&claim, revision, 400_000);
     store
-        .reserve(&claim, &second, [4; 32])
+        .reserve(&claim, &second, [3; 32])
         .await
         .expect("reserve");
     store
@@ -357,10 +389,11 @@ async fn expiry_retains_all_reservations_and_recovery_never_requeues_unknown_eff
     };
     let store = SupervisorStore::new(db.pool.clone());
     let (revision, claim) = setup(&store, Area::General, 1).await;
+    bind_work(&db, &store, &claim, [2; 32]).await;
     let reserved = request(&claim, revision, 100_000);
     let begun = request(&claim, revision, 100_000);
     store
-        .reserve(&claim, &reserved, [1; 32])
+        .reserve(&claim, &reserved, [2; 32])
         .await
         .expect("reserve");
     store
@@ -470,6 +503,7 @@ async fn over_bound_settlement_records_full_u64_charge_and_revokes_current_polic
     };
     let store = SupervisorStore::new(db.pool.clone());
     let (revision, claim) = setup(&store, Area::Homelab, 120).await;
+    bind_work(&db, &store, &claim, [2; 32]).await;
     let request = request(&claim, revision, 1);
     store
         .reserve(&claim, &request, [2; 32])
@@ -623,6 +657,7 @@ async fn begin_waiting_on_journal_rechecks_expiry_and_cannot_issue_late_permit()
     };
     let store = SupervisorStore::new(db.pool.clone());
     let (revision, claim) = setup(&store, Area::Trust, 1).await;
+    bind_work(&db, &store, &claim, [2; 32]).await;
     let request = request(&claim, revision, 50);
     store
         .reserve(&claim, &request, [2; 32])
@@ -663,6 +698,7 @@ async fn accounting_day_is_db_utc_and_prior_day_attempt_cannot_begin() {
     };
     let store = SupervisorStore::new(db.pool.clone());
     let (revision, claim) = setup(&store, Area::Workshop, 120).await;
+    bind_work(&db, &store, &claim, [1; 32]).await;
     let row = sqlx::query("SELECT (clock_timestamp() AT TIME ZONE 'UTC')::date AS day")
         .fetch_one(&db.pool)
         .await
@@ -726,6 +762,9 @@ async fn delayed_renew_publication_and_reservation_roll_back_when_lease_expires(
         (2, Area::Workshop, "workshop"),
     ] {
         let (revision, claim) = setup(&store, area, 1).await;
+        if area == Area::Workshop {
+            bind_work(&db, &store, &claim, [2; 32]).await;
+        }
         let id = claim.action_id();
         let original_fence = claim.fence();
         let request = request(&claim, revision, 50);

@@ -5,7 +5,9 @@
 use crate::model::{CountedRequest, ModelError, PreparedRequest, Proposal};
 use chrono::Utc;
 use mem_supervisor::{DEFAULT_MODEL, StableId, UnixSeconds, budget::ProviderRequest};
-use mem_supervisor_store::{LeaseClaim, Reservation, SendPermit, StoreError, SupervisorStore};
+use mem_supervisor_store::{
+    LeaseClaim, ModelWorkContext, Reservation, SendPermit, StoreError, SupervisorStore,
+};
 use reqwest::{
     Client,
     header::{AUTHORIZATION, HeaderMap, HeaderValue},
@@ -32,6 +34,7 @@ pub struct OpenAiTransport {
 
 /// Trusted caller's stable execution binding, not a disclosure capability.
 pub struct ProposalExecution {
+    pub instance_id: Uuid,
     pub policy_revision: Uuid,
     pub attempt_id: Uuid,
     pub project_id: Uuid,
@@ -51,18 +54,7 @@ impl OpenAiTransport {
         execution: &ProposalExecution,
         request: &PreparedRequest,
     ) -> Result<mem_supervisor_store::PrivateProposal, TransportError> {
-        if execution.project_id.is_nil() {
-            return Err(TransportError::Authority);
-        }
-        let proposal = self
-            .execute(
-                store,
-                lease,
-                execution.policy_revision,
-                execution.attempt_id,
-                request,
-            )
-            .await?;
+        let proposal = self.execute(store, lease, execution, request).await?;
         store
             .publish_proposal(
                 lease,
@@ -166,10 +158,11 @@ impl OpenAiTransport {
         &self,
         store: &SupervisorStore,
         lease: &LeaseClaim,
+        context: &ModelWorkContext,
         request: &'a PreparedRequest,
     ) -> Result<CountedRequest<'a>, TransportError> {
         store
-            .check_current(lease)
+            .check_model_work(lease, context)
             .await
             .map_err(|_| TransportError::Authority)?;
         let body = self
@@ -181,7 +174,7 @@ impl OpenAiTransport {
             )
             .await?;
         let now = store
-            .check_current(lease)
+            .check_model_work(lease, context)
             .await
             .map_err(|_| TransportError::Authority)?;
         request
@@ -227,12 +220,16 @@ impl OpenAiTransport {
         &self,
         store: &SupervisorStore,
         lease: &LeaseClaim,
-        policy_revision: Uuid,
-        attempt_id: Uuid,
+        execution: &ProposalExecution,
         request: &PreparedRequest,
     ) -> Result<Proposal, TransportError> {
+        let policy_revision = execution.policy_revision;
+        let attempt_id = execution.attempt_id;
         if attempt_id.is_nil() || policy_revision.is_nil() {
             return Err(TransportError::PermitMismatch);
+        }
+        if execution.instance_id.is_nil() || execution.project_id.is_nil() {
+            return Err(TransportError::Authority);
         }
         store
             .check_current(lease)
@@ -268,7 +265,20 @@ impl OpenAiTransport {
             Err(StoreError::NotFound) => {}
             Err(_) => return Err(TransportError::Authority),
         }
-        let counted = self.count(store, lease, request).await?;
+        // Bind the complete input before even the token-count endpoint sees it.
+        // A reviewed local source grant remains a caller obligation; neither
+        // this identity binding nor project existence manufactures consent.
+        let context = store
+            .bind_model_work(
+                lease,
+                execution.instance_id,
+                execution.project_id,
+                digest,
+                request.evidence_digests(),
+            )
+            .await
+            .map_err(|_| TransportError::Authority)?;
+        let counted = self.count(store, lease, &context, request).await?;
         let provider_request = ProviderRequest {
             id: stable(attempt_id)?,
             action_id: stable(lease.action_id())?,
@@ -321,7 +331,7 @@ impl OpenAiTransport {
         // its digest atomically. This adapter does NOT mark the action Verified:
         // doing so here would turn a returned-only proposal into lost history.
         store
-            .check_current(lease)
+            .check_model_work(lease, &context)
             .await
             .map_err(|_| TransportError::Authority)?;
         measured.proposal.map_err(TransportError::Model)

@@ -94,6 +94,10 @@ impl SupervisorStore {
             return Err(PolicyError::StaleRevision.into());
         }
         check_lease(&mut tx, &row, claim).await?;
+        let context = contexts::validate_current(&mut tx, &row).await?;
+        if context.request_digest() != request_digest {
+            return Err(StoreError::Conflict);
+        }
         let day = current_day(&mut tx).await?;
         lock_day(&mut tx, claim.area, day).await?;
         if let Some(existing) = read_attempt(&mut tx, id).await? {
@@ -162,6 +166,10 @@ impl SupervisorStore {
             return Err(StoreError::Fenced);
         }
         policy.validate(attempt.record.policy_revision)?;
+        let context = contexts::validate_current(&mut tx, &row).await?;
+        if context.request_digest() != attempt.record.request_digest {
+            return Err(StoreError::Conflict);
+        }
         if attempt.record.day != current_day(&mut tx).await? {
             return Err(BudgetError::WrongDay.into());
         }

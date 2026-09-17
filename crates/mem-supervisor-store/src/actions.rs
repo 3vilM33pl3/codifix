@@ -316,7 +316,7 @@ pub(crate) async fn finish(
         if had_attempt {
             // A generic hash-only completion must not bypass atomic private
             // result persistence. publish_proposal inserts this row before us.
-            let persisted: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM supervisor_proposals p JOIN supervisor_attempts a ON a.id=p.attempt_id JOIN supervisor_attempt_states s ON s.attempt_id=a.id WHERE p.action_id=$1 AND p.area=$2 AND p.policy_revision=$3 AND p.fence=$4 AND p.proposal_digest=$5 AND a.action_id=p.action_id AND a.area=p.area AND a.policy_revision=p.policy_revision AND a.fence=p.fence AND a.request_digest=p.request_digest AND s.state='settled')")
+            let persisted: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM supervisor_proposals p JOIN supervisor_attempts a ON a.id=p.attempt_id JOIN supervisor_attempt_states s ON s.attempt_id=a.id JOIN supervisor_model_contexts c ON c.action_id=p.action_id AND c.area=p.area AND c.policy_revision=p.policy_revision AND c.project_id=p.project_id AND c.request_digest=p.request_digest AND c.evidence_digests=p.evidence_digests WHERE p.action_id=$1 AND p.area=$2 AND p.policy_revision=$3 AND p.fence=$4 AND p.proposal_digest=$5 AND a.action_id=p.action_id AND a.area=p.area AND a.policy_revision=p.policy_revision AND a.fence=p.fence AND a.request_digest=p.request_digest AND s.state='settled')")
                 .bind(id).bind(row.try_get::<String,_>("area")?).bind(row.try_get::<Uuid,_>("policy_revision")?)
                 .bind(row.try_get::<i64,_>("fence")?).bind(evidence.to_vec()).fetch_one(&mut *conn).await?;
             if !persisted {

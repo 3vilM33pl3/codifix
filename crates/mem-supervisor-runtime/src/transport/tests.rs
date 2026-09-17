@@ -27,6 +27,7 @@ enum Mode {
     Revoke,
     Redirect,
     RateLimit,
+    RevokeDuringCount,
 }
 #[derive(Clone)]
 struct Fake {
@@ -35,6 +36,18 @@ struct Fake {
     mode: Mode,
     store: SupervisorStore,
     revision: Uuid,
+    instance_id: Uuid,
+    project_id: Uuid,
+}
+impl Fake {
+    fn execution(&self, revision: Uuid, attempt_id: Uuid) -> ProposalExecution {
+        ProposalExecution {
+            instance_id: self.instance_id,
+            project_id: self.project_id,
+            policy_revision: revision,
+            attempt_id,
+        }
+    }
 }
 async fn count(State(s): State<Fake>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
     assert_eq!(headers[AUTHORIZATION], "Bearer synthetic-only");
@@ -42,6 +55,12 @@ async fn count(State(s): State<Fake>, headers: HeaderMap, Json(body): Json<Value
     assert_eq!(body["tools"], json!([]));
     assert!(body.get("previous_response_id").is_none());
     s.count.fetch_add(1, Ordering::SeqCst);
+    if matches!(s.mode, Mode::RevokeDuringCount) {
+        s.store
+            .revoke_policy(Area::Workshop, s.revision)
+            .await
+            .expect("revoke");
+    }
     Json(json!({"object":"response.input_tokens","input_tokens":100})).into_response()
 }
 async fn generate(State(s): State<Fake>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
@@ -113,6 +132,14 @@ async fn fixture_kind(
 )> {
     let db = IsolatedDatabase::new().await?;
     let store = SupervisorStore::new(db.pool.clone());
+    let instance_id = Uuid::new_v4();
+    let project_id = Uuid::new_v4();
+    store
+        .bind_instance(instance_id, Area::Workshop)
+        .await
+        .expect("bind instance");
+    sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,'supervisor-synthetic','Synthetic','/synthetic')")
+        .bind(project_id).execute(&db.pool).await.expect("project");
     let revision = Uuid::new_v4();
     store
         .install_policy(Area::Workshop, revision)
@@ -156,6 +183,8 @@ async fn fixture_kind(
         mode,
         store: store.clone(),
         revision,
+        instance_id,
+        project_id,
     };
     let router = Router::new()
         .route("/v1/responses/input_tokens", post(count))
@@ -186,10 +215,9 @@ async fn returned_proposal_and_completed_action_are_durable_and_project_scoped()
     let Some((db, store, lease, revision, fake, client, server)) = fixture(Mode::Good).await else {
         return;
     };
-    let project_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,'supervisor-synthetic','Synthetic','/synthetic')")
-        .bind(project_id).execute(&db.pool).await.expect("project");
+    let project_id = fake.project_id;
     let execution = ProposalExecution {
+        instance_id: fake.instance_id,
         policy_revision: revision,
         attempt_id: Uuid::new_v4(),
         project_id,
@@ -257,7 +285,12 @@ async fn deterministic_health_and_privileged_installs_never_disclose_to_a_model(
         };
         assert!(matches!(
             client
-                .execute(&store, &lease, revision, Uuid::new_v4(), &request())
+                .execute(
+                    &store,
+                    &lease,
+                    &fake.execution(revision, Uuid::new_v4()),
+                    &request()
+                )
                 .await,
             Err(TransportError::Authority)
         ));
@@ -284,7 +317,7 @@ async fn durable_admission_precedes_one_physical_send_and_duplicate_is_not_reiss
     let attempt = Uuid::new_v4();
     let request = request();
     let proposal = client
-        .execute(&store, &lease, revision, attempt, &request)
+        .execute(&store, &lease, &fake.execution(revision, attempt), &request)
         .await
         .expect("proposal");
     assert_eq!(proposal.proposal, crate::model::ProposalKind::AskHuman);
@@ -299,7 +332,7 @@ async fn durable_admission_precedes_one_physical_send_and_duplicate_is_not_reiss
     );
     assert!(matches!(
         client
-            .execute(&store, &lease, revision, attempt, &request)
+            .execute(&store, &lease, &fake.execution(revision, attempt), &request)
             .await,
         Err(TransportError::ExistingAttempt)
     ));
@@ -308,7 +341,7 @@ async fn durable_admission_precedes_one_physical_send_and_duplicate_is_not_reiss
     let changed = PreparedRequest::new("Altered payload", &[]).expect("request");
     assert!(matches!(
         client
-            .execute(&store, &lease, revision, attempt, &changed)
+            .execute(&store, &lease, &fake.execution(revision, attempt), &changed)
             .await,
         Err(TransportError::PermitMismatch)
     ));
@@ -345,7 +378,7 @@ async fn missing_usage_retains_full_reservation_and_cannot_auto_retry() {
     let request = request();
     assert!(matches!(
         client
-            .execute(&store, &lease, revision, attempt, &request)
+            .execute(&store, &lease, &fake.execution(revision, attempt), &request)
             .await,
         Err(TransportError::Model(ModelError::UnknownUsage))
     ));
@@ -354,7 +387,7 @@ async fn missing_usage_retains_full_reservation_and_cannot_auto_retry() {
     assert_eq!(record.worst_case_cost, UsdMicros(16_500));
     assert!(matches!(
         client
-            .execute(&store, &lease, revision, attempt, &request)
+            .execute(&store, &lease, &fake.execution(revision, attempt), &request)
             .await,
         Err(TransportError::ExistingAttempt)
     ));
@@ -372,7 +405,12 @@ async fn revocation_after_model_execution_accounts_cost_but_refuses_result() {
     let attempt = Uuid::new_v4();
     assert!(matches!(
         client
-            .execute(&store, &lease, revision, attempt, &request())
+            .execute(
+                &store,
+                &lease,
+                &fake.execution(revision, attempt),
+                &request()
+            )
             .await,
         Err(TransportError::Authority)
     ));
@@ -389,15 +427,19 @@ async fn revocation_after_model_execution_accounts_cost_but_refuses_result() {
 
 #[tokio::test]
 async fn invalid_citation_is_billed_but_not_accepted_as_a_proposal() {
-    let Some((db, store, lease, revision, _fake, client, server)) =
-        fixture(Mode::BadCitation).await
+    let Some((db, store, lease, revision, fake, client, server)) = fixture(Mode::BadCitation).await
     else {
         return;
     };
     let attempt = Uuid::new_v4();
     assert!(matches!(
         client
-            .execute(&store, &lease, revision, attempt, &request())
+            .execute(
+                &store,
+                &lease,
+                &fake.execution(revision, attempt),
+                &request()
+            )
             .await,
         Err(TransportError::Model(ModelError::InvalidEvidence))
     ));
@@ -419,7 +461,12 @@ async fn redirects_and_rate_limits_never_trigger_hidden_retries_or_error_body_le
         };
         let attempt = Uuid::new_v4();
         let result = client
-            .execute(&store, &lease, revision, attempt, &request())
+            .execute(
+                &store,
+                &lease,
+                &fake.execution(revision, attempt),
+                &request(),
+            )
             .await;
         assert!(matches!(result, Err(TransportError::ProviderRejected)));
         let error = result.err().expect("error");
@@ -445,4 +492,82 @@ fn invalid_secret_or_binding_never_enters_an_error_message() {
         Err(TransportError::CredentialUnavailable)
     ));
     assert!(digest_hex("not-a-hash").is_err());
+}
+
+#[tokio::test]
+async fn mismatched_instance_or_missing_project_never_discloses_even_to_token_counter() {
+    let Some((db, store, lease, revision, fake, client, server)) = fixture(Mode::Good).await else {
+        return;
+    };
+    let mut execution = fake.execution(revision, Uuid::new_v4());
+    execution.instance_id = Uuid::new_v4();
+    assert!(matches!(
+        client.execute(&store, &lease, &execution, &request()).await,
+        Err(TransportError::Authority)
+    ));
+    execution.instance_id = fake.instance_id;
+    execution.project_id = Uuid::new_v4();
+    assert!(matches!(
+        client.execute(&store, &lease, &execution, &request()).await,
+        Err(TransportError::Authority)
+    ));
+    assert_eq!(fake.count.load(Ordering::SeqCst), 0);
+    assert_eq!(fake.generated.load(Ordering::SeqCst), 0);
+    server.abort();
+    db.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
+async fn changed_project_under_bound_action_is_rejected_before_input_counting() {
+    let Some((db, store, lease, revision, fake, client, server)) = fixture(Mode::Good).await else {
+        return;
+    };
+    let input = request();
+    store
+        .bind_model_work(
+            &lease,
+            fake.instance_id,
+            fake.project_id,
+            digest_hex(input.digest()).expect("digest"),
+            input.evidence_digests(),
+        )
+        .await
+        .expect("bind");
+    let other_project = Uuid::new_v4();
+    sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,'other','Other','/synthetic-other')")
+        .bind(other_project).execute(&db.pool).await.expect("project");
+    let mut execution = fake.execution(revision, Uuid::new_v4());
+    execution.project_id = other_project;
+    assert!(matches!(
+        client.execute(&store, &lease, &execution, &input).await,
+        Err(TransportError::Authority)
+    ));
+    assert_eq!(fake.count.load(Ordering::SeqCst), 0);
+    assert_eq!(fake.generated.load(Ordering::SeqCst), 0);
+    server.abort();
+    db.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
+async fn revocation_during_token_counting_prevents_generation() {
+    let Some((db, store, lease, revision, fake, client, server)) =
+        fixture(Mode::RevokeDuringCount).await
+    else {
+        return;
+    };
+    assert!(matches!(
+        client
+            .execute(
+                &store,
+                &lease,
+                &fake.execution(revision, Uuid::new_v4()),
+                &request()
+            )
+            .await,
+        Err(TransportError::Authority)
+    ));
+    assert_eq!(fake.count.load(Ordering::SeqCst), 1);
+    assert_eq!(fake.generated.load(Ordering::SeqCst), 0);
+    server.abort();
+    db.cleanup().await.expect("cleanup");
 }

@@ -34,7 +34,7 @@ seconds. Opaque `LeaseClaim` values are not deserializable. `renew` replaces the
 fence and rejects unresolved provider attempts; callers must not renew across
 a send. `check_current` is a point-in-time common-policy/lease preflight, not a
 disclosure grant or send permit. Every `begin` and `publish` rechecks persisted
-policy, exact claim and database time. A revoked policy cannot accept a result.
+policy, exact claim and database time. A revoked policy cannot accept a new result.
 
 `stop` and `reap_expired` fence running work and mark its outstanding reservations
 uncertain. Such work is never automatically requeued. `reconcile` requires all
@@ -46,6 +46,56 @@ Use `publish_proposal` below for atomic typed private proposal persistence.
 Generic verified publication/reconciliation rejects any action with provider-
 attempt history unless its matching private proposal is already persisted in
 the same transaction. Hash-only completion cannot bypass private persistence.
+
+## Local instance and model-input binding
+
+Additive migration 0055 adds `supervisor_instance_binding` and
+`supervisor_model_contexts`. Both are immutable, initially empty, and contain
+only UUIDs, bounded hashes and database timestamps. No policy is enabled, no
+existing attempt is backfilled, and migrations 0053/0054 remain unchanged.
+
+`bind_instance(instance_id, area)` is explicit trusted bootstrap: exactly one
+non-nil instance UUID and one area may be bound in a database. Exact retries are
+read-only; different identities or areas fail. `instance_binding()` returns the
+stored identity, never infers it from hostnames or project names. This is **local
+database uniqueness only**: a clone copies its binding, and another independent
+database can bind the same area. Deployment still must provide one authoritative
+ledger per area and fence duplicate instances/clones. This is not fleet identity
+enrollment or distributed uniqueness enforcement.
+
+Before any token-counting disclosure, call
+`bind_model_work(claim, instance_id, project_id, request_digest, evidence_digests)`.
+It fixes the exact instance, area, action, policy revision, existing project UUID,
+wire-request SHA-256 and ordered list of at most eight evidence hashes. It checks
+current policy and lease, locks the current project `FOR KEY SHARE`, and commits
+the immutable context with a metadata-only `model_context_bound` journal event.
+An exact repeat returns the same opaque `ModelWorkContext`; changing any input
+fails. Contexts cannot be added retroactively to actions with provider attempts.
+Health checks and installation actions cannot bind model work.
+
+`check_model_work(claim, context)` revalidates the persisted context, local
+binding, current project existence, current policy and exact lease using the
+database clock. Call it before and after token counting and immediately before
+generation; `check_current` alone is insufficient for model work. Valid lease
+renewal preserves the input context but invalidates the old claim. `reserve`,
+`begin` and first proposal publication independently require the same context;
+publication cannot relabel a result's project or reorder/substitute evidence.
+Journal contention cannot commit a context whose lease expired while waiting.
+
+These checks establish scope, **not permission to disclose project data**.
+The trusted service caller must independently authorize the exact project and
+source subset, retain the relevant permission locks across its dispatch boundary,
+and recheck current source eligibility. This crate has no service principal or
+permission-lock API and performs no network request. Its point-in-time checks
+cannot recall already dispatched traffic or prevent a subsequent permission
+change. Real service configuration/authorization integration remains required.
+
+The retained project UUID has no foreign key, preserving deletion behavior.
+Deletion prevents further model preflight, reservation, begin or first result
+publication; it does not erase evidence or prevent settlement/recovery. Historical
+0054 proposals remain readable without a new context. Where a context exists,
+private reads also verify its immutable project/request/evidence binding. No
+legacy action gains new dispatch authority just because 0055 was applied.
 
 ## Private model proposals
 
@@ -92,7 +142,9 @@ attempt bindings are rejected; corruption is not returned as a valid proposal.
 
 1. Establish the exact input, output/token caps and conservative micro-USD cost
    bound outside this crate. Bind the exact wire request SHA-256 and fixed model.
-2. `reserve(claim, ProviderRequest, request_digest)` atomically checks policy,
+2. Bind the local identity and model context above, then use `check_model_work`
+   before any external token counting. `reserve(claim, ProviderRequest,
+   request_digest)` atomically checks matching context, current project, policy,
    lease, the area's current UTC day and remaining limits. A duplicate returns
    `Reservation::Existing`, never permission for another send.
 3. `begin(claim, attempt_id)` commits the in-flight record before returning a
@@ -172,3 +224,7 @@ commit-order journal barrier, delayed-begin expiry and UTC day rollover. Private
 proposal tests cover atomic publication and journal-failure rollback, restart
 reads, exact scope, immutable bodies, revocation/expiry, altered retries, matching
 attempt fences, bounded references, corruption and sanitized database errors.
+Context tests additionally cover missing/default-deny binding, concurrent local
+identity assignment, exact input retries and mismatches, renewal, current project
+deletion, retained usage, rejected retroactive binding, corruption and atomic
+journal rollback (including lease expiry after waiting).

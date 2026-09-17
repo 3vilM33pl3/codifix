@@ -78,6 +78,32 @@ async fn fixture(db: &IsolatedDatabase, kind: ActionKind, ttl: u32, settled: boo
         model: StableId::new(DEFAULT_MODEL).expect("model"),
         worst_case_cost: UsdMicros(1000),
     };
+    if matches!(
+        kind,
+        ActionKind::HealthCheck | ActionKind::InstallMaintenance
+    ) {
+        return Fixture {
+            store,
+            revision,
+            project,
+            claim,
+            attempt,
+        };
+    }
+    let instance = match store.instance_binding().await.expect("binding") {
+        Some(binding) => binding.instance_id,
+        None => {
+            store
+                .bind_instance(Uuid::new_v4(), Area::Workshop)
+                .await
+                .expect("bind instance")
+                .instance_id
+        }
+    };
+    store
+        .bind_model_work(&claim, instance, project, [3; 32], &[[5; 32], [6; 32]])
+        .await
+        .expect("bind model work");
     store
         .reserve(&claim, &request, [3; 32])
         .await
@@ -379,7 +405,7 @@ async fn new_private_write_requires_live_policy_settled_attempt_current_project_
                 &[[5; 32], [6; 32]]
             )
             .await,
-        Err(StoreError::NotFound)
+        Err(StoreError::Conflict)
     ));
     f.store
         .revoke_policy(Area::Workshop, f.revision)
@@ -615,9 +641,9 @@ async fn proposal_bounds_and_reference_validation_apply_before_private_storage()
         evidence_indices: vec![],
     };
     f.store
-        .publish_proposal(&f.claim, &f.attempt, f.project, &empty, &[])
+        .publish_proposal(&f.claim, &f.attempt, f.project, &empty, &[[5; 32], [6; 32]])
         .await
-        .expect("explicit no-evidence suggestion");
+        .expect("explicit no-citation suggestion with unchanged input evidence");
     db.cleanup().await.expect("cleanup");
 }
 

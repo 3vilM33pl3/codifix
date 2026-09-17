@@ -3,6 +3,7 @@
 //! executor. All clocks are read from PostgreSQL after acquiring relevant locks.
 mod actions;
 mod attempts;
+mod contexts;
 mod policy;
 mod proposals;
 
@@ -16,6 +17,7 @@ use uuid::Uuid;
 
 pub use actions::{ActionSubmission, ReadyTransition};
 pub use attempts::{AttemptRecord, Reservation, SendPermit};
+pub use contexts::{InstanceBinding, ModelWorkContext};
 pub use policy::PolicyRecord;
 pub use proposals::PrivateProposal;
 
@@ -50,6 +52,8 @@ pub enum StoreError {
     InvalidProposal,
     #[error("verified model work requires its matching durable private proposal")]
     UnpersistedProposal,
+    #[error("missing or mismatched durable instance or model-work binding")]
+    Binding,
 }
 
 #[derive(Clone)]
@@ -63,8 +67,8 @@ impl SupervisorStore {
         Self { pool }
     }
 
-    /// Point-in-time preflight for a trusted metadata/token-counting adapter.
-    /// Not a provider-send permit, disclosure grant, or kind-specific authority.
+    /// Common deterministic-work preflight only. Model disclosures, including
+    /// token counting, require check_model_work instead. Neither is user consent.
     pub async fn check_current(&self, claim: &LeaseClaim) -> Result<DateTime<Utc>> {
         let mut tx = self.pool.begin().await?;
         let policy = policy::lock_policy(&mut tx, claim.area).await?;

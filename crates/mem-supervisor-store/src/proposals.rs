@@ -109,6 +109,10 @@ impl SupervisorStore {
         }
         policy.validate(attempt.record.policy_revision)?;
         check_lease(&mut tx, &action, claim).await?;
+        let context = contexts::validate_current(&mut tx, &action).await?;
+        if !context.matches_result(project_id, attempt.record.request_digest, evidence_digests) {
+            return Err(StoreError::Conflict);
+        }
         let present: Option<Uuid> =
             sqlx::query_scalar("SELECT id FROM projects WHERE id=$1 FOR KEY SHARE")
                 .bind(project_id)
@@ -191,7 +195,7 @@ fn proposal_digest(
     Ok(hasher.finalize().into())
 }
 
-fn allowed_kind(action: &PgRow) -> Result<()> {
+pub(crate) fn allowed_kind(action: &PgRow) -> Result<()> {
     match actions::parse_kind(&action.try_get::<String, _>("kind")?)? {
         ActionKind::HealthCheck | ActionKind::InstallMaintenance => {
             Err(StoreError::InvalidProposal)
@@ -274,11 +278,19 @@ async fn read_private(
         "SELECT outcome,evidence_digest FROM supervisor_action_results WHERE action_id=$1",
     )
     .bind(action_id)
-    .fetch_optional(conn)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(StoreError::Corrupt)?;
     if result.try_get::<String, _>("outcome")? != "verified"
         || result.try_get::<Vec<u8>, _>("evidence_digest")? != stored_digest
+    {
+        return Err(StoreError::Corrupt);
+    }
+    // Old immutable 0054 history remains readable; all new publication paths
+    // require 0055 context, and retained contexts must agree with their result.
+    if let Some(context) = contexts::read_context(conn, area, action_id).await?
+        && (context.policy_revision() != bindings.policy_revision
+            || !context.matches_result(project, bindings.request_digest, &evidence))
     {
         return Err(StoreError::Corrupt);
     }
