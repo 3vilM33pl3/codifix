@@ -11,8 +11,8 @@ mod types;
 
 pub use materialize::{
     MAX_PAYLOAD_ENVELOPE_BYTES, MAX_RETAINED_TARGET_BYTES, MaterializeError, MaterializedMigration,
-    MaterializedPartition, MaterializedProjection, MaterializedRow, PayloadEvent, SERIALIZATION_ID,
-    manifest_digest, materialize,
+    MaterializedPartition, MaterializedProjection, MaterializedRow, PayloadEvent,
+    PayloadVerification, SERIALIZATION_ID, manifest_digest, materialize, verify_payload,
 };
 pub use plan::{
     draft_manifest, inspect_inventory, inventory_digest, verify_inventory, verify_manifest,

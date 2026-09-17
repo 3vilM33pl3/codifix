@@ -131,6 +131,36 @@ async fn actual_command_prepares_imports_and_reconciles_only_an_inactive_target(
         &serde_json::to_vec_pretty(&fixture.manifest).expect("synthetic operator fixture"),
     );
     write(&dir.join("payload.ndjson"), &fixture.payload);
+    let verified = success(
+        command()
+            .arg("verify-payload")
+            .arg("--inventory")
+            .arg(dir.join("inventory.json"))
+            .arg("--payload")
+            .arg(dir.join("payload.ndjson"))
+            .arg("--inventory-sha256")
+            .arg(mem_area::inventory_digest(&fixture.inventory).expect("digest"))
+            .output()
+            .expect("verifier command"),
+    );
+    assert_eq!(
+        verified["status"],
+        "payload_verified_only_not_approved_or_imported"
+    );
+    assert_eq!(verified["payload_file_sha256"], digest(&fixture.payload));
+    failure(
+        command()
+            .arg("verify-payload")
+            .arg("--inventory")
+            .arg(dir.join("inventory.json"))
+            .arg("--payload")
+            .arg(dir.join("payload.ndjson"))
+            .arg("--inventory-sha256")
+            .arg("0".repeat(64))
+            .output()
+            .expect("bad verifier binding"),
+        "digest does not match",
+    );
     let inspection = success(
         command()
             .arg("inspect")
@@ -152,6 +182,19 @@ async fn actual_command_prepares_imports_and_reconciles_only_an_inactive_target(
         &fixture.payload[..fixture.payload.len() / 2],
     )
     .expect("synthetic operator fixture");
+    failure(
+        command()
+            .arg("verify-payload")
+            .arg("--inventory")
+            .arg(dir.join("inventory.json"))
+            .arg("--payload")
+            .arg(dir.join("payload.ndjson"))
+            .arg("--inventory-sha256")
+            .arg(mem_area::inventory_digest(&fixture.inventory).expect("digest"))
+            .output()
+            .expect("interrupted verifier command"),
+        "payload verification failed",
+    );
     let mut incomplete = command();
     incomplete.arg("prepare");
     source(&mut incomplete, dir, &inspection);

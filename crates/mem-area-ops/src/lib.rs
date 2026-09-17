@@ -36,6 +36,8 @@ pub enum Failure {
     Binding,
     #[error("source materialization failed; incomplete artifacts must not be used")]
     Materialize,
+    #[error("private payload verification failed; no ownership approval or import performed")]
+    Payload,
     #[error("explicit local target or execution assertions are invalid")]
     Target,
     #[error(
@@ -100,6 +102,47 @@ pub struct Inspection {
     pub blocker_count: usize,
 }
 
+#[derive(Serialize)]
+pub struct VerifiedPayload {
+    pub status: &'static str,
+    pub source_instance: Uuid,
+    pub snapshot_id: Uuid,
+    pub inventory_file_sha256: String,
+    pub payload_file_sha256: String,
+    pub verification: mem_area::PayloadVerification,
+}
+
+/// Check exact source bytes without a manifest or any DB connection. This is
+/// deliberately insufficient input for prepare/import or ownership approval.
+pub fn verify_payload(inventory: &Path, payload: &Path, expected: &str) -> Result<VerifiedPayload> {
+    if !valid_digest(expected) {
+        return Err(Failure::Binding);
+    }
+    let mut inventory_file = Input::open(inventory, INVENTORY_LIMIT)?;
+    let mut payload_file = Input::open(payload, PAYLOAD_LIMIT)?;
+    let (inventory, inventory_file_sha256): (Inventory, _) =
+        json(&mut inventory_file, INVENTORY_LIMIT)?;
+    if mem_area::inventory_digest(&inventory).map_err(|_| Failure::Json)? != expected {
+        return Err(Failure::Binding);
+    }
+    let mut reader = BufReader::new(Hashed::new(
+        (&mut payload_file.file).take(PAYLOAD_LIMIT + 1),
+    ));
+    let verification =
+        mem_area::verify_payload(&inventory, &mut reader).map_err(|_| Failure::Payload)?;
+    let payload_file_sha256 = reader.into_inner().digest();
+    inventory_file.unchanged()?;
+    payload_file.unchanged()?;
+    Ok(VerifiedPayload {
+        status: "payload_verified_only_not_approved_or_imported",
+        source_instance: inventory.source_instance,
+        snapshot_id: inventory.snapshot_id,
+        inventory_file_sha256,
+        payload_file_sha256,
+        verification,
+    })
+}
+
 /// Read-only metadata inspection. Computing a digest does not grant review
 /// approval and does not validate the separately collected row payload.
 pub fn inspect(inventory: &Path, manifest: &Path) -> Result<Inspection> {
@@ -152,7 +195,7 @@ fn valid_digest(value: &str) -> bool {
 }
 fn json<T: DeserializeOwned>(input: &mut Input, limit: u64) -> Result<(T, String)> {
     let mut hashed = Hashed::new((&mut input.file).take(limit + 1));
-    let value = serde_json::from_reader(&mut hashed).map_err(|_| Failure::Json)?;
+    let value = serde_json::from_reader(BufReader::new(&mut hashed)).map_err(|_| Failure::Json)?;
     let digest = hashed.digest();
     input.unchanged()?;
     Ok((value, digest))

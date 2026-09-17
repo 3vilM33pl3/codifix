@@ -66,6 +66,7 @@ pub enum PayloadEvent {
 /// parser details, I/O messages or private plan blocker text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MaterializeError {
+    InvalidInventory,
     InvalidPlan,
     InputIo,
     ArchiveIo,
@@ -83,6 +84,7 @@ pub enum MaterializeError {
 impl fmt::Display for MaterializeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
+            Self::InvalidInventory => "payload verification requires a complete valid inventory",
             Self::InvalidPlan => "materialization requires a valid reviewed plan",
             Self::InputIo => "private payload input failed",
             Self::ArchiveIo => "provisional protected archive output failed",
@@ -354,6 +356,138 @@ fn read_event(
     serde_json::from_slice(&bytes)
         .map(Some)
         .map_err(|_| MaterializeError::InvalidEnvelope)
+}
+
+/// Data-integrity evidence only: no ownership decisions, target rows, archive
+/// permissions or execution authority are returned by this read-only check.
+#[derive(Debug, Serialize)]
+pub struct PayloadVerification {
+    pub inventory_sha256: String,
+    pub source_table_count: u64,
+    pub source_row_count: u64,
+    pub retained_inventory_notices: usize,
+}
+
+/// Check an independently exported payload before reviewing any partition.
+/// Reuses the materializer's complete-byte/schema/identity validation and never
+/// manufactures a reviewed manifest just to gain access to those checks.
+pub fn verify_payload(
+    inventory: &Inventory,
+    mut payloads: impl BufRead,
+) -> Result<PayloadVerification, MaterializeError> {
+    let inspection = inspect_inventory(inventory);
+    if !inspection.blockers.is_empty() {
+        return Err(MaterializeError::InvalidInventory);
+    }
+    let inventory_sha256 =
+        inventory_digest(inventory).map_err(|_| MaterializeError::InternalAccounting)?;
+    match read_event(&mut payloads, MAX_PAYLOAD_ENVELOPE_BYTES)? {
+        Some(PayloadEvent::Header {
+            format_version: 1,
+            source_instance,
+            snapshot_id,
+            inventory_sha256: supplied,
+            serialization_id,
+        }) if source_instance == inventory.source_instance
+            && snapshot_id == inventory.snapshot_id
+            && supplied == inventory_sha256
+            && serialization_id == SERIALIZATION_ID => {}
+        _ => return Err(MaterializeError::ProtocolMismatch),
+    }
+    let mut tables: Vec<_> = inventory.tables.iter().collect();
+    tables.sort_by(|a, b| a.table.cmp(&b.table));
+    let index: BTreeMap<_, _> = tables
+        .iter()
+        .filter(|table| primary_columns(&table.table).is_some())
+        .flat_map(|table| {
+            table
+                .rows
+                .iter()
+                .map(move |row| ((table.table.as_str(), row.key.as_str()), row))
+        })
+        .collect();
+    let mut total = 0u64;
+    for table in &tables {
+        match read_event(&mut payloads, MAX_PAYLOAD_ENVELOPE_BYTES)? {
+            Some(PayloadEvent::TableStart {
+                table: name,
+                row_count,
+            }) if name == table.table && row_count == table.row_count => {}
+            _ => return Err(MaterializeError::ProtocolMismatch),
+        }
+        let mut rows: Vec<_> = table.rows.iter().collect();
+        rows.sort_by(|a, b| a.key.cmp(&b.key));
+        for expected in rows {
+            read_verified_row(
+                &mut payloads,
+                MAX_PAYLOAD_ENVELOPE_BYTES,
+                inventory,
+                table,
+                expected,
+                &index,
+            )?;
+            total = total
+                .checked_add(1)
+                .ok_or(MaterializeError::InternalAccounting)?;
+        }
+        match read_event(&mut payloads, MAX_PAYLOAD_ENVELOPE_BYTES)? {
+            Some(PayloadEvent::TableEnd {
+                table: name,
+                row_count,
+            }) if name == table.table && row_count == table.row_count => {}
+            _ => return Err(MaterializeError::ProtocolMismatch),
+        }
+    }
+    match read_event(&mut payloads, MAX_PAYLOAD_ENVELOPE_BYTES)? {
+        Some(PayloadEvent::Complete {
+            table_count,
+            row_count,
+        }) if table_count == tables.len() as u64 && row_count == total => {}
+        _ => return Err(MaterializeError::ProtocolMismatch),
+    }
+    if read_event(&mut payloads, MAX_PAYLOAD_ENVELOPE_BYTES)?.is_some() {
+        return Err(MaterializeError::ProtocolMismatch);
+    }
+    Ok(PayloadVerification {
+        inventory_sha256,
+        source_table_count: tables.len() as u64,
+        source_row_count: total,
+        retained_inventory_notices: inspection.notices.len(),
+    })
+}
+
+fn read_verified_row(
+    payloads: &mut impl BufRead,
+    envelope_limit: usize,
+    inventory: &Inventory,
+    table: &TableInventory,
+    expected: &RowInventory,
+    index: &BTreeMap<(&str, &str), &RowInventory>,
+) -> Result<(RecordRef, String, RawRow), MaterializeError> {
+    let Some(PayloadEvent::Row {
+        table: name,
+        key,
+        row_sha256,
+        row_json,
+    }) = read_event(payloads, envelope_limit)?
+    else {
+        return Err(MaterializeError::ProtocolMismatch);
+    };
+    if name != table.table || key != expected.key {
+        return Err(MaterializeError::ProtocolMismatch);
+    }
+    if row_sha256 != expected.row_sha256
+        || format!("{:x}", Sha256::digest(row_json.as_bytes())) != expected.row_sha256
+    {
+        return Err(MaterializeError::HashMismatch);
+    }
+    let fields = validate_row(&row_json, table)?;
+    validate_bound_metadata(&fields, &table.table, expected)?;
+    validate_materializable_identity(&fields, table, expected, index)?;
+    if table.table == "public.projects" {
+        validate_project_provenance(&fields, inventory)?;
+    }
+    Ok((RecordRef { table: name, key }, row_json, fields))
 }
 
 /// RawValue preserves arbitrarily large exact numbers and nested JSON. A custom
@@ -841,31 +975,16 @@ fn materialize_bounded<R: BufRead, W: Write>(
         )?;
         let columns: Arc<[Column]> = table.columns.clone().into();
         for expected in rows {
-            let Some(PayloadEvent::Row {
-                table: name,
-                key,
-                row_sha256,
-                row_json,
-            }) = read_event(&mut payloads, envelope_limit)?
-            else {
-                return Err(MaterializeError::ProtocolMismatch);
-            };
-            if name != table.table || key != expected.key {
-                return Err(MaterializeError::ProtocolMismatch);
-            }
-            if row_sha256 != expected.row_sha256
-                || format!("{:x}", Sha256::digest(row_json.as_bytes())) != expected.row_sha256
-            {
-                return Err(MaterializeError::HashMismatch);
-            }
-            let fields = validate_row(&row_json, table)?;
-            validate_bound_metadata(&fields, &table.table, expected)?;
-            validate_materializable_identity(&fields, table, expected, &identity_index)?;
-            if table.table == "public.projects" {
-                validate_project_provenance(&fields, inventory)?;
-            }
+            let (record, row_json, fields) = read_verified_row(
+                &mut payloads,
+                envelope_limit,
+                inventory,
+                table,
+                expected,
+                &identity_index,
+            )?;
+            let row_sha256 = expected.row_sha256.clone();
             let action = actions.next().ok_or(MaterializeError::InternalAccounting)?;
-            let record = RecordRef { table: name, key };
             if action.record != record || action.source_sha256 != row_sha256 {
                 return Err(MaterializeError::InternalAccounting);
             }

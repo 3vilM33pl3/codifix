@@ -26,6 +26,21 @@ against directories another process under that UID is modifying.
    not an arbitrary server. It uses a read-only transaction, exact UTF-8 JSON
    bytes and lexical key ordering. The supplied inventory digest is only a
    claimed binding; preparation independently checks every row against it.
+   Before ownership review is finished, independently validate that export:
+
+   ```sh
+   memory-area-import verify-payload \
+     --inventory /protected/inventory.json \
+     --payload /protected/new-payload.ndjson \
+     --inventory-sha256 INVENTORY_SHA
+   ```
+
+   This reads protected files only and checks all tables, row bytes/hashes,
+   identities, columns, references, ordering and complete counts against the
+   inventory. The metadata reports both exact file hashes and retained notice
+   counts. No manifest, database connection, output archive, partition or
+   approval is created. Failure produces no partial success report. Passing is
+   source integrity evidence, not a replacement for preparation or review.
 4. In a new empty private output directory, run:
 
    ```sh

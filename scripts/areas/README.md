@@ -122,7 +122,11 @@ node scripts/areas/payload.mjs \
   --output /protected/new-baseline/partition-payload.ndjson
 ```
 
-The digest is a claimed source binding, not a verification result. The protected
+The digest is a claimed source binding, not a verification result. Use
+`memory-area-import verify-payload --inventory /protected/inventory.json
+--payload /protected/payload.ndjson --inventory-sha256 INVENTORY_SHA` for an
+independent read-only comparison before ownership review. It emits metadata only
+and grants no import authority. The protected
 [`memory-area-import` workflow](../../crates/mem-area-ops/README.md) independently
 verifies all row identities, hashes, ownership decisions and reviewed provenance
 before preparing an archive or connecting to an explicit inactive local target.

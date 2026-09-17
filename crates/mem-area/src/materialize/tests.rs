@@ -393,6 +393,81 @@ fn run(fixture: &Fixture) -> (MaterializedMigration, Vec<u8>) {
     (result, archive)
 }
 
+#[test]
+fn standalone_payload_verification_needs_no_ownership_approval_and_returns_no_partition() {
+    let mut fixture = fixture(false);
+    let original_events = encode(&events(&fixture));
+    fixture.manifest = draft_manifest(&fixture.inventory).expect("unreviewed fixture");
+    assert!(!verify_manifest(&fixture.inventory, &fixture.manifest).plan_valid);
+    let result =
+        verify_payload(&fixture.inventory, Cursor::new(original_events)).expect("verified bytes");
+    assert_eq!(
+        result.inventory_sha256,
+        inventory_digest(&fixture.inventory).expect("digest")
+    );
+    assert_eq!(
+        result.source_table_count as usize,
+        fixture.inventory.tables.len()
+    );
+    assert_eq!(
+        result.source_row_count,
+        fixture
+            .inventory
+            .tables
+            .iter()
+            .map(|t| t.row_count)
+            .sum::<u64>()
+    );
+    let metadata = serde_json::to_string(&result).expect("metadata");
+    assert!(!metadata.contains(PRIVATE));
+    assert!(!metadata.contains("partition"));
+}
+
+#[test]
+fn standalone_payload_checks_framing_hashes_identities_and_complete_inventory() {
+    let fixture = fixture(false);
+    let original = events(&fixture);
+    for kind in ["header", "missing", "extra", "hash", "count"] {
+        let mut altered = original.clone();
+        match kind {
+            "header" => altered[0]["snapshot_id"] = json!(id(999)),
+            "missing" => {
+                altered.pop();
+            }
+            "extra" => altered.push(original[0].clone()),
+            "hash" => {
+                altered
+                    .iter_mut()
+                    .find(|e| e["event"] == "row")
+                    .expect("row")["row_json"] = json!(PRIVATE)
+            }
+            _ => altered.last_mut().expect("footer")["row_count"] = json!(1),
+        }
+        let error = verify_payload(&fixture.inventory, Cursor::new(encode(&altered)))
+            .expect_err("bad payload");
+        assert!(!error.to_string().contains(PRIVATE));
+    }
+    let mut fixture = fixture;
+    change_field(
+        &mut fixture,
+        "public.memory_entries",
+        10,
+        "project_id",
+        json!(id(999)),
+    );
+    assert_eq!(
+        verify_payload(&fixture.inventory, Cursor::new(encode(&events(&fixture))))
+            .expect_err("false provenance"),
+        MaterializeError::InvalidRow
+    );
+    fixture.inventory.tables.pop();
+    assert_eq!(
+        verify_payload(&fixture.inventory, Cursor::new(Vec::<u8>::new()))
+            .expect_err("missing table"),
+        MaterializeError::InvalidInventory
+    );
+}
+
 // Rebind synthetic evidence deliberately: these tests must reach byte/identity
 // validation rather than merely fail on an obsolete digest.
 fn rebind(fixture: &mut Fixture) {

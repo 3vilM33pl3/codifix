@@ -40,6 +40,15 @@ impl From<Source> for Inputs {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Independently verify every exported row; no ownership review, writes or DB connection.
+    VerifyPayload {
+        #[arg(long)]
+        inventory: PathBuf,
+        #[arg(long)]
+        payload: PathBuf,
+        #[arg(long)]
+        inventory_sha256: String,
+    },
     /// Print normalized review digests and blocker count, without writing or connecting.
     Inspect {
         #[arg(long)]
@@ -83,6 +92,15 @@ fn print(value: &impl serde::Serialize) -> Result<(), Failure> {
 }
 async fn run(cli: Cli) -> Result<(), Failure> {
     match cli.command {
+        Command::VerifyPayload {
+            inventory,
+            payload,
+            inventory_sha256,
+        } => print(&mem_area_ops::verify_payload(
+            &inventory,
+            &payload,
+            &inventory_sha256,
+        )?),
         Command::Inspect {
             inventory,
             manifest,
