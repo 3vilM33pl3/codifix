@@ -7,6 +7,9 @@ Use this map to find the right PR boundary before opening the large files.
 - `crates/mem-record`: shared request/response and domain record types (pure serde, no I/O).
 - `crates/mem-area`: offline, hash-bound four-area partition inventory and review planner. No database importer or implicit project-name classification; unknown tables and unresolved ownership block migration.
 - `crates/mem-supervisor`: pure supervisor policy, action, budget and fencing contracts. No provider/process/runtime access; adapters must establish durable admission and verified effects. See the [four-area execution ledger](../../reviews/four-area-network/README.md).
+- `crates/mem-supervisor-store`: opt-in supervisor policies, fenced actions, immutable physical attempts, daily accounting and commit-ordered metadata journal. Private typed proposals use a separate exact-project store; no service authorization or scheduler.
+- `crates/mem-supervisor-runtime`: bounded text-only Sol requests, exact token counting and one-shot provider sends admitted by the supervisor store. No ordinary query context, Pi integration or running worker; source/disclosure consent remains a service-boundary obligation.
+- `crates/mem-supervisor-pi`: pinned, credential-free Linux process/control probe. Production provider gate stays closed; independently sandboxed real AMD64 control tests use only an invalid test token. Not a sandbox, installer or agent service.
 - `crates/mem-store`: transaction-aware local events, durable jobs, execution/effect journals and operator repair; no network/configuration/service dependency. Connected workers are in `mem-service/src/background.rs`, clients in Web/CLI/TUI Jobs; see the [R1 inventory](../../reviews/federation-first/r1-coverage.md).
 - `crates/mem-config`: configuration loading, discovery, and validation helpers.
 - `crates/mem-cli`: the `memory` binary, CLI command routing, TUI, setup wizard, eval runner orchestration, and local service tooling.

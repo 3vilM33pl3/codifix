@@ -28,8 +28,8 @@ Today's demo: four actual areas, selected real knowledge, discovery, governed qu
 
 ## Step 0: preservation and checkpoint
 
-- [ ] Record R3 paused and preserve artifacts/diagnoses/approvals/budget; no evaluation calls.
-- [ ] Checkpoint approved plan in dev Memory before implementation.
+- [x] Record R3 paused and preserve artifacts/diagnoses/approvals/budget; no evaluation calls.
+- [x] Checkpoint approved plan in dev Memory before implementation.
 - [ ] Inventory all writers, database bindings, watchers, offline stores, configuration/credential locations on Monolith and via CA console.
 - [ ] Fresh encrypted backup of databases/evidence/offline stores/configuration/journals/required identities with separately protected credentials.
 - [ ] Isolated restore with workers/watchers/federation/provider calls disabled; verify contents and startup.
@@ -100,4 +100,3 @@ Today's demo: four actual areas, selected real knowledge, discovery, governed qu
 - [ ] Demo actual four running areas; Homelab discovers Workshop and cites release answer; restricted request denied; real release notice and installation decision; human stale-knowledge question; restart preserves work/history.
 
 Completion is verified internal deployment, not customer readiness or evaluation success. R3 remains paused. General delegation/public federation/autonomous CA administration are outside this series. Small incremental commits and truthful evidence throughout.
-

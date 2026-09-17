@@ -4,9 +4,10 @@
 //!
 //! No prompts, arbitrary commands, credential inputs or provider settings are
 //! accepted. This is process/protocol hygiene, not an OS or network sandbox.
-//! Provider execution remains blocked after a successful probe. Real Pi has not
-//! been exercised by this crate's fake-process tests; missing credentials or an
-//! unavailable exact model may legitimately prevent a real control handshake.
+//! Provider execution remains blocked after a successful probe. Separate ignored
+//! diagnostics exercise authentic Pi only inside an independently enforced
+//! network-disabled container; normal tests use fake processes. Missing local
+//! credential presence prevents a production control handshake.
 
 mod artifact;
 mod process;

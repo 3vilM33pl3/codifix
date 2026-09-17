@@ -59,6 +59,28 @@ for crate in mem-area mem-supervisor; do
   done
 done
 
+# Supervisor persistence is not a provider client. Pi process control has no
+# credentials, SQL or network transport. Only the narrow runtime may connect the
+# two; neither adapter may reach ordinary knowledge/query/curation pipelines.
+supervisor_store_tree=$(cargo tree -p mem-supervisor-store -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in reqwest axum mem-config mem-service mem-platform mem-supervisor-pi atrium-api; do
+  if echo "$supervisor_store_tree" | grep -qx "$dep"; then
+    err "mem-supervisor-store depends on $dep"
+  fi
+done
+supervisor_pi_tree=$(cargo tree -p mem-supervisor-pi -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in reqwest sqlx axum mem-config mem-service mem-platform mem-supervisor-store; do
+  if echo "$supervisor_pi_tree" | grep -qx "$dep"; then
+    err "mem-supervisor-pi depends on $dep"
+  fi
+done
+supervisor_runtime_tree=$(cargo tree -p mem-supervisor-runtime -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in mem-service mem-platform mem-search mem-curate mem-config duckdb atrium-api; do
+  if echo "$supervisor_runtime_tree" | grep -qx "$dep"; then
+    err "mem-supervisor-runtime depends on $dep"
+  fi
+done
+
 # 3b. Transactional storage may use SQL/runtime, but must not become a network
 # Local jobs/events obey the same boundary independently of federation.
 store_tree=$(cargo tree -p mem-store -e normal --prefix none | awk '{print $1}' | sort -u)
