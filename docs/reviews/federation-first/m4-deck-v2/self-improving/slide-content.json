@@ -1,0 +1,1768 @@
+[
+  {
+    "number": 1,
+    "pageId": "p1",
+    "title": "Infrastructure for the\nAgentic Enterprise",
+    "items": [
+      {
+        "id": "p1_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Infrastructure for the\nAgentic Enterprise",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p1_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Codifix is the plumbing and electrical wiring\nfor the Agentic Enterprise.",
+        "bounds": [
+          48,
+          163,
+          850,
+          98
+        ],
+        "fontSize": 30,
+        "link": null
+      },
+      {
+        "id": "p1_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Your platforms keep their interfaces.\nCodifix does the integration.",
+        "bounds": [
+          48,
+          309,
+          850,
+          81
+        ],
+        "fontSize": 25,
+        "link": null
+      },
+      {
+        "id": "m4_s1_text_1",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Connect existing AI platforms, agents and enterprise expertise.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "m4_s1_text_2",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Infrastructure vision · evidence and boundaries",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "m4_s1_text_3",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "01",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "p1:notes_i3",
+    "notes": "Founder-selected positioning: Codifix supplies the infrastructure for an Agentic Enterprise. The plumbing and electrical wiring phrase is a metaphor for reusable connections, knowledge and governance. The goal is easier and lower-risk transformation; no measured risk reduction, universal connector coverage or productivity claim is implied. Knowledge/governance remains the foundation, broad platform integration the product direction. Platform-native adapters allow external systems to keep supported interfaces; Codifix builds the integration and maps authorization explicitly. Configuration, authentication and permission mapping remain necessary. No new standard must be adopted by the external platform. This is an investor discussion deck, not an offer or fixed fundraising ask. The Tom briefing is pre-meeting research only; no conversation, feedback, endorsement or investment interest is claimed.\n\nRepository evidence checked 17 September 2026 at 54195f4. Concurrent uncommitted engineering is excluded.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "narrativeWords": 20
+  },
+  {
+    "number": 2,
+    "pageId": "p2",
+    "title": "Great AI platforms.\nA disconnected enterprise.",
+    "items": [
+      {
+        "id": "p2_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Great AI platforms.\nA disconnected enterprise.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p2_i3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Application team",
+        "bounds": [
+          66,
+          180,
+          322,
+          40
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p2_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "AI platform + agents\nChange history and symptoms",
+        "bounds": [
+          66,
+          242,
+          322,
+          83
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_2",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Platform team",
+        "bounds": [
+          572,
+          176.4,
+          322,
+          40
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_4",
+        "action": "reuse",
+        "role": "body",
+        "text": "AI platform + agents\nRunbooks and infrastructure context",
+        "bounds": [
+          572,
+          238.4,
+          322,
+          83
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Handover",
+        "bounds": [
+          416,
+          211,
+          126,
+          33
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_7",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Context stays local",
+        "bounds": [
+          48,
+          390,
+          284,
+          66
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Connections rebuilt",
+        "bounds": [
+          351,
+          390,
+          265,
+          66
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Controls rechecked",
+        "bounds": [
+          652,
+          390,
+          271,
+          66
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_10",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Illustrative problem to validate in discovery.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_11",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Buyer and incident-handover hypothesis · M1",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3dc8990715f4815a812bf2a9262ef282"
+      },
+      {
+        "id": "m4_s2_text_12",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "02",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "p2:notes_i3",
+    "notes": "This is a fictional enterprise structure, not a customer case study. Native AI capabilities do not alone establish authorized, reusable expertise exchange across independently administered units. Discovery must confirm actual fragmentation, repeated connector/governance work, expert interruption and budget ownership. Do not imply existing platforms lack connectors, enterprise search, memory or governance. Codifix's proposed focus is exchange across independent administrations and corrections owned/reviewed at origin. Use the incident handover from application to platform teams as the first bounded proof. Source: M1 preparation, docs/reviews/federation-first/m1-execution.md. No numerical market, productivity or customer-traction claims.\n\nRepository evidence checked 17 September 2026 at 54195f4. Concurrent uncommitted engineering is excluded.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "narrativeWords": 16
+  },
+  {
+    "number": 3,
+    "pageId": "p4",
+    "title": "Your platforms keep their interfaces.\nCodifix connects them.",
+    "items": [
+      {
+        "id": "p4_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Your platforms keep their interfaces.\nCodifix connects them.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p4_i3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Application unit",
+        "bounds": [
+          65,
+          167,
+          292,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p4_i4",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Existing platform + agents\nNative APIs / MCP",
+        "bounds": [
+          65,
+          221,
+          292,
+          64
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p4_i5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Codifix adapter",
+        "bounds": [
+          72,
+          306,
+          275,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p4_i6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Own knowledge\nOwn administration",
+        "bounds": [
+          65,
+          362,
+          292,
+          62
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "m4_s4_text_3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Platform unit",
+        "bounds": [
+          603,
+          163.4,
+          292,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s4_text_6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Existing platform + agents\nNative APIs / MCP",
+        "bounds": [
+          603,
+          217.4,
+          292,
+          64
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "m4_s4_text_7",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Codifix adapter",
+        "bounds": [
+          610,
+          302.4,
+          275,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s4_text_8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Own knowledge\nOwn administration",
+        "bounds": [
+          603,
+          354.8,
+          292,
+          62
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "m4_s4_text_9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Authorized exchange\nMemory gateway",
+        "bounds": [
+          382,
+          192,
+          196,
+          76
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "v2_s3_text_5",
+        "action": "create",
+        "role": "diagram label",
+        "text": "ATProto identity\nSigned repositories",
+        "bounds": [
+          382,
+          359,
+          196,
+          65
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "v2_s3_text_6",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Architecture direction: Codifix builds adapters and maps permissions.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "v2_s3_text_7",
+        "action": "create",
+        "role": "source link",
+        "text": "Adapter architecture · ATProto Lexicon",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://atproto.com/specs/lexicon"
+      },
+      {
+        "id": "v2_s3_text_8",
+        "action": "create",
+        "role": "slide number",
+        "text": "03",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "p4:notes_i3",
+    "notes": "Architectural direction: external platforms use their own supported interfaces; Codifix implements adapters. The diagram does not establish that every API/MCP platform has a shipped connector or that credentials/permissions transfer automatically. Vertices are independently administered units, each with local knowledge and agents. Authorized edges exchange selected expertise. ATProto sits between Codifix network components, not as a new interface requirement imposed on Databricks or every external platform. Private Q&A still uses the Memory gateway; it is not placed in the PDS or publication log. ATProto Lexicons describe records, RPC endpoints and events; XRPC defines the wire conventions and service authentication. These extension points do not provide arbitrary enterprise-policy semantics. Memory owns disclosure, authorization and operational history. Sources: https://atproto.com/specs/lexicon; https://atproto.com/specs/xrpc; docs/developer/adr/0011-atproto-federation-adapter.md; docs/developer/architecture/mcp-server.md. Controlled implementation and integration strategy are distinct.\n\nRepository evidence checked 17 September 2026 at 54195f4. Concurrent uncommitted engineering is excluded.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "narrativeWords": 0
+  },
+  {
+    "number": 4,
+    "pageId": "p5",
+    "title": "Databricks plugs into the network",
+    "items": [
+      {
+        "id": "p5_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Databricks plugs into the network",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p5_i4",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Proposed integration using supported interfaces",
+        "bounds": [
+          48,
+          112,
+          864,
+          40
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "p5_i5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Databricks agent",
+        "bounds": [
+          61,
+          192,
+          226,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p5_i6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Native MCP\nIncident question",
+        "bounds": [
+          61,
+          248,
+          226,
+          63
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p5_i7",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Codifix",
+        "bounds": [
+          367,
+          192,
+          226,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p5_i9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Adapter + controls\nPermitted request",
+        "bounds": [
+          367,
+          248,
+          226,
+          63
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p5_i10",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Platform expertise",
+        "bounds": [
+          673,
+          192,
+          226,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p5_i12",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Private Q&A\nReviewed sources",
+        "bounds": [
+          673,
+          248,
+          226,
+          63
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p5_i13",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Cited answer returns to the existing agent",
+        "bounds": [
+          215,
+          346,
+          551,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p5_i14",
+        "action": "reuse",
+        "role": "body",
+        "text": "Payment latency: check the permitted runbook.\nA responder acts; the source team reviews corrections for later reuse.",
+        "bounds": [
+          48,
+          397,
+          864,
+          66
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p5_i16",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "No platform rewrite or ATProto adoption. Connector configuration still required.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "p5_i17",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Databricks external MCP documentation · integration not yet verified",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://docs.databricks.com/aws/en/ai-gateway/register-mcp-service"
+      },
+      {
+        "id": "p5_i19",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "04",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "p5:notes_i3",
+    "notes": "Illustrative consumer path: Databricks agent → Unity Catalog registered MCP Service and HTTP connection → Codifix Streamable HTTP MCP interface → permitted private Memory expertise Q&A → cited answer. Databricks is a consumer, not a live federated data source in this example. The incident and expected answer are fictional; no deployment, affiliation or customer outcome is claimed. No Databricks-specific connector or end-to-end test was found. No platform rewrite or ATProto adoption is required by this proposed route, but endpoint reachability, TLS/network configuration, scoped credential mapping and a consent/citation test remain necessary.\nDatabricks requires Streamable HTTP, a Unity Catalog enabled workspace, supported model-serving region and reachability from serverless compute over permitted public/private networking. Invocation requires EXECUTE and USE CATALOG/SCHEMA; restrict USE CONNECTION to service authors/admins because direct connection use can bypass service restrictions. Stored Bearer credentials are supported, alongside OAuth options. Shared credentials do not propagate a person's identity or authorize onward model disclosure. Confirm target cloud/account availability. Native agent-use documentation is Public Preview; service policies have their own Beta status. Do not imply the entire integration path is GA.\nMemory has scoped Bearer/x-api-token HTTP MCP and per-request roles. F1 requires exact-question consent plus operator-bound caller/output destination; read_only=false for ask. An adapter must preserve these requirements, including human confirmation. Correction reuse requires origin review, local curation and renewed collection review; ordinary source memory is not automatically rewritten.\nSources: https://docs.databricks.com/aws/en/ai-gateway/register-mcp-service; https://docs.databricks.com/aws/en/agents/mcp-tools/use-mcp-in-agents; https://docs.databricks.com/aws/en/query-federation/http#authentication; https://docs.databricks.com/aws/en/ai-gateway/govern-mcp-service; docs/developer/architecture/mcp-server.md; docs/user/f1-internal-expertise.md; docs/reviews/federation-first/f1-execution.md.\n\nRepository evidence checked 17 September 2026 at 54195f4. Concurrent uncommitted engineering is excluded.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "narrativeWords": 17
+  },
+  {
+    "number": 5,
+    "pageId": "p6",
+    "title": "Self-improving knowledge,\nwith human control",
+    "items": [
+      {
+        "id": "p6_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Self-improving knowledge,\nwith human control",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p6_i4",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Prioritize",
+        "bounds": [
+          58,
+          152,
+          238,
+          35
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Usage + source volatility",
+        "bounds": [
+          58,
+          194,
+          238,
+          30
+        ],
+        "fontSize": 17,
+        "link": null
+      },
+      {
+        "id": "p6_i6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Gather evidence",
+        "bounds": [
+          360,
+          152,
+          238,
+          35
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Recorded sources + history",
+        "bounds": [
+          360,
+          194,
+          238,
+          30
+        ],
+        "fontSize": 17,
+        "link": null
+      },
+      {
+        "id": "p6_i9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Decide",
+        "bounds": [
+          664,
+          152,
+          238,
+          35
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i11",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Evidence + confidence",
+        "bounds": [
+          664,
+          194,
+          238,
+          30
+        ],
+        "fontSize": 17,
+        "link": null
+      },
+      {
+        "id": "p6_i12",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Reconfirm",
+        "bounds": [
+          48,
+          273,
+          258,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i14",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Supported knowledge",
+        "bounds": [
+          48,
+          315,
+          258,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p6_i15",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Flag uncertainty",
+        "bounds": [
+          350,
+          273,
+          258,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i17",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Insufficient evidence",
+        "bounds": [
+          350,
+          315,
+          258,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_9",
+        "action": "create",
+        "role": "diagram label",
+        "text": "Review a correction",
+        "bounds": [
+          654,
+          273,
+          270,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_10",
+        "action": "create",
+        "role": "diagram label",
+        "text": "New version",
+        "bounds": [
+          654,
+          315,
+          258,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_12",
+        "action": "create",
+        "role": "diagram label",
+        "text": "Reuse later",
+        "bounds": [
+          654,
+          374,
+          258,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_14",
+        "action": "create",
+        "role": "roadmap label",
+        "text": "Next: notify the responsible human.",
+        "bounds": [
+          48,
+          422,
+          864,
+          35
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_15",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Implemented and configurable. Quality improvement remains to be measured.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_16",
+        "action": "create",
+        "role": "source link",
+        "text": "Knowledge maintenance, evidence and review boundaries",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "v2r2_s5_text_17",
+        "action": "create",
+        "role": "slide number",
+        "text": "05",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "p6:notes_i3",
+    "notes": "Codifix seeks supporting evidence and preserves reviewable history as knowledge changes. This is implemented, configurable knowledge maintenance, not measured autonomous quality improvement. The diagram shows the enabled, non-dry-run decision paths; it does not claim every check rewrites content or requires human approval.\nPrioritize: retrieval, citations and direct reads reinforce activation. This usage signal identifies frequently used knowledge; it is not proof of correctness. Volatility is an EWMA of recorded source-verification status changes, not detection of every changing enterprise fact. Higher volatility brings eligible rechecks forward. Activation thresholds, an existing review flag, cooldown, due time and daily/per-cycle budgets still apply. High volatility with low activation does not trigger evidence gathering or an LLM call.\nAutomatic validation defaults to off, with dry-run on and auto-apply rewording off. Operators must opt in. Dry-run records evidence and would_* outcomes/cooldown without the diagram's live content/status changes. Source: crates/mem-config/src/pipeline.rs:537; crates/mem-reinforce/src/selection.rs:35; crates/mem-service/src/repository/handlers/reinforcement.rs:216.\nGather evidence: bounded recorded source snippets, provenance verification, one-hop related memories, prior validations and source-path repository history. A strict evidence-reference allowlist rejects unknown references; accepted references do not prove conclusions or calibrate model confidence. Optional manual/API hybrid fallback scans a bounded tracked repository when first-pass evidence is ambiguous or unsupported. No unrestricted web research or mathematical proof. Source: crates/mem-reinforce/src/validate/evidence.rs:71; verdict.rs:131; mod.rs:291.\nDecide: clear valid knowledge refreshes validation metadata without a new content version. Ambiguous, unsupported or low-confidence findings set needs_review and leave content unchanged. Flag-only findings are surfaced by scores --needs-review/query flags, not the default pending correction queue. A supported proposed correction is queued separately; an authorized reviewer can apply or reject it. Approval writes an immutable new version while preserving canonical identity/history. The review permission is a service role, not proof of a human identity. Neither flags nor queued proposals currently notify/contact anyone outside Memory. The dashed Next branch is planned proactive human outreach, requiring ownership, channel permissions, acknowledgement and audit design.\nWeak evidence does not authorize a rewrite. Explicitly enabled, high-confidence wording-only changes can auto-apply; separate curation policies have their own replacement rules. Do not claim all changes require human approval. Source: crates/mem-reinforce/src/validate/apply.rs:76; mod.rs:350,573; crates/mem-curate/src/repository.rs:570; docs/user/cli/review.md. Cross-unit correction reuse still requires origin/local curation and renewed collection review. Validation quality, missed changes, reviewer time, validation-token cost and subsequent correction reuse remain M3/M5 evidence gates. Architecture explanation: docs/developer/architecture/memory-reinforcement.md.\n\nKnowledge-maintenance, retrieval and review evidence checked 17 September 2026 at 5827aeb. Existing federation/R3 evidence and financial checks retain their original dated observations.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "narrativeWords": 0
+  },
+  {
+    "number": 6,
+    "pageId": "p12",
+    "title": "Connected context. Portable memory.\nTraceable corrections.",
+    "items": [
+      {
+        "id": "p12_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Connected context. Portable memory.\nTraceable corrections.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p12_i5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Connected retrieval",
+        "bounds": [
+          48,
+          157,
+          303,
+          65
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p12_i6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Meaning, keywords and code relationships\nfind relevant context.",
+        "bounds": [
+          374,
+          157,
+          538,
+          69
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p12_i8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Portable memory",
+        "bounds": [
+          48,
+          260,
+          303,
+          65
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p12_i9",
+        "action": "reuse",
+        "role": "body",
+        "text": "Knowledge persists across supported agent clients\nand embedding-model changes.",
+        "bounds": [
+          374,
+          260,
+          538,
+          69
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p12_i11",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Traceable corrections",
+        "bounds": [
+          48,
+          363,
+          303,
+          65
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p12_i12",
+        "action": "reuse",
+        "role": "body",
+        "text": "Sources, version history and review decisions\nremain connected.",
+        "bounds": [
+          374,
+          363,
+          538,
+          69
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p12_i14",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Implemented strengths. Their combined customer value remains to be measured.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "p12_i15",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Retrieval, embedding spaces, review and evaluation evidence",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "p12_i17",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "06",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "p12:notes_i3",
+    "notes": "Codifix's distinctive combination is connected retrieval, portable canonical memory and traceable corrections. This describes product focus, not exclusivity or a claim that competitors lack these features.\nConnected retrieval: the query pipeline combines semantic similarity, lexical/keyword matching and bounded graph signals. The code graph must be extracted first; memories link through file provenance to symbols and nearby relationships. Semantic retrieval needs populated embeddings. Graph connections explain retrieval but are not standalone answer citations. Answer synthesis exposes evidence sufficiency and validates cited memory IDs. The current retrieval channels run sequentially, so no parallel-retrieval performance claim is made. Sources: docs/user/cli/query.md:41; crates/mem-search/src/lib.rs:377.\nPortable memory: canonical content and history are separate from derived vectors. Supported agent clients can use Memory's MCP interfaces. Embedding spaces are keyed by provider, base URL and model; several spaces can coexist. A new space must be populated/backfilled and validated before active use. Switching to an already populated supported space need not recompute existing vectors. Multi-backend creation incurs additional embedding calls. Provider support for embeddings does not imply identical chat-model support, interchangeable database engines or universal platform/model compatibility. Sources: docs/user/cli/embeddings.md; crates/mem-search/src/embedding_backend.rs:37; rebuild.rs:113; lib.rs:150; docs/developer/architecture/mcp-server.md.\nTraceable corrections: canonical memory identity connects provenance, review outcomes and immutable versions. Approved factual corrections create a new version; explicitly configured high-confidence wording changes and separate curation policy differ. Signatures establish authenticity/integrity, not factual truth or human approval. Sources: docs/user/cli/review.md; crates/mem-reinforce/src/validate/mod.rs:573; docs/developer/adr/0002-reinforcement-scores-outside-immutable-versions.md.\nImplemented: stdio/Streamable HTTP MCP; scoped per-request service authorization; reviewed federation publication/import; version/provenance controls; private gateway Q&A and explicit onward-consent boundary. F1 uses synthetic data, fake provider synthesis and independent databases/HTTP applications in a single test process on one host. The E gate starts independent service executables. These are controlled demonstrations, not customer deployments, customer SSO or a multi-host fleet. Full security, recovery, deployment and evaluation gates remain.\nR3 development observation on 17 September: 75/75 executions completed; 60 knowledge answers await genuine blinded human review; 0/15 successful complete coding sequences (one repository family, five conditions, three repeats). execution_valid=true, harness_valid=false, official_evidence=false, quality_passed=false. Deadline/tool/completion-protocol failures do not isolate Memory's coding contribution. No validated quality improvement, perfect recall or token saving is claimed.\nSince prior M4, committed protected payload export/import operator and metadata-only area-supervisor inspection add bounded foundations. They do not establish real-data area import, integrated agent execution, release activation or a live four-area demo. Native Spaces adoption and broader delegated execution remain future work.\nSources: docs/reviews/federation-first/f1-execution.md; docs/reviews/federation-first/2026-09-09-e-completion.md; evals/r3/development-continuation-20260917.md; evals/r3/coding-diagnosis-20260917.md; docs/reviews/four-area-network/README.md; docs/developer/architecture/mcp-server.md.\n\nKnowledge-maintenance, retrieval and review evidence checked 17 September 2026 at 5827aeb. Existing federation/R3 evidence and financial checks retain their original dated observations.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "narrativeWords": 25
+  },
+  {
+    "number": 7,
+    "pageId": "p8",
+    "title": "Start with two teams.\nExpand across the enterprise.",
+    "items": [
+      {
+        "id": "p8_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Start with two teams.\nExpand across the enterprise.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p8_i4",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Buyer",
+        "bounds": [
+          48,
+          143,
+          369,
+          31
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "p8_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "CIO / CTO",
+        "bounds": [
+          48,
+          183,
+          371,
+          42
+        ],
+        "fontSize": 25,
+        "link": null
+      },
+      {
+        "id": "p8_i8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Champions",
+        "bounds": [
+          48,
+          257,
+          369,
+          31
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "p8_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Application + platform leaders",
+        "bounds": [
+          48,
+          297,
+          376,
+          65
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p8_i11",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "£80k / year · two deployments",
+        "bounds": [
+          48,
+          395,
+          406,
+          66
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p8_i12",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Start",
+        "bounds": [
+          504.8,
+          151,
+          384,
+          30
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p8_i14",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Two independent teams",
+        "bounds": [
+          512,
+          185,
+          384,
+          33
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p8_i16",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Expand",
+        "bounds": [
+          512,
+          243,
+          384,
+          30
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p8_i18",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Divisions and acquisitions",
+        "bounds": [
+          512,
+          277,
+          384,
+          33
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p8_i19",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Extend",
+        "bounds": [
+          512,
+          335,
+          384,
+          30
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s8_text_1",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Authorized partners",
+        "bounds": [
+          504.8,
+          361.8,
+          384,
+          33
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "m4_s8_text_2",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "8-week pilot: 2 baseline / 4 assisted / 2 analysis",
+        "bounds": [
+          496,
+          438,
+          416,
+          37
+        ],
+        "fontSize": 16,
+        "link": null
+      },
+      {
+        "id": "m4_s8_text_3",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Pricing and expansion hypotheses; commercial qualification plus technical readiness.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "v2_s7_text_1",
+        "action": "create",
+        "role": "source link",
+        "text": "Buyer, pilot charter and Base packaging · M1 / M2",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3dc8990715f4815a812bf2a9262ef282"
+      },
+      {
+        "id": "v2_s7_text_2",
+        "action": "create",
+        "role": "slide number",
+        "text": "07",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "p8:notes_i3",
+    "notes": "Economic buyer: CIO/CTO or technology-operations leader; application/platform champions. Founder-led discovery qualifies recurring pain, measurable operational cost, independent control, sponsor/budget access, baseline feasibility and expansion. Internal discovery priority 9/12 is provisional, not an evidence-based threshold. A pilot needs two independently administered instances, named owners, approved sharing, observable baseline and passed technical gates. Illustrative eight weeks: two baseline, four assisted, two analysis; calendar completion is not success if cases or thresholds are missing.\n£80,000 annual platform package for one account with two independently administered deployments remains an unvalidated price anchor. Additional deployments, onboarding and usage are separate hypotheses; Base includes no pilot/onboarding/overage receipts. Replicated copies are not separately billable new knowledge. M2 pilot funnel starts month 5 conditional on readiness, two pilot months and 50% conversion; net retention=(1−5% churn)×(1+45% retained expansion)=137.75%. Fractional accounts are expected values, not signed customers. Expansion to divisions, acquisitions and authorized partners is a strategy, not commitments.\nSources: https://app.notion.com/p/3dc8990715f4815a812bf2a9262ef282; https://app.notion.com/p/3dc8990715f4813fb281d4a8175c3d1a; London Assumptions!E12:E27 https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit; same shared assumptions in New York https://docs.google.com/spreadsheets/d/1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es/edit.\n\nRepository evidence checked 17 September 2026 at 54195f4. Concurrent uncommitted engineering is excluded.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "narrativeWords": 7
+  },
+  {
+    "number": 8,
+    "pageId": "p14",
+    "title": "Fund the next proof points",
+    "items": [
+      {
+        "id": "p14_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Fund the next proof points",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p14_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Olivier Van Acker · creator of Memory Layer",
+        "bounds": [
+          48,
+          126,
+          864,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p14_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Rust platform, MCP integration and evaluation tooling",
+        "bounds": [
+          48,
+          166,
+          864,
+          36
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p14_i6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Repeatable integrations",
+        "bounds": [
+          62,
+          230,
+          343,
+          41
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p14_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "Validate a Databricks connection end to end.",
+        "bounds": [
+          430,
+          230,
+          467,
+          41
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p14_i9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Measurable customer value",
+        "bounds": [
+          62,
+          295,
+          343,
+          41
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p14_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Measure quality and value in a qualified pilot.",
+        "bounds": [
+          430,
+          295,
+          467,
+          41
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p14_i12",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Viable delivery economics",
+        "bounds": [
+          62,
+          360,
+          343,
+          41
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p14_i13",
+        "action": "reuse",
+        "role": "body",
+        "text": "Validate cost, support and onboarding effort.",
+        "bounds": [
+          430,
+          360,
+          467,
+          41
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p14_i14",
+        "action": "reuse",
+        "role": "body",
+        "text": "Discuss the milestones and financing structure.",
+        "bounds": [
+          48,
+          439,
+          864,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p14_i15",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Planned: nine employees + fractional counsel. Round size follows scope and evidence.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "m4_s14_text_1",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Founder evidence and planned operating model",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "v2_s8_text_1",
+        "action": "create",
+        "role": "slide number",
+        "text": "08",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "p14:notes_i3",
+    "notes": "Founder credibility is based on shipped repository work: Olivier Van Acker created the Rust Memory Layer platform, code-graph retrieval, MCP integration and evaluation tooling. No invented career metrics, employer logos, candidate pipeline or team hiring commitment. Planned nine employees include founder plus a Head of Security & AI Governance; fractional counsel is external. Roles cover core/platform/retrieval engineering, deployment, enterprise/security, commercial and support. Assurance leadership owns preparation for ISO 27001, ISO 42001 and SOC 2 Type II; no certification or completed attestation claimed. Employee AI allowance £5,000/person/month at 50% utilisation; actual spend and throughput remain hypotheses. Financial details in appendix. Capital should demonstrate repeatable platform connections, customer-agreed quality and operating outcomes, and cost/onboarding economics. No fixed ask. The existing M2 scenarios do not establish the budget for universal connector coverage or Neuralese; scope and costing must precede a round-size decision. M3 and M5 remain open. Sources: repository README and implementation at snapshot; M2 model Team/Employee AI schedules; M1 pilot preparation.\n\nRepository evidence checked 17 September 2026 at 54195f4. Concurrent uncommitted engineering is excluded.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d\n\nNext proof points carried from slide 6: verify the proposed Databricks connection end to end, including permissions, exact-question consent, citations and recovery. Pass deployment, security, recovery and evaluation gates before customer operation. Then measure a qualified incident-handover pilot against agreed baseline/thresholds. M3/M5 must establish validation accuracy, missed source changes, review effort, validation-token costs and approved-correction reuse. These add evidence requirements, not a changed funding model or a claim of quality gain. Proactive human notification remains future work.",
+    "narrativeWords": 40
+  },
+  {
+    "number": 9,
+    "pageId": "m4_appendix_15",
+    "title": "Architecture today. Communication tomorrow.",
+    "items": [
+      {
+        "id": "m4_a15_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Architecture today. Communication tomorrow.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "m4_a15_i3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "ATProto foundation",
+        "bounds": [
+          63,
+          145,
+          388,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_a15_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Identity + signed records\nExtensible schemas and services",
+        "bounds": [
+          63,
+          196,
+          388,
+          60
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Memory governance",
+        "bounds": [
+          509,
+          141.4,
+          388,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Authorization + publication history\nPrivate Q&A through the gateway",
+        "bounds": [
+          509,
+          192.4,
+          388,
+          60
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Trust boundaries",
+        "bounds": [
+          48,
+          292,
+          864,
+          31
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Trusted gateway; authorized copies remain readable.\nRevocation cannot recall copies. Signatures do not establish truth.",
+        "bounds": [
+          48,
+          334,
+          864,
+          58
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_7",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Neuralese · future research",
+        "bounds": [
+          48,
+          408,
+          864,
+          31
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_8",
+        "action": "reuse",
+        "role": "body",
+        "text": "Machine-native agent communication: compatibility, evaluation and auditability first.",
+        "bounds": [
+          48,
+          447,
+          864,
+          33
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_9",
+        "action": "reuse",
+        "role": "source link",
+        "text": "ATProto specifications · Memory boundaries · Neuralese research",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "v2_s9_text_1",
+        "action": "create",
+        "role": "slide number",
+        "text": "09",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "SLIDES_API430531847_10",
+    "notes": "ATProto supplies stable identifiers, record schemas, signed repositories and synchronization; custom Lexicon services extend the protocol. It does not automatically supply enterprise policy, truth, immutable audit history or cross-model representation compatibility. Memory enforces authorization, reviewed publication/version history and disclosure. Private expertise Q&A uses the addressed gateway mailbox, outside the PDS, shared publication log and retrieval corpus. Gateway availability/enforcement are trusted dependencies. Authorized gateways/operators/recipients can read and retain content. Revocation denies subsequent gateway operations; already authorized in-flight work may complete and delivered copies cannot be recalled while local authorization permits reading.\nNative ATProto Spaces is upstream alpha; Codifix adoption remains deferred, and broader delegated execution remains future work. Do not portray these as completed or production ready.\nNeuralese is an application-level research direction: learned/latent inter-agent representations. ATProto can carry extensible data/messages but transport flexibility does not make heterogeneous model representations compatible. No latent-payload feature, token saving, superior quality or Neuralese security guarantee is implemented. Any experiment needs supported participant interfaces, representation compatibility, human-review/audit design, workload/cost and task-quality evaluation. Structured messages are not automatically Neuralese.\nSources: https://atproto.com/specs/lexicon; https://atproto.com/specs/xrpc; https://atproto.com/specs/did; https://atproto.com/specs/repository; https://atproto.com/specs/sync; https://atproto.com/blog/atproto-spaces-alpha; docs/developer/adr/0011-atproto-federation-adapter.md; docs/reviews/federation-first/f1-execution.md; docs/developer/architecture/federation-security.md; docs/future-development/federation-protocol-spike.md:106; https://aclanthology.org/P17-1022/ (Translating Neuralese, primary 2017 research).\n\nRepository evidence checked 17 September 2026 at 54195f4. Concurrent uncommitted engineering is excluded.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "narrativeWords": 40
+  },
+  {
+    "number": 10,
+    "pageId": "m4_appendix_18",
+    "title": "Operating model and funding scenarios",
+    "items": [
+      {
+        "id": "m4_a18_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Operating model and funding scenarios",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "m4_a18_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Planned: nine employees + fractional counsel; assurance lead included.",
+        "bounds": [
+          48,
+          365,
+          864,
+          32
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_a18_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "New York in common GBP: £3.65m at $1.3476/£. Alternative bases.",
+        "bounds": [
+          48,
+          408,
+          864,
+          33
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s18_text_2",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "AI headroom is cash. External assurance and broader connector/research costs need validation.",
+        "bounds": [
+          48,
+          453,
+          864,
+          44
+        ],
+        "fontSize": 16,
+        "link": null
+      },
+      {
+        "id": "m4_s18_text_3",
+        "action": "reuse",
+        "role": "source link",
+        "text": "M2 Base · live source check 17 Sep 2026 · ranges and limits in notes",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit"
+      },
+      {
+        "id": "m4_s18_text_4",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "10",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      }
+    ],
+    "notesId": "SLIDES_API430531847_1",
+    "notes": "These are alternative company bases serving the same global workload; never add them. All values are planning hypotheses, not a fundraising ask, hiring/spending commitment, customer evidence or assurance quote.\n\nLive verification, 17 September 2026, 12:37:56–12:37:59 UTC: both remain Base, M2-2026-09-15-v3-assurance, formula fingerprint fnv1a32:d74d6a28. Each location has 12,354 matching formulas, 371 inputs matching capture signatures, 25 matching Base outputs and 23 passing reconciliations; 304 shared inputs agree. Original captures remain 15 September at 20:38:21.652Z London / 20:38:16.635Z New York. This was verification, not a new scenario refresh.\n\nSource ranges in London / New York:\nSummary!B23 gross funding: £3,226,268.30 / $4,913,192.66.\nSummary!B22 net funding: £3,161,742.93 / $4,814,928.81; B24 financing fees: £64,525.37 / $98,263.85.\nSummary!B73 employee AI expense through month 24: £420,000 / $565,992. B74 earmarked AI cash headroom: the same amounts, additional retained cash rather than an expense.\nSummary!B25 operating cash outflows for months 25–27: £504,025.07 / $743,765.21. B27 month-24 closing cash: £924,025.07 / $1,309,757.21.\nSummary!B32 New York common-GBP funding: £3,645,883.54 at Assumptions!E11 planning FX $1.3476/£, dated 14 September 2026.\nSummary!B58 first-24-month counsel fees: £120,000 / $180,000. Team!B46 assurance lead annual salary: £130,000 / $190,000; AM46 hire month 3; AQ46 included. Summary!C18:E18 year-end staffing: 8 / 9 / 9, including founder; counsel is external.\n\nEmployee AI policy: Assumptions!E119 allowance £5,000 per person per month, E120 utilisation 50%, E121 subscription component £250. Expected expense £2,500 comprises £250 subscriptions plus £2,250 metered usage; do not charge included subscription usage twice. Employee AI!C9:C12 shows the policy. Allowance starts at hire; fractional counsel is excluded. Full-36-month expected spending and headroom are each £690,000 ($929,844), separately disclosed from the 24-month funding objective.\n\nHeadroom remains cash, not a second expense or supplier payment. Required net funding avoids negative cash through month 24 and retains months 25–27 operating outflows plus the first 24 months of unused AI allowance at month 24, with opening cash, financing timing and fees shown separately. This does not guarantee 36-month runway.\n\nFull initial and recurring external ISO 27001, ISO 42001 and SOC 2 Type II costs remain unquoted (Summary!B70; Assumptions!B130). No separately costed universal-adapter or Neuralese programme exists. Payroll/AI envelopes do not establish incremental engineering, compatibility, compute or support coverage. M3 must validate scope, packaging, provider rates, actual employee AI spend, throughput/rework, support capacity and legal/assurance quotes. M5 supplies customer evidence.\nWorkbooks: https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit\nhttps://docs.google.com/spreadsheets/d/1fT9Ta-IjX65NqwcRXFRJq5tW814aqje2Vha9YFfx2es/edit\nFinancial evidence: https://app.notion.com/p/3dc8990715f4813fb281d4a8175c3d1a.\n\nRepository evidence checked 17 September 2026 at 54195f4. Concurrent uncommitted engineering is excluded.\nDated compact-v2 evidence: https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "narrativeWords": 19
+  }
+]

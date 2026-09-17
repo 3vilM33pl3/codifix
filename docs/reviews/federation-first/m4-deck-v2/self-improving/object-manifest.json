@@ -1,0 +1,2546 @@
+[
+  {
+    "number": 1,
+    "pageId": "p1",
+    "elements": [
+      {
+        "id": "p1_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Infrastructure for the\nAgentic Enterprise",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p1_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Codifix is the plumbing and electrical wiring\nfor the Agentic Enterprise.",
+        "bounds": [
+          48,
+          163,
+          850,
+          98
+        ],
+        "fontSize": 30,
+        "link": null
+      },
+      {
+        "id": "p1_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Your platforms keep their interfaces.\nCodifix does the integration.",
+        "bounds": [
+          48,
+          309,
+          850,
+          81
+        ],
+        "fontSize": 25,
+        "link": null
+      },
+      {
+        "id": "m4_s1_text_1",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Connect existing AI platforms, agents and enterprise expertise.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "m4_s1_text_2",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Infrastructure vision · evidence and boundaries",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "m4_s1_text_3",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "01",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "p1_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p1_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 2,
+    "pageId": "p2",
+    "elements": [
+      {
+        "id": "p2_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Great AI platforms.\nA disconnected enterprise.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "m4_s2_box_3",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          161,
+          358,
+          183
+        ]
+      },
+      {
+        "id": "p2_i3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Application team",
+        "bounds": [
+          66,
+          180,
+          322,
+          40
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p2_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "AI platform + agents\nChange history and symptoms",
+        "bounds": [
+          66,
+          242,
+          322,
+          83
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_box_1",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          554,
+          161,
+          358,
+          183
+        ]
+      },
+      {
+        "id": "m4_s2_text_2",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Platform team",
+        "bounds": [
+          572,
+          176.4,
+          322,
+          40
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_4",
+        "action": "reuse",
+        "role": "body",
+        "text": "AI platform + agents\nRunbooks and infrastructure context",
+        "bounds": [
+          572,
+          238.4,
+          322,
+          83
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_edge_6",
+        "action": "reuse",
+        "role": "connector",
+        "endpoints": [
+          420,
+          254,
+          540,
+          254
+        ]
+      },
+      {
+        "id": "m4_s2_text_5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Handover",
+        "bounds": [
+          416,
+          211,
+          126,
+          33
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_7",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Context stays local",
+        "bounds": [
+          48,
+          390,
+          284,
+          66
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Connections rebuilt",
+        "bounds": [
+          351,
+          390,
+          265,
+          66
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Controls rechecked",
+        "bounds": [
+          652,
+          390,
+          271,
+          66
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_10",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Illustrative problem to validate in discovery.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "m4_s2_text_11",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Buyer and incident-handover hypothesis · M1",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3dc8990715f4815a812bf2a9262ef282"
+      },
+      {
+        "id": "m4_s2_text_12",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "02",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "p2_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p2_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_s2_text_13",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": "02\n"
+      }
+    ]
+  },
+  {
+    "number": 3,
+    "pageId": "p4",
+    "elements": [
+      {
+        "id": "p4_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Your platforms keep their interfaces.\nCodifix connects them.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "m4_s4_box_2",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          151,
+          326,
+          282
+        ]
+      },
+      {
+        "id": "p4_i3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Application unit",
+        "bounds": [
+          65,
+          167,
+          292,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p4_i4",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Existing platform + agents\nNative APIs / MCP",
+        "bounds": [
+          65,
+          221,
+          292,
+          64
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "m4_s4_box_1",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          65,
+          301,
+          292,
+          46
+        ]
+      },
+      {
+        "id": "p4_i5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Codifix adapter",
+        "bounds": [
+          72,
+          306,
+          275,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s4_edge_4",
+        "action": "reuse",
+        "role": "connector",
+        "endpoints": [
+          211,
+          283,
+          211,
+          298
+        ]
+      },
+      {
+        "id": "p4_i6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Own knowledge\nOwn administration",
+        "bounds": [
+          65,
+          362,
+          292,
+          62
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "v2_s3_box_1",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          586,
+          151,
+          326,
+          282
+        ]
+      },
+      {
+        "id": "m4_s4_text_3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Platform unit",
+        "bounds": [
+          603,
+          163.4,
+          292,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s4_text_6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Existing platform + agents\nNative APIs / MCP",
+        "bounds": [
+          603,
+          217.4,
+          292,
+          64
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "v2_s3_box_2",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          603,
+          301,
+          292,
+          46
+        ]
+      },
+      {
+        "id": "m4_s4_text_7",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Codifix adapter",
+        "bounds": [
+          610,
+          302.4,
+          275,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s4_edge_5",
+        "action": "reuse",
+        "role": "connector",
+        "endpoints": [
+          749,
+          283,
+          749,
+          298
+        ]
+      },
+      {
+        "id": "m4_s4_text_8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Own knowledge\nOwn administration",
+        "bounds": [
+          603,
+          354.8,
+          292,
+          62
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "m4_s4_text_9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Authorized exchange\nMemory gateway",
+        "bounds": [
+          382,
+          192,
+          196,
+          76
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "v2_s3_edge_3",
+        "action": "create",
+        "role": "connector",
+        "endpoints": [
+          389,
+          311,
+          571,
+          311
+        ]
+      },
+      {
+        "id": "v2_s3_edge_4",
+        "action": "create",
+        "role": "connector",
+        "endpoints": [
+          571,
+          333,
+          389,
+          333
+        ]
+      },
+      {
+        "id": "v2_s3_text_5",
+        "action": "create",
+        "role": "diagram label",
+        "text": "ATProto identity\nSigned repositories",
+        "bounds": [
+          382,
+          359,
+          196,
+          65
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "v2_s3_text_6",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Architecture direction: Codifix builds adapters and maps permissions.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "v2_s3_text_7",
+        "action": "create",
+        "role": "source link",
+        "text": "Adapter architecture · ATProto Lexicon",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://atproto.com/specs/lexicon"
+      },
+      {
+        "id": "v2_s3_text_8",
+        "action": "create",
+        "role": "slide number",
+        "text": "03",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "p4_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i11",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p4_i12",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 4,
+    "pageId": "p5",
+    "elements": [
+      {
+        "id": "p5_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Databricks plugs into the network",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p5_i4",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Proposed integration using supported interfaces",
+        "bounds": [
+          48,
+          112,
+          864,
+          40
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "p5_i22",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          176,
+          252,
+          143
+        ]
+      },
+      {
+        "id": "p5_i5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Databricks agent",
+        "bounds": [
+          61,
+          192,
+          226,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p5_i6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Native MCP\nIncident question",
+        "bounds": [
+          61,
+          248,
+          226,
+          63
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p5_i18",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          354,
+          176,
+          252,
+          143
+        ]
+      },
+      {
+        "id": "p5_i7",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Codifix",
+        "bounds": [
+          367,
+          192,
+          226,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p5_i9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Adapter + controls\nPermitted request",
+        "bounds": [
+          367,
+          248,
+          226,
+          63
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p5_i15",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          660,
+          176,
+          252,
+          143
+        ]
+      },
+      {
+        "id": "p5_i10",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Platform expertise",
+        "bounds": [
+          673,
+          192,
+          226,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p5_i12",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Private Q&A\nReviewed sources",
+        "bounds": [
+          673,
+          248,
+          226,
+          63
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "m4_s5_edge_1",
+        "action": "reuse",
+        "role": "connector",
+        "endpoints": [
+          312,
+          247,
+          342,
+          247
+        ]
+      },
+      {
+        "id": "m4_s5_edge_2",
+        "action": "reuse",
+        "role": "connector",
+        "endpoints": [
+          618,
+          247,
+          648,
+          247
+        ]
+      },
+      {
+        "id": "m4_s5_edge_3",
+        "action": "reuse",
+        "role": "connector",
+        "endpoints": [
+          782,
+          338,
+          178,
+          338
+        ]
+      },
+      {
+        "id": "p5_i13",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Cited answer returns to the existing agent",
+        "bounds": [
+          215,
+          346,
+          551,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p5_i14",
+        "action": "reuse",
+        "role": "body",
+        "text": "Payment latency: check the permitted runbook.\nA responder acts; the source team reviews corrections for later reuse.",
+        "bounds": [
+          48,
+          397,
+          864,
+          66
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p5_i16",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "No platform rewrite or ATProto adoption. Connector configuration still required.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "p5_i17",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Databricks external MCP documentation · integration not yet verified",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://docs.databricks.com/aws/en/ai-gateway/register-mcp-service"
+      },
+      {
+        "id": "p5_i19",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "04",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "p5_i11",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": ""
+      },
+      {
+        "id": "p5_i8",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": ""
+      },
+      {
+        "id": "p5_i3",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": ""
+      },
+      {
+        "id": "p5_i20",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": "Components implemented; end-to-end customer improvement still requires a measured pilot.\n"
+      },
+      {
+        "id": "p5_i21",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": "Federation / private Q&A evidence · 11 September 2026\n"
+      },
+      {
+        "id": "p5_i23",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": "05\n"
+      },
+      {
+        "id": "p5_i29",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i30",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i31",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i32",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i33",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p5_i34",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_s5_edge_4",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": ""
+      },
+      {
+        "id": "m4_s5_edge_5",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": ""
+      }
+    ]
+  },
+  {
+    "number": 5,
+    "pageId": "p6",
+    "elements": [
+      {
+        "id": "p6_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Self-improving knowledge,\nwith human control",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_box_1",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          145,
+          258,
+          82
+        ]
+      },
+      {
+        "id": "p6_i4",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Prioritize",
+        "bounds": [
+          58,
+          152,
+          238,
+          35
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Usage + source volatility",
+        "bounds": [
+          58,
+          194,
+          238,
+          30
+        ],
+        "fontSize": 17,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_box_2",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          350,
+          145,
+          258,
+          82
+        ]
+      },
+      {
+        "id": "p6_i6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Gather evidence",
+        "bounds": [
+          360,
+          152,
+          238,
+          35
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Recorded sources + history",
+        "bounds": [
+          360,
+          194,
+          238,
+          30
+        ],
+        "fontSize": 17,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_box_3",
+        "action": "create",
+        "role": "semantic panel",
+        "bounds": [
+          654,
+          145,
+          258,
+          82
+        ]
+      },
+      {
+        "id": "p6_i9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Decide",
+        "bounds": [
+          664,
+          152,
+          238,
+          35
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i11",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Evidence + confidence",
+        "bounds": [
+          664,
+          194,
+          238,
+          30
+        ],
+        "fontSize": 17,
+        "link": null
+      },
+      {
+        "id": "m4_s6_edge_1",
+        "action": "reuse",
+        "role": "connector",
+        "endpoints": [
+          312,
+          178,
+          342,
+          178
+        ]
+      },
+      {
+        "id": "m4_s6_edge_2",
+        "action": "reuse",
+        "role": "connector",
+        "endpoints": [
+          612,
+          178,
+          646,
+          178
+        ]
+      },
+      {
+        "id": "v2r2_s5_edge_4",
+        "action": "create",
+        "role": "rule",
+        "endpoints": [
+          783,
+          228,
+          783,
+          246
+        ]
+      },
+      {
+        "id": "v2r2_s5_edge_5",
+        "action": "create",
+        "role": "rule",
+        "endpoints": [
+          172,
+          246,
+          783,
+          246
+        ]
+      },
+      {
+        "id": "v2r2_s5_edge_6",
+        "action": "create",
+        "role": "connector",
+        "endpoints": [
+          172,
+          246,
+          172,
+          263
+        ]
+      },
+      {
+        "id": "v2r2_s5_edge_7",
+        "action": "create",
+        "role": "connector",
+        "endpoints": [
+          477,
+          246,
+          477,
+          263
+        ]
+      },
+      {
+        "id": "v2r2_s5_edge_8",
+        "action": "create",
+        "role": "connector",
+        "endpoints": [
+          783,
+          246,
+          783,
+          263
+        ]
+      },
+      {
+        "id": "p6_i12",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Reconfirm",
+        "bounds": [
+          48,
+          273,
+          258,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i14",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Supported knowledge",
+        "bounds": [
+          48,
+          315,
+          258,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p6_i15",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Flag uncertainty",
+        "bounds": [
+          350,
+          273,
+          258,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p6_i17",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Insufficient evidence",
+        "bounds": [
+          350,
+          315,
+          258,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_9",
+        "action": "create",
+        "role": "diagram label",
+        "text": "Review a correction",
+        "bounds": [
+          654,
+          273,
+          270,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_10",
+        "action": "create",
+        "role": "diagram label",
+        "text": "New version",
+        "bounds": [
+          654,
+          315,
+          258,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_edge_11",
+        "action": "create",
+        "role": "connector",
+        "endpoints": [
+          672,
+          351,
+          672,
+          371
+        ]
+      },
+      {
+        "id": "v2r2_s5_text_12",
+        "action": "create",
+        "role": "diagram label",
+        "text": "Reuse later",
+        "bounds": [
+          654,
+          374,
+          258,
+          35
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_edge_13",
+        "action": "create",
+        "role": "rule",
+        "endpoints": [
+          477,
+          354,
+          477,
+          412
+        ],
+        "dashStyle": "DASH"
+      },
+      {
+        "id": "v2r2_s5_text_14",
+        "action": "create",
+        "role": "roadmap label",
+        "text": "Next: notify the responsible human.",
+        "bounds": [
+          48,
+          422,
+          864,
+          35
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_15",
+        "action": "create",
+        "role": "evidence label",
+        "text": "Implemented and configurable. Quality improvement remains to be measured.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_text_16",
+        "action": "create",
+        "role": "source link",
+        "text": "Knowledge maintenance, evidence and review boundaries",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "v2r2_s5_text_17",
+        "action": "create",
+        "role": "slide number",
+        "text": "05",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "p6_i33",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i34",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i35",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i36",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i37",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p6_i38",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 6,
+    "pageId": "p12",
+    "elements": [
+      {
+        "id": "p12_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Connected context. Portable memory.\nTraceable corrections.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p12_i5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Connected retrieval",
+        "bounds": [
+          48,
+          157,
+          303,
+          65
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p12_i6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Meaning, keywords and code relationships\nfind relevant context.",
+        "bounds": [
+          374,
+          157,
+          538,
+          69
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p12_i8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Portable memory",
+        "bounds": [
+          48,
+          260,
+          303,
+          65
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p12_i9",
+        "action": "reuse",
+        "role": "body",
+        "text": "Knowledge persists across supported agent clients\nand embedding-model changes.",
+        "bounds": [
+          374,
+          260,
+          538,
+          69
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p12_i11",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Traceable corrections",
+        "bounds": [
+          48,
+          363,
+          303,
+          65
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p12_i12",
+        "action": "reuse",
+        "role": "body",
+        "text": "Sources, version history and review decisions\nremain connected.",
+        "bounds": [
+          374,
+          363,
+          538,
+          69
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p12_i14",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Implemented strengths. Their combined customer value remains to be measured.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "p12_i15",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Retrieval, embedding spaces, review and evaluation evidence",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "p12_i17",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "06",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "p12_i18",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": "Controlled evidence does not establish customer readiness or quality improvement.\n"
+      },
+      {
+        "id": "p12_i20",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": "Dated implementation and R3 evaluation evidence\n"
+      },
+      {
+        "id": "p12_i21",
+        "action": "delete",
+        "reason": "Unused exemplar content or structure in compact narrative",
+        "oldText": "06\n"
+      },
+      {
+        "id": "p12_i29",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i30",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i31",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i32",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i33",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p12_i34",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 7,
+    "pageId": "p8",
+    "elements": [
+      {
+        "id": "p8_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Start with two teams.\nExpand across the enterprise.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p8_i4",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Buyer",
+        "bounds": [
+          48,
+          143,
+          369,
+          31
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "p8_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "CIO / CTO",
+        "bounds": [
+          48,
+          183,
+          371,
+          42
+        ],
+        "fontSize": 25,
+        "link": null
+      },
+      {
+        "id": "p8_i8",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Champions",
+        "bounds": [
+          48,
+          257,
+          369,
+          31
+        ],
+        "fontSize": 18,
+        "link": null
+      },
+      {
+        "id": "p8_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Application + platform leaders",
+        "bounds": [
+          48,
+          297,
+          376,
+          65
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p8_i11",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "£80k / year · two deployments",
+        "bounds": [
+          48,
+          395,
+          406,
+          66
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p8_i15",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          496,
+          145,
+          416,
+          79
+        ]
+      },
+      {
+        "id": "p8_i12",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Start",
+        "bounds": [
+          504.8,
+          151,
+          384,
+          30
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p8_i14",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Two independent teams",
+        "bounds": [
+          512,
+          185,
+          384,
+          33
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p8_i13",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          496,
+          237,
+          416,
+          79
+        ]
+      },
+      {
+        "id": "p8_i16",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Expand",
+        "bounds": [
+          512,
+          243,
+          384,
+          30
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p8_i18",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Divisions and acquisitions",
+        "bounds": [
+          512,
+          277,
+          384,
+          33
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p8_i9",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          496,
+          329,
+          416,
+          79
+        ]
+      },
+      {
+        "id": "p8_i19",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Extend",
+        "bounds": [
+          512,
+          335,
+          384,
+          30
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s8_text_1",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Authorized partners",
+        "bounds": [
+          504.8,
+          361.8,
+          384,
+          33
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "m4_s8_text_2",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "8-week pilot: 2 baseline / 4 assisted / 2 analysis",
+        "bounds": [
+          496,
+          438,
+          416,
+          37
+        ],
+        "fontSize": 16,
+        "link": null
+      },
+      {
+        "id": "m4_s8_text_3",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Pricing and expansion hypotheses; commercial qualification plus technical readiness.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "v2_s7_text_1",
+        "action": "create",
+        "role": "source link",
+        "text": "Buyer, pilot charter and Base packaging · M1 / M2",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3dc8990715f4815a812bf2a9262ef282"
+      },
+      {
+        "id": "v2_s7_text_2",
+        "action": "create",
+        "role": "slide number",
+        "text": "07",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "p8_i20",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i21",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i22",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i23",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i24",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p8_i25",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 8,
+    "pageId": "p14",
+    "elements": [
+      {
+        "id": "p14_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Fund the next proof points",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "p14_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Olivier Van Acker · creator of Memory Layer",
+        "bounds": [
+          48,
+          126,
+          864,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p14_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Rust platform, MCP integration and evaluation tooling",
+        "bounds": [
+          48,
+          166,
+          864,
+          36
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p14_i11",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          222,
+          864,
+          54
+        ]
+      },
+      {
+        "id": "p14_i6",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Repeatable integrations",
+        "bounds": [
+          62,
+          230,
+          343,
+          41
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p14_i7",
+        "action": "reuse",
+        "role": "body",
+        "text": "Validate a Databricks connection end to end.",
+        "bounds": [
+          430,
+          230,
+          467,
+          41
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p14_i8",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          287,
+          864,
+          54
+        ]
+      },
+      {
+        "id": "p14_i9",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Measurable customer value",
+        "bounds": [
+          62,
+          295,
+          343,
+          41
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p14_i10",
+        "action": "reuse",
+        "role": "body",
+        "text": "Measure quality and value in a qualified pilot.",
+        "bounds": [
+          430,
+          295,
+          467,
+          41
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p14_i5",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          352,
+          864,
+          54
+        ]
+      },
+      {
+        "id": "p14_i12",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Viable delivery economics",
+        "bounds": [
+          62,
+          360,
+          343,
+          41
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "p14_i13",
+        "action": "reuse",
+        "role": "body",
+        "text": "Validate cost, support and onboarding effort.",
+        "bounds": [
+          430,
+          360,
+          467,
+          41
+        ],
+        "fontSize": 20,
+        "link": null
+      },
+      {
+        "id": "p14_i14",
+        "action": "reuse",
+        "role": "body",
+        "text": "Discuss the milestones and financing structure.",
+        "bounds": [
+          48,
+          439,
+          864,
+          37
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "p14_i15",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "Planned: nine employees + fractional counsel. Round size follows scope and evidence.",
+        "bounds": [
+          48,
+          472,
+          864,
+          30
+        ],
+        "fontSize": 15,
+        "link": null
+      },
+      {
+        "id": "m4_s14_text_1",
+        "action": "reuse",
+        "role": "source link",
+        "text": "Founder evidence and planned operating model",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "v2_s8_text_1",
+        "action": "create",
+        "role": "slide number",
+        "text": "08",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "p14_i16",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i17",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i18",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i19",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i20",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "p14_i21",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 9,
+    "pageId": "m4_appendix_15",
+    "elements": [
+      {
+        "id": "m4_a15_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Architecture today. Communication tomorrow.",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "m4_s15_box_2",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          48,
+          133,
+          418,
+          132
+        ]
+      },
+      {
+        "id": "m4_a15_i3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "ATProto foundation",
+        "bounds": [
+          63,
+          145,
+          388,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_a15_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Identity + signed records\nExtensible schemas and services",
+        "bounds": [
+          63,
+          196,
+          388,
+          60
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s15_box_1",
+        "action": "reuse",
+        "role": "semantic panel",
+        "bounds": [
+          494,
+          133,
+          418,
+          132
+        ]
+      },
+      {
+        "id": "m4_s15_text_3",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Memory governance",
+        "bounds": [
+          509,
+          141.4,
+          388,
+          38
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_4",
+        "action": "reuse",
+        "role": "body",
+        "text": "Authorization + publication history\nPrivate Q&A through the gateway",
+        "bounds": [
+          509,
+          192.4,
+          388,
+          60
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_5",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Trust boundaries",
+        "bounds": [
+          48,
+          292,
+          864,
+          31
+        ],
+        "fontSize": 21,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_6",
+        "action": "reuse",
+        "role": "body",
+        "text": "Trusted gateway; authorized copies remain readable.\nRevocation cannot recall copies. Signatures do not establish truth.",
+        "bounds": [
+          48,
+          334,
+          864,
+          58
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_7",
+        "action": "reuse",
+        "role": "diagram label",
+        "text": "Neuralese · future research",
+        "bounds": [
+          48,
+          408,
+          864,
+          31
+        ],
+        "fontSize": 22,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_8",
+        "action": "reuse",
+        "role": "body",
+        "text": "Machine-native agent communication: compatibility, evaluation and auditability first.",
+        "bounds": [
+          48,
+          447,
+          864,
+          33
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s15_text_9",
+        "action": "reuse",
+        "role": "source link",
+        "text": "ATProto specifications · Memory boundaries · Neuralese research",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d"
+      },
+      {
+        "id": "v2_s9_text_1",
+        "action": "create",
+        "role": "slide number",
+        "text": "09",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "m4_a15_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a15_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  },
+  {
+    "number": 10,
+    "pageId": "m4_appendix_18",
+    "elements": [
+      {
+        "id": "m4_a18_i2",
+        "action": "reuse",
+        "role": "title",
+        "text": "Operating model and funding scenarios",
+        "bounds": [
+          48,
+          37,
+          864,
+          86
+        ],
+        "fontSize": 32,
+        "link": null
+      },
+      {
+        "id": "m4_s18_table_1",
+        "action": "reuse",
+        "role": "native financial table",
+        "values": [
+          [
+            "24-month funding objective",
+            "London · GBP",
+            "New York · USD"
+          ],
+          [
+            "Gross funding requirement",
+            "£3.23m",
+            "$4.91m"
+          ],
+          [
+            "Expected employee AI spend",
+            "£420k",
+            "$566k"
+          ],
+          [
+            "AI headroom retained as cash",
+            "£420k",
+            "$566k"
+          ],
+          [
+            "M25–27 operating buffer",
+            "£504k",
+            "$744k"
+          ]
+        ],
+        "bounds": [
+          48,
+          124,
+          864,
+          221
+        ]
+      },
+      {
+        "id": "m4_a18_i3",
+        "action": "reuse",
+        "role": "body",
+        "text": "Planned: nine employees + fractional counsel; assurance lead included.",
+        "bounds": [
+          48,
+          365,
+          864,
+          32
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_a18_i4",
+        "action": "reuse",
+        "role": "body",
+        "text": "New York in common GBP: £3.65m at $1.3476/£. Alternative bases.",
+        "bounds": [
+          48,
+          408,
+          864,
+          33
+        ],
+        "fontSize": 19,
+        "link": null
+      },
+      {
+        "id": "m4_s18_text_2",
+        "action": "reuse",
+        "role": "evidence label",
+        "text": "AI headroom is cash. External assurance and broader connector/research costs need validation.",
+        "bounds": [
+          48,
+          453,
+          864,
+          44
+        ],
+        "fontSize": 16,
+        "link": null
+      },
+      {
+        "id": "m4_s18_text_3",
+        "action": "reuse",
+        "role": "source link",
+        "text": "M2 Base · live source check 17 Sep 2026 · ranges and limits in notes",
+        "bounds": [
+          48,
+          507,
+          720,
+          20
+        ],
+        "fontSize": 10,
+        "link": "https://docs.google.com/spreadsheets/d/1PIUTGbZ2a-7sXsxAl6wbChJVTeKN8Q2K2rv1LRcBbO0/edit"
+      },
+      {
+        "id": "m4_s18_text_4",
+        "action": "reuse",
+        "role": "slide number",
+        "text": "10",
+        "bounds": [
+          780,
+          506,
+          32,
+          21
+        ],
+        "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "m4_a18_i5",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i6",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i7",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i8",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i9",
+        "action": "keep",
+        "role": "Codifix native logo"
+      },
+      {
+        "id": "m4_a18_i10",
+        "action": "keep",
+        "role": "Codifix native logo"
+      }
+    ]
+  }
+]

@@ -34,3 +34,11 @@ Every material number is a model value, dated development result or explicitly i
 The technical reviewer requested an explicit visible distinction on slide 3: exchange through the Memory gateway; ATProto identity/signed repositories underneath. This was incorporated before native publication. Final review found no further material claim issues. Detailed R3 results remain in slide 6 notes and this register, avoiding a misleading headline quality metric.
 
 M3 remains open for observed employee AI expenditure, accepted engineering throughput, review/rework, delivery capacity, provider/workload cost, integration maintenance, packaging and legal/assurance quotes. M5 remains open for customers, sponsorship, measured quality, correction reuse, operational value and comparable pilot evidence. The Tom meeting has not happened; the briefing is research only. No investor endorsement, traction, partner commitment or certification is implied.
+
+## 17 September self-improving revision
+
+The current deck replaces slides 5–6 with knowledge maintenance and three product strengths. The [dated extension and four-case checks](self-improving/evidence-and-handoff.md) are authoritative for those revised slides; the rows above retain the initial compact edition's evidence history. Original slide-5 value statements remain hypotheses in supporting notes. Integration/pilot milestones moved into slide 8. Relevant implementation re-read at `5827aeb` on 17 September, 14:17:57 BST.
+
+New claims distinguish eligible volatility-based rechecking, bounded supporting evidence, uncertainty flags, authorized correction review and immutable versions. Proactive notification is visibly future work. Connected retrieval requires extracted code graphs/populated embeddings; portability is limited to supported interfaces and populated embedding spaces. The combination is distinctive product positioning, not competitor exclusivity. There is no measured autonomous-quality claim.
+
+M3/M5 now additionally require validation accuracy, missed changes, reviewer effort, validation-token cost and correction reuse with explicit denominators and independent outcome evidence. See the extension's reusable handoff table.
