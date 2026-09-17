@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, writeFile, rm, lstat, open } from 'node:fs/promises';
 import { join, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const url = new URL(process.env.MEMORY_SUPERVISOR_REHEARSAL_URL ?? '');
@@ -26,6 +27,8 @@ try {
   assert.equal(cli.execution,'not_integrated');
   assert.equal(cli.snapshot.policy.enabled,false);
   assert.equal(cli.snapshot.journal[0].event,'policy_installed');
+  const pty=JSON.parse(execFileSync('python3',[fileURLToPath(new URL('../../scripts/tests/supervisor-pty.py',import.meta.url)),binary,config,instance],{env,timeout:20000,encoding:'utf8',cwd:privateDir}));
+  assert.equal(pty.tui_pty,'passed');
   browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:1280,height:900},serviceWorkers:'block'});
   // This read-only rehearsal has no need for any other network destination.
@@ -63,7 +66,7 @@ try {
   }
   await page.getByRole('button',{name:'Help',exact:true}).click();
   await page.getByText('Supervisor Help',{exact:true}).waitFor();
-  console.log(JSON.stringify({browser:'passed',cli:'passed',api_database_binding:'matched',worker_activated:false,screenshot}));
+  console.log(JSON.stringify({browser:'passed',cli:'passed',tui_pty:pty.tui_pty,api_database_binding:'matched',worker_activated:false,screenshot}));
 } finally {
   await browser?.close();
   await rm(privateDir,{recursive:true,force:true});

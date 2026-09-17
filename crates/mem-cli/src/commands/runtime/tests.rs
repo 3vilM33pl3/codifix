@@ -931,7 +931,7 @@ fn restart_notice_ignores_prod_marker_for_dev_tui() {
 }
 
 #[test]
-fn packaging_hooks_restart_services_and_mark_tui_restart() {
+fn debian_stays_opt_in_while_existing_macos_hooks_mark_restarts() {
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
@@ -940,7 +940,9 @@ fn packaging_hooks_restart_services_and_mark_tui_restart() {
     let pkg = fs::read_to_string(workspace.join("packaging/build-pkg.sh")).unwrap();
     let formula = fs::read_to_string(workspace.join("Formula/memory-layer.rb")).unwrap();
 
-    for contents in [postinst, pkg, formula] {
+    assert!(!postinst.contains("service restart-all"));
+    assert!(!postinst.contains("ensure-api-token"));
+    for contents in [pkg, formula] {
         assert!(contents.contains("service restart-all"));
         assert!(contents.contains("--mark-tui-restart"));
     }

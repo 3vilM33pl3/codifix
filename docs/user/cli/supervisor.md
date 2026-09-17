@@ -42,3 +42,14 @@ These surfaces do not expose questions, private proposals, source text, evidence
 bytes, model prompts or provider bodies. They never invoke a model or mutate
 policy. Pause/resume, approvals, supervisor chat and actual scheduling remain
 separate implementation work, not implied by this read-only panel.
+
+## Disposable verification
+
+The ignored service test `supervisor_real_browser_cli_rehearsal` creates its own
+synthetic PostgreSQL database, paused policy and read-only service on an allocated
+loopback port. It runs the real CLI, TUI through a PTY, and built Web UI through
+Playwright, verifies their durable identity against storage, then confirms no
+actions were created. It requires built Web assets, a TUI-enabled CLI, Chromium,
+Python 3 with `pexpect`, and the explicitly configured disposable test database.
+Set `MEMORY_SUPERVISOR_REHEARSAL_CLI` to that CLI's absolute path before running
+the test with `--ignored --nocapture`. Never point it at an existing deployment.

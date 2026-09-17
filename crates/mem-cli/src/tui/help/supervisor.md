@@ -1,15 +1,26 @@
 # Area supervisor
 
+## Purpose
+
 This view is local and instance-wide, not scoped by the project selector. It
 requires global memory_read. It never enrolls peers, changes policy or calls a
 model. An enabled policy is not evidence of an active worker: this build reports
 execution not integrated.
+
+## Layout
+
+The panel shows the durable area identity, policy revision, exact budget totals
+and committed metadata history. It never shows private prompts or source text.
+
+## Controls
 
 - `r`: refresh current history page, clearing stale state before the request.
 - `PageDown`: read the next committed history page, if available.
 - `Home`: return to the first history page.
 - `j` / `k` or down/up arrows: scroll.
 - `h` / `Esc`: shared help controls; Tab/Shift+Tab change tabs.
+
+## Workflows
 
 The journal contains IDs, event codes and timestamps, not private questions,
 sources, prompts or proposal contents. Budgets show UTC accounting days and exact
