@@ -41,6 +41,25 @@ pub struct ProposalExecution {
 }
 
 impl OpenAiTransport {
+    /// Narrow Pi ingress: validate the exact prepared input before token counting
+    /// or journal writes, then use Memory's frozen upstream profile and existing
+    /// durable one-shot execution. Never forward Pi's body/headers or trust its
+    /// usage report. A caller still needs authenticated, sandboxed ingress and
+    /// current source/project/model-destination consent. Completed replay is
+    /// recovered through scoped private-proposal reads, never another send.
+    pub async fn execute_pi_and_persist(
+        &self,
+        store: &SupervisorStore,
+        lease: &LeaseClaim,
+        execution: &ProposalExecution,
+        request: &PreparedRequest,
+        pi_body: &[u8],
+    ) -> Result<mem_supervisor_store::PrivateProposal, TransportError> {
+        crate::pi_admission::PiAdmission::new(request).validate(pi_body)?;
+        self.execute_and_persist(store, lease, execution, request)
+            .await
+    }
+
     /// Execute once, then persist the private suggestion and its completed
     /// action together. The caller must authorize this exact project and retain
     /// reviewed source/version bindings independently of the metadata journal.
@@ -360,6 +379,8 @@ fn digest_hex(s: &str) -> Result<[u8; 32], TransportError> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum TransportError {
+    #[error(transparent)]
+    PiAdmission(#[from] crate::pi_admission::PiAdmissionError),
     #[error("normal OpenAI credential is unavailable or invalid")]
     CredentialUnavailable,
     #[error("approved model transport is unavailable")]

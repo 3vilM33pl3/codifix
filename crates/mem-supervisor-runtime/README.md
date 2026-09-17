@@ -84,3 +84,39 @@ result denial after revocation, durable private recovery and wrong-project/area
 read denial. Missing projects, wrong instance IDs, attempts to rebind a project's
 input and revocation during token counting fail closed. No real credential or
 provider is used.
+
+## Pi request admission (not a running proxy)
+
+`pi_admission::PiAdmission` supplies the exact single-message prompt and fixed
+system instructions for an isolated pinned Pi process. Its validator rejects
+requests over 256 KiB, malformed/duplicate JSON, unknown fields, changed inputs,
+history, files/images, tool declarations, provider storage and model/options
+overrides. Empty or absent `tools` is accepted; explicit null is not. Disable Pi
+cache-affinity metadata with `PI_CACHE_RETENTION=none`; session identifiers are
+not approved context. Only the pinned app's canonical English date suffix is
+accepted, then discarded. The suffix is never a trusted clock or model input.
+
+`OpenAiTransport::execute_pi_and_persist` performs that validation before token
+counting or journal mutation, then uses the existing durable execution path.
+It sends the original immutable `PreparedRequest`, **never** Pi's bytes or headers.
+This is an intentional restricted profile translation, not a transparent OpenAI
+proxy: Pi requests streaming with its thinking control off; Memory alone fixes
+low reasoning, strict proposal JSON, no tools/storage and non-streaming upstream.
+Authoritative provider usage is settled independently of Pi. No synthetic usage
+is invented for a paid response, and no streaming-response adapter exists yet.
+
+Required-database fake-provider tests cover rejection without side effects,
+exact upstream payloads, concurrent duplicate admission, durable private result
+recovery, cross-project/area denial, revocation during counting/generation and
+uncertain billing without reissue. Concurrent valid requests can both reach the
+counter before reservation; only one generation can consume a send permit. Do
+not claim exactly-once token counting. Attempts/leases remain trusted caller
+bindings, not values supplied by Pi.
+
+This in-process API is not a listening HTTP server, authenticated ingress, an
+egress sandbox, a scheduler, or source/destination disclosure authorization. A
+future broker must enforce those boundaries and validate current reviewed-source
+eligibility before disclosing even to the counter, and again before accepting
+results. Pi production execution remains disabled; these tests use synthetic
+input and fake providers only. The Pi crate uses the validator as a **test-only**
+dependency, so its production process adapter still has no SQL/provider client.

@@ -54,6 +54,8 @@ async fn count(State(s): State<Fake>, headers: HeaderMap, Json(body): Json<Value
     assert_eq!(body["model"], DEFAULT_MODEL);
     assert_eq!(body["tools"], json!([]));
     assert!(body.get("previous_response_id").is_none());
+    // Pi's date decoration/client profile must never be forwarded upstream.
+    assert_eq!(body, request().count_body());
     s.count.fetch_add(1, Ordering::SeqCst);
     if matches!(s.mode, Mode::RevokeDuringCount) {
         s.store
@@ -70,6 +72,7 @@ async fn generate(State(s): State<Fake>, headers: HeaderMap, Json(body): Json<Va
     assert_eq!(body["store"], false);
     assert_eq!(body["service_tier"], "default");
     assert_eq!(body["tools"], json!([]));
+    assert_eq!(&body, request().generation_body());
     s.generated.fetch_add(1, Ordering::SeqCst);
     if matches!(s.mode, Mode::Redirect) {
         return (
@@ -208,6 +211,194 @@ fn request() -> PreparedRequest {
         &["Fake reviewed context".into()],
     )
     .expect("request")
+}
+
+fn pi_body(request: &PreparedRequest) -> Vec<u8> {
+    serde_json::to_vec(&json!({
+        "model": DEFAULT_MODEL,
+        "instructions": format!("{}\nCurrent date and time: Thursday, September 17, 2026", crate::pi_admission::PiAdmission::new(request).system_prompt()),
+        "input": request.generation_body()["input"],
+        "max_output_tokens":800,"store":false,"stream":true
+    })).expect("synthetic Pi wire")
+}
+
+#[tokio::test]
+async fn pi_rejection_precedes_any_count_or_journal_mutation() {
+    let Some((db, store, lease, revision, fake, client, server)) = fixture(Mode::Good).await else {
+        return;
+    };
+    let execution = fake.execution(revision, Uuid::new_v4());
+    let request = request();
+    let before = serde_json::to_value(store.journal(Area::Workshop, 0, 500).await.expect("before"))
+        .expect("journal JSON");
+    let changed = PreparedRequest::new("unreviewed changed question", &[]).expect("request");
+    for bytes in [
+        pi_body(&changed),
+        b"{\"model\":\"first\",\"model\":\"second\"}".to_vec(),
+        vec![b' '; crate::pi_admission::MAX_PI_REQUEST_BYTES + 1],
+    ] {
+        let result = client
+            .execute_pi_and_persist(&store, &lease, &execution, &request, &bytes)
+            .await;
+        assert!(matches!(result, Err(TransportError::PiAdmission(_))));
+        // The provider never sees rejected content, including the token counter.
+        assert_eq!(fake.count.load(Ordering::SeqCst), 0);
+        assert_eq!(fake.generated.load(Ordering::SeqCst), 0);
+        assert!(matches!(
+            store.attempt(execution.attempt_id).await,
+            Err(StoreError::NotFound)
+        ));
+    }
+    let after = serde_json::to_value(store.journal(Area::Workshop, 0, 500).await.expect("after"))
+        .expect("journal JSON");
+    assert_eq!(before, after);
+    server.abort();
+    db.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
+async fn admitted_pi_request_uses_frozen_payload_and_durable_private_recovery() {
+    let Some((db, store, lease, revision, fake, client, server)) = fixture(Mode::Good).await else {
+        return;
+    };
+    let execution = fake.execution(revision, Uuid::new_v4());
+    let request = request();
+    let wire = pi_body(&request);
+    let result = client
+        .execute_pi_and_persist(&store, &lease, &execution, &request, &wire)
+        .await
+        .expect("persisted Pi proposal");
+    assert_eq!(result.proposal.summary, "Ask a human to review");
+    assert_eq!(
+        store
+            .attempt(execution.attempt_id)
+            .await
+            .expect("attempt")
+            .state,
+        AttemptState::Settled {
+            actual_cost: UsdMicros(800)
+        }
+    );
+    let restarted = SupervisorStore::new(db.pool.clone());
+    assert!(
+        client
+            .execute_pi_and_persist(&restarted, &lease, &execution, &request, &wire)
+            .await
+            .is_err()
+    );
+    let recovered = restarted
+        .private_proposal(Area::Workshop, execution.project_id, lease.action_id())
+        .await
+        .expect("private recovery");
+    assert_eq!(recovered.proposal.summary, result.proposal.summary);
+    assert_eq!(recovered.proposal.proposal, result.proposal.proposal);
+    assert_eq!(
+        recovered.proposal.evidence_indices,
+        result.proposal.evidence_indices
+    );
+    assert_eq!(fake.count.load(Ordering::SeqCst), 1);
+    assert_eq!(fake.generated.load(Ordering::SeqCst), 1);
+    assert!(matches!(
+        restarted
+            .private_proposal(Area::Trust, execution.project_id, lease.action_id())
+            .await,
+        Err(StoreError::NotFound)
+    ));
+    assert!(matches!(
+        restarted
+            .private_proposal(Area::Workshop, Uuid::new_v4(), lease.action_id())
+            .await,
+        Err(StoreError::NotFound)
+    ));
+    server.abort();
+    db.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
+async fn simultaneous_pi_replays_can_generate_and_persist_only_once() {
+    let Some((db, store, lease, revision, fake, client, server)) = fixture(Mode::Good).await else {
+        return;
+    };
+    let execution = fake.execution(revision, Uuid::new_v4());
+    let request = request();
+    let wire = pi_body(&request);
+    let (one, two) = tokio::join!(
+        client.execute_pi_and_persist(&store, &lease, &execution, &request, &wire),
+        client.execute_pi_and_persist(&store, &lease, &execution, &request, &wire)
+    );
+    assert_eq!(usize::from(one.is_ok()) + usize::from(two.is_ok()), 1);
+    assert_eq!(fake.generated.load(Ordering::SeqCst), 1);
+    // Parallel pre-admission counting can disclose the same approved input twice;
+    // generation is fenced. Do not claim exactly-once token-counter execution.
+    assert!((1..=2).contains(&fake.count.load(Ordering::SeqCst)));
+    assert_eq!(
+        store
+            .action(Area::Workshop, lease.action_id())
+            .await
+            .expect("action")
+            .state,
+        ActionState::Verified
+    );
+    server.abort();
+    db.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
+async fn admitted_pi_request_still_obeys_revocation_and_uncertain_billing() {
+    for mode in [Mode::RevokeDuringCount, Mode::Revoke, Mode::MalformedUsage] {
+        let Some((db, store, lease, revision, fake, client, server)) = fixture(mode).await else {
+            return;
+        };
+        let execution = fake.execution(revision, Uuid::new_v4());
+        let request = request();
+        let wire = pi_body(&request);
+        assert!(
+            client
+                .execute_pi_and_persist(&store, &lease, &execution, &request, &wire)
+                .await
+                .is_err()
+        );
+        let expected_calls = usize::from(!matches!(mode, Mode::RevokeDuringCount));
+        assert_eq!(fake.generated.load(Ordering::SeqCst), expected_calls);
+        if matches!(mode, Mode::MalformedUsage) {
+            assert_eq!(
+                store
+                    .attempt(execution.attempt_id)
+                    .await
+                    .expect("attempt")
+                    .state,
+                AttemptState::Uncertain
+            );
+        }
+        if matches!(mode, Mode::Revoke) {
+            assert_eq!(
+                store
+                    .attempt(execution.attempt_id)
+                    .await
+                    .expect("attempt")
+                    .state,
+                AttemptState::Settled {
+                    actual_cost: UsdMicros(800)
+                }
+            );
+        }
+        assert!(matches!(
+            store
+                .private_proposal(Area::Workshop, execution.project_id, lease.action_id())
+                .await,
+            Err(StoreError::NotFound)
+        ));
+        assert!(
+            client
+                .execute_pi_and_persist(&store, &lease, &execution, &request, &wire)
+                .await
+                .is_err()
+        );
+        assert_eq!(fake.generated.load(Ordering::SeqCst), expected_calls);
+        assert_eq!(fake.count.load(Ordering::SeqCst), 1);
+        server.abort();
+        db.cleanup().await.expect("cleanup");
+    }
 }
 
 #[tokio::test]

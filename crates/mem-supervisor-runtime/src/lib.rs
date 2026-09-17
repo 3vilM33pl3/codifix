@@ -3,5 +3,6 @@
 //! authorization remain the responsibility of the trusted runtime.
 
 pub mod model;
+pub mod pi_admission;
 mod strict_json;
 pub mod transport;
