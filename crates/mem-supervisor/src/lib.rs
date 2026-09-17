@@ -9,6 +9,7 @@ pub mod action;
 pub mod budget;
 pub mod lease;
 pub mod policy;
+pub mod proposal;
 pub mod upgrade;
 
 use serde::{Deserialize, Serialize};

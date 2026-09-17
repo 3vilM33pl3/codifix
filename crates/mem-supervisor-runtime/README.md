@@ -1,8 +1,8 @@
 # Supervisor model adapter
 
 The first adapter is an offline-testable, **stateless, text-only** OpenAI
-Responses profile. It does not start supervisors, read credentials, call models,
-or confer permission to disclose a collection. Model suggestions are not actions
+Responses profile, with a separately tested one-shot HTTP adapter. It does not
+start supervisors or confer permission to disclose a collection. Model suggestions are not actions
 or approvals. The normal Memory credential was selected for reuse on 2026-09-17;
 the R3 credential and spending authorization are excluded.
 
@@ -36,9 +36,33 @@ Sources reviewed 2026-09-17:
 - [Input-token counting](https://developers.openai.com/api/reference/typescript/resources/responses/subresources/input_tokens/methods/count)
 - [Responses request and usage contract](https://developers.openai.com/api/reference/cli/resources/responses/methods/create)
 
-The eventual network adapter must obtain a committed physical-attempt permit from
-`mem-supervisor-store` immediately before a single send. It must disable HTTP
-retries, redirects, inherited proxies and provider fallback; bind the request
-digest; keep credentials outside Pi; bound responses; and journal sanitized
-outcomes. No paid provider or live Pi compatibility result is claimed by protocol
-unit tests. Existing user Web/TUI interfaces are not yet connected to this crate.
+`transport::OpenAiTransport::from_environment` reads only `OPENAI_API_KEY` from
+the explicitly prepared process environment. It has no credential-file discovery,
+R3 fallback or arbitrary endpoint configuration. No secret is written to disk or
+passed to Pi. Production endpoints are fixed to `https://api.openai.com/v1`.
+HTTP retries, redirects and inherited proxies are disabled. The private alternate
+base URL is used only by in-crate synthetic localhost tests.
+
+`execute` needs a currently claimed, authorized action and input already approved
+for this model destination. It rechecks common area policy before and after
+counting, reserves the exact request digest/cost in PostgreSQL, commits `begin`,
+and consumes its one-shot send permit. Response reads are bounded to 64 KiB and
+the lease deadline. Non-2xx responses, missing usage and transport ambiguity
+retain reservations; errors contain fixed classifications, never provider bodies.
+Authoritative usage is committed even after revocation. Over-bound settlement
+revokes policy in the store; current authority is rechecked before returning
+a proposal. These local checks cannot recall a dispatched request or substitute
+for current source eligibility and collection/model-destination consent.
+
+The caller **must durably preserve the private structured proposal before
+publishing a Verified action**. This adapter deliberately does not claim an
+in-memory return as a durable completed decision. Proposal persistence, a worker,
+Pi admission proxy, service authorization and Web/TUI views remain integration
+work. No paid provider or live Pi compatibility result is claimed from these
+tests. The $10 fleet cap covers these four supervisors, not other existing
+applications using the normal shared key.
+
+Focused tests use a required disposable PostgreSQL database and fake HTTP
+providers. They prove begin-before-send accounting, duplicate denial, no hidden
+redirect/rate-limit retries, uncertain reservations, billing of invalid answers,
+and result denial after revocation. No real credential or provider is used.

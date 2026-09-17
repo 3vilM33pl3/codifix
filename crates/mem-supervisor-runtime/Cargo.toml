@@ -7,10 +7,19 @@ authors.workspace = true
 
 [dependencies]
 mem-supervisor = { path = "../mem-supervisor" }
+mem-supervisor-store = { path = "../mem-supervisor-store" }
+chrono.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+mem-test-support = { path = "../mem-test-support" }
+tokio.workspace = true
 
 [lints]
 workspace = true

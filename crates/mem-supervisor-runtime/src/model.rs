@@ -2,8 +2,9 @@
 //! No tools, conversation continuation, background work or provider substitution.
 //! Count the exact input through the official input-token endpoint before admission.
 
+pub use mem_supervisor::proposal::{Proposal, ProposalKind};
 use mem_supervisor::{DEFAULT_MODEL, UnixSeconds, UsdMicros};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -158,7 +159,7 @@ impl CountedRequest<'_> {
         if body.len() > MAX_RESPONSE_BYTES {
             return Err(ModelError::Malformed);
         }
-        let response: Value = serde_json::from_slice(body).map_err(|_| ModelError::Malformed)?;
+        let response: Value = crate::strict_json::parse(body).map_err(|_| ModelError::Malformed)?;
         if response["object"] != "response"
             || response["model"] != DEFAULT_MODEL
             || response["service_tier"] != "default"
@@ -247,25 +248,6 @@ impl Usage {
     }
 }
 
-/// Suggestions are untrusted content, not an Action or authorization token.
-/// Deliberately no Debug; only explicit authorized result views may render text.
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Proposal {
-    pub summary: String,
-    pub proposal: ProposalKind,
-    pub evidence_indices: Vec<usize>,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ProposalKind {
-    None,
-    AskHuman,
-    ProposeCorrection,
-    ReviewRelease,
-}
-
 fn parse_proposal(response: &Value, count: usize) -> Result<Proposal, ModelError> {
     if response["status"] != "completed" || !response["error"].is_null() {
         return Err(ModelError::Incomplete);
@@ -293,17 +275,9 @@ fn parse_proposal(response: &Value, count: usize) -> Result<Proposal, ModelError
         return Err(ModelError::Malformed);
     }
     let proposal: Proposal = serde_json::from_str(texts[0]).map_err(|_| ModelError::Malformed)?;
-    let mut indices = proposal.evidence_indices.clone();
-    indices.sort_unstable();
-    indices.dedup();
-    if proposal.summary.trim().is_empty()
-        || proposal.summary.len() > 4096
-        || indices.len() != proposal.evidence_indices.len()
-        || indices.len() > 8
-        || indices.iter().any(|i| *i >= count)
-    {
-        return Err(ModelError::InvalidEvidence);
-    }
+    proposal
+        .validate(count)
+        .map_err(|_| ModelError::InvalidEvidence)?;
     Ok(proposal)
 }
 
