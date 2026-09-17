@@ -104,6 +104,18 @@ duplicate canonical versions and contradictory child ownership are blockers.
 Sessions, tasks, raw captures, relations and commits receive individual reviews,
 even if a collector believes they have one apparent owner.
 
+Manifest v2 also supports explicitly reviewed relations with no single
+`source_project_id`, as in the current source schema. Both non-null canonical
+endpoints must resolve to the **same destination area**, and each endpoint's
+original project must have its own area binding. The relation retains its
+original ID, bytes, endpoint IDs and null project metadata; no project owner is
+invented and no inventory hash is rewritten. Its individual source/project/
+content review is still mandatory. Cross-area or archived endpoints are blocked
+unless the relation itself remains archived. This does not grant project access
+or federation disclosure. Format 1 retains its missing-project rejection.
+Materialization checks the actual endpoint bytes against these reviewed logical
+references; a matching row hash alone is insufficient.
+
 ## Reviewed manifest and protected retention
 
 The draft pins the complete normalized inventory digest, including its schema,

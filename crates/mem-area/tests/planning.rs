@@ -122,6 +122,164 @@ fn reviewed(inventory: &Inventory) -> Manifest {
     manifest
 }
 
+fn relation_fixture() -> (Inventory, Manifest) {
+    let mut inventory = fixture();
+    let mut project = inventory.projects[0].clone();
+    project.id = id(51);
+    project.slug = "second-project".into();
+    inventory.projects.push(project.clone());
+    push(
+        &mut inventory,
+        "public.projects",
+        row(id(51).to_string(), None, None, None),
+    );
+    push(
+        &mut inventory,
+        "public.memory_entries",
+        row(
+            id(52).to_string(),
+            Some(id(51)),
+            Some(id(52)),
+            Some(VersionIdentity {
+                version_no: 1,
+                is_tombstone: false,
+            }),
+        ),
+    );
+    push(
+        &mut inventory,
+        "public.memory_canonical_state",
+        row(id(52).to_string(), Some(id(51)), Some(id(52)), None),
+    );
+    let mut relation = row(id(53).to_string(), None, None, None);
+    relation.references = vec![
+        reference(
+            "logical:src_canonical_id",
+            "public.memory_canonical_state",
+            10,
+        ),
+        reference(
+            "logical:dst_canonical_id",
+            "public.memory_canonical_state",
+            52,
+        ),
+    ];
+    push(&mut inventory, "public.memory_relations", relation);
+    let mut manifest = reviewed(&inventory);
+    manifest.format_version = PROVENANCE_MANIFEST_VERSION;
+    manifest.projects.push(ProjectBinding {
+        area: AreaId::General,
+        source: project,
+        reason: "Keep second endpoint in its original project".into(),
+    });
+    manifest.records[0].disposition = Disposition::Area {
+        area: AreaId::General,
+        review: review(SourceClassification::Knowledge),
+    };
+    (inventory, manifest)
+}
+
+#[test]
+fn reviewed_v2_relation_preserves_both_projects_without_rewriting_inventory() {
+    let (inventory, manifest) = relation_fixture();
+    let original = inventory_digest(&inventory).expect("synthetic inventory digest");
+    let report = verify_manifest(&inventory, &manifest);
+    assert!(report.plan_valid, "{:?}", report.blockers);
+    let edge = report
+        .records
+        .iter()
+        .find(|r| r.record.table == "public.memory_relations")
+        .expect("synthetic relation action");
+    assert_eq!(edge.source_project_id, None);
+    assert_eq!(edge.canonical_id, None);
+    assert_eq!(edge.destination, Destination::Area(AreaId::General));
+    assert_eq!(
+        inventory_digest(&inventory).expect("synthetic inventory digest"),
+        original
+    );
+    let mut old = manifest;
+    old.format_version = FORMAT_VERSION;
+    assert_blocked(&inventory, &old, "area record has no project provenance");
+}
+
+#[test]
+fn relation_still_requires_its_own_review_and_each_original_project_binding() {
+    let (inventory, manifest) = relation_fixture();
+    let mut no_review = manifest.clone();
+    no_review.records[0].disposition = Disposition::Unresolved;
+    assert_blocked(&inventory, &no_review, "unresolved");
+    let mut no_binding = manifest;
+    no_binding.projects.pop();
+    assert_blocked(&inventory, &no_binding, "missing area project binding");
+}
+
+#[test]
+fn relation_cannot_cross_an_area_or_archived_endpoint() {
+    let (inventory, manifest) = relation_fixture();
+    let mut cross_area = manifest.clone();
+    cross_area
+        .lineages
+        .iter_mut()
+        .find(|l| l.canonical_id == id(52))
+        .expect("synthetic endpoint lineage")
+        .disposition = Disposition::Area {
+        area: AreaId::Trust,
+        review: review(SourceClassification::Knowledge),
+    };
+    cross_area.projects.push(ProjectBinding {
+        area: AreaId::Trust,
+        source: inventory.projects[1].clone(),
+        reason: "Explicit synthetic Trust endpoint".into(),
+    });
+    assert_blocked(&inventory, &cross_area, "cross-area/archive reference");
+    let mut archived = manifest;
+    archived
+        .lineages
+        .iter_mut()
+        .find(|l| l.canonical_id == id(52))
+        .expect("synthetic endpoint lineage")
+        .disposition = Disposition::ProtectedArchive {
+        reason: "Synthetic private endpoint".into(),
+        review: review(SourceClassification::Mixed),
+    };
+    assert_blocked(&inventory, &archived, "cross-area/archive reference");
+}
+
+#[test]
+fn malformed_relation_endpoint_cannot_supply_project_authority() {
+    for kind in ["missing", "null", "wrong_table", "dangling"] {
+        let (mut inventory, mut manifest) = relation_fixture();
+        let relation = &mut table_mut(&mut inventory, "public.memory_relations").rows[0];
+        match kind {
+            "missing" => {
+                relation.references.pop();
+            }
+            "null" => relation.references[1].target = None,
+            "wrong_table" => {
+                relation.references[1]
+                    .target
+                    .as_mut()
+                    .expect("synthetic endpoint")
+                    .table = "public.projects".into()
+            }
+            _ => {
+                relation.references[1]
+                    .target
+                    .as_mut()
+                    .expect("synthetic endpoint")
+                    .key = id(99).to_string()
+            }
+        }
+        manifest.inventory_sha256 =
+            inventory_digest(&inventory).expect("synthetic inventory digest");
+        assert_blocked(
+            &inventory,
+            &manifest,
+            "relation endpoint has no project provenance",
+        );
+    }
+}
+
 fn assert_blocked(inventory: &Inventory, manifest: &Manifest, needle: &str) {
     let report = verify_manifest(inventory, manifest);
     assert!(!report.plan_valid, "expected blocker {needle}");

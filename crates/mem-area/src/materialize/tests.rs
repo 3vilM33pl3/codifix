@@ -763,6 +763,61 @@ fn exact_payload_identity_references_and_version_metadata_cannot_be_forged_by_re
 }
 
 #[test]
+fn relation_bytes_keep_the_exact_reviewed_endpoints_even_after_rehashing() {
+    let mut fixture = fixture(false);
+    table_mut(&mut fixture.inventory, "public.memory_relations").columns = vec![
+        col("id", "uuid", false),
+        col("src_canonical_id", "uuid", false),
+        col("dst_canonical_id", "uuid", false),
+        col("relation_type", "text", false),
+    ];
+    push(&mut fixture.inventory, &mut fixture.payloads, "public.memory_relations", 50, None, None,
+        vec![reference("logical:src_canonical_id", "public.memory_canonical_state", 10), reference("logical:dst_canonical_id", "public.memory_canonical_state", 10)],
+        json!({"id":id(50),"src_canonical_id":id(10),"dst_canonical_id":id(10),"relation_type":"supports"}).to_string());
+    table_mut(&mut fixture.inventory, "public.memory_relations").rows[0].source_project_id = None;
+    fixture.manifest.format_version = PROVENANCE_MANIFEST_VERSION;
+    fixture.manifest.records.push(RecordDecision {
+        record: RecordRef {
+            table: "public.memory_relations".into(),
+            key: id(50).to_string(),
+        },
+        disposition: Disposition::Area {
+            area: AreaId::General,
+            review: review(SourceClassification::Knowledge),
+        },
+    });
+    rebind(&mut fixture);
+    let (migration, _) = run(&fixture);
+    assert!(
+        migration
+            .partition(AreaId::General)
+            .rows()
+            .iter()
+            .any(|row| row.record().table == "public.memory_relations")
+    );
+    for column in ["id", "src_canonical_id", "dst_canonical_id"] {
+        change_field(
+            &mut fixture,
+            "public.memory_relations",
+            50,
+            column,
+            json!(id(999)),
+        );
+        assert_eq!(
+            materialization_error(&fixture),
+            MaterializeError::InvalidRow
+        );
+        change_field(
+            &mut fixture,
+            "public.memory_relations",
+            50,
+            column,
+            json!(id(if column == "id" { 50 } else { 10 })),
+        );
+    }
+}
+
+#[test]
 fn claimed_version_identity_fields_cannot_be_removed_from_both_payload_and_column_catalog() {
     for column in ["canonical_id", "version_no", "is_tombstone"] {
         let mut fixture = fixture(false);

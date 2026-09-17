@@ -2,12 +2,66 @@
 //! Set MEMORY_LAYER_TEST_DATABASE_URL to a disposable pgvector database and
 //! MEMORY_LAYER_TEST_REQUIRE_DB=1. Every source and target is a newly generated
 //! IsolatedDatabase, never an existing backup or application database. Fixtures
-//! cover all import tables except memory_relations (empty, no inferred owner).
+//! cover all import tables, including reviewed canonical relationship edges.
 mod support;
 
 use mem_area_store::{ImportError, import_partition};
 use support::*;
 use uuid::Uuid;
+
+#[tokio::test]
+async fn reviewed_relations_preserve_endpoint_projects_provenance_and_replay() {
+    let Some(source) = database().await else {
+        return;
+    };
+    let target = database().await.expect("synthetic target");
+    seed(&source.pool).await;
+    execute(&source.pool, "INSERT INTO projects(id,slug,name,root_path) VALUES('00000000-0000-0000-0000-000000000051','second-project','Synthetic second project','/synthetic/second'); INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES('00000000-0000-0000-0000-000000000052','00000000-0000-0000-0000-000000000051','00000000-0000-0000-0000-000000000052',1,false,'Synthetic second endpoint','Synthetic second endpoint','documentation','project',3,0.5,'2026-09-01T10:00:00Z','2026-09-01T10:00:00Z',to_tsvector('simple','Synthetic second endpoint'));").await;
+    sqlx::query("INSERT INTO memory_relations(id,src_canonical_id,dst_canonical_id,relation_type,origin,confidence,actor,created_at) VALUES($1,$2,'00000000-0000-0000-0000-000000000052','supports','asserted',0.875,'synthetic-human','2026-09-05T10:00:00.123456Z')")
+        .bind(id(53)).bind(id(13)).execute(&source.pool).await.expect("synthetic relation");
+    let mut fixture = capture(&source.pool).await;
+    fixture.manifest.format_version = mem_area::PROVENANCE_MANIFEST_VERSION;
+    let relation = fixture
+        .inventory
+        .tables
+        .iter()
+        .find(|t| t.table == "public.memory_relations")
+        .expect("synthetic relation table");
+    assert_eq!(relation.rows[0].source_project_id, None);
+    let (partition, _) = fixture.partition();
+    import_partition(&target.pool, TARGET, OPERATION, &partition)
+        .await
+        .expect("relation import");
+    for table in OWNED {
+        assert_eq!(
+            rows(&target.pool, table).await,
+            rows(&source.pool, table).await,
+            "{table}"
+        );
+    }
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM memory_relations r JOIN memory_canonical_state s ON s.canonical_id=r.src_canonical_id JOIN memory_canonical_state d ON d.canonical_id=r.dst_canonical_id WHERE s.project_id<>d.project_id AND r.actor='synthetic-human'")
+        .fetch_one(&target.pool).await.expect("preserved project boundary");
+    assert_eq!(count, 1);
+    assert!(
+        import_partition(&target.pool, TARGET, OPERATION, &partition)
+            .await
+            .expect("replay")
+            .already_applied
+    );
+    execute(
+        &target.pool,
+        "UPDATE memory_relations SET actor='changed-attribution'",
+    )
+    .await;
+    assert_eq!(
+        import_partition(&target.pool, TARGET, OPERATION, &partition)
+            .await
+            .expect_err("changed edge"),
+        ImportError::Changed
+    );
+    target.cleanup().await.expect("cleanup target");
+    source.cleanup().await.expect("cleanup source");
+}
 
 #[tokio::test]
 async fn replay_refuses_disabled_kill_switch_and_new_authority_auth_or_job_state() {

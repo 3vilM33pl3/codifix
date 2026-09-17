@@ -1068,6 +1068,17 @@ pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verificati
     let mut actions = BTreeMap::new();
     let mut consumed_decisions = BTreeSet::new();
     let mut required_bindings = BTreeSet::new();
+    // Relations have no project_id in the source schema. V2 can preserve an
+    // explicitly reviewed edge using both endpoint projects without inventing
+    // a single owner or changing the hash-bound inventory. Endpoint area
+    // equality is still checked by the ordinary reference validation below.
+    let endpoint_projects: BTreeMap<_, _> = inventory
+        .tables
+        .iter()
+        .filter(|table| table.table == "public.memory_canonical_state")
+        .flat_map(|table| &table.rows)
+        .filter_map(|row| row.source_project_id.map(|id| (row.key.as_str(), id)))
+        .collect();
     for table in &inventory.tables {
         let strategy = table_strategy(&table.table);
         for row in &table.rows {
@@ -1106,6 +1117,29 @@ pub fn verify_manifest(inventory: &Inventory, manifest: &Manifest) -> Verificati
                     match row.source_project_id {
                         Some(project) => {
                             required_bindings.insert((area, project));
+                        }
+                        None if table.table == "public.memory_relations"
+                            && manifest.format_version == PROVENANCE_MANIFEST_VERSION =>
+                        {
+                            for (constraint, target_table, _) in required_logical_refs(&table.table)
+                            {
+                                let project = row
+                                    .references
+                                    .iter()
+                                    .find(|reference| reference.constraint == *constraint)
+                                    .and_then(|reference| reference.target.as_ref())
+                                    .filter(|target| target.table == *target_table)
+                                    .and_then(|target| endpoint_projects.get(target.key.as_str()));
+                                match project {
+                                    Some(project) => {
+                                        required_bindings.insert((area, *project));
+                                    }
+                                    None => errors.push(format!(
+                                        "relation endpoint has no project provenance {}:{}:{}",
+                                        record.table, record.key, constraint
+                                    )),
+                                }
+                            }
                         }
                         None => errors.push(format!(
                             "area record has no project provenance {}:{}",

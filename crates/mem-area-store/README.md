@@ -79,10 +79,11 @@ claim populated relationship migration coverage.
 
 ## Focused verification
 
-Nine tests use generated, migrated `mem-test-support::IsolatedDatabase` sources
+Ten tests use generated, migrated `mem-test-support::IsolatedDatabase` sources
 and targets with synthetic text only. They exercise exact historical versions
 with reversed UUID order, tombstones, canonical state, source-check history,
-tags, commits, exact retries, identity conflicts, changed rows, nonempty targets,
+tags, commits, populated reviewed relations across preserved project boundaries
+within one area, exact retries, identity conflicts, changed rows, nonempty targets,
 schema mismatch, private provenance projections and immutable receipts.
 Injected insertion, post-trigger verification and deferred-commit failures
 demonstrate rollback of data, receipts, identity sequence and the kill switch.
