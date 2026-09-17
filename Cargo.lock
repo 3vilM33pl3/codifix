@@ -3240,6 +3240,7 @@ name = "mem-supervisor-pi"
 version = "2.1.0-rc.1"
 dependencies = [
  "mem-supervisor",
+ "mem-supervisor-runtime",
  "rustix 1.1.4",
  "serde",
  "serde_json",

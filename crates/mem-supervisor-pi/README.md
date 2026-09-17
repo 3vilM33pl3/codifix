@@ -239,7 +239,37 @@ reproduces the defect. Its production hash is unchanged and rejects the patched
 binary, whose fixed digest exists only inside the diagnostic test module.
 
 See [patch, complete notice, identity and evidence](patches/README.md). The
-13 ordinary tests pass; four environment-bound diagnostics remain ignored by
+13 ordinary tests pass; five environment-bound diagnostics remain ignored by
 default, including the patched test that was explicitly exercised separately.
 This is not a live agent, general FTUI/SDK certification, an ARM64/CA runtime
 result, an admission proxy or a production provider grant.
+
+## Exact-input supervisor admission diagnostic
+
+The ignored `provider_probe::sandboxed_patched_pi_matches_supervisor_admission`
+test connects the actual separately hashed AMD64 binary's first request to
+`mem-supervisor-runtime::pi_admission::PiAdmission`, a test-only dependency here.
+It supplies the exact structured question/evidence prompt, fixed supervisor
+instructions and `PI_CACHE_RETENTION=none`. The validator rejects all unknown
+fields, context additions and profile changes, including session-affinity keys.
+Only the canonical date suffix added by pinned Pi is tolerated; the runtime
+discards that date rather than sending it to a provider.
+
+On 2026-09-17 both synthetic success and HTTP 429 passed in the same pinned
+network-none/read-only/non-root Ubuntu container described above, with one local
+HTTP request per case and no real credentials. The success returned the exact
+structured fixture proposal through RPC; the 429 failed without retry. Reproduce
+by building the test driver and selecting the new exact test name in the Docker
+command above. No binary or production hash changed in this test.
+
+The runtime's separate required-PostgreSQL tests feed accepted Pi-shaped requests
+through real reserve/begin/settle/private-proposal persistence with fake providers.
+They prove one generation under concurrent replay, exact frozen provider payloads,
+scoped recovery and revocation/uncertain-usage handling. These are **separate
+composable tests**, not one Pi-to-PostgreSQL live integration. This crate still
+exposes no production prompt API, provider credential, SQL access or listening
+server. HTTP authentication, proxy-only egress, current disclosure consent and
+safe result streaming remain integration work. Pi's off-thinking/streaming wire
+profile is deliberately translated to Memory's fixed low-reasoning/non-streaming
+structured proposal profile, not passed through to OpenAI unchanged. This is a
+restricted proposal path, not general autonomous Pi tool execution.

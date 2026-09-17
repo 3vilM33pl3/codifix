@@ -40,6 +40,25 @@ result. Both patched binaries still require glibc 2.43. Provider
 activation/admission and disclosure gates remain
 closed. Nothing was installed into an existing service.
 
+Supervisor-admission follow-up, 2026-09-17: the dev checkpoint at 20:55 UTC
+preceded an exact-input Pi ingress validator and its binding to the existing
+durable model transport. Changed question/evidence, unreviewed context, tools,
+unknown or duplicate fields, storage and model overrides are rejected before
+counter calls or journal mutation. The immutable Memory request is sent upstream,
+never Pi's original bytes; its date/session metadata cannot leak into that request.
+The fixed profile translation and remaining caller-consent obligations are in the
+[runtime contract](../../../crates/mem-supervisor-runtime/README.md#pi-request-admission-not-a-running-proxy).
+All **37 runtime tests** pass with required disposable PostgreSQL, including
+concurrent replay yielding one generation, durable private recovery, revocation
+and uncertain billing. Thirteen ordinary Pi tests pass, with five environment-only
+diagnostics explicitly ignored by default. The new real patched-AMD64 admission
+diagnostic was run separately in the pinned network-none sandbox: success and
+HTTP 429 each made exactly one synthetic request, with no tools or real key.
+Focused strict Clippy, formatting and boundaries pass. This validates separately
+the Pi wire and database/provider path; it is not yet an authenticated running
+proxy, current source/destination consent implementation, live agent, ARM64
+runtime or four-area deployment. Provider activation remains closed.
+
 The native rc.1 binaries and Web UI compiled at source `5827aeb`, but packaging
 failed because a private umask left the Debian control directory mode 0700.
 Commit `7c988fab` normalizes only the public package payload, leaving its staging

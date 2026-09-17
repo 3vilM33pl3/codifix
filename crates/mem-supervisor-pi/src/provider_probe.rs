@@ -4,6 +4,7 @@
 #![allow(clippy::unwrap_used)]
 
 use crate::{Failure, LinuxArchitecture, ProbeConfig, artifact, process, protocol};
+use mem_supervisor_runtime::{model::PreparedRequest, pi_admission::PiAdmission};
 use serde_json::{Value, json};
 use std::{
     path::PathBuf,
@@ -21,6 +22,11 @@ const TOKEN: &str = "synthetic-local-probe-not-a-valid-provider-key";
 const QUESTION: &str = "Synthetic routing check. Return the supplied synthetic response unchanged.";
 const ANSWER: &str = "Synthetic provider result; no real model was called.";
 const SYSTEM: &str = "This is a synthetic local transport test. No tools or external actions.";
+const PROPOSAL: &str = "{\"summary\":\"Synthetic proposal; no real model was called\",\"proposal\":\"ask_human\",\"evidence_indices\":[0]}";
+
+fn approved_input() -> PreparedRequest {
+    PreparedRequest::new(QUESTION, &["Synthetic approved evidence".to_owned()]).unwrap()
+}
 
 // Private test identity only. Never replace the official production pins or
 // accept a caller/environment-provided digest to make an arbitrary binary pass.
@@ -107,6 +113,7 @@ async fn serve_one(
     status: u16,
     explicit_tool_off: bool,
     profile: ArtifactProfile,
+    admission: bool,
 ) -> Result<(), &'static str> {
     let mut reader = BufReader::new(stream);
     let mut header = Vec::new();
@@ -160,6 +167,11 @@ async fn serve_one(
         .read_exact(&mut body)
         .await
         .map_err(|_| "http body read")?;
+    if admission {
+        PiAdmission::new(&approved_input())
+            .validate(&body)
+            .map_err(|_| "supervisor admission rejected Pi wire")?;
+    }
     let body: Value = serde_json::from_slice(&body).map_err(|_| "http json")?;
     if body["model"] != mem_supervisor::DEFAULT_MODEL {
         return Err("wrong model");
@@ -178,8 +190,20 @@ async fn serve_one(
     let instructions = body["instructions"]
         .as_str()
         .ok_or("missing system context")?;
+    let approved = approved_input();
+    let system = if admission {
+        PiAdmission::new(&approved).system_prompt()
+    } else {
+        SYSTEM
+    };
+    let question = if admission {
+        PiAdmission::new(&approved).prompt()
+    } else {
+        QUESTION
+    };
+    let answer = if admission { PROPOSAL } else { ANSWER };
     let date = instructions
-        .strip_prefix(&format!("{SYSTEM}\nCurrent date and time: "))
+        .strip_prefix(&format!("{system}\nCurrent date and time: "))
         .ok_or("unreviewed system context")?;
     if date.is_empty()
         || date.len() > 128
@@ -196,14 +220,14 @@ async fn serve_one(
     if input.len() != 1 || input[0]["role"] != "user" {
         return Err("unexpected conversation context");
     }
-    if input[0]["content"] != QUESTION
-        && input[0]["content"] != json!([{"type":"input_text","text":QUESTION}])
+    if input[0]["content"] != question
+        && input[0]["content"] != json!([{"type":"input_text","text":question}])
     {
         return Err("unexpected question");
     }
     let (content_type, payload) = if status == 200 {
         let events = [
-            json!({"type":"response.output_text.delta","item_id":"synthetic-message","content_index":0,"delta":ANSWER}),
+            json!({"type":"response.output_text.delta","item_id":"synthetic-message","content_index":0,"delta":answer}),
             json!({"type":"response.completed","response":{"id":"synthetic-response","status":"completed","incomplete_details":null,"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}}),
         ];
         (
@@ -237,7 +261,7 @@ async fn serve_one(
     Ok(())
 }
 
-async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile) {
+async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile, admission: bool) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let calls = Arc::new(AtomicUsize::new(0));
@@ -250,7 +274,7 @@ async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile
             }
             timeout(
                 Duration::from_secs(5),
-                serve_one(stream, status, explicit_tool_off, profile),
+                serve_one(stream, status, explicit_tool_off, profile, admission),
             )
             .await
             .map_err(|_| "http timeout")??;
@@ -289,9 +313,25 @@ async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile
     .await
     .unwrap();
     let mut command = process::isolated_command(&prepared);
+    let approved = approved_input();
+    let system = if admission {
+        PiAdmission::new(&approved).system_prompt()
+    } else {
+        SYSTEM
+    };
+    let question = if admission {
+        PiAdmission::new(&approved).prompt()
+    } else {
+        QUESTION
+    };
+    let answer = if admission { PROPOSAL } else { ANSWER };
+    if admission {
+        // No session-affinity metadata is part of the approved upstream request.
+        command.env("PI_CACHE_RETENTION", "none");
+    }
     command
         .env("OPENAI_API_KEY", TOKEN)
-        .args(["--system-prompt", SYSTEM]);
+        .args(["--system-prompt", system]);
     let mut child = command.spawn().unwrap();
     let stderr = tokio::spawn(process::drain_stderr(child.stderr.take().unwrap()));
     let result = timeout(Duration::from_secs(15), async {
@@ -301,7 +341,7 @@ async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile
         protocol::confirm_controls(&mut stdin, &mut stdout, &mut total, &mut Vec::new()).await?;
         let prompt = format!(
             "{}\n",
-            json!({"type":"prompt","id":"synthetic-prompt","message":QUESTION})
+            json!({"type":"prompt","id":"synthetic-prompt","message":question})
         );
         stdin
             .write_all(prompt.as_bytes())
@@ -358,7 +398,7 @@ async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile
         {
             return Err(Failure::UnexpectedFrame);
         }
-        if status == 200 && reply["data"]["text"] != ANSWER {
+        if status == 200 && reply["data"]["text"] != answer {
             return Err(Failure::UnsafeState);
         }
         if status != 200
@@ -413,7 +453,7 @@ async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile
     assert!(crate::provider_execution_gate().is_err());
     println!(
         "{}",
-        json!({"case_status":status,"explicit_tool_off":explicit_tool_off,"artifact_profile":profile.label(),"artifact_sha256":config.expected_digest,"architecture":match architecture {LinuxArchitecture::Amd64 => "amd64", LinuxArchitecture::Arm64 => "arm64"},"synthetic_provider_calls":1,"external_network":false,"real_credentials":false,"production_provider_gate":"closed","tool_free_gate":if profile == ArtifactProfile::NoTools1 {"request_schema_verified"} else {"blocked"}})
+        json!({"case_status":status,"explicit_tool_off":explicit_tool_off,"artifact_profile":profile.label(),"artifact_sha256":config.expected_digest,"architecture":match architecture {LinuxArchitecture::Amd64 => "amd64", LinuxArchitecture::Arm64 => "arm64"},"synthetic_provider_calls":1,"external_network":false,"real_credentials":false,"production_provider_gate":"closed","supervisor_admission":admission,"tool_free_gate":if profile == ArtifactProfile::NoTools1 {"request_schema_verified"} else {"blocked"}})
     );
 }
 
@@ -421,9 +461,9 @@ async fn run_case(status: u16, explicit_tool_off: bool, profile: ArtifactProfile
 #[ignore = "requires the official pinned Pi artifact inside the network-none read-only-root sandbox"]
 async fn sandboxed_real_fake_provider_exposes_unrequested_tool() {
     require_sandbox();
-    run_case(200, false, ArtifactProfile::Official).await;
-    run_case(200, true, ArtifactProfile::Official).await;
-    run_case(429, true, ArtifactProfile::Official).await;
+    run_case(200, false, ArtifactProfile::Official, false).await;
+    run_case(200, true, ArtifactProfile::Official, false).await;
+    run_case(429, true, ArtifactProfile::Official, false).await;
 }
 
 #[tokio::test]
@@ -440,9 +480,17 @@ async fn sandboxed_patched_fake_provider_has_no_tools() {
         artifact::prepare(&official).await.err(),
         Some(Failure::ArtifactDigestMismatch)
     );
-    run_case(200, false, ArtifactProfile::NoTools1).await;
-    run_case(200, true, ArtifactProfile::NoTools1).await;
-    run_case(429, true, ArtifactProfile::NoTools1).await;
+    run_case(200, false, ArtifactProfile::NoTools1, false).await;
+    run_case(200, true, ArtifactProfile::NoTools1, false).await;
+    run_case(429, true, ArtifactProfile::NoTools1, false).await;
+}
+
+#[tokio::test]
+#[ignore = "requires the separately pinned native-architecture no-tools.1 artifact inside the network-none read-only-root sandbox"]
+async fn sandboxed_patched_pi_matches_supervisor_admission() {
+    require_sandbox();
+    run_case(200, false, ArtifactProfile::NoTools1, true).await;
+    run_case(429, true, ArtifactProfile::NoTools1, true).await;
 }
 
 #[test]
