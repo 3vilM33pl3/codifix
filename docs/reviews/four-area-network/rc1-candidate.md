@@ -3,6 +3,35 @@
 Status: **build candidate only**. Not signed, published, installed or activated.
 This is not completion of the four-area foundation or permission to cut over.
 
+## Local build status, 2026-09-17 14:08 UTC
+
+- Source `5827aeb`: native and ARM64 CLI/operator/gateway compilation completed;
+  both Debian assemblies failed under the private umask. The ARM64 CLI was
+  statically inspected, not executed on ARM64 or the CA.
+- Source `a1c5e4ee`: an unsigned AMD64 package assembled successfully in
+  `/data/tmp/memory-four-area-rc1-artifacts-a1c5e4ee/`. It predates the runtime
+  dependency and Web-tooling fixes and is **superseded; do not install/sign it**.
+- Source `57dd6a77c218bc641bc41258b22aad29154074b0`: corrected builds are in progress.
+  Outputs are `/data/tmp/memory-four-area-rc1-amd64-artifacts-57dd6a77/` and
+  `/data/tmp/memory-four-area-rc1-arm64-artifacts-57dd6a77/`. Completion, package
+  metadata, checksums and extracted-artifact verification remain to be recorded.
+  Their logs are `/data/tmp/memory-four-area-rc1-57dd6a77-amd64-build.log` and
+  `/data/tmp/memory-four-area-rc1-57dd6a77-arm64-build.log`.
+
+The corrected build checkouts retain their original directory names
+`/data/tmp/memory-four-area-rc1-a1c5e4ee` (AMD64) and
+`/data/tmp/memory-four-area-rc1-5827aeb` (ARM64); both were cleanly fast-forwarded
+to the exact `57dd6a77` revision only after their previous commands exited.
+Directory names are not source identity. No original artifact was overwritten.
+
+The real native `memory --version` and `memory-area-import schema-plan` smoke
+checks passed in a non-root, network-none, read-only container. The latter binds
+head 0057 to schema digest
+`a67df68d9fd458173172b7a314b0478d00b8abd8e7d956e8a6011ec5710f696d`,
+without connecting to a database. Three clean-launcher tests and 17 signed
+staging-helper tests also pass. Their fixture signing keys are not release trust.
+No image was installed on the CA; no real release was signed or published.
+
 ## Included software
 
 - Strict, lossless area inventory and reviewed-partition tooling; protected local
