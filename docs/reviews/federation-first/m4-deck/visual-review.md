@@ -1,9 +1,13 @@
 # M4 native deck visual review
 
-Reviewed 17 September 2026. This review covers the first rendered revision of the
-18-slide M4 deck. Every slide was opened individually with `view_image`; a
-montage was not used as a substitute. No slide objects or content were edited
-during this review.
+Reviewed 17 September 2026. This review covers the first rendered revision and
+the final repair checks of the 18-slide M4 deck. Every slide was opened
+individually with `view_image`; a montage was not used as a substitute. No slide
+objects or content were edited during this review.
+
+**Final visual status: passed.** Native revision `XPNgiWlMLaNeJg` has 18 slides.
+All blocking visual findings are resolved. The detailed first-pass findings
+below are retained as review history, not outstanding repair requests.
 
 ## Evidence and scope
 
@@ -141,10 +145,61 @@ slightly if spacing allows, but this is optional.
 - Retain the material implementation and commercial qualifications. Avoid adding
   further generic warnings to the already substantial footer text.
 
-## Re-review scope
+## Re-review of the first final candidate
 
-This document records the v1 audit, not a pass on a repaired render. After the
-consolidated edit, inspect every changed slide at full size, check the connectors
-and the three pilot-card baselines, then verify the 18-slide order and unchanged
-branding in the final deck. The structural/factual owner should record the final
-claim and native editability checks separately.
+All 18 images in `/tmp/m4-deck-review-20260917/renders/final/` were inspected
+individually after the consolidated copy and alignment repair. The wording
+repairs on slides 5, 13, 17 and 18 pass. The three pilot-stage text baselines on
+slide 11 now align visibly. No new text clipping, missing glyphs or colour/font
+regressions appeared.
+
+This candidate did not pass visual sign-off because the connector repair changed
+the rendered line lengths on slides 2–6:
+
+- Slide 2: the handover arrow extends into the platform card and crosses text.
+- Slide 3: both progression arrows extend through the destination cards.
+- Slide 4: exchange arrows extend into the unit cards, including a text row.
+- Slide 5: horizontal arrows cross step text, and the vertical arrow runs
+  through step 4 down to the slide number/footer.
+- Slide 6: full-width row rules shrink to roughly one-quarter width.
+
+The implementation owner identified the native cause: Google normalises newly
+created line objects to an intrinsic 3,000,000 EMU size. Reusing creation-time
+scales while setting a zero orthogonal axis lost the intended lengths. The
+second repair computed each intended span against the actual native size while
+retaining exact horizontal/vertical geometry. The corrected slides 2–6 received
+the targeted re-review below. The first candidate's other 13 slides passed the
+final regression check.
+
+The structural/factual owner records source, claim, sharing and native
+editability checks separately.
+
+## Final visual sign-off
+
+Evidence: `/tmp/m4-deck-review-20260917/verified-native.json`, revision
+`XPNgiWlMLaNeJg`, and `/tmp/m4-deck-review-20260917/renders/verified/`.
+
+Slides 2, 3, 4, 5 and 6 were opened individually after the second line-geometry
+repair. Every connector now has the intended span and direction. Arrows stay in
+the gaps between cards. Slide 5's vertical arrow stays between steps 3 and 4,
+and its numbered workflow proceeds correctly through all six steps. Slide 6's
+two horizontal rules span the complete measurement rows. No lines cross text.
+
+The verified PNGs for slides 1 and 7–18 have SHA-256 hashes identical to their
+already-inspected final-candidate images. All 18 slides are therefore covered
+by individual visual inspection and the targeted regression check.
+
+- No visible clipping, unintended overlap, missing glyphs or out-of-canvas
+  content remains.
+- Slide 5 explicitly records a correction before origin review and describes
+  source citations.
+- Slide 11's pilot-stage headings and body baselines align.
+- Slide 13 states both employee AI amounts per person, per month.
+- Slide 17 names net revenue retention.
+- Slide 18 explains funding through month 24 and retained AI headroom plus
+  months 25–27 operating outflows.
+- The first five slides remain understandable without protocol expertise.
+- Arial, pale Codifix colours, 16:9 proportions and branding remain consistent.
+
+No further visual repairs are required for this revision. The optional wording
+polish listed above does not prevent use of the deck.

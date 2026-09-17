@@ -2,8 +2,9 @@
 
 Date: **17 September 2026**. Owner: founder / M4 editor.
 Target: [Codifix investor deck](https://docs.google.com/presentation/d/1RtPlKvSxf3Z3dmLRHoIaiaKN3n8xtr6WGWJAzeWXCIY/edit).
-Status: editorial evidence register for the approved 18-slide revision. This
-document does not establish completion of deck editing, customer readiness or M4.
+Status: verified claim register for the completed 18-slide M4 revision. See the
+[delivery and validation dossier](m4-deck/README.md). Completion establishes an
+investor preparation artifact, not customer readiness or M3/M5 evidence.
 
 The technical audit was refreshed against `codex/federation-v1` at **`0436b17`**
 (17 September 2026, 12:45 BST), with the latest comprehensive four-area evidence

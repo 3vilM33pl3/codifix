@@ -1,0 +1,179 @@
+{
+  "verifiedDate": "2026-09-17",
+  "revisionId": "XPNgiWlMLaNeJg",
+  "presentationId": "1RtPlKvSxf3Z3dmLRHoIaiaKN3n8xtr6WGWJAzeWXCIY",
+  "slideCount": 18,
+  "canvasPt": [
+    960,
+    540
+  ],
+  "rawSha256": "cd543e52e6f5072adc97d2658711295a4a93e6aab8c93403bce20599840595bd",
+  "pdfSha256": "27d34f842c7f446b0bc3469fa87b148e06916343b224c3eb375bb8f2e92082c8",
+  "nativeEditability": "Text, semantic diagrams and three native tables; zero flattened slide images",
+  "connectorEndpoints": "12 correct within 0.03 pt",
+  "unchangedRenderPages": "1 and 7\u201318 byte-identical to the already inspected previous pass",
+  "slides": [
+    {
+      "slide": 1,
+      "pageId": "p1",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 2,
+      "pageId": "p2",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 3,
+      "pageId": "p3",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 4,
+      "pageId": "p4",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 5,
+      "pageId": "p5",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 6,
+      "pageId": "p6",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 7,
+      "pageId": "p7",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 1
+    },
+    {
+      "slide": 8,
+      "pageId": "p8",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 9,
+      "pageId": "p9",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 10,
+      "pageId": "p10",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 11,
+      "pageId": "p11",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 12,
+      "pageId": "p12",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 13,
+      "pageId": "p13",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 14,
+      "pageId": "p14",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 15,
+      "pageId": "m4_appendix_15",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 16,
+      "pageId": "m4_appendix_16",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 0
+    },
+    {
+      "slide": 17,
+      "pageId": "m4_appendix_17",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 1
+    },
+    {
+      "slide": 18,
+      "pageId": "m4_appendix_18",
+      "visibleContent": "exact match",
+      "notes": "exact match",
+      "logoObjectsPreserved": 6,
+      "sourceLinks": 1,
+      "nativeTables": 1
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "presentation": {
+    "id": "1RtPlKvSxf3Z3dmLRHoIaiaKN3n8xtr6WGWJAzeWXCIY",
+    "title": "Codifix — Agentic Enterprise — investor deck",
+    "revisionId": "XPNgiWlMLaNeJg",
+    "slideCount": 18
+  },
+  "snapshotSha256": "8b329fdcbb0dc8d4da152e338956dac97386a79407f7e3c7e0051d203e32e052",
+  "summary": {
+    "totalIssues": 0,
+    "reportedIssues": 0,
+    "truncated": false,
+    "bySeverity": {},
+    "byCode": {}
+  },
+  "issues": []
+}

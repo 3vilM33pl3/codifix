@@ -1,13 +1,16 @@
 # M4 native deck content review
 
-Date: **17 September 2026**. Reviewed the prepared
+Date: **17 September 2026**. **Final technical content sign-off: PASS**, verified
+at **12:05:04 UTC** against `edited-final.json`; see the final readback below.
+The initial review inspected the prepared
 `/tmp/m4-deck-review-20260917/requests/content.json` and native readback
 `/tmp/m4-deck-review-20260917/edited-v1.json` against the
 [claim register](../m4-claim-register.md) and [live financial evidence](financial-evidence.md).
-This is a text/source review of v1, not a visual review or a final corrected-deck
-verification. The builder and native deck were not changed by this reviewer.
+The v1 findings and their resolution are retained below. This is a text/source
+review, not a visual, sharing-permission or financial-table-geometry review.
+The builder and native deck were not changed by this reviewer.
 
-## Result
+## Initial v1 result
 
 All **18 slide IDs, visible text segments and speaker notes match** the prepared
 content after whitespace normalization. No material funding/forecast transcription
@@ -15,7 +18,7 @@ discrepancy was found. Main-slide claim controls correctly distinguish hypothese
 controlled implementation evidence, customer proof, planned staffing and financial
 preparation. Resolve the notes and source-access items below before final sign-off.
 
-## Corrections for the coordinating editor
+## V1 corrections, resolved in final readback
 
 | Priority | Location | Finding and exact correction |
 | --- | --- | --- |
@@ -64,6 +67,40 @@ Added source **C5** to the claim register for the completed 17 September native
 finance readback, with links to both evidence files. Slides 10, 13, 17 and 18 now
 refer to it. The historical 15 September source-capture timestamps remain intact.
 
-After the coordinator applies corrections and replaces inaccessible sources,
-re-fetch the native deck to verify final notes/text and the new dossier content.
-The final visual review and M4 completion checkpoint remain coordinator-owned.
+The v1 follow-through called for a fresh native read after corrections and source
+replacement. That technical readback is completed below. Destination-content,
+visual review and the M4 completion checkpoint remain coordinator-owned.
+
+## Final native readback — passed
+
+Verified **17 September 2026, 12:05:04 UTC** using the updated prepared content and
+`/tmp/m4-deck-review-20260917/edited-final.json`. All 18 native slide IDs, visible
+text segments and speaker notes match the updated content after whitespace
+normalization. The final review retains the frozen technical evidence at
+`89104dd` and the claim register's separate `0436b17` follow-up; it does not chase
+subsequent engineering changes.
+
+| Reviewed item | Final outcome |
+| --- | --- |
+| Slide 4 signature scope | Correctly distinguishes verified authenticity/integrity from truth, original human authorship and human review. |
+| Slide 5 correction reuse | Retains local curation and renewed collection review, human action and measurement limitations. |
+| Slide 7 test topology and durability attribution | Distinguishes F1 service applications/workers in one test process from accompanying E executables; correctly assigns federation outboxes/inboxes to C and local durable jobs to R1. Synthetic/fake-provider and customer-readiness limits remain. |
+| Slide 11 pilot clock | Explicitly begins after readiness and charter approval; inadequate case counts cannot pass by elapsed time. |
+| Slide 15 private Q&A and revocation | Excludes questions/answers from any PDS, shared publication log, timeline and retrieval corpus. Explains subsequent gateway denial, in-flight completion and locally authorized readability of retained copies. |
+| Slide 16 R3 sample | Adds one coding family × five conditions × three repeats; retains the original 0/15 outcome and all nonpassing quality/official/harness flags. |
+| Repository-source access | No unavailable frozen GitHub URL remains anywhere in the native JSON, including hyperlink styles. Exact repository paths and `89104dd` remain provenance text. |
+| Replacement hyperlinks | Native footer links target the supplied M1/M2 Notion pages, workbooks, official comparator sources or the new M4 dossier. Technical slides 4, 5, 7, 12, 15 and 16 link to the exact M4 dossier below; notes also carry that dossier. |
+
+The replacement technical destination is
+[M4 dated evidence dossier](https://app.notion.com/p/3de8990715f481448e6dc392c3f853c4).
+This review confirms its exact use in native notes and links; the coordinator
+owns verification of destination content and sharing access, alongside visual,
+object/financial-table and final M4 completion checks. No new technical content
+correction remains from this review.
+
+Input SHA-256 values:
+
+- Updated `requests/content.json`:
+  `f5601844ecba30b53806b307483b0fd1be4a2b8867b296bf38edda957c42a97e`.
+- Native `edited-final.json`:
+  `630037fbf484fe612761feeacb7056995693ddae38b95f5c22ac23eb83aa3e1f`.
