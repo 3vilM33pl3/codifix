@@ -146,10 +146,14 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
     }
     if !matches!(
         inventory.migration_version,
-        SUPPORTED_MIGRATION | SUPERVISOR_MIGRATION | SUPERVISOR_PROPOSAL_MIGRATION
+        SUPPORTED_MIGRATION
+            | SUPERVISOR_MIGRATION
+            | SUPERVISOR_PROPOSAL_MIGRATION
+            | SUPERVISOR_CONTEXT_MIGRATION
+            | AREA_IMPORT_MIGRATION
     ) {
         errors.push(format!(
-            "unsupported migration version {}; expected {SUPPORTED_MIGRATION}, {SUPERVISOR_MIGRATION} or {SUPERVISOR_PROPOSAL_MIGRATION}",
+            "unsupported migration version {}; supported explicit heads are 52, 53, 54, 55 and 56",
             inventory.migration_version
         ));
     }
@@ -399,7 +403,10 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
     for (table, _) in SUPERVISOR_TABLES_0053 {
         if matches!(
             inventory.migration_version,
-            SUPERVISOR_MIGRATION | SUPERVISOR_PROPOSAL_MIGRATION
+            SUPERVISOR_MIGRATION
+                | SUPERVISOR_PROPOSAL_MIGRATION
+                | SUPERVISOR_CONTEXT_MIGRATION
+                | AREA_IMPORT_MIGRATION
         ) && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0053 table inventory {table}"));
@@ -410,8 +417,10 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         }
     }
     for (table, _) in SUPERVISOR_TABLES_0054 {
-        if inventory.migration_version == SUPERVISOR_PROPOSAL_MIGRATION
-            && !tables.contains_key(table)
+        if matches!(
+            inventory.migration_version,
+            SUPERVISOR_PROPOSAL_MIGRATION | SUPERVISOR_CONTEXT_MIGRATION | AREA_IMPORT_MIGRATION
+        ) && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0054 table inventory {table}"));
         } else if matches!(
@@ -422,6 +431,24 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
             errors.push(format!(
                 "migration 0054 table present before migration 0054 head: {table}"
             ));
+        }
+    }
+    for (head, catalog) in [
+        (SUPERVISOR_CONTEXT_MIGRATION, SUPERVISOR_TABLES_0055),
+        (AREA_IMPORT_MIGRATION, AREA_IMPORT_TABLES_0056),
+    ] {
+        for (table, _) in catalog {
+            if (head..=AREA_IMPORT_MIGRATION).contains(&inventory.migration_version)
+                && !tables.contains_key(table)
+            {
+                errors.push(format!(
+                    "missing migration {head:04} table inventory {table}"
+                ));
+            } else if inventory.migration_version < head && tables.contains_key(table) {
+                errors.push(format!(
+                    "migration {head:04} table present before migration {head:04} head: {table}"
+                ));
+            }
         }
     }
     if HISTORICAL_TABLES
@@ -774,6 +801,15 @@ fn reviewed_projections<'a>(
         let source = lookup(&binding.source.record);
         let version = lookup(&binding.memory_version.record);
         let source_table = tables.get("public.memory_sources");
+        if source.is_some_and(|row| {
+            row.references.iter().any(|reference| {
+                reference.constraint == "logical:target_memory_id" && reference.target.is_some()
+            })
+        }) {
+            errors.push(format!(
+                "projection cannot discard a non-null memory target {label}"
+            ));
+        }
         if !source.is_some_and(|row| {
             row.canonical_id == Some(binding.canonical_id)
                 && row.references.iter().any(|reference| {

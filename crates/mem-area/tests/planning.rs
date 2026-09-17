@@ -1296,11 +1296,17 @@ fn reviewed_schema_catalog_matches_every_current_repository_table() {
         .iter()
         .chain(SUPERVISOR_TABLES_0053)
         .chain(SUPERVISOR_TABLES_0054)
+        .chain(SUPERVISOR_TABLES_0055)
+        .chain(AREA_IMPORT_TABLES_0056)
         .map(|(name, _)| name.to_string())
         .collect();
     assert_eq!(
         catalog.len(),
-        KNOWN_TABLES.len() + SUPERVISOR_TABLES_0053.len() + SUPERVISOR_TABLES_0054.len(),
+        KNOWN_TABLES.len()
+            + SUPERVISOR_TABLES_0053.len()
+            + SUPERVISOR_TABLES_0054.len()
+            + SUPERVISOR_TABLES_0055.len()
+            + AREA_IMPORT_TABLES_0056.len(),
         "duplicate table policy"
     );
     assert_eq!(
@@ -1380,7 +1386,7 @@ fn migration_0053_is_exact_version_gated_and_cannot_reactivate_supervisor_state(
             .iter()
             .any(|error| error.contains("unclassified table public.supervisor_future_authority"))
     );
-    for unsupported in [51, 55, 999] {
+    for unsupported in [51, 57, 999] {
         let mut future = inventory.clone();
         future.migration_version = unsupported;
         assert!(
@@ -1494,6 +1500,99 @@ fn migration_0054_requires_exact_additive_catalog_and_archives_private_proposals
             .any(|error| error.contains("unclassified table public.supervisor_proposals_future"))
     );
     assert!(verify_inventory(&baseline).is_empty());
+}
+
+#[test]
+fn migration_0055_and_0056_require_exact_additions_and_preserve_retention_policies() {
+    assert_eq!(SUPERVISOR_CONTEXT_MIGRATION, 55);
+    assert_eq!(AREA_IMPORT_MIGRATION, 56);
+    assert_eq!(SUPERVISOR_TABLES_0055.len(), 2);
+    assert_eq!(AREA_IMPORT_TABLES_0056.len(), 3);
+    for head in [55, 56] {
+        let mut inventory = fixture();
+        inventory.migration_version = head;
+        for (name, _) in SUPERVISOR_TABLES_0053
+            .iter()
+            .chain(SUPERVISOR_TABLES_0054)
+            .chain(SUPERVISOR_TABLES_0055)
+            .chain(if head == 56 {
+                AREA_IMPORT_TABLES_0056
+            } else {
+                &[]
+            })
+        {
+            inventory.tables.push(TableInventory {
+                table: (*name).into(),
+                columns: vec![Column {
+                    name: "id".into(),
+                    data_type: "uuid".into(),
+                    nullable: false,
+                }],
+                foreign_keys: vec![],
+                row_count: 1,
+                rows: vec![row(id(990).to_string(), None, None, None)],
+            });
+        }
+        assert!(verify_inventory(&inventory).is_empty());
+        let manifest = reviewed(&inventory);
+        let report = verify_manifest(&inventory, &manifest);
+        assert!(report.plan_valid, "{:?}", report.blockers);
+        for (name, strategy) in SUPERVISOR_TABLES_0055.iter().chain(if head == 56 {
+            AREA_IMPORT_TABLES_0056
+        } else {
+            &[]
+        }) {
+            assert_eq!(
+                report
+                    .records
+                    .iter()
+                    .find(|row| row.record.table == *name)
+                    .expect("retention row")
+                    .destination,
+                if *strategy == TableStrategy::RetireRuntime {
+                    Destination::ArchiveAndRetire
+                } else {
+                    Destination::ProtectedArchive
+                }
+            );
+            let mut altered = manifest.clone();
+            altered
+                .table_policies
+                .iter_mut()
+                .find(|policy| policy.table == *name)
+                .expect("policy")
+                .strategy = Some(TableStrategy::Owned);
+            assert_blocked(&inventory, &altered, "invalid or unclassified table policy");
+            let mut missing = inventory.clone();
+            missing.tables.retain(|table| table.table != *name);
+            assert!(verify_inventory(&missing).iter().any(|error| {
+                error.contains(&format!("missing migration {head:04} table inventory"))
+                    || error.contains("missing migration 0055 table inventory")
+            }));
+        }
+        for earlier in 52..head {
+            let mut wrong = inventory.clone();
+            wrong.migration_version = earlier;
+            assert!(
+                verify_inventory(&wrong)
+                    .iter()
+                    .any(|error| error.contains("table present before"))
+            );
+        }
+    }
+    let mut premature = fixture();
+    premature.tables.push(TableInventory {
+        table: "public.area_import_rows".into(),
+        columns: vec![],
+        foreign_keys: vec![],
+        row_count: 0,
+        rows: vec![],
+    });
+    assert!(
+        verify_inventory(&premature)
+            .iter()
+            .any(|error| error.contains("migration 0056 table present before"))
+    );
 }
 
 #[test]

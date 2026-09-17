@@ -299,6 +299,33 @@ pub const SUPERVISOR_TABLES_0054: &[(&str, TableStrategy)] = &[(
     TableStrategy::HistoricalArchive,
 )];
 
+/// Instance binding is retired, never installed as a new area's identity.
+/// Model contexts remain private immutable evidence, not live authority.
+pub const SUPERVISOR_TABLES_0055: &[(&str, TableStrategy)] = &[
+    (
+        "public.supervisor_instance_binding",
+        TableStrategy::RetireRuntime,
+    ),
+    (
+        "public.supervisor_model_contexts",
+        TableStrategy::HistoricalArchive,
+    ),
+];
+
+/// Old import receipts are retained evidence, never proof of a fresh target
+/// import. A future importer creates its own destination-bound receipts.
+pub const AREA_IMPORT_TABLES_0056: &[(&str, TableStrategy)] = &[
+    (
+        "public.area_import_receipts",
+        TableStrategy::HistoricalArchive,
+    ),
+    ("public.area_import_rows", TableStrategy::HistoricalArchive),
+    (
+        "public.area_import_provenance",
+        TableStrategy::HistoricalArchive,
+    ),
+];
+
 /// Optional, observed historical evaluation snapshot. Presence of any member
 /// requires the whole catalog, including empty tables. Never match a prefix or
 /// apply the public schema's ownership/rebuild policy to these archived rows.
@@ -329,6 +356,8 @@ pub fn table_strategy(table: &str) -> Option<TableStrategy> {
         .iter()
         .chain(SUPERVISOR_TABLES_0053)
         .chain(SUPERVISOR_TABLES_0054)
+        .chain(SUPERVISOR_TABLES_0055)
+        .chain(AREA_IMPORT_TABLES_0056)
         .find_map(|(name, strategy)| (*name == table).then_some(*strategy))
         .or_else(|| historical_project_table(table).map(|_| TableStrategy::HistoricalArchive))
 }
