@@ -32,3 +32,18 @@ runtime/approval gates, then launch once on a fresh disposable database.
 On interruption, retain evidence and reconcile provider journals before any
 further action. Completion of development execution is not completion of R3:
 human adjudication and the separately authorized official campaign remain open.
+
+### Frozen continuation 5
+
+Pack: `/data/tmp/r3-continue5-20260917`; manifest:
+`b43cd0958100064339d6d37e7a84534be1eae4d1f071b22b250782903ee979f7`.
+All 29 nonconfiguration asset pins, cases, model, seed, repeats, semantic time,
+provider profile and per-task/preparation bounds match the previous reviewed
+pack. The only campaign-limit change is the authorized reconciled allowance.
+Runtime integrity and label/development approval preflight pass without provider
+calls. The latest reduced-request-allocation fix is present in the frozen runtime.
+
+Owned disposable PostgreSQL: `memory-r3-continue5-20260917`, container ID
+`948d97f2b88c9625f99d099753530868b128d74b5b34a61f23c5493b50a76a94`,
+owner label `continuation-20260917`, loopback port 55439 and tmpfs data. Existing
+services are not modified.
