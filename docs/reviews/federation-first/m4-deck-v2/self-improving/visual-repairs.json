@@ -1,0 +1,47 @@
+{
+  "pass": 1,
+  "changes": [
+    {
+      "id": "p6_i6",
+      "text": "Gather evidence",
+      "shiftPt": [
+        -7.2,
+        -3.6
+      ]
+    },
+    {
+      "id": "v2r2_s5_text_9",
+      "text": "Review a correction",
+      "shiftPt": [
+        -7.2,
+        -7.2
+      ]
+    },
+    {
+      "id": "v2r2_s5_text_10",
+      "text": "New version",
+      "shiftPt": [
+        -7.2,
+        -7.2
+      ]
+    },
+    {
+      "id": "v2r2_s5_text_12",
+      "text": "Reuse later",
+      "shiftPt": [
+        -7.2,
+        0
+      ]
+    },
+    {
+      "id": "v2r2_s5_text_14",
+      "text": "Next: notify the responsible human.",
+      "shiftPt": [
+        302,
+        0
+      ]
+    }
+  ],
+  "newLabel": "Planned outreach",
+  "reason": "Explicit future status, connect notification to uncertainty branch and align inherited text insets."
+}

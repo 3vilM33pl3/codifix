@@ -722,8 +722,8 @@
         "role": "diagram label",
         "text": "Gather evidence",
         "bounds": [
-          360,
-          152,
+          352.8,
+          148.4,
           238,
           35
         ],
@@ -834,8 +834,8 @@
         "role": "diagram label",
         "text": "Review a correction",
         "bounds": [
-          654,
-          273,
+          646.8,
+          265.8,
           270,
           38
         ],
@@ -848,8 +848,8 @@
         "role": "diagram label",
         "text": "New version",
         "bounds": [
-          654,
-          315,
+          646.8,
+          307.8,
           258,
           35
         ],
@@ -862,7 +862,7 @@
         "role": "diagram label",
         "text": "Reuse later",
         "bounds": [
-          654,
+          646.8,
           374,
           258,
           35
@@ -876,9 +876,9 @@
         "role": "roadmap label",
         "text": "Next: notify the responsible human.",
         "bounds": [
-          48,
+          350,
           422,
-          864,
+          562,
           35
         ],
         "fontSize": 21,
@@ -924,6 +924,20 @@
           21
         ],
         "fontSize": 10,
+        "link": null
+      },
+      {
+        "id": "v2r2_s5_planned_outreach",
+        "action": "create",
+        "role": "roadmap label",
+        "text": "Planned outreach",
+        "bounds": [
+          48,
+          422,
+          270,
+          36
+        ],
+        "fontSize": 20,
         "link": null
       }
     ],

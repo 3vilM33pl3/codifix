@@ -1,0 +1,56 @@
+{
+  "verifiedAt": "2026-09-17T13:34:47.444Z",
+  "compact": {
+    "id": "1dMosQKiMjTx1k9yztYfiURaxQTj_HtOSgrmDYW9Ot_g",
+    "revision": "PpuOu-E_XqasQg",
+    "url": "https://docs.google.com/presentation/d/1dMosQKiMjTx1k9yztYfiURaxQTj_HtOSgrmDYW9Ot_g/edit",
+    "permissions": [
+      {
+        "type": "user",
+        "role": "owner",
+        "emailAddress": "olivier@robotmotel.com",
+        "domain": null,
+        "displayName": "Olivier Van Acker",
+        "allowFileDiscovery": null
+      }
+    ]
+  },
+  "backup": {
+    "success": true,
+    "id": "1rVYE6pdmJXEi9l9ZGz9UmtG6dJVA3JmUY8BNLpd6p9c",
+    "title": "Codifix compact v2 — backup before self-improving revision — 2026-09-17 13:22 UTC",
+    "mimeType": "application/vnd.google-apps.presentation",
+    "url": "https://docs.google.com/presentation/d/1rVYE6pdmJXEi9l9ZGz9UmtG6dJVA3JmUY8BNLpd6p9c/edit?usp=drivesdk",
+    "made_private": false
+  },
+  "original": {
+    "id": "1RtPlKvSxf3Z3dmLRHoIaiaKN3n8xtr6WGWJAzeWXCIY",
+    "revision": "_ojXdF-794TMog",
+    "slideCount": 18,
+    "unchanged": true
+  },
+  "notion": {
+    "url": "https://app.notion.com/p/3de8990715f48198a8f3f9a4ac34092d",
+    "readbackVerified": true,
+    "pdfCount": 2,
+    "currentUpload": "3de89907-15f4-817c-b659-00b2c9348ee0"
+  },
+  "render": {
+    "allSlidesInspected": true,
+    "repairPasses": 1,
+    "finalSlide5Reinspection": "pass",
+    "othersByteIdentical": [
+      1,
+      2,
+      3,
+      4,
+      6,
+      7,
+      8,
+      9,
+      10
+    ]
+  },
+  "financialContent": "Native appendix and notes exactly unchanged; prior model freshness evidence retains original timestamps",
+  "runtimeChanges": false
+}
