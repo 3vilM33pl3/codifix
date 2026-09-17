@@ -70,10 +70,46 @@ Protect the restored database and inventories as sensitive data even though the
 container has no network. They contain the complete original dataset and must
 never become an application instance or a source for model prompts.
 
+## Complete partition inventory
+
+The current collector is deliberately restricted to the reviewed
+`memory-four-area-restore-20260917` sandbox and `memory_restore` database. It does
+not accept a live connection URL. After successful restore verification:
+
+```sh
+node scripts/areas/inventory.mjs \
+  --source-instance OBSERVED_SOURCE_INSTANCE_UUID \
+  --snapshot-id NEW_SNAPSHOT_UUID \
+  --output /protected/new-baseline/partition-inventory.json
+```
+
+The parent directory must be owned by the operator with mode 0700. Both the
+inventory and its `.collector.json` evidence sidecar are created exclusively at
+0600. One read-only repeatable-read transaction streams all table rows and
+reconciles counts. Full-row hashes cover PostgreSQL's complete JSONB value
+serialization in UTC; bigint keys are never rounded through JavaScript numbers.
+The evidence sidecar binds the file digest and records its precise serialization.
+Unrecognized schema is retained for review, not omitted. Tables without primary
+keys, foreign tables, broken database foreign keys, oversized envelopes and
+incomplete streams fail closed. No raw row bodies or database errors are printed.
+
+The snapshot's source instance is an observed source binding, **not** a claim
+that it authored every historical row. Existing authorship remains in the
+protected source records. Public and historical project identities stay distinct.
+
+Pass the complete inventory to `memory-area inventory`, then `plan` and `verify`
+as described in [the planner contract](../../crates/mem-area/README.md). Keep
+reports and unresolved drafts private. On the real source, the inventory is
+approximately 1 GB; do not open or parse the whole file in a browser. Collector
+streaming is bounded, but the Rust planner still materializes its input and
+requires enough memory. Structural validity is not a reviewed area assignment,
+and no importer is implemented in this slice. Opaque links embedded in content
+or JSON require separate review; catalog FK coverage alone cannot prove them.
+
 ## Tests
 
 ```sh
-node --test scripts/areas/snapshot.test.mjs scripts/areas/restore-audit.test.mjs
+node --test scripts/areas/*.test.mjs
 ```
 
 The first real restore evidence is recorded in
