@@ -9,6 +9,12 @@ source/artifact pins and record the exact patch, separate build identity and
 artifact hashes. No silent substitution for the official artifact; paid calls
 and live activation remain disabled while the patch is tested.
 
+Continuation confirmed by Olivier after licence inspection, 2026-09-17: proceed
+with that internal patch and offline testing. Preserve the complete upstream
+MIT-derived notice, including its nonstandard OpenAI/Anthropic rider. This is
+user authorization to continue, not a claim of standard MIT terms, maintainer
+permission or legal clearance; no Pi publication or redistribution is included.
+
 ## Agreed operating model
 
 Four independently running Memory installations with separate databases, credentials, storage and Pi Rust supervisors: Trust (CA knowledge, on the console-only CA); Homelab (infrastructure, on Monolith); Workshop (Memory development and releases, on Monolith); General (other genuine knowledge retaining project boundaries, on Monolith). Trust contains procedures and configuration knowledge, never private keys.

@@ -18,10 +18,11 @@ Clippy pass, but this diagnostic is not a passed activation gate. A separately
 hashed patch was approved and checkpointed at 13:36 UTC (plan memory
 `03320fec-9b3f-4fed-afb2-21c5eb4a2c93`). Before modification, the complete pinned
 source exposed a nonstandard licence rider restricting OpenAI/Anthropic-related
-use. Its applicability to this assisted work needs clarification; no patched
-source/binary was produced or distributed. The original pins are retained and
-Pi modification/testing/redistribution is held pending clarification. No real
-key or paid call was used.
+use. Work paused for clarification; Olivier subsequently confirmed continuation
+of the internal patch, checkpointed at 20:06 UTC. Preserve the complete notice
+without claiming standard MIT terms or legal clearance. Original pins remain
+unchanged; separately identified local patch/testing may proceed, with no Pi
+publication, paid calls or live activation. No real key or paid call was used.
 See [reproduction and evidence](../../../crates/mem-supervisor-pi/README.md#real-fake-provider-diagnostic-tool-isolation-blocked).
 
 The native rc.1 binaries and Web UI compiled at source `5827aeb`, but packaging
