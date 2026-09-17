@@ -167,6 +167,26 @@ pub(crate) async fn handshake(
 ) -> Result<(), Failure> {
     let mut reader = BufReader::new(stdout);
     let mut total = 0;
+    confirm_controls(&mut stdin, &mut reader, &mut total, transcript).await?;
+    drop(stdin);
+    // A control-only probe must finish cleanly. Any subsequent frame (including
+    // generation, tool or usage events) is unsolicited and makes it fail closed.
+    if let Some(bytes) = read_frame(&mut reader, &mut total).await? {
+        transcript.push(TranscriptEvent {
+            kind: EventKind::RejectedFrame,
+            bytes: bytes.len(),
+        });
+        return Err(Failure::UnexpectedFrame);
+    }
+    Ok(())
+}
+
+pub(crate) async fn confirm_controls(
+    stdin: &mut tokio::process::ChildStdin,
+    reader: &mut BufReader<tokio::process::ChildStdout>,
+    total: &mut usize,
+    transcript: &mut Vec<TranscriptEvent>,
+) -> Result<(), Failure> {
     for command in [
         ControlCommand::DisableRetry,
         ControlCommand::DisableCompaction,
@@ -182,7 +202,7 @@ pub(crate) async fn handshake(
             kind: EventKind::CommandSent(command),
             bytes: encoded.len(),
         });
-        let bytes = read_frame(&mut reader, &mut total)
+        let bytes = read_frame(reader, total)
             .await?
             .ok_or(Failure::UnexpectedEof)?;
         let response: WireFrame =
@@ -206,20 +226,10 @@ pub(crate) async fn handshake(
             }
         }
     }
-    drop(stdin);
-    // A control-only probe must finish cleanly. Any subsequent frame (including
-    // generation, tool or usage events) is unsolicited and makes it fail closed.
-    if let Some(bytes) = read_frame(&mut reader, &mut total).await? {
-        transcript.push(TranscriptEvent {
-            kind: EventKind::RejectedFrame,
-            bytes: bytes.len(),
-        });
-        return Err(Failure::UnexpectedFrame);
-    }
     Ok(())
 }
 
-async fn read_frame(
+pub(crate) async fn read_frame(
     reader: &mut BufReader<tokio::process::ChildStdout>,
     total: &mut usize,
 ) -> Result<Option<Vec<u8>>, Failure> {

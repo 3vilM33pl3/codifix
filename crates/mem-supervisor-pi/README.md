@@ -22,8 +22,11 @@ The executable is copied into fresh private scratch, hashing the exact copied
 bytes before making the copy executable. Input is a regular nonempty file capped
 at 512 MiB. Every launch uses `env_clear`, fresh HOME/XDG/agent/config/session and
 working directories, fixed settings disabling retries/failover/compaction, and
-fixed CLI flags disabling tools, extensions, skills, context files, prompt
+fixed CLI flags requesting disabled tools, extensions, skills, context files, prompt
 templates, themes, sessions, and migrations. No shell is involved.
+The later real-provider diagnostic below establishes that the tool flag is not
+sufficient in the pinned upstream build; do not interpret these flags as a
+verified empty tool registry.
 
 The only RPC requests are correlated `set_auto_retry(false)`,
 `set_auto_compaction(false)`, and `get_state`. State must confirm exactly
@@ -177,3 +180,40 @@ ARM64 binary was executed. GLIBC compatibility still needs explicit checking on
 each deployment target; neither an older CA distro nor a production sandbox is
 certified. Production remains credential-free and therefore blocked at Pi's
 auth-presence gate until a separately reviewed proxy-only integration exists.
+
+## Real fake-provider diagnostic: tool isolation blocked
+
+On 2026-09-17 the additional ignored test
+`provider_probe::sandboxed_real_fake_provider_exposes_unrequested_tool` ran in
+the same pinned Ubuntu 26.04/network-none/non-root/read-only container. Its
+in-container fake HTTP server accepted only the fixed invalid fixture token,
+exact model, bounded synthetic input, no provider storage, streaming and an
+800-output-token limit. No host service, real credential, dataset or paid model
+was used. Reproduce with the earlier Docker command and this exact test name.
+
+The test **reproduces a blocked tool-isolation gate**, not a qualified agent:
+
+- `--no-tools` still advertises `xdev` and `submit_plan`.
+- Explicit `tools.loadMode` settings turning `manage_skill`, `xdev` and
+  `submit_plan` off instead advertise `manage_skill` and `submit_plan`.
+- Both successful synthetic responses complete a full RPC prompt/result cycle.
+  A synthetic HTTP 429 yields `provider_error` and terminal failure with exactly
+  one request, no retry and no successful answer.
+- The supplied system prompt has an upstream current-date line appended. The
+  diagnostic accepts only that bounded line, not paths or other added context.
+
+The [pinned tool registry](https://github.com/Dicklesworthstone/pi_agent_rust/blob/7c018475d54d4e09c907691e47a520f1f09e3288/src/tools.rs#L5262)
+adds `manage_skill` independently of the selected built-ins, while the
+[pinned startup](https://github.com/Dicklesworthstone/pi_agent_rust/blob/7c018475d54d4e09c907691e47a520f1f09e3288/src/main.rs#L2020)
+adds `submit_plan`. The dispatcher derives from discoverable registrations;
+setting a tier to off does not remove these unconditional additions. The
+[prompt builder](https://github.com/Dicklesworthstone/pi_agent_rust/blob/7c018475d54d4e09c907691e47a520f1f09e3288/src/app.rs#L221)
+adds the date even with an explicit system prompt.
+
+The diagnostic intentionally supplies only a fixed text response, never a tool
+call. It proves these declarations exist, **not** that a particular privileged
+effect was executed. Production `provider_execution_gate()` remains closed.
+A request to approve a narrowly patched, separately hashed Pi build was sent
+to Olivier; no new upstream pin, patched artifact or authority is assumed.
+Even a corrected tool flag will not replace the external sandbox, exact input
+consent, per-request admission, response validation or budget checks.

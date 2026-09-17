@@ -165,3 +165,6 @@ pub fn control_arguments() -> &'static [&'static str] {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod provider_probe;

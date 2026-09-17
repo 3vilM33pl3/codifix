@@ -23,28 +23,7 @@ pub(crate) async fn run(config: ProbeConfig) -> ProbeReport {
         Ok(Err(failure)) => return ProbeReport::failed(failure),
         Err(_) => return ProbeReport::failed(Failure::Deadline),
     };
-    let mut command = Command::new(&prepared.executable);
-    command
-        .args(control_arguments())
-        .current_dir(&prepared.cwd)
-        .env_clear()
-        .env("HOME", &prepared.home)
-        .env("XDG_CONFIG_HOME", prepared.home.join("config"))
-        .env("XDG_DATA_HOME", prepared.home.join("data"))
-        .env("XDG_STATE_HOME", prepared.home.join("state"))
-        .env("XDG_CACHE_HOME", prepared.home.join("cache"))
-        .env("XDG_RUNTIME_DIR", prepared.home.join("runtime"))
-        .env("TMPDIR", prepared.scratch.path())
-        .env("PI_CODING_AGENT_DIR", &prepared.agent)
-        .env("PI_PACKAGE_DIR", prepared.agent.join("packages"))
-        .env("PI_SESSIONS_DIR", prepared.agent.join("sessions"))
-        .env("PI_CONFIG_PATH", &prepared.settings)
-        .env("PATH", "/usr/bin:/bin")
-        .env("LANG", "C.UTF-8")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
+    let mut command = isolated_command(&prepared);
     // Absent from production builds. This fixed, invalid non-secret token only
     // bypasses Pi's local presence check in the explicit network-none diagnostic.
     #[cfg(test)]
@@ -141,7 +120,37 @@ pub(crate) async fn run(config: ProbeConfig) -> ProbeReport {
     }
 }
 
-async fn drain_stderr(mut stderr: tokio::process::ChildStderr) -> Result<usize, Failure> {
+/// Process hygiene shared with the explicit fake-provider compatibility test.
+/// This does not establish an OS sandbox or grant provider authority.
+pub(crate) fn isolated_command(prepared: &artifact::Prepared) -> Command {
+    let mut command = Command::new(&prepared.executable);
+    command
+        .args(control_arguments())
+        .current_dir(&prepared.cwd)
+        .env_clear()
+        .env("HOME", &prepared.home)
+        .env("XDG_CONFIG_HOME", prepared.home.join("config"))
+        .env("XDG_DATA_HOME", prepared.home.join("data"))
+        .env("XDG_STATE_HOME", prepared.home.join("state"))
+        .env("XDG_CACHE_HOME", prepared.home.join("cache"))
+        .env("XDG_RUNTIME_DIR", prepared.home.join("runtime"))
+        .env("TMPDIR", prepared.scratch.path())
+        .env("PI_CODING_AGENT_DIR", &prepared.agent)
+        .env("PI_PACKAGE_DIR", prepared.agent.join("packages"))
+        .env("PI_SESSIONS_DIR", prepared.agent.join("sessions"))
+        .env("PI_CONFIG_PATH", &prepared.settings)
+        .env("PATH", "/usr/bin:/bin")
+        .env("LANG", "C.UTF-8")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    command
+}
+
+pub(crate) async fn drain_stderr(
+    mut stderr: tokio::process::ChildStderr,
+) -> Result<usize, Failure> {
     let mut total = 0;
     let mut buffer = [0_u8; 1024];
     loop {

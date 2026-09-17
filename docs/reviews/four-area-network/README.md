@@ -9,6 +9,15 @@ explicit build-volume output and Debian prerelease ordering (`2.1.0~rc.1` before
 `2.1.0`). The three clean-launcher tests also pass. These are build-path tests,
 not actual architecture artifacts, signing, installation or CA runtime evidence.
 
+Pi follow-up: a real AMD64 RPC/fake-provider diagnostic in the pinned,
+network-disabled sandbox reproduces an **open tool-isolation defect**.
+`--no-tools` advertises `xdev`/`submit_plan`; explicit off tiers still advertise
+`manage_skill`/`submit_plan`. Synthetic success and HTTP 429 each make one local
+request; failure is explicit without retry. The ordinary 11 Pi tests and strict
+Clippy pass, but this diagnostic is not a passed activation gate. A separately
+hashed patch requires the requested approval. No real key or paid call was used.
+See [reproduction and evidence](../../../crates/mem-supervisor-pi/README.md#real-fake-provider-diagnostic-tool-isolation-blocked).
+
 The [approved execution contract](contract.md) is the source of scope and gates.
 Trust runs on the console-administered CA; Homelab, Workshop and General run on
 Monolith, each with independent application/database boundaries. Supervisors use
