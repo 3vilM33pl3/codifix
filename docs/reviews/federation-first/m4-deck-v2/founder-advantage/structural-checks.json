@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "presentation": {
+    "id": "1dMosQKiMjTx1k9yztYfiURaxQTj_HtOSgrmDYW9Ot_g",
+    "title": "Codifix — Infrastructure for the Agentic Enterprise — compact v2 — 2026-09-17",
+    "revisionId": "oV9_HKFm4MVSsQ",
+    "slideCount": 10
+  },
+  "snapshotSha256": "fb975a5179ec1cbe6d54d73324f4ae1195ac701a1404cb5124da43a98b6fac07",
+  "summary": {
+    "totalIssues": 0,
+    "reportedIssues": 0,
+    "truncated": false,
+    "bySeverity": {},
+    "byCode": {}
+  },
+  "issues": []
+}

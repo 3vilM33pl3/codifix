@@ -42,3 +42,9 @@ The current deck replaces slides 5–6 with knowledge maintenance and three prod
 New claims distinguish eligible volatility-based rechecking, bounded supporting evidence, uncertainty flags, authorized correction review and immutable versions. Proactive notification is visibly future work. Connected retrieval requires extracted code graphs/populated embeddings; portability is limited to supported interfaces and populated embedding spaces. The combination is distinctive product positioning, not competitor exclusivity. There is no measured autonomous-quality claim.
 
 M3/M5 now additionally require validation accuracy, missed changes, reviewer effort, validation-token cost and correction reuse with explicit denominators and independent outcome evidence. See the extension's reusable handoff table.
+
+## 17 September founder-advantage revision
+
+Current slide 8 now explicitly presents founder enterprise delivery and established relationships. [Relationship labels, source evidence and limits](founder-advantage/design-and-evidence.md) supersede the initial slide-8 founder wording while preserving the original evidence history. BAE is a founder-confirmed client engagement; Shell engineering leadership and McKinsey technology consulting are supported by the existing CV/career archive. Established relationships are a founder-reported route to introductions, buyer insight and discovery. Company endorsement, guaranteed access, buyer interest, active pilots and assured success are not claimed.
+
+The slide retains shipped-product credibility, planned staffing and a financing discussion around repeatable integrations, measured pilots and validated delivery economics. No financial assumption, capability/evaluation result or M3/M5 completion status changed.
