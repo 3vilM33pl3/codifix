@@ -4,5 +4,6 @@ Section: utils
 Priority: optional
 Architecture: amd64
 Maintainer: Codex <codex@example.invalid>
-Depends: postgresql
+Depends: ${shlibs:Depends}, python3, gpg
+Suggests: postgresql
 Description: Local-first project memory backend and CLI

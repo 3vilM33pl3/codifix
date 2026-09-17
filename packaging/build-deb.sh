@@ -156,9 +156,57 @@ cp -R "$ROOT_DIR/.agents/skills/." "$PKG_ROOT/usr/share/memory-layer/skill-templ
 find "$PKG_ROOT/usr/share/memory-layer/skill-template" -type f -name '*.sh' -exec chmod 0755 {} +
 cp -R "$ROOT_DIR/web/dist/." "$PKG_ROOT/usr/share/memory-layer/web/"
 
+# Derive ABI dependencies from every shipped executable, without running it.
+# PostgreSQL provisioning is separate: installing a client package must not pull
+# in and start a database server as an implicit dependency.
+mkdir -p "$BUILD_ROOT/debian"
+{ printf 'Source: memory-layer\n\n'; cat "$ROOT_DIR/packaging/debian/control"; } > "$BUILD_ROOT/debian/control"
+case "$DEB_ARCH" in
+  amd64) GNU_TARGET=x86_64-linux-gnu ;;
+  arm64) GNU_TARGET=aarch64-linux-gnu ;;
+esac
+SHLIB_ARGS=(--package=memory-layer -O)
+if [[ "$HOST_TARGET" != "$RUST_TARGET" ]]; then
+  SHLIB_ARGS+=("-l/usr/$GNU_TARGET/lib")
+fi
+for executable in memory memory-area memory-area-import memory-federation-gateway; do
+  SHLIB_ARGS+=("-e$PKG_ROOT/usr/bin/$executable")
+done
+DEPENDENCY_LINE="$(cd "$BUILD_ROOT"; DEB_HOST_ARCH="$DEB_ARCH" DEB_HOST_GNU_TYPE="$GNU_TARGET" dpkg-shlibdeps "${SHLIB_ARGS[@]}")"
+if [[ "$DEPENDENCY_LINE" != shlibs:Depends=* || "$DEPENDENCY_LINE" == *$'\n'* ]]; then
+  echo "Expected one complete runtime dependency result from dpkg-shlibdeps" >&2
+  exit 1
+fi
+RUNTIME_DEPENDENCIES="${DEPENDENCY_LINE#shlibs:Depends=}"
+# Cross-toolchain symbol metadata names host-side sysroot packages. Map only
+# these known ABI-identical runtime counterparts, retaining version bounds.
+for runtime in libc6 libgcc-s1 libstdc++6; do
+  RUNTIME_DEPENDENCIES="${RUNTIME_DEPENDENCIES//$runtime-$DEB_ARCH-cross/$runtime:$DEB_ARCH}"
+done
+IFS=',' read -r -a DEPENDENCY_PARTS <<< "$RUNTIME_DEPENDENCIES"
+DEPENDENCY_PATTERN="^ *(libc6|libgcc-s1|libstdc[+][+]6)(:$DEB_ARCH)? \\(>= [0-9][0-9A-Za-z.+:~_-]*\\)$"
+if [[ "${#DEPENDENCY_PARTS[@]}" != 3 ]]; then
+  echo "Unexpected runtime library set; review package ABI dependencies" >&2
+  exit 1
+fi
+declare -A CHECKED_DEPENDENCIES=()
+for dependency in "${DEPENDENCY_PARTS[@]}"; do
+  if [[ ! "$dependency" =~ $DEPENDENCY_PATTERN ]]; then
+    echo "Unresolved runtime dependency; target metadata must supply version bounds" >&2
+    exit 1
+  fi
+  runtime="${BASH_REMATCH[1]}"
+  if [[ -v "CHECKED_DEPENDENCIES[$runtime]" ]]; then
+    echo "Duplicate runtime metadata; review package ABI dependencies" >&2
+    exit 1
+  fi
+  CHECKED_DEPENDENCIES[$runtime]=1
+done
+
 sed \
   -e "s/^Version: .*/Version: $DEB_VERSION/" \
   -e "s/^Architecture: .*/Architecture: $DEB_ARCH/" \
+  -e "s/\${shlibs:Depends}/$RUNTIME_DEPENDENCIES/" \
   "$ROOT_DIR/packaging/debian/control" > "$PKG_ROOT/DEBIAN/control"
 install -m 0644 "$ROOT_DIR/packaging/debian/conffiles" "$PKG_ROOT/DEBIAN/conffiles"
 install -m 0755 "$ROOT_DIR/packaging/debian/postinst" "$PKG_ROOT/DEBIAN/postinst"

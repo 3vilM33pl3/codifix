@@ -42,6 +42,17 @@ version/tombstone/provenance import and reconciliation. Strict operator Clippy,
 formatting and boundaries pass. No real target was initialized or imported; CA
 operator/environment gates are unchanged.
 
+Native `memory --version` passed inside the network-none, read-only-root,
+non-root container and reports `2.1.0-rc.1`; it did not contact any database.
+Static ELF/dependency inspection found missing runtime dependencies in the old
+Debian manifest. Packaging now requires computed, versioned libc/C++/GCC bounds
+for all four executables and rejects missing/unresolved metadata. The observed
+native requirements are libc6 >= 2.39 and libstdc++6 >= 14; the cross sysroot
+metadata conservatively requires libc6:arm64 >= 2.43. These are not CA runtime
+approval. PostgreSQL provisioning is no longer an implicit hard package
+dependency. Synthetic native/cross and dependency-failure tests pass; actual
+rebuilt artifacts are still pending.
+
 The [approved execution contract](contract.md) is the source of scope and gates.
 Trust runs on the console-administered CA; Homelab, Workshop and General run on
 Monolith, each with independent application/database boundaries. Supervisors use

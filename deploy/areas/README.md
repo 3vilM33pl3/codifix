@@ -28,6 +28,14 @@ binaries are only packaged, never executed. An ARM64 package build is **not**
 an ARM64 runtime test: actual CA compatibility remains a console gate. Artifact
 filenames retain SemVer (`2.1.0-rc.1`); Debian's internal version is
 `2.1.0~rc.1`, so a later `2.1.0` stable package upgrades the candidate correctly.
+The build also requires `dpkg-shlibdeps` and the selected architecture's runtime
+symbol metadata. It computes versioned libc/C++/GCC dependencies from all four
+ELFs without executing them; missing or unresolved dependencies fail the build.
+Cross sysroot package names are mapped only to their known target counterparts,
+without reducing their version bounds. Python 3 and GPG support the operator
+tools. PostgreSQL is suggested, not pulled in or started implicitly: provision
+each intended database separately. Do not upgrade CA system libraries merely to
+satisfy a candidate package; review compatibility before installation.
 
 ## Files and identities
 

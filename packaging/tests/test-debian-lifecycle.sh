@@ -175,6 +175,25 @@ ln -s "$test_root/unrelated-build" "$fixture/target/debian/memory-layer-amd64"
 cargo() { log_command "cargo $*"; }
 npm() { log_command "npm $*"; }
 rustc() { [[ "$1" == -vV ]] || return 99; printf 'host: x86_64-unknown-linux-gnu\n'; }
+dpkg-shlibdeps() {
+    [[ "${PACKAGING_TEST_SHLIB_STATUS:-0}" == 0 ]] || return 1
+    [[ -f debian/control ]] || return 1
+    local executables=0 arg
+    for arg in "$@"; do
+        if [[ "$arg" == -e* ]]; then
+            [[ -x "${arg#-e}" ]] || return 1
+            executables=$((executables + 1))
+        fi
+    done
+    [[ "$executables" == 4 ]] || return 1
+    if [[ "${PACKAGING_TEST_SHLIB_INVALID:-0}" == 1 ]]; then
+        printf 'shlibs:Depends=libc6 (>= 2.39), libunknown-cross, libstdc++6\n'
+    elif [[ "$DEB_HOST_ARCH" == arm64 ]]; then
+        printf 'shlibs:Depends=libc6:arm64 (>= 2.43), libgcc-s1-arm64-cross (>= 4.2), libstdc++6-arm64-cross (>= 14)\n'
+    else
+        printf 'shlibs:Depends=libc6 (>= 2.39), libgcc-s1 (>= 4.2), libstdc++6 (>= 14)\n'
+    fi
+}
 dpkg-deb() {
     [[ "$1" == --root-owner-group && "$2" == --build ]] || return 90
     local staging="$3" architecture rust_target
@@ -188,6 +207,12 @@ dpkg-deb() {
         *) return 90 ;;
     esac
     grep -Fxq 'Version: 2.1.0~rc.1' "$staging/DEBIAN/control" || return 90
+    if [[ "$architecture" == arm64 ]]; then
+        grep -Fxq 'Depends: libc6:arm64 (>= 2.43), libgcc-s1:arm64 (>= 4.2), libstdc++6:arm64 (>= 14), python3, gpg' "$staging/DEBIAN/control" || return 90
+    else
+        grep -Fxq 'Depends: libc6 (>= 2.39), libgcc-s1 (>= 4.2), libstdc++6 (>= 14), python3, gpg' "$staging/DEBIAN/control" || return 90
+    fi
+    grep -Fxq 'Suggests: postgresql' "$staging/DEBIAN/control" || return 90
     [[ -f "$staging/lib/systemd/system/memory-layer@.service" ]] || return 91
     [[ -x "$staging/usr/libexec/memory-layer/verify-instance-release" ]] || return 92
     [[ -x "$staging/usr/libexec/memory-layer/run-instance" ]] || return 92
@@ -210,7 +235,7 @@ dpkg-deb() {
     printf 'fixture deb\n' > "$4"
     log_command "dpkg-deb $*"
 }
-export -f cargo npm rustc dpkg-deb
+export -f cargo npm rustc dpkg-deb dpkg-shlibdeps
 export CARGO_TARGET_DIR="$test_root/binaries"
 : > "$PACKAGING_TEST_LOG"
 (umask 077; bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null)
@@ -248,6 +273,13 @@ grep -q '^cargo build --locked -p mem-cli --no-default-features --features tui .
 grep -q '^cargo build --release --locked -p mem-federation-runtime .*--target aarch64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross gateway targeted the wrong architecture"
 dpkg --compare-versions 2.1.0~rc.1 lt 2.1.0 || fail "Debian candidate does not sort before stable"
 dpkg --compare-versions 2.1.0~rc.1 gt 2.0.0 || fail "Debian candidate does not sort after the prior stable"
+
+if PACKAGING_TEST_SHLIB_STATUS=1 bash "$fixture/packaging/build-deb.sh" --output-dir "$test_root/missing-dependencies" >/dev/null 2>&1; then
+    fail "builder ignored missing runtime metadata"
+fi
+if PACKAGING_TEST_SHLIB_INVALID=1 bash "$fixture/packaging/build-deb.sh" --output-dir "$test_root/invalid-dependencies" >/dev/null 2>&1; then
+    fail "builder accepted unresolved or unversioned runtime metadata"
+fi
 
 for arguments in '--arch' '--target' '--output-dir' '--arch mips' '--arch amd64 --target aarch64-unknown-linux-gnu' '--target ../../other'; do
     : > "$PACKAGING_TEST_LOG"
