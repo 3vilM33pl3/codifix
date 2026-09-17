@@ -2,6 +2,8 @@
 
 **Completed and verified 17 September 2026.** Fourteen core slides and four appendix slides now replace the earlier narrative at the existing native URL. M3 cost/packaging validation and M5 customer evidence remain open.
 
+The [project Memory completion checkpoint](completion-checkpoint.json) verified all eight approved checklist items, archived the plan and recorded the implementation.
+
 ## Deliverables
 
 - [Updated native investor deck](https://docs.google.com/presentation/d/1RtPlKvSxf3Z3dmLRHoIaiaKN3n8xtr6WGWJAzeWXCIY/edit) — editable text, diagrams and three native tables; no fixed fundraising ask.
