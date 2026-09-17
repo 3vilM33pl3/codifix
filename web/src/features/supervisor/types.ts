@@ -11,12 +11,14 @@ export const EVENT_LABELS = {
 export interface SupervisorResponse {
   read_only: boolean;
   execution: "not_integrated";
+  deterministic_checks_configured?: boolean;
   snapshot: null | {
     instance_id: string;
     area: SupervisorArea | null;
     observed_at: string;
     policy: null | { revision: string; enabled: boolean; revoked: boolean; model: string; daily_usd_micros: string; daily_calls: number };
     budget: null | { day: string; charged_usd_micros: string; reserved_usd_micros: string; calls: number };
+    last_health_observation?: null | { action_id: string; policy_revision: string; observed_at: string; next_due_at: string; project_count: string; canonical_count: string; blocked_jobs: string; failed_jobs: string; uncertain_actions: string };
     action_counts: { state: string; count: string }[];
     journal: { sequence: string; action_id: string | null; attempt_id: string | null; policy_revision: string; event: keyof typeof EVENT_LABELS; recorded_at: string }[];
     next_after: string;

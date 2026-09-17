@@ -24,6 +24,7 @@ mod routes;
 mod runtime;
 mod runtime_status;
 mod state;
+mod supervisor;
 
 pub use repository::{
     fetch_project_commit, fetch_project_commits, fetch_project_memories, fetch_project_overview,

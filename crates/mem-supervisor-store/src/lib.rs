@@ -4,6 +4,7 @@
 mod actions;
 mod attempts;
 mod contexts;
+mod health;
 mod inspection;
 mod policy;
 mod proposals;

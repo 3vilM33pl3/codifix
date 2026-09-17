@@ -9,6 +9,7 @@ use sqlx::{PgConnection, PgPool, Row};
 use uuid::Uuid;
 
 pub const TARGET_MIGRATION: i64 = 56;
+pub const HEALTH_TARGET_MIGRATION: i64 = 57;
 const TABLES: &[&str] = &[
     "public.projects",
     "public.sessions",
@@ -146,10 +147,11 @@ pub async fn import_partition(
         sqlx::query_scalar("SELECT max(version) FROM public._sqlx_migrations WHERE success")
             .fetch_one(&mut *tx)
             .await?;
-    if head != Some(TARGET_MIGRATION) {
+    if !matches!(head, Some(TARGET_MIGRATION | HEALTH_TARGET_MIGRATION)) {
         return Err(ImportError::Schema);
     }
-    let valid_history: bool = sqlx::query_scalar("SELECT count(*)=56 AND bool_and(success AND version BETWEEN 1 AND 56) FROM public._sqlx_migrations").fetch_one(&mut *tx).await?;
+    let target_head = head.ok_or(ImportError::Schema)?;
+    let valid_history: bool = sqlx::query_scalar("SELECT count(*)=$1 AND bool_and(success AND version BETWEEN 1 AND $1) FROM public._sqlx_migrations").bind(target_head).fetch_one(&mut *tx).await?;
     if !valid_history {
         return Err(ImportError::Schema);
     }
@@ -161,6 +163,11 @@ pub async fn import_partition(
         .chain(mem_area::SUPERVISOR_TABLES_0054)
         .chain(mem_area::SUPERVISOR_TABLES_0055)
         .chain(mem_area::AREA_IMPORT_TABLES_0056)
+        .chain(if target_head == HEALTH_TARGET_MIGRATION {
+            mem_area::SUPERVISOR_TABLES_0057
+        } else {
+            &[]
+        })
         .map(|(name, _)| (*name).into())
         .collect();
     if tables
@@ -208,17 +215,17 @@ pub async fn import_partition(
         if existing.try_get::<i32, _>("source_migration")?
             != i32::try_from(partition.source_migration_version())
                 .map_err(|_| ImportError::Invalid)?
-            || existing.try_get::<i32, _>("target_migration")? != TARGET_MIGRATION as i32
+            || existing.try_get::<i32, _>("target_migration")? != target_head as i32
         {
             return Err(ImportError::Conflict);
         }
     } else {
-        sqlx::query("INSERT INTO public.area_import_receipts(id,target_instance,area,source_instance,snapshot_id,inventory_sha256,manifest_sha256,partition_sha256,source_migration,target_migration,row_count,projection_count) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,56,$10,$11)")
+        sqlx::query("INSERT INTO public.area_import_receipts(id,target_instance,area,source_instance,snapshot_id,inventory_sha256,manifest_sha256,partition_sha256,source_migration,target_migration,row_count,projection_count) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$12,$10,$11)")
             .bind(operation_id).bind(target_instance).bind(area_name(partition.area()))
             .bind(partition.source_instance()).bind(partition.snapshot_id())
             .bind(partition.inventory_sha256()).bind(partition.manifest_sha256()).bind(partition.partition_sha256())
             .bind(i32::try_from(partition.source_migration_version()).map_err(|_| ImportError::Invalid)?)
-            .bind(count).bind(projections).execute(&mut *tx).await?;
+            .bind(count).bind(projections).bind(target_head as i32).execute(&mut *tx).await?;
     }
     // Source and target column catalogs must match before *any* source insert.
     // Materialization shares one catalog per table; do not issue a catalog

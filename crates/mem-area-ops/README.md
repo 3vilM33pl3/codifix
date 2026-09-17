@@ -64,7 +64,7 @@ against directories another process under that UID is modifying.
 ## Explicit target and import
 
 Provision an independent local target with the exact supported migrations
-(currently 0056), no application/worker connections and no prior knowledge,
+(explicitly supported heads 0056 or 0057), no application/worker connections and no prior knowledge,
 credentials, jobs or federation authority. Migration and writer fencing are
 separate operator steps. A target UUID is a binding, not proof of host identity.
 

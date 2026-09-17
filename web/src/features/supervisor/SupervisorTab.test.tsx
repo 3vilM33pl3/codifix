@@ -59,3 +59,15 @@ it("formats exact millionths without floating point rounding", () => {
   expect(dollars("9007199254740993123456")).toBe("$9007199254740993.123456");
   expect(dollars("-1")).toBe("unavailable");
 });
+
+it("shows historical deterministic checks without claiming current health or model activation", async () => {
+  vi.mocked(supervisorStatus).mockResolvedValue({ ...fixture, deterministic_checks_configured: true, snapshot: {
+    ...fixture.snapshot!, last_health_observation: { action_id: "health-action", policy_revision: "old-policy", observed_at: "2026-09-17T10:00:00Z", next_due_at: "2026-09-17T10:05:00Z", project_count: "7", canonical_count: "100", blocked_jobs: "2", failed_jobs: "3", uncertain_actions: "1" },
+  }});
+  render(<SupervisorTab />);
+  const observation = await screen.findByRole("region", { name: "Last operational observation" });
+  expect(observation).toHaveTextContent("old-policy");
+  expect(observation).toHaveTextContent("2 blocked jobs; 3 failed jobs; 1 uncertain actions");
+  expect(observation).toHaveTextContent("does not prove current availability");
+  expect(screen.getByText(/Deterministic operational checks:/)).toHaveTextContent("do not enable Pi or model calls");
+});

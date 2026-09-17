@@ -32,7 +32,8 @@ export function SupervisorTab() {
     {error ? <p role="alert">{error}</p> : null}
     {!data && !error ? <p role="status">Loading supervisor…</p> : null}
     {data ? <>
-      <p role="status">Supervisor execution is not integrated in this build. No active agent or healthy heartbeat is claimed.</p>
+      <p role="status">Pi/model supervisor execution is not integrated in this build. No active agent or healthy heartbeat is claimed.</p>
+      <p>Deterministic operational checks: {data.deterministic_checks_configured ? "configured; current policy and writable service required" : "not configured"}. These do not enable Pi or model calls.</p>
       {data.read_only ? <p>Read-only service. This panel never starts work or changes policy.</p> : null}
       {!snapshot ? <p>No durable supervisor identity is configured. Nothing was enrolled or enabled.</p>
         : <>
@@ -45,6 +46,12 @@ export function SupervisorTab() {
           </> : <p>No supervisor policy installed.</p>}
           {snapshot.budget ? <p>UTC accounting day {snapshot.budget.day}: {snapshot.budget.calls} calls; charged {dollars(snapshot.budget.charged_usd_micros)}; reserved or uncertain {dollars(snapshot.budget.reserved_usd_micros)}. Uncertain charges remain reserved.</p> : null}
           <h3>Recorded actions</h3>
+          {snapshot.last_health_observation ? <section aria-label="Last operational observation">
+            <p>Observed {snapshot.last_health_observation.observed_at}; next due {snapshot.last_health_observation.next_due_at}.</p>
+            <p>Policy {snapshot.last_health_observation.policy_revision}; action {snapshot.last_health_observation.action_id}.</p>
+            <p>{snapshot.last_health_observation.project_count} projects; {snapshot.last_health_observation.canonical_count} canonical histories; {snapshot.last_health_observation.blocked_jobs} blocked jobs; {snapshot.last_health_observation.failed_jobs} failed jobs; {snapshot.last_health_observation.uncertain_actions} uncertain actions.</p>
+            <p>Historical database observation only. It does not prove current availability, backup recovery, remote connectivity or model health.</p>
+          </section> : null}
           {snapshot.action_counts.length ? <ul>{snapshot.action_counts.map(c => <li key={c.state}>{c.state}: {c.count}</li>)}</ul> : <p>No recorded actions.</p>}
           <h3>Action history</h3>
           <p>Metadata only: no questions, source contents, private proposals or model prompts.</p>

@@ -288,11 +288,26 @@ Monolith, each with independent application/database boundaries. Supervisors use
   Stubbed lifecycle/staging tests prove they are included but never executed
   by a package hook; no package was built for release, signed, installed or
   activated by this test. No Pi binary, secret or private dataset is bundled.
+- Opt-in deterministic observation is now implemented: migration 0057 stores a
+  five-minute database schedule and immutable operational counts. A writable,
+  non-evaluation primary service polls every ten seconds, requires the exact
+  instance/area binding and enabled policy, and never bootstraps authority.
+  Action, schedule, observation, result and history commit together. Tests prove
+  concurrent-check serialization, durable restart, policy/revocation denial,
+  deferred-commit rollback and recovery from an absent service pool. No model,
+  content, remote request, knowledge mutation or installation is involved.
+- Inspection surfaces show the historical observation and its policy/time, not
+  a claim of current availability or full agent execution. The Web suite now
+  passes **100 tests** and its build; five focused CLI/TUI tests pass. The store
+  suite passes **28 tests**, with focused strict Clippy and boundaries passing.
+  The importer supports exact schema heads 0056 and 0057; a new required-DB test
+  proves an old receipt survives additive upgrade unchanged but cannot authorize
+  replay at a different head. No live schema or configuration was changed.
 
 Next: review and classify the protected source by content/provenance; obtain the CA
 console inventory and complete the writer-stop/host/offline backup gates. Model
 integration still needs current collection/destination consent and Pi proxy-only
-egress; credential selection is resolved. Durable scheduling and supervision,
+egress; credential selection is resolved. Full agent scheduling and supervision,
 Web/TUI agent actions/chat, real releases, enrollment and the live four-area demo
 remain unimplemented or unverified. The inspection-only browser/terminal rehearsal
 does not satisfy those gates or prove actual agent execution. No full-workspace,

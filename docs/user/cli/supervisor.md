@@ -16,6 +16,7 @@ The service uses an explicitly configured durable identity:
 [supervisor]
 instance_id = "REPLACE_WITH_DURABLE_INSTANCE_UUID"
 area = "workshop"
+deterministic_checks = false
 ```
 
 This is an inactive configuration example, not an activation procedure. The
@@ -24,8 +25,9 @@ deployment path. Configuration does not create a binding, install policy, enroll
 a participant, start Pi or allow model disclosure. The process ID from `/healthz`
 is regenerated on startup and is **not** this durable identity.
 
-`execution: not_integrated` is deliberate in this build. A stored enabled policy
-is not a heartbeat or proof that an agent is running. Missing configuration,
+`execution: not_integrated` describes Pi/model agency, not the separately opt-in
+database observer below. A stored enabled policy is not a heartbeat or proof that
+an agent is running. Missing configuration,
 unbound database identity, missing policy, paused/revoked policy, access denial,
 offline storage and identity mismatch are separate states.
 
@@ -40,8 +42,29 @@ making a request so denied/offline state is not shown as current healthy state.
 
 These surfaces do not expose questions, private proposals, source text, evidence
 bytes, model prompts or provider bodies. They never invoke a model or mutate
-policy. Pause/resume, approvals, supervisor chat and actual scheduling remain
+policy. Pause/resume, approvals, supervisor chat and model scheduling remain
 separate implementation work, not implied by this read-only panel.
+
+## Deterministic operational checks
+
+After migration 0057, the separately provisioned identity and explicitly enabled
+policy can run fixed metadata-only checks when the operator sets
+`deterministic_checks = true`. This setting defaults off. Read-only, relay and
+evaluation services never start this worker. It observes project/history counts,
+blocked/failed background jobs and uncertain supervisor actions only; no content,
+model invocation, remote contact, knowledge change or installation is involved.
+
+A database schedule permits one observation every five minutes, checked every
+ten seconds. The action, result, schedule and history commit together. Competing
+processes serialize on the schedule; restart does not repeat completed periods.
+Database disconnection leaves the period due; reconnection resumes polling.
+Shutdown/config reload cancels this process's worker. It never creates an identity
+or enables policy itself. Pausing/revoking policy blocks subsequent observations.
+
+The UI shows **last observation**, its policy revision and next due time. Old
+observations remain visible after policy changes and are not proof of present
+availability, backups, network access or healthy models. Successful collection
+does not mean the observed counts indicate a healthy system.
 
 ## Disposable verification
 

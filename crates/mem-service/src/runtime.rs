@@ -268,6 +268,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         let shutdown_handle = Arc::new(Mutex::new(Some(shutdown_tx)));
         let state = build_state(config.clone(), shutdown_handle.clone()).await?;
         let _background_tasks = crate::background::start(state.clone());
+        let _supervisor_checks = crate::supervisor::start(state.clone());
         let _effect_recovery = crate::effects::start(state.clone());
         let _federation_tasks = federation::start(
             state.clone(),

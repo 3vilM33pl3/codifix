@@ -336,7 +336,12 @@ pub async fn capture(pool: &PgPool) -> Fixture {
         source_instance: id(10000),
         snapshot_id: id(10001),
         captured_at: "2026-09-17T12:00:00Z".into(),
-        migration_version: 56,
+        migration_version: sqlx::query_scalar::<_, i64>(
+            "SELECT max(version) FROM _sqlx_migrations WHERE success",
+        )
+        .fetch_one(pool)
+        .await
+        .expect("synthetic schema head") as u32,
         projects,
         tables,
     };

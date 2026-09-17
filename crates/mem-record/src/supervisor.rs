@@ -8,8 +8,12 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SupervisorResponse {
     pub read_only: bool,
-    /// A persisted enabled policy is not evidence of an active worker.
+    /// Full Pi/model agency, independently of the optional DB-only observer.
+    /// A persisted enabled policy is not evidence of an active agent.
     pub execution: SupervisorExecution,
+    /// Operator opt-in, not proof that a check succeeded or a Pi agent is active.
+    #[serde(default)]
+    pub deterministic_checks_configured: bool,
     /// Absent when no durable supervisor identity is configured.
     pub snapshot: Option<SupervisorSnapshot>,
 }
@@ -27,11 +31,26 @@ pub struct SupervisorSnapshot {
     pub observed_at: DateTime<Utc>,
     pub policy: Option<SupervisorPolicySummary>,
     pub budget: Option<SupervisorBudgetSummary>,
+    #[serde(default)]
+    pub last_health_observation: Option<SupervisorHealthObservation>,
     pub action_counts: Vec<SupervisorActionCount>,
     pub journal: Vec<SupervisorJournalEntry>,
     /// Opaque decimal string prevents browser integer precision loss.
     pub next_after: String,
     pub has_more: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorHealthObservation {
+    pub action_id: Uuid,
+    pub policy_revision: Uuid,
+    pub observed_at: DateTime<Utc>,
+    pub next_due_at: DateTime<Utc>,
+    pub project_count: String,
+    pub canonical_count: String,
+    pub blocked_jobs: String,
+    pub failed_jobs: String,
+    pub uncertain_actions: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

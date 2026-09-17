@@ -14,7 +14,7 @@ identity or stale-writer fencing.
 
 ## Transaction and verification
 
-The only supported target head is migration **0056**, with the exact public table
+Supported target heads are migrations **0056 and 0057**, with the exact public table
 catalog, no historical schemas, and matching source columns for every imported
 row. The first import requires empty knowledge, authentication, jobs, federation
 and supervisor state; only the known empty-installation seed rows are allowed.
@@ -55,6 +55,8 @@ commit acknowledgement was lost, reconnect to the independently verified same
 target and retry the exact operation. Preserve failures for reconciliation; do
 not delete the target or invent a new operation to bypass them. Replaying after
 activation is not supported; use a separately authorized operational audit.
+The receipt binds the exact target head. An additive upgrade retains earlier
+receipts unchanged but does not authorize replaying the import at the new head.
 Receipts attest to import contents, not deployment approval.
 
 ## Limits and remaining integration
@@ -71,15 +73,14 @@ rebuild, target isolation, enrollment and live cutover are separate gates.
 Synthetic PostgreSQL evidence is not authorization to migrate the running
 Monolith or CA instances.
 
-The current snapshot collector leaves `memory_relations` without project
-provenance. The planner therefore blocks sending those records to an area; it
-does not silently assign an owner. A reviewed endpoint-ownership contract and
-collector evidence are still needed. The importer tests deliberately do not
-claim populated relationship migration coverage.
+The snapshot collector leaves `memory_relations` without a project owner.
+Manifest v2 can explicitly review an edge whose two canonical endpoints belong
+to the same area, preserving both original project bindings. Missing, archived
+or cross-area endpoints remain blocked; no fictional source owner is assigned.
 
 ## Focused verification
 
-Ten tests use generated, migrated `mem-test-support::IsolatedDatabase` sources
+Eleven tests use generated, migrated `mem-test-support::IsolatedDatabase` sources
 and targets with synthetic text only. They exercise exact historical versions
 with reversed UUID order, tombstones, canonical state, source-check history,
 tags, commits, populated reviewed relations across preserved project boundaries

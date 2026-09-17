@@ -224,6 +224,30 @@ async fn supervisor_http_requires_global_access_and_never_claims_live_execution(
         .await
         .expect("no work created");
     assert_eq!(action_count, 0);
+    let observation = store
+        .observe_health(instance, SupervisorArea::Workshop)
+        .await
+        .expect("synthetic deterministic observation")
+        .expect("due");
+    let body: Value = client
+        .get(&url)
+        .bearer_auth(&tokens[1])
+        .send()
+        .await
+        .expect("read observation")
+        .json()
+        .await
+        .expect("metadata");
+    assert_eq!(
+        body["snapshot"]["last_health_observation"]["action_id"],
+        observation.action_id.to_string()
+    );
+    assert_eq!(
+        body["snapshot"]["last_health_observation"]["project_count"],
+        "1"
+    );
+    assert_eq!(body["deterministic_checks_configured"], false);
+    assert_eq!(body["execution"], "not_integrated");
     task.abort();
     let _ = task.await;
     if let Ok(pool) = state.pool() {

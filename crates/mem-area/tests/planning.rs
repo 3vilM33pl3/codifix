@@ -1456,6 +1456,7 @@ fn reviewed_schema_catalog_matches_every_current_repository_table() {
         .chain(SUPERVISOR_TABLES_0054)
         .chain(SUPERVISOR_TABLES_0055)
         .chain(AREA_IMPORT_TABLES_0056)
+        .chain(SUPERVISOR_TABLES_0057)
         .map(|(name, _)| name.to_string())
         .collect();
     assert_eq!(
@@ -1464,7 +1465,8 @@ fn reviewed_schema_catalog_matches_every_current_repository_table() {
             + SUPERVISOR_TABLES_0053.len()
             + SUPERVISOR_TABLES_0054.len()
             + SUPERVISOR_TABLES_0055.len()
-            + AREA_IMPORT_TABLES_0056.len(),
+            + AREA_IMPORT_TABLES_0056.len()
+            + SUPERVISOR_TABLES_0057.len(),
         "duplicate table policy"
     );
     assert_eq!(
@@ -1544,7 +1546,7 @@ fn migration_0053_is_exact_version_gated_and_cannot_reactivate_supervisor_state(
             .iter()
             .any(|error| error.contains("unclassified table public.supervisor_future_authority"))
     );
-    for unsupported in [51, 57, 999] {
+    for unsupported in [51, 58, 999] {
         let mut future = inventory.clone();
         future.migration_version = unsupported;
         assert!(
@@ -1661,20 +1663,27 @@ fn migration_0054_requires_exact_additive_catalog_and_archives_private_proposals
 }
 
 #[test]
-fn migration_0055_and_0056_require_exact_additions_and_preserve_retention_policies() {
+fn migrations_0055_through_0057_require_exact_additions_and_preserve_retention_policies() {
     assert_eq!(SUPERVISOR_CONTEXT_MIGRATION, 55);
     assert_eq!(AREA_IMPORT_MIGRATION, 56);
+    assert_eq!(SUPERVISOR_HEALTH_MIGRATION, 57);
     assert_eq!(SUPERVISOR_TABLES_0055.len(), 2);
     assert_eq!(AREA_IMPORT_TABLES_0056.len(), 3);
-    for head in [55, 56] {
+    assert_eq!(SUPERVISOR_TABLES_0057.len(), 2);
+    for head in [55, 56, 57] {
         let mut inventory = fixture();
         inventory.migration_version = head;
         for (name, _) in SUPERVISOR_TABLES_0053
             .iter()
             .chain(SUPERVISOR_TABLES_0054)
             .chain(SUPERVISOR_TABLES_0055)
-            .chain(if head == 56 {
+            .chain(if head >= 56 {
                 AREA_IMPORT_TABLES_0056
+            } else {
+                &[]
+            })
+            .chain(if head == 57 {
+                SUPERVISOR_TABLES_0057
             } else {
                 &[]
             })
@@ -1695,11 +1704,19 @@ fn migration_0055_and_0056_require_exact_additions_and_preserve_retention_polici
         let manifest = reviewed(&inventory);
         let report = verify_manifest(&inventory, &manifest);
         assert!(report.plan_valid, "{:?}", report.blockers);
-        for (name, strategy) in SUPERVISOR_TABLES_0055.iter().chain(if head == 56 {
-            AREA_IMPORT_TABLES_0056
-        } else {
-            &[]
-        }) {
+        for (name, strategy) in SUPERVISOR_TABLES_0055
+            .iter()
+            .chain(if head >= 56 {
+                AREA_IMPORT_TABLES_0056
+            } else {
+                &[]
+            })
+            .chain(if head == 57 {
+                SUPERVISOR_TABLES_0057
+            } else {
+                &[]
+            })
+        {
             assert_eq!(
                 report
                     .records
@@ -1726,6 +1743,7 @@ fn migration_0055_and_0056_require_exact_additions_and_preserve_retention_polici
             assert!(verify_inventory(&missing).iter().any(|error| {
                 error.contains(&format!("missing migration {head:04} table inventory"))
                     || error.contains("missing migration 0055 table inventory")
+                    || error.contains("missing migration 0056 table inventory")
             }));
         }
         for earlier in 52..head {

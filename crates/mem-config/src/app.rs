@@ -100,6 +100,9 @@ pub struct AppConfig {
 pub struct SupervisorIdentityConfig {
     pub instance_id: Uuid,
     pub area: SupervisorArea,
+    /// Fixed metadata-only five-minute checks. Never enables Pi or models.
+    #[serde(default)]
+    pub deterministic_checks: bool,
 }
 
 /// Setting a semantic timestamp opts a dedicated service into measurement mode.

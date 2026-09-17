@@ -118,6 +118,7 @@ mod tests {
         state.receive(Ok(SupervisorResponse {
             read_only: true,
             execution: mem_record::SupervisorExecution::NotIntegrated,
+            deterministic_checks_configured: false,
             snapshot: None,
         }));
         assert!(state.response.is_some());

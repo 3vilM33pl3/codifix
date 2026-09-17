@@ -2375,6 +2375,7 @@ components:
       properties:
         read_only: { type: boolean }
         execution: { type: string, enum: [not_integrated] }
+        deterministic_checks_configured: { type: boolean, default: false, description: Operator opt-in only; not proof of current health or Pi activation. }
         snapshot:
           oneOf:
             - { type: 'null' }
@@ -2386,6 +2387,21 @@ components:
         instance_id: { type: string, format: uuid }
         area: { type: [string, 'null'], enum: [trust, homelab, workshop, general, null] }
         observed_at: { type: string, format: date-time }
+        last_health_observation:
+          oneOf:
+            - { type: 'null' }
+            - type: object
+              required: [action_id, policy_revision, observed_at, next_due_at, project_count, canonical_count, blocked_jobs, failed_jobs, uncertain_actions]
+              properties:
+                action_id: { type: string, format: uuid }
+                policy_revision: { type: string, format: uuid }
+                observed_at: { type: string, format: date-time }
+                next_due_at: { type: string, format: date-time }
+                project_count: { type: string, pattern: '^[0-9]+$' }
+                canonical_count: { type: string, pattern: '^[0-9]+$' }
+                blocked_jobs: { type: string, pattern: '^[0-9]+$' }
+                failed_jobs: { type: string, pattern: '^[0-9]+$' }
+                uncertain_actions: { type: string, pattern: '^[0-9]+$' }
         policy:
           oneOf:
             - { type: 'null' }

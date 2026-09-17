@@ -29,12 +29,16 @@ pub(crate) async fn handle(args: SupervisorArgs, api: &ApiClient) -> Result<()> 
 pub(crate) fn lines(response: &SupervisorResponse) -> Vec<String> {
     let mut lines = vec![
         "Local area supervisor — instance-wide metadata only".into(),
-        "Execution not integrated in this build; no active agent or healthy heartbeat is claimed."
+        "Execution not integrated for Pi/model agency; no active agent or healthy heartbeat is claimed."
             .into(),
     ];
     if response.read_only {
         lines.push("Read-only service.".into());
     }
+    lines.push(format!(
+        "Deterministic operational checks configured: {} (not model/agent activation)",
+        response.deterministic_checks_configured
+    ));
     let Some(s) = &response.snapshot else {
         lines
             .push("No durable supervisor identity configured; nothing enrolled or enabled.".into());
@@ -73,6 +77,14 @@ pub(crate) fn lines(response: &SupervisorResponse) -> Vec<String> {
             b.day, b.charged_usd_micros, b.reserved_usd_micros, b.calls
         ));
     }
+    if let Some(health) = &s.last_health_observation {
+        lines.push(format!(
+            "Last operational observation: {} | policy {} | action {}",
+            health.observed_at, health.policy_revision, health.action_id
+        ));
+        lines.push(format!("{} projects / {} canonical histories; {} blocked jobs / {} failed jobs / {} uncertain actions", health.project_count, health.canonical_count, health.blocked_jobs, health.failed_jobs, health.uncertain_actions));
+        lines.push(format!("Next due: {}. Historical observation, not proof of current availability or external health.", health.next_due_at));
+    }
     for count in &s.action_counts {
         lines.push(format!("{:?}: {}", count.state, count.count));
     }
@@ -106,6 +118,7 @@ mod tests {
         let response = SupervisorResponse {
             read_only: true,
             execution: SupervisorExecution::NotIntegrated,
+            deterministic_checks_configured: false,
             snapshot: None,
         };
         let text = lines(&response).join("\n");

@@ -1,8 +1,22 @@
 # Supervisor persistence
 
 Trusted, in-process PostgreSQL storage for the contracts in `mem-supervisor`.
-No HTTP, provider credentials, workers, schedulers, service authorization, human
+No HTTP, provider credentials, worker process, service authorization, human
 approval UI, Pi execution or live migration is implemented by this crate.
+
+## Deterministic operational observations
+
+Additive migration 0057 adds an initially empty, instance-bound five-minute
+schedule and immutable metadata observations. `observe_health(instance, area)`
+requires an exact existing binding and current enabled, unrevoked policy. It
+counts projects, canonical histories, blocked/failed jobs and uncertain actions
+only. Schedule locking fences competing callers; action/result/journal/observation
+and next due time commit atomically. There are no provider attempts or charges.
+Observation means successful collection, not proof of overall system health.
+
+The service supplies a separately opt-in polling worker. This store does not
+bootstrap, start a task, or authorize other health actions. During partition,
+old schedules are retired and observations are protected historical evidence.
 
 ## Authority and actions
 

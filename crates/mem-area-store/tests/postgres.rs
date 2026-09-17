@@ -10,6 +10,54 @@ use support::*;
 use uuid::Uuid;
 
 #[tokio::test]
+async fn migration_0056_import_receipt_survives_upgrade_but_cannot_authorize_replay_at_0057() {
+    let Some(source) = database().await else {
+        return;
+    };
+    let target = database().await.expect("synthetic old target");
+    seed(&source.pool).await;
+    let (partition, _) = capture(&source.pool).await.partition();
+    // This newly created disposable database alone simulates a pre-0057
+    // installation. Never downgrade an existing installation or receipt.
+    execute(&target.pool, "DROP TABLE supervisor_health_observations; DROP TABLE supervisor_health_schedule; DELETE FROM _sqlx_migrations WHERE version=57; ALTER TABLE area_import_receipts DROP CONSTRAINT area_import_receipts_target_migration_check; ALTER TABLE area_import_receipts ADD CONSTRAINT area_import_receipts_target_migration_check CHECK(target_migration=56);").await;
+    import_partition(&target.pool, TARGET, OPERATION, &partition)
+        .await
+        .expect("supported old head");
+    assert!(
+        import_partition(&target.pool, TARGET, OPERATION, &partition)
+            .await
+            .expect("same-head replay")
+            .already_applied
+    );
+    let before = rows(&target.pool, "public.area_import_receipts").await;
+    sqlx::migrate!("../../migrations")
+        .run(&target.pool)
+        .await
+        .expect("normal additive upgrade");
+    assert_eq!(
+        rows(&target.pool, "public.area_import_receipts").await,
+        before
+    );
+    assert!(
+        import_partition(&target.pool, TARGET, OPERATION, &partition)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        rows(&target.pool, "public.area_import_receipts").await,
+        before
+    );
+    for table in OWNED {
+        assert_eq!(
+            rows(&target.pool, table).await,
+            rows(&source.pool, table).await
+        );
+    }
+    target.cleanup().await.expect("cleanup");
+    source.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
 async fn reviewed_relations_preserve_endpoint_projects_provenance_and_replay() {
     let Some(source) = database().await else {
         return;

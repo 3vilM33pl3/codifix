@@ -39,12 +39,14 @@ impl SupervisorStore {
             observed_at,
             policy: None,
             budget: None,
+            last_health_observation: None,
             action_counts: vec![],
             journal: vec![],
             next_after: after.to_string(),
             has_more: false,
         };
         if let Some(binding) = binding {
+            snapshot.last_health_observation = health::latest(&mut tx, instance_id).await?;
             let area = binding.area;
             match policy::read_policy(&mut tx, area).await {
                 Ok(policy) => {
