@@ -2,8 +2,10 @@
 # Read-only console inventory. This script never installs, starts or changes a
 # service, reads application configuration/credentials, or prompts for a password.
 set -euo pipefail
+# Root-console checks must not execute a program selected by an inherited PATH.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 if ! command -v python3 >/dev/null 2>&1; then
-    printf '%s\n' '{"format":"memory-ca-preflight-v1","status":"unavailable","reason":"python3_missing","database_binding":{"status":"unknown","reason":"not_inspected"}}'
+    printf '%s\n' '{"format":"memory-ca-preflight-v2","status":"unavailable","reason":"python3_missing","database_binding":{"status":"unknown","reason":"not_inspected"}}'
     exit 1
 fi
 exec python3 -I -S - <<'PYTHON_PREFLIGHT'
@@ -18,7 +20,7 @@ import stat
 import subprocess
 import time
 
-PATH = os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")
+PATH = "/usr/sbin:/usr/bin:/sbin:/bin"
 ENV = {"PATH": PATH, "LC_ALL": "C", "LANG": "C"}
 DEADLINE = time.monotonic() + 60
 MAX_CLUSTERS = 4
@@ -27,6 +29,20 @@ TABLES = (
     "projects", "sessions", "tasks", "raw_captures", "memory_entries",
     "memory_sources", "memory_canonical_state", "_sqlx_migrations",
 )
+# Static ELF metadata observed on 2026-09-17 after independently matching the
+# official v0.5.1 ARM64 archive and exact pi member against SHA256SUMS and its
+# upstream build manifest. This is not operator signature/activation approval.
+PI_ARM64_ABI = {
+    "version": "0.5.1",
+    "source_revision": "7c018475d54d4e09c907691e47a520f1f09e3288",
+    "binary_sha256": "0190009efe002c3cbca80a5f005472cea0df5901706c9e49dcb6c4c6891e0884",
+    "archive_sha256": "89906e3fd11842c1a571f174740a188ebdc6c8a7a65f51f1d6f0b23800ad2e44",
+    "elf_class": "ELF64", "endianness": "little", "machine": "AArch64",
+    "loader": "ld-linux-aarch64.so.1", "required_glibc": "2.43",
+    "needed_libraries": ["libgcc_s.so.1", "libm.so.6", "libc.so.6", "ld-linux-aarch64.so.1"],
+    "evidence": "upstream_checksum_and_build_manifest_matched_static_readelf_only",
+    "execution_tested": False, "operator_signature_verified": False,
+}
 
 
 def outcome(status, reason=None, **values):
@@ -72,6 +88,87 @@ def version():
     return outcome("ok", version=match[1]) if match else outcome("unavailable", "unexpected_version_output")
 
 
+def libc():
+    try:
+        value = os.confstr("CS_GNU_LIBC_VERSION")
+    except (AttributeError, OSError, ValueError):
+        return outcome("unknown", "gnu_libc_identity_unavailable")
+    match = re.fullmatch(r"glibc ([0-9]{1,3}\.[0-9]{1,3}(?:\.[0-9]{1,3})?)", value or "")
+    return outcome("ok", family="glibc", version=match[1]) if match else outcome("unknown", "gnu_libc_identity_unavailable")
+
+
+def metadata_number(path):
+    try:
+        value = pathlib.Path(path).read_text().strip()
+    except PermissionError:
+        return outcome("permission_denied", "kernel_metadata_not_permitted")
+    except (OSError, UnicodeError):
+        return outcome("unavailable", "kernel_metadata_missing")
+    return outcome("ok", value=int(value)) if re.fullmatch(r"[0-9]{1,18}", value) else outcome("unknown", "unexpected_kernel_metadata")
+
+
+def namespace_metadata():
+    namespaces = {}
+    for name in ("user", "mnt", "pid", "net", "cgroup", "ipc", "uts"):
+        try:
+            # Metadata only: never read process environment/arguments or print
+            # namespace IDs, cgroup paths, container IDs or another process.
+            os.stat("/proc/self/ns/" + name)
+            namespaces[name] = outcome("present")
+        except PermissionError:
+            namespaces[name] = outcome("permission_denied", "namespace_metadata_not_permitted")
+        except OSError:
+            namespaces[name] = outcome("unavailable", "namespace_metadata_missing")
+    return {"interfaces": namespaces,
+            "max_user_namespaces": metadata_number("/proc/sys/user/max_user_namespaces"),
+            "unprivileged_userns_clone": metadata_number("/proc/sys/kernel/unprivileged_userns_clone"),
+            "namespace_creation_tested": False, "sandbox_enforcement_proven": False}
+
+
+def cgroup_metadata():
+    try:
+        raw = pathlib.Path("/sys/fs/cgroup/cgroup.controllers").read_text()
+    except PermissionError:
+        return outcome("permission_denied", "cgroup_metadata_not_permitted", enforcement_proven=False)
+    except (OSError, UnicodeError):
+        # Missing unified controllers can mean v1, an unmounted hierarchy or a
+        # restricted container. Never claim there is no cgroup support.
+        return outcome("unknown", "unified_controllers_unavailable_v1_or_restriction_unchecked", enforcement_proven=False)
+    allowed = {"cpu", "cpuset", "io", "memory", "hugetlb", "pids", "rdma", "misc", "dmem"}
+    controllers = raw.split()
+    if len(raw) > 512 or any(value not in allowed for value in controllers) or len(set(controllers)) != len(controllers):
+        return outcome("unknown", "unexpected_cgroup_metadata", enforcement_proven=False)
+    return outcome("observed", version=2, controllers=sorted(controllers),
+                   resource_controllers_present={name: name in controllers for name in ("cpu", "memory", "pids")},
+                   delegation_tested=False, enforcement_proven=False)
+
+
+def runtime_metadata():
+    status, reason, output = run(["systemctl", "--version"])
+    match = re.match(r"systemd ([0-9]{1,4})(?:\s|$)", output) if status == "ok" else None
+    manager = outcome("ok", version=int(match[1])) if match else outcome(status if status != "ok" else "unknown", reason or "unexpected_systemd_version")
+    return {"systemd": manager, "namespaces": namespace_metadata(), "cgroup": cgroup_metadata(),
+            "tools": {name: bool(shutil.which(name, path=PATH)) for name in
+                      ("docker", "podman", "systemd-nspawn", "bwrap", "unshare")},
+            "tool_coverage": "executable_presence_only_no_daemon_connection_or_container_start",
+            "container_execution_available": "unverified", "sandbox_enforcement_proven": False}
+
+
+def pi_compatibility(host_metadata):
+    architecture = host_metadata["architecture"]
+    local_libc = host_metadata["libc"]
+    if architecture not in ("aarch64", "arm64"):
+        compatibility = outcome("blocked", "host_is_not_native_arm64")
+    elif local_libc["status"] != "ok":
+        compatibility = outcome("unknown", "host_glibc_cannot_be_compared")
+    elif tuple(map(int, local_libc["version"].split("."))) < (2, 43):
+        compatibility = outcome("blocked", "host_glibc_below_pinned_pi_requirement")
+    else:
+        compatibility = outcome("minimum_version_matches_only", "loader_libraries_kernel_isa_and_isolation_unverified")
+    return {"pinned_artifact_metadata": PI_ARM64_ABI, "native_abi_precheck": compatibility,
+            "local_artifact_inspected": False, "artifact_executed": False, "activation_authorized": False}
+
+
 def host():
     architecture = os.uname().machine
     os_info = {}
@@ -100,7 +197,7 @@ def host():
         except OSError:
             disks[label] = outcome("unavailable", "location_missing_or_inaccessible")
     return {"architecture": architecture if re.fullmatch(r"[A-Za-z0-9_-]{1,32}", architecture) else "unknown",
-            "os": os_result, "disk": disks, "root": os.geteuid() == 0}
+            "os": os_result, "disk": disks, "libc": libc(), "root": os.geteuid() == 0}
 
 
 def service(unit):
@@ -210,6 +307,17 @@ def inspect_database(port, database):
             any(type(value) is not int or value < 0 for value in counts.values())):
         check = outcome("unavailable", "unexpected_count_metadata")
     result["counts"] = outcome("ok", tables=counts) if check["status"] == "ok" else check
+    check, activity = sql(port, database,
+        "SELECT json_build_object('client_backends', COUNT(*) FILTER (WHERE backend_type='client backend'), "
+        "'local_socket_client_backends', COUNT(*) FILTER (WHERE backend_type='client backend' AND client_addr IS NULL)) "
+        "FROM pg_catalog.pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid();")
+    if check["status"] == "ok" and (not isinstance(activity, dict) or
+            set(activity) != {"client_backends", "local_socket_client_backends"} or
+            any(type(value) is not int or value < 0 for value in activity.values()) or
+            activity["local_socket_client_backends"] > activity["client_backends"]):
+        check = outcome("unavailable", "unexpected_activity_metadata")
+    result["client_activity"] = outcome("observed", counts=activity,
+        memory_client_identity_proven=False) if check["status"] == "ok" else check
     if "_sqlx_migrations" in relations:
         check, migrations = sql(port, database,
             "SELECT json_build_object('head', MAX(version) FILTER (WHERE success), "
@@ -235,7 +343,7 @@ def databases():
     if os.geteuid() != 0:
         result["database_inventory"] = outcome("permission_denied", "root_required_for_passwordless_peer_check")
         return result
-    if not shutil.which("psql") or not shutil.which("runuser"):
+    if not shutil.which("psql", path=PATH) or not shutil.which("runuser", path=PATH):
         result["database_inventory"] = outcome("unavailable", "psql_or_runuser_missing")
         return result
     if not ports:
@@ -279,24 +387,44 @@ def databases():
             if schema_status == "candidate" and any(database.get(field, {}).get("status") != "ok"
                                                      for field in ("counts", "schema_head")):
                 incomplete = True
+            if schema_status == "candidate" and database.get("client_activity", {}).get("status") != "observed":
+                incomplete = True
     result["database_inventory"] = outcome("partial" if len(ports) > MAX_CLUSTERS or incomplete
         else "ok", clusters=clusters, truncated=len(ports) > MAX_CLUSTERS)
     return result
 
 
+def database_binding(postgresql):
+    candidates = []
+    for cluster in postgresql.get("database_inventory", {}).get("clusters", []):
+        for database in cluster.get("databases", []):
+            if database.get("memory_schema", {}).get("status") == "candidate":
+                candidates.append({"local_socket_port": cluster["port"], "database": database["name"],
+                                   "schema_head": database.get("schema_head", outcome("unknown")),
+                                   "client_activity": database.get("client_activity", outcome("unknown"))})
+    return outcome("unknown", "cannot_bind_running_memory_to_database_without_separate_review",
+                   local_memory_schema_candidates=candidates, configuration_inspected=False,
+                   process_connection_identity_proven=False, shared_vs_unique_proven=False,
+                   no_data_proven=False)
+
+
+host_metadata = host()
 report = {
-    "format": "memory-ca-preflight-v1",
+    "format": "memory-ca-preflight-v2",
     "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     "status": "inventory_only_activation_not_approved",
     "command_time_budget_seconds": 60,
-    "host": host(),
+    "host": host_metadata,
+    "runtime": runtime_metadata(),
+    "pi_arm64": pi_compatibility(host_metadata),
     "memory": version(),
     "services": {unit: service(unit) for unit in
-                 ("memory-layer.service", "step-ca.service", "openbao.service", "sshd.service", "ssh.service", "postgresql.service")},
+                 ("memory-layer.service", "memory-layer@trust.service", "step-ca.service", "openbao.service", "sshd.service", "ssh.service", "postgresql.service", "docker.service", "containerd.service", "podman.socket")},
     "network": listeners(),
-    "postgresql": databases(),
-    "database_binding": outcome("unknown", "cannot_establish_shared_vs_unique_database_without_separate_review"),
     "redaction": "no_config_env_credentials_records_logs_addresses_processes_or_secret_paths",
 }
+postgresql = databases()
+report["postgresql"] = postgresql
+report["database_binding"] = database_binding(postgresql)
 print(json.dumps(report, indent=2, sort_keys=True))
 PYTHON_PREFLIGHT

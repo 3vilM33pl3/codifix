@@ -17,7 +17,8 @@ SECRET = "DO_NOT_PRINT_PRIVATE_KEY_OR_PASSWORD"
 
 
 class InventoryTests(unittest.TestCase):
-    def inventory(self, root=True, scenario="healthy", sockets=True, missing_tool=False):
+    def inventory(self, root=True, scenario="healthy", sockets=True, missing_tool=False,
+                  architecture="aarch64", libc="glibc 2.36"):
         commands = []
         table_names = ["projects", "sessions", "tasks", "raw_captures", "memory_entries", "_sqlx_migrations"]
 
@@ -25,6 +26,7 @@ class InventoryTests(unittest.TestCase):
             commands.append(arguments)
             self.assertEqual(kwargs["cwd"], "/")
             self.assertEqual(set(kwargs["env"]), {"PATH", "LANG", "LC_ALL"})
+            self.assertEqual(kwargs["env"]["PATH"], "/usr/sbin:/usr/bin:/sbin:/bin")
             self.assertNotIn("shell", kwargs)
             self.assertIs(kwargs["stdin"], subprocess.DEVNULL)
             self.assertLessEqual(kwargs["timeout"], 6)
@@ -35,8 +37,11 @@ class InventoryTests(unittest.TestCase):
                 self.assertEqual(arguments, ["memory", "--version"])
                 output = SECRET if scenario == "malformed" else "memory 2.1.0-rc.1\n"
             elif program == "systemctl":
-                self.assertEqual(arguments[1:4], ["show", "--no-pager", "--property=LoadState,ActiveState,SubState"])
-                output = "LoadState=loaded\nActiveState=active\nSubState=running\n"
+                if arguments == ["systemctl", "--version"]:
+                    output = "systemd 252 (252.31-1)\n+PAM +SECCOMP +BPF_FRAMEWORK\n"
+                else:
+                    self.assertEqual(arguments[1:4], ["show", "--no-pager", "--property=LoadState,ActiveState,SubState"])
+                    output = "LoadState=loaded\nActiveState=active\nSubState=running\n"
             elif program == "ss":
                 self.assertEqual(arguments[1:], ["--no-header", "--listening", "--tcp", "--udp", "--numeric"])
                 output = ("tcp LISTEN 0 128 127.0.0.1:5432 0.0.0.0:*\n"
@@ -67,6 +72,12 @@ class InventoryTests(unittest.TestCase):
                     output = json.dumps([{"name": name, "size_bytes": 12345}])
                 elif "pg_catalog.pg_class" in query:
                     output = json.dumps([] if scenario == "not_memory" else table_names)
+                elif "pg_catalog.pg_stat_activity" in query:
+                    for forbidden in ("query", "usename", "application_name"):
+                        self.assertNotIn(forbidden, query)
+                    output = json.dumps({"client_backends": 2, "local_socket_client_backends": 1})
+                    if scenario == "bad_activity":
+                        output = SECRET
                 elif "MAX(version)" in query:
                     output = json.dumps({"head": 52, "applied": 52, "failed": 0})
                 else:
@@ -86,8 +97,34 @@ class InventoryTests(unittest.TestCase):
             return contextlib.nullcontext(iter([entry]))
 
         def read(path, *args, **kwargs):
-            self.assertEqual(str(path), "/etc/os-release", "only OS metadata may be read")
-            return 'ID=debian\nVERSION_ID="12"\nPRETTY_NAME=' + SECRET + '\nOTHER_SECRET=' + SECRET
+            path = str(path)
+            if path == "/etc/os-release":
+                return 'ID=debian\nVERSION_ID="12"\nPRETTY_NAME=' + SECRET + '\nOTHER_SECRET=' + SECRET
+            if scenario == "kernel_denied":
+                raise PermissionError(SECRET)
+            if scenario == "kernel_missing":
+                raise FileNotFoundError(SECRET)
+            if path == "/sys/fs/cgroup/cgroup.controllers":
+                return SECRET if scenario == "bad_kernel" else "cpuset cpu io memory pids\n"
+            if path == "/proc/sys/user/max_user_namespaces":
+                return "0\n" if scenario == "namespaces_disabled" else "3000\n"
+            if path == "/proc/sys/kernel/unprivileged_userns_clone":
+                return "0\n" if scenario == "namespaces_disabled" else "1\n"
+            self.fail("Unexpected file read: " + path)
+
+        def metadata(path, **kwargs):
+            self.assertIn(str(path), ["/proc/self/ns/" + name for name in
+                                    ("user", "mnt", "pid", "net", "cgroup", "ipc", "uts")])
+            if scenario == "kernel_denied":
+                raise PermissionError(SECRET)
+            if scenario == "kernel_missing":
+                raise FileNotFoundError(SECRET)
+            return types.SimpleNamespace(st_mode=stat.S_IFREG)
+
+        def which(program, **kwargs):
+            self.assertEqual(kwargs, {"path": "/usr/sbin:/usr/bin:/sbin:/bin"})
+            self.assertIn(program, ("docker", "podman", "systemd-nspawn", "bwrap", "unshare", "psql", "runuser"))
+            return None if missing_tool else "/usr/bin/tool"
 
         stream = io.StringIO()
         ticks = iter([0] + [61] * 200)
@@ -95,12 +132,15 @@ class InventoryTests(unittest.TestCase):
         with mock.patch("subprocess.run", command), \
              mock.patch("os.geteuid", return_value=0 if root else 1000), \
              mock.patch("os.scandir", scan), \
-             mock.patch("os.uname", return_value=types.SimpleNamespace(machine="aarch64")), \
+             mock.patch("os.uname", return_value=types.SimpleNamespace(machine=architecture)), \
+             mock.patch("os.confstr", return_value=libc), \
+             mock.patch("os.stat", metadata), \
              mock.patch("os.statvfs", return_value=types.SimpleNamespace(f_blocks=100, f_frsize=4096, f_bavail=50)), \
              mock.patch("pathlib.Path.read_text", read), \
-             mock.patch("shutil.which", return_value=None if missing_tool else "/usr/bin/tool"), \
+             mock.patch("shutil.which", which), \
              mock.patch("time.monotonic", clock), \
-             mock.patch.dict("os.environ", {"OPENAI_API_KEY": SECRET, "PGPASSWORD": SECRET, "PGHOST": "remote.invalid"}), \
+             mock.patch.dict("os.environ", {"OPENAI_API_KEY": SECRET, "PGPASSWORD": SECRET,
+                                           "PGHOST": "remote.invalid", "PATH": "/untrusted/command/path"}), \
              contextlib.redirect_stdout(stream):
             exec(compile(SOURCE, str(SCRIPT), "exec"), {"__name__": "__main__"})
         text = stream.getvalue()
@@ -121,7 +161,15 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(database["schema_head"]["head"], 52)
         self.assertEqual(report["database_binding"]["status"], "unknown")
         self.assertFalse(report["postgresql"]["local_data_absence_proven"])
-        self.assertEqual(len([args for args in commands if args[0] == "runuser"]), 4)
+        self.assertEqual(len([args for args in commands if args[0] == "runuser"]), 5)
+        self.assertEqual(report["format"], "memory-ca-preflight-v2")
+        self.assertEqual(report["host"]["libc"], {"status": "ok", "family": "glibc", "version": "2.36"})
+        self.assertEqual(database["client_activity"]["counts"]["client_backends"], 2)
+        self.assertFalse(database["client_activity"]["memory_client_identity_proven"])
+        binding = report["database_binding"]
+        self.assertEqual(binding["local_memory_schema_candidates"][0]["database"], "memory_trust")
+        self.assertFalse(binding["process_connection_identity_proven"])
+        self.assertFalse(binding["shared_vs_unique_proven"])
 
     def test_non_root_reports_permission_limit_without_db_attempt(self):
         report, commands = self.inventory(root=False)
@@ -171,6 +219,57 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(commands, [])
         self.assertEqual(report["memory"]["reason"], "inventory_time_budget_exhausted")
         self.assertEqual(report["database_binding"]["status"], "unknown")
+
+    def test_verified_arm64_metadata_blocks_old_libc_without_executing_artifacts(self):
+        for version, expected in (("2.9", "blocked"), ("2.36", "blocked"),
+                                  ("2.42", "blocked"), ("2.43", "minimum_version_matches_only"),
+                                  ("2.43.1", "minimum_version_matches_only"), ("3.0", "minimum_version_matches_only")):
+            with self.subTest(version=version):
+                report, commands = self.inventory(libc="glibc " + version)
+                pi = report["pi_arm64"]
+                self.assertEqual(pi["native_abi_precheck"]["status"], expected)
+                self.assertEqual(pi["pinned_artifact_metadata"]["required_glibc"], "2.43")
+                self.assertEqual(pi["pinned_artifact_metadata"]["machine"], "AArch64")
+                self.assertFalse(pi["artifact_executed"])
+                self.assertFalse(pi["local_artifact_inspected"])
+                self.assertFalse(pi["activation_authorized"])
+                self.assertTrue(all(args[0] in ("systemctl", "memory", "ss", "runuser") for args in commands))
+
+    def test_wrong_architecture_and_unknown_libc_never_pass_native_check(self):
+        report, _ = self.inventory(architecture="armv7l", libc="glibc 2.43")
+        self.assertEqual(report["pi_arm64"]["native_abi_precheck"]["reason"], "host_is_not_native_arm64")
+        for value in (None, "musl 1.2.5", SECRET):
+            report, _ = self.inventory(libc=value)
+            self.assertEqual(report["pi_arm64"]["native_abi_precheck"]["status"], "unknown")
+
+    def test_kernel_and_container_metadata_do_not_claim_isolation_or_start_anything(self):
+        report, commands = self.inventory()
+        runtime = report["runtime"]
+        self.assertEqual(runtime["systemd"]["version"], 252)
+        self.assertEqual(runtime["cgroup"]["version"], 2)
+        self.assertTrue(runtime["cgroup"]["resource_controllers_present"]["memory"])
+        self.assertEqual(runtime["container_execution_available"], "unverified")
+        self.assertFalse(runtime["sandbox_enforcement_proven"])
+        self.assertFalse(runtime["namespaces"]["namespace_creation_tested"])
+        self.assertFalse(any(args[0] in ("docker", "podman", "unshare", "bwrap") for args in commands))
+        for scenario in ("bad_kernel", "kernel_denied", "kernel_missing", "namespaces_disabled"):
+            report, _ = self.inventory(scenario=scenario)
+            self.assertFalse(report["runtime"]["sandbox_enforcement_proven"])
+            if scenario == "bad_kernel":
+                self.assertEqual(report["runtime"]["cgroup"]["status"], "unknown")
+            elif scenario == "kernel_denied":
+                self.assertEqual(report["runtime"]["cgroup"]["status"], "permission_denied")
+            elif scenario == "kernel_missing":
+                self.assertEqual(report["runtime"]["cgroup"]["status"], "unknown")
+                self.assertEqual(report["runtime"]["namespaces"]["interfaces"]["net"]["status"], "unavailable")
+            else:
+                self.assertEqual(report["runtime"]["namespaces"]["max_user_namespaces"]["value"], 0)
+
+    def test_bad_activity_is_partial_and_never_establishes_memory_binding(self):
+        report, _ = self.inventory(scenario="bad_activity")
+        self.assertEqual(report["postgresql"]["database_inventory"]["status"], "partial")
+        self.assertEqual(report["database_binding"]["status"], "unknown")
+        self.assertFalse(report["database_binding"]["no_data_proven"])
 
 
 if __name__ == "__main__":

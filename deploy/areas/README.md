@@ -117,6 +117,10 @@ directory or write through its symlink.
 
 ## Read-only CA console preflight
 
+For the exact console handoff, expected results, ARM64/libc blockers, optional
+authenticated staging and recovery stops, use
+[CA-CONSOLE-HANDOFF.md](CA-CONSOLE-HANDOFF.md). It does not claim an installer exists.
+
 After placing this reviewed repository snapshot on the CA using an existing
 approved transfer path, open the CA's local root console in the repository root
 and run this single command:
@@ -130,6 +134,12 @@ to share for migration planning. It requires Python 3 and neither invokes sudo
 nor enables SSH. It makes no service, package, configuration or credential
 changes, and does not contact a provider or remote database. It reads OS metadata,
 filesystem capacity, service active states and listener port/scope metadata.
+Format `memory-ca-preflight-v2` additionally reports GNU libc, namespace/kernel
+limits, exposed cgroup-v2 controllers, container-tool presence and pinned Pi ARM64
+static ABI metadata. The official pinned ARM64 binary requires GLIBC 2.43; the
+script compares versions without executing it. Tool/controller presence proves
+neither a working container runtime nor an enforced sandbox. No container client
+or daemon is invoked. The system executable search path is fixed, not inherited.
 Service logs, command lines, network addresses, config/env content, secret paths
 and application records are excluded. It does not inspect CA keys or OpenBao.
 
@@ -138,10 +148,11 @@ local PostgreSQL sockets in the standard runtime directory and 16 databases per
 socket. It uses passwordless local peer authentication as `postgres`, with
 startup/password/service files disabled, read-only transactions and query
 timeouts. Output includes database names/sizes, recognized Memory table counts
-and SQLx schema head. It only selects fixed aggregate/catalog metadata from
+and SQLx schema head, plus anonymous local/client connection counts (not process
+or Memory-client identity). It only selects fixed aggregate/catalog metadata from
 ordinary base tables, excluding views, foreign/partitioned tables and inherited
-children. Memory
-entry counts include all versions and tombstones; they are not a content review.
+children. Memory entry counts include all versions and tombstones; they are not
+a content review.
 The subprocess time budget is 60 seconds; partial checks are labelled.
 
 An unavailable, denied, missing or custom socket never proves there is no data.
@@ -149,8 +160,11 @@ Custom locations, containers, remote/shared databases and bindings are explicitl
 unverified. The script deliberately does not read the application's database
 configuration, so **shared versus unique local data remains unresolved** even
 when a local database has Memory-shaped tables. A separate reviewed binding and
-content reconciliation is required before migration. Table counts are live
-observations across separate queries, not a consistent backup or restore proof.
+content reconciliation is required before migration. The top-level binding result
+lists local candidate metadata but remains explicitly `unknown`; connection
+counts never identify the Memory service or prove the absence of remote writers.
+Table counts are live observations across separate queries, not a consistent
+backup or restore proof.
 
 Test without inspecting a host or database:
 
