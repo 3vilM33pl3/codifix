@@ -147,7 +147,7 @@
         "text": "Platform team",
         "bounds": [
           572,
-          180,
+          176.4,
           322,
           40
         ],
@@ -161,7 +161,7 @@
         "text": "AI platform + agents\nRunbooks and infrastructure context",
         "bounds": [
           572,
-          242,
+          238.4,
           322,
           83
         ],
@@ -353,7 +353,7 @@
         "text": "Platform unit",
         "bounds": [
           603,
-          167,
+          163.4,
           292,
           37
         ],
@@ -367,7 +367,7 @@
         "text": "Existing platform + agents\nNative APIs / MCP",
         "bounds": [
           603,
-          221,
+          217.4,
           292,
           64
         ],
@@ -381,7 +381,7 @@
         "text": "Codifix adapter",
         "bounds": [
           610,
-          306,
+          302.4,
           275,
           37
         ],
@@ -395,7 +395,7 @@
         "text": "Own knowledge\nOwn administration",
         "bounds": [
           603,
-          362,
+          354.8,
           292,
           62
         ],
@@ -1120,7 +1120,7 @@
         "role": "diagram label",
         "text": "Start",
         "bounds": [
-          512,
+          504.8,
           151,
           384,
           30
@@ -1190,8 +1190,8 @@
         "role": "diagram label",
         "text": "Authorized partners",
         "bounds": [
-          512,
-          369,
+          504.8,
+          361.8,
           384,
           33
         ],
@@ -1505,7 +1505,7 @@
         "text": "Memory governance",
         "bounds": [
           509,
-          145,
+          141.4,
           388,
           38
         ],
@@ -1519,7 +1519,7 @@
         "text": "Authorization + publication history\nPrivate Q&A through the gateway",
         "bounds": [
           509,
-          196,
+          192.4,
           388,
           60
         ],

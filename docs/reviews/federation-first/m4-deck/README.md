@@ -4,6 +4,10 @@
 
 The [project Memory completion checkpoint](completion-checkpoint.json) verified all eight approved checklist items, archived the plan and recorded the implementation.
 
+## Available editions
+
+The [compact infrastructure v2](../m4-deck-v2/README.md) adds a separate eight-core/two-appendix presentation on 17 September 2026. This eighteen-slide first edition remains unchanged.
+
 ## Deliverables
 
 - [Updated native investor deck](https://docs.google.com/presentation/d/1RtPlKvSxf3Z3dmLRHoIaiaKN3n8xtr6WGWJAzeWXCIY/edit) — editable text, diagrams and three native tables; no fixed fundraising ask.

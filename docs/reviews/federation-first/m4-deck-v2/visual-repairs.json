@@ -1,0 +1,75 @@
+{
+  "reason": "Normalize visible baselines/insets inherited from scaled source text frames; no copy/font reduction",
+  "adjustments": [
+    {
+      "slide": 2,
+      "id": "m4_s2_text_2",
+      "text": "Platform team",
+      "dx": 0,
+      "dy": -3.6
+    },
+    {
+      "slide": 2,
+      "id": "m4_s2_text_4",
+      "text": "AI platform + agents\nRunbooks and infrastructure context",
+      "dx": 0,
+      "dy": -3.6
+    },
+    {
+      "slide": 3,
+      "id": "m4_s4_text_3",
+      "text": "Platform unit",
+      "dx": 0,
+      "dy": -3.6
+    },
+    {
+      "slide": 3,
+      "id": "m4_s4_text_6",
+      "text": "Existing platform + agents\nNative APIs / MCP",
+      "dx": 0,
+      "dy": -3.6
+    },
+    {
+      "slide": 3,
+      "id": "m4_s4_text_7",
+      "text": "Codifix adapter",
+      "dx": 0,
+      "dy": -3.6
+    },
+    {
+      "slide": 3,
+      "id": "m4_s4_text_8",
+      "text": "Own knowledge\nOwn administration",
+      "dx": 0,
+      "dy": -7.2
+    },
+    {
+      "slide": 7,
+      "id": "p8_i12",
+      "text": "Start",
+      "dx": -7.2,
+      "dy": 0
+    },
+    {
+      "slide": 7,
+      "id": "m4_s8_text_1",
+      "text": "Authorized partners",
+      "dx": -7.2,
+      "dy": -7.2
+    },
+    {
+      "slide": 9,
+      "id": "m4_s15_text_3",
+      "text": "Memory governance",
+      "dx": 0,
+      "dy": -3.6
+    },
+    {
+      "slide": 9,
+      "id": "m4_s15_text_4",
+      "text": "Authorization + publication history\nPrivate Q&A through the gateway",
+      "dx": 0,
+      "dy": -3.6
+    }
+  ]
+}

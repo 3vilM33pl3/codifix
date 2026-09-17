@@ -37,6 +37,7 @@ F1='docs/reviews/federation-first/f1-execution.md'
 ADR='docs/developer/adr/0011-atproto-federation-adapter.md'
 R3='evals/r3/development-continuation-20260917.md'
 SNAPSHOT='Repository evidence checked 17 September 2026 at 54195f4. Concurrent uncommitted engineering is excluded.'
+FIT={'m4_s2_text_2': (0, -3.6), 'm4_s2_text_4': (0, -3.6), 'm4_s4_text_3': (0, -3.6), 'm4_s4_text_6': (0, -3.6), 'm4_s4_text_7': (0, -3.6), 'm4_s4_text_8': (0, -7.2), 'p8_i12': (-7.2, 0), 'm4_s8_text_1': (-7.2, -7.2), 'm4_s15_text_3': (0, -3.6), 'm4_s15_text_4': (0, -3.6)}
 slides=[];manifest=[]
 def rgb(h):return {k:int(h[i:i+2],16)/255 for k,i in [('red',0),('green',2),('blue',4)]}
 def tx(e):return ''.join(t.get('textRun',{}).get('content','') for t in e.get('shape',{}).get('text',{}).get('textElements',[]))
@@ -65,6 +66,7 @@ class Slide:
         self.req.append({'updatePageElementTransform':{'objectId':e['objectId'],'applyMode':'ABSOLUTE','transform':{'scaleX':sx,'scaleY':sy,'translateX':x,'translateY':y,'unit':'PT'}}})
     def text(self,t,x,y,w,h,size=21,bold=False,color=INK,align='START',id=None,role='body',link=None):
         e=self.get('text',id);oid=e['objectId'] if e else self.fresh('text')
+        dx,dy=FIT.get(oid,(0,0));x+=dx;y+=dy
         if e:
             # M4 text frames are uniform styles. Logo mixed styles are protected.
             runs=[v.get('textRun',{}).get('style',{}) for v in e['shape']['text']['textElements'] if v.get('textRun',{}).get('content','').strip()]
@@ -110,6 +112,9 @@ class Slide:
         nid=self.orig['slideProperties']['notesPage']['notesProperties']['speakerNotesObjectId']
         notes=notes+'\n\n'+SNAPSHOT+'\nDated compact-v2 evidence: '+DOSSIER
         self.req.extend([{'deleteText':{'objectId':nid,'textRange':{'type':'ALL'}}},{'insertText':{'objectId':nid,'insertionIndex':0,'text':notes}}])
+        for match in re.finditer(r'https://[^\s]+',notes):
+            url=match.group(0).rstrip('.,;');start=len(notes[:match.start()].encode('utf-16-le'))//2;end=start+len(url.encode('utf-16-le'))//2
+            self.req.append({'updateTextStyle':{'objectId':nid,'textRange':{'type':'FIXED_RANGE','startIndex':start,'endIndex':end},'style':{'link':{'url':url}},'fields':'link'}})
         for e in self.elements:
             if e['objectId'] not in self.used:
                 self.req.append({'deleteObject':{'objectId':e['objectId']}});self.mapping.append({'id':e['objectId'],'action':'delete','reason':'Unused exemplar content or structure in compact narrative','oldText':tx(e)})

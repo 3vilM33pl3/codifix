@@ -1,0 +1,39 @@
+{
+  "verified": true,
+  "revision": "eo7sVBXZEaBxxA",
+  "presentationId": "1dMosQKiMjTx1k9yztYfiURaxQTj_HtOSgrmDYW9Ot_g",
+  "sourceCopySha256": "be7c058866e7ced698bc6ae7471cf9bc631026c99266b81a05f0228ed21bdb49",
+  "nativeJsonSha256": "314bc54ea76894e482ffd415836ad28800c689f91a8b29da8fedb86b888d4599",
+  "counts": {
+    "textFrames": 115,
+    "notes": 10,
+    "sourceLinks": 10,
+    "noteLinks": 30,
+    "logos": 60,
+    "tables": 1,
+    "connectorsAndRules": 10,
+    "nativeShapes": 172
+  },
+  "unchangedInspectedRenders": [
+    1,
+    4,
+    5,
+    6,
+    8,
+    10
+  ],
+  "backgroundCheck": "Stable native properties plus ten empty-edge pixel samples per slide; temporary provider contentUrl excluded",
+  "slideOrder": [
+    "p1",
+    "p2",
+    "p4",
+    "p5",
+    "p6",
+    "p12",
+    "p8",
+    "p14",
+    "m4_appendix_15",
+    "m4_appendix_18"
+  ],
+  "errors": []
+}
