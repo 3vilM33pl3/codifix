@@ -166,6 +166,17 @@ done
 if grep -q '^sqlx' crates/mem-cli/Cargo.toml; then
   err "mem-cli declares sqlx directly"
 fi
+postgres_cli_tree=$(cargo tree -p mem-cli --no-default-features --features tui,embedded-service-postgres -e normal --prefix none | awk '{print $1}' | sort -u)
+if echo "$postgres_cli_tree" | grep -qx 'duckdb'; then
+  err "PostgreSQL-only service build depends on DuckDB"
+fi
+if ! echo "$postgres_cli_tree" | grep -qx 'mem-service'; then
+  err "PostgreSQL-only service build omits the service"
+fi
+default_cli_tree=$(cargo tree -p mem-cli -e normal --prefix none | awk '{print $1}' | sort -u)
+if ! echo "$default_cli_tree" | grep -qx 'duckdb'; then
+  err "default full CLI build lost offline support"
+fi
 
 # 7. Dependents declare minimal needs.
 for crate in mem-curate mem-graph mem-eval mem-loops; do

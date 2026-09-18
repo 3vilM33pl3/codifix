@@ -495,6 +495,7 @@ pub(crate) fn truncate_chars(content: &str, limit: usize) -> (String, bool) {
     (format!("{prefix}{suffix}"), true)
 }
 
+#[cfg(any(feature = "offline", test))]
 pub(crate) fn activity_kind_label(kind: &ActivityKind) -> &'static str {
     match kind {
         ActivityKind::Checkpoint => "checkpoint",

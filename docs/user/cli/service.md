@@ -97,3 +97,17 @@ cargo run --bin memory -- service run
 `--copy-from-global` lifts the database URL and LLM/embedding endpoints out of the installed config into the dev overlay. Without it (and without a TTY) you will need to populate those sections in the user-local project `config.dev.toml` by hand.
 
 For the full isolation contract, override flags, verification steps, and troubleshooting, see [Dev Stack vs Installed Stack](../../developer/dev-stack.md).
+
+### PostgreSQL-only service build
+
+An isolated instance that explicitly disables offline storage can build the
+service and TUI without DuckDB:
+
+```bash
+cargo build -p mem-cli --bin memory --no-default-features --features tui,embedded-service-postgres --locked
+```
+
+Set `[offline] enabled = false` in its explicit configuration. Database outages
+cannot fall back to local capture in this build. Default/full builds and the
+existing `embedded-service` feature still include offline storage; `--features
+tui --no-default-features` remains a client-only build and cannot run a service.

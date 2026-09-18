@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use anyhow::Result;
-#[cfg(feature = "embedded-service")]
+#[cfg(feature = "embedded-service-postgres")]
 use mem_service as service_runtime;
 use std::path::PathBuf;
 
@@ -22,14 +22,14 @@ pub(super) async fn handle(args: &ServiceArgs, cli_config: Option<PathBuf>) -> R
         .clone()
         .unwrap_or_else(default_global_config_path);
     match &args.command {
-        #[cfg(feature = "embedded-service")]
+        #[cfg(feature = "embedded-service-postgres")]
         ServiceCommand::Run => {
             service_runtime::run_service(cli_config).await?;
         }
-        #[cfg(not(feature = "embedded-service"))]
+        #[cfg(not(feature = "embedded-service-postgres"))]
         ServiceCommand::Run => {
             anyhow::bail!(
-                "`memory service run` requires a build with the embedded-service feature \
+                "`memory service run` requires a build with the embedded-service or embedded-service-postgres feature \
                  (default source and packaged builds include it; explicitly lean builds do not); \
                  enable/disable/status/restart-all still manage the installed service"
             );

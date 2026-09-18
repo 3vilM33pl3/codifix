@@ -20,7 +20,7 @@ mem-eval = { path = "../mem-eval" }
 mem-graph = { path = "../mem-graph" }
 mem-mcp = { path = "../mem-mcp" }
 mem-platform = { path = "../mem-platform" }
-mem-service = { path = "../mem-service", optional = true }
+mem-service = { path = "../mem-service", optional = true, default-features = false }
 mem-skills = { path = "../mem-skills" }
 mem-watch = { path = "../mem-watch" }
 ratatui = { workspace = true, optional = true }
@@ -42,7 +42,8 @@ zip.workspace = true
 [features]
 default = ["full"]
 tui = ["dep:ratatui", "dep:crossterm"]
-embedded-service = ["dep:mem-service"]
+embedded-service-postgres = ["dep:mem-service"]
+embedded-service = ["embedded-service-postgres", "mem-service/offline"]
 full = ["tui", "embedded-service"]
 
 [[bin]]

@@ -4,7 +4,7 @@
 //! DuckDB) is disabled. `build_offline_runtime` then always yields `None`,
 //! so none of these methods can be reached at runtime.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -16,15 +16,6 @@ use uuid::Uuid;
 pub(crate) struct OfflineRuntime {
     pub(crate) store: OfflineStore,
     pub(crate) state: Arc<Mutex<OfflineSyncState>>,
-}
-
-impl OfflineRuntime {
-    pub(crate) fn new(store: OfflineStore) -> Self {
-        Self {
-            store,
-            state: Arc::new(Mutex::new(OfflineSyncState::default())),
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -39,6 +30,7 @@ pub(crate) struct OfflineSyncState {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Shared call-site shape; no offline runtime consumes it in this build.
 pub(crate) struct QueuedActivityEvent {
     pub(crate) context: Option<mem_store::events::MutationContext>,
     pub(crate) event_id: Uuid,
@@ -50,10 +42,6 @@ pub(crate) struct QueuedActivityEvent {
 }
 
 impl OfflineStore {
-    pub(crate) async fn open(_path: PathBuf) -> Result<Self> {
-        anyhow::bail!("this build of mem-service was compiled without the offline feature")
-    }
-
     pub(crate) fn path(&self) -> &Path {
         unreachable!("offline store cannot exist without the offline feature")
     }

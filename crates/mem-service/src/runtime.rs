@@ -635,6 +635,7 @@ async fn build_offline_runtime(config: &AppConfig) -> Result<Option<OfflineRunti
     Ok(Some(OfflineRuntime::new(store)))
 }
 
+#[cfg(feature = "offline")]
 fn offline_database_path(config: &AppConfig) -> Option<PathBuf> {
     if let Some(path) = &config.offline.path {
         return Some(path.clone());

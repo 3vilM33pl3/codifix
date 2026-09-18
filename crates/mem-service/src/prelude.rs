@@ -42,9 +42,9 @@ pub(crate) use mem_config::{
     llm_max_output_tokens_field, llm_requires_api_key, load_repo_replacement_policy,
     repo_agent_settings_path, resolve_llm_api_key,
 };
-pub(crate) use mem_curate::{
-    list_replacement_proposals, preview_capture, preview_curate, store_capture,
-};
+#[cfg(feature = "offline")]
+pub(crate) use mem_curate::store_capture;
+pub(crate) use mem_curate::{list_replacement_proposals, preview_capture, preview_curate};
 pub(crate) use mem_platform::{
     managed_watch_service_name, preferred_user_state_dir, restart_local_watcher_service_name,
     watch_service_unit_name,
