@@ -9,6 +9,12 @@ records in an independent database. Web/CLI/TUI inspection and local Web queryin
 work. Existing services and the original dataset remain unchanged. Start with the
 [demo guide](../../user/workshop-preview.md); remaining four-area gates stay open.
 
+The [Workshop interaction increment](workshop-interaction.md) now exposes the
+saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
+human review. The independent preview is upgraded through migration 0059.
+New-question submission and recoverable execution are still pending; review does
+not execute a proposal or authorize another paid call.
+
 ## Historical implementation notes
 
 The entries below describe progress at their recorded stage, not the current

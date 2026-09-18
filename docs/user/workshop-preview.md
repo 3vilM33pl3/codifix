@@ -14,13 +14,20 @@ Memory-development records are loaded. The original dataset is unchanged.
 3. Select **More → Supervisor**, then **Refresh supervisor**. Show Workshop's
    identity, the $2.50 / 20-call daily ceiling and the recorded completed action.
    The first live run used one generation and cost $0.008608.
-4. Read the private saved result at
-   `/home/olivier/.local/state/memory-workshop-preview-20260918/first-live-result.md`.
-   Pi explained ATProto's role and proposed a human check before cross-area
-   sharing. It cited all three supplied records; it did not execute a change.
+4. In Supervisor, click **Load saved proposals**, then **Open proposal** for
+   `e711c518-a60c-467a-9c3e-55f4d7ae91b2`. Read the original question, Pi's answer
+   and all three exact source-version citations. Pi explained ATProto's role and
+   proposed a human check before cross-area sharing; it did not execute a change.
+5. **Approve** or **Reject** opens a confirmation showing the result digest and
+   request ID. Confirm only your actual decision: it is permanently recorded.
+   For a demonstration without a decision, close the confirmation. Approval
+   records human review only; it does not execute a suggestion, change a memory,
+   install software or make another model call.
 
 The Supervisor feed deliberately contains metadata, not private proposal text.
-The result file is a genuine saved-output export, not an interactive chat screen.
+Private results have their own project-scoped access check and are not part of
+that feed. The original `first-live-result.md` is also retained as an export.
+**New supervisor questions cannot yet be submitted through these screens.**
 One earlier setup failure is retained in history; it occurred before any model
 call and was reconciled. Do not describe the failed action as another charge.
 
@@ -29,13 +36,19 @@ For the terminal interface:
 ```sh
 memory-workshop
 memory-workshop supervisor
+memory-workshop supervisor proposals --project memory
+memory-workshop supervisor result --project memory --action e711c518-a60c-467a-9c3e-55f4d7ae91b2
 memory-workshop query --project memory --question ATProto
 memory-workshop health
 ```
 
 The local wrapper is `/home/olivier/.local/bin/memory-workshop`. It always selects
 this installation and intentionally disallows shared service/watcher management.
-In the TUI, select **Supervisor**, press `r`, and use `j`/`k` to scroll.
+In the TUI, select **Supervisor**, press `r` for metadata or `v` for private
+proposals, then Enter to open the selected result. Use `j`/`k` to scroll, `a`/`x`
+to prepare approval/rejection and Enter to confirm. `c` closes the confirmation;
+Escape returns to metadata. For scripted review, see the
+[CLI instructions](cli/supervisor.md#private-proposals-and-human-review).
 
 ## What stays running
 
@@ -61,8 +74,11 @@ memory-workshop health
 ```
 
 Do not use `memory service restart-all` for this preview. Do not start the retained
-`memory-workshop-preview-app-initial-transport-20260918` container. It is stopped
-diagnostic evidence, not another supported writer. After recreating—not simply
+`memory-workshop-preview-app-initial-transport-20260918` or
+`memory-workshop-preview-app-before-interaction-59` containers. They are stopped
+historical artifacts, not supported writers. The latter predates migration 0059;
+starting it against the upgraded database is not a rollback procedure.
+After recreating—not simply
 restarting—the database container, the operator must revalidate its private IP
 and update the relay's fixed database destination.
 
@@ -86,6 +102,11 @@ The newer `live-preview-recovery.tar.gpg` includes the completed proposal,
 current database/configuration and operator helper sources, but not the OpenAI
 key or binary artifacts. Rebuild/verify artifacts against the retained hashes;
 that newer recovery bundle has not itself been restore-rehearsed.
+The review UI upgrade has a separate encrypted `before-interaction-59.tar.gpg`
+backup, copied to the same NAS location and checksum-verified before migration
+0059. It preserves the pre-upgrade database and private configuration, without
+the provider key. It has not had a restore rehearsal. This preview's current
+binary/Web assets and hash-bound work manifest are under `interaction-59`.
 
 Only the selected curated text can reach Pi/OpenAI through the frozen grant.
 Raw captures, sessions, source-file bytes and other areas were excluded. Imported

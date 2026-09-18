@@ -202,7 +202,13 @@ bounded activation plan; it does not close the parent four-area contract.
 
 Remaining: complete dataset classification/cutover, Homelab/General/Trust
 activation, gateway enrollment and real cross-area exchange, supervisor chat and
-private proposal-body review in Web/TUI, ongoing autonomous knowledge maintenance,
+ongoing autonomous knowledge maintenance,
 release notification/installation, communication channels and CA console
 rehearsal. Do not demo those as already working or confuse this local preview
 with a signed release or company-wide authenticated deployment.
+
+Subsequent [Workshop interaction work](workshop-interaction.md) deployed private
+proposal-body inspection and human review in Web/CLI/TUI, with migration 0059
+and a separate pre-upgrade encrypted backup. This supersedes the result-file-only
+delivery above. New-question submission is still pending and no additional paid
+generation or review decision was performed during that upgrade.

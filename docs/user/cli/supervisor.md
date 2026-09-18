@@ -77,8 +77,9 @@ making a request so denied/offline state is not shown as current healthy state.
 
 These surfaces do not expose questions, private proposals, source text, evidence
 bytes, model prompts or provider bodies. They never invoke a model or mutate
-policy merely by inspecting it. Approvals, supervisor chat and model scheduling
-remain separate implementation work.
+policy merely by inspecting it. Private human review uses the separate
+project-scoped workflow above; supervisor chat and model scheduling remain
+separate implementation work.
 
 ## Explicit pause and resume
 
