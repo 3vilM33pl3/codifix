@@ -56,7 +56,7 @@ pub(crate) async fn handle(args: SupervisorArgs, api: &ApiClient) -> Result<()> 
                 serde_json::to_string_pretty(&request)?
             );
             println!(
-                "Existing policy only; no new disclosure, Pi activation or model request. A pause cannot recall already transmitted bytes."
+                "Existing policy only; no new disclosure consent. Resume can run eligible approved work, including a paid proposal, in an already configured worker. A pause cannot recall already transmitted bytes."
             );
             return Ok(());
         }
@@ -87,6 +87,18 @@ pub(crate) fn lines(response: &SupervisorResponse) -> Vec<String> {
     ];
     if response.read_only {
         lines.push("Read-only service.".into());
+    }
+    if let Some(work) = &response.model_work {
+        lines.push(format!(
+            "Bounded single-proposal worker: {:?} | observed {} | action {} | durable state {:?}",
+            work.state,
+            work.observed_at,
+            work.action_id
+                .map(|id| id.to_string())
+                .unwrap_or_else(|| "not loaded".into()),
+            work.action_state
+        ));
+        lines.push("One fixed proposal, not autonomous agency. Stored means durable output exists; delivery is unconfirmed. Restart never reissues finished/uncertain work.".into());
     }
     lines.push(format!(
         "Deterministic operational checks configured: {} (not model/agent activation)",
@@ -172,6 +184,7 @@ mod tests {
             read_only: true,
             execution: SupervisorExecution::NotIntegrated,
             deterministic_checks_configured: false,
+            model_work: None,
             can_control: false,
             snapshot: None,
         };
@@ -181,6 +194,37 @@ mod tests {
                 && text.contains("nothing enrolled or enabled")
         );
         assert!(text.contains("Read-only service"));
+    }
+
+    #[test]
+    fn bounded_worker_status_is_not_full_agency_or_an_automatic_retry() {
+        let response = SupervisorResponse {
+            read_only: false,
+            execution: SupervisorExecution::NotIntegrated,
+            deterministic_checks_configured: false,
+            can_control: false,
+            snapshot: None,
+            model_work: Some(mem_record::SupervisorModelWorkStatus {
+                state: mem_record::SupervisorModelWorkState::Stored,
+                observed_at: chrono::Utc::now(),
+                action_id: Some(uuid::Uuid::new_v4()),
+                attempt_id: Some(uuid::Uuid::new_v4()),
+                action_state: Some(mem_record::SupervisorActionState::Verified),
+            }),
+        };
+        let text = lines(&response).join("\n");
+        assert!(text.contains("Bounded single-proposal worker: Stored"));
+        assert!(text.contains("not autonomous agency"));
+        assert!(text.contains("delivery is unconfirmed"));
+        assert!(text.contains("Restart never reissues"));
+        let mut old = serde_json::to_value(&response).expect("response");
+        old.as_object_mut().expect("object").remove("model_work");
+        assert!(
+            serde_json::from_value::<SupervisorResponse>(old)
+                .expect("old server compatible")
+                .model_work
+                .is_none()
+        );
     }
 
     #[tokio::test]

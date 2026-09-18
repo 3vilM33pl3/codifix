@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Opt-in deterministic observations only. No Pi, model or federation dispatch.
+//! Separately opt-in deterministic observations and bounded single-work models.
 use crate::AppState;
 use mem_supervisor_store::SupervisorStore;
 use std::time::Duration;
+
+pub(crate) mod model;
 
 #[cfg(test)]
 mod tests;

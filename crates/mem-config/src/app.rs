@@ -103,6 +103,16 @@ pub struct SupervisorIdentityConfig {
     /// Fixed metadata-only five-minute checks. Never enables Pi or models.
     #[serde(default)]
     pub deterministic_checks: bool,
+    /// Explicit one-work opt-in; no default model loop or source selection.
+    #[serde(default)]
+    pub model_work: Option<SupervisorModelWorkConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SupervisorModelWorkConfig {
+    pub manifest: PathBuf,
+    pub sha256: String,
 }
 
 /// Setting a semantic timestamp opts a dedicated service into measurement mode.

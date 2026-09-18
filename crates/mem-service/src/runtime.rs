@@ -269,6 +269,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         let state = build_state(config.clone(), shutdown_handle.clone()).await?;
         let _background_tasks = crate::background::start(state.clone());
         let _supervisor_checks = crate::supervisor::start(state.clone());
+        let supervisor_model = crate::supervisor::model::start(state.clone());
         let _effect_recovery = crate::effects::start(state.clone());
         let _federation_tasks = federation::start(
             state.clone(),
@@ -279,6 +280,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         let listener = bind_http_listener_with_handoff(&config, addr)
             .await
             .context("bind http listener")?;
+        let supervisor_shutdown = supervisor_model.as_ref().map(|worker| worker.control());
         let mut http_server = tokio::spawn(async move {
             axum::serve(
                 listener,
@@ -286,6 +288,9 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
             )
             .with_graceful_shutdown(async {
                 let _ = shutdown_rx.await;
+                if let Some(control) = supervisor_shutdown {
+                    control.stop();
+                }
             })
             .await
         });
@@ -334,16 +339,19 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         if let Some(path) = config_path.as_deref() {
             tokio::select! {
                 result = &mut http_server => {
+                    if let Some(worker) = &supervisor_model { worker.stop(); }
                     result.context("join mem-service task")??;
                     break;
                 }
                 result = tokio::signal::ctrl_c() => {
+                    if let Some(worker) = &supervisor_model { worker.stop(); }
                     result.context("listen for ctrl-c")?;
                     shutdown_http_server(&shutdown_handle, &mut http_server, "ctrl-c").await?;
                     abort_tasks(&mut cluster_tasks);
                     break;
                 }
                 result = wait_for_config_change(path, config_fingerprint) => {
+                    if let Some(worker) = &supervisor_model { worker.stop(); }
                     config_fingerprint = result.context("watch config file")?;
                     tracing::info!(path = %path.display(), "config changed; restarting backend");
                     shutdown_http_server(&shutdown_handle, &mut http_server, "config-reload").await?;
@@ -353,10 +361,12 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         } else {
             tokio::select! {
                 result = &mut http_server => {
+                    if let Some(worker) = &supervisor_model { worker.stop(); }
                     result.context("join mem-service task")??;
                     break;
                 }
                 result = tokio::signal::ctrl_c() => {
+                    if let Some(worker) = &supervisor_model { worker.stop(); }
                     result.context("listen for ctrl-c")?;
                     shutdown_http_server(&shutdown_handle, &mut http_server, "ctrl-c").await?;
                     abort_tasks(&mut cluster_tasks);
@@ -451,6 +461,7 @@ pub(crate) async fn build_state(
             ..ProvenanceRuntimeState::default()
         })),
         background: crate::background::Runtime::default(),
+        supervisor_model: Default::default(),
         federation: Default::default(),
         reinforcement: reinforcement.as_ref().map(|(runtime, _)| runtime.clone()),
         cluster: ClusterRuntime {

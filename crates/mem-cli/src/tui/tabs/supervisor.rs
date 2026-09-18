@@ -171,7 +171,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
             "Request {}. Enter confirms/retries these exact terms; c closes and inspects history.",
             request.request_id
         )));
-        text.push(Line::from("No new disclosure consent, Pi activation or installation. Already transmitted bytes cannot be recalled."));
+        text.push(Line::from("No new disclosure consent or installation. Resume permits configured workers to run eligible approved paid work. Already transmitted bytes cannot be recalled."));
     }
     if state.busy {
         text.push(Line::from("Loading supervisor…"));
@@ -247,6 +247,7 @@ mod tests {
             read_only: true,
             execution: mem_record::SupervisorExecution::NotIntegrated,
             deterministic_checks_configured: false,
+            model_work: None,
             can_control: false,
             snapshot: None,
         }));

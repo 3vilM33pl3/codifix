@@ -38,7 +38,8 @@ paths:
         CSRF and the configured Origin. Exact instance/revision/expected-state
         binding; request UUID is idempotent only for the same actor and terms.
         Policy, supervisor journal and protected auth audit commit together.
-        Does not bootstrap, start Pi, grant sharing/model consent or change limits.
+        Does not bootstrap, grant sharing/model consent or change limits.
+        Resume permits an already configured worker to run eligible approved paid work.
         Retrying a prior request returns its historical receipt, not fresh state.
         Read the supervisor snapshot afterwards. On an unconfirmed outcome,
         inspect or retry the exact request ID; never change its terms.
@@ -2426,11 +2427,25 @@ components:
         read_only: { type: boolean }
         execution: { type: string, enum: [not_integrated] }
         deterministic_checks_configured: { type: boolean, default: false, description: Operator opt-in only; not proof of current health or Pi activation. }
+        model_work:
+          oneOf:
+            - { type: 'null' }
+            - { $ref: '#/components/schemas/SupervisorModelWorkStatus' }
         can_control: { type: boolean, default: false, description: UI hint only; mutations recheck current authority. }
         snapshot:
           oneOf:
             - { type: 'null' }
             - { $ref: '#/components/schemas/SupervisorSnapshot' }
+    SupervisorModelWorkStatus:
+      type: object
+      description: Process-local single-proposal observation, not autonomous agency. Durable action history is authoritative after restart. No source or provider payloads.
+      required: [state, observed_at, action_id, attempt_id, action_state]
+      properties:
+        state: { type: string, enum: [starting, waiting_for_database, awaiting_authority, ready, running, completed, stored, stopped, intervention_required, invalid_configuration, credential_unavailable, artifact_rejected, sandbox_unavailable, cleanup_unconfirmed, delivery_unconfirmed, execution_deadline] }
+        observed_at: { type: string, format: date-time }
+        action_id: { type: [string, 'null'], format: uuid }
+        attempt_id: { type: [string, 'null'], format: uuid }
+        action_state: { type: [string, 'null'], enum: [observed, proposed, authorized, queued, running, verified, denied, failed, expired, cancelled, uncertain, null] }
     SupervisorSnapshot:
       type: object
       required: [instance_id, area, observed_at, policy, budget, action_counts, journal, next_after, has_more]

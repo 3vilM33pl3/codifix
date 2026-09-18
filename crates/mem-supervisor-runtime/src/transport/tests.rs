@@ -21,6 +21,7 @@ use std::sync::{
 
 mod broker;
 mod disclosure;
+mod work;
 
 #[derive(Clone, Copy)]
 enum Mode {

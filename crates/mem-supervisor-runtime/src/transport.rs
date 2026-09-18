@@ -33,6 +33,7 @@ pub struct OpenAiTransport {
 }
 
 /// Trusted caller's stable execution binding, not a disclosure capability.
+#[derive(Clone)]
 pub struct ProposalExecution {
     pub instance_id: Uuid,
     pub policy_revision: Uuid,

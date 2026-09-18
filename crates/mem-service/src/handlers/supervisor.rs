@@ -64,6 +64,7 @@ pub(crate) async fn inspect(
         Json(SupervisorResponse {
             read_only: state.config.service.read_only,
             execution: SupervisorExecution::NotIntegrated,
+            model_work: state.supervisor_model.snapshot(),
             deterministic_checks_configured: state
                 .config
                 .supervisor

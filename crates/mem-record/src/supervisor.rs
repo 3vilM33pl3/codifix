@@ -14,6 +14,10 @@ pub struct SupervisorResponse {
     /// Operator opt-in, not proof that a check succeeded or a Pi agent is active.
     #[serde(default)]
     pub deterministic_checks_configured: bool,
+    /// Process-local bounded worker observation, not an autonomous-agent heartbeat.
+    /// Durable action/attempt history remains authoritative after restart.
+    #[serde(default)]
+    pub model_work: Option<SupervisorModelWorkStatus>,
     /// UI hint only; every mutation independently rechecks current authority.
     #[serde(default)]
     pub can_control: bool,
@@ -25,6 +29,36 @@ pub struct SupervisorResponse {
 #[serde(rename_all = "snake_case")]
 pub enum SupervisorExecution {
     NotIntegrated,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorModelWorkStatus {
+    pub state: SupervisorModelWorkState,
+    pub observed_at: DateTime<Utc>,
+    pub action_id: Option<Uuid>,
+    pub attempt_id: Option<Uuid>,
+    pub action_state: Option<SupervisorActionState>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SupervisorModelWorkState {
+    Starting,
+    WaitingForDatabase,
+    AwaitingAuthority,
+    Ready,
+    Running,
+    Completed,
+    Stored,
+    Stopped,
+    InterventionRequired,
+    InvalidConfiguration,
+    CredentialUnavailable,
+    ArtifactRejected,
+    SandboxUnavailable,
+    CleanupUnconfirmed,
+    DeliveryUnconfirmed,
+    ExecutionDeadline,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

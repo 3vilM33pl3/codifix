@@ -70,7 +70,8 @@ Current source eligibility, project existence/authorization and disclosure
 consent remain caller obligations **before dispatch**. The stored instance/project
 binding prevents relabeling work after dispatch; it does not establish source
 authorization. The guarded path below supplies the narrow local profile. A
-scheduler, service lifecycle and live Web/TUI integration remain work. No paid provider result is claimed from
+general scheduler and full agency remain work. The bounded service worker below
+has separate lifecycle/status wiring. No paid provider result is claimed from
 these tests. The intended $10 fleet allocation requires exactly one authoritative
 $2.50 ledger per area and a verified instance-to-area binding. Duplicate/cloned
 ledgers are not detected by these APIs; deployment and recovery must fence stale
@@ -123,6 +124,41 @@ The trusted `BrokerJob` owns current disclosure checks and durable execution.
 Work survives HTTP disconnect; ambiguous deadline/shutdown retains uncertainty.
 Delivery requires a fresh authority check. Replies contain only the persisted
 typed proposal and its actual settled counters, translated to bounded SSE.
+
+## Opt-in single-work host integration
+
+`work::PinnedWork` loads a private, exact-hash, unique-key JSON manifest (schema 1).
+It binds a Workshop instance, exact source collection, question, action/event/
+attempt identities and sandbox artifacts. Replaying changed terms conflicts with
+the existing durable action. Two contenders can prepare, but only one can claim.
+Restart observes running/verified/uncertain work and never dispatches it again.
+Abandoned 180-second leases are reaped to uncertain; no automatic provider retry.
+
+`launcher::launch` owns preparation, a private Unix broker, the fixed patched-Pi
+container and bounded cleanup. It validates/copies approved artifacts into new
+private files before mounting them. The network-none/read-only, capability-free
+non-root child gets only its prompt and one-work token. A result hash must match
+the exact saved proposal and known settled usage before delivery is confirmed.
+`LocalDisclosure::with_control` rejects new counts, generation, acceptance and
+delivery after shutdown; already-sent requests retain accounting. A database
+commit already started when stop is signaled can finish. Restart uses its stored
+outcome, not a second model request.
+
+The service's optional `[supervisor.model_work]` starts this **one-work** path
+only for writable, non-evaluation, primary Workshop instances. No identity,
+policy, collection or credential is bootstrapped. Web/CLI/TUI show metadata-only
+worker status separately from full autonomous agency. See the
+[operator contract](../../docs/user/cli/supervisor.md#bounded-workshop-proposal-worker).
+
+Deployment limitation: the current launcher requires an explicitly trusted local
+Docker host process. The hardened `memory-layer@.service` intentionally removes
+Docker access and inherited provider credentials, and permits loopback egress
+only. **Do not remove these protections or grant the application Docker-group
+membership to make this launcher work.** A separately reviewed, narrowly scoped
+sandbox launch/egress bridge is still needed for the hardened independent target.
+Passing the non-root operator-host rehearsal is not evidence that this production
+service boundary has been solved, or permission to run against the existing
+mixed-area installation. No deployment or paid call is activated by this crate.
 Unknown usage cannot be represented as a successful reply.
 
 Never mount this router on the ordinary service/public interface. A private Unix

@@ -2,6 +2,7 @@
 //! installer; the host must opt in, authenticate configuration changes and stop
 //! jobs on read-only/evaluation/reload. Never construct grants from Pi input.
 use crate::{
+    launcher::RunControl,
     model::{PreparedRequest, Proposal},
     pi_broker::JobFuture,
     transport::{DisclosureGuard, DisclosurePhase, ProposalExecution, TransportError},
@@ -16,6 +17,7 @@ pub struct LocalDisclosure {
     pool: PgPool,
     grant: LocalCollectionGrant,
     question: String,
+    control: RunControl,
 }
 
 impl LocalDisclosure {
@@ -26,6 +28,22 @@ impl LocalDisclosure {
             pool,
             grant,
             question,
+            control: RunControl::default(),
+        }
+    }
+
+    /// Cancellation denies new disclosure and publication; in-flight provider
+    /// accounting remains recoverable. A commit already started may complete.
+    pub fn with_control(mut self, control: RunControl) -> Self {
+        self.control = control;
+        self
+    }
+
+    fn check_running(&self) -> Result<(), TransportError> {
+        if self.control.stopped() {
+            Err(TransportError::Authority)
+        } else {
+            Ok(())
         }
     }
 
@@ -44,9 +62,11 @@ impl LocalDisclosure {
         &self,
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<PreparedRequest, TransportError> {
+        self.check_running()?;
         let evidence = sources::authorize_tx(tx, &self.grant)
             .await
             .map_err(|_| TransportError::Authority)?;
+        self.check_running()?;
         PreparedRequest::new(&self.question, &evidence).map_err(TransportError::Model)
     }
 

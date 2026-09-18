@@ -212,13 +212,21 @@ async fn stale_wrong_scope_broad_identity_and_expired_grants_never_disclose_to_c
 
 #[tokio::test]
 async fn changes_during_generation_are_billed_but_never_accepted_as_current_knowledge() {
-    for change in ["source", "tombstone", "principal", "permissions"] {
+    for change in [
+        "source",
+        "tombstone",
+        "principal",
+        "permissions",
+        "shutdown",
+    ] {
         let Some((db, store, lease, revision, fake, client, server)) = fixture(Mode::Good).await
         else {
             return;
         };
         let grant = grant(&db, &fake).await;
-        let guard = LocalDisclosure::new(db.pool.clone(), grant.clone(), "Review".into());
+        let control = crate::launcher::RunControl::default();
+        let guard = LocalDisclosure::new(db.pool.clone(), grant.clone(), "Review".into())
+            .with_control(control.clone());
         let request = Arc::new(guard.prepare().await.expect("prepare"));
         *fake.expected.write().expect("expected") = Arc::clone(&request);
         let pause = Arc::new(tokio::sync::Notify::new());
@@ -240,6 +248,7 @@ async fn changes_during_generation_are_billed_but_never_accepted_as_current_know
         .await
         .expect("generation began");
         match change {
+            "shutdown" => control.stop(),
             "source" => {
                 insert_version(
                     &db,

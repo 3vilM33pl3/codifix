@@ -25,6 +25,7 @@ pub(crate) struct AppState {
     pub(crate) watchers: Arc<Mutex<HashMap<String, WatcherPresence>>>,
     pub(crate) provenance: Arc<Mutex<ProvenanceRuntimeState>>,
     pub(crate) background: crate::background::Runtime,
+    pub(crate) supervisor_model: crate::supervisor::model::Status,
     pub(crate) federation: crate::federation::Registry,
     pub(crate) reinforcement: Option<crate::reinforcement::ReinforcementRuntime>,
     pub(crate) cluster: ClusterRuntime,
