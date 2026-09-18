@@ -34,11 +34,16 @@ async fn supervisor_real_browser_cli_rehearsal() {
         "background_work":{"enabled":false},"mcp":{"enabled":false},
         "embeddings":{"enabled":false,"create_enabled":false},
         "llm":{"provider":"ollama","base_url":"http://127.0.0.1:1","model":"disabled-synthetic"},
-        "supervisor":{"instance_id":instance,"area":"workshop"}
+        "supervisor":{"instance_id":instance,"area":"workshop",
+            "model_work":{"manifest":"/nonexistent/synthetic-work.json","sha256":"0".repeat(64)}}
     })).expect("synthetic config");
     let mut state = crate::runtime::build_state(config, Arc::new(Mutex::new(None)))
         .await
         .expect("state");
+    assert!(
+        crate::supervisor::model::start(state.clone()).is_none(),
+        "read-only rehearsal never starts a provider worker"
+    );
     sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,'memory','Synthetic supervisor rehearsal','/synthetic')")
         .bind(Uuid::new_v4()).execute(&db.pool).await.expect("project");
     let store = SupervisorStore::new(db.pool.clone());

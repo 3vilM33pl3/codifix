@@ -13,6 +13,13 @@ export interface SupervisorResponse {
   execution: "not_integrated";
   can_control?: boolean;
   deterministic_checks_configured?: boolean;
+  model_work?: null | {
+    state: keyof typeof MODEL_WORK_LABELS;
+    observed_at: string;
+    action_id: string | null;
+    attempt_id: string | null;
+    action_state: string | null;
+  };
   snapshot: null | {
     instance_id: string;
     area: SupervisorArea | null;
@@ -26,6 +33,25 @@ export interface SupervisorResponse {
     has_more: boolean;
   };
 }
+
+export const MODEL_WORK_LABELS = {
+  starting: "Checking the fixed work configuration",
+  waiting_for_database: "Waiting for the local database",
+  awaiting_authority: "Waiting for current policy, permissions or eligible sources",
+  ready: "Preparing the authorized work",
+  running: "Work claimed — inspect durable history for progress",
+  completed: "Proposal stored and delivery confirmed",
+  stored: "Proposal stored — delivery not confirmed by this process",
+  stopped: "Worker stopped",
+  intervention_required: "Operator review required — no automatic paid retry",
+  invalid_configuration: "Work configuration rejected",
+  credential_unavailable: "Configured provider credential unavailable — no new work will be claimed",
+  artifact_rejected: "Private runtime files or artifact hashes rejected",
+  sandbox_unavailable: "Required sandbox unavailable — no automatic paid retry",
+  cleanup_unconfirmed: "Sandbox removal unconfirmed — operator cleanup required",
+  delivery_unconfirmed: "Proposal delivery unconfirmed — inspect stored work and usage",
+  execution_deadline: "Sandbox deadline elapsed — inspect stored work and usage",
+} as const;
 
 export function dollars(micros: string): string {
   if (!/^\d+$/.test(micros)) return "unavailable";

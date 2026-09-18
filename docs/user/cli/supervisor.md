@@ -49,8 +49,9 @@ remain separate implementation work.
 
 An existing policy can be paused/resumed by a current **global `system_admin`**,
 not a project administrator. Read-only and evaluation services deny changes.
-Controls do not create identities/policies, change limits, authorize new data
-disclosure or start Pi. A pause cannot recall already transmitted bytes.
+Controls do not create identities/policies, change limits or authorize new data
+disclosure. Resume permits an already configured worker to run eligible approved
+work, including a paid proposal. A pause cannot recall already transmitted bytes.
 
 Web provides **Pause supervisor / Resume supervisor**, then a confirmation with
 the exact instance, policy and request ID. TUI uses `p` / `e` to prepare and
@@ -93,6 +94,53 @@ observations remain visible after policy changes and are not proof of present
 availability, backups, network access or healthy models. Successful collection
 does not mean the observed counts indicate a healthy system.
 
+## Bounded Workshop proposal worker
+
+This is separate from full autonomous agency and defaults off. An independently
+provisioned Workshop service can opt into **one fixed proposal**, with a dedicated
+exact-project internal identity and frozen source grant. A private JSON work
+file fixes schema version 1, action/source-event/attempt UUIDs, the grant, question
+and sandbox artifacts. It must be owned by the service user, mode 0600, inside a
+0700 directory. Symlinks, unsafe ancestor permissions, duplicate JSON keys,
+unknown fields, changed hashes and other areas are rejected.
+
+```toml
+# Add only after target, source exclusions and artifact verification are complete.
+[supervisor.model_work]
+manifest = "/ABSOLUTE/PRIVATE/work.json"
+sha256 = "REPLACE_WITH_EXACT_MANIFEST_SHA256"
+```
+
+The host process inherits the approved normal `OPENAI_API_KEY`; Pi receives only
+an opaque one-work broker token. Do not point this process at an R3 credential or
+an existing mixed-area database. No credential lookup/fallback is performed by
+the worker. Current implementation requires non-root Linux AMD64, local Docker,
+the pinned local Ubuntu image, hash-verified patched Pi and sandbox driver in
+non-group-writable paths, and a separate private runtime directory. Pi gets no
+network, host workspace, Docker socket, database credential or provider key.
+
+This operator-host launcher is **not yet compatible with the hardened named
+instance service**: that service deliberately denies Docker and external egress
+and strips inherited provider keys. Do not weaken it or add Docker-group access.
+A narrow launch/egress bridge and independent target verification remain live
+deployment prerequisites; the example above is not permission to bypass them.
+
+The worker polls every two seconds and claims once with a 180-second lease.
+Shutdown/reload blocks new disclosure and results; an already-started commit can
+complete, and already-sent provider calls must still be accounted. Abrupt death
+retains durable reservations; recovery expires the action to `uncertain`, never
+automatically requeues or regenerates it. Changing the work file requires a new
+hash in configuration; reusing an ID with changed terms fails. New work is a new
+disclosure/billing decision, not a recovery shortcut. The existing USD 2.50 and
+20-generation daily maximum remains enforced independently by the store.
+
+Web, CLI and TUI show `model_work` separately from `execution: not_integrated`
+(full autonomous agency). `completed` means the exact stored proposal's hash and
+usage were verified against child delivery; `stored` means durable output exists
+but this process cannot confirm delivery. Neither means the proposed correction
+is correct or has been applied. No result is executed as an instruction. Status
+and history omit questions, source contents, paths and private proposal bodies.
+
 ## Disposable verification
 
 The ignored service test `supervisor_real_browser_cli_rehearsal` creates its own
@@ -100,6 +148,7 @@ synthetic PostgreSQL database, paused policy and read-only service on an allocat
 loopback port. It runs the real CLI, TUI through a PTY, and built Web UI through
 Playwright, verifies their durable identity against storage, then confirms no
 actions were created. It requires built Web assets, a TUI-enabled CLI, Chromium,
-Python 3 with `pexpect`, and the explicitly configured disposable test database.
+Python 3 with `scripts/tests/supervisor-pty-requirements.txt` installed in a test
+virtual environment on `PATH`, and the explicitly configured disposable test database.
 Set `MEMORY_SUPERVISOR_REHEARSAL_CLI` to that CLI's absolute path before running
 the test with `--ignored --nocapture`. Never point it at an existing deployment.

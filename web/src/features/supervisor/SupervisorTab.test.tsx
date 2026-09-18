@@ -17,6 +17,18 @@ const fixture: SupervisorResponse = {
 beforeEach(() => { vi.mocked(supervisorStatus).mockReset(); vi.mocked(supervisorPolicy).mockReset(); });
 afterEach(cleanup);
 
+it.each([['completed', 'Proposal stored and delivery confirmed'], ['stored', 'delivery not confirmed'], ['intervention_required', 'no automatic paid retry']] as const)("distinguishes bounded %s work from autonomous agency", async (state, label) => {
+  vi.mocked(supervisorStatus).mockResolvedValue({ ...fixture, model_work: {
+    state, observed_at: "2026-09-18T12:00:00Z", action_id: "fixed-action", attempt_id: "fixed-attempt", action_state: "verified",
+  }});
+  render(<SupervisorTab />);
+  const worker = await screen.findByRole("region", { name: "Bounded proposal worker" });
+  expect(worker).toHaveTextContent(label);
+  expect(worker).toHaveTextContent("One fixed proposal, not autonomous agency");
+  expect(worker).toHaveTextContent("fixed-action");
+  expect(supervisorPolicy).not.toHaveBeenCalled();
+});
+
 it("confirms exact policy terms and preserves the request ID across an uncertain retry", async () => {
   const mutable = { ...fixture, read_only: false, can_control: true };
   vi.mocked(supervisorStatus).mockResolvedValue(mutable);

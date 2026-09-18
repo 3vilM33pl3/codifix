@@ -30,7 +30,7 @@ export function SupervisorControls({ data, onInspect, onPendingChange }: { data:
       <div role="dialog" aria-label="Confirm supervisor policy change" aria-busy={busy}>
         <p>{request.enabled ? "Resume" : "Pause"} {snapshot.area} on instance {request.instance_id}?</p>
         <p>Exact policy {request.policy_revision}; request {request.request_id}.</p>
-        <p>Existing policy only. No new sharing/model consent, Pi activation or installation. Pausing blocks future admissions and results; already transmitted bytes cannot be recalled.</p>
+        <p>Existing policy only; no new sharing/model consent or installation. Resuming permits an already configured worker to run its eligible approved work, including a paid proposal. Pausing blocks future admissions and results; already transmitted bytes cannot be recalled.</p>
         {failure ? <p role="alert">{failure}</p> : null}
         <button disabled={busy} onClick={() => void submit()}>{busy ? "Submitting…" : failure ? "Retry same request" : "Confirm policy change"}</button>
         <button disabled={busy} onClick={() => { setRequest(null); onInspect(); }}>{failure ? "Close and inspect history" : "Cancel"}</button>

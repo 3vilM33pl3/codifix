@@ -25,6 +25,7 @@ try {
   const cli=JSON.parse(execFileSync(binary,['--config',config,'supervisor','--json'],{env,timeout:15000,encoding:'utf8',cwd:privateDir}));
   assert.equal(cli.snapshot.instance_id,instance);
   assert.equal(cli.execution,'not_integrated');
+  assert.equal(cli.model_work.state,'stopped');
   assert.equal(cli.snapshot.policy.enabled,false);
   assert.equal(cli.snapshot.journal[0].event,'policy_installed');
   const pty=JSON.parse(execFileSync('python3',[fileURLToPath(new URL('../../scripts/tests/supervisor-pty.py',import.meta.url)),binary,config,instance],{env,timeout:20000,encoding:'utf8',cwd:privateDir}));
@@ -41,6 +42,7 @@ try {
   const panel=page.getByRole('region',{name:'Area supervisor'});
   await panel.getByRole('heading',{name:'Workshop',exact:true}).waitFor();
   assert.match(await panel.innerText(),/execution is not integrated/);
+  assert.match(await panel.getByRole('region',{name:'Bounded proposal worker'}).innerText(),/Worker stopped/);
   assert.match(await panel.innerText(),/Policy: paused/);
   assert.match(await panel.innerText(),/Policy prepared/);
   assert.match(await panel.innerText(),new RegExp(instance));

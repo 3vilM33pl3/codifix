@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supervisorStatus } from "../../api";
-import { dollars, EVENT_LABELS, type SupervisorResponse } from "./types";
+import { dollars, EVENT_LABELS, MODEL_WORK_LABELS, type SupervisorResponse } from "./types";
 import { SupervisorControls } from "./SupervisorControls";
 
 export function SupervisorTab() {
@@ -34,7 +34,13 @@ export function SupervisorTab() {
     {error ? <p role="alert">{error}</p> : null}
     {!data && !error ? <p role="status">Loading supervisor…</p> : null}
     {data ? <>
-      <p role="status">Pi/model supervisor execution is not integrated in this build. No active agent or healthy heartbeat is claimed.</p>
+      <p role="status">Full autonomous supervisor execution is not integrated. Bounded proposal work is shown separately; no healthy agent heartbeat is claimed.</p>
+      {data.model_work ? <section aria-label="Bounded proposal worker">
+        <h3>Single-proposal worker</h3>
+        <p>{MODEL_WORK_LABELS[data.model_work.state] ?? "Unknown worker state — operator review required"}.</p>
+        <p>Observed {data.model_work.observed_at}. Action {data.model_work.action_id ?? "not loaded"}; recorded state {data.model_work.action_state ?? "unavailable"}.</p>
+        <p>One fixed proposal, not autonomous agency. Restart does not reissue finished or uncertain work. This is a process-local observation; durable history below is authoritative.</p>
+      </section> : null}
       <p>Deterministic operational checks: {data.deterministic_checks_configured ? "configured; current policy and writable service required" : "not configured"}. These do not enable Pi or model calls.</p>
       {data.read_only ? <p>Read-only service. This panel never starts work or changes policy.</p> : null}
       {!snapshot ? <p>No durable supervisor identity is configured. Nothing was enrolled or enabled.</p>
