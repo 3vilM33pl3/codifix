@@ -36,3 +36,34 @@ remain mandatory. Dev Memory checkpoint recorded this amendment at 11:51 UTC.
 Not active. Per-collection human disclosure review is no longer blocking Workshop;
 the runtime, deployment and source-isolation gates remain. No source dataset has
 been migrated and no existing service restarted.
+
+## 2026-09-18 implementation evidence
+
+- `b0625f22`: migration 0058 commits actual token counters with settlement;
+  historical unknown usage remains unknown. No live migration was applied.
+- `d838dd1a`: authenticated, bounded, single-work broker; replay, slow input,
+  disconnect, expiry and denied delivery tests pass.
+- `bc9665c8`: separate pinned-patch `memory-pi-sandbox` child, fixed private Unix
+  relay, network-none/read-only-root container and metadata-only result hash.
+- `9fed4919`: exact local source and disclosure guards reject wrong scope, changed
+  versions, tombstones, withdrawn sources, expired grants and revoked authority.
+  Authentication/source locks and proposal publication share one transaction.
+  This is a Workshop-only opt-in runtime profile, not an activated service.
+- Authentic patched AMD64 Pi completed three disposable runs through the guarded
+  broker and PostgreSQL: success, revocation during counting and unknown usage.
+  Success matched the saved proposal hash and synthetic provider counters.
+  Denied/uncertain cases accepted no proposal and did not reissue a generation.
+- Required-database validation passed **195 tests** across `mem-supervisor`,
+  `mem-supervisor-store`, `mem-supervisor-runtime`, `mem-supervisor-pi`, `mem-area`,
+  `mem-area-store` and `mem-area-ops`, with `--all-targets --locked --offline`.
+  Six opt-in diagnostics are ignored by that command; the guarded real-Pi test
+  above was explicitly run separately (three container cases). Strict Clippy for
+  those seven crates, workspace formatting and boundary checks passed. This is
+  focused validation, not a claim of a full-workspace or deployed acceptance run.
+
+No real knowledge, provider credential or paid call was used in these rehearsals.
+No CA, Homelab, General, production/dev service or source migration was changed.
+Next: integrate the service-owned opt-in worker/launcher and truthful operator
+status, preserve its exact collection grant and prepare the independent Workshop
+target. Only then run the approved bounded live proposal. Do not mark activation
+complete from the component/container evidence above.
