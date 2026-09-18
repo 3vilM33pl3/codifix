@@ -5,6 +5,7 @@
 pub mod launcher;
 pub mod local_disclosure;
 pub mod model;
+pub mod operator;
 pub mod pi_admission;
 pub mod pi_broker;
 mod private_files;

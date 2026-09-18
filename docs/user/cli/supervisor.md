@@ -96,6 +96,32 @@ does not mean the observed counts indicate a healthy system.
 
 ## Bounded Workshop proposal worker
 
+For an application deployment that intentionally cannot access Docker or a
+provider, use the separate **operator-only** `memory-workshop-worker` executable.
+It has no HTTP listener and must never become an MCP tool or application command.
+The trusted operator owns Docker access and the approved normal provider key;
+neither authority is given to the Memory application or Pi. Its fixed transport
+can only contact OpenAI's approved API, with redirects, proxies and retries off.
+This is not an OS-wide egress firewall for the operator account.
+
+```sh
+# Explicit private paths and durable IDs; never put a secret in command arguments.
+memory-workshop-worker observe /PRIVATE/work.json SHA256 INSTANCE_UUID
+memory-workshop-worker run /PRIVATE/work.json SHA256 INSTANCE_UUID
+```
+
+`DATABASE_URL` must explicitly name a loopback `memory_workshop_` database.
+`run` may perform one approved paid generation; it requires the separately
+prepared normal `OPENAI_API_KEY`. Missing credentials still permit metadata
+recovery but never a claim. `observe` journals/reconciles metadata only. Existing
+running or completed actions are not relaunched. A stopped/uncertain run must
+be inspected, not retried under a fresh identity to bypass its reservation.
+SIGINT/SIGTERM blocks new disclosure while allowing bounded billing settlement.
+Output is metadata only; durable history remains visible through the normal
+Supervisor views. The in-application worker status is not a heartbeat for this
+separate process. It does not provision, migrate, enable policy, import a corpus
+or complete the four-area deployment.
+
 This is separate from full autonomous agency and defaults off. An independently
 provisioned Workshop service can opt into **one fixed proposal**, with a dedicated
 exact-project internal identity and frozen source grant. A private JSON work

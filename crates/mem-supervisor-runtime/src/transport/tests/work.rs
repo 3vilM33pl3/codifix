@@ -38,6 +38,69 @@ fn save(dir: &tempfile::TempDir, manifest: &WorkManifest) -> String {
 }
 
 #[tokio::test]
+#[ignore = "requires pinned patched Pi/driver and explicit disposable PostgreSQL"]
+async fn operator_executes_one_real_pi_proposal_and_restart_only_observes_it() {
+    let (db, store, _, _, fake, client, provider) = fixture(Mode::Good).await.expect("required DB");
+    let (dir, mut manifest, _) = manifest(&db, &fake).await;
+    let driver = dir.path().join("driver");
+    std::fs::copy(
+        std::env::var_os("MEMORY_PI_SANDBOX_DRIVER").expect("driver"),
+        &driver,
+    )
+    .expect("stage");
+    std::fs::set_permissions(&driver, std::fs::Permissions::from_mode(0o500)).expect("private");
+    manifest.sandbox = SandboxConfig {
+        pi: std::env::var_os("MEMORY_PI_PATCHED_ARTIFACT")
+            .expect("pinned Pi")
+            .into(),
+        driver_sha256: format!(
+            "{:x}",
+            Sha256::digest(std::fs::read(&driver).expect("bytes"))
+        ),
+        driver,
+        private_runtime: dir.path().into(),
+    };
+    let disclosure = crate::local_disclosure::LocalDisclosure::new(
+        db.pool.clone(),
+        manifest.grant.clone(),
+        manifest.question.clone(),
+    );
+    *fake.expected.write().expect("expected") =
+        Arc::new(disclosure.prepare().await.expect("sources"));
+    let hash = save(&dir, &manifest);
+    let work = PinnedWork::load(
+        &dir.path().join("work.json"),
+        &hash,
+        fake.instance_id,
+        Area::Workshop,
+    )
+    .expect("work");
+    let result =
+        crate::operator::run(&work, db.pool.clone(), Some(client), RunControl::default()).await;
+    assert_eq!(result.outcome, crate::operator::Outcome::Completed);
+    assert_eq!(result.action_state, Some(ActionState::Verified));
+    assert_eq!(fake.generated.load(Ordering::SeqCst), 1);
+    assert!(
+        store
+            .settled_usage(manifest.attempt_id)
+            .await
+            .expect("accounting")
+            .is_some()
+    );
+    assert_eq!(
+        crate::operator::run(&work, db.pool.clone(), None, RunControl::default())
+            .await
+            .outcome,
+        crate::operator::Outcome::Stored
+    );
+    assert_eq!(fake.generated.load(Ordering::SeqCst), 1);
+    let metadata = serde_json::to_string(&result).expect("metadata");
+    assert!(!metadata.contains("synthetic") && !metadata.contains("summary"));
+    provider.abort();
+    db.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
 async fn fixed_work_restart_and_competing_claims_never_reissue_running_or_verified_actions() {
     let Some((db, store, _, _, fake, client, provider)) = fixture(Mode::Good).await else {
         return;
@@ -67,6 +130,10 @@ async fn fixed_work_restart_and_competing_claims_never_reissue_running_or_verifi
     assert_eq!(claims.len(), 1, "only one worker obtains a paid-work lease");
     let claim = claims.pop().expect("claim");
     let resumed = PinnedWork::load(&path, &hash, fake.instance_id, Area::Workshop).expect("reload");
+    let existing =
+        crate::operator::run(&resumed, db.pool.clone(), None, RunControl::default()).await;
+    assert_eq!(existing.outcome, crate::operator::Outcome::ExistingWork);
+    assert_eq!(existing.action_state, Some(ActionState::Running));
     assert!(matches!(
         resumed
             .step(db.pool.clone(), RunControl::default())
@@ -107,6 +174,10 @@ async fn fixed_work_restart_and_competing_claims_never_reissue_running_or_verifi
         .expect("confirmed exact child hash");
     assert!(claim.confirm([0; 32]).await.is_err());
     assert_eq!(fake.generated.load(Ordering::SeqCst), 1);
+    let recovered =
+        crate::operator::run(&resumed, db.pool.clone(), None, RunControl::default()).await;
+    assert_eq!(recovered.outcome, crate::operator::Outcome::Stored);
+    assert_eq!(fake.generated.load(Ordering::SeqCst), 1);
     let mut altered = manifest;
     altered.question.push_str(" changed");
     let hash = save(&dir, &altered);
@@ -134,8 +205,20 @@ async fn abandoned_work_becomes_uncertain_not_queued_and_stopped_work_never_star
     }
     assert!(PinnedWork::load(&path, &hash, Uuid::new_v4(), Area::Workshop).is_err());
     let work = PinnedWork::load(&path, &hash, fake.instance_id, Area::Workshop).expect("pinned");
+    let no_key = crate::operator::run(&work, db.pool.clone(), None, RunControl::default()).await;
+    assert_eq!(
+        no_key.outcome,
+        crate::operator::Outcome::CredentialUnavailable
+    );
+    assert_eq!(no_key.action_state, Some(ActionState::Observed));
     let stop = RunControl::default();
     stop.stop();
+    assert_eq!(
+        crate::operator::run(&work, db.pool.clone(), None, stop.clone())
+            .await
+            .outcome,
+        crate::operator::Outcome::Stopped
+    );
     assert!(work.step(db.pool.clone(), stop).await.is_err());
     for _ in 0..4 {
         work.step(db.pool.clone(), RunControl::default())
@@ -145,6 +228,12 @@ async fn abandoned_work_becomes_uncertain_not_queued_and_stopped_work_never_star
     sqlx::query("UPDATE supervisor_actions SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1")
         .bind(manifest.action_id).execute(&db.pool).await.expect("simulate crash lease expiry");
     for _ in 0..3 {
+        assert_eq!(
+            crate::operator::run(&work, db.pool.clone(), None, RunControl::default())
+                .await
+                .outcome,
+            crate::operator::Outcome::InterventionRequired
+        );
         assert_eq!(
             work.observe(db.pool.clone())
                 .await

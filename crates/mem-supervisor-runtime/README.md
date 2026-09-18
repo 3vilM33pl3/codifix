@@ -127,6 +127,13 @@ typed proposal and its actual settled counters, translated to bounded SSE.
 
 ## Opt-in single-work host integration
 
+`memory-workshop-worker` provides a separate operator-owned entry point to the
+same pinned work, guarded broker, sandbox and accounting. No listener or general
+queue is exposed; it accepts one private manifest and an explicit local Workshop
+database. This permits the main application to retain its no-Docker/no-provider
+boundary. Docker remains a privileged operator capability, not a grant to the
+application or model. See [operator commands](../../docs/user/cli/supervisor.md).
+
 `work::PinnedWork` loads a private, exact-hash, unique-key JSON manifest (schema 1).
 It binds a Workshop instance, exact source collection, question, action/event/
 attempt identities and sandbox artifacts. Replaying changed terms conflicts with
