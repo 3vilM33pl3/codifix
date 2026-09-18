@@ -69,8 +69,8 @@ evidence-byte hashes bind indices but are not source identities or proof of trut
 Current source eligibility, project existence/authorization and disclosure
 consent remain caller obligations **before dispatch**. The stored instance/project
 binding prevents relabeling work after dispatch; it does not establish source
-authorization. A scheduler, Pi admission proxy, service authorization and
-Web/TUI views remain integration work. No paid provider result is claimed from
+authorization. The guarded path below supplies the narrow local profile. A
+scheduler, service lifecycle and live Web/TUI integration remain work. No paid provider result is claimed from
 these tests. The intended $10 fleet allocation requires exactly one authoritative
 $2.50 ledger per area and a verified instance-to-area binding. Duplicate/cloned
 ledgers are not detected by these APIs; deployment and recovery must fence stale
@@ -133,3 +133,33 @@ or oversized bodies, disconnect, expiry, denied delivery and uncertain usage.
 Pi production execution remains disabled; tests use synthetic input and fake
 providers only. The Pi crate uses the validator as a **test-only** dependency,
 so its production process adapter still has no SQL/provider client.
+
+## Guarded Workshop execution
+
+`GuardedBrokerJob` uses `execute_guarded_and_persist` with a mandatory
+`DisclosureGuard`. Checks run immediately before counting, after counting,
+again after reservation/admission, after usage settlement and before delivery.
+Billing remains durable even when accepting or delivering the answer is denied.
+The original lower-level APIs remain trusted in-process building blocks, not
+safe substitutes for this guarded worker path.
+
+`local_disclosure::LocalDisclosure` is the concrete initial Workshop-only
+implementation. It reconstructs the exact prepared request from frozen local
+source bindings and current project-scoped internal authority, rejects changed
+questions or destinations, and holds current authentication/source locks through
+the same transaction as private proposal publication. Expiry is checked again
+after journal waits. There is no permissive fallback, automatic source selection,
+model substitution, or role-derived disclosure grant. Configuration must carry
+the explicit operator consent and exact source bindings; it must be preserved
+with the deployment/recovery evidence. Standing consent is compatible with a
+machine-prepared bounded collection but does not authorize credentials or other
+areas. Source projection is not a secret scrubber.
+
+Required-database tests cover current and revoked permissions, global authority
+rejection, wrong instance/project, changed versions, tombstones, withdrawal,
+expired grants, destination rejection, changes during generation, billing despite
+denied acceptance, and transaction rollback with retained authorization locks.
+The ignored real patched-Pi Unix-socket/container test also uses this guarded
+source path, a synthetic collection and a fake provider. Service scheduling,
+configuration loading, read-only/evaluation/reload handling and independent
+Workshop deployment are still required before live activation.

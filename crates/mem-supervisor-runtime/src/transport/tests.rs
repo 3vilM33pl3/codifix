@@ -20,6 +20,7 @@ use std::sync::{
 };
 
 mod broker;
+mod disclosure;
 
 #[derive(Clone, Copy)]
 enum Mode {
@@ -40,6 +41,8 @@ struct Fake {
     revision: Uuid,
     instance_id: Uuid,
     project_id: Uuid,
+    expected: Arc<std::sync::RwLock<Arc<PreparedRequest>>>,
+    generation_pause: Arc<std::sync::Mutex<Option<Arc<tokio::sync::Notify>>>>,
 }
 impl Fake {
     fn execution(&self, revision: Uuid, attempt_id: Uuid) -> ProposalExecution {
@@ -57,7 +60,10 @@ async fn count(State(s): State<Fake>, headers: HeaderMap, Json(body): Json<Value
     assert_eq!(body["tools"], json!([]));
     assert!(body.get("previous_response_id").is_none());
     // Pi's date decoration/client profile must never be forwarded upstream.
-    assert_eq!(body, request().count_body());
+    assert_eq!(
+        body,
+        s.expected.read().expect("expected input").count_body()
+    );
     s.count.fetch_add(1, Ordering::SeqCst);
     if matches!(s.mode, Mode::RevokeDuringCount) {
         s.store
@@ -74,8 +80,15 @@ async fn generate(State(s): State<Fake>, headers: HeaderMap, Json(body): Json<Va
     assert_eq!(body["store"], false);
     assert_eq!(body["service_tier"], "default");
     assert_eq!(body["tools"], json!([]));
-    assert_eq!(&body, request().generation_body());
+    assert_eq!(
+        &body,
+        s.expected.read().expect("expected input").generation_body()
+    );
     s.generated.fetch_add(1, Ordering::SeqCst);
+    let pause = s.generation_pause.lock().expect("pause").clone();
+    if let Some(pause) = pause {
+        pause.notified().await;
+    }
     if matches!(s.mode, Mode::Redirect) {
         return (
             StatusCode::TEMPORARY_REDIRECT,
@@ -190,6 +203,8 @@ async fn fixture_kind(
         revision,
         instance_id,
         project_id,
+        expected: Arc::new(std::sync::RwLock::new(Arc::new(request()))),
+        generation_pause: Arc::new(std::sync::Mutex::new(None)),
     };
     let router = Router::new()
         .route("/v1/responses/input_tokens", post(count))

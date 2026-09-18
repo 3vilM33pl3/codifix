@@ -2,6 +2,8 @@ use super::*;
 use crate::pi_broker::{BrokerFailure, BrokerJob, BrokerReply, JobFuture, PiBroker};
 use std::sync::atomic::AtomicBool;
 
+mod sandbox;
+
 struct Work {
     store: SupervisorStore,
     lease: LeaseClaim,
@@ -13,6 +15,9 @@ struct Work {
     pause: Option<Arc<tokio::sync::Notify>>,
 }
 impl BrokerJob for Work {
+    fn request_digest(&self) -> &str {
+        self.request.digest()
+    }
     fn run(&self) -> JobFuture<'_, Result<BrokerReply, BrokerFailure>> {
         Box::pin(async {
             self.runs.fetch_add(1, Ordering::SeqCst);
@@ -117,6 +122,14 @@ async fn authenticated_broker_returns_only_durable_structured_text_and_real_coun
         return;
     };
     let client = http();
+    assert!(matches!(
+        PiBroker::new(
+            Arc::new(PreparedRequest::new("different admitted input", &[]).expect("input")),
+            work.clone(),
+            Duration::from_secs(30)
+        ),
+        Err(BrokerFailure::Denied)
+    ));
     let result = post(&client, &url, &token, &work)
         .send()
         .await

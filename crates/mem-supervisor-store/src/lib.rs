@@ -8,6 +8,7 @@ mod health;
 mod inspection;
 mod policy;
 mod proposals;
+pub mod sources;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use mem_supervisor::{

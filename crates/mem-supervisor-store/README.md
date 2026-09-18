@@ -99,8 +99,9 @@ Journal contention cannot commit a context whose lease expired while waiting.
 These checks establish scope, **not permission to disclose project data**.
 The trusted service caller must independently authorize the exact project and
 source subset, retain the relevant permission locks across its dispatch boundary,
-and recheck current source eligibility. This crate has no service principal or
-permission-lock API and performs no network request. Its point-in-time checks
+and recheck current source eligibility. The narrow `sources` API below supports
+the initial local profile, not general service authentication, and performs no
+network request. Point-in-time checks
 cannot recall already dispatched traffic or prevent a subsequent permission
 change. Real service configuration/authorization integration remains required.
 
@@ -112,6 +113,42 @@ private reads also verify its immutable project/request/evidence binding. No
 legacy action gains new dispatch authority just because 0055 was applied.
 
 ## Private model proposals
+
+`publish_proposal_tx` is the transaction-taking equivalent of the pool wrapper.
+It neither commits nor releases the caller's source/authority locks. A returned
+proposal remains tentative until the caller commits; rollback cannot leak a
+Verified outcome. Lock current authentication and sources before supervisor
+policy/action locks, with application event append last.
+
+## Exact local collection disclosure
+
+`sources::prepare_tx` projects at most eight exact active canonical histories in
+one project into bounded JSON evidence (project/canonical/version IDs, authored
+time, summary and text). It never selects raw captures, paths, sessions, tags or
+another project. It is preparation, **not consent**. The resulting `SourceBinding`
+fixes each version and the complete evidence-byte hash. `validate_tx` requires
+every binding to match; changed, tombstoned, archived or missing sources are
+rejected without substitution. Canonical locks are acquired in UUID order and
+held through the caller's transaction, using the existing 0044 version fence.
+
+`sources::authorize_tx` implements the initial **Workshop-only** local profile.
+A trusted, explicit `LocalCollectionGrant` binds instance, project, internal
+principal, supervisor policy revision, expiry, exact sources and the OpenAI
+destination. Preserve this grant in the approved deployment configuration and
+its backups; do not infer it from a project role or deserialize it from Pi.
+The principal must have no global/group permissions and exactly one project
+membership with an explicit minimal `memory_read`, `bundle_export`, `loops_run`
+override. No role-preset fallback exists. Current permissions, policy and source
+locks can be held through `publish_proposal_tx` and commit. Disable/revoke the
+principal or policy revision to stop future disclosure. Already sent bytes are
+not recalled. The host still owns read-only/evaluation/reload gates and consent
+configuration authentication. No worker or live deployment is activated here.
+
+Projection/hashes are not credential detection or a factual-quality guarantee.
+The operator-approved source selection must exclude secrets and other areas;
+standing Workshop consent does not grant access to arbitrary projects.
+
+## Private model proposal persistence
 
 Additive migration 0054 introduces `supervisor_proposals` and an immutable-body
 guard; it seeds/enables nothing and does not change migration 0053. The retained

@@ -40,7 +40,54 @@ pub struct ProposalExecution {
     pub project_id: Uuid,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisclosurePhase {
+    Count,
+    Generate,
+    Accept,
+    Deliver,
+}
+
+/// Trusted application boundary. Check the exact current principal, source
+/// versions, collection and destination, not merely the requester's old grant.
+/// Publication MUST recheck and retain those locks in the same transaction as
+/// `SupervisorStore::publish_proposal_tx`, through commit. No permissive default
+/// implementation exists. Provider billing is settled even when consent ends.
+pub trait DisclosureGuard: Send + Sync + 'static {
+    fn authorize<'a>(
+        &'a self,
+        phase: DisclosurePhase,
+        execution: &'a ProposalExecution,
+        request: &'a PreparedRequest,
+    ) -> crate::pi_broker::JobFuture<'a, Result<(), TransportError>>;
+
+    fn publish<'a>(
+        &'a self,
+        lease: &'a LeaseClaim,
+        execution: &'a ProposalExecution,
+        request: &'a PreparedRequest,
+        proposal: &'a Proposal,
+    ) -> crate::pi_broker::JobFuture<
+        'a,
+        Result<mem_supervisor_store::PrivateProposal, TransportError>,
+    >;
+}
+
 impl OpenAiTransport {
+    pub async fn execute_guarded_and_persist(
+        &self,
+        store: &SupervisorStore,
+        lease: &LeaseClaim,
+        execution: &ProposalExecution,
+        request: &PreparedRequest,
+        guard: &dyn DisclosureGuard,
+    ) -> Result<mem_supervisor_store::PrivateProposal, TransportError> {
+        let proposal = self
+            .execute_inner(store, lease, execution, request, Some(guard))
+            .await?;
+        guard.publish(lease, execution, request, &proposal).await
+    }
+
     /// Narrow Pi ingress: validate the exact prepared input before token counting
     /// or journal writes, then use Memory's frozen upstream profile and existing
     /// durable one-shot execution. Never forward Pi's body/headers or trust its
@@ -179,11 +226,20 @@ impl OpenAiTransport {
         lease: &LeaseClaim,
         context: &ModelWorkContext,
         request: &'a PreparedRequest,
+        authorization: Option<(&dyn DisclosureGuard, &ProposalExecution)>,
     ) -> Result<CountedRequest<'a>, TransportError> {
         store
             .check_model_work(lease, context)
             .await
             .map_err(|_| TransportError::Authority)?;
+        if let Some((guard, execution)) = authorization {
+            guard
+                .authorize(DisclosurePhase::Count, execution, request)
+                .await?;
+        }
+        if Utc::now() >= lease.expires_at() {
+            return Err(TransportError::Authority);
+        }
         let body = self
             .post(
                 "/responses/input_tokens",
@@ -242,6 +298,18 @@ impl OpenAiTransport {
         execution: &ProposalExecution,
         request: &PreparedRequest,
     ) -> Result<Proposal, TransportError> {
+        self.execute_inner(store, lease, execution, request, None)
+            .await
+    }
+
+    async fn execute_inner(
+        &self,
+        store: &SupervisorStore,
+        lease: &LeaseClaim,
+        execution: &ProposalExecution,
+        request: &PreparedRequest,
+        guard: Option<&dyn DisclosureGuard>,
+    ) -> Result<Proposal, TransportError> {
         let policy_revision = execution.policy_revision;
         let attempt_id = execution.attempt_id;
         if attempt_id.is_nil() || policy_revision.is_nil() {
@@ -297,7 +365,20 @@ impl OpenAiTransport {
             )
             .await
             .map_err(|_| TransportError::Authority)?;
-        let counted = self.count(store, lease, &context, request).await?;
+        let counted = self
+            .count(
+                store,
+                lease,
+                &context,
+                request,
+                guard.map(|guard| (guard, execution)),
+            )
+            .await?;
+        if let Some(guard) = guard {
+            guard
+                .authorize(DisclosurePhase::Generate, execution, request)
+                .await?;
+        }
         let provider_request = ProviderRequest {
             id: stable(attempt_id)?,
             action_id: stable(lease.action_id())?,
@@ -316,6 +397,18 @@ impl OpenAiTransport {
             .begin(lease, attempt_id)
             .await
             .map_err(|_| TransportError::Authority)?;
+        if let Some(guard) = guard {
+            // Reservation/admission can wait for DB locks. Recheck after those
+            // waits immediately before any generation disclosure. Retain the
+            // conservative begun reservation on denial; never reissue it.
+            if let Err(error) = guard
+                .authorize(DisclosurePhase::Generate, execution, request)
+                .await
+            {
+                let _ = store.mark_uncertain(attempt_id).await;
+                return Err(error);
+            }
+        }
         // From this point onward, losing control flow leaves a durable in-flight
         // attempt. Recovery must classify it uncertain, never invoke it again.
         let response = match self.send_once(permit, &counted).await {
@@ -353,6 +446,11 @@ impl OpenAiTransport {
             .check_model_work(lease, &context)
             .await
             .map_err(|_| TransportError::Authority)?;
+        if let Some(guard) = guard {
+            guard
+                .authorize(DisclosurePhase::Accept, execution, request)
+                .await?;
+        }
         measured.proposal.map_err(TransportError::Model)
     }
 }

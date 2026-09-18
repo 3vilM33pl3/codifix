@@ -4,7 +4,11 @@
 //! A trusted service implements `BrokerJob` and owns the exact reviewed request,
 //! durable lease/attempt and current disclosure checks. No identifiers, URLs,
 //! model settings or credentials supplied by Pi are forwarded to that job.
-use crate::{model::PreparedRequest, pi_admission::PiAdmission, transport::ProposalExecution};
+use crate::{
+    model::PreparedRequest,
+    pi_admission::PiAdmission,
+    transport::{DisclosureGuard, DisclosurePhase, OpenAiTransport, ProposalExecution},
+};
 use axum::{
     Router,
     body::{Body, to_bytes},
@@ -14,7 +18,7 @@ use axum::{
     routing::post,
 };
 use mem_supervisor::{Area, DEFAULT_MODEL};
-use mem_supervisor_store::SupervisorStore;
+use mem_supervisor_store::{LeaseClaim, SupervisorStore};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::{
@@ -40,8 +44,59 @@ pub type JobFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// publication with current source/project authority. `run` may be called once;
 /// `authorize_delivery` must recheck current disclosure after durable completion.
 pub trait BrokerJob: Send + Sync + 'static {
+    fn request_digest(&self) -> &str;
     fn run(&self) -> JobFuture<'_, Result<BrokerReply, BrokerFailure>>;
     fn authorize_delivery(&self) -> JobFuture<'_, Result<(), BrokerFailure>>;
+}
+
+/// Concrete host job: requires a service-supplied current disclosure guard and
+/// durable authorization/claim. None of these fields originate from Pi input.
+pub struct GuardedBrokerJob {
+    pub store: SupervisorStore,
+    pub lease: LeaseClaim,
+    pub execution: ProposalExecution,
+    pub request: Arc<PreparedRequest>,
+    pub transport: OpenAiTransport,
+    pub disclosure: Arc<dyn DisclosureGuard>,
+}
+
+impl BrokerJob for GuardedBrokerJob {
+    fn request_digest(&self) -> &str {
+        self.request.digest()
+    }
+    fn run(&self) -> JobFuture<'_, Result<BrokerReply, BrokerFailure>> {
+        Box::pin(async {
+            self.transport
+                .execute_guarded_and_persist(
+                    &self.store,
+                    &self.lease,
+                    &self.execution,
+                    &self.request,
+                    self.disclosure.as_ref(),
+                )
+                .await
+                .map_err(|error| match error {
+                    crate::transport::TransportError::Authority => BrokerFailure::Denied,
+                    _ => BrokerFailure::Uncertain,
+                })?;
+            BrokerReply::from_persisted(
+                &self.store,
+                self.lease.area(),
+                self.lease.action_id(),
+                &self.execution,
+                &self.request,
+            )
+            .await
+        })
+    }
+    fn authorize_delivery(&self) -> JobFuture<'_, Result<(), BrokerFailure>> {
+        Box::pin(async {
+            self.disclosure
+                .authorize(DisclosurePhase::Deliver, &self.execution, &self.request)
+                .await
+                .map_err(|_| BrokerFailure::Denied)
+        })
+    }
 }
 
 /// Opaque credential for one exact job, not a provider credential. Intentionally
@@ -160,6 +215,9 @@ impl PiBroker {
         job: Arc<dyn BrokerJob>,
         lifetime: Duration,
     ) -> Result<(Self, BrokerToken), BrokerFailure> {
+        if job.request_digest() != request.digest() {
+            return Err(BrokerFailure::Denied);
+        }
         if lifetime.is_zero() || lifetime > Duration::from_secs(120) {
             return Err(BrokerFailure::Expired);
         }

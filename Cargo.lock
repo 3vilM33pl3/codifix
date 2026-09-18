@@ -3265,6 +3265,7 @@ dependencies = [
  "sha2",
  "sqlx",
  "subtle",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "uuid",

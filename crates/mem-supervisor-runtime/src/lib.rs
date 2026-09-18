@@ -2,6 +2,7 @@
 //! The wire contract is usable offline; deployment, credentials and disclosure
 //! authorization remain the responsibility of the trusted runtime.
 
+pub mod local_disclosure;
 pub mod model;
 pub mod pi_admission;
 pub mod pi_broker;

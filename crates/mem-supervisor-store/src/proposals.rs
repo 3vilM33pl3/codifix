@@ -38,13 +38,51 @@ impl SupervisorStore {
         proposal: &Proposal,
         evidence_digests: &[EvidenceDigest],
     ) -> Result<PrivateProposal> {
-        self.publish_private(claim, *attempt_id, project_id, proposal, evidence_digests)
-            .await
-            .map_err(sanitize)
+        async {
+            let mut tx = self.pool.begin().await?;
+            let stored = Self::publish_proposal_tx(
+                &mut tx,
+                claim,
+                attempt_id,
+                project_id,
+                proposal,
+                evidence_digests,
+            )
+            .await?;
+            tx.commit().await?;
+            Ok(stored)
+        }
+        .await
+        .map_err(sanitize)
+    }
+
+    /// Caller holds current project/source/disclosure locks in this SAME
+    /// transaction through commit. Acquire those before supervisor locks, and
+    /// append application audit events only after this operation. A returned
+    /// body is not durable until the caller successfully commits. This API does
+    /// not itself manufacture source consent or authentication.
+    pub async fn publish_proposal_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        claim: &LeaseClaim,
+        attempt_id: &Uuid,
+        project_id: Uuid,
+        proposal: &Proposal,
+        evidence_digests: &[EvidenceDigest],
+    ) -> Result<PrivateProposal> {
+        Self::publish_private(
+            tx,
+            claim,
+            *attempt_id,
+            project_id,
+            proposal,
+            evidence_digests,
+        )
+        .await
+        .map_err(sanitize)
     }
 
     async fn publish_private(
-        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         claim: &LeaseClaim,
         attempt_id: Uuid,
         project_id: Uuid,
@@ -56,11 +94,10 @@ impl SupervisorStore {
         proposal
             .validate(evidence_digests.len())
             .map_err(|_| StoreError::InvalidProposal)?;
-        let mut tx = self.pool.begin().await?;
-        let policy = policy::lock_policy(&mut tx, claim.area).await?;
-        let action = lock_action(&mut tx, claim.area, claim.action_id).await?;
+        let policy = policy::lock_policy(tx, claim.area).await?;
+        let action = lock_action(tx, claim.area, claim.action_id).await?;
         allowed_kind(&action)?;
-        let attempt = attempts::read_attempt(&mut tx, attempt_id)
+        let attempt = attempts::read_attempt(tx, attempt_id)
             .await?
             .ok_or(StoreError::NotFound)?;
         if attempt.record.area != claim.area
@@ -92,10 +129,10 @@ impl SupervisorStore {
             "SELECT EXISTS(SELECT 1 FROM supervisor_proposals WHERE action_id=$1)",
         )
         .bind(claim.action_id)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
         if exists {
-            let existing = read_private(&mut tx, claim.area, project_id, claim.action_id)
+            let existing = read_private(tx, claim.area, project_id, claim.action_id)
                 .await?
                 .ok_or(StoreError::Conflict)?;
             if existing.proposal_digest != digest
@@ -104,19 +141,18 @@ impl SupervisorStore {
             {
                 return Err(StoreError::Conflict);
             }
-            tx.commit().await?;
             return Ok(existing);
         }
         policy.validate(attempt.record.policy_revision)?;
-        check_lease(&mut tx, &action, claim).await?;
-        let context = contexts::validate_current(&mut tx, &action).await?;
+        check_lease(tx, &action, claim).await?;
+        let context = contexts::validate_current(tx, &action).await?;
         if !context.matches_result(project_id, attempt.record.request_digest, evidence_digests) {
             return Err(StoreError::Conflict);
         }
         let present: Option<Uuid> =
             sqlx::query_scalar("SELECT id FROM projects WHERE id=$1 FOR KEY SHARE")
                 .bind(project_id)
-                .fetch_optional(&mut *tx)
+                .fetch_optional(&mut **tx)
                 .await?;
         if present.is_none() {
             return Err(StoreError::NotFound);
@@ -129,14 +165,13 @@ impl SupervisorStore {
         sqlx::query("INSERT INTO supervisor_proposals(action_id,area,attempt_id,policy_revision,fence,project_id,request_digest,proposal_digest,body,evidence_digests) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)")
             .bind(claim.action_id).bind(area_name(claim.area)).bind(attempt_id).bind(attempt.record.policy_revision)
             .bind(claim.fence).bind(project_id).bind(attempt.record.request_digest.to_vec()).bind(digest.to_vec())
-            .bind(sqlx::types::Json(proposal)).bind(digests).execute(&mut *tx).await?;
-        actions::finish(&mut tx, &action, KnownOutcome::Verified, digest).await?;
+            .bind(sqlx::types::Json(proposal)).bind(digests).execute(&mut **tx).await?;
+        actions::finish(tx, &action, KnownOutcome::Verified, digest).await?;
         // finish can wait for the area journal head: lease must still be live.
-        check_lease(&mut tx, &action, claim).await?;
-        let stored = read_private(&mut tx, claim.area, project_id, claim.action_id)
+        check_lease(tx, &action, claim).await?;
+        let stored = read_private(tx, claim.area, project_id, claim.action_id)
             .await?
             .ok_or(StoreError::Corrupt)?;
-        tx.commit().await?;
         Ok(stored)
     }
 

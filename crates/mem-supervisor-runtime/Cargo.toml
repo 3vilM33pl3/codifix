@@ -18,10 +18,11 @@ uuid.workspace = true
 axum.workspace = true
 tokio.workspace = true
 subtle = "2.6.1"
+sqlx.workspace = true
 
 [dev-dependencies]
 mem-test-support = { path = "../mem-test-support" }
-sqlx.workspace = true
+tempfile = "3.27.0"
 
 [lints]
 workspace = true
