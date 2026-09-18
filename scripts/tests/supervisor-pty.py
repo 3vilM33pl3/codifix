@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Real TUI on a PTY, only against the synthetic rehearsal service.
+"""Real TUI on a PTY, against an explicitly configured rehearsal or preview.
 
 Called by web/tests/supervisor-real-rehearsal.mjs with private temporary config.
 No host environment, credentials or terminal contents are printed or retained.
@@ -42,7 +42,8 @@ class Utf8Screen:
 def main():
     binary, config, instance = sys.argv[1:4]
     controls = sys.argv[4:] == ["controls"]
-    if sys.argv[4:] and not controls:
+    enabled_inspection = sys.argv[4:] == ["enabled-inspection"]
+    if sys.argv[4:] and not controls and not enabled_inspection:
         raise RehearsalFailure("unknown rehearsal mode")
     if not os.path.isabs(binary) or not os.path.isabs(config):
         raise RehearsalFailure("explicit rehearsal paths required")
@@ -94,7 +95,8 @@ def main():
             if "PolicyInstalled" in text():
                 break
         rendered = text()
-        for label, required in [("identity", instance), ("area", "Workshop"), ("policy", "paused"), ("activation", "Execution not integrated"), ("history", "PolicyInstalled")]:
+        expected_policy = "enabled (activation separate)" if enabled_inspection else "paused"
+        for label, required in [("identity", instance), ("area", "Workshop"), ("policy", expected_policy), ("activation", "Execution not integrated"), ("history", "PolicyInstalled")]:
             if required not in rendered:
                 raise RehearsalFailure(f"supervisor {label} did not render")
         if controls:

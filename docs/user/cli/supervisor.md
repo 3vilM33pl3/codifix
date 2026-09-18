@@ -148,8 +148,10 @@ network, host workspace, Docker socket, database credential or provider key.
 This operator-host launcher is **not yet compatible with the hardened named
 instance service**: that service deliberately denies Docker and external egress
 and strips inherited provider keys. Do not weaken it or add Docker-group access.
-A narrow launch/egress bridge and independent target verification remain live
-deployment prerequisites; the example above is not permission to bypass them.
+Use the separate operator path above instead of weakening that named service.
+The [Workshop local preview](../workshop-preview.md) demonstrates this separation
+with an independently verified containerized app and target; it does not turn
+this in-service configuration example into a supported named-service activation.
 
 The worker polls every two seconds and claims once with a 180-second lease.
 Shutdown/reload blocks new disclosure and results; an already-started commit can

@@ -1,12 +1,18 @@
 # Four-area internal Memory network
 
-Status: implementation started 2026-09-17. Not deployed; no release published.
+Status: Workshop-only local preview is live as of 2026-09-18. The full four-area
+network is not deployed; no new signed release was published for this preview.
 
 Current narrowed work: [Workshop-first live activation](workshop-live.md). The
-bounded service worker, pinned operator-host launcher and Web/CLI/TUI status are
-implemented and rehearsed with fake providers. The hardened service still needs
-a compatible narrow sandbox/egress bridge; no live Pi execution or target import
-is claimed. Standing Workshop disclosure approval is recorded in that contract.
+bounded operator worker completed one real Pi/Sol proposal over three reviewed
+records in an independent database. Web/CLI/TUI inspection and local Web querying
+work. Existing services and the original dataset remain unchanged. Start with the
+[demo guide](../../user/workshop-preview.md); remaining four-area gates stay open.
+
+## Historical implementation notes
+
+The entries below describe progress at their recorded stage, not the current
+Workshop activation status. The linked live evidence supersedes earlier gates.
 
 Packaging follow-up: the Debian builder includes the opt-in gateway and uses a
 host-native lean CLI for cross-build completions, never the ARM64 target binary.

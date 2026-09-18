@@ -23,19 +23,24 @@ remain mandatory. Dev Memory checkpoint recorded this amendment at 11:51 UTC.
 - [x] Authenticated, bounded request/reply broker with exact-input admission.
 - [x] Durable actual usage and proposals; no invented paid counters or reissue.
 - [x] Current project, source, collection and destination authorization checks.
-- [x] Pinned patched Pi with independently enforced broker-only sandbox access (operator-host rehearsal; hardened deployment remains below).
-- [x] Opt-in worker lifecycle and truthful status, pause, leases and budget limits (software implemented; not activated).
-- [ ] Bounded first collection under standing consent, with verified source/version and secret/other-area exclusions.
-- [ ] Independent Workshop target, preservation/restore and artifact verification.
-- [ ] Fake-provider/disposable-DB end-to-end, hostile and recovery verification.
-- [ ] Workshop live activation and a bounded real proposal with verified accounting.
-- [ ] Record operational evidence and remaining four-area gates.
+- [x] Pinned patched Pi with independently enforced broker-only sandbox access.
+- [x] Opt-in worker lifecycle and truthful status, pause, leases and budget limits.
+- [x] Bounded first collection under standing consent, with verified source/version and secret/other-area exclusions.
+- [x] Independent Workshop target, preservation/restore and artifact verification.
+- [x] Fake-provider/disposable-DB end-to-end, hostile and recovery verification.
+- [x] Workshop live activation and a bounded real proposal with verified accounting.
+- [x] Record operational evidence and remaining four-area gates.
 
 ## Activation state
 
-Not active. Per-collection human disclosure review is no longer blocking Workshop;
-the runtime, deployment and source-isolation gates remain. No source dataset has
-been migrated and no existing service restarted.
+**Workshop preview is live locally**, with one completed real Pi proposal at
+13:57 UTC on 2026-09-18. [Demo and operator instructions](../../user/workshop-preview.md).
+Only three reviewed records were copied from the preserved snapshot; the original
+dataset and services were not cut over or restarted. This completes the bounded
+Workshop-first activation, not the full four-area network or autonomous agency.
+
+The earlier implementation entries below describe their state at the time. The
+final deployment evidence supersedes their earlier "not active" statements.
 
 ## 2026-09-18 implementation evidence
 
@@ -101,7 +106,7 @@ component/container evidence above.
   explicitly warns that eligible already-approved paid work may run. Inspection
   remains metadata-only; it neither starts work nor exposes questions/proposals.
 
-### Remaining live deployment gate
+### Deployment gate before the final operator separation
 
 The existing hardened `memory-layer@.service` deliberately denies Docker access,
 external egress and inherited provider credentials. The new operator-host
@@ -116,3 +121,88 @@ standing Workshop disclosure approval and USD 2.50/20-generation limits remain
 unchanged; no new disclosure approval is being requested. Real source selection,
 target migration, release/activation verification and paid accounting remain open.
 No existing service, other area's data, provider credential or R3 setup changed.
+
+## Live preview evidence, 2026-09-18
+
+- `baac74da` separates one-work execution into the operator-only worker. The
+  application has no Docker socket or provider key. The operator retains Docker
+  authority; its code fixes the OpenAI destination and rejects proxy/redirect/
+  retry behavior. This is not an OS-wide operator egress firewall.
+- `584c1476` adds the explicit PostgreSQL-only embedded service build, preserving
+  offline support in default/full builds and keeping the TUI-only build lean.
+  The first staged binary was client-only and failed before app startup; it was
+  retained and replaced with the tested service-enabled artifact.
+- New instance `72d1a39c-29fe-4f8d-94ee-b3a8dba51f85` uses a new PostgreSQL 17
+  container/volume and an internal Docker network without a default internet
+  route. Fresh schema initialization applied migrations through 0058. The app
+  has a read-only root, no capabilities, no provider key, no Docker access and
+  only its dedicated configuration/state/Web mounts.
+- The source snapshot contains 104 tables and 2,331,495 rows. The reviewed
+  preview imports only one project, three exact version-1 curated records and
+  19 archive-reference provenance projections. No raw captures, task/session
+  excerpts, credentials or other-area records were imported. Original project
+  metadata remains local; the separate typed model projection excludes paths.
+  Import receipt `a25fc2dc-0992-4b86-b77d-e20af3d84b1f` records 30 target rows.
+- The complete materialized source archive and review manifest were encrypted
+  to the existing backup recipient, copied to the NAS and checksum-verified.
+  A separate encrypted pre-activation target dump was restored successfully:
+  project/version/capture/import counts and the source-row digest match. That
+  restore database has connections disabled and no activated policy. This is a
+  bounded preview restore check, not complete customer disaster recovery.
+  A post-run recovery bundle also preserves the current database, private
+  deployment configuration, work IDs, result and operator helper sources,
+  encrypted/copied/checksum-verified without the OpenAI key. That newer bundle
+  has not had its own full restore rehearsal.
+- The app listens on container loopback only. A host-loopback listener uses a
+  fixed operator-owned Docker exec/stdin bridge into that loopback socket;
+  browser requests cannot select a container, command or destination. This
+  preserves the existing local-owner bootstrap and CSRF checks. The initial TCP
+  bridge correctly received 403 for browser bootstrap and was replaced, not
+  given an authentication bypass. No application port is published on the LAN.
+- The first worker failed on missing PostgreSQL `projects FOR KEY SHARE`
+  privilege **before model-context registration or provider admission**. Its
+  zero-attempt history was explicitly reconciled to failed, not erased/requeued.
+  `cf57efb8` tests the deployed restricted grants with real patched Pi and a fake
+  provider, including denial of source-content writes and duplicate reissue.
+  A new explicit operator work identity retained the approved question, exact
+  source grant, model and budget. No uncertain paid attempt was retried.
+- Live action `e711c518-a60c-467a-9c3e-55f4d7ae91b2`, attempt
+  `b8b3c45a-0375-44a4-a81b-63206cf56496`, completed and was hash-confirmed.
+  Actual counters: 937 input, 243 output, 1,180 total; 49 reasoning tokens are
+  included in output; zero cache reads/writes. Recorded cost: **8,608 USD
+  microdollars ($0.008608)**. One physical generation, one durable proposal, no
+  remaining reservation. Exact result digest:
+  `457302ac698f9ff9c9925b4a9766fab6c818047c6ca543487c23b676eebd2e4e`.
+- Fresh worker invocations return stored/verified without another generation.
+  Application restarts preserve the identity, proposal and single-call ledger.
+  Owned Pi containers and temporary broker files were removed. Deterministic
+  five-minute database observations remain enabled; paid work is not scheduled.
+- Live Web browsing/query/session bootstrap and supervisor budget/history were
+  exercised. A local `ATProto` query returned one cited lexical result with no
+  model call. Broad questions may correctly return insufficient evidence from
+  this tiny collection. Real CLI and PTY TUI inspect the same durable identity.
+  Private proposal text is exported separately, not exposed in operational feeds.
+- This turn: 56 ordinary required-DB runtime tests passed (three opt-in tests
+  excluded); the real-Pi restricted-role operator test passed separately; five
+  focused PostgreSQL-only service tests passed (two UI rehearsals excluded);
+  strict runtime and PostgreSQL-only CLI Clippy, formatting and boundaries pass.
+  Two terminal-observer unit tests and live read-only PTY inspection pass.
+  Web assets were built; no Web source behavior was changed. No claim is made
+  of a new full-workspace, four-area or customer-release acceptance run.
+
+Private evidence, pinned artifacts, result export and configuration live under
+`/home/olivier/.local/state/memory-workshop-preview-20260918` (mode 0700).
+The normal OpenAI key is loaded in memory only for explicit operator execution;
+it is not copied into this directory or passed to Pi/the app. R3 is untouched.
+
+The dev Memory completion workflow verified all eleven Workshop-first items and
+archived that plan as `066668bf-2dc5-4a04-82aa-b42de2e45de1`, recording
+implementation `47470f78-224b-466d-8188-a22255cdcdf0`. This closes only that
+bounded activation plan; it does not close the parent four-area contract.
+
+Remaining: complete dataset classification/cutover, Homelab/General/Trust
+activation, gateway enrollment and real cross-area exchange, supervisor chat and
+private proposal-body review in Web/TUI, ongoing autonomous knowledge maintenance,
+release notification/installation, communication channels and CA console
+rehearsal. Do not demo those as already working or confuse this local preview
+with a signed release or company-wide authenticated deployment.
