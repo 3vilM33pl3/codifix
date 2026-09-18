@@ -22,9 +22,9 @@ remain mandatory. Dev Memory checkpoint recorded this amendment at 11:51 UTC.
 - [x] Record the Workshop-only scope and checkpoint before implementation.
 - [x] Authenticated, bounded request/reply broker with exact-input admission.
 - [x] Durable actual usage and proposals; no invented paid counters or reissue.
-- [ ] Current project, source, collection and destination authorization checks.
-- [ ] Pinned patched Pi with independently enforced broker-only sandbox access.
-- [ ] Opt-in worker lifecycle and truthful status, pause, leases and budget limits.
+- [x] Current project, source, collection and destination authorization checks.
+- [x] Pinned patched Pi with independently enforced broker-only sandbox access (operator-host rehearsal; hardened deployment remains below).
+- [x] Opt-in worker lifecycle and truthful status, pause, leases and budget limits (software implemented; not activated).
 - [ ] Bounded first collection under standing consent, with verified source/version and secret/other-area exclusions.
 - [ ] Independent Workshop target, preservation/restore and artifact verification.
 - [ ] Fake-provider/disposable-DB end-to-end, hostile and recovery verification.
@@ -63,7 +63,56 @@ been migrated and no existing service restarted.
 
 No real knowledge, provider credential or paid call was used in these rehearsals.
 No CA, Homelab, General, production/dev service or source migration was changed.
-Next: integrate the service-owned opt-in worker/launcher and truthful operator
-status, preserve its exact collection grant and prepare the independent Workshop
-target. Only then run the approved bounded live proposal. Do not mark activation
-complete from the component/container evidence above.
+The follow-up below implements the service-owned opt-in path. The independent
+Workshop target and deployed sandbox/egress boundary remain prerequisites before
+the approved bounded live proposal. Do not mark activation complete from the
+component/container evidence above.
+
+## Service worker and operator verification, 2026-09-18
+
+- `7dde0aed` adds a private hash-bound schema-1 work manifest, one stable
+  action/event/attempt, and an opt-in writable-primary Workshop-only worker.
+  Competing claims serialize; restart never reissues running or terminal work.
+  A 180-second abandoned lease becomes uncertain, not queued. Missing provider
+  credentials do not prevent metadata recovery; they prevent new claims.
+- The production launcher copies hash-verified artifacts into private per-run
+  files, owns the Unix broker and constrained container, and confirms removal
+  before reclaiming its files. Cancellation blocks new disclosures/results while
+  preserving accounting for already dispatched calls. The exact saved proposal
+  hash and settled usage are checked before reporting confirmed delivery.
+- Real patched AMD64 Pi exercised this launcher with synthetic sources and fake
+  provider responses: success, revocation during counting, unknown usage and
+  cancellation during generation. All four cases pass; owned sandbox files are
+  removed after verified container cleanup. No normal or R3 key was supplied.
+- The seven area/supervisor crates pass **201 required-database tests** with
+  `--all-targets --locked --offline`. Seven environment-bound tests are ignored
+  by the normal command; the four-case production-launcher test was run
+  separately. Focused service tests pass (five); CLI/TUI tests pass (seven).
+  Runtime/service and lean-CLI strict Clippy, OpenAPI parity, formatting and
+  boundaries pass. These are not full-workspace/release acceptance results.
+- Web passes **112 tests** and builds. Real disposable browser/CLI/PTY inspection
+  shows a deliberately stopped bounded worker, not an active agent. The control
+  rehearsal passes six confirmed pause/resume changes and ends paused with zero
+  provider calls. The deprecated terminal observer initially misread Unicode
+  cursor updates; a test-only pinned terminal emulator and two regression cases
+  fix the observer without weakening confirmation checks.
+- Operator views distinguish confirmed delivery, stored-only results, missing
+  credentials, rejected artifacts and unconfirmed cleanup. Resume confirmation
+  explicitly warns that eligible already-approved paid work may run. Inspection
+  remains metadata-only; it neither starts work nor exposes questions/proposals.
+
+### Remaining live deployment gate
+
+The existing hardened `memory-layer@.service` deliberately denies Docker access,
+external egress and inherited provider credentials. The new operator-host
+launcher therefore **cannot be activated by simply adding its work manifest to
+that service**. Do not remove `InaccessiblePaths`, grant the application Docker
+group membership, open unrestricted egress or reuse the mixed-area dev service.
+
+Next implement and verify a narrowly scoped launch/egress boundary compatible
+with the independent Workshop service, then preserve its exact collection grant,
+prepare/restore/verify the target and perform the approved live proposal. The
+standing Workshop disclosure approval and USD 2.50/20-generation limits remain
+unchanged; no new disclosure approval is being requested. Real source selection,
+target migration, release/activation verification and paid accounting remain open.
+No existing service, other area's data, provider credential or R3 setup changed.

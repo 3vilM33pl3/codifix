@@ -2,6 +2,12 @@
 
 Status: implementation started 2026-09-17. Not deployed; no release published.
 
+Current narrowed work: [Workshop-first live activation](workshop-live.md). The
+bounded service worker, pinned operator-host launcher and Web/CLI/TUI status are
+implemented and rehearsed with fake providers. The hardened service still needs
+a compatible narrow sandbox/egress bridge; no live Pi execution or target import
+is claimed. Standing Workshop disclosure approval is recorded in that contract.
+
 Packaging follow-up: the Debian builder includes the opt-in gateway and uses a
 host-native lean CLI for cross-build completions, never the ARM64 target binary.
 Synthetic AMD64/ARM64 packaging tests pass, including immutable output paths,
