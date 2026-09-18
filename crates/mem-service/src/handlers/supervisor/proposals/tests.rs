@@ -310,7 +310,12 @@ async fn private_results_require_current_project_access_and_reviews_are_atomic_i
     let (a, b) = tokio::join!(
         client
             .post(&review)
-            .bearer_auth(&f.token)
+            .header(
+                header::COOKIE,
+                "memory_session=private-test-session; memory_csrf=private-test-csrf"
+            )
+            .header("x-csrf-token", "private-test-csrf")
+            .header(header::ORIGIN, &url)
             .json(&request)
             .send(),
         client

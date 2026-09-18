@@ -302,6 +302,29 @@ mod tests {
     use mem_record::SupervisorExecution;
 
     #[test]
+    fn private_proposal_text_cannot_emit_terminal_or_bidi_controls() {
+        let detail = mem_record::SupervisorProposalDetail {
+            project_id: uuid::Uuid::new_v4(),
+            action_id: uuid::Uuid::new_v4(),
+            proposal_digest: "a".repeat(64),
+            question: "Question\u{1b}]8;;https://invalid.example\u{7}\u{202e}?".into(),
+            summary: "Answer\u{1b}[2J\r\u{2066}\u{2069}\nCitation follows".into(),
+            proposal: serde_json::from_value(serde_json::json!("ask_human")).unwrap(),
+            citations: Vec::new(),
+            created_at: chrono::Utc::now(),
+            review: None,
+            can_review: true,
+        };
+        let text = proposal_lines(&detail).join("\n");
+        assert!(!text.chars().any(|c| {
+            (c.is_control() && c != '\n' && c != '\t')
+                || matches!(c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+        }));
+        assert!(text.contains("Citation follows"));
+        assert!(text.contains("Human review only"));
+    }
+
+    #[test]
     fn supervisor_text_never_infers_execution_from_missing_configuration() {
         let response = SupervisorResponse {
             read_only: true,
