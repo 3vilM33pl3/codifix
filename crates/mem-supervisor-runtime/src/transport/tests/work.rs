@@ -145,6 +145,12 @@ async fn abandoned_work_becomes_uncertain_not_queued_and_stopped_work_never_star
     sqlx::query("UPDATE supervisor_actions SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1")
         .bind(manifest.action_id).execute(&db.pool).await.expect("simulate crash lease expiry");
     for _ in 0..3 {
+        assert_eq!(
+            work.observe(db.pool.clone())
+                .await
+                .expect("credential-free recovery"),
+            ActionState::Uncertain
+        );
         assert!(matches!(
             work.step(db.pool.clone(), RunControl::default())
                 .await

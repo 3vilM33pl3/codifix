@@ -112,20 +112,16 @@ impl PinnedWork {
         self.manifest.attempt_id
     }
 
-    /// The embedding service checks read-only/evaluation/role before calling.
-    /// Competing polls may lose a transition; a later poll reads durable state.
-    /// Authority is independently checked again at every disclosure and commit.
-    pub async fn step(&self, pool: PgPool, control: RunControl) -> Result<WorkStep, WorkError> {
-        if control.stopped() {
-            return Err(WorkError::Stopped);
-        }
+    /// Metadata recovery does not require a provider credential. Never claims,
+    /// reads source contents or contacts a provider; changed terms still fail.
+    pub async fn observe(&self, pool: PgPool) -> Result<ActionState, WorkError> {
         let m = &self.manifest;
-        let store = SupervisorStore::new(pool.clone());
+        let store = SupervisorStore::new(pool);
         store
             .reap_expired(Area::Workshop, 100)
             .await
             .map_err(|_| WorkError::Storage)?;
-        let action = store
+        Ok(store
             .submit(&ActionSubmission {
                 id: m.action_id,
                 key: ActionKey {
@@ -137,8 +133,20 @@ impl PinnedWork {
                 source_digest: self.digest,
             })
             .await
-            .map_err(|_| WorkError::Storage)?;
-        let transition = match action.state {
+            .map_err(|_| WorkError::Storage)?
+            .state)
+    }
+
+    /// The embedding service checks read-only/evaluation/role before calling.
+    /// Competing polls may lose a transition; a later poll reads durable state.
+    /// Authority is independently checked again at every disclosure and commit.
+    pub async fn step(&self, pool: PgPool, control: RunControl) -> Result<WorkStep, WorkError> {
+        if control.stopped() {
+            return Err(WorkError::Stopped);
+        }
+        let m = &self.manifest;
+        let store = SupervisorStore::new(pool.clone());
+        let transition = match self.observe(pool.clone()).await? {
             ActionState::Observed => Some(ReadyTransition::Propose),
             ActionState::Proposed => Some(ReadyTransition::Authorize),
             ActionState::Authorized => Some(ReadyTransition::Queue),

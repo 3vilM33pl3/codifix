@@ -96,13 +96,7 @@ pub(crate) fn start(state: AppState) -> Option<Worker> {
         }
         // Validate the explicitly inherited normal credential before claiming;
         // absence must not turn otherwise eligible work into a running lease.
-        let Ok(transport) = OpenAiTransport::from_environment() else {
-            state
-                .supervisor_model
-                .set(Phase::CredentialUnavailable, Some(&work), None);
-            return;
-        };
-        let mut transport = Some(transport);
+        let mut transport = OpenAiTransport::from_environment().ok();
         let mut launch_failure = None;
         let mut poll = tokio::time::interval(Duration::from_secs(2));
         poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -114,6 +108,34 @@ pub(crate) fn start(state: AppState) -> Option<Worker> {
                     .set(Phase::WaitingForDatabase, Some(&work), None);
                 continue;
             };
+            if transport.is_none() && launch_failure.is_none() {
+                // Missing/revoked credentials must not suppress crash recovery
+                // or existing completed state. This branch cannot claim or send.
+                let observation = tokio::select! {
+                    _=owned.cancelled()=>break,
+                    result=tokio::time::timeout(Duration::from_secs(15),work.observe(pool))=>result,
+                };
+                let action = match observation {
+                    Ok(Ok(action)) => Some(action),
+                    _ => None,
+                };
+                let phase = match action {
+                    Some(ActionState::Verified) => Phase::Stored,
+                    Some(
+                        ActionState::Uncertain
+                        | ActionState::Failed
+                        | ActionState::Denied
+                        | ActionState::Cancelled
+                        | ActionState::Expired,
+                    ) => Phase::InterventionRequired,
+                    _ => Phase::CredentialUnavailable,
+                };
+                state.supervisor_model.set(phase, Some(&work), action);
+                if matches!(phase, Phase::Stored | Phase::InterventionRequired) {
+                    return;
+                }
+                continue;
+            }
             // Reads/transitions can wait on DB locks. Timeout cannot authorize a
             // retry of an ambiguously committed claim: next poll reads Running.
             let step = tokio::select! {
