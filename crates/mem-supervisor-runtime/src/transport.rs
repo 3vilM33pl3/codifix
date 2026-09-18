@@ -334,7 +334,7 @@ impl OpenAiTransport {
         };
         let evidence: [u8; 32] = Sha256::digest(&response).into();
         store
-            .settle(attempt_id, measured.actual_cost, evidence)
+            .settle_with_usage(attempt_id, measured.actual_cost, evidence, measured.usage)
             .await
             .map_err(|_| TransportError::Journal)?;
         if measured.exceeded_reservation {

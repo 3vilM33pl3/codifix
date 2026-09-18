@@ -28,6 +28,124 @@ struct Fixture {
     claim: LeaseClaim,
     attempt: Uuid,
 }
+
+#[tokio::test]
+async fn actual_counters_commit_with_cost_survive_restart_and_reject_changed_replays() {
+    use mem_supervisor::{budget::Settlement, usage::ProviderUsage};
+    let Some(db) = IsolatedDatabase::new().await else {
+        return;
+    };
+    let f = fixture(&db, ActionKind::StaleKnowledgeReview, 120, false).await;
+    let usage = ProviderUsage::from_counters([100, 20, 120, 10, 5, 4]).expect("valid");
+    assert_eq!(
+        f.store.settled_usage(f.attempt).await.expect("unsettled"),
+        None
+    );
+    f.store
+        .settle_with_usage(f.attempt, UsdMicros(50), [4; 32], usage)
+        .await
+        .expect("settle");
+    let recovered = SupervisorStore::new(db.pool.clone());
+    assert_eq!(
+        recovered.settled_usage(f.attempt).await.expect("recover"),
+        Some(usage)
+    );
+    assert_eq!(
+        recovered
+            .settle_with_usage(f.attempt, UsdMicros(50), [4; 32], usage)
+            .await
+            .expect("exact replay"),
+        Settlement::AlreadySettled
+    );
+    let changed =
+        ProviderUsage::from_counters([100, 20, 120, 0, 0, 0]).expect("valid other counters");
+    assert!(matches!(
+        recovered
+            .settle_with_usage(f.attempt, UsdMicros(50), [4; 32], changed)
+            .await,
+        Err(StoreError::Conflict)
+    ));
+    assert!(matches!(
+        recovered.settle(f.attempt, UsdMicros(50), [4; 32]).await,
+        Err(StoreError::Conflict)
+    ));
+    assert_eq!(
+        recovered.settled_usage(f.attempt).await.expect("unchanged"),
+        Some(usage)
+    );
+    db.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
+async fn historical_unknown_counters_are_not_zero_or_retroactively_fabricated() {
+    use mem_supervisor::usage::ProviderUsage;
+    let Some(db) = IsolatedDatabase::new().await else {
+        return;
+    };
+    let f = fixture(&db, ActionKind::StaleKnowledgeReview, 120, true).await;
+    assert_eq!(
+        f.store.settled_usage(f.attempt).await.expect("legacy"),
+        None
+    );
+    assert!(matches!(
+        f.store
+            .settle_with_usage(
+                f.attempt,
+                UsdMicros(50),
+                [4; 32],
+                ProviderUsage::from_counters([0; 6]).expect("known zero")
+            )
+            .await,
+        Err(StoreError::Conflict)
+    ));
+    db.cleanup().await.expect("cleanup");
+}
+
+#[tokio::test]
+async fn invalid_usage_and_failed_commit_preserve_inflight_reservation() {
+    use mem_supervisor::{budget::AttemptState, usage::ProviderUsage};
+    let Some(db) = IsolatedDatabase::new().await else {
+        return;
+    };
+    let f = fixture(&db, ActionKind::StaleKnowledgeReview, 120, false).await;
+    let mut usage = ProviderUsage::from_counters([100, 20, 120, 0, 0, 4]).expect("valid");
+    usage.total_tokens = 121;
+    assert!(matches!(
+        f.store
+            .settle_with_usage(f.attempt, UsdMicros(50), [4; 32], usage)
+            .await,
+        Err(StoreError::InvalidInput)
+    ));
+    sqlx::raw_sql("CREATE FUNCTION fail_usage_settlement() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic late failure'; END $$; CREATE CONSTRAINT TRIGGER fail_usage_settlement AFTER INSERT ON supervisor_settlements DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION fail_usage_settlement();")
+        .execute(&db.pool).await.expect("fault injection");
+    usage.total_tokens = 120;
+    assert!(
+        f.store
+            .settle_with_usage(f.attempt, UsdMicros(50), [4; 32], usage)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        f.store.attempt(f.attempt).await.expect("attempt").state,
+        AttemptState::InFlight
+    );
+    assert_eq!(
+        f.store
+            .settled_usage(f.attempt)
+            .await
+            .expect("no committed usage"),
+        None
+    );
+    assert!(
+        !f.store
+            .journal(Area::Workshop, 0, 100)
+            .await
+            .expect("journal")
+            .iter()
+            .any(|e| e.event == "settled")
+    );
+    db.cleanup().await.expect("cleanup");
+}
 async fn fixture(db: &IsolatedDatabase, kind: ActionKind, ttl: u32, settled: bool) -> Fixture {
     let store = SupervisorStore::new(db.pool.clone());
     let revision = Uuid::new_v4();

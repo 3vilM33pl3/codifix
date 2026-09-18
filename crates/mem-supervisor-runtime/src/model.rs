@@ -3,6 +3,7 @@
 //! Count the exact input through the official input-token endpoint before admission.
 
 pub use mem_supervisor::proposal::{Proposal, ProposalKind};
+use mem_supervisor::usage::ProviderUsage;
 use mem_supervisor::{DEFAULT_MODEL, UnixSeconds, UsdMicros};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -188,6 +189,7 @@ impl CountedRequest<'_> {
             parse_proposal(&response, self.request.evidence_count)
         };
         Ok(MeasuredResponse {
+            usage: usage.counters(),
             actual_cost: measured,
             exceeded_reservation: exceeded,
             proposal,
@@ -196,6 +198,7 @@ impl CountedRequest<'_> {
 }
 
 pub struct MeasuredResponse {
+    pub usage: ProviderUsage,
     pub actual_cost: UsdMicros,
     /// Stop further sends and require review if the provider violates its bound.
     pub exceeded_reservation: bool,
@@ -227,6 +230,16 @@ struct OutputDetails {
 }
 
 impl Usage {
+    fn counters(&self) -> ProviderUsage {
+        ProviderUsage {
+            input_tokens: self.input_tokens,
+            output_tokens: self.output_tokens,
+            total_tokens: self.total_tokens,
+            cached_tokens: self.input_tokens_details.cached_tokens,
+            cache_write_tokens: self.input_tokens_details.cache_write_tokens,
+            reasoning_tokens: self.output_tokens_details.reasoning_tokens,
+        }
+    }
     fn measure(&self) -> Result<UsdMicros, ModelError> {
         let cached = self.input_tokens_details.cached_tokens;
         let written = self.input_tokens_details.cache_write_tokens;

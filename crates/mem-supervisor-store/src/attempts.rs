@@ -3,6 +3,7 @@ use super::*;
 use mem_supervisor::{
     DEFAULT_MODEL,
     budget::{AttemptState, BudgetTotals, ProviderRequest, Settlement},
+    usage::ProviderUsage,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -293,6 +294,33 @@ impl SupervisorStore {
         actual_cost: UsdMicros,
         evidence: EvidenceDigest,
     ) -> Result<Settlement> {
+        self.settle_measured(attempt_id, actual_cost, evidence, None)
+            .await
+    }
+
+    /// Counters and cost commit together, even if authority was revoked after
+    /// dispatch. Exact retries cannot change or retroactively invent counters.
+    pub async fn settle_with_usage(
+        &self,
+        attempt_id: Uuid,
+        actual_cost: UsdMicros,
+        evidence: EvidenceDigest,
+        usage: ProviderUsage,
+    ) -> Result<Settlement> {
+        if !usage.validate() {
+            return Err(StoreError::InvalidInput);
+        }
+        self.settle_measured(attempt_id, actual_cost, evidence, Some(usage))
+            .await
+    }
+
+    async fn settle_measured(
+        &self,
+        attempt_id: Uuid,
+        actual_cost: UsdMicros,
+        evidence: EvidenceDigest,
+        usage: Option<ProviderUsage>,
+    ) -> Result<Settlement> {
         let mut tx = self.pool.begin().await?;
         let original = read_attempt(&mut tx, attempt_id)
             .await?
@@ -314,6 +342,7 @@ impl SupervisorStore {
         if let AttemptState::Settled { actual_cost: old } = attempt.record.state {
             if old != actual_cost
                 || attempt.settlement_digest.as_deref() != Some(evidence.as_slice())
+                || usage != attempt.usage
             {
                 return Err(StoreError::Conflict);
             }
@@ -325,8 +354,9 @@ impl SupervisorStore {
         ) {
             return Err(StoreError::Transition);
         }
-        sqlx::query("INSERT INTO supervisor_settlements(attempt_id,actual_usd_micros,evidence_digest) VALUES($1,$2::text::numeric,$3)")
-            .bind(attempt_id).bind(actual_cost.0.to_string()).bind(evidence.to_vec()).execute(&mut *tx).await?;
+        let counters = usage.map(|u| u.counters().map(|n| n.to_string()).to_vec());
+        sqlx::query("INSERT INTO supervisor_settlements(attempt_id,actual_usd_micros,evidence_digest,token_usage) VALUES($1,$2::text::numeric,$3,$4::text[]::numeric[])")
+            .bind(attempt_id).bind(actual_cost.0.to_string()).bind(evidence.to_vec()).bind(counters).execute(&mut *tx).await?;
         set_state(&mut tx, attempt_id, "settled").await?;
         journal(
             &mut tx,
@@ -378,6 +408,16 @@ impl SupervisorStore {
             .await?
             .ok_or(StoreError::NotFound)?
             .record)
+    }
+
+    /// Trusted exact-attempt read; service callers must enforce project/area
+    /// scope. None means unknown legacy usage or an unsettled attempt, NOT zero.
+    pub async fn settled_usage(&self, id: Uuid) -> Result<Option<ProviderUsage>> {
+        let mut conn = self.pool.acquire().await?;
+        Ok(read_attempt(&mut conn, id)
+            .await?
+            .ok_or(StoreError::NotFound)?
+            .usage)
     }
     pub async fn budget(&self, area: Area, day: NaiveDate) -> Result<BudgetTotals> {
         let mut conn = self.pool.acquire().await?;
@@ -433,12 +473,13 @@ pub(crate) struct StoredAttempt {
     pub(crate) record: AttemptRecord,
     pub(crate) fence: i64,
     settlement_digest: Option<Vec<u8>>,
+    usage: Option<ProviderUsage>,
 }
 pub(crate) async fn read_attempt(
     conn: &mut PgConnection,
     id: Uuid,
 ) -> Result<Option<StoredAttempt>> {
-    let Some(row) = sqlx::query("SELECT a.*,s.state,u.actual_usd_micros::text AS actual,u.evidence_digest AS settlement_digest FROM supervisor_attempts a JOIN supervisor_attempt_states s ON s.attempt_id=a.id LEFT JOIN supervisor_settlements u ON u.attempt_id=a.id WHERE a.id=$1")
+    let Some(row) = sqlx::query("SELECT a.*,s.state,u.actual_usd_micros::text AS actual,u.evidence_digest AS settlement_digest,u.token_usage::text[] AS token_usage FROM supervisor_attempts a JOIN supervisor_attempt_states s ON s.attempt_id=a.id LEFT JOIN supervisor_settlements u ON u.attempt_id=a.id WHERE a.id=$1")
         .bind(id).fetch_optional(conn).await? else { return Ok(None); };
     let state = match row.try_get::<String, _>("state")?.as_str() {
         "reserved" => AttemptState::Reserved,
@@ -455,6 +496,17 @@ pub(crate) async fn read_attempt(
         _ => return Err(StoreError::Corrupt),
     };
     Ok(Some(StoredAttempt {
+        usage: row
+            .try_get::<Option<Vec<String>>, _>("token_usage")?
+            .map(|values| {
+                let numbers = values
+                    .iter()
+                    .map(|v| v.parse::<u64>().map_err(|_| StoreError::Corrupt))
+                    .collect::<Result<Vec<_>>>()?;
+                ProviderUsage::from_counters(numbers.try_into().map_err(|_| StoreError::Corrupt)?)
+                    .ok_or(StoreError::Corrupt)
+            })
+            .transpose()?,
         fence: row.try_get("fence")?,
         settlement_digest: row.try_get("settlement_digest")?,
         record: AttemptRecord {

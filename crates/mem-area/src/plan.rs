@@ -152,9 +152,10 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
             | SUPERVISOR_CONTEXT_MIGRATION
             | AREA_IMPORT_MIGRATION
             | SUPERVISOR_HEALTH_MIGRATION
+            | SUPERVISOR_USAGE_MIGRATION
     ) {
         errors.push(format!(
-            "unsupported migration version {}; supported explicit heads are 52, 53, 54, 55, 56 and 57",
+            "unsupported migration version {}; supported explicit heads are 52, 53, 54, 55, 56, 57 and 58",
             inventory.migration_version
         ));
     }
@@ -409,6 +410,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
                 | SUPERVISOR_CONTEXT_MIGRATION
                 | AREA_IMPORT_MIGRATION
                 | SUPERVISOR_HEALTH_MIGRATION
+                | SUPERVISOR_USAGE_MIGRATION
         ) && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0053 table inventory {table}"));
@@ -425,6 +427,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
                 | SUPERVISOR_CONTEXT_MIGRATION
                 | AREA_IMPORT_MIGRATION
                 | SUPERVISOR_HEALTH_MIGRATION
+                | SUPERVISOR_USAGE_MIGRATION
         ) && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0054 table inventory {table}"));
@@ -444,7 +447,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         (SUPERVISOR_HEALTH_MIGRATION, SUPERVISOR_TABLES_0057),
     ] {
         for (table, _) in catalog {
-            if (head..=SUPERVISOR_HEALTH_MIGRATION).contains(&inventory.migration_version)
+            if (head..=SUPERVISOR_USAGE_MIGRATION).contains(&inventory.migration_version)
                 && !tables.contains_key(table)
             {
                 errors.push(format!(

@@ -11,6 +11,7 @@ pub mod lease;
 pub mod policy;
 pub mod proposal;
 pub mod upgrade;
+pub mod usage;
 
 use serde::{Deserialize, Serialize};
 
