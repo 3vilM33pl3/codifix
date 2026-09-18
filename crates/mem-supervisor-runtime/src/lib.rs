@@ -4,5 +4,6 @@
 
 pub mod model;
 pub mod pi_admission;
+pub mod pi_broker;
 mod strict_json;
 pub mod transport;

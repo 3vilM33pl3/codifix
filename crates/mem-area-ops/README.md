@@ -66,7 +66,7 @@ against directories another process under that UID is modifying.
 ## Explicit target and import
 
 Provision an independent local target with the exact supported migrations
-(explicitly supported heads 0056 or 0057), no application/worker connections and no prior knowledge,
+(explicitly supported heads 0056, 0057 or 0058), no application/worker connections and no prior knowledge,
 credentials, jobs or federation authority. Migration and writer fencing are
 separate operator steps. A target UUID is a binding, not proof of host identity.
 
@@ -99,7 +99,7 @@ Do **not** start Memory merely to apply migrations: normal service startup also
 creates administration and loop definitions, which correctly makes a target
 ineligible for fresh import. For a newly provisioned **empty** dedicated database,
 use the reviewed executable's `memory-area-import schema-plan` first. It makes
-no connection and prints the exact compiled schema digest and fixed head 0057.
+no connection and prints the exact compiled schema digest and fixed head 0058.
 Review that digest against the selected release, then explicitly run:
 
 ```sh
@@ -117,7 +117,7 @@ extensions. The PostgreSQL server must already support pgcrypto, pgvector and
 pg_trgm; installing server extensions or creating database roles is a separate
 operator step. Standard `plpgsql` in an otherwise empty database is allowed.
 
-All 57 migrations and their history run in one transaction with bounded waits;
+All 58 migrations and their history run in one transaction with bounded waits;
 the established migration-4 pgvector compatibility rule retains its original
 checksum. Required-DB tests inject a failure at migration 55 and confirm that
 earlier tables, history and extension creation roll back. No credentials, loop

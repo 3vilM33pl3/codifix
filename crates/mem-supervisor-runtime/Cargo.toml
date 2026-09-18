@@ -15,12 +15,13 @@ serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
+axum.workspace = true
+tokio.workspace = true
+subtle = "2.6.1"
 
 [dev-dependencies]
-axum.workspace = true
 mem-test-support = { path = "../mem-test-support" }
 sqlx.workspace = true
-tokio.workspace = true
 
 [lints]
 workspace = true

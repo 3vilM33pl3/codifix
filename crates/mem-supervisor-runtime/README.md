@@ -103,7 +103,8 @@ This is an intentional restricted profile translation, not a transparent OpenAI
 proxy: Pi requests streaming with its thinking control off; Memory alone fixes
 low reasoning, strict proposal JSON, no tools/storage and non-streaming upstream.
 Authoritative provider usage is settled independently of Pi. No synthetic usage
-is invented for a paid response, and no streaming-response adapter exists yet.
+is invented for a paid response. Migration 0058 commits actual usage counters
+with settlement; older settlements remain explicitly unknown, not zero.
 
 Required-database fake-provider tests cover rejection without side effects,
 exact upstream payloads, concurrent duplicate admission, durable private result
@@ -113,10 +114,22 @@ counter before reservation; only one generation can consume a send permit. Do
 not claim exactly-once token counting. Attempts/leases remain trusted caller
 bindings, not values supplied by Pi.
 
-This in-process API is not a listening HTTP server, authenticated ingress, an
-egress sandbox, a scheduler, or source/destination disclosure authorization. A
-future broker must enforce those boundaries and validate current reviewed-source
-eligibility before disclosing even to the counter, and again before accepting
-results. Pi production execution remains disabled; these tests use synthetic
-input and fake providers only. The Pi crate uses the validator as a **test-only**
-dependency, so its production process adapter still has no SQL/provider client.
+`pi_broker::PiBroker` supplies an authenticated one-work router, not an automatic
+listener or worker. A random job token authorizes only the fixed prepared input;
+it is not the provider credential. Invalid requests do not consume the session;
+one valid request consumes it even on failure. Body limits, a two-second body
+deadline, one concurrent reader and a maximum 120-second lifetime bound ingress.
+The trusted `BrokerJob` owns current disclosure checks and durable execution.
+Work survives HTTP disconnect; ambiguous deadline/shutdown retains uncertainty.
+Delivery requires a fresh authority check. Replies contain only the persisted
+typed proposal and its actual settled counters, translated to bounded SSE.
+Unknown usage cannot be represented as a successful reply.
+
+Never mount this router on the ordinary service/public interface. A private Unix
+socket plus independently isolated Pi relay is the intended connection. No
+source-consent implementation, sandbox, scheduler or live service is implied by
+creating the router. Tests cover auth, altered input, duplicate delivery, slow
+or oversized bodies, disconnect, expiry, denied delivery and uncertain usage.
+Pi production execution remains disabled; tests use synthetic input and fake
+providers only. The Pi crate uses the validator as a **test-only** dependency,
+so its production process adapter still has no SQL/provider client.

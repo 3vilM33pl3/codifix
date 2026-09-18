@@ -14,7 +14,7 @@ identity or stale-writer fencing.
 
 ## Transaction and verification
 
-Supported target heads are migrations **0056 and 0057**, with the exact public table
+Supported target heads are migrations **0056, 0057 and 0058**, with the exact public table
 catalog, no historical schemas, and matching source columns for every imported
 row. The first import requires empty knowledge, authentication, jobs, federation
 and supervisor state; only the known empty-installation seed rows are allowed.

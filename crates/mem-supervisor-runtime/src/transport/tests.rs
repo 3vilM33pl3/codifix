@@ -19,6 +19,8 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
+mod broker;
+
 #[derive(Clone, Copy)]
 enum Mode {
     Good,
@@ -269,6 +271,15 @@ async fn admitted_pi_request_uses_frozen_payload_and_durable_private_recovery() 
         .await
         .expect("persisted Pi proposal");
     assert_eq!(result.proposal.summary, "Ask a human to review");
+    assert_eq!(
+        store
+            .settled_usage(execution.attempt_id)
+            .await
+            .expect("authoritative counters")
+            .expect("known usage")
+            .counters(),
+        [100, 20, 120, 0, 0, 5]
+    );
     assert_eq!(
         store
             .attempt(execution.attempt_id)
