@@ -19,7 +19,7 @@ async fn migration_0056_import_receipt_survives_upgrade_but_cannot_authorize_rep
     let (partition, _) = capture(&source.pool).await.partition();
     // This newly created disposable database alone simulates a pre-0057
     // installation. Never downgrade an existing installation or receipt.
-    execute(&target.pool, "ALTER TABLE supervisor_settlements DROP COLUMN token_usage; DELETE FROM _sqlx_migrations WHERE version=58; DROP TABLE supervisor_health_observations; DROP TABLE supervisor_health_schedule; DELETE FROM _sqlx_migrations WHERE version=57; ALTER TABLE area_import_receipts DROP CONSTRAINT area_import_receipts_target_migration_check; ALTER TABLE area_import_receipts ADD CONSTRAINT area_import_receipts_target_migration_check CHECK(target_migration=56);").await;
+    execute(&target.pool, "DROP TABLE supervisor_proposal_reviews; DELETE FROM _sqlx_migrations WHERE version=59; ALTER TABLE supervisor_settlements DROP COLUMN token_usage; DELETE FROM _sqlx_migrations WHERE version=58; DROP TABLE supervisor_health_observations; DROP TABLE supervisor_health_schedule; DELETE FROM _sqlx_migrations WHERE version=57; ALTER TABLE area_import_receipts DROP CONSTRAINT area_import_receipts_target_migration_check; ALTER TABLE area_import_receipts ADD CONSTRAINT area_import_receipts_target_migration_check CHECK(target_migration=56);").await;
     import_partition(&target.pool, TARGET, OPERATION, &partition)
         .await
         .expect("supported old head");

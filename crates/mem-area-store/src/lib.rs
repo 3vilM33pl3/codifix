@@ -11,6 +11,7 @@ use uuid::Uuid;
 pub const TARGET_MIGRATION: i64 = 56;
 pub const HEALTH_TARGET_MIGRATION: i64 = 57;
 pub const USAGE_TARGET_MIGRATION: i64 = 58;
+pub const REVIEW_TARGET_MIGRATION: i64 = 59;
 const TABLES: &[&str] = &[
     "public.projects",
     "public.sessions",
@@ -150,7 +151,12 @@ pub async fn import_partition(
             .await?;
     if !matches!(
         head,
-        Some(TARGET_MIGRATION | HEALTH_TARGET_MIGRATION | USAGE_TARGET_MIGRATION)
+        Some(
+            TARGET_MIGRATION
+                | HEALTH_TARGET_MIGRATION
+                | USAGE_TARGET_MIGRATION
+                | REVIEW_TARGET_MIGRATION
+        )
     ) {
         return Err(ImportError::Schema);
     }
@@ -169,6 +175,11 @@ pub async fn import_partition(
         .chain(mem_area::AREA_IMPORT_TABLES_0056)
         .chain(if target_head >= HEALTH_TARGET_MIGRATION {
             mem_area::SUPERVISOR_TABLES_0057
+        } else {
+            &[]
+        })
+        .chain(if target_head >= REVIEW_TARGET_MIGRATION {
+            mem_area::SUPERVISOR_TABLES_0059
         } else {
             &[]
         })

@@ -337,6 +337,12 @@ pub const SUPERVISOR_TABLES_0057: &[(&str, TableStrategy)] = &[
     ),
 ];
 
+/// Human decisions are retained evidence, never fresh execution permissions.
+pub const SUPERVISOR_TABLES_0059: &[(&str, TableStrategy)] = &[(
+    "public.supervisor_proposal_reviews",
+    TableStrategy::HistoricalArchive,
+)];
+
 /// Optional, observed historical evaluation snapshot. Presence of any member
 /// requires the whole catalog, including empty tables. Never match a prefix or
 /// apply the public schema's ownership/rebuild policy to these archived rows.
@@ -370,6 +376,7 @@ pub fn table_strategy(table: &str) -> Option<TableStrategy> {
         .chain(SUPERVISOR_TABLES_0055)
         .chain(AREA_IMPORT_TABLES_0056)
         .chain(SUPERVISOR_TABLES_0057)
+        .chain(SUPERVISOR_TABLES_0059)
         .find_map(|(name, strategy)| (*name == table).then_some(*strategy))
         .or_else(|| historical_project_table(table).map(|_| TableStrategy::HistoricalArchive))
 }

@@ -62,6 +62,15 @@ pub struct ClaimedWork {
 }
 
 impl PinnedWork {
+    pub fn grant(&self) -> &LocalCollectionGrant {
+        &self.manifest.grant
+    }
+    pub fn question(&self) -> &str {
+        &self.manifest.question
+    }
+    pub fn digest(&self) -> [u8; 32] {
+        self.digest
+    }
     /// Read only a private, hash-bound operator file. No HTTP manifest endpoint.
     pub fn load(path: &Path, hash: &str, instance: Uuid, area: Area) -> Result<Self, WorkError> {
         let bytes = private_files::read(path, hash).map_err(|_| WorkError::Manifest)?;

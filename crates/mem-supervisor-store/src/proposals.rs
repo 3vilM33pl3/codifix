@@ -195,6 +195,19 @@ impl SupervisorStore {
         .await
         .map_err(sanitize)
     }
+
+    /// Private read in the caller's current authorization/source transaction.
+    pub async fn private_proposal_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        area: Area,
+        project_id: Uuid,
+        action_id: Uuid,
+    ) -> Result<PrivateProposal> {
+        read_private(tx, area, project_id, action_id)
+            .await
+            .map_err(sanitize)?
+            .ok_or(StoreError::NotFound)
+    }
 }
 
 // Database errors may include failing-row DETAIL containing private JSON.

@@ -84,3 +84,4 @@ pub(crate) async fn inspect(
 
 mod control;
 pub(crate) use control::control;
+pub(crate) mod proposals;

@@ -64,6 +64,7 @@ offline = ["dep:duckdb"]
 
 [dev-dependencies]
 mem-test-support = { path = "../mem-test-support" }
+mem-supervisor = { path = "../mem-supervisor" }
 
 [lints]
 workspace = true

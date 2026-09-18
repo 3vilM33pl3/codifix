@@ -5,6 +5,62 @@ pub use mem_supervisor::{Area as SupervisorArea, action::ActionState as Supervis
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Private exact-project content. Never serialize into operational feeds.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SupervisorProposalDetail {
+    pub project_id: Uuid,
+    pub action_id: Uuid,
+    pub proposal_digest: String,
+    pub question: String,
+    pub summary: String,
+    pub proposal: mem_supervisor::proposal::ProposalKind,
+    pub citations: Vec<SupervisorCitation>,
+    pub created_at: DateTime<Utc>,
+    pub review: Option<SupervisorReviewReceipt>,
+    pub can_review: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorCitation {
+    pub index: usize,
+    pub canonical_id: Uuid,
+    pub version_id: Uuid,
+    pub version: i32,
+    pub evidence_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorProposalList {
+    pub actions: Vec<Uuid>,
+    pub next_after: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SupervisorReviewDecision {
+    Approve,
+    Reject,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SupervisorReviewRequest {
+    pub request_id: Uuid,
+    pub proposal_digest: String,
+    pub decision: SupervisorReviewDecision,
+}
+
+/// Review acknowledgement only. It is not an executable approval token.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorReviewReceipt {
+    pub request_id: Uuid,
+    pub action_id: Uuid,
+    pub proposal_digest: String,
+    pub decision: SupervisorReviewDecision,
+    pub reviewer_id: Uuid,
+    pub recorded_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SupervisorResponse {
     pub read_only: bool,

@@ -153,9 +153,10 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
             | AREA_IMPORT_MIGRATION
             | SUPERVISOR_HEALTH_MIGRATION
             | SUPERVISOR_USAGE_MIGRATION
+            | SUPERVISOR_REVIEW_MIGRATION
     ) {
         errors.push(format!(
-            "unsupported migration version {}; supported explicit heads are 52, 53, 54, 55, 56, 57 and 58",
+            "unsupported migration version {}; supported explicit heads are 52 through 59",
             inventory.migration_version
         ));
     }
@@ -411,6 +412,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
                 | AREA_IMPORT_MIGRATION
                 | SUPERVISOR_HEALTH_MIGRATION
                 | SUPERVISOR_USAGE_MIGRATION
+                | SUPERVISOR_REVIEW_MIGRATION
         ) && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0053 table inventory {table}"));
@@ -428,6 +430,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
                 | AREA_IMPORT_MIGRATION
                 | SUPERVISOR_HEALTH_MIGRATION
                 | SUPERVISOR_USAGE_MIGRATION
+                | SUPERVISOR_REVIEW_MIGRATION
         ) && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0054 table inventory {table}"));
@@ -445,9 +448,10 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         (SUPERVISOR_CONTEXT_MIGRATION, SUPERVISOR_TABLES_0055),
         (AREA_IMPORT_MIGRATION, AREA_IMPORT_TABLES_0056),
         (SUPERVISOR_HEALTH_MIGRATION, SUPERVISOR_TABLES_0057),
+        (SUPERVISOR_REVIEW_MIGRATION, SUPERVISOR_TABLES_0059),
     ] {
         for (table, _) in catalog {
-            if (head..=SUPERVISOR_USAGE_MIGRATION).contains(&inventory.migration_version)
+            if (head..=SUPERVISOR_REVIEW_MIGRATION).contains(&inventory.migration_version)
                 && !tables.contains_key(table)
             {
                 errors.push(format!(

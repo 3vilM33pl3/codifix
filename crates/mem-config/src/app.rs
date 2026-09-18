@@ -106,6 +106,10 @@ pub struct SupervisorIdentityConfig {
     /// Explicit one-work opt-in; no default model loop or source selection.
     #[serde(default)]
     pub model_work: Option<SupervisorModelWorkConfig>,
+    /// Private human interaction over an operator-pinned collection. Loading
+    /// this profile never launches a model or grants the app provider access.
+    #[serde(default)]
+    pub interaction: Option<SupervisorModelWorkConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

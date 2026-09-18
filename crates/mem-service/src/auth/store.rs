@@ -556,12 +556,23 @@ pub(crate) async fn background_permissions(
     actor: &mem_store::jobs::JobActor,
     project: Uuid,
 ) -> Result<PermissionSet, ApiError> {
-    use mem_store::jobs::JobActor;
     if state.config.service.read_only {
         return Err(ApiError::forbidden(
             "background writes disabled in read-only mode",
         ));
     }
+    locked_project_permissions(state, tx, actor, project).await
+}
+
+/// Current permission and credential locks, also usable by private semantic
+/// reads. Callers separately enforce mutation/read-only/evaluation policy.
+pub(crate) async fn locked_project_permissions(
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    actor: &mem_store::jobs::JobActor,
+    project: Uuid,
+) -> Result<PermissionSet, ApiError> {
+    use mem_store::jobs::JobActor;
     let (principal, token, session) = match actor {
         JobActor::System(name)
             if name == "local-curation" && state.config.background_work.internal_automation =>
