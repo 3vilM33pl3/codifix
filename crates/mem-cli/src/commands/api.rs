@@ -51,6 +51,91 @@ pub(crate) struct ApiClient {
 }
 
 impl ApiClient {
+    pub(crate) async fn supervisor_proposals(
+        &self,
+        project: &str,
+        after: Option<Uuid>,
+    ) -> Result<mem_record::SupervisorProposalList> {
+        self.supervisor_private(project, None, after, None).await
+    }
+    pub(crate) async fn supervisor_proposal(
+        &self,
+        project: &str,
+        id: Uuid,
+    ) -> Result<mem_record::SupervisorProposalDetail> {
+        self.supervisor_private(project, Some(id), None, None).await
+    }
+    pub(crate) async fn supervisor_review(
+        &self,
+        project: &str,
+        id: Uuid,
+        request: &mem_record::SupervisorReviewRequest,
+    ) -> Result<mem_record::SupervisorReviewReceipt> {
+        let receipt: mem_record::SupervisorReviewReceipt = self
+            .supervisor_private(project, Some(id), None, Some(request))
+            .await?;
+        anyhow::ensure!(
+            receipt.action_id == id
+                && receipt.request_id == request.request_id
+                && receipt.proposal_digest == request.proposal_digest
+                && receipt.decision == request.decision,
+            "Review receipt mismatch; inspect before further changes"
+        );
+        Ok(receipt)
+    }
+    async fn supervisor_private<T: serde::de::DeserializeOwned>(
+        &self,
+        project: &str,
+        id: Option<Uuid>,
+        after: Option<Uuid>,
+        request: Option<&mem_record::SupervisorReviewRequest>,
+    ) -> Result<T> {
+        let mut url = reqwest::Url::parse("http://localhost/")?;
+        {
+            let mut path = url
+                .path_segments_mut()
+                .map_err(|_| anyhow::anyhow!("invalid URL"))?;
+            path.extend(["v1", "projects", project, "supervisor", "proposals"]);
+            if let Some(id) = id {
+                path.push(&id.to_string());
+            }
+            if request.is_some() {
+                path.push("review");
+            }
+        }
+        let endpoint = service_url(&self.config, url.path());
+        let builder = if let Some(body) = request {
+            self.client.post(endpoint).json(body)
+        } else {
+            self.client.get(endpoint)
+        };
+        let builder = if let Some(after) = after {
+            builder.query(&[("after", after.to_string())])
+        } else {
+            builder
+        };
+        let response = builder
+            .headers(write_headers(&self.config)?)
+            .header(reqwest::header::CACHE_CONTROL, "no-store")
+            .send()
+            .await
+            .map_err(|_| {
+                anyhow::anyhow!("Private operation unconfirmed; retry the same request ID")
+            })?;
+        match response.status().as_u16() {
+            200 => response.json().await.map_err(|_| {
+                anyhow::anyhow!("Unreadable private response; retry the same request ID")
+            }),
+            401 | 403 => {
+                anyhow::bail!("Denied: current project permissions and authentication required")
+            }
+            404 => anyhow::bail!("Private interaction or this result is unavailable"),
+            409 => anyhow::bail!("Conflict: profile, sources or review changed; refresh"),
+            _ => anyhow::bail!(
+                "Private operation unconfirmed; response details suppressed; retry the same request ID"
+            ),
+        }
+    }
     pub(crate) async fn supervisor_policy(
         &self,
         request: &mem_record::SupervisorPolicyRequest,

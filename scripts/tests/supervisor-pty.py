@@ -42,7 +42,8 @@ class Utf8Screen:
 def main():
     binary, config, instance = sys.argv[1:4]
     controls = sys.argv[4:] == ["controls"]
-    enabled_inspection = sys.argv[4:] == ["enabled-inspection"]
+    proposals = sys.argv[4:] == ["proposals"]
+    enabled_inspection = sys.argv[4:] == ["enabled-inspection"] or proposals
     if sys.argv[4:] and not controls and not enabled_inspection:
         raise RehearsalFailure("unknown rehearsal mode")
     if not os.path.isabs(binary) or not os.path.isabs(config):
@@ -99,6 +100,27 @@ def main():
         for label, required in [("identity", instance), ("area", "Workshop"), ("policy", expected_policy), ("activation", "Execution not integrated"), ("history", "PolicyInstalled")]:
             if required not in rendered:
                 raise RehearsalFailure(f"supervisor {label} did not render")
+        if proposals:
+            os.write(master, b"v")
+            for _ in range(30):
+                drain(0.2)
+                if "Private supervisor proposals" in text() and "Loading private" not in text():
+                    break
+            os.write(master, b"\r")
+            for _ in range(30):
+                drain(0.2)
+                if "Question:" in text() and "Evidence 1:" in text():
+                    break
+            else:
+                raise RehearsalFailure("private cited proposal did not render")
+            os.write(master, b"a")
+            drain(0.3)
+            if "CONFIRM Approve" not in text() or "Permanent human review only" not in text():
+                raise RehearsalFailure("private review confirmation did not render")
+            os.write(master, b"c")  # Never approve the user's actual proposal.
+            drain(0.3)
+            os.write(master, b"\x1b")
+            drain(0.3)
         if controls:
             for key, confirm, expected in [(b"e", "CONFIRM RESUME", "enabled (activation separate)"), (b"p", "CONFIRM PAUSE", "paused")]:
                 os.write(master, key)

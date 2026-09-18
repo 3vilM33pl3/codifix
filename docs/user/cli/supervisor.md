@@ -1,5 +1,40 @@
 # Supervisor inspection
 
+## Private proposals and human review
+
+When the operator configures `[supervisor.interaction]` with a private, hash-bound
+Workshop work manifest, its saved result is available in the exact project:
+
+```sh
+memory supervisor proposals --project memory
+memory supervisor result --project memory --action ACTION_UUID
+memory supervisor review --project memory --action ACTION_UUID --digest RESULT_SHA256 --request-id NEW_UUID --decision approve
+```
+
+The review command previews the exact terms. Repeat with `--confirm` only after
+reading the result. Use `reject` to decline. Review is permanent, digest-bound
+and idempotent for the same reviewer/request/terms; preserve the request UUID
+after an uncertain response. **Approval does not execute the suggestion**, edit
+a memory, install software or authorize a model call.
+
+Private reads require current project `memory_read`; review additionally requires
+`loops_run`, a writable primary and fresh credentials. Changed/withdrawn source
+versions fail closed; current versions are never silently substituted. The
+ordinary supervisor feed remains metadata-only. CLI output includes exact source
+version IDs and evidence hashes; JSON output is available with `--json` before
+the subcommand. No source paths are included.
+
+In the TUI Supervisor tab, press `v` for private proposals in the selected
+project, `j`/`k` to select, Enter to inspect, `a`/`x` to prepare approval/rejection,
+and Enter again to confirm. `c` closes a pending confirmation; inspect afterward
+if the outcome was uncertain. Escape returns to operational status. Web provides
+the same saved-result and explicit-review workflow.
+
+This saved-result increment is not a question-submission queue or an autonomous
+agent. Interactive new questions and their isolated execution remain separate.
+
+## Operational metadata
+
 `memory supervisor` reads this installation's metadata-only policy, budget and
 ordered history. It requires **global `memory_read`**; a project administrator
 cannot inspect other projects' instance-wide supervisor activity.

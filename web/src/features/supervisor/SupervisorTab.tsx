@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { supervisorStatus } from "../../api";
 import { dollars, EVENT_LABELS, MODEL_WORK_LABELS, type SupervisorResponse } from "./types";
 import { SupervisorControls } from "./SupervisorControls";
+import { ProposalsPanel } from "./ProposalsPanel";
 
-export function SupervisorTab() {
+export function SupervisorTab({ project }: { project?: string }) {
   const [data, setData] = useState<SupervisorResponse | null>(null);
   const [after, setAfter] = useState("0");
   const [revision, setRevision] = useState(0);
@@ -29,7 +30,8 @@ export function SupervisorTab() {
   function refresh(cursor: string) { setData(null); setError(""); setAfter(cursor); setRevision(v => v + 1); }
   return <section aria-label="Area supervisor">
     <h2>Area supervisor</h2>
-    <p>This installation only. The project selector does not change this instance-wide view. Other areas are not contacted.</p>
+    <p>This installation only. Operational status is instance-wide; private proposals use the selected project. Other areas are not contacted.</p>
+    {project ? <ProposalsPanel key={project} project={project} /> : null}
     <button disabled={controlPending} onClick={() => refresh(after)}>Refresh supervisor</button>
     {error ? <p role="alert">{error}</p> : null}
     {!data && !error ? <p role="status">Loading supervisor…</p> : null}

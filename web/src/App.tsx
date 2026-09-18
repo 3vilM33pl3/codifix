@@ -558,7 +558,7 @@ export default function App() {
       ) : null}
       {tab === "federation" ? <FederationTab project={project} /> : null}
       {tab === "jobs" ? <JobsTab project={project} readOnly={serviceReadOnly} /> : null}
-      {tab === "supervisor" ? <SupervisorTab key={authMe?.principal.id ?? "signed-out"} /> : null}
+      {tab === "supervisor" ? <SupervisorTab key={authMe?.principal.id ?? "signed-out"} project={project} /> : null}
       <footer className="statusbar">{statusMessage}</footer>
     </div>
   );

@@ -57,6 +57,32 @@ let sessionBootstrapPromise: Promise<void> | null = null;
 let authMePromise: Promise<AuthMeResponse> | null = null;
 let serviceReadOnly = false;
 
+export type SupervisorProposalDetail = {
+  project_id: string; action_id: string; proposal_digest: string; question: string;
+  summary: string; proposal: string; created_at: string; can_review: boolean;
+  citations: { index: number; canonical_id: string; version_id: string; version: number; evidence_digest: string }[];
+  review: SupervisorReviewReceipt | null;
+};
+export type SupervisorReviewRequest = { request_id: string; proposal_digest: string; decision: "approve" | "reject" };
+export type SupervisorReviewReceipt = SupervisorReviewRequest & { action_id: string; reviewer_id: string; recorded_at: string };
+export async function supervisorPrivate<T>(project: string, suffix: string, signal?: AbortSignal, request?: SupervisorReviewRequest): Promise<T> {
+  let response: Response;
+  try { response = await apiFetch(`/v1/projects/${encodeURIComponent(project)}/supervisor/proposals${suffix}`, {
+    signal, cache: "no-store", ...(request ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) } : {}),
+  }); } catch { throw new Error("Connection unavailable. A review may have committed; retry the same request ID."); }
+  if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "Access denied. Current project permissions and authentication are required."
+    : response.status === 404 ? "Private interaction or this result is unavailable."
+    : response.status === 409 ? "The profile, sources or review changed. Refresh before continuing."
+    : "Private operation unconfirmed. Retry the same request ID; response details suppressed.");
+  try { return await response.json() as T; } catch { throw new Error("Unreadable receipt. Retry the same request ID."); }
+}
+export async function supervisorReview(project: string, id: string, request: SupervisorReviewRequest): Promise<SupervisorReviewReceipt> {
+  const result = await supervisorPrivate<SupervisorReviewReceipt>(project, `/${encodeURIComponent(id)}/review`, undefined, request);
+  if (result.action_id !== id || result.request_id !== request.request_id || result.proposal_digest !== request.proposal_digest || result.decision !== request.decision)
+    throw new Error("Review receipt mismatch. Inspect before further changes.");
+  return result;
+}
+
 export async function supervisorStatus(after: string, signal?: AbortSignal): Promise<import("./features/supervisor/types").SupervisorResponse> {
   return parseJson(await apiFetch(`/v1/supervisor?${new URLSearchParams({ after, limit: "50" })}`, {
     signal, cache: "no-store",

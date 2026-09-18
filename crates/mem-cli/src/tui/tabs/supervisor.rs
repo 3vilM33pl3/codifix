@@ -13,9 +13,11 @@ use ratatui::{
     text::Line,
     widgets::{Paragraph, Wrap},
 };
+pub(in crate::tui) mod private;
 
 #[derive(Default)]
 pub(in crate::tui) struct SupervisorState {
+    pub private: private::PrivateState,
     pub response: Option<SupervisorResponse>,
     pub busy: bool,
     pub error: Option<String>,
@@ -86,6 +88,9 @@ impl App {
         });
     }
     pub(in crate::tui) fn supervisor_key(&mut self, key: KeyEvent, api: &ApiClient) -> bool {
+        if self.supervisor.pending.is_none() && self.supervisor_private_key(key, api) {
+            return true;
+        }
         if self.supervisor.pending.is_some() {
             match key.code {
                 KeyCode::Enter if !self.supervisor.busy => {
@@ -158,8 +163,14 @@ impl App {
     }
 }
 pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect) {
+    if private::draw(frame, app, area) {
+        return;
+    }
     let state = &app.supervisor;
     let mut text = vec![];
+    text.push(Line::from(
+        "v: private saved proposals for the selected project",
+    ));
     if let Some(request) = &state.pending {
         text.push(Line::from(format!(
             "CONFIRM {} instance {} policy {}",

@@ -19,6 +19,35 @@ pub(crate) struct SupervisorArgs {
 }
 #[derive(Debug, Subcommand)]
 enum SupervisorCommand {
+    /// List private proposal IDs in exactly one project; no model call.
+    Proposals {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        after: Option<uuid::Uuid>,
+    },
+    /// Read a private saved question, response and exact evidence references.
+    Result {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        action: uuid::Uuid,
+    },
+    /// Record human review, not execution permission. Preview without --confirm.
+    Review {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        action: uuid::Uuid,
+        #[arg(long)]
+        digest: String,
+        #[arg(long)]
+        request_id: uuid::Uuid,
+        #[arg(long, value_parser=["approve","reject"])]
+        decision: String,
+        #[arg(long)]
+        confirm: bool,
+    },
     /// Pause the exact currently enabled policy; in-flight bytes cannot be recalled.
     Pause(ControlArgs),
     /// Resume the exact currently paused policy, without granting new permissions.
@@ -40,6 +69,58 @@ struct ControlArgs {
 pub(crate) async fn handle(args: SupervisorArgs, api: &ApiClient) -> Result<()> {
     if let Some(command) = args.command {
         let (control, enabled) = match command {
+            SupervisorCommand::Proposals { project, after } => {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &api.supervisor_proposals(&project, after).await?
+                    )?
+                );
+                return Ok(());
+            }
+            SupervisorCommand::Result { project, action } => {
+                let result = api.supervisor_proposal(&project, action).await?;
+                if args.json {
+                    println!("{}", serde_json::to_string_pretty(&result)?);
+                } else {
+                    for line in proposal_lines(&result) {
+                        println!("{line}");
+                    }
+                }
+                return Ok(());
+            }
+            SupervisorCommand::Review {
+                project,
+                action,
+                digest,
+                request_id,
+                decision,
+                confirm,
+            } => {
+                let request = mem_record::SupervisorReviewRequest {
+                    request_id,
+                    proposal_digest: digest,
+                    decision: if decision == "approve" {
+                        mem_record::SupervisorReviewDecision::Approve
+                    } else {
+                        mem_record::SupervisorReviewDecision::Reject
+                    },
+                };
+                if !confirm {
+                    println!(
+                        "Preview only: project {project}, action {action}. Human review only; no action executes. Decision is permanent.\n{}\nRepeat with --confirm after inspecting the saved result.",
+                        serde_json::to_string_pretty(&request)?
+                    );
+                } else {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(
+                            &api.supervisor_review(&project, action, &request).await?
+                        )?
+                    );
+                }
+                return Ok(());
+            }
             SupervisorCommand::Pause(c) => (c, false),
             SupervisorCommand::Resume(c) => (c, true),
         };
@@ -78,6 +159,48 @@ pub(crate) async fn handle(args: SupervisorArgs, api: &ApiClient) -> Result<()> 
         }
     }
     Ok(())
+}
+
+pub(crate) fn proposal_lines(p: &mem_record::SupervisorProposalDetail) -> Vec<String> {
+    // Model text is untrusted: no terminal controls, bidi controls or ANSI links.
+    fn plain(s: &str) -> String {
+        s.chars()
+            .filter(|c| {
+                (!c.is_control() || *c == '\n' || *c == '\t')
+                    && !matches!(*c,'\u{202a}'..='\u{202e}'|'\u{2066}'..='\u{2069}')
+            })
+            .collect()
+    }
+    let mut lines = vec![
+        format!(
+            "Private proposal {} | project {}",
+            p.action_id, p.project_id
+        ),
+        format!("Question: {}", plain(&p.question)),
+        plain(&p.summary),
+        format!(
+            "Suggested next step: {:?}. Model suggestion, not verified truth.",
+            p.proposal
+        ),
+        format!("Digest: {}", p.proposal_digest),
+    ];
+    for c in &p.citations {
+        lines.push(format!(
+            "Evidence {}: version {} record {} digest {}",
+            c.index + 1,
+            c.version,
+            c.version_id,
+            c.evidence_digest
+        ));
+    }
+    if let Some(r) = &p.review {
+        lines.push(format!(
+            "Review: {:?} by {} at {}",
+            r.decision, r.reviewer_id, r.recorded_at
+        ));
+    }
+    lines.push("Human review only. No memory edit, installation or action executes.".into());
+    lines
 }
 pub(crate) fn lines(response: &SupervisorResponse) -> Vec<String> {
     let mut lines = vec![

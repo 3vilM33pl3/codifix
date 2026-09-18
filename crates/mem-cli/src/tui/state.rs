@@ -405,6 +405,10 @@ pub(super) struct ProjectRefreshResult {
 }
 
 pub(super) enum BackgroundEvent {
+    SupervisorPrivate {
+        project: String,
+        result: Result<super::tabs::supervisor::private::PrivateResult, String>,
+    },
     Supervisor(Result<mem_record::SupervisorResponse, String>),
     SupervisorControlled(Result<mem_record::SupervisorResponse, String>),
     Jobs {

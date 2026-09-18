@@ -1048,6 +1048,11 @@ impl App {
     fn apply_background_event(&mut self, event: BackgroundEvent) {
         self.chrome.needs_redraw = true;
         match event {
+            BackgroundEvent::SupervisorPrivate { project, result } => {
+                if project == self.project {
+                    self.supervisor.private.receive(result);
+                }
+            }
             BackgroundEvent::Jobs { project, result } => {
                 if project == self.project {
                     self.jobs.receive(result);
