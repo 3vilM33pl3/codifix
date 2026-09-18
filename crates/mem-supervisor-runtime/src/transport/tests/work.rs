@@ -75,8 +75,53 @@ async fn operator_executes_one_real_pi_proposal_and_restart_only_observes_it() {
         Area::Workshop,
     )
     .expect("work");
-    let result =
-        crate::operator::run(&work, db.pool.clone(), Some(client), RunControl::default()).await;
+    // Exercise the deployed non-superuser grants, including the project KEY
+    // SHARE prerequisite. Superuser-only fixtures miss missing lock privileges.
+    let role = format!("workshop_test_{}", Uuid::new_v4().simple());
+    sqlx::raw_sql(&format!(
+        "CREATE ROLE {role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE"
+    ))
+    .execute(&db.pool)
+    .await
+    .expect("isolated role");
+    sqlx::raw_sql(
+        &include_str!("../../../operator-worker-grants.sql").replace("workshop_worker", &role),
+    )
+    .execute(&db.pool)
+    .await
+    .expect("deployment grants");
+    let selected_role = role.clone();
+    let restricted = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(4)
+        .after_connect(move |connection, _| {
+            let statement = format!("SET ROLE {selected_role}");
+            Box::pin(async move {
+                sqlx::query(&statement).execute(connection).await?;
+                Ok(())
+            })
+        })
+        .connect_with((*db.pool.connect_options()).clone())
+        .await
+        .expect("restricted pool");
+    assert!(
+        sqlx::query("DELETE FROM memory_entries WHERE false")
+            .execute(&restricted)
+            .await
+            .is_err()
+    );
+    assert!(
+        sqlx::query("UPDATE memory_entries SET canonical_text=canonical_text WHERE false")
+            .execute(&restricted)
+            .await
+            .is_err()
+    );
+    let result = crate::operator::run(
+        &work,
+        restricted.clone(),
+        Some(client),
+        RunControl::default(),
+    )
+    .await;
     assert_eq!(result.outcome, crate::operator::Outcome::Completed);
     assert_eq!(result.action_state, Some(ActionState::Verified));
     assert_eq!(fake.generated.load(Ordering::SeqCst), 1);
@@ -88,7 +133,7 @@ async fn operator_executes_one_real_pi_proposal_and_restart_only_observes_it() {
             .is_some()
     );
     assert_eq!(
-        crate::operator::run(&work, db.pool.clone(), None, RunControl::default())
+        crate::operator::run(&work, restricted.clone(), None, RunControl::default())
             .await
             .outcome,
         crate::operator::Outcome::Stored
@@ -97,6 +142,11 @@ async fn operator_executes_one_real_pi_proposal_and_restart_only_observes_it() {
     let metadata = serde_json::to_string(&result).expect("metadata");
     assert!(!metadata.contains("synthetic") && !metadata.contains("summary"));
     provider.abort();
+    restricted.close().await;
+    sqlx::raw_sql(&format!("DROP OWNED BY {role}; DROP ROLE {role};"))
+        .execute(&db.pool)
+        .await
+        .expect("isolated role cleanup");
     db.cleanup().await.expect("cleanup");
 }
 
