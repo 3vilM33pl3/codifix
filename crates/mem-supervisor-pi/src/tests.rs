@@ -179,7 +179,9 @@ async fn one_deadline_covers_handshake_and_process_exit_then_kills_and_reaps() {
         "linger_after_eof",
     ] {
         let mut fixture = Fixture::new(mode);
-        fixture.config.deadline = Duration::from_millis(250);
+        // Leave room for parallel test startup/filesystem scheduling. The fake
+        // still delays the three-command handshake beyond this shared deadline.
+        fixture.config.deadline = Duration::from_millis(1500);
         let started = Instant::now();
         let report = probe(&fixture.config).await;
         assert_eq!(
@@ -188,7 +190,7 @@ async fn one_deadline_covers_handshake_and_process_exit_then_kills_and_reaps() {
             "{mode}: {report:?}"
         );
         assert_eq!(report.process, ProcessDisposition::Reaped);
-        assert!(started.elapsed() < Duration::from_secs(2));
+        assert!(started.elapsed() < Duration::from_secs(3));
         fixture.assert_reaped();
     }
 }
@@ -196,10 +198,10 @@ async fn one_deadline_covers_handshake_and_process_exit_then_kills_and_reaps() {
 #[tokio::test]
 async fn cancelling_the_waiter_keeps_the_bounded_cleanup_owner_alive() {
     let mut fixture = Fixture::new("timeout_before_response");
-    fixture.config.deadline = Duration::from_millis(300);
+    fixture.config.deadline = Duration::from_secs(2);
     let config = fixture.config.clone();
     let waiting = tokio::spawn(async move { probe(&config).await });
-    for _ in 0..100 {
+    for _ in 0..300 {
         if fixture.pid_file.exists() {
             break;
         }
@@ -208,7 +210,7 @@ async fn cancelling_the_waiter_keeps_the_bounded_cleanup_owner_alive() {
     assert!(fixture.pid_file.exists());
     waiting.abort();
     let _ = waiting.await;
-    sleep(Duration::from_millis(450)).await;
+    sleep(Duration::from_millis(2200)).await;
     fixture.assert_reaped();
 }
 

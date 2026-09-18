@@ -123,9 +123,16 @@ pub(crate) async fn run(config: ProbeConfig) -> ProbeReport {
 /// Process hygiene shared with the explicit fake-provider compatibility test.
 /// This does not establish an OS sandbox or grant provider authority.
 pub(crate) fn isolated_command(prepared: &artifact::Prepared) -> Command {
+    isolated_command_with_arguments(prepared, control_arguments())
+}
+
+pub(crate) fn isolated_command_with_arguments(
+    prepared: &artifact::Prepared,
+    arguments: &[&str],
+) -> Command {
     let mut command = Command::new(&prepared.executable);
     command
-        .args(control_arguments())
+        .args(arguments)
         .current_dir(&prepared.cwd)
         .env_clear()
         .env("HOME", &prepared.home)

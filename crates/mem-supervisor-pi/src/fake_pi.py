@@ -48,7 +48,7 @@ for index, expected in enumerate(commands):
         expected_request["enabled"] = False
     assert request == expected_request, "unexpected RPC or prompt supplied"
     if MODE == "slow_handshake":
-        time.sleep(0.12)
+        time.sleep(0.6)
     if index == 0:
         if MODE == "malformed":
             print("{invalid " + SENTINEL, flush=True)

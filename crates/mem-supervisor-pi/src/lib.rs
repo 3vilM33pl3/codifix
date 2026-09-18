@@ -2,8 +2,9 @@
 
 //! Credential-free control probe for the pinned Pi Rust v0.5.1 RPC executable.
 //!
-//! No prompts, arbitrary commands, credential inputs or provider settings are
-//! accepted. This is process/protocol hygiene, not an OS or network sandbox.
+//! The control probe accepts no prompts or provider settings. The separate
+//! `sandbox` child entrypoint accepts exact broker-bound input only inside an
+//! independently enforced container. Neither API creates an OS/network sandbox.
 //! Provider execution remains blocked after a successful probe. Separate ignored
 //! diagnostics exercise authentic Pi only inside an independently enforced
 //! network-disabled container; normal tests use fake processes. Missing local
@@ -12,10 +13,11 @@
 mod artifact;
 mod process;
 mod protocol;
+pub mod sandbox;
 
 use std::{path::PathBuf, time::Duration};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub use protocol::{ControlCommand, EventKind, Failure, StartupFailure, TranscriptEvent};
 
@@ -81,7 +83,7 @@ impl ProbeConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessDisposition {
     NotStarted,

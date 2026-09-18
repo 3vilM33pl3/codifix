@@ -1,4 +1,4 @@
-# Pinned Pi control probe (not activated)
+# Pinned Pi control probe and broker-only child (not activated)
 
 This Linux-only library is a credential-free, bounded **control protocol probe**
 for Pi Rust v0.5.1. It is not a provider transport, executable installer, service,
@@ -91,7 +91,49 @@ needs a durable area/work/fencing-bound reservation before dispatch, exact model
 and endpoint/body/output limits, conservative cost ceilings, and durable actual
 usage settlement or an uncertain reservation retained after ambiguous outcomes.
 That transport must prevent Pi from bypassing admission, and separately persist
-private proposals before publishing verified outcomes. None is implemented here.
+private proposals before publishing verified outcomes. Those host responsibilities
+are not conferred by the probe or the separate child entrypoint below.
+
+## Broker-only child entrypoint
+
+`memory-pi-sandbox` is a separate restricted executable for the approved
+`0.5.1+memory.no-tools.1` patch. It is **not a host launcher**. An independently
+enforced network-none, read-only-root, non-root container supplies only the
+verified patched binary at `/pi/pi`, this driver, a private `/broker/job.sock`,
+and a fresh scratch tmpfs. The child checks loopback-only networking, empty
+capabilities, no-new-privileges, a read-only root and the socket's owner/modes to
+catch accidental host invocation; these checks do not replace outer isolation.
+
+Bounded stdin carries exact system/prompt bytes and a single-work broker token,
+never an OpenAI or database credential. No endpoint, path or additional argument
+can be supplied. A one-connection loopback-to-Unix relay is the only provider
+route. The real provider remains outside the container in the trusted broker.
+Pi retry, fallback, compaction, tools, context discovery, sessions and cache
+affinity remain disabled; control state is checked before the single prompt.
+
+The driver uses a maximum 110-second exchange, 256-KiB frame/2-MiB total stdout
+limits, 8-KiB discarded stderr, bounded relay traffic and explicit kill/reap.
+Reports contain only a proposal-text hash, process outcome and typed failure.
+The parent must match that hash against the exact durably stored proposal;
+child success/usage is never authority, billing evidence or completion proof.
+The legacy `provider_execution_gate()` remains closed: a successful probe cannot
+authorize the new broker-only path or arbitrary provider traffic.
+
+The 2026-09-18 ignored runtime test
+`transport::tests::broker::sandbox::patched_pi_reaches_durable_broker_only_through_private_socket`
+ran the authentic patched AMD64 Pi through this driver, a host Unix broker,
+fake provider and disposable PostgreSQL. The happy path matched the saved
+proposal hash and all 120 reported synthetic tokens, with one count and one
+generation. Revocation during counting sent no generation; malformed usage
+retained uncertainty with no accepted proposal. All containers were removed.
+No paid calls, real knowledge, live database or credential was used.
+
+Reproduce after building `cargo build -p mem-supervisor-pi --bin memory-pi-sandbox`
+using the shared build target, with `MEMORY_PI_PATCHED_ARTIFACT` and
+`MEMORY_PI_SANDBOX_DRIVER` set to those explicit verified local paths,
+`MEMORY_LAYER_TEST_REQUIRE_DB=1` and a disposable test database. Run the named
+ignored test in `mem-supervisor-runtime`. These environment-selected test paths
+are not a production installer, sandbox-launch API or activation grant.
 
 ## Focused checks
 

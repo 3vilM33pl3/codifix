@@ -67,7 +67,7 @@ pub struct TranscriptEvent {
     pub bytes: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StartupFailure {
     MissingCredential,
@@ -77,7 +77,7 @@ pub enum StartupFailure {
     Other,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, thiserror::Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
 #[serde(rename_all = "snake_case", tag = "failure", content = "class")]
 pub enum Failure {
     #[error("probe configuration is invalid")]
@@ -233,6 +233,15 @@ pub(crate) async fn read_frame(
     reader: &mut BufReader<tokio::process::ChildStdout>,
     total: &mut usize,
 ) -> Result<Option<Vec<u8>>, Failure> {
+    read_frame_bounded(reader, total, MAX_FRAME_BYTES, MAX_STDOUT_BYTES).await
+}
+
+pub(crate) async fn read_frame_bounded<R: tokio::io::AsyncRead + Unpin>(
+    reader: &mut BufReader<R>,
+    total: &mut usize,
+    frame_limit: usize,
+    total_limit: usize,
+) -> Result<Option<Vec<u8>>, Failure> {
     let mut frame = Vec::new();
     loop {
         let available = reader.fill_buf().await.map_err(|_| Failure::ProcessIo)?;
@@ -245,7 +254,7 @@ pub(crate) async fn read_frame(
         }
         let newline = available.iter().position(|byte| *byte == b'\n');
         let length = newline.map_or(available.len(), |index| index + 1);
-        if frame.len() + length > MAX_FRAME_BYTES || *total + length > MAX_STDOUT_BYTES {
+        if frame.len() + length > frame_limit || *total + length > total_limit {
             return Err(Failure::OutputLimit);
         }
         frame.extend_from_slice(&available[..length]);
