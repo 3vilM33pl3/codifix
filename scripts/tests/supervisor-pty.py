@@ -16,15 +16,27 @@ import struct
 import sys
 import termios
 import time
-import warnings
-
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", UserWarning)
-    from pexpect.ANSI import ANSI
+import pyte
 
 
 class RehearsalFailure(Exception):
     """Static diagnostic, never subprocess output."""
+
+
+class Utf8Screen:
+    """Terminal cursor columns count characters, not the bytes of box borders."""
+
+    def __init__(self, rows, columns):
+        self.screen = pyte.Screen(columns, rows)
+        self.stream = pyte.ByteStream(self.screen)
+
+    def feed(self, data):
+        # PTY reads may split a multibyte character. Preserve decoder state so
+        # later cursor-addressed updates cannot corrupt confirmation text.
+        self.stream.feed(data)
+
+    def __str__(self):
+        return "\n".join(self.screen.display)
 
 
 def main():
@@ -41,7 +53,7 @@ def main():
         os.chdir(os.path.dirname(config))
         os.execve(binary, [binary, "--config", config, "tui", "--project", "synthetic" if controls else "memory"], env)
     fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 55, 180, 0, 0))
-    screen = ANSI(55, 180)
+    screen = Utf8Screen(55, 180)
     output_bytes = 0
     exited = False
 
@@ -60,7 +72,7 @@ def main():
                 if not data:
                     return
                 output_bytes += len(data)
-                screen.write(data)
+                screen.feed(data)
                 if output_bytes > 4 * 1024 * 1024:
                     raise RehearsalFailure("bounded terminal output exceeded")
 
@@ -93,7 +105,11 @@ def main():
                     if confirm in text() and "Enter confirms/retries" in text():
                         break
                 else:
-                    raise RehearsalFailure(f"{confirm}: exact supervisor confirmation was not visible")
+                    # Booleans only: diagnose readiness without retaining terminal
+                    # bodies or changing the requirement to see both safeguards.
+                    raise RehearsalFailure(f"{confirm}: exact supervisor confirmation was not visible "
+                        f"(heading={confirm in text()}, terms={'Enter confirms/retries' in text()}, "
+                        f"loading={'Loading supervisor' in text()}, controls={'p: prepare pause' in text()})")
                 os.write(master, b"\r")
                 for _ in range(30):
                     drain(0.2)

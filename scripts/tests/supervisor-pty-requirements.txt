@@ -1,0 +1,4 @@
+# Test-only terminal emulation; never packaged with the application.
+# https://pypi.org/project/pyte/0.8.2/
+pyte==0.8.2
+wcwidth==0.2.14
