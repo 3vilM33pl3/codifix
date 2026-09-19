@@ -112,16 +112,25 @@ function connect(network, id, docker) {
   docker.run([...args, network.id, id]);
 }
 function named(name, docker) { const id = docker.run(['ps', '-aq', '--no-trunc', '--filter', `name=^/${name}$`]); check(!id || hex.test(id), 'ambiguous_named_container'); return id || null; }
-function checkNetworks(v, old, complete = false) {
+function checkNetworks(v, old, docker, complete = false) {
   const current = Object.entries(v.NetworkSettings.Networks);
   for (const [name, value] of current) {
     if (name === 'none' && !complete) continue;
     const n = old.networks.find(n => n.name === name);
-    check(n && value.NetworkID === n.id && value.IPAddress === n.address && equal(sorted(value.Aliases ?? []), sorted(n.aliases)), 'container_networks_changed');
+    check(n && equal(sorted(value.Aliases ?? []), sorted(n.aliases)), 'container_networks_changed');
+    if (!v.State.Running && !value.IPAddress) {
+      // Docker records requested networking before start, but assigns endpoint
+      // IDs and addresses only when the stopped container actually starts.
+      const network = JSON.parse(docker.run(['network', 'inspect', name]))[0];
+      check(network.Id === n.id && network.Name === name && network.Internal && !network.EnableIPv6
+        && (!value.NetworkID || value.NetworkID === n.id), 'container_networks_changed');
+      const requested = value.IPAMConfig?.IPv4Address;
+      check(requested ? requested === n.address : v.Id === old.id, 'requested_container_address_changed');
+    } else check(value.NetworkID === n.id && value.IPAddress === n.address, 'container_networks_changed');
   }
   if (complete) check(current.length === old.networks.length, 'container_networks_incomplete');
 }
-function createdBoundary(v, c, old, approval) {
+function createdBoundary(v, c, old, approval, docker) {
   validateBoundary(v);
   check(v.Image === old.image_id && [`/${c.name}`, `/${c.name}-unconfirmed-dependable`].includes(v.Name)
     && v.Config.Labels?.[label] === approval && v.Config.Labels?.[oldLabel] === c.old_id, 'replacement_identity_changed');
@@ -129,13 +138,13 @@ function createdBoundary(v, c, old, approval) {
     && equal(v.Config.Entrypoint ?? [], old.config.Entrypoint ?? []) && v.Config.WorkingDir === old.config.WorkingDir
     && v.HostConfig.Memory === old.host.Memory && v.HostConfig.PidsLimit === old.host.PidsLimit
     && equal(sorted(v.Mounts.map(m => [m.Source, m.Destination, m.RW])), sorted(c.mounts.map(m => [m.source, m.destination, m.writable]))), 'replacement_contract_changed');
-  checkNetworks(v, old);
+  checkNetworks(v, old, docker);
 }
-function retainedBoundary(v, c, old) {
+function retainedBoundary(v, c, old, docker) {
   validateBoundary(v);
   check(v.Id === c.old_id && [`/${c.name}`, `/${c.retained_name}`].includes(v.Name) && v.Image === old.image_id
     && equal(v.Config, old.config) && equal(sorted(v.Mounts.map(m => [m.Source, m.Destination, m.RW])), sorted(old.mounts)), 'retained_container_changed');
-  checkNetworks(v, old);
+  checkNetworks(v, old, docker);
 }
 export function execute(c, phase, approval, injected) {
   check(['review', 'replace', 'restore-old'].includes(phase), 'explicit_phase_required');
@@ -179,18 +188,20 @@ function executeLocked(c, phase, approval, docker) {
     args.push(old.image_id, ...(old.config.Cmd ?? []));
     const id = docker.run(args); check(hex.test(id), 'creation_unconfirmed');
     write(`${c.directory}/created.json`, { review: approval, id, old_id: c.old_id });
-    createdBoundary(docker.inspect(id), c, old, approval);
+    createdBoundary(docker.inspect(id), c, old, approval, docker);
     docker.run(['network', 'disconnect', 'none', id]);
     for (const n of old.networks) connect(n, id, docker);
-    const ready = docker.inspect(id); createdBoundary(ready, c, old, approval); checkNetworks(ready, old, true);
+    const ready = docker.inspect(id); createdBoundary(ready, c, old, approval, docker); checkNetworks(ready, old, docker, true);
     docker.run(['start', id]);
+    const started = docker.inspect(id); createdBoundary(started, c, old, approval, docker); checkNetworks(started, old, docker, true);
+    check(started.State.Running, 'replacement_start_unconfirmed');
     write(`${c.directory}/started.json`, { review: approval, id, health_verified: false, provider_calls: 0 });
     return { started: true, id, retained: c.old_id, health_verified: false, provider_calls: 0 };
   }
   if (phase === 'restore-old') {
     const intent = JSON.parse(read(`${c.directory}/intent.json`));
     check(intent.review === approval && intent.old_id === c.old_id, 'replacement_intent_required');
-    let prior = docker.inspect(c.old_id); retainedBoundary(prior, c, old);
+    let prior = docker.inspect(c.old_id); retainedBoundary(prior, c, old, docker);
     let replacement;
     if (fs.existsSync(`${c.directory}/created.json`)) {
       const created = JSON.parse(read(`${c.directory}/created.json`));
@@ -201,7 +212,7 @@ function executeLocked(c, phase, approval, docker) {
       if (candidate && candidate !== c.old_id) replacement = candidate;
     }
     if (replacement) {
-      const live = docker.inspect(replacement); createdBoundary(live, c, old, approval);
+      const live = docker.inspect(replacement); createdBoundary(live, c, old, approval, docker);
       if (!fs.existsSync(`${c.directory}/created.json`) && !fs.existsSync(`${c.directory}/reconciled-created.json`))
         write(`${c.directory}/reconciled-created.json`, { review: approval, id: replacement, old_id: c.old_id, observed_only: true });
       if (live.State.Running) docker.run(['stop', '--time', '30', replacement]);
@@ -212,12 +223,12 @@ function executeLocked(c, phase, approval, docker) {
         docker.run(['rename', replacement, `${c.name}-unconfirmed-dependable`]);
       }
     }
-    prior = docker.inspect(c.old_id); retainedBoundary(prior, c, old);
+    prior = docker.inspect(c.old_id); retainedBoundary(prior, c, old, docker);
     for (const n of old.networks) if (!prior.NetworkSettings.Networks[n.name]) connect(n, c.old_id, docker);
     if (prior.Name === `/${c.retained_name}`) docker.run(['rename', c.old_id, c.name]);
     docker.run(['update', `--restart=${restart(old.host)}`, c.old_id]);
     if (!prior.State.Running) docker.run(['start', c.old_id]);
-    const restored = docker.inspect(c.old_id); retainedBoundary(restored, c, old); checkNetworks(restored, old, true);
+    const restored = docker.inspect(c.old_id); retainedBoundary(restored, c, old, docker); checkNetworks(restored, old, docker, true);
     check(restored.Name === `/${c.name}` && restored.State.Running, 'restoration_unconfirmed');
     const result = { review: approval, restored_old: c.old_id, health_verified: false, remote_effects_reversed: false };
     if (!fs.existsSync(`${c.directory}/restored-old.json`)) write(`${c.directory}/restored-old.json`, result);

@@ -34,13 +34,19 @@ function fixture(t, kind = 'memory-company-20260919-gateway-1') {
       const fails = failure && failure.predicate(args); const after = failure?.after;
       if (fails) { failure = null; if (!after) throw Error('synthetic_unconfirmed'); }
       let result = '';
-      if (args[0] === 'network' && args[1] === 'inspect') result = JSON.stringify([networks.find(n => n.Id === args[2])]);
+      if (args[0] === 'network' && args[1] === 'inspect') result = JSON.stringify([networks.find(n => n.Id === args[2] || n.Name === args[2])]);
       else if (args[0] === 'image') result = JSON.stringify([{ Id: imageId }]);
       else if (args[0] === 'ps') {
         const wanted = args.at(-1).slice('name=^/'.length, -1);
         result = [...containers.values()].find(c => c.Name === `/${wanted}`)?.Id ?? '';
       } else if (args[0] === 'stop') containers.get(args.at(-1)).State.Running = false;
-      else if (args[0] === 'start') containers.get(args[1]).State.Running = true;
+      else if (args[0] === 'start') {
+        const c = containers.get(args[1]); c.State.Running = true;
+        for (const [name, net] of Object.entries(c.NetworkSettings.Networks)) {
+          net.NetworkID = networks.find(n => n.Name === name).Id;
+          net.IPAddress = net.IPAMConfig?.IPv4Address ?? net.IPAddress;
+        }
+      }
       else if (args[0] === 'update') {
         const [name, count = '0'] = args[1].slice('--restart='.length).split(':');
         containers.get(args[2]).HostConfig.RestartPolicy = { Name: name, MaximumRetryCount: Number(count) };
@@ -51,7 +57,8 @@ function fixture(t, kind = 'memory-company-20260919-gateway-1') {
       } else if (args[0] === 'network' && args[1] === 'connect') {
         const network = networks.find(n => n.Id === args.at(-2)), aliases = [];
         for (let i = 0; i < args.length; i++) if (args[i] === '--alias') aliases.push(args[i + 1]);
-        containers.get(args.at(-1)).NetworkSettings.Networks[network.Name] = { NetworkID: network.Id, IPAddress: args[args.indexOf('--ip') + 1], Aliases: aliases };
+        const c = containers.get(args.at(-1)), requested = args[args.indexOf('--ip') + 1];
+        c.NetworkSettings.Networks[network.Name] = { NetworkID: c.State.Running ? network.Id : '', IPAddress: c.State.Running ? requested : '', IPAMConfig: { IPv4Address: requested }, Aliases: aliases };
       } else if (args[0] === 'create') {
         const replacement = structuredClone(before); replacement.Id = newId; replacement.Name = `/${contract.name}`; replacement.State.Running = false;
         replacement.Config.Labels = {};
