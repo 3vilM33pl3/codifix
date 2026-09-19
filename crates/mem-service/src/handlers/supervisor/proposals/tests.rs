@@ -20,6 +20,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+mod question_tests;
+
 struct Fixture {
     db: IsolatedDatabase,
     state: AppState,

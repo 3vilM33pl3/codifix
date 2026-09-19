@@ -11,22 +11,22 @@ use uuid::Uuid;
 #[cfg(test)]
 mod tests;
 
-fn unavailable(_: impl std::fmt::Display) -> ApiError {
+pub(super) fn unavailable(_: impl std::fmt::Display) -> ApiError {
     ApiError::service_unavailable(
         "private supervisor operation unconfirmed; retry the same request ID",
     )
 }
-fn conflict() -> ApiError {
+pub(super) fn conflict() -> ApiError {
     ApiError::status_message(
         StatusCode::CONFLICT,
         "supervisor profile, sources or review changed; refresh before continuing",
     )
 }
-fn hex(digest: &[u8]) -> String {
+pub(super) fn hex(digest: &[u8]) -> String {
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-async fn profile(state: &AppState) -> Result<PinnedWork, ApiError> {
+pub(super) async fn profile(state: &AppState) -> Result<PinnedWork, ApiError> {
     let identity = state.config.supervisor.as_ref().ok_or_else(conflict)?;
     let config = identity.interaction.clone().ok_or_else(|| {
         ApiError::status_message(
@@ -44,7 +44,7 @@ async fn profile(state: &AppState) -> Result<PinnedWork, ApiError> {
     .map_err(|_| conflict())
 }
 
-async fn access(
+pub(super) async fn access(
     state: &AppState,
     tx: &mut Transaction<'_, Postgres>,
     principal: &crate::AuthenticatedPrincipal,
@@ -100,7 +100,7 @@ async fn access(
     Ok(())
 }
 
-async fn bound(
+pub(super) async fn bound(
     state: &AppState,
     tx: &mut Transaction<'_, Postgres>,
     work: &PinnedWork,
@@ -231,10 +231,33 @@ async fn detail_tx(
     })?;
     // Never infer citations by searching for similar text or silently substitute
     // newer versions. The immutable request/evidence must match this profile.
-    let evidence = mem_supervisor_store::sources::validate_tx(tx, grant.project_id, &grant.sources)
-        .await
-        .map_err(|_| conflict())?;
-    let prepared = PreparedRequest::new(work.question(), &evidence).map_err(|_| conflict())?;
+    let (question, queued) =
+        match mem_supervisor_store::questions::read_tx(tx, grant.project_id, action)
+            .await
+            .map_err(unavailable)?
+        {
+            Some(question) if question.submission.profile_digest == work.digest() => {
+                mem_supervisor_store::questions::authorize_requester_tx(
+                    tx,
+                    &question.submission.actor,
+                    grant.project_id,
+                )
+                .await
+                .map_err(|_| {
+                    ApiError::forbidden("question disclosure authority is no longer current")
+                })?;
+                (question.submission.question, true)
+            }
+            None if action == work.action_id() => (work.question().to_owned(), false),
+            _ => return Err(conflict()),
+        };
+    let evidence = if queued {
+        mem_supervisor_store::sources::authorize_tx(tx, grant).await
+    } else {
+        mem_supervisor_store::sources::validate_tx(tx, grant.project_id, &grant.sources).await
+    }
+    .map_err(|_| conflict())?;
+    let prepared = PreparedRequest::new(&question, &evidence).map_err(|_| conflict())?;
     if stored.policy_revision != grant.policy_revision
         || stored.evidence_digests != prepared.evidence_digests()
         || hex(&stored.request_digest) != prepared.digest()
@@ -246,21 +269,21 @@ async fn detail_tx(
         .evidence_indices
         .iter()
         .map(|&index| {
-            let source = &grant.sources[index];
-            SupervisorCitation {
+            let source = grant.sources.get(index).ok_or_else(conflict)?;
+            Ok(SupervisorCitation {
                 index,
                 canonical_id: source.canonical_id,
                 version_id: source.version_id,
                 version: source.version,
                 evidence_digest: hex(&source.evidence_digest),
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, ApiError>>()?;
     Ok(SupervisorProposalDetail {
         project_id: grant.project_id,
         action_id: action,
         proposal_digest: hex(&stored.proposal_digest),
-        question: work.question().into(),
+        question,
         summary: stored.proposal.summary,
         proposal: stored.proposal.proposal,
         citations,

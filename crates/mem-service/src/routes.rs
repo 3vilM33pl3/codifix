@@ -52,6 +52,19 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
     let mut app = Router::new()
         .route("/v1/supervisor", get(crate::handlers::supervisor::inspect))
         .route(
+            "/v1/projects/{slug}/supervisor/questions/prepare",
+            post(crate::handlers::supervisor::questions::prepare),
+        )
+        .route(
+            "/v1/projects/{slug}/supervisor/questions",
+            get(crate::handlers::supervisor::questions::list)
+                .post(crate::handlers::supervisor::questions::submit),
+        )
+        .route(
+            "/v1/projects/{slug}/supervisor/questions/{id}",
+            get(crate::handlers::supervisor::questions::status),
+        )
+        .route(
             "/v1/projects/{slug}/supervisor/proposals",
             get(crate::handlers::supervisor::proposals::list),
         )

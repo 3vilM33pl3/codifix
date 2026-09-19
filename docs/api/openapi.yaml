@@ -27,6 +27,81 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/projects/{slug}/supervisor/questions/prepare:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+    post:
+      operationId: preparePrivateSupervisorQuestion
+      x-stability: internal
+      summary: Preview exact bounded question, reviewed source profile and model destination.
+      description: Requires a current revocable credential, direct project memory_read, loops_run and bundle_export, active supervisor authority, a writable primary and browser CSRF. No provider call or durable work is created. Question input is at most 4096 UTF-8 bytes; only newline and tab control characters are permitted. Returned hashes bind the exact subsequent confirmation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [question]
+              properties:
+                question: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        '200':
+          description: Private no-store confirmation preview.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupervisorQuestionPreview' }
+  /v1/projects/{slug}/supervisor/questions:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+    get:
+      operationId: listPrivateSupervisorQuestions
+      x-stability: internal
+      summary: List at most 50 original-requester question states without question bodies.
+      parameters:
+        - { name: after, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Current project memory_read required. Original requester only; no-store.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [questions, next_after]
+                properties:
+                  questions: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/SupervisorQuestionStatus' } }
+                  next_after: { type: [string, 'null'], format: uuid }
+    post:
+      operationId: submitPrivateSupervisorQuestion
+      x-stability: internal
+      summary: Commit explicit paid-work intent for the separately isolated operator worker.
+      description: Same authority and disclosure checks as prepare. Request ID, principal and immutable payload must match for replay; changed terms fail closed. A new credential for the same principal can reconcile status but does not replace the original execution credential. Submission does not imply execution or an answer. Current source versions, consent, budget and revocation are rechecked by the worker. Uncertain attempts are never automatically resent. No provider credential or container access is held by this handler.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupervisorQuestionRequest' }
+      responses:
+        '200':
+          description: Committed or reconciled metadata-only status; no-store.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupervisorQuestionStatus' }
+  /v1/projects/{slug}/supervisor/questions/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: readPrivateSupervisorQuestionStatus
+      x-stability: internal
+      summary: Inspect a question's durable status without exposing its body.
+      description: Current project memory_read and original requester identity required. The action ID links to the separately authorized private proposal once available. Neither read nor replay restarts expired or uncertain work.
+      responses:
+        '200':
+          description: Metadata-only no-store state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupervisorQuestionStatus' }
   /v1/projects/{slug}/supervisor/proposals:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }
@@ -2456,6 +2531,36 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    SupervisorQuestionPreview:
+      type: object
+      required: [profile_digest, request_digest, question, model, destination, source_count, daily_call_limit, daily_usd_micros]
+      properties:
+        profile_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        request_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        question: { type: string }
+        model: { type: string }
+        destination: { type: string, enum: [openai] }
+        source_count: { type: integer, minimum: 1, maximum: 8 }
+        daily_call_limit: { type: integer, minimum: 0 }
+        daily_usd_micros: { type: string, pattern: '^[0-9]+$', description: Exact daily US-dollar micro-unit ceiling. }
+    SupervisorQuestionRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, question, profile_digest, request_digest]
+      properties:
+        request_id: { type: string, format: uuid }
+        question: { type: string, minLength: 1, maxLength: 4096 }
+        profile_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        request_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+    SupervisorQuestionStatus:
+      type: object
+      required: [request_id, action_id, state, expires_at, proposal_available]
+      properties:
+        request_id: { type: string, format: uuid }
+        action_id: { type: string, format: uuid }
+        state: { type: string }
+        expires_at: { type: string, format: date-time }
+        proposal_available: { type: boolean }
     SupervisorReviewRequest:
       type: object
       additionalProperties: false
