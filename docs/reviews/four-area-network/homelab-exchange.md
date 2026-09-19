@@ -1,7 +1,7 @@
 # Homelab / Workshop exchange increment
 
-Status: independent local Homelab preview verified, 2026-09-19; exchange remains
-in progress. This is an increment of the
+Status: real two-way Homelab/Workshop expertise exchange verified, 2026-09-19.
+This is an increment of the
 [approved four-area contract](contract.md), not a completed network or customer
 release. The approved-plan Memory checkpoint was renewed before edits.
 
@@ -21,8 +21,8 @@ release. The approved-plan Memory checkpoint was renewed before edits.
   its encrypted NAS backup without connecting either preview.
 - [x] Provision the private gateway/PDS with separately pinned receipt/repository
   keys and a separate space authority; retain interrupted-operation evidence.
-- [ ] Review exact per-recipient collections and enable deterministic exchange.
-- [ ] Demonstrate both directions and a denied non-member, with signed receipts.
+- [x] Review exact per-recipient collections and enable deterministic exchange.
+- [x] Demonstrate both directions and a denied non-member, with signed receipts.
 
 The initial local Homelab selection contains two historical observability
 records: SigNoz endpoint ownership and Docker blackbox-probe routing. This is a
@@ -32,8 +32,9 @@ captures, sessions, source paths or unrelated project rows enter the new corpus.
 The complete originals remain in the protected archive. This does not finish
 the full dataset partition or fence original writers.
 
-Homelab starts with model calls, Pi execution, federation and background learning
-disabled. Workshop's existing time-bounded model grant is not extended to it.
+Homelab started with model calls, Pi execution, federation and background learning
+disabled. Only the explicitly reviewed deterministic federation below is now
+enabled; Workshop's existing time-bounded model grant is not extended to it.
 The local preview uses a different loopback host (`127.0.0.2:4261`) so its browser
 session cookies do not replace Workshop's cookies on `127.0.0.1:4260`.
 Neither owner-bootstrap preview endpoint is a LAN service.
@@ -243,3 +244,77 @@ installation, gateway restart and any blocked-publication retry require the
 documented explicit operator workflow. At this checkpoint neither app is
 attached, no knowledge collection is activated and no model/Pi call was made.
 Local grants, exact review and real two-way answers are the next gates.
+
+## Real deterministic exchange, 12:04 UTC
+
+Both existing apps were preserved, upgraded and attached to their own company
+gateway-edge networks. Their databases, source records, application TOMLs,
+browser addresses and local credentials were unchanged. The original app
+containers remain stopped with restart disabled. The standalone Workshop model
+worker was paused for the backup and then resumed with its original manifest,
+budget and 13:46:41 UTC expiry. Before resume, no eligible pending questions,
+active actions or unsettled attempts existed; no paid call was initiated here.
+Encrypted pre-attachment bundles were hash-verified on the NAS:
+
+- Homelab: `8d8aeb05ab75ab652e8cf70580f59b6b6bda30056dfb2e58788590f60b66bbb0`.
+- Workshop: `c25afe6a18eb1d4f46787c539977c8a6b091d1b0ffbf3ed400a363f29642d013`.
+
+The initial NAS check stopped before service changes because `findmnt` reported
+both autofs and its CIFS mount. A separately reviewed amendment retained the
+original staging receipt and verified the exact `//bunnychow/olivier` CIFS share.
+Only encrypted NAS files permit its existing group permissions; local secret
+checks were not relaxed. Neither backup has a full restore/decryption rehearsal.
+
+Workshop's new internal answerer `bd431be5-ffa4-447c-8bb2-5c9db0fe1ef4` was
+provisioned through the supported transactional API, with only local project
+read/export access and no login credential. Each answering identity then received
+only its answering capability and its own exact collection grant. The human
+operator has separate local pull/publish/ask/answer grants, not gateway authority.
+
+| Origin | Reviewed collection | Scope |
+| --- | --- | --- |
+| Workshop | `212e0207-7f1f-4048-b5dd-c33e1f1fda45` | Three exact v1 Memory-development records; Homelab requester only |
+| Homelab | `7bb6c76d-5319-459d-9898-91e2e0a3aab2` | Two exact v1 observability records; Workshop requester only |
+
+Both revisions permit deterministic excerpts and `local_human` output only;
+model destinations and selected evidence arrays are empty. These are delegated
+operator reviews under the approved split, not a claim of a new separate human
+sign-off. Review digests bind every field; original authorship/source versions
+and timestamps are retained. No raw captures, paths, sessions or implicit evidence
+are added. Advertisements, not collection contents, reached published sequence
+10. Both apps caught up, with no blocked or queued publication intents.
+
+Homelab request `fb567735-d3d5-4d5f-bd14-0eecff8ac168` and Workshop request
+`762a3977-785a-47e8-b3c4-f500c79725ea` both reached `answered`. Local validation
+recomputed request/review/collection/content digests, checked every citation's
+author, source version, responder and exact approved excerpt, and confirmed
+deterministic answer construction. Each answer contains one citation. Answer
+bodies stayed in protected local artifacts, not cloud tool output.
+
+The real browser workflow separately discovered Homelab, reviewed and submitted
+`What do we know about SigNoz and blackbox probe routing?`, then displayed the
+answer and attribution. Its request is `cffd69b6-eecf-448a-9d89-545e3095cdf0`.
+An exact browser retry returned completed status without executing another
+answer: the gateway held three distinct questions, three execution claims and
+three completed answers. Submission/retry returns metadata only; fetching the
+answer performs a fresh origin-approved delivery. The focused federation TUI
+also started in a real PTY with its explicit local-human policy banner.
+
+Eighteen live checks across the two member networks rejected missing/fake
+credentials (`401`) and raw repository/CAR/event/config routes (`404`). Fresh
+container inspection confirmed each app has only its own database network and
+its own gateway-edge network, with no published ports or cross-database peer.
+These checks do not substitute for a second-space/valid-wrong-credential test.
+
+Source `28633739` adds explicit loopback human sessions for CLI/TUI without
+changing default token behavior or minting deployment service tokens. Required-
+database browser-session/CSRF/revocation tests, 13 federation client tests, four
+supervisor regressions, scoped strict Clippy, formatting and boundaries passed.
+The full CLI invocation had 258 passes and one pre-existing machine-local docs
+link failure. No complete workspace/Lean regression is claimed.
+
+The [demo guide](../../user/homelab-preview.md) describes the actual UI and CLI.
+This is two independently stored areas on one host, not four independent hosts,
+the complete dataset partition, autonomous expertise exchange, a signed software
+release, CA activation or customer readiness. R3 remains paused. The scoped TLS
+and PDS-session maintenance and full recovery gates above remain open.
