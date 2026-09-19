@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-export const MAX_WEB_CONNECTIONS = 64;
+export const MAX_WEB_CONNECTIONS = 32;
 export const WEB_IDLE_MS = 300_000;
 export const MAX_DATABASE_CONNECTIONS = 64;
 
@@ -40,7 +40,9 @@ function main() {
   // A TUI startup can retain more than sixteen HTTP keep-alive connections
   // alongside the browser/WebSocket. A separate private question auth request
   // must not be dropped merely because those connections occupy idle slots.
-  // Keep a finite 64-slot cap and the existing idle timeout: this application
+  // Each stdio bridge uses two threads. Thirty-two bridges leave headroom for
+  // the service below the container's unchanged 128-PID/thread ceiling.
+  // Keep a finite 32-slot cap and the existing idle timeout: this application
   // has no proven periodic WebSocket heartbeat, so 30 seconds is not safe.
   let webActive = 0;
   net.createServer(socket => {

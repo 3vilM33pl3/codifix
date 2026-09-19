@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { MAX_WEB_CONNECTIONS, MAX_DATABASE_CONNECTIONS, WEB_IDLE_MS, validateTargets } from '../workshop-loopback-relay.mjs';
 
 test('preview relay keeps finite connection and existing WebSocket idle bounds', () => {
-  assert.equal(MAX_WEB_CONNECTIONS, 64);
+  assert.equal(MAX_WEB_CONNECTIONS, 32);
   assert.equal(MAX_DATABASE_CONNECTIONS, 64);
   assert.equal(WEB_IDLE_MS, 300_000);
 });

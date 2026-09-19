@@ -43,7 +43,8 @@ def main():
     binary, config, instance = sys.argv[1:4]
     controls = sys.argv[4:] == ["controls"]
     proposals = sys.argv[4:] == ["proposals"]
-    enabled_inspection = sys.argv[4:] == ["enabled-inspection"] or proposals
+    question_preview = sys.argv[4:] == ["question-preview"]
+    enabled_inspection = sys.argv[4:] == ["enabled-inspection"] or proposals or question_preview
     if sys.argv[4:] and not controls and not enabled_inspection:
         raise RehearsalFailure("unknown rehearsal mode")
     if not os.path.isabs(binary) or not os.path.isabs(config):
@@ -121,6 +122,52 @@ def main():
             drain(0.3)
             os.write(master, b"\x1b")
             drain(0.3)
+        if question_preview:
+            os.write(master, b"v")
+            for _ in range(30):
+                drain(0.2)
+                if "Private supervisor proposals" in text() and "Loading private" not in text():
+                    break
+            else:
+                raise RehearsalFailure("private proposals were not ready for question navigation")
+            os.write(master, b"q")
+            for _ in range(30):
+                drain(0.2)
+                if "Private questions" in text() and "Checking private question" not in text():
+                    break
+            else:
+                raise RehearsalFailure("private question listing did not render")
+            os.write(master, b"n")
+            drain(0.2)
+            if "Exact question: Enter prepares" not in text():
+                raise RehearsalFailure("private question input did not render")
+            os.write(master, b"What does the approved collection say about ATProto?")
+            drain(0.3)
+            if "What does the approved collection say about ATProto?" not in text():
+                raise RehearsalFailure("exact question input was not preserved")
+            os.write(master, b"\r")  # Prepare only, not confirmation.
+            for _ in range(30):
+                drain(0.2)
+                if "CONFIRMS PAID QUESTION" in text():
+                    break
+            else:
+                raise RehearsalFailure("paid question preview did not render "
+                    f"(input={'Exact question: Enter prepares' in text()}, "
+                    f"loading={'Checking private question' in text()}, "
+                    f"denied={'Question access denied' in text()}, "
+                    f"conflict={'Question conflicts' in text()}, "
+                    f"unconfirmed={'Question outcome unconfirmed' in text()}, "
+                    f"unreadable={'Unreadable question receipt' in text()}, "
+                    f"unavailable={'unavailable' in text()}, "
+                    f"preview={'Profile digest:' in text()}, "
+                    f"destination={'openai' in text()}, "
+                    f"auth_transport={'Could not inspect local authentication' in text()})")
+            if "openai" not in text() or "gpt-5.6-sol" not in text():
+                raise RehearsalFailure("question destination/model not visible")
+            os.write(master, b"\x1b")  # Never submit a paid question in this rehearsal.
+            drain(0.3)
+            if "CONFIRMS PAID QUESTION" in text():
+                raise RehearsalFailure("question cancellation was not visible")
         if controls:
             for key, confirm, expected in [(b"e", "CONFIRM RESUME", "enabled (activation separate)"), (b"p", "CONFIRM PAUSE", "paused")]:
                 os.write(master, key)
@@ -143,7 +190,9 @@ def main():
                     raise RehearsalFailure("confirmed policy outcome was not visible")
         os.write(master, b"\x03")
         drain(0.5)
-        for _ in range(20):
+        # Allow runtime/network shutdown after the UI handles Ctrl-C. Read only;
+        # never send a second Enter or interpret slow shutdown as paid consent.
+        for _ in range(100):
             child, status = os.waitpid(pid, os.WNOHANG)
             if child:
                 exited = True
