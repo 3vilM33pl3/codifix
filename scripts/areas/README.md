@@ -133,6 +133,11 @@ requires enough memory. Structural validity is not a reviewed area assignment,
 and is not permission to import. Opaque links embedded in content
 or JSON require separate review; catalog FK coverage alone cannot prove them.
 
+For complete redacted history review, explicit agent ownership decisions,
+full-partition manifests and snapshot-delta revalidation, follow the
+[full review ledger workflow](review-ledger-README.md). The older classification
+summary is a proposal aid, not an approval or a complete-history review.
+
 ## Exact row payloads and protected preparation
 
 `payload.mjs` uses the same pinned isolated restore and private-file controls.

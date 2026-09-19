@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { open, lstat, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { DATABASE, SERIALIZATION, privateArtifact, streamLines, inspectSandbox } from './inventory.mjs';
+import { DATABASE, SERIALIZATION, privateArtifact, streamLines, inspectSandbox, CATALOG_SQL } from './inventory.mjs';
 
 export const LIMITS = { entry_excerpt_chars: 1600, summary_chars: 600, source_previews: 6, source_excerpt_chars: 300, path_chars: 500, title_chars: 180, manifest_bytes: 128 * 1024 * 1024, review_pack_bytes: 128 * 1024 * 1024, lineage_count: 20_000 };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -95,9 +95,12 @@ const authorityOperation = /\b(?:configure|operate|bootstrap|restore|back\s?up|r
 const certificateConsumer = /\b(?:Turris|certificate consumer|(?:admin|web|application) (?:UI|interface|dashboard)|HTTPS (?:UI|interface|dashboard)|(?:client|server|browser|leaf) certificate|certificate (?:issued by|signed by))\b/i;
 const negatedAuthorityOperation = /\b(?:never|not|avoid|forbid|without|mustn't|don't|do not)\b[^.\n]{0,100}\b(?:step[- ]ca|(?:root|intermediate) CA|certificate authority|CA (?:signing|bootstrap|provisioner))\b/i;
 const syntheticContent = /\b(?:synthetic (?:fixture|record|memory|dataset)|evaluation[- ]only|benchmark fixture|test fixture (?:only|data)|fabricated (?:record|memory))\b/i;
-const secretPatterns = [ /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|$)/g,
+const secretPatterns = [ /-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----|$)/g,
   /\bsk-(?:proj-)?[A-Za-z0-9_-]{24,}\b/g,
-  /\b(?:password|api[_-]?key|client[_-]?secret)\s*[:=]\s*["']?[A-Za-z0-9_+\/=.-]{24,}["']?/gi ];
+  /\b(?:password|api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token)\s*[:=]\s*["']?[A-Za-z0-9_+\/=.-]{12,}["']?/gi,
+  /\bBearer\s+[A-Za-z0-9_.~+\/-]{12,}/gi,
+  /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+  /\b(?:postgres(?:ql)?|https?):\/\/[^\s\/@]+:[^\s\/@]+@[^\s]+/gi ];
 
 export function redact(value) {
   let text = String(value ?? '');
@@ -289,6 +292,61 @@ SELECT jsonb_build_object('event','lineage','canonical_id',ids.canonical_id,
 COMMIT;
 SELECT jsonb_build_object('event','complete')::text;
 `;
+
+// Extra metadata is computed locally in PostgreSQL. No capture/session/task
+// body enters the review stream: only complete-row SHA-256 dependencies do.
+const fullDependencies = `
+ 'state_row_sha256',(SELECT encode(sha256(convert_to(to_jsonb(cs)::text,'UTF8')),'hex') FROM public.memory_canonical_state cs WHERE cs.canonical_id=ids.canonical_id),
+ 'dependencies',COALESCE((SELECT jsonb_agg(jsonb_build_object('table',d.tbl,'key',d.key,'row_sha256',d.sha) ORDER BY d.tbl,d.key) FROM (
+  SELECT 'public.memory_tags' tbl,jsonb_build_array(t.memory_entry_id,t.tag)::text key,encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') sha FROM public.memory_tags t JOIN public.memory_entries v ON v.id=t.memory_entry_id WHERE v.canonical_id=ids.canonical_id
+  UNION ALL SELECT 'public.memory_source_checks',c.id::text,encode(sha256(convert_to(to_jsonb(c)::text,'UTF8')),'hex') FROM public.memory_source_checks c JOIN public.memory_sources s ON s.id=c.source_id JOIN public.memory_entries v ON v.id=s.memory_entry_id WHERE v.canonical_id=ids.canonical_id
+  UNION ALL SELECT 'public.tasks',t.id::text,encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') FROM public.tasks t WHERE t.id IN (SELECT s.task_id FROM public.memory_sources s JOIN public.memory_entries v ON v.id=s.memory_entry_id WHERE v.canonical_id=ids.canonical_id)
+  UNION ALL SELECT 'public.sessions',s.id::text,encode(sha256(convert_to(to_jsonb(s)::text,'UTF8')),'hex') FROM public.sessions s WHERE s.id IN (SELECT t.session_id FROM public.tasks t JOIN public.memory_sources ms ON ms.task_id=t.id JOIN public.memory_entries v ON v.id=ms.memory_entry_id WHERE v.canonical_id=ids.canonical_id)
+  UNION ALL SELECT 'public.raw_captures',r.id::text,encode(sha256(convert_to(to_jsonb(r)::text,'UTF8')),'hex') FROM public.raw_captures r WHERE r.task_id IN (SELECT s.task_id FROM public.memory_sources s JOIN public.memory_entries v ON v.id=s.memory_entry_id WHERE v.canonical_id=ids.canonical_id)
+  UNION ALL SELECT 'public.memory_relations',r.id::text,encode(sha256(convert_to(to_jsonb(r)::text,'UTF8')),'hex') FROM public.memory_relations r WHERE ids.canonical_id IN (r.src_canonical_id,r.dst_canonical_id)
+  UNION ALL SELECT 'public.memory_canonical_state',c.canonical_id::text,encode(sha256(convert_to(to_jsonb(c)::text,'UTF8')),'hex') FROM public.memory_canonical_state c WHERE c.canonical_id IN (SELECT r.src_canonical_id FROM public.memory_relations r WHERE r.dst_canonical_id=ids.canonical_id UNION SELECT r.dst_canonical_id FROM public.memory_relations r WHERE r.src_canonical_id=ids.canonical_id)
+  UNION ALL SELECT 'public.memory_entries',v.id::text,encode(sha256(convert_to(to_jsonb(v)::text,'UTF8')),'hex') FROM public.memory_entries v WHERE v.canonical_id IN (SELECT r.src_canonical_id FROM public.memory_relations r WHERE r.dst_canonical_id=ids.canonical_id UNION SELECT r.dst_canonical_id FROM public.memory_relations r WHERE r.src_canonical_id=ids.canonical_id)
+  UNION ALL SELECT 'public.memory_entries',v.id::text,encode(sha256(convert_to(to_jsonb(v)::text,'UTF8')),'hex') FROM public.memory_entries v WHERE v.id IN (SELECT s.target_memory_id FROM public.memory_sources s JOIN public.memory_entries own ON own.id=s.memory_entry_id WHERE own.canonical_id=ids.canonical_id)
+ ) d),'[]'::jsonb),
+ 'relations',COALESCE((SELECT jsonb_agg(jsonb_build_object('id',r.id,'src_canonical_id',r.src_canonical_id,'dst_canonical_id',r.dst_canonical_id,'relation_type',r.relation_type,'row_sha256',encode(sha256(convert_to(to_jsonb(r)::text,'UTF8')),'hex')) ORDER BY r.id) FROM public.memory_relations r WHERE ids.canonical_id IN (r.src_canonical_id,r.dst_canonical_id)),'[]'::jsonb),
+`;
+
+export const FULL_REVIEW_SQL = REVIEW_SQL
+  .replace('WITH ids AS', `${CATALOG_SQL}\nWITH ids AS`)
+  .replace(" 'state',", `${fullDependencies} 'state',`)
+  .replace('jsonb_agg(to_jsonb(p) ORDER BY p.id)', "jsonb_agg(to_jsonb(p)||jsonb_build_object('row_sha256',encode(sha256(convert_to(to_jsonb(p)::text,'UTF8')),'hex')) ORDER BY p.id)");
+
+export function redactReviewText(value) {
+  const safe = redact(value);
+  return { text: safe.text.replace(/(?<![A-Za-z0-9:/])(?:[A-Za-z]:\\|\/(?!\/))[^\s<>"'`),;]+/g, '[LOCAL PATH OMITTED]'), secret: safe.redacted };
+}
+
+export function fullHistoryReview(input) {
+  const summary = summarizeLineage(input);
+  const allStrings = JSON.stringify({ versions: input.versions, sources: input.sources, projects: input.projects, state: input.state, relations: input.relations });
+  const secret = redact(allStrings).redacted;
+  const oversized = Buffer.byteLength(allStrings) > 2 * 1024 * 1024;
+  const hold = secret || oversized;
+  return {
+    event: 'history', canonical_id: input.canonical_id,
+    review_hold: hold ? (secret ? 'possible_secret_material' : 'history_exceeds_review_limit') : null,
+    projects: input.projects.map(p => ({ id: p.id, slug: hold ? '[WITHHELD]' : redactReviewText(p.slug).text, name: hold ? '[WITHHELD]' : redactReviewText(p.name).text })),
+    versions: input.versions.map(v => ({ id: v.id, project_id: v.project_id, version_no: v.version_no,
+      is_tombstone: v.is_tombstone, row_sha256: v.row_sha256,
+      summary: hold ? '[HISTORY WITHHELD]' : redactReviewText(v.summary).text,
+      canonical_text: hold ? '[HISTORY WITHHELD]' : redactReviewText(v.canonical_text).text })),
+    sources: input.sources.map(s => ({ id: s.id, memory_entry_id: s.memory_entry_id, row_sha256: s.row_sha256,
+      source_kind: hold ? '[WITHHELD]' : redactReviewText(s.source_kind).text,
+      evidence_label: hold ? '[WITHHELD]' : redactReviewText(String(s.file_path ?? '').split(/[\\/]/).at(-1)).text,
+      // Original evidence bytes, prompts and task titles are not disclosed.
+      evidence_content: 'protected archive; reference-only projection available after explicit review' })),
+    relations: (input.relations ?? []).map(r => ({ id: r.id, src_canonical_id: r.src_canonical_id, dst_canonical_id: r.dst_canonical_id,
+      relation_type: hold ? '[WITHHELD]' : redactReviewText(r.relation_type).text, row_sha256: r.row_sha256 })),
+    heuristic: { candidate_area: summary.proposal.candidate_area, risks: summary.proposal.risks, ownership_approved: false },
+    complete_curated_history: !hold, original_evidence_disclosed: false,
+    secret_assurance: 'Pattern screening only; not proof that all secrets have been found.',
+  };
+}
 
 export async function consumeReview(lines, bindings) {
   const entries = [];

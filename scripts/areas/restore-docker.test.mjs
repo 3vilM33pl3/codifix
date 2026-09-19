@@ -9,6 +9,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { FULL_REVIEW_SQL } from './classify.mjs';
+import { consumePack } from './review-ledger.mjs';
 
 const scripts = fileURLToPath(new URL('.', import.meta.url));
 function run(command, args, options = {}) {
@@ -81,6 +83,40 @@ SELECT setval('history.example_id_seq',19,true);`;
   const payload = JSON.parse(run(process.execPath, [join(scripts, 'payload.mjs'), '--descriptor', descriptor,
     '--inventory-sha256', 'a'.repeat(64), '--output', join(root, 'payload.ndjson')], { encoding: 'utf8' }));
   assert.equal(payload.row_count, 4); assert.equal(payload.inventory_verified, false);
+  // Full-history SQL/projection rehearsal on synthetic local rows only. These
+  // are added to the fixture source, never to the verified restore target.
+  const uid = n => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`;
+  const knowledge = `CREATE TABLE memory_entries(id uuid PRIMARY KEY,project_id uuid REFERENCES projects(id),canonical_id uuid,version_no integer,is_tombstone boolean,summary text,canonical_text text,memory_type text,scope text,created_at timestamptz,updated_at timestamptz);
+CREATE TABLE memory_canonical_state(canonical_id uuid PRIMARY KEY,project_id uuid REFERENCES projects(id),status text);
+CREATE TABLE sessions(id uuid PRIMARY KEY,project_id uuid REFERENCES projects(id),writer_name text,writer_id text,body text);
+CREATE TABLE tasks(id uuid PRIMARY KEY,session_id uuid REFERENCES sessions(id),title text,body text);
+CREATE TABLE raw_captures(id uuid PRIMARY KEY,task_id uuid REFERENCES tasks(id),payload_json jsonb);
+CREATE TABLE memory_sources(id uuid PRIMARY KEY,memory_entry_id uuid REFERENCES memory_entries(id),task_id uuid REFERENCES tasks(id),target_memory_id uuid,file_path text,git_commit text,source_kind text,excerpt text,content_hash text);
+CREATE TABLE memory_tags(memory_entry_id uuid REFERENCES memory_entries(id),tag text,PRIMARY KEY(memory_entry_id,tag));
+CREATE TABLE memory_source_checks(id bigint PRIMARY KEY,source_id uuid REFERENCES memory_sources(id),reason text);
+CREATE TABLE memory_relations(id uuid PRIMARY KEY,src_canonical_id uuid,dst_canonical_id uuid,relation_type text);
+INSERT INTO sessions VALUES ('${uid(40)}','${uid(1)}','fixture','fixture','NEVER EXPORT SESSION BODY');
+INSERT INTO tasks VALUES ('${uid(41)}','${uid(40)}','PRIVATE TASK TITLE','NEVER EXPORT TASK BODY');
+INSERT INTO raw_captures VALUES ('${uid(42)}','${uid(41)}','{"text":"NEVER EXPORT CAPTURE BODY"}');
+INSERT INTO memory_entries VALUES ('${uid(11)}','${uid(1)}','${uid(10)}',1,false,'First','First synthetic retained version.','implementation','project',now(),now()),
+('${uid(12)}','${uid(1)}','${uid(10)}',2,true,'','', 'implementation','project',now(),now()),
+('${uid(21)}','${uid(1)}','${uid(20)}',1,false,'Second','Second synthetic retained history.','implementation','project',now(),now());
+INSERT INTO memory_canonical_state VALUES ('${uid(10)}','${uid(1)}','active'),('${uid(20)}','${uid(1)}','active');
+INSERT INTO memory_sources VALUES ('${uid(50)}','${uid(11)}','${uid(41)}',null,'/private/source/file.md',null,'file','NEVER EXPORT EVIDENCE BODY',null);
+INSERT INTO memory_tags VALUES ('${uid(11)}','tag');
+INSERT INTO memory_source_checks VALUES (1,'${uid(50)}','synthetic');
+INSERT INTO memory_relations VALUES ('${uid(60)}','${uid(10)}','${uid(20)}','relates_to');`;
+  run('docker', ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'memory_fixture_source'], { input: knowledge });
+  const full = run('docker', ['exec', '-i', container, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'memory_fixture_source'], { input: FULL_REVIEW_SQL, encoding: 'utf8' });
+  const chunks = [];
+  const index = await consumePack((async function* () { for (const line of full.trim().split('\n')) yield line; })(), {
+    database: 'memory_fixture_source', canonical_ids: new Set([uid(10), uid(20)]), expected_versions: 3, expected_projects: 1, evidence: {},
+  }, async line => chunks.push(line));
+  assert.equal(index.histories.length, 2); assert.equal(index.versions, 3);
+  assert.ok(index.histories.every(h => h.dependencies.some(d => d.table === 'public.memory_relations')));
+  assert.ok(index.histories[0].dependencies.some(d => d.table === 'public.raw_captures'));
+  assert.ok(!chunks.join('').includes('NEVER EXPORT'));
+  assert.ok(!chunks.join('').includes('/private/'));
   // Mutating only the restored sequence must fail independent verification, even
   // though the table-row multiset is still identical to the encrypted snapshot.
   run('docker', ['exec', container, 'psql', '-X', '-U', 'postgres', '-d', 'memory_restore_fixture', '-c', "SELECT setval('public.example_id_seq',1,true)"]);
