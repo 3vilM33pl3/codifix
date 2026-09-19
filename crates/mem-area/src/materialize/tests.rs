@@ -1080,6 +1080,78 @@ fn opaque_results_are_deterministic_and_bind_area_manifest_snapshot_and_projecti
 }
 
 #[test]
+fn retained_target_opt_in_is_bounded_and_does_not_change_bytes_or_validation() {
+    let default = RetainedTargetBudget::default();
+    assert_eq!(default.mib(), 256);
+    assert_eq!(default.bytes(), MAX_RETAINED_TARGET_BYTES);
+    for invalid in [0, 1, 255, 1025, u32::MAX] {
+        assert_eq!(
+            RetainedTargetBudget::from_mib(invalid),
+            Err(MaterializeError::InvalidTargetBudget)
+        );
+    }
+    assert_eq!(
+        RetainedTargetBudget::from_mib(1024)
+            .expect("upper bound")
+            .bytes(),
+        1024 * 1024 * 1024
+    );
+    let larger = RetainedTargetBudget::from_mib(512).expect("explicit budget");
+    // Test the exact production accumulator at the real boundary without
+    // allocating a 256 MiB fixture. Per-row accounting remains unchanged.
+    let mut used = default.bytes();
+    assert_eq!(
+        retain_budget(&mut used, 1, default.bytes()),
+        Err(MaterializeError::TargetLimit)
+    );
+    let mut used = default.bytes();
+    assert_eq!(retain_budget(&mut used, 1, larger.bytes()), Ok(()));
+    let mut used = larger.bytes();
+    assert_eq!(
+        retain_budget(&mut used, 1, larger.bytes()),
+        Err(MaterializeError::TargetLimit)
+    );
+    let mut used = usize::MAX;
+    assert_eq!(
+        retain_budget(&mut used, 1, larger.bytes()),
+        Err(MaterializeError::TargetLimit)
+    );
+
+    let fixture = fixture(true);
+    let payload = encode(&events(&fixture));
+    let (original, original_archive) = run(&fixture);
+    let mut archive = Vec::new();
+    let result = materialize_with_budget(
+        &fixture.inventory,
+        &fixture.manifest,
+        Cursor::new(&payload),
+        &mut archive,
+        larger,
+    )
+    .expect("same valid reviewed fixture");
+    assert_eq!(archive, original_archive);
+    for area in AREAS {
+        assert_eq!(
+            result.partition(area).partition_sha256(),
+            original.partition(area).partition_sha256()
+        );
+    }
+    let error = materialize_with_budget(
+        &fixture.inventory,
+        &fixture.manifest,
+        Cursor::new(&payload[..payload.len() / 2]),
+        &mut Vec::new(),
+        larger,
+    )
+    .err()
+    .expect("truncated payload still rejected");
+    assert!(matches!(
+        error,
+        MaterializeError::InvalidEnvelope | MaterializeError::ProtocolMismatch
+    ));
+}
+
+#[test]
 fn bounded_buffers_and_sink_input_failures_are_sanitized_and_return_no_object() {
     let fixture = fixture(false);
     let payload = encode(&events(&fixture));

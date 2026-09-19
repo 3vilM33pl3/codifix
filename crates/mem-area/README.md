@@ -286,7 +286,13 @@ fsync and atomic publication. `Write::flush` is called; generic writers cannot
 promise filesystem durability. Never send archive or partition JSON to logs.
 
 Input envelope size is capped at 64 MiB, and retained target payload plus counted
-metadata at 256 MiB; exceeding either fails rather than truncates. Original
+metadata defaults to 256 MiB; exceeding either fails rather than truncates.
+`materialize_with_budget` accepts a validated `RetainedTargetBudget::from_mib`
+from 256 through 1024 MiB inclusive for explicitly reviewed larger snapshots.
+`materialize` retains the default. No unbounded API or envelope-limit override
+is exposed, and changing the budget does not change successful output bytes or
+partition hashes. The operator CLI binds the chosen budget into its preparation
+receipt and requires the same value for import (see `mem-area-ops`). Original
 archive bytes stream without whole-archive buffering. Inventory/verification
 metadata, temporary row parsing, schema/index overhead and caller buffers are
 additional memory; the cap is not a total-process RSS guarantee. Errors are

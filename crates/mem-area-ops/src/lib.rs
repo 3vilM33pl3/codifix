@@ -5,7 +5,7 @@
 pub mod preview;
 mod private;
 pub mod schema;
-use mem_area::{AREAS, AreaId, Inventory, Manifest, MaterializedMigration};
+use mem_area::{AREAS, AreaId, Inventory, Manifest, MaterializedMigration, RetainedTargetBudget};
 use private::{Directory, Input};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
@@ -41,8 +41,8 @@ pub enum Failure {
     Json,
     #[error("reviewed input or prepared artifact digest does not match")]
     Binding,
-    #[error("source materialization failed; incomplete artifacts must not be used")]
-    Materialize,
+    #[error("source materialization failed: {0}; incomplete artifacts must not be used")]
+    Materialize(#[from] mem_area::MaterializeError),
     #[error("private payload verification failed; no ownership approval or import performed")]
     Payload,
     #[error("explicit local target or execution assertions are invalid")]
@@ -90,6 +90,8 @@ pub struct PartitionSummary {
 #[serde(deny_unknown_fields)]
 pub struct Prepared {
     pub format_version: u32,
+    #[serde(default = "default_max_retained_target_mib")]
+    pub max_retained_target_mib: u32,
     pub source_instance: Uuid,
     pub snapshot_id: Uuid,
     pub inventory_sha256: String,
@@ -102,6 +104,10 @@ pub struct Prepared {
     pub source_tables: u64,
     pub source_rows: u64,
     pub partitions: Vec<PartitionSummary>,
+}
+
+fn default_max_retained_target_mib() -> u32 {
+    mem_area::DEFAULT_RETAINED_TARGET_MIB
 }
 #[derive(Serialize)]
 pub struct PreparedReport {
@@ -222,6 +228,7 @@ fn json<T: DeserializeOwned>(input: &mut Input, limit: u64) -> Result<(T, String
 fn materialize(
     inputs: &Inputs,
     archive: &mut impl Write,
+    budget: RetainedTargetBudget,
 ) -> Result<(MaterializedMigration, Prepared)> {
     if !valid_digest(&inputs.inventory_sha256) || !valid_digest(&inputs.manifest_sha256) {
         return Err(Failure::Binding);
@@ -239,14 +246,15 @@ fn materialize(
         return Err(Failure::Binding);
     }
     let mut reader = BufReader::new(Hashed::new((&mut payload.file).take(PAYLOAD_LIMIT + 1)));
-    let migration = mem_area::materialize(&inventory, &manifest, &mut reader, archive)
-        .map_err(|_| Failure::Materialize)?;
+    let migration =
+        mem_area::materialize_with_budget(&inventory, &manifest, &mut reader, archive, budget)?;
     let payload_file_sha256 = reader.into_inner().digest();
     inventory_file.unchanged()?;
     manifest_file.unchanged()?;
     payload.unchanged()?;
     let prepared = Prepared {
         format_version: 1,
+        max_retained_target_mib: budget.mib(),
         source_instance: inventory.source_instance,
         snapshot_id: inventory.snapshot_id,
         inventory_sha256: inputs.inventory_sha256.clone(),
@@ -277,11 +285,20 @@ fn materialize(
 /// Existing private directory; no overwrites. Partial files are retained on
 /// failure. A complete archive without prepared.json is not import authority.
 pub fn prepare(inputs: &Inputs, output: &Path) -> Result<PreparedReport> {
+    prepare_with_budget(inputs, output, RetainedTargetBudget::default())
+}
+
+/// Explicit larger bounded target budget, recorded in the prepared receipt.
+pub fn prepare_with_budget(
+    inputs: &Inputs,
+    output: &Path,
+    budget: RetainedTargetBudget,
+) -> Result<PreparedReport> {
     let directory = Directory::open(output)?;
     directory.ensure_absent(&["archive.partial", ARCHIVE, "prepared.partial", PREPARED])?;
     let archive = directory.create("archive.partial")?;
     let mut writer = BufWriter::new(archive);
-    let (_, prepared) = materialize(inputs, &mut writer)?;
+    let (_, prepared) = materialize(inputs, &mut writer, budget)?;
     writer.flush().map_err(|_| Failure::PrivateFiles)?;
     let archive = writer.into_inner().map_err(|_| Failure::PrivateFiles)?;
     directory.publish("archive.partial", ARCHIVE, &archive)?;
@@ -393,6 +410,16 @@ pub async fn import(
     inputs: &Inputs,
     execution: &Execution,
 ) -> Result<mem_area_store::ImportReceipt> {
+    import_with_budget(inputs, execution, RetainedTargetBudget::default()).await
+}
+
+/// The explicit budget must match the hash-bound prepared receipt before any
+/// archive rematerialization or target connection. Older receipts mean 256 MiB.
+pub async fn import_with_budget(
+    inputs: &Inputs,
+    execution: &Execution,
+    budget: RetainedTargetBudget,
+) -> Result<mem_area_store::ImportReceipt> {
     if !execution.execute
         || !execution.writers_stopped
         || !execution.archive_backed_up
@@ -404,7 +431,10 @@ pub async fn import(
     }
     let mut receipt_file = Input::open(&execution.prepared, RECEIPT_LIMIT)?;
     let (expected, digest): (Prepared, _) = json(&mut receipt_file, RECEIPT_LIMIT)?;
-    if digest != execution.prepared_sha256 || expected.format_version != 1 {
+    if digest != execution.prepared_sha256
+        || expected.format_version != 1
+        || expected.max_retained_target_mib != budget.mib()
+    {
         return Err(Failure::Binding);
     }
     let parent = execution.prepared.parent().ok_or(Failure::PrivateFiles)?;
@@ -416,7 +446,7 @@ pub async fn import(
         return Err(Failure::Binding);
     }
     archive.unchanged()?;
-    let (migration, actual) = materialize(inputs, &mut std::io::sink())?;
+    let (migration, actual) = materialize(inputs, &mut std::io::sink(), budget)?;
     if actual != expected {
         return Err(Failure::Binding);
     }

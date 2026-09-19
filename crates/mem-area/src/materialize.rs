@@ -28,7 +28,38 @@ use crate::*;
 /// ISO/YMD dates, postgres intervals, extra_float_digits=3 and bytea_output=hex.
 pub const SERIALIZATION_ID: &str = "postgresql-to-jsonb-utf8-utc-v1";
 pub const MAX_PAYLOAD_ENVELOPE_BYTES: usize = 64 * 1024 * 1024;
+/// Default retained-target budget; larger snapshots require explicit opt-in.
 pub const MAX_RETAINED_TARGET_BYTES: usize = 256 * 1024 * 1024;
+pub const DEFAULT_RETAINED_TARGET_MIB: u32 = 256;
+pub const MAX_RETAINED_TARGET_MIB: u32 = 1024;
+
+/// Validated total retained-target budget. This does not change per-envelope,
+/// row validation or archive limits, and is not a process-wide memory limit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RetainedTargetBudget(u32);
+
+impl RetainedTargetBudget {
+    pub fn from_mib(mib: u32) -> Result<Self, MaterializeError> {
+        if !(DEFAULT_RETAINED_TARGET_MIB..=MAX_RETAINED_TARGET_MIB).contains(&mib) {
+            return Err(MaterializeError::InvalidTargetBudget);
+        }
+        Ok(Self(mib))
+    }
+
+    pub fn mib(self) -> u32 {
+        self.0
+    }
+
+    pub fn bytes(self) -> usize {
+        self.0 as usize * 1024 * 1024
+    }
+}
+
+impl Default for RetainedTargetBudget {
+    fn default() -> Self {
+        Self(DEFAULT_RETAINED_TARGET_MIB)
+    }
+}
 
 /// Strict NDJSON protocol; table and row keys must be in Rust UTF-8 lexical
 /// order. Include each inventoried table, even empty tables, and an EOF footer.
@@ -77,6 +108,7 @@ pub enum MaterializeError {
     ColumnMismatch,
     InvalidRow,
     UnsupportedProjection,
+    InvalidTargetBudget,
     TargetLimit,
     InternalAccounting,
 }
@@ -95,6 +127,7 @@ impl fmt::Display for MaterializeError {
             Self::ColumnMismatch => "private payload column inventory mismatch",
             Self::InvalidRow => "invalid complete-row JSON or bound row identity",
             Self::UnsupportedProjection => "unsupported or inconsistent reviewed source projection",
+            Self::InvalidTargetBudget => "retained target budget must be between 256 and 1024 MiB",
             Self::TargetLimit => "retained target payload exceeds its materialization limit",
             Self::InternalAccounting => "materialization accounting mismatch",
         };
@@ -883,13 +916,31 @@ pub fn materialize<R: BufRead, W: Write>(
     payloads: R,
     protected_archive: &mut W,
 ) -> Result<MaterializedMigration, MaterializeError> {
+    materialize_with_budget(
+        inventory,
+        manifest,
+        payloads,
+        protected_archive,
+        RetainedTargetBudget::default(),
+    )
+}
+
+/// Explicit bounded opt-in for a larger retained target. All validation and
+/// provisional archive semantics are identical to [`materialize`].
+pub fn materialize_with_budget<R: BufRead, W: Write>(
+    inventory: &Inventory,
+    manifest: &Manifest,
+    payloads: R,
+    protected_archive: &mut W,
+    budget: RetainedTargetBudget,
+) -> Result<MaterializedMigration, MaterializeError> {
     materialize_bounded(
         inventory,
         manifest,
         payloads,
         protected_archive,
         MAX_PAYLOAD_ENVELOPE_BYTES,
-        MAX_RETAINED_TARGET_BYTES,
+        budget.bytes(),
     )
 }
 

@@ -27,6 +27,22 @@ struct Source {
     #[arg(long)]
     manifest_sha256: String,
 }
+
+#[derive(Args)]
+struct Retention {
+    /// Total retained target MiB (256..=1024); repeat the prepared receipt's value for import.
+    #[arg(long, default_value_t = mem_area::DEFAULT_RETAINED_TARGET_MIB,
+        value_parser = clap::value_parser!(u32).range(256..=1024))]
+    max_retained_target_mib: u32,
+}
+
+impl Retention {
+    fn budget(self) -> Result<mem_area::RetainedTargetBudget, Failure> {
+        Ok(mem_area::RetainedTargetBudget::from_mib(
+            self.max_retained_target_mib,
+        )?)
+    }
+}
 impl From<Source> for Inputs {
     fn from(s: Source) -> Self {
         Self {
@@ -88,6 +104,8 @@ enum Command {
     Prepare {
         #[command(flatten)]
         source: Source,
+        #[command(flatten)]
+        retention: Retention,
         #[arg(long)]
         output_dir: PathBuf,
     },
@@ -95,6 +113,8 @@ enum Command {
     Import {
         #[command(flatten)]
         source: Source,
+        #[command(flatten)]
+        retention: Retention,
         #[arg(long)]
         prepared: PathBuf,
         #[arg(long)]
@@ -163,11 +183,18 @@ async fn run(cli: Cli) -> Result<(), Failure> {
             inventory,
             manifest,
         } => print(&mem_area_ops::inspect(&inventory, &manifest)?),
-        Command::Prepare { source, output_dir } => {
-            print(&mem_area_ops::prepare(&source.into(), &output_dir)?)
-        }
+        Command::Prepare {
+            source,
+            retention,
+            output_dir,
+        } => print(&mem_area_ops::prepare_with_budget(
+            &source.into(),
+            &output_dir,
+            retention.budget()?,
+        )?),
         Command::Import {
             source,
+            retention,
             prepared,
             prepared_sha256,
             target,
@@ -187,7 +214,10 @@ async fn run(cli: Cli) -> Result<(), Failure> {
                 writers_stopped,
                 archive_backed_up,
             };
-            print(&mem_area_ops::import(&source.into(), &execution).await?)
+            print(
+                &mem_area_ops::import_with_budget(&source.into(), &execution, retention.budget()?)
+                    .await?,
+            )
         }
     }
 }

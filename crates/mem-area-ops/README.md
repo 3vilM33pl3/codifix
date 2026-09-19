@@ -143,6 +143,33 @@ not approve or execute import, activation, retrieval exposure or model calls.
    that backup before importing. Temporary files retained after interruption are
    not authority to import; inspect them and use a new output directory.
 
+### Explicit retained-target budget for larger snapshots
+
+Preparation and import default to **256 MiB** of retained target payload and
+counted metadata across all four areas. A large reviewed snapshot may exceed
+that ceiling even though every individual row is valid. The static error
+`retained target payload exceeds its materialization limit` identifies this
+case without printing source data. Other materialization errors remain errors;
+a larger budget is not a workaround for failed validation.
+
+After checking available memory, explicitly add
+`--max-retained-target-mib 512` to **both** `prepare` and `import`. Accepted
+integer values are 256 through 1024 inclusive; zero, smaller, larger and invalid
+values fail before opening inputs or creating partial output. There is no
+unbounded option. The full materializer still retains the inventory, indexes
+and parsing buffers separately: this budget is not a total-process RSS limit.
+The per-envelope 64 MiB cap, source-file bounds and every row/schema/hash check
+remain unchanged.
+
+The format-1 `prepared.json` receipt records `max_retained_target_mib`, included
+in its exact file hash. Import must repeat the same value; changing or omitting
+a non-default budget fails before archive rematerialization or any database
+connection. Older receipts without this field remain readable and mean 256 MiB.
+Budget changes do not change the archive or per-area partition digests for the
+same validated inputs. Preserve failed `.partial` artifacts as protected
+evidence and use a fresh output directory when preparing with a larger budget;
+they cannot be resumed or used for import.
+
 ## Explicit target and import
 
 Provision an independent local target with the exact supported migrations

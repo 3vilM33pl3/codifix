@@ -10,9 +10,11 @@ mod policy;
 mod types;
 
 pub use materialize::{
-    MAX_PAYLOAD_ENVELOPE_BYTES, MAX_RETAINED_TARGET_BYTES, MaterializeError, MaterializedMigration,
-    MaterializedPartition, MaterializedProjection, MaterializedRow, PayloadEvent,
-    PayloadVerification, SERIALIZATION_ID, manifest_digest, materialize, verify_payload,
+    DEFAULT_RETAINED_TARGET_MIB, MAX_PAYLOAD_ENVELOPE_BYTES, MAX_RETAINED_TARGET_BYTES,
+    MAX_RETAINED_TARGET_MIB, MaterializeError, MaterializedMigration, MaterializedPartition,
+    MaterializedProjection, MaterializedRow, PayloadEvent, PayloadVerification,
+    RetainedTargetBudget, SERIALIZATION_ID, manifest_digest, materialize, materialize_with_budget,
+    verify_payload,
 };
 pub use plan::{
     draft_manifest, inspect_inventory, inventory_digest, verify_inventory, verify_manifest,
