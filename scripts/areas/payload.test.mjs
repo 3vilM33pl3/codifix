@@ -35,7 +35,7 @@ test('exact private row bytes, lexical keys, empty tables and protocol completio
   assert.match(payloadSql(table('projects')), /FROM ONLY/);
 });
 test('missing digest, duplicate options and any live-target selector fail closed', () => {
-  const args = ['--source-instance', options['source-instance'], '--snapshot-id', options['snapshot-id'], '--output', '/tmp/private/out'];
+  const args = ['--descriptor', '/private/restore.json', '--source-instance', options['source-instance'], '--snapshot-id', options['snapshot-id'], '--output', '/tmp/private/out'];
   assert.throws(() => parseArgs(args));
   assert.equal(parseArgs([...args, '--inventory-sha256', options.inventory_sha256]).inventory_sha256, options.inventory_sha256);
   for (const extra of [['--container', 'live'], ['--inventory-sha256', 'bad'], ['--inventory-sha256', options.inventory_sha256]]) assert.throws(() => parseArgs([...args, '--inventory-sha256', options.inventory_sha256, ...extra]));

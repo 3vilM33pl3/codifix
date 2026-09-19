@@ -4,13 +4,14 @@
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BEGIN_SQL, DATABASE, CONTAINER, MAX_ENVELOPE_BYTES, headerSql, keyExpression,
+import { BEGIN_SQL, DATABASE, MAX_ENVELOPE_BYTES, headerSql, keyExpression, bindCollectorOptions,
   identifier, literal, inspectSandbox, psqlSession, privateArtifact, parseArgs as inventoryArgs } from './inventory.mjs';
 
 export const SERIALIZATION_ID = 'postgresql-to-jsonb-utf8-utc-v1';
-export const HELP = `Usage: node scripts/areas/payload.mjs --source-instance UUID --snapshot-id UUID --inventory-sha256 SHA256 --output /protected/new-payload.ndjson
+export const HELP = `Usage: node scripts/areas/payload.mjs --descriptor /protected/restore-descriptor.json --inventory-sha256 SHA256 --output /protected/new-payload.ndjson
 
-Reads only ${CONTAINER}/${DATABASE}, never a live/configured database.
+Reads only the exact digest-bound verified isolated restore, never a live/configured database.
+Optional --source-instance UUID and --snapshot-id UUID must match the descriptor.
 Uses one read-only repeatable-read transaction, complete row JSON, C-locale key
 ordering and exact SHA-256 bytes. Output is exclusive mode 0600 beneath an
 existing owner-only 0700 parent. No row or database error is printed.
@@ -67,7 +68,7 @@ export async function streamPayload(session, options, write) {
       if (new Set(tables.map(name)).size !== tables.length) throw Error('Duplicate source tables');
       await session.send(headerSql(tables));
     } else if (event.event === 'header' && tables && !header) {
-      if (event.database !== DATABASE || event.transaction_read_only !== 'on' || count(event.failed_migrations) !== 0) throw Error('Source safety check failed');
+      if (event.database !== (options.database ?? DATABASE) || event.transaction_read_only !== 'on' || count(event.failed_migrations) !== 0) throw Error('Source safety check failed');
       header = event;
       await emit({ event: 'header', format_version: 1, source_instance: options['source-instance'], snapshot_id: options['snapshot-id'], inventory_sha256: options.inventory_sha256, serialization_id: SERIALIZATION_ID });
       await session.send(payloadSql(tables[0]));
@@ -98,11 +99,12 @@ export async function streamPayload(session, options, write) {
 }
 
 export async function collect(options) {
-  const sandbox = await inspectSandbox();
+  const sandbox = await inspectSandbox(options.descriptor);
+  options = bindCollectorOptions(options, sandbox);
   let session;
   try {
     return await privateArtifact(options.output, async write => {
-      session = psqlSession(sandbox.container_id);
+      session = psqlSession(sandbox.container_id, sandbox.database);
       return streamPayload(session, options, write);
     });
   } catch (error) { session?.abort(); throw error; }

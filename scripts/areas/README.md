@@ -48,7 +48,9 @@ Then run:
 
 ```sh
 node scripts/areas/restore-audit.mjs \
-  /protected/new-baseline memory-four-area-restore-EXACT_SANDBOX
+  /protected/new-baseline memory-four-area-restore-EXACT_SANDBOX \
+  --source-instance OBSERVED_SOURCE_INSTANCE_UUID \
+  --snapshot-id NEW_SNAPSHOT_UUID
 ```
 
 Only an empty sandbox is restored. Use `--verify-existing` solely to audit a
@@ -61,10 +63,34 @@ using original COPY column lists, exact row bytes and sorted row-hash multisets.
 No timestamp, credential, content or unknown field is ignored. Different row
 order is harmless; changed values, lost duplicate rows and missing tables fail.
 Mismatch diagnostics contain only table metadata/counts/hashes. A successful
-exclusive `restore-evidence.json` records the image/container and comparisons.
-It is not proof of application startup, role provisioning, sequence recovery,
-external-file recovery or operational cutover. Sequence state is retained in the
-database archive but is not independently compared by this row auditor yet.
+exclusive schema-v2 `restore-evidence.json` records the image/container and comparisons.
+Every sequence's `last_value` and `is_called` is independently compared with the
+encrypted archive's `setval` records. Bigint values remain exact strings; missing,
+extra or changed sequences fail even when all table rows match. The auditor never
+advances a sequence or reads sequence state from the live source.
+This is not proof of application startup, role provisioning, external-file
+recovery or operational cutover.
+
+Supplying both UUIDs creates an exclusive private `restore-descriptor.json` after
+verification. It binds the exact container ID, image ID, database, source/snapshot
+UUIDs and SHA-256 of the snapshot manifest, encrypted archive and restore evidence.
+For a completed schema-v2 audit without a descriptor, create it separately:
+
+```sh
+node scripts/areas/restore-descriptor.mjs \
+  --snapshot-directory /protected/new-baseline \
+  --source-instance OBSERVED_SOURCE_INSTANCE_UUID \
+  --snapshot-id NEW_SNAPSHOT_UUID \
+  --output /protected/new-baseline/restore-descriptor.json
+```
+
+The default restored database is `memory_restore`; an explicit
+`--database memory_restore_SUFFIX` may be pinned by the auditor. No live database
+name or connection URL is accepted. Legacy row-only evidence cannot issue a new
+descriptor: perform a fresh row-and-sequence verification in a new evidence
+directory while preserving the old artifacts. Descriptors are operator-owned
+bindings, not signatures, ownership approvals or a defense against the host's
+root/current-user administrator. Keep the verified restore inactive and unchanged.
 
 Protect the restored database and inventories as sensitive data even though the
 container has no network. They contain the complete original dataset and must
@@ -72,14 +98,14 @@ never become an application instance or a source for model prompts.
 
 ## Complete partition inventory
 
-The current collector is deliberately restricted to the reviewed
-`memory-four-area-restore-20260917` sandbox and `memory_restore` database. It does
-not accept a live connection URL. After successful restore verification:
+The collector requires an explicit verified restore descriptor. It rechecks
+artifact digests, exact running container/image identity, network isolation,
+read-only root and absence of published ports or host privileges before querying.
+There is no default container and no live connection URL. After verification:
 
 ```sh
 node scripts/areas/inventory.mjs \
-  --source-instance OBSERVED_SOURCE_INSTANCE_UUID \
-  --snapshot-id NEW_SNAPSHOT_UUID \
+  --descriptor /protected/new-baseline/restore-descriptor.json \
   --output /protected/new-baseline/partition-inventory.json
 ```
 
@@ -93,7 +119,8 @@ Unrecognized schema is retained for review, not omitted. Tables without primary
 keys, foreign tables, broken database foreign keys, oversized envelopes and
 incomplete streams fail closed. No raw row bodies or database errors are printed.
 
-The snapshot's source instance is an observed source binding, **not** a claim
+Source/snapshot UUIDs come from the descriptor. Optional `--source-instance` and
+`--snapshot-id` arguments must match it exactly. The snapshot's source instance is an observed source binding, **not** a claim
 that it authored every historical row. Existing authorship remains in the
 protected source records. Public and historical project identities stay distinct.
 
@@ -116,8 +143,7 @@ count marker only after PostgreSQL exits successfully.
 
 ```sh
 node scripts/areas/payload.mjs \
-  --source-instance OBSERVED_SOURCE_INSTANCE_UUID \
-  --snapshot-id INVENTORY_SNAPSHOT_UUID \
+  --descriptor /protected/new-baseline/restore-descriptor.json \
   --inventory-sha256 NORMALIZED_INVENTORY_SHA256 \
   --output /protected/new-baseline/partition-payload.ndjson
 ```
@@ -139,7 +165,14 @@ synchronization precede successful publication. No live service is touched.
 
 ```sh
 node --test scripts/areas/*.test.mjs
+MEMORY_AREA_TEST_DOCKER=1 node --test scripts/areas/restore-docker.test.mjs
 ```
+
+The opt-in rehearsal uses an already installed pgvector PostgreSQL 17 image,
+resolves its immutable image ID, creates a network-none temporary container and a
+temporary GPG identity, then exercises encrypted restore, exact sequence state,
+descriptor issuance and both collectors. It also proves a sequence-only change
+fails re-verification. All data is synthetic; no live configuration or key is read.
 
 The first real restore evidence is recorded in
 [`docs/reviews/four-area-network/README.md`](../../docs/reviews/four-area-network/README.md).

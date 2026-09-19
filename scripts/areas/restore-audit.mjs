@@ -8,10 +8,11 @@ import { createHash } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { pipeline } from 'node:stream/promises';
 import { pathToFileURL } from 'node:url';
-import { hashFile } from './snapshot.mjs';
+import { validateSandbox, inspectContainer, privateInput, createRestoreDescriptor } from './restore-descriptor.mjs';
+export { validateSandbox } from './restore-descriptor.mjs';
 
-export async function copyInventory(input) {
-  const tables = new Map(); let current;
+export async function archiveInventory(input) {
+  const tables = new Map(), sequences = new Map(); let current;
   for await (const line of createInterface({ input, crlfDelay: Infinity })) {
     if (current) {
       if (line === '\\.') { current = undefined; continue; }
@@ -22,21 +23,31 @@ export async function copyInventory(input) {
       const match = line.match(/^COPY ((?:[a-z_][a-z_0-9]*|"(?:[^"]|"")+")\.(?:[a-z_][a-z_0-9]*|"(?:[^"]|"")+")) (\(.*\)) FROM stdin;$/);
       if (!match || tables.has(match[1])) throw Error('Unsupported or duplicate COPY table');
       current = { columns: match[2], rows: [] }; tables.set(match[1], current);
+    } else if (/\bsetval\s*\(/.test(line) && !line.startsWith('--')) {
+      // Parse the exact pg_dump sequence-set protocol, never execute dump SQL.
+      // Keep bigint values as strings and compare is_called, including false.
+      const match = line.match(/^SELECT pg_catalog\.setval\('((?:[^']|'')+)', (-?\d+), (true|false)\);$/);
+      if (!match) throw Error('Unsupported sequence state in archive');
+      const sequence = match[1].replaceAll("''", "'");
+      if (sequences.has(sequence)) throw Error('Duplicate sequence state in archive');
+      sequences.set(sequence, { sequence, last_value: BigInt(match[2]).toString(), is_called: match[3] === 'true' });
     }
   }
   if (current || tables.size === 0) throw Error('Truncated or empty COPY inventory');
-  return [...tables].sort(([a], [b]) => a.localeCompare(b)).map(([table, value]) => ({
+  return { tables: [...tables].sort(([a], [b]) => a.localeCompare(b)).map(([table, value]) => ({
     table, columns: value.columns, rows: value.rows.length,
     row_set_sha256: createHash('sha256').update(value.rows.sort().join('\n')).digest('hex'),
-  }));
+  })), sequences: [...sequences.values()].sort((a, b) => a.sequence.localeCompare(b.sequence)) };
 }
 
-export function inventoryDifferences(expected, actual) {
-  const before = new Map(expected.map(table => [table.table, table]));
-  const after = new Map(actual.map(table => [table.table, table]));
+export async function copyInventory(input) { return (await archiveInventory(input)).tables; }
+
+export function inventoryDifferences(expected, actual, identity = 'table') {
+  const before = new Map(expected.map(table => [table[identity], table]));
+  const after = new Map(actual.map(table => [table[identity], table]));
   return [...new Set([...before.keys(), ...after.keys()])].sort().flatMap(table => {
     const left = before.get(table), right = after.get(table);
-    return JSON.stringify(left) === JSON.stringify(right) ? [] : [{ table,
+    return JSON.stringify(left) === JSON.stringify(right) ? [] : [{ [identity]: table,
       expected: left ?? null, actual: right ?? null }];
   });
 }
@@ -77,56 +88,53 @@ async function pipeRun(source, target, inspect) {
   }
 }
 
-export function validateSandbox(metadata, container) {
-  if (!/^memory-four-area-restore-[a-z0-9-]+$/.test(container)
-      || metadata.Name !== `/${container}` || !metadata.State?.Running
-      || metadata.HostConfig?.NetworkMode !== 'none' || !metadata.HostConfig?.ReadonlyRootfs
-      || Object.keys(metadata.NetworkSettings?.Ports || {}).length
-        && Object.values(metadata.NetworkSettings.Ports).some(value => value !== null))
-    throw Error('Restore target must be an explicitly named network-none, read-only-root sandbox without published ports');
-}
-
-export async function restoreAudit(directory, container, verifyExisting = false, timezoneOverride) {
+export async function restoreAudit(directory, container, verifyExisting = false, timezoneOverride, database = 'memory_restore') {
+  if (!/^memory_restore(?:_[a-z0-9_]+)?$/.test(database)) throw Error('Explicit restore database name is invalid');
   const root = path.resolve(directory);
-  const manifest = JSON.parse(await fs.readFile(path.join(root, 'snapshot.json'), 'utf8'));
+  const snapshot = await privateInput(path.join(root, 'snapshot.json'), 1024 * 1024, true);
+  const manifest = snapshot.value;
   const timezone = archiveTimezone(manifest, timezoneOverride);
   const dump = manifest.artifacts?.find(item => item.name === 'database.pgdump.gpg');
   const encrypted = path.join(root, 'database.pgdump.gpg');
-  if (manifest.schema_version !== 1 || !dump || dump.sha256 !== await hashFile(encrypted))
+  if (manifest.schema_version !== 1 || !dump || dump.sha256 !== (await privateInput(encrypted)).sha256)
     throw Error('Snapshot checksum mismatch');
-  const inspected = spawnSync('docker', ['inspect', container], { encoding: 'utf8' });
-  if (inspected.status !== 0) throw Error('Restore sandbox unavailable');
-  const metadata = JSON.parse(inspected.stdout)[0]; validateSandbox(metadata, container);
-  const empty = spawnSync('docker', ['exec', container, 'psql', '-X', '-U', 'postgres', '-d', 'memory_restore',
+  const metadata = inspectContainer(container); validateSandbox(metadata, container);
+  if (!/^[0-9a-f]{64}$/.test(metadata.Id) || !/^sha256:[0-9a-f]{64}$/.test(metadata.Image)) throw Error('Restore sandbox lacks exact identities');
+  const containerId = metadata.Id;
+  const empty = spawnSync('docker', ['exec', containerId, 'psql', '-X', '-U', 'postgres', '-d', database,
     '-Atc', "SELECT count(*) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') AND schemaname !~ '^pg_toast'"], { encoding: 'utf8' });
   if (empty.status !== 0) throw Error('Sandbox database inspection failed');
   if (!verifyExisting) {
     if (empty.stdout.trim() !== '0') throw Error('Restore requires a fresh empty memory_restore database');
-    const restored = start('docker', ['exec', '-i', container, 'pg_restore', '-U', 'postgres',
-      '--dbname=memory_restore', '--exit-on-error', '--no-owner', '--no-privileges']);
+    const restored = start('docker', ['exec', '-i', containerId, 'pg_restore', '-U', 'postgres',
+      `--dbname=${database}`, '--exit-on-error', '--no-owner', '--no-privileges']);
     await pipeRun(decrypt(encrypted), restored);
   }
   const archive = start('pg_restore', ['--data-only', '--no-owner', '--no-privileges', '--file=-']);
-  const expected = await pipeRun(decrypt(encrypted), archive, copyInventory);
-  const actualDump = start('docker', ['exec', '--env', `PGOPTIONS=-c timezone=${timezone}`, container, 'pg_dump', '-U', 'postgres', '-d', 'memory_restore',
+  const expected = await pipeRun(decrypt(encrypted), archive, archiveInventory);
+  const actualDump = start('docker', ['exec', '--env', `PGOPTIONS=-c timezone=${timezone}`, containerId, 'pg_dump', '-U', 'postgres', '-d', database,
     '--data-only', '--no-owner', '--no-privileges']);
   actualDump.child.stdin.end();
-  const [actual] = await Promise.all([copyInventory(actualDump.child.stdout), actualDump.done]);
-  const differences = inventoryDifferences(expected, actual);
+  const [actual] = await Promise.all([archiveInventory(actualDump.child.stdout), actualDump.done]);
+  const differences = [...inventoryDifferences(expected.tables, actual.tables), ...inventoryDifferences(expected.sequences, actual.sequences, 'sequence')];
   if (differences.length) {
     // Metadata and hashes only; never persist differing record contents here.
     await fs.writeFile(path.join(root, `restore-mismatch-${Date.now()}.json`),
       JSON.stringify(differences, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
-    throw Error('Restored table row/hash inventory differs from archive; protected diagnostic saved');
+    throw Error('Restored table rows or sequence state differ from archive; protected diagnostic saved');
   }
-  const validation = spawnSync('docker', ['exec', container, 'psql', '-X', '-U', 'postgres', '-d', 'memory_restore',
+  const validation = spawnSync('docker', ['exec', containerId, 'psql', '-X', '-U', 'postgres', '-d', database,
     '-Atc', "SELECT count(*) FROM pg_index WHERE NOT indisvalid; SELECT count(*) FROM pg_constraint WHERE NOT convalidated;"],
   { encoding: 'utf8' });
   if (validation.status !== 0 || validation.stdout.trim() !== '0\n0') throw Error('Restored schema has invalid indexes or unvalidated constraints');
-  const report = { schema_version: 1, completed_at: new Date().toISOString(),
-    database_archive_sha256: dump.sha256, container_id: metadata.Id, image_id: metadata.Image,
+  const after = inspectContainer(containerId); validateSandbox(after, container);
+  if (after.Id !== metadata.Id || after.Image !== metadata.Image) throw Error('Restore sandbox changed during audit');
+  const report = { schema_version: 2, completed_at: new Date().toISOString(),
+    snapshot_manifest_sha256: snapshot.sha256, database_archive_sha256: dump.sha256,
+    container_name: container, container_id: metadata.Id, image_id: metadata.Image, database,
     comparison_timezone: timezone, timezone_from_operator: !manifest.database_session_timezone,
-    network: 'none', published_ports: false, restored_table_inventory: actual,
+    network: 'none', published_ports: false, restored_table_inventory: actual.tables,
+    restored_sequence_inventory: actual.sequences, all_sequence_states_match: true,
     all_table_row_hashes_match: true, invalid_indexes: 0, unvalidated_constraints: 0,
     limitations: ['Does not verify application startup, operational identities or final writer-stop capture.',
       'Role ownership and grants require separate explicitly reviewed provisioning.'], cutover_ready: false };
@@ -137,18 +145,24 @@ export async function restoreAudit(directory, container, verifyExisting = false,
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const [directory, container, ...options] = process.argv.slice(2);
-  let verifyExisting = false, timezone;
+  let verifyExisting = false, timezone, sourceInstance, snapshotId, database;
   for (let i = 0; i < options.length; i++) {
     if (options[i] === '--verify-existing' && !verifyExisting) verifyExisting = true;
     else if (options[i] === '--archive-timezone' && !timezone) timezone = options[++i];
+    else if (options[i] === '--source-instance' && !sourceInstance) sourceInstance = options[++i];
+    else if (options[i] === '--snapshot-id' && !snapshotId) snapshotId = options[++i];
+    else if (options[i] === '--database' && !database) database = options[++i];
     else throw Error('Unknown or repeated restore option');
   }
-  if (!directory || !container)
-    throw Error('Usage: restore-audit.mjs SNAPSHOT_DIRECTORY SANDBOX_CONTAINER [--verify-existing] [--archive-timezone ZONE]');
-  restoreAudit(directory, container, verifyExisting, timezone).then(report => console.log(JSON.stringify({
+  if (!directory || !container || Boolean(sourceInstance) !== Boolean(snapshotId))
+    throw Error('Usage: restore-audit.mjs SNAPSHOT_DIRECTORY SANDBOX_CONTAINER [--verify-existing] [--archive-timezone ZONE] [--database memory_restore_NAME] [--source-instance UUID --snapshot-id UUID]');
+  restoreAudit(directory, container, verifyExisting, timezone, database).then(async report => {
+    const descriptor = sourceInstance ? await createRestoreDescriptor(directory, sourceInstance, snapshotId, path.join(path.resolve(directory), 'restore-descriptor.json')) : {};
+    console.log(JSON.stringify({
     status: 'database_restore_verified', tables: report.restored_table_inventory.length,
     rows: report.restored_table_inventory.reduce((n, table) => n + table.rows, 0), cutover_ready: false,
-  }))).catch(error => {
+    sequences: report.restored_sequence_inventory.length, ...descriptor,
+  })); }).catch(error => {
     // Messages are fixed local diagnostics; child/provider output is never surfaced.
     console.error(error.message); process.exitCode = 1;
   });

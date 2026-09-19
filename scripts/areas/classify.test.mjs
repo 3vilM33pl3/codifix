@@ -154,5 +154,5 @@ test('SQL never fetches raw capture payloads or updates source state; options ca
   assert.match(REVIEW_SQL, /REPEATABLE READ READ ONLY/);
   assert.ok(!/payload_json|INSERT INTO|UPDATE public|DELETE FROM/.test(REVIEW_SQL));
   assert.throws(() => parseArgs(['--database', 'live']), /explicit|Explicit/);
-  assert.throws(() => parseArgs([]), /five/);
+  assert.throws(() => parseArgs([]), /six/);
 });

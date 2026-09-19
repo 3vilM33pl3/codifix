@@ -9,15 +9,16 @@ import { open, link, unlink, stat, lstat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { pathToFileURL } from 'node:url';
-import { validateSandbox } from './restore-audit.mjs';
+import { loadRestoreDescriptor } from './restore-descriptor.mjs';
 
-export const CONTAINER = 'memory-four-area-restore-20260917';
 export const DATABASE = 'memory_restore';
 export const MAX_ENVELOPE_BYTES = 64 * 1024 * 1024;
 export const SERIALIZATION = 'PostgreSQL to_jsonb(complete_heap_row)::text encoded as UTF-8; session timezone UTC, DateStyle ISO/YMD, IntervalStyle postgres, extra_float_digits 3, bytea_output hex. SHA-256 covers those exact text bytes, with no newline. This represents logical row values, not physical heap bytes or original JSON whitespace.';
-export const HELP = `Usage: node scripts/areas/inventory.mjs --source-instance UUID --snapshot-id UUID --output /protected/new-inventory.json
+export const HELP = `Usage: node scripts/areas/inventory.mjs --descriptor /protected/restore-descriptor.json --output /protected/new-inventory.json
 
-Read-only collector restricted to ${CONTAINER}/${DATABASE}, with Docker network none.
+Read-only collector restricted to the exact digest-bound verified restore descriptor.
+It verifies private snapshot/archive/proof bindings and a Docker network-none sandbox.
+Optional --source-instance UUID and --snapshot-id UUID must match the descriptor.
 Uses one REPEATABLE READ READ ONLY transaction and UTC complete-row JSON hashing.
 Streams all ordinary/partitioned tables in every non-system schema, including empty
 tables. Foreign tables fail closed. FK targets and the mem-area logical-reference
@@ -40,16 +41,19 @@ export function parseArgs(args) {
   const options = {};
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
-    if (!['--source-instance', '--snapshot-id', '--output'].includes(name)
+    if (!['--source-instance', '--snapshot-id', '--descriptor', '--output'].includes(name)
       || !args[index + 1] || Object.hasOwn(options, name.slice(2))) throw Error('Invalid or duplicate collector option; use --help');
     options[name.slice(2)] = args[index + 1];
   }
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   for (const field of ['source-instance', 'snapshot-id']) {
+    if (options[field] === undefined) continue;
     if (!uuid.test(options[field] ?? '') || options[field].replaceAll('-', '').replaceAll('0', '') === '') throw Error('Explicit nonzero source and snapshot UUIDs are required');
     options[field] = options[field].toLowerCase();
   }
   if (!options.output || !options.output.startsWith('/')) throw Error('An absolute private output path is required');
+  if (!options.descriptor?.startsWith('/')) throw Error('An explicit absolute restore descriptor is required');
+  options.descriptor = resolve(options.descriptor);
   options.output = resolve(options.output);
   return options;
 }
@@ -204,7 +208,7 @@ export async function streamInventory(session, options, write) {
       await session.send(headerSql(tables));
     } else if (event.event === 'header' && tables && !header) {
       header = event;
-      if (header.transaction_read_only !== 'on' || header.database !== DATABASE || count(header.failed_migrations) !== 0) throw Error('Source transaction/database/migration safety check failed');
+      if (header.transaction_read_only !== 'on' || header.database !== (options.database ?? DATABASE) || count(header.failed_migrations) !== 0) throw Error('Source transaction/database/migration safety check failed');
       const projects = header.project_catalogs.find(catalog => catalog.table === 'public.projects')?.projects;
       if (!Array.isArray(projects)) throw Error('Public project provenance is missing');
       const start = { format_version: 1, source_instance: options['source-instance'], snapshot_id: options['snapshot-id'],
@@ -239,7 +243,7 @@ export async function streamInventory(session, options, write) {
   if (result.code !== 0 || !completed) throw Error('Database collection failed or was interrupted; raw stderr suppressed');
   return {
     collector_format_version: 1, source_instance: options['source-instance'], snapshot_id: options['snapshot-id'],
-    captured_at: header.captured_at, database: DATABASE, transaction_snapshot: header.snapshot,
+    captured_at: header.captured_at, database: options.database ?? DATABASE, transaction_snapshot: header.snapshot,
     transaction_read_only: true, server_version: header.server_version, timezone: 'UTC', row_serialization: SERIALIZATION,
     table_count: tables.length, row_count: total, schemas: [...new Set(tables.map(table => table.schema))],
     table_identities: tables.map(table => ({ table: tableName(table), kind: table.kind, is_partition: table.is_partition,
@@ -255,28 +259,24 @@ export async function streamInventory(session, options, write) {
   };
 }
 
-async function bufferedCommand(args) {
-  const child = spawn('docker', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-  const chunks = [];
-  child.stdout.on('data', data => chunks.push(data));
-  child.stderr.resume();
-  const result = await new Promise(resolveResult => {
-    child.once('error', () => resolveResult(-1));
-    child.once('close', code => resolveResult(code));
-  });
-  if (result !== 0) throw Error('Docker sandbox inspection failed; stderr suppressed');
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw Error('Docker sandbox metadata is invalid'); }
+export async function inspectSandbox(descriptorPath) {
+  const { descriptor, descriptor_sha256 } = await loadRestoreDescriptor(descriptorPath);
+  return { container: descriptor.container_name, container_id: descriptor.container_id, image: descriptor.image_id,
+    database: descriptor.database, source_instance: descriptor.source_instance, snapshot_id: descriptor.snapshot_id,
+    restore_descriptor_sha256: descriptor_sha256, restore_evidence_sha256: descriptor.restore_evidence.sha256,
+    network: 'none', read_only_root: true, published_ports: false };
 }
 
-export async function inspectSandbox() {
-  const metadata = await bufferedCommand(['inspect', '--format', '{{json .}}', CONTAINER]);
-  validateSandbox(metadata, CONTAINER);
-  if (!/^[0-9a-f]{64}$/.test(metadata.Id)) throw Error('Collector requires a pinned sandbox identity');
-  return { container: CONTAINER, container_id: metadata.Id, image: metadata.Image, network: 'none', read_only_root: true, published_ports: false };
+export function bindCollectorOptions(options, sandbox) {
+  for (const [option, field] of [['source-instance', 'source_instance'], ['snapshot-id', 'snapshot_id']]) {
+    if (options[option] !== undefined && options[option] !== sandbox[field]) throw Error('Collector identity differs from verified restore descriptor');
+  }
+  return { ...options, 'source-instance': sandbox.source_instance, 'snapshot-id': sandbox.snapshot_id, database: sandbox.database };
 }
 
-export function psqlSession(containerId) {
-  const child = spawn('docker', ['exec', '-i', containerId, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-h', '/var/run/postgresql', '-U', 'postgres', '-d', DATABASE], { stdio: ['pipe', 'pipe', 'pipe'] });
+export function psqlSession(containerId, database = DATABASE) {
+  if (!/^[0-9a-f]{64}$/.test(containerId) || !/^memory_restore(?:_[a-z0-9_]+)?$/.test(database)) throw Error('Exact isolated database identity required');
+  const child = spawn('docker', ['exec', '-i', containerId, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-h', '/var/run/postgresql', '-U', 'postgres', '-d', database], { stdio: ['pipe', 'pipe', 'pipe'] });
   child.stderr.resume();
   child.stdin.on('error', () => {}); // Failure is reported by the exit event, without SQL/body text.
   const lines = streamLines(child.stdout);
@@ -359,7 +359,8 @@ export async function privateArtifact(output, body) {
 }
 
 export async function collect(options) {
-  const sandbox = await inspectSandbox();
+  const sandbox = await inspectSandbox(options.descriptor);
+  options = bindCollectorOptions(options, sandbox);
   const sidecar = `${options.output}.collector.json`;
   try { await stat(sidecar); throw Error('Collector evidence path already exists; refusing overwrite'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -367,7 +368,7 @@ export async function collect(options) {
   let evidence;
   try {
     evidence = await privateArtifact(options.output, async write => {
-      session = psqlSession(sandbox.container_id);
+      session = psqlSession(sandbox.container_id, sandbox.database);
       return streamInventory(session, options, write);
     });
     const digest = createHash('sha256');

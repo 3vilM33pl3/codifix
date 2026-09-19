@@ -6,15 +6,14 @@ import { createHash } from 'node:crypto';
 import { open, lstat, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { CONTAINER, DATABASE, SERIALIZATION, privateArtifact, streamLines } from './inventory.mjs';
-import { validateSandbox } from './restore-audit.mjs';
+import { DATABASE, SERIALIZATION, privateArtifact, streamLines, inspectSandbox } from './inventory.mjs';
 
 export const LIMITS = { entry_excerpt_chars: 1600, summary_chars: 600, source_previews: 6, source_excerpt_chars: 300, path_chars: 500, title_chars: 180, manifest_bytes: 128 * 1024 * 1024, review_pack_bytes: 128 * 1024 * 1024, lineage_count: 20_000 };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const sha256 = /^[0-9a-f]{64}$/;
-export const HELP = `Usage: node scripts/areas/classify.mjs --inventory /protected/partition-inventory.json --manifest /protected/unresolved-manifest.json --validation /protected/inventory-validation.json --restore-evidence /protected/restore-evidence.json --output /protected/new-review-pack.json
+export const HELP = `Usage: node scripts/areas/classify.mjs --descriptor /protected/restore-descriptor.json --inventory /protected/partition-inventory.json --manifest /protected/unresolved-manifest.json --validation /protected/inventory-validation.json --restore-evidence /protected/restore-evidence.json --output /protected/new-review-pack.json
 
-Reads ONLY the fixed network-none restore sandbox ${CONTAINER}/${DATABASE}.
+Reads ONLY the exact digest-bound, network-none verified restore descriptor.
 Uses no provider, credentials, keychain, network service, live source DB, or importer.
 Reads all remaining canonical versions and source links in one read-only snapshot.
 Writes a bounded private human review pack; stdout contains aggregate counts only.
@@ -27,11 +26,11 @@ export function parseArgs(args) {
   const options = {};
   for (let i = 0; i < args.length; i += 2) {
     const name = args[i]?.slice(2);
-    if (!['inventory', 'manifest', 'validation', 'restore-evidence', 'output'].includes(name)
+    if (!['descriptor', 'inventory', 'manifest', 'validation', 'restore-evidence', 'output'].includes(name)
       || args[i] !== `--${name}` || !args[i + 1]?.startsWith('/') || options[name]) throw Error('Explicit unique absolute input/output paths are required');
     options[name] = resolve(args[i + 1]);
   }
-  if (Object.keys(options).length !== 5 || new Set(Object.values(options)).size !== 5) throw Error('All five distinct input/output paths are required');
+  if (Object.keys(options).length !== 6 || new Set(Object.values(options)).size !== 6) throw Error('All six distinct descriptor/input/output paths are required');
   return options;
 }
 
@@ -291,19 +290,6 @@ COMMIT;
 SELECT jsonb_build_object('event','complete')::text;
 `;
 
-async function sandbox() {
-  const child = spawn('docker', ['inspect', '--format', '{{json .}}', CONTAINER], { stdio: ['ignore', 'pipe', 'pipe'] });
-  const done = new Promise(resolve => { child.once('error', () => resolve(-1)); child.once('close', resolve); });
-  child.stderr.resume();
-  const chunks = [];
-  for await (const data of child.stdout) chunks.push(data);
-  const status = await done;
-  if (status !== 0) throw Error('Sandbox inspection failed');
-  const metadata = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  validateSandbox(metadata, CONTAINER);
-  return metadata.Id;
-}
-
 export async function consumeReview(lines, bindings) {
   const entries = [];
   const seen = new Set();
@@ -316,7 +302,7 @@ export async function consumeReview(lines, bindings) {
     if (complete) throw Error('Unexpected data after review completion');
     if (event.event === 'header' && !header) {
       header = event;
-      if (header.read_only !== 'on' || header.database !== DATABASE || header.canonical_count !== bindings.canonical_ids.size
+      if (header.read_only !== 'on' || header.database !== (bindings.database ?? DATABASE) || header.canonical_count !== bindings.canonical_ids.size
         || header.version_count !== bindings.expected_versions || header.project_count !== bindings.expected_projects) throw Error('Restored source counts or transaction safety changed');
     } else if (event.event === 'lineage' && header) {
       if (!bindings.canonical_ids.has(event.canonical_id) || seen.has(event.canonical_id)) throw Error('Unknown or duplicate canonical history');
@@ -357,9 +343,13 @@ export async function consumeReview(lines, bindings) {
 
 export async function collectReview(options) {
   const bindings = await loadBindings(options);
-  const containerId = await sandbox();
-  if (containerId !== bindings.container_id) throw Error('Restore sandbox identity changed');
-  const child = spawn('docker', ['exec', '-i', containerId, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-h', '/var/run/postgresql', '-U', 'postgres', '-d', DATABASE], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const sandbox = await inspectSandbox(options.descriptor);
+  if (sandbox.container_id !== bindings.container_id || sandbox.restore_evidence_sha256 !== bindings.evidence.restore_evidence_sha256
+    || sandbox.source_instance !== bindings.evidence.source_instance || sandbox.snapshot_id !== bindings.evidence.snapshot_id)
+    throw Error('Restore descriptor, review evidence or source identities changed');
+  bindings.database = sandbox.database;
+  bindings.evidence.restore_descriptor_sha256 = sandbox.restore_descriptor_sha256;
+  const child = spawn('docker', ['exec', '-i', sandbox.container_id, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-h', '/var/run/postgresql', '-U', 'postgres', '-d', sandbox.database], { stdio: ['pipe', 'pipe', 'pipe'] });
   child.stderr.resume();
   child.stdin.on('error', () => {});
   const done = new Promise(resolve => { child.once('error', () => resolve(-1)); child.once('close', resolve); });

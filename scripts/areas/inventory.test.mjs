@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { BEGIN_SQL, CATALOG_SQL, DATABASE, SERIALIZATION, parseArgs, identifier, literal,
-  keyExpression, tableSql, inventoryRow, streamInventory, streamLines, privateArtifact } from './inventory.mjs';
+  keyExpression, tableSql, inventoryRow, streamInventory, streamLines, privateArtifact, bindCollectorOptions } from './inventory.mjs';
 
 const options = { 'source-instance': '37e0de32-98b4-4133-81e6-b9d2c2f8f9e9', 'snapshot-id': 'ee7c0a85-a155-4ce8-9aef-b142bd72b36a' };
 const table = (name, primary = ['id'], schema = 'public') => ({ schema, name, kind: 'r', is_partition: false,
@@ -34,8 +34,17 @@ async function consume(events, code = 0) {
 }
 
 test('requires explicit UUIDs, absolute output and rejects injected options', () => {
-  assert.equal(parseArgs(['--source-instance', options['source-instance'], '--snapshot-id', options['snapshot-id'], '--output', '/tmp/private.json']).output, '/tmp/private.json');
+  assert.equal(parseArgs(['--descriptor', '/private/restore.json', '--source-instance', options['source-instance'], '--snapshot-id', options['snapshot-id'], '--output', '/tmp/private.json']).output, '/tmp/private.json');
+  assert.equal(parseArgs(['--descriptor', '/private/restore.json', '--output', '/tmp/private.json']).descriptor, '/private/restore.json');
+  assert.throws(() => parseArgs(['--source-instance', options['source-instance'], '--snapshot-id', options['snapshot-id'], '--output', '/tmp/private.json']), /descriptor/);
   for (const args of [[], ['--output', 'relative.json'], ['--source-instance', 'not-a-uuid'], ['--container', 'live'], ['--output', '/tmp/one', '--output', '/tmp/two']]) assert.throws(() => parseArgs(args));
+});
+
+test('optional source selectors must equal the independently verified descriptor binding', () => {
+  const sandbox = { source_instance: options['source-instance'], snapshot_id: options['snapshot-id'], database: 'memory_restore_new' };
+  assert.equal(bindCollectorOptions({}, sandbox).database, 'memory_restore_new');
+  assert.equal(bindCollectorOptions(options, sandbox)['snapshot-id'], options['snapshot-id']);
+  assert.throws(() => bindCollectorOptions({ 'snapshot-id': options['source-instance'] }, sandbox), /differs/);
 });
 
 test('identifier/literal quoting and exact bigint/composite key construction', () => {

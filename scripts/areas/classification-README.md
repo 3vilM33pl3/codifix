@@ -7,6 +7,7 @@ restore evidence and a new output path:
 
 ```sh
 node scripts/areas/classify.mjs \
+  --descriptor /protected/restore-descriptor.json \
   --inventory /protected/partition-inventory.json \
   --manifest /protected/partition-unresolved-draft.json \
   --validation /protected/partition-inventory-validation.json \
