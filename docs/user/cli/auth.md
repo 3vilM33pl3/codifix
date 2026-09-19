@@ -62,6 +62,45 @@ Creation makes a service principal and an initial project membership. The raw
 Store the secret in OpenBao or another secret manager before closing the output.
 Use memberships to grant the same service principal access to more projects.
 
+## Internal expertise answerer (installation operator)
+
+Use this only when preparing the optional private federation answering worker.
+It requires **global `system_admin`**, not a project administrator. It creates an
+internal identity with exactly one project and explicit `memory_read` plus
+`bundle_export` permissions. It issues no token or browser session and enables
+no worker, space membership, collection consent or model destination.
+
+Select the intended instance's private client configuration, verify its URL and
+`auth whoami`, and retain two new UUIDs for the operation and principal. Do not
+rely on the development default configuration for installation. First preview:
+
+```sh
+memory --config /private/selected-instance/client.toml auth expertise-answerer \
+  --request-id <stable-request-uuid> --principal <new-principal-uuid> \
+  --project homelab --name 'Homelab deterministic answerer'
+```
+
+Inspect the project, name and IDs, then repeat the exact command with `--confirm`
+to commit. `--json` returns machine-readable metadata without credentials. After
+an ambiguous response, retry only the identical request and IDs. A changed or
+revoked identity is rejected; replay cannot silently restore its access. The
+principal, membership and protected authentication audit commit together. The
+operation creates no project timeline event or background job.
+
+The API is `POST /v1/auth/expertise-answerers` with
+`{request_id, principal_id, project, name, confirmed: true}`. Browser calls require
+CSRF/Origin checks. Read-only, evaluation and relay services reject it. Existing
+global-admin principal/membership inventory shows the result; revoking its local
+project membership stops answering. Do not add other project memberships or
+change its reviewed identity through ordinary access-administration commands;
+those changes require separate review and invalidate provisioning replay.
+
+Next, independently review the local `answer-expertise` space grant, exact
+collection/service grant and `expertise_principal` runtime binding as described
+in [federation runtime](../federation-runtime.md#f1-private-expertise-opt-in).
+Joining a space is not collection consent. Keep deterministic mode and empty
+model destinations for the initial internal installation.
+
 ## Project Memberships
 
 ```bash

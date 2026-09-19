@@ -104,6 +104,10 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         .route("/v1/auth/tokens/{selector}/revoke", post(auth_revoke_token))
         .route("/v1/auth/principals", get(auth_list_principals))
         .route(
+            "/v1/auth/expertise-answerers",
+            post(crate::auth::answerer::create),
+        )
+        .route(
             "/v1/auth/memberships",
             get(auth_list_memberships).post(auth_grant_membership),
         )

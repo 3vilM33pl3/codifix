@@ -1461,6 +1461,11 @@ pub(in crate::commands) struct AuthArgs {
 
 #[derive(Debug, Subcommand)]
 pub(in crate::commands) enum AuthCommand {
+    /// Preview a restricted internal expertise answerer; --confirm provisions it.
+    #[command(
+        after_help = "Agent notes:\nPreview is offline. Inspect project, name and stable request/principal IDs before --confirm. Requires global system_admin. Creates only local read/export access, never login credentials, federation membership, collection consent or model authority. Exact retries cannot restore revoked access."
+    )]
+    ExpertiseAnswerer(ExpertiseAnswererArgs),
     /// Show the principal resolved for the current client credential.
     #[command(after_help = AUTH_WHOAMI_AFTER_HELP)]
     Whoami(AuthOutputArgs),
@@ -1470,6 +1475,23 @@ pub(in crate::commands) enum AuthCommand {
     /// Grant, list, and revoke project memberships.
     #[command(after_help = AUTH_MEMBERSHIP_GROUP_AFTER_HELP)]
     Membership(AuthMembershipArgs),
+}
+
+#[derive(Debug, Args)]
+pub(in crate::commands) struct ExpertiseAnswererArgs {
+    #[arg(long)]
+    pub(crate) request_id: uuid::Uuid,
+    #[arg(long)]
+    pub(crate) principal: uuid::Uuid,
+    #[arg(long)]
+    pub(crate) project: String,
+    #[arg(long)]
+    pub(crate) name: String,
+    /// Explicitly commit this exact request; default is an offline preview.
+    #[arg(long)]
+    pub(crate) confirm: bool,
+    #[arg(long)]
+    pub(crate) json: bool,
 }
 
 #[derive(Debug, Args)]

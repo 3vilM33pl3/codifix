@@ -455,7 +455,7 @@ async fn principal_from_row(
 
 /// Global administration only: project grants cannot authorize an instance
 /// policy change. Hold the principal and presented credential through commit.
-pub(crate) async fn lock_supervisor_administrator(
+pub(crate) async fn lock_global_administrator(
     state: &AppState,
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     principal: &AuthenticatedPrincipal,
@@ -463,7 +463,7 @@ pub(crate) async fn lock_supervisor_administrator(
     use mem_record::Permission;
     if state.config.service.read_only || state.config.evaluation.active() || !state.is_primary() {
         return Err(ApiError::forbidden(
-            "supervisor controls are disabled on this service",
+            "administrative controls are disabled on this service",
         ));
     }
     let row =

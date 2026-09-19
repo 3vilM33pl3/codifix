@@ -442,6 +442,28 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AuthServiceTokenResponse' }
+  /v1/auth/expertise-answerers:
+    post:
+      operationId: post_v1_auth_expertise_answerers
+      summary: "Explicitly provision an internal project-scoped expertise answerer, without credentials or federation grants."
+      description: "Requires current global system_admin, a writable primary service and explicit confirmation. Request ID binds exact actor, principal, project and name. Exact retries never restore revoked or changed permissions. Browser mutations require CSRF."
+      tags: ["Access administration"]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExpertiseAnswererRequest' }
+      responses:
+        "200":
+          description: "Created or reconciled exact unchanged identity; no worker or credential is enabled."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExpertiseAnswererResponse' }
+        "400": { description: "Invalid or unconfirmed request." }
+        "403": { description: "Current global administration or writable primary service required." }
+        "409": { description: "Request or current identity changed; no permissions restored." }
+        "503": { description: "Outcome unconfirmed; inspect or retry exact IDs." }
   /v1/auth/principals:
     get:
       operationId: get_v1_auth_principals
@@ -2948,6 +2970,30 @@ components:
         mode: { type: string, enum: [single_user, multi_user] }
         read_only: { type: boolean }
         principal: { $ref: '#/components/schemas/AuthPrincipal' }
+    ExpertiseAnswererRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, principal_id, project, name, confirmed]
+      properties:
+        request_id: { type: string, format: uuid }
+        principal_id: { type: string, format: uuid }
+        project: { type: string, minLength: 1, maxLength: 120 }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        confirmed: { type: boolean, const: true }
+    ExpertiseAnswererResponse:
+      type: object
+      additionalProperties: false
+      required: [request_id, principal_id, project_id, project, permissions, replayed, credential_issued]
+      properties:
+        request_id: { type: string, format: uuid }
+        principal_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        project: { type: string }
+        permissions:
+          type: array
+          items: { type: string, enum: [memory_read, bundle_export] }
+        replayed: { type: boolean }
+        credential_issued: { type: boolean, const: false }
     AuthServiceTokenCreateRequest:
       type: object
       required: [name, project, role]

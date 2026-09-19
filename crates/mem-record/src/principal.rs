@@ -104,6 +104,29 @@ pub struct AuthServiceTokenCreateRequest {
     pub expires_in_seconds: Option<u64>,
 }
 
+/// Operator provisioning only. This creates no credential or federation grant.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExpertiseAnswererRequest {
+    pub request_id: Uuid,
+    pub principal_id: Uuid,
+    pub project: String,
+    pub name: String,
+    pub confirmed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExpertiseAnswererResponse {
+    pub request_id: Uuid,
+    pub principal_id: Uuid,
+    pub project_id: Uuid,
+    pub project: String,
+    pub permissions: Vec<Permission>,
+    pub replayed: bool,
+    pub credential_issued: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthServiceTokenResponse {
     pub id: Uuid,

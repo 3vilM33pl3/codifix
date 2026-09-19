@@ -316,6 +316,17 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )],
         ),
         (
+            "/v1/auth/expertise-answerers",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
             "/v1/auth/memberships",
             &[
                 (

@@ -239,6 +239,36 @@ fn rendered_help(args: &[&str]) -> String {
     err.to_string()
 }
 
+#[test]
+fn expertise_answerer_requires_stable_ids_and_defaults_to_preview() {
+    let args = [
+        "memory",
+        "auth",
+        "expertise-answerer",
+        "--request-id",
+        "00000000-0000-4000-8000-000000000001",
+        "--principal",
+        "00000000-0000-4000-8000-000000000002",
+        "--project",
+        "homelab",
+        "--name",
+        "Homelab answerer",
+    ];
+    let cli = Cli::try_parse_from(args).unwrap();
+    let super::Command::Auth(auth) = cli.command else {
+        panic!("auth")
+    };
+    let super::AuthCommand::ExpertiseAnswerer(request) = auth.command else {
+        panic!("answerer")
+    };
+    assert!(!request.confirm);
+    assert_eq!(request.project, "homelab");
+    let mut confirmed = args.to_vec();
+    confirmed.push("--confirm");
+    assert!(Cli::try_parse_from(confirmed).is_ok());
+    assert!(Cli::try_parse_from(["memory", "auth", "expertise-answerer", "--confirm"]).is_err());
+}
+
 fn assert_command_metadata(cmd: &Command, path: &str) {
     if cmd.get_name() != "help" {
         let about = cmd

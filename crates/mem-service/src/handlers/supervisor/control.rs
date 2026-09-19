@@ -47,7 +47,7 @@ pub(crate) async fn control(
         .execute(&mut *tx)
         .await
         .map_err(storage)?;
-    crate::auth::lock_supervisor_administrator(&state, &mut tx, &principal)
+    crate::auth::lock_global_administrator(&state, &mut tx, &principal)
         .await
         .map_err(authority)?;
     // Request reconciliation and policy changes serialize on the same authority
@@ -105,7 +105,7 @@ pub(crate) async fn control(
             .bind(request.request_id).bind(principal.id).bind(metadata).execute(&mut *tx).await.map_err(storage)?;
     }
     // Expiry is a real clock: do not accept an expired credential after a lock wait.
-    crate::auth::lock_supervisor_administrator(&state, &mut tx, &principal)
+    crate::auth::lock_global_administrator(&state, &mut tx, &principal)
         .await
         .map_err(authority)?;
     tx.commit().await.map_err(storage)?;

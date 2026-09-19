@@ -4,7 +4,8 @@ use anyhow::{Context, Result};
 use mem_config::AppConfig;
 use mem_record::{
     AuthMeResponse, AuthMembershipGrantRequest, AuthMembershipResponse, AuthPrincipalResponse,
-    AuthServiceTokenCreateRequest, AuthServiceTokenResponse,
+    AuthServiceTokenCreateRequest, AuthServiceTokenResponse, ExpertiseAnswererRequest,
+    ExpertiseAnswererResponse,
 };
 use reqwest::Client;
 
@@ -16,6 +17,50 @@ use crate::commands::{
 
 pub(super) async fn handle(args: AuthArgs, client: Client, config: AppConfig) -> Result<()> {
     match args.command {
+        AuthCommand::ExpertiseAnswerer(args) => {
+            let request = ExpertiseAnswererRequest {
+                request_id: args.request_id,
+                principal_id: args.principal,
+                project: args.project,
+                name: args.name,
+                confirmed: args.confirm,
+            };
+            if !args.confirm {
+                print_json(&serde_json::json!({
+                    "request":request, "executed":false,
+                    "permissions":["memory_read","bundle_export"],
+                    "credential_issued":false, "federation_grants_created":false,
+                    "collection_consent_created":false,
+                    "next":"Review the exact project, name and IDs; repeat unchanged with --confirm",
+                }))?;
+            } else {
+                let response: ExpertiseAnswererResponse = get_json(
+                    client
+                        .post(service_url(&config, "/v1/auth/expertise-answerers"))
+                        .json(&request)
+                        .send()
+                        .await?,
+                )
+                .await?;
+                if args.json {
+                    print_json(&response)?;
+                } else {
+                    println!(
+                        "Internal answerer {} on {}{}",
+                        response.principal_id,
+                        response.project,
+                        if response.replayed {
+                            " (exact retry)"
+                        } else {
+                            ""
+                        }
+                    );
+                    println!(
+                        "Local read/export only; no login credential, federation grant, collection consent or worker activation."
+                    );
+                }
+            }
+        }
         AuthCommand::Whoami(args) => {
             let me: AuthMeResponse = get_json(
                 client

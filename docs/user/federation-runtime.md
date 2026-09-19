@@ -130,6 +130,13 @@ read/export permissions, the local space's `AnswerExpertise` grant and an explic
 grant for the reviewed collection. Global roles, global permissions and group
 identities are rejected. Merely naming a principal does not grant access.
 
+Provision that identity through the explicitly confirmed
+[`memory auth expertise-answerer` installation command](cli/auth.md#internal-expertise-answerer-installation-operator),
+not fixture SQL, a service token or the local-owner administrator. The command
+creates only local read/export permissions and protected audit. Remote
+membership, local space and collection grants remain separate; no worker or
+model is enabled automatically.
+
 The optional worker answers queued questions and validates retained answer
 delivery in independent loops. Ordinary query retrieval is never used; model
 synthesis is separately disabled unless explicitly configured below. Both loops poll every
