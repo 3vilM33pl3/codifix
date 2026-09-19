@@ -3258,7 +3258,6 @@ version = "2.1.0-rc.1"
 dependencies = [
  "axum",
  "chrono",
- "mem-config",
  "mem-supervisor",
  "mem-supervisor-pi",
  "mem-supervisor-store",

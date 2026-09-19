@@ -9,7 +9,6 @@ authors.workspace = true
 mem-supervisor = { path = "../mem-supervisor" }
 mem-supervisor-store = { path = "../mem-supervisor-store" }
 mem-supervisor-pi = { path = "../mem-supervisor-pi" }
-mem-config = { path = "../mem-config" }
 chrono.workspace = true
 reqwest.workspace = true
 serde.workspace = true

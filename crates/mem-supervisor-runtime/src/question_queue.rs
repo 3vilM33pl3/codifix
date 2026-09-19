@@ -7,10 +7,9 @@ use crate::{
     transport::OpenAiTransport,
     work::{PinnedWork, WorkError},
 };
-use mem_config::AppConfig;
 use mem_supervisor::Area;
 use mem_supervisor_store::{SupervisorStore, questions};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Postgres, pool::PoolConnection};
 use std::{
     path::{Path, PathBuf},
@@ -28,16 +27,63 @@ pub struct ServiceExecutionGuard {
     profile_digest: [u8; 32],
 }
 
+// Data-only view of the operator-pinned TOML, never config discovery/platform
+// dependencies. Mirrors mem-config::app safety semantics: semantic_time enables
+// evaluation, read_only defaults false, clustering defaults true. Unrelated app
+// fields are ignored; malformed safety fields fail closed. No env coercions.
+#[derive(Deserialize)]
+struct ExecutionConfig {
+    service: ExecutionService,
+    #[serde(default)]
+    evaluation: ExecutionEvaluation,
+    #[serde(default)]
+    cluster: ExecutionCluster,
+    supervisor: ExecutionIdentity,
+}
+#[derive(Deserialize)]
+struct ExecutionService {
+    #[serde(default)]
+    read_only: bool,
+}
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExecutionEvaluation {
+    semantic_time: Option<chrono::DateTime<chrono::Utc>>,
+}
+#[derive(Deserialize)]
+struct ExecutionCluster {
+    #[serde(default = "enabled")]
+    enabled: bool,
+}
+fn enabled() -> bool {
+    true
+}
+impl Default for ExecutionCluster {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+#[derive(Deserialize)]
+struct ExecutionIdentity {
+    instance_id: Uuid,
+    area: Area,
+    interaction: ExecutionInteraction,
+}
+#[derive(Deserialize)]
+struct ExecutionInteraction {
+    sha256: String,
+}
+
 impl ServiceExecutionGuard {
     pub fn load(path: &Path, hash: &str, work: &PinnedWork) -> Result<Self, WorkError> {
         let bytes = private_files::read(path, hash).map_err(|_| WorkError::Authority)?;
-        let config: AppConfig =
+        let config: ExecutionConfig =
             toml::from_str(std::str::from_utf8(&bytes).map_err(|_| WorkError::Authority)?)
                 .map_err(|_| WorkError::Authority)?;
-        let identity = config.supervisor.as_ref().ok_or(WorkError::Authority)?;
-        let interaction = identity.interaction.as_ref().ok_or(WorkError::Authority)?;
+        let identity = &config.supervisor;
+        let interaction = &identity.interaction;
         if config.service.read_only
-            || config.evaluation.active()
+            || config.evaluation.semantic_time.is_some()
             || config.cluster.enabled
             || identity.instance_id != work.grant().instance_id
             || identity.area != Area::Workshop
@@ -252,7 +298,12 @@ mod tests {
         for changed in [
             config.replace("read_only=false", "read_only=true"),
             config.replace("enabled=false", "enabled=true"),
+            config.replace("[cluster]\nenabled=false\n", ""),
+            config.replace("enabled=false", ""),
+            config.replace("read_only=false", "read_only='false'"),
             format!("{config}\n[evaluation]\nsemantic_time='2026-09-19T00:00:00Z'\n"),
+            format!("{config}\n[evaluation]\nsemantic_time='not-a-timestamp'\n"),
+            format!("{config}\n[evaluation]\nunknown=true\n"),
             config.replace("area='workshop'", "area='general'"),
             config.replace(
                 &profile.grant().instance_id.to_string(),
