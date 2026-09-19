@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Fresh schema only, never application bootstrap or an existing-target upgrade.
+pub mod gateway;
 use crate::{Failure, Input, Result, TARGET_LIMIT, Target, hash, json, valid_digest};
 use serde::Serialize;
 use sqlx::{
@@ -145,16 +146,23 @@ async fn prepare(connection: &mut PgConnection, migrator: &Migrator) -> Result<(
     // pre-existing extension except PostgreSQL's default plpgsql is accepted.
     // Do not mistake an empty table, custom function or another schema for an
     // empty database, and do not terminate other clients to make this pass.
+    // Namespace dependencies also catch standalone collations, operators and
+    // text-search objects that are absent from pg_class/pg_proc/pg_type.
     let occupied: bool = sqlx::query_scalar(r#"
 SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND pid<>pg_backend_pid())
 OR EXISTS(SELECT 1 FROM pg_namespace WHERE nspname NOT IN ('public','information_schema') AND nspname !~ '^pg_')
 OR EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public')
 OR EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public')
 OR EXISTS(SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public')
+OR EXISTS(SELECT 1 FROM pg_depend d JOIN pg_namespace n ON d.refobjid=n.oid WHERE d.refclassid='pg_namespace'::regclass AND n.nspname='public')
 OR EXISTS(SELECT 1 FROM pg_extension WHERE extname<>'plpgsql')
 OR EXISTS(SELECT 1 FROM pg_event_trigger)
 OR EXISTS(SELECT 1 FROM pg_largeobject_metadata)
 OR EXISTS(SELECT 1 FROM pg_foreign_server)
+OR EXISTS(SELECT 1 FROM pg_foreign_data_wrapper)
+OR EXISTS(SELECT 1 FROM pg_default_acl)
+OR EXISTS(SELECT 1 FROM pg_publication)
+OR EXISTS(SELECT 1 FROM pg_subscription WHERE subdbid=(SELECT oid FROM pg_database WHERE datname=current_database()))
 "#).fetch_one(&mut *transaction).await.map_err(|_| Failure::Schema)?;
     if occupied {
         return Err(Failure::NotEmpty);

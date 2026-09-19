@@ -67,16 +67,27 @@ reviewed installation overlay must bind that local image ID separately. Run the
 enrollment executable as a one-shot maintenance process with only its own token
 and endpoint network, never by adding authority credentials to a participant.
 
-Provision a **new dedicated** PostgreSQL database as a separate schema owner and
-apply the repository migrations, including 0036, using the normal migration
-workflow. Existing published history without receipts deliberately fails
-enrollment; it requires a separately approved revalidation/migration exercise.
-The test-only `isolation-admin` example uses `mem-test-support` to handle the
-known legacy dimensionless-vector migration; do not install this privileged
-fixture utility with the gateway.
+Provision a **new dedicated** PostgreSQL database as a separate schema owner, then
+use the production [gateway schema operator](gateway-schema.md):
 
-Create a distinct non-owner `gateway_runtime` login and adapt the database name
-in `gateway-grants.sql`. Grant only the listed federation tables, never application
+```sh
+memory-gateway-schema /private/company/gateway-schema.json
+memory-gateway-schema execute /private/company/gateway-schema.json EXACT_REVIEW_SHA256 \
+  --writers-stopped --fresh-database
+```
+
+The default is offline review; explicit execution applies the exact compiled
+schema without Memory bootstrap, jobs, listeners, credentials or grants. Existing
+published history without receipts deliberately fails
+enrollment; it requires a separately approved revalidation/migration exercise.
+The production operator reuses the existing fresh-schema dimensionless-vector
+compatibility rule. Do not use the privileged test-only `isolation-admin` example
+against a real gateway database.
+
+Create a distinct non-owner `gateway_runtime` login and explicitly adapt both
+`memory_isolation` database identifiers in `gateway-grants.sql` to the reviewed
+target (and each role occurrence if choosing another runtime name). The schema
+operator does not apply grants. Grant only the listed federation tables, never application
 tables, role membership, schema ownership, TRUNCATE or migration rights. After
 migrations 0048–0050, reapply the reviewed grants: private Q&A storage is needed
 for recovery fencing even while F1 routes remain disabled. DELETE is limited to

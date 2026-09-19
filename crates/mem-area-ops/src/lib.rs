@@ -54,6 +54,10 @@ pub enum Failure {
     #[error("local target connection failed; credentials and database details suppressed")]
     Connection,
     #[error(
+        "connected database, login or owner differs from the reviewed gateway target; no schema changes started"
+    )]
+    GatewayTarget,
+    #[error(
         "schema preparation requires an empty dedicated database with no other client connections"
     )]
     NotEmpty,
@@ -304,7 +308,7 @@ pub struct Target {
     pub username: String,
     pub password: Option<String>,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Connection {
     Loopback { port: u16 },
@@ -312,6 +316,25 @@ pub enum Connection {
 }
 impl Target {
     fn options(&self) -> Result<PgConnectOptions> {
+        if self.format_version != 1 || self.instance_id.is_nil() {
+            return Err(Failure::Target);
+        }
+        self.connection.options(
+            &self.database,
+            &self.username,
+            self.password.as_deref(),
+            "memory-area-import",
+        )
+    }
+}
+impl Connection {
+    fn options(
+        &self,
+        database: &str,
+        username: &str,
+        password: Option<&str>,
+        application: &str,
+    ) -> Result<PgConnectOptions> {
         if std::env::vars_os().any(|(key, _)| key.to_string_lossy().starts_with("PG")) {
             return Err(Failure::Environment);
         }
@@ -321,15 +344,13 @@ impl Target {
                 && s.bytes()
                     .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
         };
-        if self.format_version != 1
-            || self.instance_id.is_nil()
-            || !bounded_name(&self.database)
-            || !bounded_name(&self.username)
-            || self.password.as_ref().is_some_and(|s| s.len() > 4096)
+        if !bounded_name(database)
+            || !bounded_name(username)
+            || password.is_some_and(|s| s.len() > 4096)
         {
             return Err(Failure::Target);
         }
-        let (host, port) = match &self.connection {
+        let (host, port) = match self {
             Connection::Loopback { port } => ("127.0.0.1", *port),
             Connection::Unix { directory, port } => {
                 if !directory.is_absolute()
@@ -348,11 +369,11 @@ impl Target {
         Ok(PgConnectOptions::new_without_pgpass()
             .host(host)
             .port(port)
-            .username(&self.username)
-            .database(&self.database)
-            .password(self.password.as_deref().unwrap_or(""))
+            .username(username)
+            .database(database)
+            .password(password.unwrap_or(""))
             .ssl_mode(PgSslMode::Disable)
-            .application_name("memory-area-import")
+            .application_name(application)
             .statement_cache_capacity(0))
     }
 }

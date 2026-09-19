@@ -9,6 +9,10 @@ authors.workspace = true
 name = "memory-area-import"
 path = "src/main.rs"
 
+[[bin]]
+name = "memory-gateway-schema"
+path = "src/bin/memory-gateway-schema.rs"
+
 [dependencies]
 mem-area = { path = "../mem-area" }
 mem-area-store = { path = "../mem-area-store" }
