@@ -73,6 +73,13 @@ pub(super) fn lines(status: &Value, now: DateTime<Utc>) -> Vec<String> {
             date(&c["tls_expires_at"])
         ),
     ];
+    if let Some(expiry) = c["tls_expires_at"].as_i64() {
+        if expiry <= now {
+            out.push("WARNING: observed PDS operator TLS certificate has expired; operator intervention is required. No automatic issuer or CA changes.".into());
+        } else if expiry.saturating_sub(now) <= 86_400 {
+            out.push("WARNING: observed PDS operator TLS certificate expires within one day; arrange operator renewal. No automatic issuer or CA changes.".into());
+        }
+    }
     if gateway["pending"].is_object() {
         out.push(format!("Pending publication: {failure}."));
     }
@@ -83,6 +90,27 @@ pub(super) fn lines(status: &Value, now: DateTime<Utc>) -> Vec<String> {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn tls_warnings_follow_observed_expiry_and_age_on_redraw() {
+        let now = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let mut value =
+            json!({"gateway":{"credentials":{"tls_expires_at":now.timestamp()+86_401}}});
+        assert!(!lines(&value, now).join("\n").contains("WARNING:"));
+        assert!(
+            lines(&value, now + chrono::Duration::seconds(1))
+                .join("\n")
+                .contains("expires within one day")
+        );
+        assert!(
+            lines(&value, now + chrono::Duration::seconds(86_401))
+                .join("\n")
+                .contains("has expired")
+        );
+        value["gateway"]["credentials"]["tls_expires_at"] = Value::Null;
+        let unknown = lines(&value, now).join("\n");
+        assert!(unknown.contains("leaf expires unknown"));
+        assert!(!unknown.contains("WARNING:"));
+    }
     #[test]
     fn missing_stale_static_expired_and_blocked_never_claim_eligible_credentials() {
         let now = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
