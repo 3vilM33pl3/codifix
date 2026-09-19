@@ -140,6 +140,32 @@ test('foreign owners, hard-linked secrets and permissive ancestors are rejected'
   await assert.rejects(privateRead(join(f.directory, 'parent-alias', 'password')));
 });
 
+test('a FIFO is rejected promptly before any blocking read', async t => {
+  const f = await fixture(t); const fifo = join(f.directory, 'fifo');
+  assert.equal(spawnSync('mkfifo', ['-m', '600', fifo]).status, 0);
+  const module = new URL('./files.mjs', import.meta.url).href;
+  const program = `import {privateRead} from ${JSON.stringify(module)}; try { await privateRead(${JSON.stringify(fifo)}); process.exitCode=2; } catch { process.stdout.write('rejected'); }`;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', program], { encoding: 'utf8', timeout: 2000 });
+  assert.equal(result.status, 0); assert.equal(result.stdout, 'rejected');
+});
+
+test('oversized or growing-file inputs remain bounded and cannot advance the journal', async t => {
+  const f = await fixture(t);
+  await f.write('oversized', Buffer.alloc(65537));
+  await assert.rejects(privateRead(join(f.directory, 'oversized')), /unsafe_private_file/u);
+  await assert.rejects(f.files.write('journal.json', { data: 'x'.repeat(65536) }), /invalid_private_file_bound/u);
+  assert.equal(await f.files.read('journal.json'), null);
+  // Compete with bounded reads; every outcome is either one complete allowed
+  // small snapshot or a refusal, never a returned oversized allocation.
+  const path = join(f.directory, 'growing'); await f.write('growing', 'x');
+  const reads = Array.from({ length: 40 }, async () => {
+    try { const bytes = await privateRead(path, { limit: 32 }); assert.ok(bytes.length <= 32); }
+    catch (error) { assert.ok(error instanceof OperatorError); }
+  });
+  await writeFile(path, Buffer.alloc(1024 * 1024), { mode: 0o600 });
+  await Promise.all(reads);
+});
+
 test('directory replacement cannot redirect a write or its temporary cleanup', async t => {
   const f = await fixture(t); const moved = `${f.directory}-moved`;
   t.after(async () => rm(moved, { recursive: true, force: true }));

@@ -98,13 +98,21 @@ export function safeFile(meta, limit, publicFile) {
       : meta.uid === uid() && (meta.mode & 0o777) === 0o600), 'unsafe_private_file');
 }
 async function readAt(directory, name, { optional = false, limit = 65536, publicFile = false } = {}) {
+  check(Number.isSafeInteger(limit) && limit > 0 && limit <= 65536, 'invalid_private_file_bound');
   let file;
   try {
-    file = await open(fdPath(directory, name), constants.O_RDONLY | constants.O_NOFOLLOW);
+    // A FIFO must reach fstat rejection instead of hanging during open.
+    file = await open(fdPath(directory, name), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     const before = await file.stat(); safeFile(before, limit, publicFile);
-    const bytes = await file.readFile(); const after = await file.stat(); safeFile(after, limit, publicFile);
-    check(bytes.length <= limit && before.size === after.size && before.mtimeMs === after.mtimeMs, 'private_file_changed');
-    return bytes;
+    const buffer = Buffer.alloc(limit + 1); let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await file.read(buffer, length, buffer.length - length, null);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    const after = await file.stat(); safeFile(after, limit, publicFile);
+    check(length <= limit && before.size === after.size && before.mtimeMs === after.mtimeMs, 'private_file_changed');
+    return buffer.subarray(0, length);
   } catch (error) {
     if (optional && error.code === 'ENOENT') return null;
     if (error instanceof OperatorError) throw error;
@@ -140,6 +148,8 @@ export class StateFiles {
   }
   async write(name, data) {
     this.path(name);
+    const bytes = Buffer.from(`${canonical(data)}\n`);
+    check(bytes.length <= 65536, 'invalid_private_file_bound');
     return this.withDirectory(async directory => {
       await readAt(directory, name, { optional: true });
       const temporary = `.pending-${randomUUID()}`;
@@ -147,7 +157,7 @@ export class StateFiles {
       try {
         file = await open(fdPath(directory, temporary), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
         owned = await file.stat(); safeFile(owned, 65536, false);
-        await file.writeFile(`${canonical(data)}\n`);
+        await file.writeFile(bytes);
         await this.fault('before_file_sync', name);
         await this.checkBinding(directory);
         await file.sync(); await file.close(); file = null;
