@@ -82,9 +82,9 @@ import { companyBootstrapTopology } from './deploy/federation/company-bootstrap-
 const result = companyBootstrapTopology(reviewedCompanySettings, {
   schemaVersion: 1,
   operatorHostname: 'operator.memory.company.internal',
-  repositoryHostname: 'repository.memory.company.internal',
-  repositoryDid: 'did:web:repository.memory.company.internal',
-  accountHandle: 'repository.memory.company.internal',
+  repositoryHostname: 'space.memory.company.internal',
+  repositoryDid: 'did:web:space.memory.company.internal',
+  accountHandle: 'space.memory.company.internal',
   didDocument: reviewedPublicDocumentBytes,
   didDocumentSha256: reviewedPublicDocumentDigest,
   caCertificateSha256: reviewedCaFileDigest,
@@ -96,6 +96,9 @@ values. The account handle must equal the repository hostname and be beneath
 the configured company domain; the overlay sets `PDS_SERVICE_HANDLE_DOMAINS` to
 that company suffix. Repository, operator, member and gateway origins cannot
 collide. `repositoryDid` must explicitly equal `did:web:<repositoryHostname>`.
+The PDS also applies its own reserved-handle policy: for pinned 0.5.27,
+`repository` is reserved, while the disposable rehearsal uses `space`. The
+generator does not replace the upstream account-policy validation.
 
 `didDocument` is the exact UTF-8 JSON string, at most 16 KiB, with its matching
 SHA-256. Compact JSON, pretty JSON and a trailing newline retain their exact
@@ -181,6 +184,8 @@ node --test deploy/federation/company-topology.test.mjs deploy/federation/compan
 Tests cover unchanged default output, exact routes/methods, network non-adjacency,
 scoped credentials, 443 sysctls, CA inventory pinning, public-document byte/hash
 round-trip and rejection of malicious/ambiguous input. These are graph and
-generation tests, not a live Caddy/PDS verification. Before deployment, demonstrate
-the actual pinned parser's served bytes, TLS rejection, IPv4 firewall denials,
-non-root startup and bootstrap/handoff/activation in a disposable rehearsal.
+generation tests. The separate [disposable runtime rehearsal](../../tests/company-topology/README.md)
+checks the actual pinned parser's served bytes, TLS rejection, IPv4 firewall
+denials, non-root startup and optional real PDS bootstrap/handoff/activation.
+Re-run that gate for the reviewed target engine/images before deployment; it
+does not prove Memory application authorization or activate existing services.

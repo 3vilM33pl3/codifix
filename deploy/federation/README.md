@@ -7,8 +7,10 @@ are introduced. Container/host administrators remain trusted plaintext operators
 
 For the separate production-intended Workshop/Homelab blueprint, see
 [company topology](company-topology.md). Its default-deny generator does not
-install services, reuse fixture identities or grant collection consent; it needs
-its own disposable runtime rehearsal before installation.
+install services, reuse fixture identities or grant collection consent. Its
+[disposable runtime rehearsal](../../tests/company-topology/README.md) covers
+real TLS/routing/isolation and the optional pinned PDS enrollment lifecycle;
+it does not replace application deployment or authorization gates.
 
 `topology.mjs` constructs the Compose graph used by the
 [executable isolation test](../../tests/federation-isolation/README.md):
