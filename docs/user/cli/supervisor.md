@@ -30,8 +30,108 @@ and Enter again to confirm. `c` closes a pending confirmation; inspect afterward
 if the outcome was uncertain. Escape returns to operational status. Web provides
 the same saved-result and explicit-review workflow.
 
-This saved-result increment is not a question-submission queue or an autonomous
-agent. Interactive new questions and their isolated execution remain separate.
+The original fixed-proposal result remains supported. The opt-in question queue
+below adds new reviewed requests; neither workflow provides autonomous agency.
+
+## Explicit private questions
+
+This is an opt-in Workshop-local workflow, not remote expertise discovery or
+four-area communication. Migration `0060`, an explicitly provisioned Workshop
+identity/policy, the approved exact-source grant, `[supervisor.interaction]`, and
+a separate operator worker are required. Merely building this code or opening
+the panel does not deploy or enable a paid question worker.
+
+Prepare one question, using a fresh non-nil UUID for this new request:
+
+```sh
+memory supervisor ask --project memory --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID
+```
+
+The preparation displays the **exact question**, OpenAI destination,
+`gpt-5.6-sol` model, approved source count, current daily limits and two hashes.
+It does not invoke a model or enqueue work. Inspect these terms, then copy both
+hashes into the confirmation with the **same question and request UUID**:
+
+```sh
+memory supervisor ask --project memory --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID --profile-digest PROFILE_SHA256 --request-digest REQUEST_SHA256 --confirm
+memory supervisor question --project memory --request-id REQUEST_UUID
+memory supervisor questions --project memory
+# Optional bounded pagination:
+memory supervisor questions --project memory --after LAST_REQUEST_UUID
+```
+
+Confirmation does not silently prepare replacement terms. A changed profile,
+source, question or request digest fails closed. The question is limited to
+4096 UTF-8 bytes. Only it and the approved collection are supplied; conversation
+history, files, ordinary-query results and other areas are never attached.
+
+**Queued is not answered.** The queue admits at most eight outstanding questions
+per Workshop project, with a ten-minute deadline, and the operator processes one
+question at a time. The standing source grant can expire earlier. The existing
+20-generation / USD 2.50 daily ceilings are unchanged and may be reduced by
+policy. Exhaustion does not authorize increasing limits or selecting another
+model. Model suggestions are untrusted text, not executable instructions.
+
+Poll status explicitly. When `proposal_available` is true, use its `action_id`
+with `memory supervisor result` above. Status listings are requester-private
+metadata, not question bodies. After an ambiguous submission, retain the same
+UUID, question and hashes: inspect status or repeat the exact confirmed command.
+This only reconciles the original request; it does not authorize another provider
+invocation. An `uncertain` provider attempt is not automatically regenerated.
+Starting a new question can repeat billing. Expired work is not restarted.
+
+Question intake and execution require current direct database permissions for
+`memory_read`, `loops_run` and `bundle_export`, plus a revocable service token or
+browser session. Group-mapping-only permissions are insufficient for this narrow
+background path. The original submitting credential remains bound to queued
+work: revocation/expiry blocks further execution and answer delivery even if the
+same person later signs in again. Changed or withdrawn sources, an expired
+standing grant, policy changes and disabled identities also block disclosure.
+Already transmitted bytes cannot be recalled.
+
+For an authenticated numeric-loopback single-user service, CLI/TUI verifies
+`/v1/auth/me` and exchanges local-owner access for a revocable session through
+the existing bootstrap endpoint. Its cookie/CSRF values remain only in client
+memory, shared across TUI requests; they are never printed or saved to disk.
+Redirects and proxies are disabled for these question calls. Remote/multi-user
+service-token access is not exchanged for owner authority. A revoked cached
+session is not automatically reminted to bypass denial.
+
+### TUI questions
+
+In **Supervisor**, press `v` for the selected project's private pane, then `q`
+for questions (`q` does not quit inside that pane). Press `n`, type the exact
+question and press Enter to prepare. Read the destination, model, limits and
+hashes; Enter again confirms a potentially paid attempt. Escape cancels an
+unsent preview. After an uncertain submission, Enter retries the same request
+and `r` inspects it; no new UUID is generated. Use `l` for your question list,
+`j`/`k` to select, Enter for status, `r` to refresh, and Enter on an available
+answer to read its citations. Escape returns to private proposals.
+
+### Operator queue execution
+
+The application must not acquire a provider credential or Docker socket. The
+separate trusted operator can process at most one pending question with:
+
+```sh
+memory-workshop-worker run-next /PRIVATE/work.json PROFILE_SHA256 INSTANCE_UUID /PRIVATE/service.toml CONFIG_SHA256
+```
+
+Supply the existing approved normal provider key and explicitly scoped database
+connection through the operator's protected environment, not command arguments;
+never use R3 credentials. The private service configuration must hash-match,
+remain writable-primary/non-evaluation/non-relay, and name the same instance and
+interaction profile. Current source, requester, credential, policy, expiry and
+lease checks run again before disclosure and result storage. No model retries,
+provisioning or policy enablement occur in `run-next`.
+
+For the independent preview only, the fixed-target
+`scripts/run-workshop-question-queue.mjs` operator wrapper provides `once` and
+`serve` modes; `serve` invokes the same guarded `run-next` every two seconds.
+It requires separately staged, hash-pinned artifacts and explicit operator
+activation. It is not a generic deployment installer or an application tool.
+Stop and inspect credential, storage or configuration failures. An enabled
+policy or a successful enqueue is not evidence that this worker is running.
 
 ## Operational metadata
 
@@ -75,11 +175,11 @@ Web: **More → Supervisor**. TUI: select **Supervisor**, press `r` to inspect,
 The project selector does not change this view. Refresh clears old results before
 making a request so denied/offline state is not shown as current healthy state.
 
-These surfaces do not expose questions, private proposals, source text, evidence
+The operational metadata surface does not expose questions, private proposals, source text, evidence
 bytes, model prompts or provider bodies. They never invoke a model or mutate
-policy merely by inspecting it. Private human review uses the separate
-project-scoped workflow above; supervisor chat and model scheduling remain
-separate implementation work.
+policy merely by inspecting it. Private results, human review and explicit
+questions use the separate project-scoped workflows above. Full autonomous
+supervision remains outside this bounded interaction increment.
 
 ## Explicit pause and resume
 

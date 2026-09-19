@@ -124,8 +124,61 @@ cargo run --bin memory -- service run
 **More → Supervisor** shows this instance's supervisor policy, exact budget
 amounts and bounded action history. It requires global `memory_read` and is not
 scoped by the project selector. This build explicitly reports execution **not
-integrated**, even if a policy is enabled. Viewing never starts work or exposes
-private question/model/source bodies. See [Supervisor inspection](cli/supervisor.md).
+integrated** for full autonomous agency, even if a policy is enabled. Inspecting
+this operational feed never starts work or exposes private bodies. The separate
+project-private interaction panel below has its own permissions and explicit
+consent; see [Supervisor inspection](cli/supervisor.md).
+
+### Workshop questions and saved proposals
+
+Select the Workshop project and open **More → Supervisor**. Under **Questions
+and proposals**, **Load saved proposals** and **Open proposal** display a saved
+question, plain-text response and exact source-version/digest citations. Approve
+or reject first opens confirmation. A recorded review is permanent and does not
+execute a suggestion, install software, edit a memory or permit a model call.
+The original fixed-proposal result remains supported.
+
+For a new request, enter an **Exact question** and choose **Prepare question**.
+The limit is 4096 UTF-8 bytes. Read the confirmation's exact question, OpenAI
+destination, `gpt-5.6-sol`, approved source count, daily ceiling, profile/request
+hashes and request UUID. Preparation makes no model call. **Confirm paid
+question** permits one bounded answer attempt using only that question and the
+approved collection; no conversation history, files, ordinary searches or other
+areas are attached. A model answer is untrusted text, not an instruction to run.
+
+**My questions** lists only the authenticated requester's retained request
+metadata. Choose a request to inspect status; **Refresh question status** is an
+explicit read, not another model call. **Read cited answer** appears when a saved
+result is available. Queued does not mean answered. Pending work has a ten-minute
+deadline (or an earlier standing-grant expiry), at most eight outstanding
+questions per Workshop project and one active answer worker. Existing limits of
+20 generations and USD 2.50 per day remain in force; current policy can lower
+them.
+
+After uncertain submission, use **Inspect this request** or **Retry exact
+submission**. The same question, hashes and UUID are retained; no automatic
+provider retry or replacement UUID is generated. A new question after uncertain
+provider work can repeat billing. Save the displayed request UUID before leaving
+the panel. Private input/consent lives only in browser memory and clears when the
+project or authenticated identity changes; it is not saved in browser storage.
+
+Intake, execution and answer delivery require fresh authorization. This narrow
+queued path requires direct database `memory_read`, `loops_run` and
+`bundle_export`, not merely group-mapping-only access, and a revocable session
+or service token. Revoking/expiring the **original submitting credential** blocks
+further execution and answer delivery even after a new login. Source changes,
+withdrawal, source-grant expiry and policy revocation also fail closed. Revocation
+cannot recall bytes already sent. Browser writes retain normal CSRF/Origin
+checks; read-only/evaluation services cannot accept paid work.
+
+This panel requires the separately provisioned interaction profile, approved
+source grant and isolated operator `run-next` worker (or the preview's explicitly
+activated `serve` wrapper). The app itself has no provider key or Docker socket.
+An enabled policy, visible controls or queued request does not prove the worker
+is running. These are software/operator requirements, not a claim that paid
+question execution is already deployed. This workflow does not enable the other
+three areas or cross-area communication. See the
+[CLI/TUI and operator instructions](cli/supervisor.md#explicit-private-questions).
 
 The main tabs match the TUI order:
 
