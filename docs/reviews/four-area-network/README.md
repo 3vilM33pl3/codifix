@@ -1,13 +1,19 @@
 # Four-area internal Memory network
 
-Status: Workshop-only local preview is live as of 2026-09-19. The full four-area
-network is not deployed; no new signed release was published for this preview.
+Status: Workshop and a separate two-record Homelab local preview are live as of
+2026-09-19. They do not yet exchange knowledge. The full four-area network is not
+deployed; no new signed release was published for these previews.
 
-Current narrowed work: [Workshop-first live activation](workshop-live.md). The
+Workshop evidence: [Workshop-first live activation](workshop-live.md). The
 bounded operator worker completed one real Pi/Sol proposal over three reviewed
 records in an independent database. Web/CLI/TUI inspection and local Web querying
 work. Existing services and the original dataset remain unchanged. Start with the
 [demo guide](../../user/workshop-preview.md); remaining four-area gates stay open.
+
+Current work: [Homelab / Workshop exchange](homelab-exchange.md). Homelab's
+independent database, authentication, encrypted backups and local Web/CLI/TUI
+paths are verified. Use its [demo guide](../../user/homelab-preview.md). Private
+gateway provisioning and reviewed deterministic exchange remain open.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound

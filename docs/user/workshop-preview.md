@@ -185,8 +185,12 @@ source references are archive-only; an unverified source warning is honest, not
 permission to scan the old host paths. Provenance references are not evidence
 that source files exist inside this container.
 
+An independent [Homelab local preview](homelab-preview.md) now contains two
+historical observability records, with its own database and credentials. It has
+no model or remote-expertise activation.
+
 This preview does **not** yet provide the four-area company demonstration:
-Homelab/General/CA enrollment and migration, remote expertise, autonomous release
+full Homelab migration, General/CA activation, gateway enrollment, remote expertise, autonomous release
 notifications/installations and messaging remain separate work. Explicit local
 questions are now supported, but multi-turn supervisor chat and autonomous
 knowledge upkeep are not. Do not describe the queue worker or a stored enabled
