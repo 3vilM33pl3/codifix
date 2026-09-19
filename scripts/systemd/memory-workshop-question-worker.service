@@ -1,0 +1,19 @@
+[Unit]
+Description=Workshop explicitly confirmed private question worker
+After=memory-workshop-preview-relay.service
+Requires=memory-workshop-preview-relay.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /home/olivier/.local/state/memory-workshop-preview-20260918/questions-60/queue.mjs serve
+WorkingDirectory=/home/olivier/.local/state/memory-workshop-preview-20260918
+# Authority, configuration, credentials and ambiguous work require inspection.
+# An automatic restart must not turn operator intervention into an error loop.
+Restart=no
+KillMode=control-group
+TimeoutStopSec=420
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target
