@@ -3,6 +3,7 @@
 //! automatic enrollment. Configure independently operated nodes explicitly.
 mod config;
 mod context;
+pub mod enrollment;
 mod expertise_answer;
 mod expertise_delivery;
 mod expertise_transport;
