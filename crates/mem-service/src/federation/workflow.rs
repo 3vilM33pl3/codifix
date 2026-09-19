@@ -173,8 +173,50 @@ pub(crate) async fn status(
     .await
     .ok()
     .and_then(Result::ok);
-    // A remote status request may wait while an administrator revokes access.
-    require_pull(&state, &runtime, &access).await?;
+    // A remote status request may wait while a credential, project membership,
+    // or the separate federation grant is revoked. Re-resolve all three in one
+    // bounded transaction; middleware permissions are only the initial scope.
+    let pool = state.pool()?;
+    let mut tx = pool.begin().await.map_err(|_| unavailable())?;
+    sqlx::query("SET LOCAL lock_timeout='2s'")
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| unavailable())?;
+    sqlx::query("SET LOCAL statement_timeout='3s'")
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| unavailable())?;
+    let permissions = crate::auth::locked_project_permissions(
+        &state,
+        &mut tx,
+        &mem_store::jobs::JobActor::Credential {
+            principal: principal.id,
+            token: principal.token_id,
+            session: principal.session_id,
+        },
+        access.project,
+    )
+    .await?;
+    if !permissions.contains(Permission::MemoryRead)
+        || !access.permissions.contains(Permission::MemoryRead)
+    {
+        return Err(ApiError::forbidden(
+            "current project read permission required",
+        ));
+    }
+    let current = LocalProjectAccess {
+        permissions: mem_record::PermissionSet::from_permissions(&[Permission::MemoryRead]),
+        ..access
+    };
+    mem_federation_store::authorize_source_pull_tx(
+        &mut tx,
+        &current,
+        runtime.space,
+        runtime.instance,
+    )
+    .await
+    .map_err(store_error)?;
+    tx.commit().await.map_err(|_| unavailable())?;
     Ok((
         [(axum::http::header::CACHE_CONTROL, "no-store")],
         Json(SpaceStatus {

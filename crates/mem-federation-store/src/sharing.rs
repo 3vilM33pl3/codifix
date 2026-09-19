@@ -106,13 +106,25 @@ pub async fn authorize_source_pull(
     instance: InstanceId,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
-    let grant = load_grant(&mut tx, access, space, instance).await?;
+    authorize_source_pull_tx(&mut tx, access, space, instance).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Caller-owned transaction lets a service hold current credential/project
+/// permission locks together with the separate local federation grant.
+pub async fn authorize_source_pull_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    access: &LocalProjectAccess,
+    space: SpaceId,
+    instance: InstanceId,
+) -> Result<()> {
+    let grant = load_grant(tx, access, space, instance).await?;
     if !access.permissions.contains(Permission::MemoryRead)
         || !grant.capabilities.contains(&SpaceCapability::Pull)
     {
         return Err(StoreError::Binding);
     }
-    tx.commit().await?;
     Ok(())
 }
 
