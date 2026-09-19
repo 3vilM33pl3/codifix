@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supervisorPrivate, supervisorReview, type SupervisorProposalDetail, type SupervisorReviewRequest } from "../../api";
+import { QuestionsPanel } from "./QuestionsPanel";
 
 export function ProposalsPanel({ project }: { project: string }) {
   const [actions, setActions] = useState<string[]>([]);
@@ -44,6 +45,7 @@ export function ProposalsPanel({ project }: { project: string }) {
   return <section aria-label="Private supervisor proposals">
     <h3>Questions and proposals · {project}</h3>
     <p>Private project content, separate from the operational feed. Reviewing a suggestion does not execute it, change a memory or install software.</p>
+    <QuestionsPanel key={project} project={project} onOpenProposal={id => { if (!pending && !busy) void open(id); }} />
     <button disabled={busy || !!pending} onClick={() => void list()}>Load saved proposals</button>
     <button disabled={busy || !!pending || !after} onClick={() => void list(after!)}>Next proposals</button>
     {busy ? <p role="status">Loading private supervisor result…</p> : null}

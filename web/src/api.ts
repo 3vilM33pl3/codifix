@@ -65,6 +65,33 @@ export type SupervisorProposalDetail = {
 };
 export type SupervisorReviewRequest = { request_id: string; proposal_digest: string; decision: "approve" | "reject" };
 export type SupervisorReviewReceipt = SupervisorReviewRequest & { action_id: string; reviewer_id: string; recorded_at: string };
+export type SupervisorQuestionPreview = { question: string; profile_digest: string; request_digest: string; destination: string; model: string; source_count: number; daily_call_limit: number; daily_usd_micros: string };
+export type SupervisorQuestionRequest = { request_id: string; question: string; profile_digest: string; request_digest: string };
+export type SupervisorQuestionStatus = { request_id: string; action_id: string; state: string; expires_at: string; proposal_available: boolean };
+export type SupervisorQuestionList = { questions: SupervisorQuestionStatus[]; next_after: string | null };
+
+export async function supervisorQuestions<T>(project: string, suffix: string, signal?: AbortSignal, request?: { question: string } | SupervisorQuestionRequest): Promise<T> {
+  let response: Response;
+  try {
+    // Requester-private reads also need a revocable session, not anonymous local read access.
+    const me = await getAuthMe();
+    if (me.mode === "single_user") await ensureSession();
+    response = await apiFetch(`/v1/projects/${encodeURIComponent(project)}/supervisor/questions${suffix}`, {
+      signal, cache: "no-store", ...(request ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) } : {}),
+    });
+  } catch { throw new Error("Question outcome unconfirmed. Inspect its request ID; retry only the same payload."); }
+  if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "Question access denied. Current project permission and authentication are required."
+    : response.status === 404 ? "Question or interaction profile unavailable."
+    : response.status === 409 ? "Question conflicts with current sources, policy or prior request. Do not change terms under this request ID."
+    : response.status === 429 ? "Question capacity or budget exhausted. Inspect status before retrying."
+    : "Question outcome unconfirmed. Inspect this request ID; response details suppressed.");
+  try { return await response.json() as T; } catch { throw new Error("Question receipt unreadable. Inspect this request ID."); }
+}
+export async function supervisorQuestionSubmit(project: string, request: SupervisorQuestionRequest): Promise<SupervisorQuestionStatus> {
+  const result = await supervisorQuestions<SupervisorQuestionStatus>(project, "", undefined, request);
+  if (result.request_id !== request.request_id) throw new Error("Question receipt mismatch. Inspect the original request ID.");
+  return result;
+}
 export async function supervisorPrivate<T>(project: string, suffix: string, signal?: AbortSignal, request?: SupervisorReviewRequest): Promise<T> {
   let response: Response;
   try { response = await apiFetch(`/v1/projects/${encodeURIComponent(project)}/supervisor/proposals${suffix}`, {

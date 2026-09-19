@@ -34,3 +34,26 @@ it("does not treat an unrelated receipt as confirmation", async () => {
   const { supervisorPolicy } = await import("../../api");
   await expect(supervisorPolicy(request)).rejects.toThrow("Receipt mismatch");
 });
+
+it("binds paid question receipt and sends only exact consent with CSRF", async () => {
+  const question = { request_id: "question", question: "Exact text", profile_digest: "a".repeat(64), request_digest: "b".repeat(64) };
+  const fetch = vi.fn().mockResolvedValueOnce(Response.json({ mode: "multi_user", read_only: false }))
+    .mockResolvedValueOnce(Response.json({ request_id: "other" }));
+  vi.stubGlobal("fetch", fetch);
+  const { supervisorQuestionSubmit } = await import("../../api");
+  await expect(supervisorQuestionSubmit("memory", question)).rejects.toThrow("receipt mismatch");
+  const [url, options] = fetch.mock.calls[1];
+  expect(url).toBe("/v1/projects/memory/supervisor/questions");
+  expect(JSON.parse(options.body)).toEqual(question);
+  expect(options.headers.get("x-csrf-token")).toBe("synthetic-csrf");
+  expect(options.cache).toBe("no-store");
+});
+
+it.each([401, 403, 409, 429, 500])("sanitizes private question %s failures", async status => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json({ mode: "multi_user", read_only: false }))
+    .mockResolvedValueOnce(new Response("PRIVATE_PROVIDER_OR_STORAGE_BODY", { status })));
+  const { supervisorQuestions } = await import("../../api");
+  const error = await supervisorQuestions("memory", "").catch(e => e as Error);
+  expect(error).toBeInstanceOf(Error);
+  expect(String(error)).not.toContain("PRIVATE_PROVIDER_OR_STORAGE_BODY");
+});

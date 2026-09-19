@@ -1,0 +1,70 @@
+import { StrictMode } from "react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { supervisorQuestions, supervisorQuestionSubmit, type SupervisorQuestionPreview } from "../../api";
+import { QuestionsPanel } from "./QuestionsPanel";
+vi.mock("../../api", () => ({ supervisorQuestions: vi.fn(), supervisorQuestionSubmit: vi.fn() }));
+const preview: SupervisorQuestionPreview = { question: "<script>What is approved?</script>", profile_digest: "a".repeat(64), request_digest: "b".repeat(64), model: "gpt-5.6-sol", destination: "OpenAI", source_count: 3, daily_call_limit: 20, daily_usd_micros: "2500000" };
+beforeEach(() => { vi.mocked(supervisorQuestions).mockReset(); vi.mocked(supervisorQuestionSubmit).mockReset(); });
+afterEach(cleanup);
+async function prepare() {
+  vi.mocked(supervisorQuestions).mockResolvedValueOnce(preview);
+  fireEvent.change(screen.getByRole("textbox", { name: "Exact question" }), { target: { value: preview.question } });
+  fireEvent.click(screen.getByRole("button", { name: "Prepare question" }));
+  await screen.findByRole("dialog", { name: "Confirm paid supervisor question" });
+}
+it("prepares explicitly, displays exact consent as text and makes no paid call before confirmation", async () => {
+  render(<StrictMode><QuestionsPanel project="memory" onOpenProposal={vi.fn()} /></StrictMode>);
+  expect(supervisorQuestions).not.toHaveBeenCalled();
+  await prepare();
+  expect(screen.getByRole("dialog")).toHaveTextContent(preview.question);
+  expect(screen.getByRole("dialog")).toHaveTextContent("OpenAI. Model: gpt-5.6-sol");
+  expect(screen.getByRole("dialog")).toHaveTextContent("20 calls");
+  expect(document.querySelector("section script")).toBeNull();
+  expect(supervisorQuestionSubmit).not.toHaveBeenCalled();
+  expect(vi.mocked(supervisorQuestions).mock.calls[0][2]?.aborted).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel question" }));
+  expect(supervisorQuestionSubmit).not.toHaveBeenCalled();
+});
+it("retains exact payload after an ambiguous submission and manually inspects the resulting answer", async () => {
+  const open = vi.fn();
+  render(<QuestionsPanel project="memory" onOpenProposal={open} />);
+  await prepare();
+  vi.mocked(supervisorQuestionSubmit).mockRejectedValueOnce(new Error("Unconfirmed"));
+  fireEvent.click(screen.getByRole("button", { name: "Confirm paid question" }));
+  await screen.findByRole("alert");
+  const request = vi.mocked(supervisorQuestionSubmit).mock.calls[0][1];
+  expect(request).toEqual({ request_id: expect.any(String), question: preview.question, profile_digest: preview.profile_digest, request_digest: preview.request_digest });
+  expect(screen.getByRole("textbox")).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Cancel question" })).toBeNull();
+  vi.mocked(supervisorQuestionSubmit).mockResolvedValueOnce({ request_id: request.request_id, action_id: "action", state: "queued", expires_at: "later", proposal_available: false });
+  fireEvent.click(screen.getByRole("button", { name: "Retry exact submission" }));
+  await screen.findByRole("article", { name: "Question status" });
+  expect(vi.mocked(supervisorQuestionSubmit).mock.calls[1][1]).toEqual(request);
+  expect(screen.queryByRole("button", { name: "Read cited answer" })).toBeNull();
+  vi.mocked(supervisorQuestions).mockResolvedValueOnce({ request_id: request.request_id, action_id: "action", state: "verified", expires_at: "later", proposal_available: true });
+  fireEvent.click(screen.getByRole("button", { name: "Refresh question status" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Read cited answer" }));
+  expect(open).toHaveBeenCalledWith("action");
+  expect(supervisorQuestionSubmit).toHaveBeenCalledTimes(2);
+});
+it("bounds UTF-8 bytes and clears local consent across project remount", async () => {
+  const view = render(<QuestionsPanel key="memory" project="memory" onOpenProposal={vi.fn()} />);
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "é".repeat(2049) } });
+  expect(screen.getByRole("button", { name: "Prepare question" })).toBeDisabled();
+  await prepare();
+  view.rerender(<QuestionsPanel key="homelab" project="homelab" onOpenProposal={vi.fn()} />);
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getByRole("textbox")).toHaveValue("");
+  expect(vi.mocked(supervisorQuestions).mock.calls[0][2]?.aborted).toBe(true);
+});
+it("rejects altered preparation and does not attach hidden history or context", async () => {
+  render(<QuestionsPanel project="memory" onOpenProposal={vi.fn()} />);
+  vi.mocked(supervisorQuestions).mockResolvedValueOnce({ ...preview, question: "altered" });
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: preview.question } });
+  fireEvent.click(screen.getByRole("button", { name: "Prepare question" }));
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("preview mismatch"));
+  expect(vi.mocked(supervisorQuestions).mock.calls[0][3]).toEqual({ question: preview.question });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(supervisorQuestionSubmit).not.toHaveBeenCalled();
+});
