@@ -83,4 +83,24 @@ describe("Federation workspace", () => {
       { envelope: { publisher: proposal.publisher, record_id: proposal.id, record: { kind: "proposal", payload: { content } } } },
     ] } as Parameters<typeof selectedContent>[0])).toEqual(content);
   });
+  it("clears the previous status if renewed access is denied", async () => {
+    let denied = false;
+    vi.mocked(federationRequest).mockImplementation(async (_project, space, path) => {
+      if (!space) return discover;
+      if (denied) throw new Error("403 access revoked");
+      if (path === "") return { local: { queued_intents: 0, accepted_not_replicated: 0, replicated_intents: 0, blocked_intents: 0, pending_source_changes: 0 }, retained_through: 42, observed_capabilities: [] };
+      if (path?.startsWith("/catalog")) return { streams: { items: [], next_offset: null }, proposals: { items: [], next_offset: null }, members: { items: [], next_offset: null }, local: { grants: { items: [], next_offset: null }, reviews: { items: [], next_offset: null }, subscriptions: { items: [], next_offset: null } } };
+      return { items: [] };
+    });
+    render(<FederationTab project="a" />);
+    await screen.findByText("Local actor", { exact: false });
+    fireEvent.click(screen.getByText("Refresh local status"));
+    await screen.findByText(/Verified through sequence 42/);
+    await waitFor(() => expect(screen.getByText("Refresh local status")).not.toBeDisabled());
+    denied = true;
+    fireEvent.click(screen.getByText("Refresh local status"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Forbidden");
+    expect(screen.queryByText(/Verified through sequence 42/)).toBeNull();
+    expect(screen.queryByText("No shared memories on this page.")).toBeNull();
+  });
 });

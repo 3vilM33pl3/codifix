@@ -8,12 +8,13 @@ export function GatewayHealth({ health }: { health?: Health | null }) {
   const c = health.credentials;
   const stale = !Number.isFinite(c.observed_at) || now - c.observed_at > 120 || c.observed_at - now > 30;
   const expired = c.expires_at !== null && c.expires_at <= now;
-  const usable = !stale && !expired && c.state === "usable" && c.publication_usable;
+  const maintenanceStale = c.maintenance_observed_at === null || !Number.isFinite(c.maintenance_observed_at) || now - c.maintenance_observed_at > 180 || c.maintenance_observed_at - now > 30;
+  const usable = !stale && !expired && !health.pending?.blocked && c.state === "usable" && c.publication_usable;
   return <section aria-label="Gateway credential health">
     <h3>Gateway publication credentials</h3>
-    <p role="status">{stale ? "Observation stale — refresh status" : expired ? "Expired — publication blocked" : usable ? "Credential eligible for publication attempts" : `Publication credential requires attention: ${c.state}`}.</p>
+    <p role="status">{stale ? "Observation stale — refresh status" : expired ? "Expired — publication blocked" : health.pending?.blocked ? "Publication blocked — inspect the recorded failure" : usable ? "Credential eligible for publication attempts" : `Publication credential requires attention: ${c.state}`}.</p>
     <p>Access expires {date(c.expires_at)}; generation {c.generation ?? "unknown"}. Observed {date(c.observed_at)}.</p>
-    <p>Renewal: {c.maintenance_state}; last success {date(c.last_success)}; next retry {date(c.retry_at)}. {c.reason ?? ""}</p>
+    <p>Renewal: {maintenanceStale ? "unknown — maintenance observation stale or unavailable" : c.maintenance_state}; last success {date(c.last_success)}; next retry {date(c.retry_at)}. {c.reason ?? ""}</p>
     <p>Observed PDS operator TLS expiry {date(c.tls_expires_at)}. {c.tls_expires_at !== null && c.tls_expires_at - now <= 86400 ? "Certificate renewal needs operator attention; no automatic CA changes." : ""}</p>
     {health.pending ? <p>Publication {health.pending.sequence}: {health.pending.blocked ? "blocked" : "pending"}; {health.pending.attempts} attempts; {health.pending.failure ?? "no recorded failure"}.</p> : null}
     <p>Credential eligibility is not proof that the PDS is reachable or a publication has succeeded.</p>

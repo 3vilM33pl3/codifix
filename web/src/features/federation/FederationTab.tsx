@@ -55,6 +55,9 @@ function Workspace({ project }: { project: string }) {
     finally { if (!lifetime.current?.signal.aborted) setBusy(false); }
   }
   async function refresh(page = offset) {
+    // A failed authorization refresh must not leave a previous healthy snapshot
+    // or protected catalog visible as if the latest request had succeeded.
+    setStatus(null); setCatalog(null); setContext(null); setCorrection(null); setProposal(null);
     const [s, c] = await Promise.all([call<Status>(""), call<Catalog>(`/catalog?offset=${page}`)]);
     if (lifetime.current?.signal.aborted) return;
     setStatus(s); setCatalog(c); setOffset(page);
