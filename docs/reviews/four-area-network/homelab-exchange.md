@@ -19,7 +19,7 @@ release. The approved-plan Memory checkpoint was renewed before edits.
   transactional, audited installation API; keep remote grants disabled.
 - [x] Prepare separate gateway schema and restricted runtime credentials; verify
   its encrypted NAS backup without connecting either preview.
-- [ ] Provision the private gateway/PDS with separately pinned receipt/repository
+- [x] Provision the private gateway/PDS with separately pinned receipt/repository
   keys and a separate space authority; retain interrupted-operation evidence.
 - [ ] Review exact per-recipient collections and enable deterministic exchange.
 - [ ] Demonstrate both directions and a denied non-member, with signed receipts.
@@ -141,8 +141,8 @@ It proves those bounded prerequisites, not a running Memory gateway or real
 knowledge exchange. The installed previews must be reused through dedicated
 per-member gateway networks, not replaced by the blueprint's new empty apps/DBs.
 Gateway token installation/restart and blocked-publication retry remain explicit
-operator operations. No real company PDS, membership or collection has yet been
-activated by this increment.
+operator operations. This was the pre-enrollment state; the real provisioning
+increment below supersedes it. Collection activation remains separate.
 
 ## Gateway staging, 10:07 UTC
 
@@ -202,10 +202,44 @@ the shared company project.
 
 Olivier approved the private namespace `memory.robotmotel.com` on 2026-09-19,
 before permanent enrollment. This does not authorize public DNS or changes to
-the existing CA. No permanent repository DID, TLS issuer, PDS account, remote membership
-or collection consent has been installed. No public DNS, existing CA service,
-Workshop model policy or original dataset writer was changed. Next: settle the
-private names/trust configuration, provision the pinned PDS, verify/install its
-keys, start the restricted gateway, and review both directions of deterministic
-knowledge exchange. Neither staging nor the disposable rehearsal is the completed
-four-area network.
+the existing CA. The following increment records the resulting private deployment.
+Neither staging nor the disposable rehearsal is the completed four-area network.
+
+## Private PDS and gateway enrolled, 11:44 UTC
+
+The real company PDS now owns `did:web:space.memory.robotmotel.com`. It uses the
+unchanged pinned image/SDK, production account checks, explicit invitation and
+durable bootstrap/create/key-discovery/handoff/activation phases. No disposable
+fixture account, SSRF bypass, public DNS change or existing CA operation was used.
+Names resolve only on the separate internal Docker networks. A newly generated,
+scoped preview TLS issuer is not the existing company CA: its root lasts 30 days,
+the leaves seven days, and renewal remains an explicit operator responsibility.
+Its private root key is never mounted into a service.
+
+The gateway runs with its restricted SQL role, independently pinned repository
+and receipt keys, no model destinations and a complete schema-v3 fleet. The
+separate authority enrolled Workshop and Homelab with Pull, Publish,
+AskExpertise and AnswerExpertise only. Reviewed enrollment operation
+`57767766-8fc9-44a8-896f-152c72f886f6` reached `published_proven` at sequence 8;
+an exact retry retained the same record IDs and sequence numbers. Its published
+tip is `f50656fb69923768a6fd6faaebe380410083ffecb53a0e7978d150e4a4969981`.
+
+An independent, read-only pinned-SDK download verified the actual signed CAR
+against the installed repository key and rejected the former bootstrap key.
+It added no synthetic record to the real repository. CAR SHA-256:
+`b36ec4f4054a20a47eb1fc35402ae5a10a9bef5a7fd077fe5b368255575446e7`.
+The gateway audit key is distinct from both repository and bootstrap keys.
+
+Encrypted, hash-verified NAS backups now include the enrolled PDS, its keys and
+configuration, gateway logical dump and exact artifacts. The raw PDS was copied
+only while stopped; live PostgreSQL data files were excluded. After-enrollment
+ciphertext SHA-256 is
+`c9e0b4fae14b2d2ffcc31614af22089d29100fa4293ec5e2fad7676e21a6b09d`.
+Full restore/decryption/key recovery is still **not** demonstrated.
+
+Only the PDS access token is installed in the gateway; the refresh token and
+operator/bootstrap credentials are not. Session refresh, replacement token
+installation, gateway restart and any blocked-publication retry require the
+documented explicit operator workflow. At this checkpoint neither app is
+attached, no knowledge collection is activated and no model/Pi call was made.
+Local grants, exact review and real two-way answers are the next gates.
