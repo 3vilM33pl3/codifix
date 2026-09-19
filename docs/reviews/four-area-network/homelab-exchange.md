@@ -318,3 +318,47 @@ This is two independently stored areas on one host, not four independent hosts,
 the complete dataset partition, autonomous expertise exchange, a signed software
 release, CA activation or customer readiness. R3 remains paused. The scoped TLS
 and PDS-session maintenance and full recovery gates above remain open.
+
+## Restart and status verification, 12:26 UTC
+
+The status-only upgrade deployed service source `30f26cbc` and Web source
+`10287e6f`. Synchronization retry now reports the transaction-consistent verified
+cursor, not the number of messages sent in that cycle. Both real instances
+returned `retained_through: 10`. The Web reconnect handler clears only its own
+stale connection-loss notice; unrelated messages are preserved.
+
+Before deployment, both apps and Workshop's question worker were stopped, queues
+were checked empty, and then the exact gateway/PDS writers were stopped. A fresh
+backup contains three logical database dumps/roles, current offline PDS state,
+configuration, identities and previous artifacts. It excludes live PostgreSQL
+data files and provider credentials. Local and NAS ciphertext copies match
+`a7b39a7b5adc1f52aed7516add9de67e55d7791ac0e07d979c468e4c04ced05c`.
+The temporary plaintext dumps were removed after encrypted-copy verification;
+their recoverable contents remain in the encrypted bundle. This is still not a
+full restore/decryption rehearsal.
+
+Only the application binary/Web mounts changed. Both databases, schema `0060`,
+configuration hashes and source counts remained unchanged. Independent review
+verified the same two-peer private networks, hardening and stopped old writers;
+18 post-restart denial probes passed again. Both existing CLI answers retained
+their exact response/citation digests, and Workshop displayed its saved browser
+answer after reload. Gateway totals remained three question execution claims
+and three completed answers; delivery reauthorization adds separate audit events.
+Workshop's worker resumed only after zero eligible pending questions, active
+actions and unsettled attempts, with its original manifest and grant expiry.
+
+The running binary SHA-256 is
+`c7178a51f49b57a3e3b6e6d10a28fcbc41f8663391f0d5c31df99ba8102acd2c`;
+this Web tree is
+`4b708d51accdff0109871f3dd598b5e47c7d3a9fde80644314e95bec642ba793`.
+The fresh read-only signed-repository download after capability publication also
+verified the current repository key and rejected the bootstrap key: CAR SHA-256
+`fb1d2cc01912a43a71b6695141cfb7cbd7868a922d8d63321132ab24202f337c`.
+No repository write or paid model call was made by that verification.
+
+Required-database cursor regression and federation workflow tests (14 passed,
+one ignored), scoped strict Clippy, formatting and boundaries passed. All 129
+Web tests and the production build passed. A fresh Homelab browser additionally
+exposed a missing single-user session bootstrap on initial federation reads;
+the Web follow-up below is required before calling that fresh-browser journey
+complete. Existing authenticated CLI and Workshop sessions were unaffected.
