@@ -5,6 +5,11 @@ installed customer deployment. First complete the [release gates](../../docs/rev
 No public ports, native Spaces, PDS fork, public Bluesky or automatic discovery
 are introduced. Container/host administrators remain trusted plaintext operators.
 
+For the separate production-intended Workshop/Homelab blueprint, see
+[company topology](company-topology.md). Its default-deny generator does not
+install services, reuse fixture identities or grant collection consent; it needs
+its own disposable runtime rehearsal before installation.
+
 `topology.mjs` constructs the Compose graph used by the
 [executable isolation test](../../tests/federation-isolation/README.md):
 
