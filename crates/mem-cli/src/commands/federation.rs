@@ -13,6 +13,7 @@ use std::{
 };
 use uuid::Uuid;
 mod expertise;
+mod health;
 #[cfg(test)]
 mod session_tests;
 #[cfg(feature = "tui")]
@@ -335,6 +336,7 @@ pub(super) async fn handle(args: FederationArgs, client: Client, config: AppConf
         "requested space is not configured for this project"
     );
     api.base.push_str(&format!("/{configured}"));
+    let show_health = matches!(args.command, FederationCommand::Status);
     let response=match args.command {
         FederationCommand::Collections{command}=>expertise::collection(&api,command).await?,
         FederationCommand::Capabilities{after_publisher,after_record,limit}=>api.call(Method::GET,&expertise::capability_path(after_publisher,after_record,limit),None).await?,
@@ -364,6 +366,12 @@ pub(super) async fn handle(args: FederationArgs, client: Client, config: AppConf
             anyhow::bail!("this build excludes the tui feature");
         }
     };
+    if show_health {
+        eprintln!(
+            "{}",
+            health::lines(&response, chrono::Utc::now()).join("\n")
+        );
+    }
     println!("{}", serde_json::to_string_pretty(&response)?);
     Ok(())
 }

@@ -1,5 +1,12 @@
 # Supervisor inspection
 
+The operational view includes the disclosure grant's observed expiry when a
+private interaction profile is configured. CLI and TUI use plain-language
+warnings, and the TUI recomputes expiry/staleness while open. This does not renew
+consent, prove current permissions or establish that a worker is running. Use
+refresh to obtain a current observation; new questions still require explicit
+confirmation. `--json` output retains the structured response contract.
+
 ## Private proposals and human review
 
 When the operator configures `[supervisor.interaction]` with a private, hash-bound

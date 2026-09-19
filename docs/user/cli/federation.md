@@ -15,6 +15,13 @@ All non-TUI responses are JSON. `--space UUID` optionally asserts the discovered
 space; it cannot select another endpoint. Existing client profile/token settings
 apply. An authenticated local principal and explicit local grants are required.
 
+`status` also writes a plain-language credential/renewal summary to **stderr**;
+stdout remains the unchanged JSON contract. The TUI Status view shows the same
+summary and ages it while open. Unknown/static expiry, stale observations and
+blocked publications are not reported as healthy. Credential eligibility does
+not prove PDS availability or completed publication. Gateway status remains an
+authenticated, current-member-only operation through `/v1/status`.
+
 ### Local-human sessions on single-user instances
 
 For a person using a local single-user instance, explicitly add

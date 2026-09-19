@@ -77,6 +77,7 @@ struct Workspace {
     fields: Vec<String>,
     request_id: Uuid,
     output: String,
+    status_response: Option<Value>,
     scroll: u16,
     draft: Option<Value>,
     context: Option<Value>,
@@ -94,6 +95,7 @@ impl Workspace {
             fields: vec![],
             request_id: Uuid::new_v4(),
             output: serde_json::to_string_pretty(discovery).unwrap_or_default(),
+            status_response: None,
             scroll: 0,
             draft: None,
             context: None,
@@ -106,6 +108,7 @@ impl Workspace {
     }
     fn select(&mut self, operation: usize) {
         self.operation = operation;
+        self.status_response = None;
         self.field = 0;
         self.prepared = None;
         self.scroll = 0;
@@ -345,6 +348,7 @@ impl Workspace {
         }
     }
     fn accept(&mut self, operation: usize, response: Value) -> Result<()> {
+        self.status_response = (operation == 0).then(|| response.clone());
         if operation == 5 {
             self.draft = Some(response.clone());
         }
@@ -424,6 +428,7 @@ pub(super) async fn run(api: FederationClient, discovery: Value) -> Result<()> {
             match response {
                 Ok(value) => workspace.accept(op, value)?,
                 Err(e) => {
+                    workspace.status_response = None;
                     if op == 23 {
                         workspace.prepared = None;
                     }
@@ -443,7 +448,8 @@ pub(super) async fn run(api: FederationClient, discovery: Value) -> Result<()> {
             frame.render_widget(Paragraph::new(format!("Federation — {}\n{}\nUntrusted data. Review model/output consent. Queued ≠ answered ≠ replicated.\nPlaintext is readable by recipients/admins. Revocation cannot recall copies.",discovery["space"].as_str().unwrap_or_default(),OPERATIONS[workspace.operation].0)).block(Block::bordered().title(if api.local_human_session{"Local human session — no onward model disclosure"}else{"Configured API credential"})),areas[0]);
             let form=OPERATIONS[workspace.operation].1.iter().zip(&workspace.fields).enumerate().map(|(i,(name,value))|format!("{} {name}: {}",if i==workspace.field{"▶"}else{" "},value.escape_debug())).collect::<Vec<_>>().join("\n");
             frame.render_widget(Paragraph::new(form).wrap(Wrap{trim:false}).block(Block::bordered().title("Tab: next field • type to edit")),areas[1]);
-            frame.render_widget(Paragraph::new(workspace.output.as_str()).wrap(Wrap{trim:false}).scroll((workspace.scroll,0)).block(Block::bordered().title(if pending.is_some(){"Waiting for local service"}else{"Response / exact confirmation preview • PgUp/PgDn"})),areas[2]);
+            let output = if workspace.operation == 0 { format!("{}\n\n{}",health::lines(workspace.status_response.as_ref().unwrap_or(&Value::Null),chrono::Utc::now()).join("\n"),workspace.output) } else { workspace.output.clone() };
+            frame.render_widget(Paragraph::new(output).wrap(Wrap{trim:false}).scroll((workspace.scroll,0)).block(Block::bordered().title(if pending.is_some(){"Waiting for local service"}else{"Response / exact confirmation preview • PgUp/PgDn"})),areas[2]);
             frame.render_widget(Paragraph::new(if matches!(workspace.operation, 2 | 3) {
                 "Capabilities: pull, publish, manage-membership, ask-expertise, answer-expertise. Expertise needs v3; no collection consent is granted.\nF5 preview • F6 confirm • F2/F3 operation • Esc quit"
             } else {

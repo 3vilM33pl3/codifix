@@ -260,15 +260,7 @@ pub(crate) fn lines(response: &SupervisorResponse) -> Vec<String> {
         lines.push("Read-only service.".into());
     }
     if let Some(grant) = &response.grant_health {
-        lines.push(format!("Disclosure grant window: {:?}; expires {}; observed {}. No automatic renewal; current execution permissions are checked separately.",
-            grant.state, grant.expires_at.map(|at| at.to_rfc3339()).unwrap_or_else(|| "unknown".into()), grant.observed_at));
-        if chrono::Utc::now()
-            .signed_duration_since(grant.observed_at)
-            .num_seconds()
-            > 120
-        {
-            lines.push("Grant observation is stale; refresh before relying on it.".into());
-        }
+        lines.extend(grant_lines(grant, chrono::Utc::now()));
     } else {
         lines.push("Disclosure grant expiry unavailable; no healthy grant is claimed.".into());
     }
@@ -357,10 +349,59 @@ pub(crate) fn lines(response: &SupervisorResponse) -> Vec<String> {
     lines
 }
 
+fn grant_lines(
+    grant: &mem_record::SupervisorGrantHealth,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Vec<String> {
+    let age = now.signed_duration_since(grant.observed_at).num_seconds();
+    let label = if !(-30..=120).contains(&age) {
+        "Observation stale or future-dated; refresh before relying on the grant"
+    } else if grant.state == mem_record::SupervisorGrantWindow::InvalidProfile {
+        "Profile unavailable or invalid; operator review required"
+    } else {
+        match grant
+            .expires_at
+            .map(|expiry| expiry.signed_duration_since(now).num_seconds())
+        {
+            None => "Expiry unknown; no valid disclosure window is claimed",
+            Some(seconds) if seconds <= 0 => "Expired; paid questions under this grant are blocked",
+            Some(seconds) if seconds <= 3600 => "Expires within one hour",
+            Some(seconds) if seconds <= 86400 => "Expires within one day",
+            Some(_) => "Within the reviewed time window",
+        }
+    };
+    vec![
+        format!("Disclosure grant: {label}."),
+        format!(
+            "Expires {}; observed {}. No automatic renewal; current execution permissions and explicit question confirmation are checked separately.",
+            grant
+                .expires_at
+                .map(|at| at.to_rfc3339())
+                .unwrap_or_else(|| "unknown".into()),
+            grant.observed_at
+        ),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use mem_record::SupervisorExecution;
+    #[test]
+    fn cached_grant_labels_age_and_expire_in_cli_and_tui() {
+        let now = chrono::DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let mut grant =
+            mem_record::SupervisorGrantHealth::at(Some(now + chrono::Duration::days(2)), now);
+        assert!(grant_lines(&grant, now)[0].contains("Within the reviewed"));
+        grant.expires_at = Some(now - chrono::Duration::seconds(1)); // server's old state says valid
+        assert!(grant_lines(&grant, now)[0].contains("Expired"));
+        grant.expires_at = Some(now + chrono::Duration::hours(2));
+        assert!(grant_lines(&grant, now)[0].contains("within one day"));
+        assert!(grant_lines(&grant, now + chrono::Duration::seconds(121))[0].contains("stale"));
+        grant.observed_at = now + chrono::Duration::seconds(31);
+        assert!(grant_lines(&grant, now)[0].contains("future-dated"));
+        assert!(grant_lines(&grant, now)[1].contains("No automatic renewal"));
+    }
 
     #[test]
     fn private_proposal_text_cannot_emit_terminal_or_bidi_controls() {
