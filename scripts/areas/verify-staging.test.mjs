@@ -2,11 +2,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
-import { readFile, mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { readFile, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SCHEMA60_TABLES, validateContract, validateTarget, makeExpected, consumeOriginal, finishArchive,
-  projectedSource, targetSql, verifyDatabase, readArchive, parseArgs } from './verify-staging.mjs';
+  projectedSource, targetSql, verifyDatabase, readArchive, parseArgs, stagingSession } from './verify-staging.mjs';
 
 const id = n => `00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
 const hash = v => createHash('sha256').update(v).digest('hex');
@@ -113,4 +115,59 @@ test('private complete archive binds source identity and exact bytes; partial ar
   await assert.rejects(readArchive({path,sha256:hash('wrong')},makeExpected(f.prepared,f.manifest)));
   const partial=content.slice(0,content.lastIndexOf('{"event":"complete"'));await writeFile(path,partial);f.prepared.archive_bytes=Buffer.byteLength(partial);
   await assert.rejects(readArchive({path,sha256:hash(partial)},makeExpected(f.prepared,f.manifest)));
+});
+
+test('real isolated PostgreSQL validates hashes without mutations and refuses activated runtime',{
+  skip:process.env.MEMORY_AREA_TEST_DOCKER!=='1',timeout:180_000,
+},async t=>{
+  const root=await mkdtemp(join(tmpdir(),'memory-staging-pg-'));
+  const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!k.startsWith('PG')));
+  function run(command,args,options={}){const r=spawnSync(command,args,{encoding:'utf8',maxBuffer:8*1024*1024,timeout:120_000,env,...options});if(r.status!==0)throw Error('Synthetic staging command failed; diagnostics suppressed');return r.stdout;}
+  const image=run('docker',['image','inspect','pgvector/pgvector:pg17','--format','{{.Id}}']).trim();
+  assert.match(image,/^sha256:[0-9a-f]{64}$/);
+  const socket=join(root,'socket');await mkdir(socket,{mode:0o777});
+  const name=`memory-four-area-staging-test-${process.pid}-general`;
+  const container=run('docker',['run','--pull=never','--detach','--rm','--name',name,'--network','none','--read-only',
+    '--tmpfs','/var/lib/postgresql/data:rw,size=256m','--tmpfs','/tmp:rw','--mount',`type=bind,source=${socket},target=/var/run/postgresql`,
+    '--env','POSTGRES_HOST_AUTH_METHOD=trust',image]).trim();
+  assert.match(container,/^[0-9a-f]{64}$/);
+  t.after(async()=>{spawnSync('docker',['exec',container,'chmod','0777','/var/run/postgresql'],{stdio:'ignore'});run('docker',['rm','--force',container]);await rm(root,{recursive:true,force:true});});
+  let ready=false;for(let n=0;n<100;n++){
+    const main=spawnSync('docker',['exec',container,'cat','/proc/1/comm'],{encoding:'utf8'});
+    if(main.stdout?.trim()==='postgres'&&spawnSync('docker',['exec',container,'pg_isready','-U','postgres'],{stdio:'ignore'}).status===0){ready=true;break;}
+    await delay(100);
+  }assert.equal(ready,true);
+  const f=fixture();f.target.connection.directory=socket;f.spec.container_id=container;f.spec.container_name=name;f.spec.image_id=image;
+  run('docker',['exec',container,'createdb','-U','postgres',f.target.database]);
+  const targetFile=join(root,'target.json'),targetBytes=JSON.stringify(f.target);await writeFile(targetFile,targetBytes,{mode:0o600});
+  const binary=process.env.MEMORY_AREA_IMPORT_BINARY??new URL('../../target/debug/memory-area-import',import.meta.url).pathname;
+  const plan=JSON.parse(run(binary,['schema-plan']));
+  run(binary,['initialize-schema','--target',targetFile,'--target-sha256',hash(targetBytes),'--schema-sha256',plan.schema_sha256,'--execute','--writers-stopped','--fresh-database']);
+  const psql=sql=>run('docker',['exec','-i',container,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','postgres','-d',f.target.database],{input:sql});
+  psql(`INSERT INTO projects(id,slug,name,root_path,created_at) VALUES('${id(1)}','fixture','Fixture','/synthetic','2026-09-19T10:00:00Z');
+    INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document)
+      VALUES('${id(3)}','${id(1)}','${id(2)}',1,true,'','','documentation','project',3,0.5,'2026-09-19T10:00:00Z','2026-09-19T10:00:00Z',to_tsvector('simple',''));
+    INSERT INTO memory_canonical_state(canonical_id,project_id,confidence,importance) VALUES('${id(2)}','${id(1)}',0.5,3);
+    UPDATE loop_global_state SET kill_switch_enabled=true;`);
+  const rows=[];
+  for(const table of ['projects','memory_entries','memory_canonical_state']){
+    const wire=psql(`SET timezone='UTC'; SELECT to_jsonb(r)::text FROM public.${table} r;`).trim();const value=JSON.parse(wire);
+    rows.push({event:'original_row',record:{table:'public.'+table,key:value.id??value.canonical_id},canonical_id:table==='projects'?null:id(2),destination:table==='projects'?'protected_archive':{area:'general'},row_json:wire,source_sha256:hash(wire)});
+  }
+  rows.push(f.rows.find(r=>r.record.table==='public.memory_sources'));
+  rows.sort((a,b)=>Buffer.compare(Buffer.from(a.record.table+'\0'+a.record.key),Buffer.from(b.record.table+'\0'+b.record.key)));
+  const state=makeExpected(f.prepared,f.manifest);for(const row of rows)consumeOriginal(state,row);finishArchive(state);state.sourceMigration=60;
+  const projection=projectedSource(f.source);
+  assert.equal(psql(`SELECT '${projection.replaceAll("'","''")}'::jsonb::text;`).trim(),projection);
+  psql(`INSERT INTO memory_sources SELECT * FROM json_populate_record(NULL::memory_sources,'${projection.replaceAll("'","''")}');`);
+  const e=state.expected.get('general'),p=f.prepared;
+  psql(`INSERT INTO area_import_receipts(id,target_instance,area,source_instance,snapshot_id,inventory_sha256,manifest_sha256,partition_sha256,source_migration,target_migration,row_count,projection_count)
+    VALUES('${f.spec.operation_id}','${f.target.instance_id}','general','${p.source_instance}','${p.snapshot_id}','${p.inventory_sha256}','${p.manifest_sha256}','${p.partitions[0].partition_sha256}',60,60,4,1);`);
+  for(const [key,row]of e.rows){const [table,k]=key.split('\0');psql(`INSERT INTO area_import_rows VALUES('${f.spec.operation_id}','${table}','${k}','${row.source}','${row.target}',${row.transformed});`);}
+  for(const row of e.provenance.values())psql(`INSERT INTO area_import_provenance(${['import_id',...Object.keys(row)].join(',')}) VALUES(${[f.spec.operation_id,...Object.values(row)].map(v=>`'${v}'`).join(',')});`);
+  const snapshot=()=>psql("SET timezone='UTC'; SELECT md5(string_agg(x,'' ORDER BY x)) FROM (SELECT to_jsonb(r)::text x FROM memory_entries r UNION ALL SELECT to_jsonb(r)::text FROM area_import_receipts r UNION ALL SELECT to_jsonb(r)::text FROM area_import_rows r UNION ALL SELECT to_jsonb(r)::text FROM area_import_provenance r UNION ALL SELECT to_jsonb(r)::text FROM loop_global_state r) s;").trim();
+  const before=snapshot();const result=await verifyDatabase(stagingSession(container,f.target.database),f.spec,f.target,state);
+  assert.equal(result.verified_rows,4);assert.equal(result.projected_sources,1);assert.equal(snapshot(),before);
+  psql('UPDATE loop_global_state SET kill_switch_enabled=false;');
+  await assert.rejects(verifyDatabase(stagingSession(container,f.target.database),f.spec,f.target,state));
 });

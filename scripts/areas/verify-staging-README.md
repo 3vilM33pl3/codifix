@@ -81,4 +81,12 @@ Tests:
 
 ```sh
 node --test scripts/areas/verify-staging.test.mjs
+MEMORY_AREA_TEST_DOCKER=1 node --test scripts/areas/verify-staging.test.mjs
 ```
+
+The opt-in Docker test uses an already installed `pgvector/pgvector:pg17` image
+and `target/debug/memory-area-import` (override with
+`MEMORY_AREA_IMPORT_BINARY`). It creates one network-none synthetic PostgreSQL
+container, initializes schema without starting Memory, verifies complete row and
+projection hashes, checks unchanged database state, and rejects a subsequently
+disabled kill switch. It removes only its own disposable container/directory.
