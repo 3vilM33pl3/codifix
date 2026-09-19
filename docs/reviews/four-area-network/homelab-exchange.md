@@ -69,7 +69,7 @@ Web or Lean regression run.
 ### Protected evidence
 
 Receipts and configuration are under
-`/home/olivier/.local/state/memory-homelab-preview-20260919`.
+`~/.local/state/memory-homelab-preview-20260919`.
 Encrypted, hash-verified NAS copies are under
 `/media/bunnychow/backups/memory-four-area-20260917/homelab-preview-20260919`.
 No credentials or source archive bytes are committed to the repository.

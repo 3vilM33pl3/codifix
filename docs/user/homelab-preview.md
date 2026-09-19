@@ -73,7 +73,7 @@ restart of the same container is different from recreation.
 
 Private configuration, import/restore receipts, exact artifacts and helper
 sources live in
-`/home/olivier/.local/state/memory-homelab-preview-20260919`.
+`~/.local/state/memory-homelab-preview-20260919`.
 Encrypted copies are on the NAS under
 `/media/bunnychow/backups/memory-four-area-20260917/homelab-preview-20260919`.
 Those bundles contain this instance's database credentials and must remain

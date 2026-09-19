@@ -22,8 +22,10 @@ pub(crate) struct SupervisorArgs {
 #[derive(Debug, Subcommand)]
 enum SupervisorCommand {
     /// Prepare an exact private question. Submit only with preview hashes and --confirm.
+    #[command(after_help = HELP)]
     Ask(questions::AskArgs),
     /// Inspect an originally submitted question; never re-executes it.
+    #[command(after_help = HELP)]
     Question {
         #[arg(long)]
         project: String,
@@ -31,6 +33,7 @@ enum SupervisorCommand {
         request_id: uuid::Uuid,
     },
     /// List only this authenticated requester's questions.
+    #[command(after_help = HELP)]
     Questions {
         #[arg(long)]
         project: String,
@@ -38,6 +41,7 @@ enum SupervisorCommand {
         after: Option<uuid::Uuid>,
     },
     /// List private proposal IDs in exactly one project; no model call.
+    #[command(after_help = HELP)]
     Proposals {
         #[arg(long)]
         project: String,
@@ -45,6 +49,7 @@ enum SupervisorCommand {
         after: Option<uuid::Uuid>,
     },
     /// Read a private saved question, response and exact evidence references.
+    #[command(after_help = HELP)]
     Result {
         #[arg(long)]
         project: String,
@@ -52,6 +57,7 @@ enum SupervisorCommand {
         action: uuid::Uuid,
     },
     /// Record human review, not execution permission. Preview without --confirm.
+    #[command(after_help = HELP)]
     Review {
         #[arg(long)]
         project: String,
@@ -67,8 +73,10 @@ enum SupervisorCommand {
         confirm: bool,
     },
     /// Pause the exact currently enabled policy; in-flight bytes cannot be recalled.
+    #[command(after_help = HELP)]
     Pause(ControlArgs),
     /// Resume the exact currently paused policy, without granting new permissions.
+    #[command(after_help = HELP)]
     Resume(ControlArgs),
 }
 #[derive(Debug, Args)]

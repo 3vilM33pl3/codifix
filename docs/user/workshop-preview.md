@@ -76,7 +76,7 @@ memory-workshop query --project memory --question ATProto
 memory-workshop health
 ```
 
-The local wrapper is `/home/olivier/.local/bin/memory-workshop`. It always selects
+The local wrapper is `~/.local/bin/memory-workshop`. It always selects
 this installation and intentionally disallows shared service/watcher management.
 In the TUI, select **Supervisor**, press `r` for metadata or `v` for private
 proposals, then Enter to open the selected result. Use `j`/`k` to scroll, `a`/`x`
@@ -157,7 +157,7 @@ publication, OIDC or customer readiness.
 
 Private configuration, exact work identities, artifact hashes, import/restore
 receipts and saved result are in
-`/home/olivier/.local/state/memory-workshop-preview-20260918`.
+`~/.local/state/memory-workshop-preview-20260918`.
 Encrypted backups are also copied under
 `/media/bunnychow/backups/memory-four-area-20260917/workshop-preview-20260918`.
 The pre-activation database restore matched all three memory rows and key counts;

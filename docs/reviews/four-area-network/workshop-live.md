@@ -191,7 +191,7 @@ No existing service, other area's data, provider credential or R3 setup changed.
   of a new full-workspace, four-area or customer-release acceptance run.
 
 Private evidence, pinned artifacts, result export and configuration live under
-`/home/olivier/.local/state/memory-workshop-preview-20260918` (mode 0700).
+`~/.local/state/memory-workshop-preview-20260918` (mode 0700).
 The normal OpenAI key is loaded in memory only for explicit operator execution;
 it is not copied into this directory or passed to Pi/the app. R3 is untouched.
 
