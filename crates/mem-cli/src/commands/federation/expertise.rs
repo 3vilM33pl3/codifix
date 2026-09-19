@@ -21,6 +21,7 @@ mod tests {
         let api = FederationClient {
             client: Client::new(),
             base: "must not be used".into(),
+            local_human_session: false,
         };
         assert!(
             ask(

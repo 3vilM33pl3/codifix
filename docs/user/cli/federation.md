@@ -15,6 +15,57 @@ All non-TUI responses are JSON. `--space UUID` optionally asserts the discovered
 space; it cannot select another endpoint. Existing client profile/token settings
 apply. An authenticated local principal and explicit local grants are required.
 
+### Local-human sessions on single-user instances
+
+For a person using a local single-user instance, explicitly add
+`--local-human-session` before the subcommand:
+
+```bash
+memory federation --project homelab --local-human-session capabilities
+memory federation --project memory --local-human-session tui
+```
+
+This checks the configured literal loopback address and local owner credential,
+then obtains a real, revocable browser session through the existing bootstrap
+endpoint. Session cookies and CSRF values stay in process memory; they are never
+printed or saved. Subsequent requests carry that session and the exact local
+Origin/CSRF headers, not the installation token. Proxies, redirects, non-loopback
+addresses and multi-user/service-token identities are refused. A denied session
+is not automatically reminted or retried with the installation credential.
+Each new CLI invocation explicitly obtains its own session; the TUI reuses one
+session until exit. Existing session expiry and revocation apply.
+
+The operator must still enable `expertise_browser`, allow `local_human` output,
+and grant the current principal the required local capabilities. The switch
+cannot enable expertise, bypass collection consent, or select a model output
+destination. It means the answer is **for the local human**, not for an MCP/cloud
+assistant or an automated downstream model. Do not use it to route those callers
+around their operator-bound disclosure policies. This is a trusted operator
+assertion, not proof that a terminal is human-controlled. An automated rehearsal
+must keep real answer bodies in the approved local UI/private artifacts unless
+onward disclosure is separately permitted.
+
+Without this switch, existing client behavior is unchanged. Single-user services
+do not accept minted service tokens, and the installation API token alone is not
+an expertise caller. Multi-user instances use their supported service tokens and
+exact operator-owned principal/token/output bindings. Keep credentials in the
+existing protected client configuration or secret-handling environment, never
+command-line arguments or review files.
+
+The synthetic real-client regression is opt-in: build the CLI first, set
+`MEMORY_LAYER_TEST_CLI_BINARY` to its absolute path and configure the documented
+disposable PostgreSQL test database, then run:
+
+```bash
+cargo test -p mem-service --lib --no-default-features federation_local_human_cli_real_session_and_csrf --locked -- --ignored --test-threads=1
+```
+
+This starts temporary loopback HTTP servers and checks session exchange,
+confirmed local grants, discovery, CSRF/Origin, MCP separation and revocation.
+It does not configure a deployment or call a provider. Fake-HTTP client tests
+also cover redirect refusal, malformed cookies, changed identities and no
+automatic session renewal after denial.
+
 ## Review and publication
 
 `draft --canonical UUID [--evidence-file selected.json]` prints an unconfirmed
@@ -85,9 +136,10 @@ access nor provisions an answering identity, worker or credentials. A queued
 response is not accepted membership. `status` reports capabilities observed in
 verified history, not a live access guarantee.
 
-The expertise commands below additionally require an explicit operator binding
-for the exact service-token ID, principal and output destination. No destination
-is inferred from a CLI token, and a client cannot choose a destination flag.
+The expertise commands below require either the explicitly enabled local-human
+session above or an operator binding for the exact service-token ID, principal
+and output destination on a multi-user instance. No destination is inferred from
+a CLI token, and a client cannot choose an output destination flag.
 
 ## Explicit expertise workflow
 
@@ -119,6 +171,15 @@ Put only the exact question into a private UTF-8 file (1–4096 bytes), then:
 memory federation --project example ask prepare --publisher UUID --collection UUID --request-id UUID --question-file question.txt
 memory federation --project example ask submit --file question-review.json --confirm
 memory federation --project example answer --request-id UUID
+```
+
+On a single-user instance, add `--local-human-session` to **each** command before
+`ask` or `answer`; use it for collection administration as well. For example:
+
+```bash
+memory federation --project homelab --local-human-session ask prepare --publisher UUID --collection UUID --request-id UUID --question-file question.txt
+memory federation --project homelab --local-human-session ask submit --file question-review.json --confirm
+memory federation --project homelab --local-human-session answer --request-id UUID
 ```
 
 Omit `--model-destination` for deterministic excerpts. Add

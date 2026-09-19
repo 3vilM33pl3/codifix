@@ -13,6 +13,8 @@ mod browser;
 mod collections;
 mod enrollment;
 mod f1_instances;
+#[cfg(unix)]
+mod local_human_cli;
 mod requester;
 mod two_instance;
 

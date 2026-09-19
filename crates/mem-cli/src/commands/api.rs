@@ -27,7 +27,9 @@ use uuid::Uuid;
 
 use crate::commands::output::{service_url, write_headers};
 
+mod local_session;
 mod supervisor_questions;
+pub(super) use local_session::local_human_client;
 
 fn jobs_path(project: &str, id: Option<Uuid>, retry: bool) -> Result<String> {
     let mut url = reqwest::Url::parse("http://localhost/")?;

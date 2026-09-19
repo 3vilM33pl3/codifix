@@ -1,109 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use super::ApiClient;
-use crate::commands::output::{service_url, write_headers};
+use crate::commands::output::service_url;
 use anyhow::{Result, bail, ensure};
 use mem_record::{
-    AuthMeResponse, AuthMode, AuthPrincipalKind, AuthRole, SupervisorQuestionList,
-    SupervisorQuestionPrepare, SupervisorQuestionPreview, SupervisorQuestionRequest,
-    SupervisorQuestionStatus,
+    SupervisorQuestionList, SupervisorQuestionPrepare, SupervisorQuestionPreview,
+    SupervisorQuestionRequest, SupervisorQuestionStatus,
 };
-use reqwest::{
-    Client, Method, Url,
-    header::{CACHE_CONTROL, COOKIE, HeaderMap, ORIGIN, SET_COOKIE},
-};
+use reqwest::{Client, Method, Url, header::CACHE_CONTROL};
 use uuid::Uuid;
 
 impl ApiClient {
-    async fn question_headers(&self, client: &Client) -> Result<HeaderMap> {
-        let base = Url::parse(&service_url(&self.config, "/"))?;
-        // Never discover/resolve a hostname or follow a redirect to obtain owner authority.
-        let loopback = base
-            .host_str()
-            .and_then(|host| {
-                host.trim_matches(['[', ']'])
-                    .parse::<std::net::IpAddr>()
-                    .ok()
-            })
-            .is_some_and(|ip| ip.is_loopback());
-        if !loopback {
-            return write_headers(&self.config);
-        }
-        let mut session = self.question_session.lock().await;
-        if let Some(headers) = &*session {
-            return Ok(headers.clone());
-        }
-        let response = client
-            .get(service_url(&self.config, "/v1/auth/me"))
-            .headers(write_headers(&self.config)?)
-            .send()
-            .await
-            .map_err(|_| anyhow::anyhow!("Could not inspect local authentication"))?;
-        ensure!(
-            response.status().is_success(),
-            "Local authentication unavailable"
-        );
-        let me: AuthMeResponse = response
-            .json()
-            .await
-            .map_err(|_| anyhow::anyhow!("Invalid authentication response"))?;
-        if me.mode != AuthMode::SingleUser || me.principal.kind != AuthPrincipalKind::Internal {
-            return write_headers(&self.config);
-        }
-        ensure!(
-            me.authenticated
-                && me.principal.global_role == Some(AuthRole::Admin)
-                && me.principal.id
-                    == Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-local-owner"),
-            "Local owner authentication required; no credentials were changed"
-        );
-        let origin = base.origin().ascii_serialization();
-        let response = client
-            .post(service_url(&self.config, "/v1/auth/session/bootstrap"))
-            .header(ORIGIN, &origin)
-            .send()
-            .await
-            .map_err(|_| anyhow::anyhow!("Local session bootstrap unconfirmed"))?;
-        ensure!(
-            response.status().is_success(),
-            "Local session bootstrap denied"
-        );
-        let mut auth = None;
-        let mut csrf = None;
-        for header in response.headers().get_all(SET_COOKIE) {
-            let value = header
-                .to_str()
-                .map_err(|_| anyhow::anyhow!("Invalid local session response"))?;
-            if let Some((name, value)) = value.split(';').next().and_then(|v| v.split_once('=')) {
-                match name {
-                    "memory_session" => auth = Some(value.to_owned()),
-                    "memory_csrf" => csrf = Some(value.to_owned()),
-                    _ => {}
-                }
-            }
-        }
-        let (Some(auth), Some(csrf)) = (auth, csrf) else {
-            bail!("Incomplete local session response");
-        };
-        ensure!(
-            !auth.is_empty() && !csrf.is_empty(),
-            "Empty local session response"
-        );
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            COOKIE,
-            format!("memory_session={auth}; memory_csrf={csrf}")
-                .parse()
-                .map_err(|_| anyhow::anyhow!("Invalid session cookie"))?,
-        );
-        headers.insert(
-            "x-csrf-token",
-            csrf.parse()
-                .map_err(|_| anyhow::anyhow!("Invalid session token"))?,
-        );
-        headers.insert(ORIGIN, origin.parse()?);
-        *session = Some(headers.clone());
-        Ok(headers)
-    }
     async fn question_operation<T: serde::de::DeserializeOwned>(
         &self,
         project: &str,
@@ -126,7 +32,7 @@ impl ApiClient {
                 segments.push(suffix);
             }
         }
-        let headers = self.question_headers(&client).await?;
+        let headers = self.local_session_headers(&client, false).await?;
         let mut request = client
             .request(
                 if body.is_some() {

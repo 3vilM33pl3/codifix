@@ -13,6 +13,8 @@ use std::{
 };
 use uuid::Uuid;
 mod expertise;
+#[cfg(test)]
+mod session_tests;
 #[cfg(feature = "tui")]
 mod terminal;
 const HELP: &str = "Agent notes:\nUse the configured local service and explicit project. Mutations require review and confirmation. Preserve request IDs and exact bytes on retry. Queued is not accepted; retained copies cannot be recalled. See docs/user/cli/federation.md.";
@@ -24,6 +26,10 @@ pub(super) struct FederationArgs {
     /// Omit to discover the administrator-configured space.
     #[arg(long)]
     space: Option<Uuid>,
+    /// Use a private, in-memory loopback owner session. For a local human only,
+    /// never an assistant/model destination. Default token behavior is unchanged.
+    #[arg(long)]
+    local_human_session: bool,
     #[command(subcommand)]
     command: FederationCommand,
 }
@@ -79,7 +85,7 @@ enum FederationCommand {
         #[command(subcommand)]
         command: expertise::CollectionCommand,
     },
-    /// Discover permitted expertise metadata (explicit operator-bound token required).
+    /// Discover expertise with an enabled local-human session or operator-bound token.
     #[command(after_help = HELP)]
     Capabilities {
         #[arg(long, requires = "after_record")]
@@ -229,6 +235,7 @@ enum FederationCommand {
 struct FederationClient {
     client: Client,
     base: String,
+    local_human_session: bool,
 }
 impl FederationClient {
     async fn call(&self, method: Method, suffix: &str, body: Option<Value>) -> Result<Value> {
@@ -239,10 +246,27 @@ impl FederationClient {
         if let Some(body) = body {
             req = req.json(&body);
         }
-        get_json(req.send().await.context(
+        let response = req.send().await.context(
             "local federation request; retain the request ID if the response is uncertain",
-        )?)
-        .await
+        )?;
+        if self.local_human_session {
+            match response.status().as_u16() {
+                200..=202 => response.json().await.map_err(|_| {
+                    anyhow::anyhow!("Unreadable federation receipt; inspect the same request ID")
+                }),
+                401 | 403 => anyhow::bail!(
+                    "Federation access denied; session or current policy rejected. No credentials were retried"
+                ),
+                409 => anyhow::bail!(
+                    "Federation conflict; inspect current policy and preserve exact request IDs"
+                ),
+                _ => anyhow::bail!(
+                    "Federation outcome unconfirmed; inspect the same request ID. Response details suppressed"
+                ),
+            }
+        } else {
+            get_json(response).await
+        }
     }
     async fn action(&self, id: Uuid, action: Value, confirm: bool) -> Result<Value> {
         ensure!(
@@ -279,6 +303,11 @@ fn confirmed_review(mut input: Value, confirm: bool) -> Result<Value> {
     Ok(input)
 }
 pub(super) async fn handle(args: FederationArgs, client: Client, config: AppConfig) -> Result<()> {
+    let client = if args.local_human_session {
+        super::api::local_human_client(config.clone()).await?
+    } else {
+        client
+    };
     // Encode the project as a single URL segment, never a user-selected endpoint.
     let mut url = reqwest::Url::parse(&service_url(&config, "/v1/projects/"))?;
     url.path_segments_mut()
@@ -289,6 +318,7 @@ pub(super) async fn handle(args: FederationArgs, client: Client, config: AppConf
     let mut api = FederationClient {
         client,
         base: url.to_string(),
+        local_human_session: args.local_human_session,
     };
     let discovery = api.call(Method::GET, "", None).await?;
     if matches!(args.command, FederationCommand::Discover) {
@@ -480,6 +510,7 @@ mod tests {
         let api = FederationClient {
             client: Client::new(),
             base,
+            local_human_session: false,
         };
         let id = Uuid::new_v4();
         let action = json!({"kind":"membership", "member":Uuid::new_v4(),
@@ -500,6 +531,7 @@ mod tests {
         let api = FederationClient {
             client: Client::new(),
             base: "invalid endpoint must never be used".into(),
+            local_human_session: false,
         };
         let error = api
             .action(
