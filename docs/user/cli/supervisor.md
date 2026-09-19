@@ -80,6 +80,11 @@ This only reconciles the original request; it does not authorize another provide
 invocation. An `uncertain` provider attempt is not automatically regenerated.
 Starting a new question can repeat billing. Expired work is not restarted.
 
+Saved proposal bodies retain the existing **project-private** review contract:
+another currently authorized project reader can inspect them while the original
+requester's disclosure authority remains valid. Requester-only question status
+listing does not make the eventual proposal a requester-only message.
+
 Question intake and execution require current direct database permissions for
 `memory_read`, `loops_run` and `bundle_export`, plus a revocable service token or
 browser session. Group-mapping-only permissions are insufficient for this narrow

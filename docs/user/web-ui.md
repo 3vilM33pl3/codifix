@@ -155,6 +155,10 @@ questions per Workshop project and one active answer worker. Existing limits of
 20 generations and USD 2.50 per day remain in force; current policy can lower
 them.
 
+The eventual saved question/answer follows the existing **project-private**
+proposal contract, not requester-only messaging: current project readers may
+inspect it while the original requester's disclosure authority remains valid.
+
 After uncertain submission, use **Inspect this request** or **Retry exact
 submission**. The same question, hashes and UUID are retained; no automatic
 provider retry or replacement UUID is generated. A new question after uncertain
