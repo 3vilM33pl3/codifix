@@ -200,8 +200,9 @@ required before attachment; supplied inventory is not a live verification.
 Because the DB has its own Compose file, **never use orphan-removal options** on
 the shared company project.
 
-The proposed private namespace `memory.robotmotel.com` is awaiting Olivier's
-choice. No permanent repository DID, TLS issuer, PDS account, remote membership
+Olivier approved the private namespace `memory.robotmotel.com` on 2026-09-19,
+before permanent enrollment. This does not authorize public DNS or changes to
+the existing CA. No permanent repository DID, TLS issuer, PDS account, remote membership
 or collection consent has been installed. No public DNS, existing CA service,
 Workshop model policy or original dataset writer was changed. Next: settle the
 private names/trust configuration, provision the pinned PDS, verify/install its
