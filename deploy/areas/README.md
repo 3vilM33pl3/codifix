@@ -238,3 +238,12 @@ Test without inspecting a host or database:
 ```bash
 python3 packaging/tests/test-ca-preflight.py
 ```
+
+The additive `dataset_coverage` report remains unknown for CA-only databases,
+offline captures/activity and external evidence. Trust staged on Monolith is
+not a CA migration. The shared original database remains authoritative while
+writers continue; previews are not implicitly merged into that source. Use the
+[future-cutover runbook](../../docs/reviews/four-area-network/staging-cutover.md)
+for fresh full-history/dependency revalidation and the later writer-fencing,
+activation and forward-recovery gates. Nothing in that runbook authorizes a
+current cutover, CA installation or database downgrade.

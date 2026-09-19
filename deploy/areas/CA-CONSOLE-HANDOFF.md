@@ -5,6 +5,27 @@ OpenBao configuration, use sudo, or supply a provider key for this procedure.
 Nothing below installs Memory/Pi, starts an area, applies a migration, reads a
 credential file, rotates a credential, or changes the existing CA services.
 
+## Four-area staging boundary
+
+The September 2026 four-area staging snapshot comes from the original shared
+PostgreSQL database used by both development and production configuration. It
+does **not** come from merging the Workshop/Homelab previews. Original writers
+remain live; staged partitions are point-in-time copies, not cutover targets
+approved for activation. Trust staged on Monolith is **not CA migration**.
+
+The shared snapshot does not establish coverage of a CA-only database, a DuckDB
+offline outbox, pending offline activity, local evidence files, or other
+CA-console-only records. Those require a separate operator-confirmed source
+binding and consistent capture/reconciliation. Do not search for or copy CA
+keys, OpenBao storage, credentials or raw evidence into this report. The
+preflight's `dataset_coverage` deliberately remains unknown even if it finds
+one apparently healthy local Memory database. No database means no conclusion
+about offline, custom-socket, remote or containerized data.
+
+The [future-cutover runbook](../../docs/reviews/four-area-network/staging-cutover.md)
+defines the additional snapshot, review, recovery and writer-fencing gates. This
+handoff only collects the non-secret metadata needed to plan that future work.
+
 **Current stop point:** a read-only inventory and, only when its independent
 inputs are available, authenticated local release staging. There is no completed
 live-validated CA migration or privileged selected-instance installer/rollback helper. A staged
@@ -26,6 +47,23 @@ read-only console command is:
 ```bash
 bash deploy/areas/ca-preflight.sh
 ```
+
+For the standalone private `ca-handoff` package, use these commands instead,
+from its transferred directory. First compare the manifest hash with the
+release owner's independently supplied value; the hash file inside a package
+is not an independent trust anchor:
+
+```bash
+sha256sum SHA256SUMS
+sha256sum --strict --check SHA256SUMS
+bash ca-preflight.sh
+```
+
+Stop on any mismatch. The package contains only this reviewed preflight and
+documentation, not a database, credentials, installer, Pi binary or activation
+marker. Its preparation does not confirm that it reached the CA. Run the script
+only after that independent identity check; no download-and-execute command is
+provided.
 
 Expected: one `memory-ca-preflight-v2` JSON object with
 `status: inventory_only_activation_not_approved`. It uses Python 3, a fixed
@@ -58,6 +96,7 @@ passwords, application records or signing/OpenBao files as supplementary output.
 | `services` | Current singleton, Trust-template, CA, OpenBao, SSH, PostgreSQL and container-engine unit states. The command does not change them. |
 | `network` | Listener port/protocol/scope in the current network namespace, not process ownership or proof of firewall/isolation. |
 | `database_binding` | Remains `unknown`. Candidates and anonymous client counts do not establish which database the running Memory service uses. |
+| `dataset_coverage` | Shared-snapshot coverage of CA-only/offline data is unproven; neither an empty inventory nor Trust staging proves migration. |
 
 The official Pi v0.5.1 **ARM64** binary was independently checked on 2026-09-17
 without execution: ELF64, little-endian AArch64, loader
@@ -97,6 +136,15 @@ operator records; this script deliberately cannot derive that mapping from
 secret-bearing config files. An active Memory unit plus one Memory-shaped local
 database is insufficient. Failed connections, zero observed clients, a missing
 standard socket, or empty recognized tables never prove there is no other data.
+
+Return a short operator metadata checklist beside the JSON (unknown is a valid
+answer): confirmed Memory-to-database binding; shared versus CA-only ownership;
+whether offline capture/activity stores exist; whether pending offline writes
+or external evidence need preservation; observed schema head; independently
+checked CA/OpenBao health; and whether the ARM64/libc gate is blocked. Report
+only boolean/unknown answers or already reviewed non-secret identifiers and
+aggregate counts. Do not paste filesystem listings, connection strings, config
+files, raw records or signing material. Preflight itself cannot fill this gap.
 
 ## 3. Optional authenticated staging once inputs are supplied
 

@@ -421,6 +421,16 @@ report = {
     "services": {unit: service(unit) for unit in
                  ("memory-layer.service", "memory-layer@trust.service", "step-ca.service", "openbao.service", "sshd.service", "ssh.service", "postgresql.service", "docker.service", "containerd.service", "podman.socket")},
     "network": listeners(),
+    "dataset_coverage": {
+        "status": "unknown_requires_operator_reconciliation",
+        "shared_snapshot_includes_ca_only_data": "unproven",
+        "shared_snapshot_includes_offline_data": "unproven",
+        "offline_stores_inspected": False,
+        "application_evidence_files_inspected": False,
+        "ca_private_files_inspected": False,
+        "staged_trust_is_ca_migration": False,
+        "installation_or_migration_authorized": False,
+    },
     "redaction": "no_config_env_credentials_records_logs_addresses_processes_or_secret_paths",
 }
 postgresql = databases()

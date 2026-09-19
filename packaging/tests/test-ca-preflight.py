@@ -176,6 +176,21 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(report["postgresql"]["database_inventory"]["status"], "permission_denied")
         self.assertFalse(any(args[0] == "runuser" for args in commands))
 
+    def test_staged_trust_never_proves_ca_or_offline_data_coverage(self):
+        for inputs in ({}, {"root": False}, {"sockets": False}, {"scenario": "denied"}):
+            with self.subTest(inputs=inputs):
+                report, _ = self.inventory(**inputs)
+                self.assertEqual(report["dataset_coverage"], {
+                    "status": "unknown_requires_operator_reconciliation",
+                    "shared_snapshot_includes_ca_only_data": "unproven",
+                    "shared_snapshot_includes_offline_data": "unproven",
+                    "offline_stores_inspected": False,
+                    "application_evidence_files_inspected": False,
+                    "ca_private_files_inspected": False,
+                    "staged_trust_is_ca_migration": False,
+                    "installation_or_migration_authorized": False,
+                })
+
     def test_failed_connections_never_become_zero_counts_or_no_data(self):
         for scenario, expected in (("denied", "permission_denied"), ("offline", "unavailable")):
             with self.subTest(scenario=scenario):
