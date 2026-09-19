@@ -38,6 +38,8 @@ test('default blueprint is offline, uninstalled, bounded and has no publication/
     assert.equal(app.environment.MEMORY_LAYER_FEDERATION_CONFIG, undefined);
     assert.equal(app.environment.MEMORY_LAYER__BACKGROUND_WORK__ENABLED, 'false');
     assert.equal(app.environment.MEMORY_LAYER__AUTOMATION__ENABLED, 'false');
+    assert.equal(app.environment.MEMORY_LAYER__DATABASE__MIGRATIONS, 'verify_only');
+    assert.equal(app.environment.MEMORY_LAYER__OFFLINE__ENABLED, 'false');
     assert.equal(app.environment.MEMORY_LAYER__LLM__MODEL, '');
     assert.equal(app.environment.OPENAI_API_KEY, '');
     assert.equal(app.env_file, undefined);

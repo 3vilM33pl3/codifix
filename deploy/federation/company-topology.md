@@ -98,8 +98,11 @@ entries, never a space membership or access to another area's collection.
    its own `owner-password` file. Apply the reviewed
    [gateway grants](gateway-grants.sql) and follow the existing
    [gateway installation contract](README.md). The gateway cannot migrate its
-   own database. App startup and upgrade behavior must be checked against the
-   selected release before cutover.
+   own database. Apps are explicitly locked to `database.migrations="verify_only"`:
+   they verify the prepared schema, refuse missing/dirty/mismatched migrations and
+   never fall back to running DDL or an offline capture store. Offline mode is
+   separately disabled. Follow the [prepared database contract](../../docs/user/prepared-database.md)
+   for compatible release artifacts and owner/runtime-role separation.
 5. Provision independently enrolled identities, repository signing/public receipt
    keys and instance credentials through the controlled enrollment workflow.
    Populate the separately reviewed
