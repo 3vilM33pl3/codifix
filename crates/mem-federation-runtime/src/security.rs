@@ -19,6 +19,39 @@ pub struct ReceiptTrust {
     verifiers: Vec<DetachedVerifier>,
 }
 impl ReceiptTrust {
+    pub(crate) fn verify_status(
+        &self,
+        signed: crate::SignedGatewayStatus,
+        nonce: Uuid,
+        audience: InstanceId,
+        space: SpaceId,
+        authority: InstanceId,
+    ) -> Result<crate::GatewayStatus> {
+        let c = &signed.claims;
+        let now = Utc::now();
+        if c.purpose != "memory-gateway-status-v1"
+            || c.nonce != nonce
+            || nonce.is_nil()
+            || c.audience != audience
+            || c.space != space
+            || c.authority != authority
+            || c.key_generation != self.keys.len() as u32
+            || c.issued_at > now
+            || c.expires_at <= now
+            || c.expires_at <= c.issued_at
+            || c.expires_at > c.issued_at + chrono::Duration::seconds(30)
+            || c.status.credentials.observed_at > now.timestamp().max(0) as u64
+            || (now.timestamp().max(0) as u64).saturating_sub(c.status.credentials.observed_at) > 30
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        self.verifiers
+            .last()
+            .ok_or(RuntimeError::Configuration)?
+            .verify(&canonical(c)?, &signed.signature)
+            .map_err(|_| RuntimeError::InvalidResponse)?;
+        Ok(signed.claims.status)
+    }
     pub(crate) fn verify_expertise(
         &self,
         signed: SignedExpertiseReply,
@@ -134,6 +167,32 @@ pub struct GatewaySecurity {
     policy: SpacePolicy,
 }
 impl GatewaySecurity {
+    pub(crate) fn sign_status(
+        &self,
+        status: crate::GatewayStatus,
+        nonce: Uuid,
+        audience: InstanceId,
+        space: SpaceId,
+        authority: InstanceId,
+    ) -> Result<crate::SignedGatewayStatus> {
+        let now = Utc::now();
+        let claims = crate::GatewayStatusClaims {
+            purpose: "memory-gateway-status-v1".into(),
+            nonce,
+            audience,
+            space,
+            authority,
+            key_generation: self.generation(),
+            issued_at: now,
+            expires_at: now + chrono::Duration::seconds(30),
+            status,
+        };
+        let signature = self
+            .signer
+            .sign(&canonical(&claims)?)
+            .map_err(|_| RuntimeError::InvalidResponse)?;
+        Ok(crate::SignedGatewayStatus { claims, signature })
+    }
     pub(crate) fn sign_expertise(
         &self,
         request: &ExpertiseRpc,
@@ -266,6 +325,84 @@ pub struct SignedPage {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    #[test]
+    fn status_is_signed_fresh_and_bound_to_current_member_space_and_nonce() {
+        let security = GatewaySecurity::initial(&[19; 32], SpacePolicy::default()).unwrap();
+        let trust = security.trust();
+        let nonce = Uuid::new_v4();
+        let audience = InstanceId::new(Uuid::new_v4()).unwrap();
+        let authority = InstanceId::new(Uuid::new_v4()).unwrap();
+        let space = SpaceId::new(Uuid::new_v4()).unwrap();
+        let status = crate::GatewayStatus {
+            credentials: crate::GatewayCredentialStatus::unknown(crate::credentials::now_seconds()),
+            pending: None,
+        };
+        let signed = || {
+            security
+                .sign_status(status.clone(), nonce, audience, space, authority)
+                .unwrap()
+        };
+        assert_eq!(
+            trust
+                .verify_status(signed(), nonce, audience, space, authority)
+                .unwrap(),
+            status
+        );
+        assert!(
+            trust
+                .verify_status(signed(), Uuid::new_v4(), audience, space, authority)
+                .is_err()
+        );
+        assert!(
+            trust
+                .verify_status(signed(), nonce, authority, space, authority)
+                .is_err()
+        );
+        assert!(
+            trust
+                .verify_status(signed(), nonce, audience, space, audience)
+                .is_err()
+        );
+        assert!(
+            trust
+                .verify_status(
+                    signed(),
+                    nonce,
+                    audience,
+                    SpaceId::new(Uuid::new_v4()).unwrap(),
+                    authority
+                )
+                .is_err()
+        );
+        for mutate in [
+            (|c: &mut crate::GatewayStatusClaims| c.purpose = "memory-pull-page-v1".into())
+                as fn(&mut crate::GatewayStatusClaims),
+            |c| c.expires_at = Utc::now() - chrono::Duration::seconds(1),
+            |c| c.expires_at = c.issued_at + chrono::Duration::seconds(31),
+            |c| c.issued_at = Utc::now() + chrono::Duration::seconds(1),
+            |c| c.status.credentials.observed_at = crate::credentials::now_seconds() - 31,
+            |c| c.key_generation = 0,
+        ] {
+            let mut bad = signed();
+            mutate(&mut bad.claims);
+            bad.signature = security
+                .signer
+                .sign(&canonical(&bad.claims).unwrap())
+                .unwrap();
+            assert!(
+                trust
+                    .verify_status(bad, nonce, audience, space, authority)
+                    .is_err()
+            );
+        }
+        let mut bad = signed();
+        bad.claims.status.credentials.publication_usable = true;
+        assert!(
+            trust
+                .verify_status(bad, nonce, audience, space, authority)
+                .is_err()
+        );
+    }
     #[test]
     fn private_replies_bind_operation_audience_nonce_and_expiry() {
         use crate::{ExpertiseOperation, ExpertiseReply, ExpertiseRpc};

@@ -19,6 +19,8 @@ pub struct PdsPublisher {
     endpoint: Endpoint,
     repository: String,
     token: String,
+    generation: u64,
+    rotating: Option<Arc<crate::credentials::RotatingCredentials>>,
     space: SpaceId,
     verifier: PinnedRepository,
     pub(crate) signing_key: String,
@@ -45,11 +47,64 @@ impl PdsPublisher {
             endpoint,
             repository,
             token,
+            generation: 0,
+            rotating: None,
             space,
             verifier,
             signing_key,
             verification_slot: Arc::new(tokio::sync::Semaphore::new(1)),
         })
+    }
+    /// Access-only bundle; the gateway never receives a refresh token. A missing
+    /// or expired file keeps the process inspectable but prevents work claims.
+    pub fn with_rotating_credentials(
+        endpoint: Endpoint,
+        repository: String,
+        session_file: std::path::PathBuf,
+        maintenance_file: Option<std::path::PathBuf>,
+        signing_key: String,
+        space: SpaceId,
+    ) -> Result<Self> {
+        let rotating = crate::credentials::RotatingCredentials::new(
+            session_file,
+            maintenance_file,
+            repository.clone(),
+            endpoint.origin().to_owned(),
+        )?;
+        let mut publisher = Self::new(
+            endpoint,
+            repository,
+            "unloaded-access-only-credential".into(),
+            signing_key,
+            space,
+        )?;
+        publisher.rotating = Some(Arc::new(rotating));
+        Ok(publisher)
+    }
+    pub fn credential_status(&self) -> crate::GatewayCredentialStatus {
+        let now = crate::credentials::now_seconds();
+        self.rotating.as_ref().map_or_else(
+            || crate::GatewayCredentialStatus::static_token(now),
+            |source| source.status(now),
+        )
+    }
+    pub(crate) fn credential_snapshot(&self) -> Result<Self> {
+        let mut snapshot = self.clone();
+        if let Some(source) = &self.rotating {
+            let bundle = source.snapshot(crate::credentials::now_seconds())?;
+            snapshot.token = bundle.access_token;
+            snapshot.generation = bundle.generation;
+            snapshot.rotating = None;
+        }
+        Ok(snapshot)
+    }
+    pub(crate) fn credential_generation(&self) -> u64 {
+        self.generation
+    }
+    fn authentication_failure(&self) -> PublishFailure {
+        PublishFailure::Authentication {
+            generation: self.generation,
+        }
     }
     async fn readback(
         &self,
@@ -80,6 +135,9 @@ impl PdsPublisher {
             .map_err(|_| PublishFailure::Unavailable)?;
         if response.status().is_client_error() {
             let code = response.status();
+            if code == reqwest::StatusCode::UNAUTHORIZED || code == reqwest::StatusCode::FORBIDDEN {
+                return Err(self.authentication_failure());
+            }
             let body: Value = http::json(response, 4096)
                 .await
                 .map_err(|_| PublishFailure::InvalidReceipt)?;
@@ -127,6 +185,11 @@ impl PdsPublisher {
             .await
             .map_err(|_| PublishFailure::Unavailable)?;
         if !response.status().is_success() {
+            if response.status() == reqwest::StatusCode::UNAUTHORIZED
+                || response.status() == reqwest::StatusCode::FORBIDDEN
+            {
+                return Err(self.authentication_failure());
+            }
             return Err(PublishFailure::Unavailable);
         }
         let bytes = http::bytes(response, MAX_CAR_BYTES)
@@ -160,6 +223,15 @@ impl PdsPublisher {
         &self,
         delivery: &PublicationDelivery,
     ) -> std::result::Result<VerifiedRepository, PublishFailure> {
+        let snapshot = self
+            .credential_snapshot()
+            .map_err(|_| self.authentication_failure())?;
+        snapshot.publish_verified_snapshot(delivery).await
+    }
+    async fn publish_verified_snapshot(
+        &self,
+        delivery: &PublicationDelivery,
+    ) -> std::result::Result<VerifiedRepository, PublishFailure> {
         if delivery.envelope.space != self.space {
             return Err(PublishFailure::InvalidReceipt);
         }
@@ -176,7 +248,7 @@ impl PdsPublisher {
             .map_err(|_| PublishFailure::InvalidReceipt)?;
         // Regardless of a success, timeout, conflict or lost reply, only exact
         // exact read-back AND signed repository inclusion permit success.
-        let _response = self
+        let response = self
             .endpoint
             .client
             .post(url)
@@ -184,10 +256,18 @@ impl PdsPublisher {
             .json(&body)
             .send()
             .await;
+        let authentication_rejected = response.as_ref().is_ok_and(|r| {
+            r.status() == reqwest::StatusCode::UNAUTHORIZED
+                || r.status() == reqwest::StatusCode::FORBIDDEN
+        });
         if let Some(proof) = self.readback(&wire).await? {
             Ok(proof)
         } else {
-            Err(PublishFailure::Unavailable)
+            Err(if authentication_rejected {
+                self.authentication_failure()
+            } else {
+                PublishFailure::Unavailable
+            })
         }
     }
 }

@@ -66,6 +66,11 @@ pub enum PublishFailure {
     Unavailable,
     Conflict,
     InvalidReceipt,
+    /// A transport credential was rejected. Zero denotes a non-rotating
+    /// credential and cannot be recovered automatically.
+    Authentication {
+        generation: u64,
+    },
 }
 
 /// This interface is trusted. Success means the exact immutable record exists
@@ -280,9 +285,10 @@ impl GatewayStore {
         let blocked =
             failure != PublishFailure::Unavailable || lease.attempt >= policy.max_attempts;
         let error = match failure {
-            PublishFailure::Unavailable => "unavailable",
-            PublishFailure::Conflict => "immutable_conflict",
-            PublishFailure::InvalidReceipt => "invalid_receipt",
+            PublishFailure::Unavailable => "unavailable".to_owned(),
+            PublishFailure::Conflict => "immutable_conflict".to_owned(),
+            PublishFailure::InvalidReceipt => "invalid_receipt".to_owned(),
+            PublishFailure::Authentication { generation } => format!("authentication:{generation}"),
         };
         let backoff = policy
             .backoff_seconds
@@ -306,6 +312,60 @@ impl GatewayStore {
         self.lock(&mut tx, fence).await?;
         sqlx::query("UPDATE federation_publish_outbox SET blocked=FALSE,attempts=0,available_at=clock_timestamp(),last_error=NULL WHERE space=$1 AND blocked AND NOT published")
             .bind(fence.space.as_uuid()).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Recover ONLY an authentication-blocked head after the trusted transport
+    /// has loaded a strictly newer, usable credential. The failed generation is
+    /// durable, so restarting the gateway cannot retry the rejected credential.
+    /// Integrity/conflict/exhaustion failures remain operator-controlled.
+    pub async fn recover_authentication(
+        &self,
+        fence: WriterFence,
+        generation: u64,
+    ) -> Result<bool> {
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, fence).await?;
+        let row = sqlx::query("SELECT sequence,blocked,last_error FROM federation_publish_outbox WHERE space=$1 AND NOT published ORDER BY sequence LIMIT 1 FOR UPDATE")
+            .bind(fence.space.as_uuid()).fetch_optional(&mut *tx).await?;
+        let Some(row) = row else {
+            tx.commit().await?;
+            return Ok(false);
+        };
+        let error: Option<String> = row.try_get("last_error")?;
+        let old = error.as_deref().and_then(authentication_generation);
+        if !row.try_get::<bool, _>("blocked")?
+            || !old.is_some_and(|old| old > 0 && generation > old)
+        {
+            tx.commit().await?;
+            return Ok(false);
+        }
+        // Discount just the known credential rejection, not prior transient
+        // attempts. Repeated credential rotations cannot reset other failures.
+        sqlx::query("UPDATE federation_publish_outbox SET blocked=FALSE,attempts=GREATEST(attempts-1,0),available_at=clock_timestamp(),last_error=NULL WHERE space=$1 AND sequence=$2")
+            .bind(fence.space.as_uuid()).bind(row.try_get::<i64,_>("sequence")?)
+            .execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(true)
+    }
+
+    /// Metadata-only current membership check for authenticated runtime status.
+    pub async fn authorize_status(
+        &self,
+        fence: WriterFence,
+        member: mem_federation::publication::InstanceId,
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        let authority = self.lock(&mut tx, fence).await?;
+        let state = self.load(&mut tx, fence.space, authority).await?;
+        if !state.has_capability(member, mem_federation::SpaceCapability::Pull) {
+            return Err(StoreError::Outcome(
+                mem_federation::publication::PublicationOutcome::Rejected(
+                    mem_federation::publication::PublicationReject::Unauthorized,
+                ),
+            ));
+        }
         tx.commit().await?;
         Ok(())
     }
@@ -337,4 +397,10 @@ impl GatewayStore {
             }
         }
     }
+}
+
+fn authentication_generation(error: &str) -> Option<u64> {
+    let generation = error.strip_prefix("authentication:")?;
+    let value = generation.parse::<u64>().ok()?;
+    (generation == value.to_string()).then_some(value)
 }

@@ -552,6 +552,85 @@ async fn lease_expiry_retry_limits_conflicts_and_recovery_fence_stale_workers() 
 }
 
 #[tokio::test]
+async fn authentication_recovery_is_generation_bound_durable_and_never_resets_integrity_failures() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    f.accept(&f.membership(SpaceCapability::Publish)).await;
+    let policy = RetryPolicy::default();
+    let Claim::Ready(lease) = f.gateway.claim_publication(f.fence, policy).await.unwrap() else {
+        panic!("ready")
+    };
+    f.gateway
+        .fail_publication(
+            &lease,
+            policy,
+            PublishFailure::Authentication { generation: 7 },
+        )
+        .await
+        .unwrap();
+    // New store object has no knowledge of the prior process; all replay
+    // protection must come from the committed failure generation.
+    let restarted = GatewayStore::new(f.pool.clone());
+    for generation in [0, 6, 7] {
+        assert!(
+            !restarted
+                .recover_authentication(f.fence, generation)
+                .await
+                .unwrap()
+        );
+        assert!(matches!(
+            restarted.claim_publication(f.fence, policy).await.unwrap(),
+            Claim::Blocked
+        ));
+    }
+    assert!(restarted.recover_authentication(f.fence, 8).await.unwrap());
+    assert!(!restarted.recover_authentication(f.fence, 8).await.unwrap());
+    let Claim::Ready(retry) = restarted.claim_publication(f.fence, policy).await.unwrap() else {
+        panic!("credential retry")
+    };
+    assert_eq!(retry.delivery(), lease.delivery());
+    assert_eq!(retry.attempt(), 1); // only the credential rejection was discounted
+    restarted
+        .fail_publication(&retry, policy, PublishFailure::InvalidReceipt)
+        .await
+        .unwrap();
+    assert!(!restarted.recover_authentication(f.fence, 9).await.unwrap());
+    assert_eq!(
+        restarted
+            .pending_publication(f.fence)
+            .await
+            .unwrap()
+            .unwrap()
+            .last_error
+            .as_deref(),
+        Some("invalid_receipt")
+    );
+    restarted.retry_blocked(f.fence).await.unwrap(); // explicit operator action
+    let Claim::Ready(retry) = restarted.claim_publication(f.fence, policy).await.unwrap() else {
+        panic!("operator retry")
+    };
+    restarted
+        .fail_publication(&retry, policy, PublishFailure::Conflict)
+        .await
+        .unwrap();
+    assert!(!restarted.recover_authentication(f.fence, 10).await.unwrap());
+    restarted.retry_blocked(f.fence).await.unwrap();
+    let Claim::Ready(retry) = restarted.claim_publication(f.fence, policy).await.unwrap() else {
+        panic!("operator retry")
+    };
+    restarted
+        .fail_publication(
+            &retry,
+            policy,
+            PublishFailure::Authentication { generation: 0 },
+        )
+        .await
+        .unwrap();
+    assert!(!restarted.recover_authentication(f.fence, 10).await.unwrap());
+}
+
+#[tokio::test]
 async fn quarantined_or_cross_space_intents_never_consume_order_or_outbox_work() {
     let Some(f) = Fixture::new().await else {
         return;

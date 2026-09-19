@@ -64,6 +64,61 @@ fn endpoint_is_an_explicit_origin_not_record_controlled_discovery() {
 }
 
 #[tokio::test]
+async fn pds_authentication_is_not_reported_as_a_repository_integrity_failure() {
+    let delivery = delivery();
+    let wire = PublicationWire::encode(delivery.clone()).unwrap();
+    let repo = "did:web:space.federation.example.com";
+    let expected = json!({"uri":wire.uri(&repo.parse().unwrap()).unwrap(),"cid":wire.cid().unwrap(),"value":wire.raw()});
+    for status in [StatusCode::UNAUTHORIZED, StatusCode::FORBIDDEN] {
+        for reject_car in [false, true] {
+            let body = expected.clone();
+            let writes = Arc::new(AtomicUsize::new(0));
+            let seen = writes.clone();
+            let router = Router::new()
+                .route(
+                    "/xrpc/com.atproto.repo.getRecord",
+                    get(move || async move {
+                        if reject_car {
+                            (StatusCode::OK, Json(body))
+                        } else {
+                            (
+                                status,
+                                Json(json!({"private":"must not be parsed or logged"})),
+                            )
+                        }
+                    }),
+                )
+                .route(
+                    "/xrpc/com.atproto.sync.getRepo",
+                    get(move || async move { status }),
+                )
+                .route(
+                    "/xrpc/com.atproto.repo.createRecord",
+                    post(move || async move {
+                        seen.fetch_add(1, Ordering::SeqCst);
+                        StatusCode::OK
+                    }),
+                );
+            let (endpoint, task) = serve(router).await;
+            let publisher = PdsPublisher::new(
+                endpoint,
+                repo.into(),
+                "fixture".repeat(8),
+                FixtureKey::K256.did_key(),
+                delivery.envelope.space,
+            )
+            .unwrap();
+            assert_eq!(
+                publisher.publish_exact(&delivery).await,
+                Err(PublishFailure::Authentication { generation: 0 })
+            );
+            assert_eq!(writes.load(Ordering::SeqCst), 0);
+            task.abort();
+        }
+    }
+}
+
+#[tokio::test]
 async fn conflicting_or_malformed_pds_readback_never_triggers_overwrite() {
     let delivery = delivery();
     let wire = PublicationWire::encode(delivery.clone()).unwrap();

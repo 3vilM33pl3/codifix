@@ -187,6 +187,11 @@ impl InstanceSync {
     pub fn replica(&self) -> &ReplicaStore {
         &self.replica
     }
+    /// Authenticated, fresh gateway metadata; local project authorization is
+    /// deliberately checked by the owning service before and after this call.
+    pub async fn gateway_status(&self) -> Result<crate::GatewayStatus> {
+        self.client.status(self.instance).await
+    }
     pub async fn catch_up(&self) -> Result<u32> {
         let mut after = self.verified_snapshot().await?.sequence();
         // One bounded page per tick: unrelated local work stays responsive.

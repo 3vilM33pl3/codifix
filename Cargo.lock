@@ -2987,6 +2987,7 @@ name = "mem-federation-runtime"
 version = "2.1.0-rc.1"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "chrono",
  "mem-atproto",
  "mem-atproto-verify",

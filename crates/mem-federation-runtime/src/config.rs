@@ -22,7 +22,14 @@ pub struct GatewayConfig {
     pub pds_ca_file: Option<PathBuf>,
     pub repository: String,
     pub signing_key: String,
-    pub token_file: PathBuf,
+    #[serde(default)]
+    pub token_file: Option<PathBuf>,
+    /// Mutually exclusive with token_file. Mount the containing directory so an
+    /// operator's atomic rename is visible without restarting this process.
+    #[serde(default)]
+    pub rotating_session_file: Option<PathBuf>,
+    #[serde(default)]
+    pub maintenance_status_file: Option<PathBuf>,
     pub audit_key_file: PathBuf,
     pub receipt_keys: Vec<ReceiptKey>,
     pub policy: SpacePolicy,
@@ -106,21 +113,37 @@ impl GatewayConfig {
         {
             return Err(RuntimeError::Configuration);
         }
-        let pds = PdsPublisher::new(
-            Endpoint::with_ca(
-                &self.pds,
-                self.disposable_test_mode,
-                self.pds_ca_file
-                    .as_deref()
-                    .map(root_certificate)
-                    .transpose()?
-                    .as_deref(),
-            )?,
-            self.repository,
-            private_secret(&self.token_file)?,
-            self.signing_key,
-            self.space,
+        let endpoint = Endpoint::with_ca(
+            &self.pds,
+            self.disposable_test_mode,
+            self.pds_ca_file
+                .as_deref()
+                .map(root_certificate)
+                .transpose()?
+                .as_deref(),
         )?;
+        let pds = match (
+            self.token_file,
+            self.rotating_session_file,
+            self.maintenance_status_file,
+        ) {
+            (Some(token), None, None) => PdsPublisher::new(
+                endpoint,
+                self.repository,
+                private_secret(&token)?,
+                self.signing_key,
+                self.space,
+            )?,
+            (None, Some(session), maintenance) => PdsPublisher::with_rotating_credentials(
+                endpoint,
+                self.repository,
+                session,
+                maintenance,
+                self.signing_key,
+                self.space,
+            )?,
+            _ => return Err(RuntimeError::Configuration),
+        };
         let credentials = self
             .credentials
             .into_iter()
@@ -154,6 +177,7 @@ impl GatewayConfig {
         } else {
             server
         };
+        let server = server.with_publication_status(pds.clone());
         let router = server.router();
         let worker = async {
             loop {

@@ -32,6 +32,7 @@ pub struct GatewayServer {
     expertise_enabled: bool,
     space: SpaceId,
     authority: InstanceId,
+    publication_status: Option<PdsPublisher>,
 }
 impl GatewayServer {
     /// Scheduled by the owning gateway runtime, with its normal writer fence.
@@ -77,12 +78,14 @@ impl GatewayServer {
             delivery_waiters: Default::default(),
             space,
             authority,
+            publication_status: None,
         })
     }
     pub fn router(&self) -> Router {
         let mut router = Router::new()
             .route("/v1/accept", post(accept))
             .route("/v1/pull", get(pull))
+            .route("/v1/status", get(status))
             .route("/v1/retention", post(retention));
         if self.expertise_enabled {
             router = router.route("/v1/expertise", post(expertise));
@@ -132,6 +135,17 @@ impl GatewayServer {
         {
             return Err(RuntimeError::Configuration);
         }
+        // Do not claim (and consume a retry/lease) with an unusable credential.
+        // This clone pins the token across create/read-back/signed-CAR checks.
+        let pds = match pds.credential_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(_) => return Ok(WorkerOutcome::Blocked),
+        };
+        if pds.credential_generation() > 0 {
+            self.store
+                .recover_authentication(self.fence, pds.credential_generation())
+                .await?;
+        }
         let policy = RetryPolicy::default();
         let lease = match self.store.claim_publication(self.fence, policy).await? {
             mem_federation_store::Claim::Ready(lease) => lease,
@@ -159,6 +173,10 @@ impl GatewayServer {
             ),
         }
     }
+    pub fn with_publication_status(mut self, pds: PdsPublisher) -> Self {
+        self.publication_status = Some(pds);
+        self
+    }
     fn authenticate(&self, headers: &HeaderMap) -> std::result::Result<InstanceId, StatusCode> {
         if headers.get_all("authorization").iter().count() != 1 {
             return Err(StatusCode::UNAUTHORIZED);
@@ -182,6 +200,60 @@ impl GatewayServer {
             .map(|(_, id)| *id)
             .ok_or(StatusCode::UNAUTHORIZED)
     }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StatusQuery {
+    nonce: uuid::Uuid,
+}
+async fn status(
+    State(server): State<Arc<GatewayServer>>,
+    headers: HeaderMap,
+    Query(query): Query<StatusQuery>,
+) -> std::result::Result<Json<crate::SignedGatewayStatus>, StatusCode> {
+    let actor = server.authenticate(&headers)?;
+    if query.nonce.is_nil() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    server
+        .store
+        .authorize_status(server.fence, actor)
+        .await
+        .map_err(|e| match e {
+            mem_federation_store::StoreError::Outcome(PublicationOutcome::Rejected(
+                PublicationReject::Unauthorized,
+            )) => StatusCode::FORBIDDEN,
+            _ => StatusCode::SERVICE_UNAVAILABLE,
+        })?;
+    let mut credential = server.publication_status.as_ref().map_or_else(
+        || crate::GatewayCredentialStatus::unknown(crate::credentials::now_seconds()),
+        PdsPublisher::credential_status,
+    );
+    let pending = server
+        .store
+        .pending_publication(server.fence)
+        .await
+        .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+    if pending.as_ref().is_some_and(|p| {
+        p.blocked
+            && p.last_error
+                .as_deref()
+                .is_some_and(|e| e.starts_with("authentication:"))
+    }) {
+        credential.state = crate::CredentialState::AuthenticationBlocked;
+        credential.publication_usable = false;
+        credential.reason = Some("authentication_blocked".into());
+    }
+    let status = crate::GatewayStatus {
+        credentials: credential,
+        pending: pending.map(Into::into),
+    };
+    server
+        .security
+        .sign_status(status, query.nonce, actor, server.space, server.authority)
+        .map(Json)
+        .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)
 }
 async fn retention(
     State(server): State<Arc<GatewayServer>>,
