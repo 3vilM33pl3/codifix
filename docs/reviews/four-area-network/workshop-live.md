@@ -210,5 +210,7 @@ with a signed release or company-wide authenticated deployment.
 Subsequent [Workshop interaction work](workshop-interaction.md) deployed private
 proposal-body inspection and human review in Web/CLI/TUI, with migration 0059
 and a separate pre-upgrade encrypted backup. This supersedes the result-file-only
-delivery above. New-question submission is still pending and no additional paid
-generation or review decision was performed during that upgrade.
+delivery above. No additional paid generation or review decision was performed
+during that upgrade. The subsequent 2026-09-19 interaction entry records migration
+0060, explicit question preparation/confirmation and the separate queue worker;
+it supersedes the earlier new-question-pending status, not the four-area limits.

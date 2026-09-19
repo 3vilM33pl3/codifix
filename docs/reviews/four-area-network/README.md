@@ -1,6 +1,6 @@
 # Four-area internal Memory network
 
-Status: Workshop-only local preview is live as of 2026-09-18. The full four-area
+Status: Workshop-only local preview is live as of 2026-09-19. The full four-area
 network is not deployed; no new signed release was published for this preview.
 
 Current narrowed work: [Workshop-first live activation](workshop-live.md). The
@@ -11,9 +11,11 @@ work. Existing services and the original dataset remain unchanged. Start with th
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
-human review. The independent preview is upgraded through migration 0059.
-New-question submission and recoverable execution are still pending; review does
-not execute a proposal or authorize another paid call.
+human review. The independent preview is upgraded through migration 0060, with
+explicit question preparation/confirmation and a separate bounded queue worker.
+Preparing is free; confirming may invoke the configured model under the existing
+grant and budget. Review does not execute a proposal or authorize another call.
+The source grant expires at 14:46 London on 2026-09-19 and is not silently renewed.
 
 ## Historical implementation notes
 

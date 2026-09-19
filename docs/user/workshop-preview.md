@@ -97,6 +97,8 @@ The private app and database have `unless-stopped` restart policies. The
 It listens only on host loopback. The app itself listens only on its container's
 loopback; its network has no internet default route. Browser sessions keep normal
 loopback/CSRF checks; no forwarded-address header grants owner access.
+The relay permits at most 32 Web connections so browser and TUI reads can coexist;
+the five-minute idle timeout and the app's 128-PID/thread limit remain unchanged.
 
 Deterministic health observations run every five minutes. They inspect counts,
 not knowledge contents, and do not contact a model. The separate
@@ -130,6 +132,10 @@ docker restart memory-workshop-preview-app-20260918
 systemctl --user restart memory-workshop-preview-relay.service
 memory-workshop health
 ```
+
+Restarting the relay also stops its dependent question worker. After the relay
+and app are healthy, inspect current authority and explicitly start the question
+worker again if queued execution should resume. It does not auto-restart itself.
 
 Do not use `memory service restart-all` for this preview. Do not start the retained
 `memory-workshop-preview-app-initial-transport-20260918` or
