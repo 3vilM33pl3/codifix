@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { privateInput } from './restore-descriptor.mjs';
 import { streamLines, privateArtifact } from './inventory.mjs';
 import { SCHEMA60_TABLES } from './verify-staging.mjs';
+import { archiveFraming } from './archive-framing.mjs';
 
 const AREAS = ['general', 'homelab', 'trust', 'workshop'];
 const HISTORICAL = ['_sqlx_migrations','curation_runs','memory_chunks','memory_entries','memory_relations','memory_sources','memory_tags','projects','raw_captures','sessions','tasks']
@@ -151,6 +152,7 @@ async function bound(b,maxBytes,json){
 }
 export async function accountArchive(binding,state){
   await bound(binding,Infinity,false);const input=await open(binding.path,constants.O_RDONLY|constants.O_NOFOLLOW),bytes=createHash('sha256');
+  const framing=archiveFraming(state.tables.keys(),state.prepared.source_rows);
   let header=false,complete=false,size=0;
   try{
     async function* hashed(){for await(const chunk of input.createReadStream({autoClose:false})){bytes.update(chunk);size+=chunk.length;yield chunk;}}
@@ -159,8 +161,8 @@ export async function accountArchive(binding,state){
       if(!header){if(e.event!=='header'||e.format_version!==1||e.serialization_id!=='postgresql-to-jsonb-utf8-utc-v1')fail();
         for(const k of ['source_instance','snapshot_id','inventory_sha256','manifest_sha256'])if(e[k]!==state.prepared[k])fail();header=true;
       }else if(complete)fail();else if(e.event==='complete'){
-        if(e.row_count!==state.prepared.source_rows||e.table_count!==state.prepared.source_tables)fail();complete=true;
-      }else accountOriginal(state,e);
+        framing.complete(e);complete=true;
+      }else if(framing.consume(e))accountOriginal(state,e);
     }
     if(!complete||size!==state.prepared.archive_bytes||bytes.digest('hex')!==binding.sha256)fail();return finishAccounting(state);
   }finally{await input.close();}

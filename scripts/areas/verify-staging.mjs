@@ -9,6 +9,7 @@ import { resolve, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { privateInput, inspectContainer } from './restore-descriptor.mjs';
 import { BEGIN_SQL, identifier, literal, keyExpression, streamLines, privateArtifact } from './inventory.mjs';
+import { archiveFraming } from './archive-framing.mjs';
 
 export const SCHEMA60_TABLES = [
   "public._sqlx_migrations",
@@ -186,6 +187,13 @@ export function makeExpected(prepared, manifest) {
     || prepared.inventory_sha256 !== manifest.inventory_sha256 || !sha.test(prepared.manifest_sha256)
     || !uuid.test(prepared.source_instance) || !uuid.test(prepared.snapshot_id)
     || !same([...manifest.areas].sort(), AREAS) || prepared.partitions.length !== 4) fail();
+  const historical = ['_sqlx_migrations','curation_runs','memory_chunks','memory_entries','memory_relations','memory_sources','memory_tags','projects','raw_captures','sessions','tasks']
+    .map(name => 'mab_full_20260516_150014.' + name);
+  const allowed = new Set([...SCHEMA60_TABLES, ...historical]);
+  if (!Array.isArray(manifest.table_policies)) fail();
+  const archiveTables = new Set(manifest.table_policies.map(t => t.table));
+  if (archiveTables.size !== manifest.table_policies.length || archiveTables.size !== prepared.source_tables
+    || [...archiveTables].some(t => !allowed.has(t))) fail();
   const expected = new Map(AREAS.map(area => [area, { rows: new Map(), provenance: new Map(), histories: new Set(), projects: new Set(), versions: 0, tombstones: 0 }]));
   const owners = new Map();
   for (const lineage of manifest.lineages) {
@@ -218,7 +226,7 @@ export function makeExpected(prepared, manifest) {
       || !sha.test(p.operator_attestation.decision_sha256) || projections.has(b.source.record.key)) fail();
     projections.set(b.source.record.key, p);
   }
-  return { prepared, expected, owners, relationOwners, projections, seenProjections: new Set(), sourceRows: 0, sourceTables: new Set(), lastRecord: null };
+  return { prepared, expected, owners, relationOwners, projections, archiveTables, seenProjections: new Set(), sourceRows: 0, sourceTables: new Set(), lastRecord: null };
 }
 // Only the fixed shallow projection schema is encoded here; arbitrary PostgreSQL
 // jsonb/numeric canonicalization remains PostgreSQL's responsibility.
@@ -287,6 +295,7 @@ export async function readArchive(file, state) {
   await bound(file, Infinity, false);
   const input = await open(file.path, constants.O_RDONLY | constants.O_NOFOLLOW);
   const bytes = createHash('sha256'); let size = 0, header = false, complete = false;
+  const framing = archiveFraming(state.archiveTables, state.prepared.source_rows);
   try {
     const raw = input.createReadStream({ autoClose: false });
     async function* hashed() { for await (const chunk of raw) { bytes.update(chunk); size += chunk.length; yield chunk; } }
@@ -299,9 +308,9 @@ export async function readArchive(file, state) {
         state.sourceMigration = e.source_migration_version; header = true;
       } else if (complete) fail();
       else if (e.event === 'complete') {
-        if (e.row_count !== state.prepared.source_rows || e.table_count !== state.prepared.source_tables) fail();
+        framing.complete(e);
         complete = true;
-      } else consumeOriginal(state, e);
+      } else if (framing.consume(e)) consumeOriginal(state, e);
     }
     if (!complete || size !== state.prepared.archive_bytes || bytes.digest('hex') !== file.sha256) fail();
     finishArchive(state);

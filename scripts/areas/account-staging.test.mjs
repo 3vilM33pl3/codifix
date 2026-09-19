@@ -44,7 +44,10 @@ function fixture(){
 }
 function account(f){const state=accountingState(f.prepared,f.manifest,f.ledger);for(const row of f.rows)accountOriginal(state,row);return finishAccounting(state);}
 function archive(f){return [{event:'header',format_version:1,serialization_id:'postgresql-to-jsonb-utf8-utc-v1',...Object.fromEntries(['source_instance','snapshot_id','inventory_sha256','manifest_sha256'].map(k=>[k,f.prepared[k]]))},
-  ...f.rows,{event:'complete',row_count:f.prepared.source_rows,table_count:f.prepared.source_tables}].map(v=>JSON.stringify(v)+'\n').join('');}
+  ...f.manifest.table_policies.map(t=>t.table).sort().flatMap(table=>{
+    const rows=f.rows.filter(r=>r.record.table===table);
+    return [{event:'table_start',table,row_count:rows.length,columns:[],foreign_keys:[]},...rows,{event:'table_end',table,row_count:rows.length}];
+  }),{event:'complete',row_count:f.prepared.source_rows,table_count:f.prepared.source_tables}].map(v=>JSON.stringify(v)+'\n').join('');}
 
 test('every source row is counted once; shared project copies do not inflate preservation counts',()=>{
   const f=fixture(),r=account(f);

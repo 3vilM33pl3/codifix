@@ -37,6 +37,7 @@ function fixture() {
     .sort((a,b)=>Buffer.compare(Buffer.from(a.record.table+'\0'+a.record.key),Buffer.from(b.record.table+'\0'+b.record.key)));
   b.source.row_sha256=rows.find(r=>r.record.table==='public.memory_sources').source_sha256;
   prepared.source_rows=rows.length;prepared.source_tables=4;prepared.partitions[0].rows=3;prepared.partitions[0].projections=1;
+  manifest.table_policies=[...new Set(rows.map(r=>r.record.table))].map(table=>({table,strategy:'owned'}));
   const state=makeExpected(prepared,manifest);for(const r of rows)consumeOriginal(state,r);finishArchive(state);state.sourceMigration=60;
   return {c,spec,target,prepared,manifest,rows,state,source};
 }
@@ -109,7 +110,10 @@ test('private complete archive binds source identity and exact bytes; partial ar
   const root=await mkdtemp(join(tmpdir(),'memory-staging-verify-'));t.after(()=>rm(root,{recursive:true,force:true}));
   const f=fixture(),header={event:'header',format_version:1,serialization_id:'postgresql-to-jsonb-utf8-utc-v1',source_migration_version:60};
   for(const k of ['source_instance','snapshot_id','inventory_sha256','manifest_sha256'])header[k]=f.prepared[k];
-  const content=[header,...f.rows,{event:'complete',row_count:4,table_count:4}].map(v=>JSON.stringify(v)+'\n').join('');
+  const content=[header,...f.manifest.table_policies.map(t=>t.table).sort().flatMap(table=>{
+    const rows=f.rows.filter(r=>r.record.table===table);
+    return [{event:'table_start',table,row_count:rows.length,columns:[],foreign_keys:[]},...rows,{event:'table_end',table,row_count:rows.length}];
+  }),{event:'complete',row_count:4,table_count:4}].map(v=>JSON.stringify(v)+'\n').join('');
   const path=join(root,'archive.ndjson');await writeFile(path,content,{mode:0o600});f.prepared.archive_bytes=Buffer.byteLength(content);
   const state=makeExpected(f.prepared,f.manifest);await readArchive({path,sha256:hash(content)},state);assert.equal(state.expected.get('general').rows.size,4);
   await assert.rejects(readArchive({path,sha256:hash('wrong')},makeExpected(f.prepared,f.manifest)));
