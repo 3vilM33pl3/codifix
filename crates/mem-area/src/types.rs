@@ -17,6 +17,7 @@ pub const AREA_IMPORT_MIGRATION: u32 = 56;
 pub const SUPERVISOR_HEALTH_MIGRATION: u32 = 57;
 pub const SUPERVISOR_USAGE_MIGRATION: u32 = 58;
 pub const SUPERVISOR_REVIEW_MIGRATION: u32 = 59;
+pub const SUPERVISOR_QUESTION_MIGRATION: u32 = 60;
 
 /// Stable wire identities. Display names must not become routing identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

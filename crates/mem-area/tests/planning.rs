@@ -1458,6 +1458,7 @@ fn reviewed_schema_catalog_matches_every_current_repository_table() {
         .chain(AREA_IMPORT_TABLES_0056)
         .chain(SUPERVISOR_TABLES_0057)
         .chain(SUPERVISOR_TABLES_0059)
+        .chain(SUPERVISOR_TABLES_0060)
         .map(|(name, _)| name.to_string())
         .collect();
     assert_eq!(
@@ -1468,7 +1469,8 @@ fn reviewed_schema_catalog_matches_every_current_repository_table() {
             + SUPERVISOR_TABLES_0055.len()
             + AREA_IMPORT_TABLES_0056.len()
             + SUPERVISOR_TABLES_0057.len()
-            + SUPERVISOR_TABLES_0059.len(),
+            + SUPERVISOR_TABLES_0059.len()
+            + SUPERVISOR_TABLES_0060.len(),
         "duplicate table policy"
     );
     assert_eq!(
@@ -1548,7 +1550,7 @@ fn migration_0053_is_exact_version_gated_and_cannot_reactivate_supervisor_state(
             .iter()
             .any(|error| error.contains("unclassified table public.supervisor_future_authority"))
     );
-    for unsupported in [51, 60, 999] {
+    for unsupported in [51, 61, 999] {
         let mut future = inventory.clone();
         future.migration_version = unsupported;
         assert!(
@@ -1665,14 +1667,14 @@ fn migration_0054_requires_exact_additive_catalog_and_archives_private_proposals
 }
 
 #[test]
-fn migrations_0055_through_0059_require_exact_additions_and_preserve_retention_policies() {
+fn migrations_0055_through_0060_require_exact_additions_and_preserve_retention_policies() {
     assert_eq!(SUPERVISOR_CONTEXT_MIGRATION, 55);
     assert_eq!(AREA_IMPORT_MIGRATION, 56);
     assert_eq!(SUPERVISOR_HEALTH_MIGRATION, 57);
     assert_eq!(SUPERVISOR_TABLES_0055.len(), 2);
     assert_eq!(AREA_IMPORT_TABLES_0056.len(), 3);
     assert_eq!(SUPERVISOR_TABLES_0057.len(), 2);
-    for head in [55, 56, 57, 58, 59] {
+    for head in [55, 56, 57, 58, 59, 60] {
         let mut inventory = fixture();
         inventory.migration_version = head;
         for (name, _) in SUPERVISOR_TABLES_0053
@@ -1691,6 +1693,11 @@ fn migrations_0055_through_0059_require_exact_additions_and_preserve_retention_p
             })
             .chain(if head >= 59 {
                 SUPERVISOR_TABLES_0059
+            } else {
+                &[]
+            })
+            .chain(if head >= 60 {
+                SUPERVISOR_TABLES_0060
             } else {
                 &[]
             })
@@ -1728,6 +1735,11 @@ fn migrations_0055_through_0059_require_exact_additions_and_preserve_retention_p
             } else {
                 &[]
             })
+            .chain(if head >= 60 {
+                SUPERVISOR_TABLES_0060
+            } else {
+                &[]
+            })
         {
             assert_eq!(
                 report
@@ -1757,6 +1769,7 @@ fn migrations_0055_through_0059_require_exact_additions_and_preserve_retention_p
                     || error.contains("missing migration 0055 table inventory")
                     || error.contains("missing migration 0056 table inventory")
                     || error.contains("missing migration 0057 table inventory")
+                    || error.contains("missing migration 0059 table inventory")
             }));
         }
         // 0058 adds counters to an existing operational table, not new tables.

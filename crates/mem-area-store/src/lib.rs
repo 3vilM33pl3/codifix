@@ -12,6 +12,7 @@ pub const TARGET_MIGRATION: i64 = 56;
 pub const HEALTH_TARGET_MIGRATION: i64 = 57;
 pub const USAGE_TARGET_MIGRATION: i64 = 58;
 pub const REVIEW_TARGET_MIGRATION: i64 = 59;
+pub const QUESTION_TARGET_MIGRATION: i64 = 60;
 const TABLES: &[&str] = &[
     "public.projects",
     "public.sessions",
@@ -156,6 +157,7 @@ pub async fn import_partition(
                 | HEALTH_TARGET_MIGRATION
                 | USAGE_TARGET_MIGRATION
                 | REVIEW_TARGET_MIGRATION
+                | QUESTION_TARGET_MIGRATION
         )
     ) {
         return Err(ImportError::Schema);
@@ -180,6 +182,11 @@ pub async fn import_partition(
         })
         .chain(if target_head >= REVIEW_TARGET_MIGRATION {
             mem_area::SUPERVISOR_TABLES_0059
+        } else {
+            &[]
+        })
+        .chain(if target_head >= QUESTION_TARGET_MIGRATION {
+            mem_area::SUPERVISOR_TABLES_0060
         } else {
             &[]
         })

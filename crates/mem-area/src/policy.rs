@@ -343,6 +343,19 @@ pub const SUPERVISOR_TABLES_0059: &[(&str, TableStrategy)] = &[(
     TableStrategy::HistoricalArchive,
 )];
 
+/// Preserve private consent/outcomes as historical evidence, never runnable
+/// queue authority in a new area or a restored target.
+pub const SUPERVISOR_TABLES_0060: &[(&str, TableStrategy)] = &[
+    (
+        "public.supervisor_questions",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.supervisor_question_denials",
+        TableStrategy::HistoricalArchive,
+    ),
+];
+
 /// Optional, observed historical evaluation snapshot. Presence of any member
 /// requires the whole catalog, including empty tables. Never match a prefix or
 /// apply the public schema's ownership/rebuild policy to these archived rows.
@@ -377,6 +390,7 @@ pub fn table_strategy(table: &str) -> Option<TableStrategy> {
         .chain(AREA_IMPORT_TABLES_0056)
         .chain(SUPERVISOR_TABLES_0057)
         .chain(SUPERVISOR_TABLES_0059)
+        .chain(SUPERVISOR_TABLES_0060)
         .find_map(|(name, strategy)| (*name == table).then_some(*strategy))
         .or_else(|| historical_project_table(table).map(|_| TableStrategy::HistoricalArchive))
 }
