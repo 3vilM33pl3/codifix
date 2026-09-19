@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, chmod, readFile, writeFile, rm, symlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdtemp, chmod, readFile, writeFile, rm, symlink, link, mkdir, rename, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { canonical, hash, OperatorError, parseJson, StateFiles } from './files.mjs';
+import { canonical, hash, OperatorError, parseJson, privateRead, safeFile, StateFiles } from './files.mjs';
 import { EnrollmentOperator, loadConfig, PDS_IMAGE, validateConfig } from './operator.mjs';
-import { HttpsTransport } from './transport.mjs';
+import { HttpsTransport, jsonMediaType } from './transport.mjs';
 
 const bootstrapKey = `did:key:z${'3'.repeat(45)}`;
 const signingKey = `did:key:z${'4'.repeat(45)}`;
@@ -20,7 +19,9 @@ function jwt(config, scope, expires, serial = 0) {
 }
 
 async function fixture(t, options = {}) {
-  const directory = await mkdtemp(join(tmpdir(), 'memory-pds-operator-'));
+  // The Linux operator deliberately rejects permissive non-root-owned TMPDIR
+  // ancestors. Tests use the root-owned sticky /tmp, never chmod shared paths.
+  const directory = await mkdtemp('/tmp/memory-pds-operator-');
   await chmod(directory, 0o700);
   t.after(async () => { await rm(directory, { recursive: true, force: true }); });
   const write = (name, contents) => writeFile(join(directory, name), contents, { mode: 0o600 });
@@ -126,6 +127,64 @@ test('strict configuration rejects duplicate keys, unsafe endpoints, path aliase
   await assert.rejects(loadConfig(join(f.directory, 'linked.json')));
 });
 
+test('foreign owners, hard-linked secrets and permissive ancestors are rejected', async t => {
+  const f = await fixture(t);
+  await link(f.config.password_file, join(f.directory, 'password-hardlink'));
+  await assert.rejects(privateRead(f.config.password_file), /unsafe_private_file/u);
+  const meta = { isFile: () => true, nlink: 1, size: 32, mode: 0o100600, uid: process.geteuid() + 1 };
+  assert.throws(() => safeFile(meta, 65536, false), /unsafe_private_file/u);
+  const permissive = join(f.directory, 'permissive'); await mkdir(permissive, { mode: 0o700 }); await chmod(permissive, 0o777);
+  const inner = join(permissive, 'state'); await mkdir(inner, { mode: 0o700 });
+  await assert.rejects(new StateFiles(inner).validate(), /unsafe_parent_directory/u);
+  await symlink(f.directory, join(f.directory, 'parent-alias'));
+  await assert.rejects(privateRead(join(f.directory, 'parent-alias', 'password')));
+});
+
+test('directory replacement cannot redirect a write or its temporary cleanup', async t => {
+  const f = await fixture(t); const moved = `${f.directory}-moved`;
+  t.after(async () => rm(moved, { recursive: true, force: true }));
+  let swapped = false;
+  const files = new StateFiles(f.directory, async (stage, name) => {
+    if (!swapped && stage === 'before_file_sync' && name === 'journal.json') {
+      swapped = true; await rename(f.directory, moved); await mkdir(f.directory, { mode: 0o700 });
+      await writeFile(join(f.directory, 'journal.json'), 'untouched replacement directory', { mode: 0o600 });
+    }
+  });
+  await assert.rejects(files.write('journal.json', { sensitive: 'test-only' }), /state_directory_replaced/u);
+  assert.equal(await readFile(join(f.directory, 'journal.json'), 'utf8'), 'untouched replacement directory');
+  assert.equal((await readdir(moved)).some(name => name.startsWith('.pending-')), false);
+});
+
+test('symlink directory swap fails closed without writing through the alias', async t => {
+  const f = await fixture(t); const victim = await fixture(t); const moved = `${f.directory}-moved`;
+  t.after(async () => rm(moved, { recursive: true, force: true }));
+  await victim.write('journal.json', 'unrelated protected file'); let swapped = false;
+  const files = new StateFiles(f.directory, async stage => {
+    if (!swapped && stage === 'before_file_sync') { swapped = true; await rename(f.directory, moved); await symlink(victim.directory, f.directory); }
+  });
+  await assert.rejects(files.write('journal.json', { new: 'do not redirect' }));
+  assert.equal(await readFile(join(victim.directory, 'journal.json'), 'utf8'), 'unrelated protected file');
+});
+
+test('replaced temporary and lock inodes are never deleted as ours', async t => {
+  const f = await fixture(t); let substituted = false;
+  const files = new StateFiles(f.directory, async stage => {
+    if (!substituted && stage === 'before_file_sync') {
+      substituted = true; const temporary = (await readdir(f.directory)).find(name => name.startsWith('.pending-'));
+      await rename(join(f.directory, temporary), join(f.directory, 'retained-own-temporary'));
+      await f.write(temporary, 'unrelated replacement');
+    }
+  });
+  await assert.rejects(files.write('journal.json', { private: 'synthetic' }), /owned_state_file_replaced/u);
+  const temporary = (await readdir(f.directory)).find(name => name.startsWith('.pending-'));
+  assert.equal(await readFile(join(f.directory, temporary), 'utf8'), 'unrelated replacement');
+  await assert.rejects(f.files.locked(async () => {
+    await rename(join(f.directory, 'operator.lock'), join(f.directory, 'original-lock'));
+    await f.write('operator.lock', 'replacement lock');
+  }), /owned_state_file_replaced/u);
+  assert.equal(await readFile(join(f.directory, 'operator.lock'), 'utf8'), 'replacement lock');
+});
+
 test('wrong digest and expired review fail before effects', async t => {
   const f = await fixture(t);
   await assert.rejects(f.operator.execute('bootstrap', '0'.repeat(64)), /exact_review_digest_required/u);
@@ -195,6 +254,35 @@ test('interrupted activation reconciles status without a second activation', asy
   assert.equal((await f.run('reconcile')).state, 'active'); assert.equal(count(f, 'activateAccount'), 1);
 });
 
+test('refresh during pending activation preserves its timestamp through direct and interrupted recovery', async t => {
+  for (const interrupted of [false, true]) {
+    let interrupt = false;
+    const f = await fixture(t, { fault: async (stage, name) => {
+      if (interrupt && stage === 'after_atomic_write' && name === 'session.json') { interrupt = false; throw new Error('interrupted'); }
+    } });
+    await f.ready('handoff'); f.fake.fail = 'activateAccount'; await assert.rejects(f.run('activate'));
+    const activationTime = (await f.files.read('journal.json')).pending_started_at;
+    f.clock(instant + 121 * 60000); interrupt = interrupted;
+    if (interrupted) { await assert.rejects(f.run('refresh')); await f.run('reconcile'); }
+    else await f.run('refresh');
+    const state = await f.files.read('journal.json');
+    assert.equal(state.phase, 'activate_pending'); assert.equal(state.pending_started_at, activationTime);
+    assert.equal((await f.operator.preview()).phase, 'reconcile');
+    assert.equal((await f.run('reconcile')).state, 'active'); assert.equal(count(f, 'activateAccount'), 1);
+  }
+});
+
+test('slow preflight cannot carry review authority past expiry into account creation or activation', async t => {
+  const f = await fixture(t); await f.ready('bootstrap');
+  const getDocument = f.operator.transport.document;
+  f.operator.transport.document = async (...args) => { const doc = await getDocument(...args); f.clock(instant + 86400000); return doc; };
+  await assert.rejects(f.run('create'), /review_expired/u); assert.equal(count(f, 'createAccount'), 0);
+  const g = await fixture(t); await g.ready('handoff');
+  const rpc = g.operator.transport.rpc;
+  g.operator.transport.rpc = async (...args) => { const response = await rpc(...args); if (args[1].endsWith('getSession')) g.clock(instant + 86400000); return response; };
+  await assert.rejects(g.run('activate'), /review_expired/u); assert.equal(count(g, 'activateAccount'), 0);
+});
+
 test('successful refresh persists both rotated tokens and journal generation together by recovery', async t => {
   let interrupt = false;
   const f = await fixture(t, { fault: async (stage, name) => {
@@ -260,4 +348,6 @@ test('production transport rejects arbitrary methods and cleartext before sendin
   const transport = new HttpsTransport();
   assert.throws(() => transport.rpc('https://operator.company.test', 'com.atproto.server.createInviteCode', { method: 'POST' }, Buffer.alloc(0)));
   assert.throws(() => transport.document('http://operator.company.test/.well-known/did.json', Buffer.alloc(0)), /unsafe_endpoint/u);
+  for (const type of ['application/json', 'application/did+json', 'application/did+ld+json; charset=utf-8']) assert.ok(jsonMediaType(type));
+  for (const type of ['text/html', 'application/anything+json', 'application/json-other', '']) assert.equal(jsonMediaType(type), false);
 });

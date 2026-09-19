@@ -50,14 +50,16 @@ function document(config, key) {
 }
 function validateJournal(config, state) {
   if (!state) return;
-  strict(state, ['schema_version', 'identity_sha256', 'phase', 'revision', 'session_generation', 'signing_key', 'input_sha256', 'resume_phase', 'pending_started_at']);
+  strict(state, ['schema_version', 'identity_sha256', 'phase', 'revision', 'session_generation', 'signing_key', 'input_sha256', 'resume_phase', 'pending_started_at', 'resume_pending_started_at']);
   check(state.schema_version === 1 && state.identity_sha256 === identityDigest(config) && STATES.includes(state.phase)
     && Number.isSafeInteger(state.revision) && state.revision > 0 && Number.isSafeInteger(state.session_generation) && state.session_generation >= 0
     && (state.signing_key === null || publicKey(state.signing_key))
     && (state.input_sha256 === null || HEX.test(state.input_sha256))
     && (state.resume_phase === null || ['created', 'key_review', 'handoff', 'activate_pending', 'active'].includes(state.resume_phase))
-    && (state.pending_started_at === null || (Number.isSafeInteger(state.pending_started_at) && state.pending_started_at > 0)), 'journal_binding_mismatch');
+    && (state.pending_started_at === null || (Number.isSafeInteger(state.pending_started_at) && state.pending_started_at > 0))
+    && (state.resume_pending_started_at === null || (Number.isSafeInteger(state.resume_pending_started_at) && state.resume_pending_started_at > 0)), 'journal_binding_mismatch');
   check((state.phase === 'refresh_pending') === (state.resume_phase !== null)
+    && (state.resume_phase === 'activate_pending') === (state.resume_pending_started_at !== null)
     && (['create_pending', 'activate_pending', 'refresh_pending'].includes(state.phase)) === (state.pending_started_at !== null)
     && (!['key_review', 'handoff', 'activate_pending', 'active'].includes(state.phase) || state.signing_key !== null)
     && (state.phase === 'bootstrap' || state.input_sha256 !== null), 'journal_binding_mismatch');
@@ -101,13 +103,13 @@ export class EnrollmentOperator {
     return this.files.locked(async () => {
       const review = await this.preview(phase);
       check(HEX.test(confirmation) && review.review_sha256 === confirmation, 'exact_review_digest_required');
-      check(this.now() >= timestamp(this.config.review_not_before) && this.now() < timestamp(this.config.review_expires_at), 'review_expired');
+      this.currentReview();
       let state = await this.state();
       const ca = await privateRead(this.config.tls_ca_file, { publicFile: true, limit: 16384 });
       check(hash(ca) === this.config.tls_ca_sha256, 'tls_trust_changed');
       const save = async updates => {
         state = { ...(state ?? { schema_version: 1, identity_sha256: identityDigest(this.config), revision: 0,
-          session_generation: 0, signing_key: null, input_sha256: null, resume_phase: null, pending_started_at: null }), ...updates, revision: (state?.revision ?? 0) + 1 };
+          session_generation: 0, signing_key: null, input_sha256: null, resume_phase: null, pending_started_at: null, resume_pending_started_at: null }), ...updates, revision: (state?.revision ?? 0) + 1 };
         await this.files.write('journal.json', state);
       };
       if (phase === 'bootstrap') {
@@ -157,7 +159,8 @@ export class EnrollmentOperator {
       } else if (phase === 'refresh') {
         const previous = state.phase;
         const session = await this.session(state); this.currentToken(session, 'refresh');
-        await save({ phase: 'refresh_pending', resume_phase: previous, pending_started_at: this.now() });
+        await save({ phase: 'refresh_pending', resume_phase: previous, pending_started_at: this.now(),
+          resume_pending_started_at: previous === 'activate_pending' ? state.pending_started_at : null });
         await this.refresh(state, session, ca, save);
       } else if (state.phase === 'create_pending') {
         const inputs = await this.inputs();
@@ -181,7 +184,8 @@ export class EnrollmentOperator {
           // Output persisted before a crash advancing the journal. Never invoke
           // the provider again merely to finish our local bookkeeping.
           if (session.access_expires_at > this.now() + 30000) await this.getSession(session, ca);
-          await save({ phase: state.resume_phase, resume_phase: null, session_generation: session.generation, pending_started_at: null });
+          await save({ phase: state.resume_phase, resume_phase: null, session_generation: session.generation,
+            pending_started_at: state.resume_pending_started_at, resume_pending_started_at: null });
         } else {
           check(this.now() < state.pending_started_at + 2 * 3600000, 'refresh_reconciliation_window_expired');
           this.currentToken(session, 'refresh');
@@ -192,7 +196,7 @@ export class EnrollmentOperator {
       return { executed: true, phase, state: state.phase, journal_revision: state.revision,
         repository: this.config.repository, session_generation: state.session_generation,
         access_expires_at: currentSession?.access_expires_at ?? null, refresh_expires_at: currentSession?.refresh_expires_at ?? null,
-        signing_key: state.signing_key, did_document_sha256: ['bootstrap', 'handoff'].includes(phase) ? hash(await privateRead(this.files.path('did.json'))) : null,
+        signing_key: state.signing_key, did_document_sha256: ['bootstrap', 'handoff'].includes(phase) ? hash(await this.files.bytes('did.json')) : null,
         gateway_ready: false, repository_verified: false, gateway_restart_required: ['create', 'refresh', 'reconcile'].includes(phase) };
     });
   }
@@ -202,8 +206,10 @@ export class EnrollmentOperator {
     return value;
   }
   async inputs() { return { key: await this.secret('bootstrap_key_file'), password: await this.secret('password_file'), invite: await this.secret('invite_file') }; }
-  async rpc(nsid, options, ca) { return this.transport.rpc(this.config.operator_origin, nsid, options, ca); }
+  currentReview() { check(this.now() >= timestamp(this.config.review_not_before) && this.now() < timestamp(this.config.review_expires_at), 'review_expired'); }
+  async rpc(nsid, options, ca) { this.currentReview(); return this.transport.rpc(this.config.operator_origin, nsid, options, ca); }
   async verifyDocument(key, ca) {
+    this.currentReview();
     const result = await this.transport.document(`https://${this.config.handle}/.well-known/did.json`, ca);
     check(canonical(result) === canonical(document(this.config, key)), 'served_did_document_mismatch');
   }
@@ -246,6 +252,7 @@ export class EnrollmentOperator {
   async refresh(state, session, ca, save) {
     const response = await this.rpc('com.atproto.server.refreshSession', { method: 'POST', token: session.refresh_jwt }, ca);
     await this.saveSession(response, state.session_generation + 1);
-    await save({ phase: state.resume_phase, resume_phase: null, session_generation: state.session_generation + 1, pending_started_at: null });
+    await save({ phase: state.resume_phase, resume_phase: null, session_generation: state.session_generation + 1,
+      pending_started_at: state.resume_pending_started_at, resume_pending_started_at: null });
   }
 }

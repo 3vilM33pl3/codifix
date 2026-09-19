@@ -27,6 +27,12 @@ their deployment rehearsal. Do not describe the fake tests as a live enrollment.
   account sessions and prepared public DID document. Back it up securely alongside
   the PDS data and required credentials. Never mount the whole directory into the
   gateway or participants; it contains much more than a publication token.
+- The hardened filesystem path is Linux-only. Secret files must belong to the
+  executing UID, have one hard link, and be mode `0600`. Every ancestor is
+  traversed without symlinks and must belong to root/the executing UID without
+  group/world write access, except a root-owned sticky temporary directory.
+  Public CA files may belong to root and be read-only to other users. Unsafe
+  environments are rejected; do not chmod shared ancestors to bypass a refusal.
 - Use distinct fixed origins: the repository's `did:web` hostname on HTTPS443,
   the normal private PDS publisher origin, and a separately isolated operator-only
   XRPC origin. No member may reach operator routes or raw PDS contents. Use the
@@ -145,6 +151,10 @@ prevents two local operators from running simultaneously. A process kill can
 leave `operator.lock`; verify the recorded PID is no longer the owning process
 and that no operator is active before an administrator removes **that exact
 lock file**. Never delete the journal to force a retry.
+State writes, rename and cleanup are anchored to an open directory descriptor.
+A changed directory path fails closed; cleanup never deletes a replacement
+temporary/lock inode merely because its filename matches. The review window is
+rechecked before every outbound request, including after slow DID/session reads.
 
 - A lost `createAccount` reply leaves `create_pending`. The next reviewed
   `reconcile` calls `createSession` with the exact DID and original password.
@@ -166,6 +176,8 @@ lock file**. Never delete the journal to force a retry.
   account-login recovery; this bounded version does not add an automatic
   password-login fallback. During pending activation, explicit refresh is allowed
   and returns to activation reconciliation afterward.
+  The pending activation timestamp is retained across that refresh, including
+  interruption after the new session file has committed.
 - `session.json` stores both credentials privately, with their expiry times.
   Deployment must separately install only the selected access token into the
   gateway's existing private token file, using an atomic operator-controlled
@@ -195,8 +207,9 @@ node --test deploy/federation/pds-enrollment/operator.test.mjs
 The suite injects transport, signer, clock and write interruptions. It covers
 strict/dry inputs, exact confirmation, changed retry, wrong DID/audience/endpoint,
 key-handoff gating, interrupted creation/activation, partial credential writes,
-refresh reuse/rotation, expiry and grace windows, locks, secret-free CLI refusal
-and preservation of unowned outputs. It does not test actual PDS cryptography or
+refresh reuse/rotation, per-request review expiry and grace windows, locks,
+owner/hard-link checks, adversarial directory/symlink/inode substitution,
+secret-free CLI refusal and preservation of unowned outputs. It does not test actual PDS cryptography or
 live provisioning; existing PDS regression gates still apply.
 
 The published [PDS 0.5.27 package metadata](https://registry.npmjs.org/@atproto/pds/0.5.27)

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { constants } from 'node:fs';
 import { open, lstat, rename, unlink } from 'node:fs/promises';
-import { isAbsolute, join, normalize } from 'node:path';
+import { basename, dirname, isAbsolute, join, normalize } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 
 export class OperatorError extends Error {
@@ -65,62 +65,129 @@ export function parseJson(text) {
   catch (error) { if (error instanceof OperatorError) throw error; throw new OperatorError('invalid_json'); }
 }
 
-export async function privateRead(path, { optional = false, limit = 65536, publicFile = false } = {}) {
-  absolute(path);
+const uid = () => process.geteuid();
+const fdPath = (directory, name) => `/proc/self/fd/${directory.fd}${name ? `/${name}` : ''}`;
+function safeDirectory(meta, privateFinal = false) {
+  check(meta.isDirectory(), 'unsafe_parent_directory');
+  if (privateFinal) {
+    check(meta.uid === uid() && (meta.mode & 0o777) === 0o700, 'private_state_directory_required');
+  } else {
+    const trustedTemporaryRoot = meta.uid === 0 && (meta.mode & 0o1000) !== 0;
+    check((meta.uid === 0 || meta.uid === uid()) && ((meta.mode & 0o022) === 0 || trustedTemporaryRoot), 'unsafe_parent_directory');
+  }
+}
+// Linux openat-equivalent via the process's own pinned directory descriptors.
+// Walk every component without following symlinks; a writable foreign ancestor
+// must not be able to substitute an alternative private-looking child directory.
+async function directoryHandle(path, privateFinal = false) {
+  check(process.platform === 'linux' && typeof process.geteuid === 'function', 'linux_safe_filesystem_required');
+  let directory = await open('/', constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+  try {
+    safeDirectory(await directory.stat());
+    for (const part of path.split('/').filter(Boolean)) {
+      const next = await open(fdPath(directory, part), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+      try { safeDirectory(await next.stat()); } catch (error) { await next.close(); throw error; }
+      await directory.close(); directory = next;
+    }
+    safeDirectory(await directory.stat(), privateFinal); return directory;
+  } catch (error) { await directory.close(); throw error; }
+}
+export function safeFile(meta, limit, publicFile) {
+  check(meta.isFile() && meta.nlink === 1 && meta.size <= limit
+    && (publicFile ? (meta.uid === 0 || meta.uid === uid()) && (meta.mode & 0o022) === 0
+      : meta.uid === uid() && (meta.mode & 0o777) === 0o600), 'unsafe_private_file');
+}
+async function readAt(directory, name, { optional = false, limit = 65536, publicFile = false } = {}) {
   let file;
   try {
-    file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-    const meta = await file.stat();
-    check(meta.isFile() && meta.size <= limit
-      && (publicFile || (meta.mode & 0o777) === 0o600), 'unsafe_private_file');
-    const bytes = await file.readFile(); check(bytes.length <= limit, 'unsafe_private_file'); return bytes;
+    file = await open(fdPath(directory, name), constants.O_RDONLY | constants.O_NOFOLLOW);
+    const before = await file.stat(); safeFile(before, limit, publicFile);
+    const bytes = await file.readFile(); const after = await file.stat(); safeFile(after, limit, publicFile);
+    check(bytes.length <= limit && before.size === after.size && before.mtimeMs === after.mtimeMs, 'private_file_changed');
+    return bytes;
   } catch (error) {
     if (optional && error.code === 'ENOENT') return null;
     if (error instanceof OperatorError) throw error;
     throw new OperatorError('private_file_unavailable');
   } finally { await file?.close(); }
 }
+export async function privateRead(path, options) {
+  absolute(path);
+  const directory = await directoryHandle(dirname(path));
+  try { return await readAt(directory, basename(path), options); } finally { await directory.close(); }
+}
 
 export class StateFiles {
-  constructor(directory, fault = async () => {}) { this.directory = absolute(directory); this.fault = fault; }
+  constructor(directory, fault = async () => {}) { this.directory = absolute(directory); this.fault = fault; this.bound = null; }
   async validate() {
-    const meta = await lstat(this.directory).catch(() => { throw new OperatorError('private_state_directory_required'); });
-    check(meta.isDirectory() && !meta.isSymbolicLink() && (meta.mode & 0o777) === 0o700, 'private_state_directory_required');
+    await this.withDirectory(async () => {});
   }
   path(name) { check(['journal.json', 'session.json', 'did.json', 'operator.lock'].includes(name)); return join(this.directory, name); }
+  async checkBinding(directory) {
+    const current = await directoryHandle(this.directory, true);
+    try { const a = await current.stat(); const b = await directory.stat(); check(a.dev === b.dev && a.ino === b.ino, 'state_directory_replaced'); }
+    finally { await current.close(); }
+  }
+  async withDirectory(work) {
+    if (this.bound) { await this.checkBinding(this.bound); return work(this.bound); }
+    const directory = await directoryHandle(this.directory, true);
+    try { return await work(directory); } finally { await directory.close(); }
+  }
+  async bytes(name) { this.path(name); return this.withDirectory(directory => readAt(directory, name, { optional: true })); }
   async read(name) {
-    const bytes = await privateRead(this.path(name), { optional: true });
+    const bytes = await this.bytes(name);
     return bytes ? parseJson(bytes.toString('utf8')) : null;
   }
   async write(name, data) {
-    const target = this.path(name);
-    // Existing destinations must already be private regular files, never aliases.
-    await privateRead(target, { optional: true });
-    const temporary = join(this.directory, `.pending-${randomUUID()}`);
-    let file;
-    try {
-      file = await open(temporary, 'wx', 0o600);
-      await file.writeFile(`${canonical(data)}\n`);
-      await this.fault('before_file_sync', name);
-      await file.sync(); await file.close(); file = null;
-      await rename(temporary, target);
-      const directory = await open(this.directory, constants.O_RDONLY);
-      try { await directory.sync(); } finally { await directory.close(); }
-      await this.fault('after_atomic_write', name);
-    } finally {
-      await file?.close();
-      // Only this call's uniquely named temporary file is eligible for cleanup.
-      await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw new OperatorError('private_write_unconfirmed'); });
-    }
+    this.path(name);
+    return this.withDirectory(async directory => {
+      await readAt(directory, name, { optional: true });
+      const temporary = `.pending-${randomUUID()}`;
+      let file; let owned; let renamed = false;
+      try {
+        file = await open(fdPath(directory, temporary), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+        owned = await file.stat(); safeFile(owned, 65536, false);
+        await file.writeFile(`${canonical(data)}\n`);
+        await this.fault('before_file_sync', name);
+        await this.checkBinding(directory);
+        await file.sync(); await file.close(); file = null;
+        // Recheck any destination after the asynchronous write; no symlink or
+        // hard-linked file is silently replaced by a state commit.
+        await readAt(directory, name, { optional: true });
+        await this.verifyOwned(directory, temporary, owned);
+        await rename(fdPath(directory, temporary), fdPath(directory, name)); renamed = true;
+        await directory.sync();
+        await this.fault('after_atomic_write', name);
+        await this.checkBinding(directory);
+      } finally {
+        await file?.close();
+        if (owned && !renamed) await this.unlinkOwned(directory, temporary, owned);
+      }
+    });
+  }
+  async verifyOwned(directory, name, owned) {
+    const current = await lstat(fdPath(directory, name));
+    safeFile(current, 65536, false);
+    check(current.dev === owned.dev && current.ino === owned.ino, 'owned_state_file_replaced');
+  }
+  async unlinkOwned(directory, name, owned) {
+    await this.verifyOwned(directory, name, owned);
+    await unlink(fdPath(directory, name));
   }
   async locked(work) {
-    await this.validate();
-    let lock;
-    try { lock = await open(this.path('operator.lock'), 'wx', 0o600); }
-    catch { throw new OperatorError('operator_locked_manual_recovery_required'); }
+    check(!this.bound, 'operator_locked_manual_recovery_required');
+    const directory = await directoryHandle(this.directory, true);
+    let lock; let owned;
     try {
+      try { lock = await open(fdPath(directory, 'operator.lock'), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); }
+      catch { throw new OperatorError('operator_locked_manual_recovery_required'); }
+      owned = await lock.stat(); safeFile(owned, 65536, false); this.bound = directory;
       await lock.writeFile(canonical({ process_id: process.pid })); await lock.sync();
       return await work();
-    } finally { await lock.close(); await unlink(this.path('operator.lock')); }
+    } finally {
+      this.bound = null;
+      try { await lock?.close(); if (owned) await this.unlinkOwned(directory, 'operator.lock', owned); }
+      finally { await directory.close(); }
+    }
   }
 }

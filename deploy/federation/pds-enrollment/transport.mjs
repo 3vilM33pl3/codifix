@@ -10,6 +10,7 @@ const ALLOWED = new Map([
   ['com.atproto.server.getSession', 'GET'], ['com.atproto.identity.getRecommendedDidCredentials', 'GET'],
   ['com.atproto.server.activateAccount', 'POST'], ['com.atproto.server.refreshSession', 'POST'],
 ]);
+export const jsonMediaType = type => /^application\/(?:json|did\+json|did\+ld\+json)(?:;|$)/u.test(type ?? '');
 
 // Fixed HTTPS origins from private operator config; no URL from imported data,
 // redirects, proxy environment, shared cookie jar or response body in errors.
@@ -42,7 +43,7 @@ export class HttpsTransport {
           try {
             const bytes = Buffer.concat(chunks);
             if (!bytes.length && method === 'POST' && url.pathname.endsWith('/com.atproto.server.activateAccount')) { resolve({}); return; }
-            check(/^application\/(?:json|did\+ld\+json)(?:;|$)/u.test(response.headers['content-type'] ?? ''), 'invalid_response_type');
+            check(jsonMediaType(response.headers['content-type']), 'invalid_response_type');
             resolve(parseJson(bytes.toString('utf8')));
           } catch { fail('invalid_response'); }
         });
