@@ -351,6 +351,13 @@ test('exclusive lock refuses another operator without network or credential read
   assert.equal(f.calls.length, 0);
 });
 
+test('adopted refresh-only state refuses every legacy enrollment execution', async t => {
+  const f = await fixture(t); await f.ready(); const before = f.calls.length;
+  await f.files.write('refresh-owner.json', { schema_version: 1, purpose: 'memory-private-pds-refresh-only-v1', policy_sha256: 'c'.repeat(64) });
+  await assert.rejects(f.run('refresh'), /refresh_only_maintenance_owns_session/u);
+  assert.equal(f.calls.length, before);
+});
+
 test('ambiguous refresh past upstream grace period fails before another call', async t => {
   const f = await fixture(t); await f.ready(); f.fake.fail = 'refreshSession'; await assert.rejects(f.run('refresh'));
   f.clock(instant + 121 * 60000); const prior = f.calls.length;

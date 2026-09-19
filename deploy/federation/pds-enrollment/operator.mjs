@@ -38,7 +38,7 @@ export function validateConfig(config) {
 export async function loadConfig(path) {
   return validateConfig(parseJson((await privateRead(path)).toString('utf8')));
 }
-function identityDigest(config) {
+export function identityDigest(config) {
   const { review_not_before, review_expires_at, ...identity } = config;
   return digest(identity);
 }
@@ -49,9 +49,12 @@ function document(config, key) {
     service: [{ id: `${config.repository}#atproto_pds`, type: 'AtprotoPersonalDataServer', serviceEndpoint: config.pds_origin }] };
 }
 function validateJournal(config, state) {
+  return validateEnrolledJournal(state, identityDigest(config));
+}
+export function validateEnrolledJournal(state, identity) {
   if (!state) return;
   strict(state, ['schema_version', 'identity_sha256', 'phase', 'revision', 'session_generation', 'signing_key', 'input_sha256', 'resume_phase', 'pending_started_at', 'resume_pending_started_at']);
-  check(state.schema_version === 1 && state.identity_sha256 === identityDigest(config) && STATES.includes(state.phase)
+  check(state.schema_version === 1 && state.identity_sha256 === identity && STATES.includes(state.phase)
     && Number.isSafeInteger(state.revision) && state.revision > 0 && Number.isSafeInteger(state.session_generation) && state.session_generation >= 0
     && (state.signing_key === null || publicKey(state.signing_key))
     && (state.input_sha256 === null || HEX.test(state.input_sha256))
@@ -101,6 +104,10 @@ export class EnrollmentOperator {
   }
   async execute(phase, confirmation) {
     return this.files.locked(async () => {
+      // A separately approved refresh-only owner makes the enrollment operator
+      // unavailable until an operator explicitly retires that owner. Check
+      // inside the enrollment lock so adoption cannot race a manual refresh.
+      check(!await this.files.read('refresh-owner.json'), 'refresh_only_maintenance_owns_session');
       const review = await this.preview(phase);
       check(HEX.test(confirmation) && review.review_sha256 === confirmation, 'exact_review_digest_required');
       this.currentReview();

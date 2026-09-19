@@ -29,6 +29,10 @@ export class HttpsTransport {
       const request = https.request(url, { method, ca, rejectUnauthorized: true, agent: false,
         headers: { accept: 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(payload ? { 'content-type': 'application/json', 'content-length': payload.length } : {}) } }, response => {
+        // This socket has completed normal certificate/hostname validation.
+        // Keep leaf expiry metadata only; do not expose certificate bodies.
+        const expiry = Date.parse(response.socket.getPeerCertificate()?.valid_to);
+        if (Number.isFinite(expiry)) this.peerCertificateExpiresAt = Math.floor(expiry / 1000);
         const chunks = []; let length = 0;
         response.on('data', chunk => {
           length += chunk.length;
@@ -38,7 +42,9 @@ export class HttpsTransport {
         response.on('error', () => fail('network_outcome_unconfirmed'));
         response.on('end', () => {
           if (response.statusCode < 200 || response.statusCode >= 300) {
-            fail([401, 403].includes(response.statusCode) ? 'credential_rejected' : 'remote_operation_unconfirmed'); return;
+            fail([401, 403].includes(response.statusCode) ? 'credential_rejected'
+              : response.statusCode === 429 ? 'remote_rate_limited'
+                : response.statusCode === 408 || response.statusCode >= 500 ? 'remote_operation_unconfirmed' : 'remote_request_rejected'); return;
           }
           try {
             const bytes = Buffer.concat(chunks);
@@ -50,7 +56,10 @@ export class HttpsTransport {
       });
       const timeout = setTimeout(() => { request.destroy(); fail('network_outcome_unconfirmed'); }, 30000);
       request.on('close', () => clearTimeout(timeout));
-      request.on('error', () => fail('network_outcome_unconfirmed'));
+      request.on('error', error => fail(['CERT_HAS_EXPIRED', 'CERT_NOT_YET_VALID', 'DEPTH_ZERO_SELF_SIGNED_CERT',
+        'SELF_SIGNED_CERT_IN_CHAIN', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+        'ERR_TLS_CERT_ALTNAME_INVALID', 'ERR_SSL_TLSV1_ALERT_UNKNOWN_CA'].includes(error.code)
+        ? 'tls_peer_verification_failed' : 'network_outcome_unconfirmed'));
       request.end(payload);
     });
   }

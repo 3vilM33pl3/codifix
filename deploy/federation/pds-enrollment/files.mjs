@@ -79,7 +79,7 @@ function safeDirectory(meta, privateFinal = false) {
 // Linux openat-equivalent via the process's own pinned directory descriptors.
 // Walk every component without following symlinks; a writable foreign ancestor
 // must not be able to substitute an alternative private-looking child directory.
-async function directoryHandle(path, privateFinal = false) {
+export async function directoryHandle(path, privateFinal = false) {
   check(process.platform === 'linux' && typeof process.geteuid === 'function', 'linux_safe_filesystem_required');
   let directory = await open('/', constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
   try {
@@ -130,7 +130,7 @@ export class StateFiles {
   async validate() {
     await this.withDirectory(async () => {});
   }
-  path(name) { check(['journal.json', 'session.json', 'did.json', 'operator.lock'].includes(name)); return join(this.directory, name); }
+  path(name) { check(['journal.json', 'session.json', 'did.json', 'operator.lock', 'refresh-owner.json', 'maintenance.json'].includes(name)); return join(this.directory, name); }
   async checkBinding(directory) {
     const current = await directoryHandle(this.directory, true);
     try { const a = await current.stat(); const b = await directory.stat(); check(a.dev === b.dev && a.ino === b.ino, 'state_directory_replaced'); }

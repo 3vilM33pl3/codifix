@@ -11,6 +11,12 @@ separate disposable rehearsal also exercises the actual pinned image's SDK and
 PDS, through the generated TLS/operator/DID edges. Neither test enrolls a real
 company gateway or activates a live deployment.
 
+For an already enrolled active account, the separately approved
+[refresh-only maintainer](REFRESH.md) adds bounded renewal and an access-only
+gateway bundle. It neither extends this enrollment review window nor enables
+unattended provisioning. Once adopted, its state refuses legacy enrollment
+execution until separately reviewed retirement/recovery.
+
 ## Boundaries and prerequisites
 
 - Use the existing image pin in [upstream-lock.json](../../../fixtures/federation/upstream-lock.json):
@@ -189,7 +195,9 @@ rechecked before every outbound request, including after slow DID/session reads.
   gateway's existing private token file, using an atomic operator-controlled
   replacement. Do not print it, expose the refresh token to the gateway, or mount
   the entire enrollment state. The gateway currently reads its token only at
-  startup: **gateway restart and blocked-publication retry remain manual**.
+  startup in static-token deployments: **gateway restart and blocked-publication
+  retry remain manual**. The separate [refresh-only profile](REFRESH.md) uses an
+  opt-in rotating bundle and narrowly scoped authentication recovery instead.
 - Exact completed phase retries are refused as phase mismatches; inspect the
   next offline review to see committed state. A new state/config binding cannot
   silently reuse the old directory. The tool does not erase unowned prior output.
