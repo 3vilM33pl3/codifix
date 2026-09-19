@@ -14,6 +14,85 @@ shared writable non-sticky ancestors, changed inputs and existing outputs fail
 closed. Root and the same operator UID remain trusted. Do not run this tool
 against directories another process under that UID is modifying.
 
+### Explicit reviewed preview selection (offline)
+
+For a bounded preview, `preview-manifest` accepts a protected selection supplied
+by the operator, not project-name heuristics or generated approvals:
+
+```sh
+memory-area-import preview-manifest \
+  --inventory /protected/inventory.json \
+  --selection /protected/selection.json --selection-sha256 SELECTION_FILE_SHA \
+  --output-dir /protected/new-preview
+```
+
+It opens no database or network connection and prints no success data to stdout.
+The directory must already exist, owned mode 0700. It exclusively publishes
+`preview-manifest.json` and `preview-receipt.json` as mode-0600 files, with file
+and directory synchronization. Existing final or `.partial` files block replay;
+an interruption may leave private partial artifacts, which are not import
+authority. A manifest without its receipt is an incomplete operator result.
+Do not run the helper while another same-UID process modifies its inputs.
+
+The strict version-1 selection shape is defined by `preview::Selection` in
+[src/preview.rs](src/preview.rs):
+
+```text
+format_version: 1
+source_instance, snapshot_id: exact source UUIDs
+inventory_sha256: normalized complete inventory digest
+area: trust | homelab | workshop | general
+project_id: original project UUID (not its slug)
+review:
+  explicitly_approved: true (required operator assertion, no default)
+  operator, reviewed_at, authority_basis
+  source_evidence, project_evidence, content_evidence
+lineages[]:
+  canonical_id
+  canonical_state_sha256: inventory's complete canonical-state row hash
+  versions[]: EVERY inventoried version, including tombstones
+    id, version_no, is_tombstone
+    row_sha256: inventory's complete version-row hash
+    canonical_text_sha256: SHA-256 of exact UTF-8 canonical_text
+    row_json: exact complete source row JSON encoded as a JSON string
+sources[]: EVERY source attached to the selected lineages
+  source_id, row_sha256, task_id, task_row_sha256
+  decision_id, approval_record_id: supplied stable non-nil unique UUIDs
+  explicitly_approved: true (required per-source assertion)
+```
+
+All fields are required; unknown fields are rejected. Full-row hashes use the
+inventory collector's exact complete-row JSON serialization; the text hash
+includes its original whitespace. Selected complete-row strings are needed to
+verify the content hashes rather than merely trust a content-hash assertion.
+They remain in the private selection and are not copied into the manifest or
+receipt. The selection is capped at 16 MiB, 64 lineages, 256 versions per lineage,
+4096 sources and 8 MiB per complete version row. Review strings must be nonempty
+and at most 4096 bytes. The normalized inventory digest independently binds all
+unselected evidence; separate payload verification/preparation is still required.
+
+The helper retains the original project and the entire selected histories.
+Unselected lineages, raw sessions/tasks/captures and individually reviewed
+records are excluded into protected archive, with short explicit evidence that
+no completed content review is claimed. Existing mandatory historical, derived
+rebuild and retired-runtime table policies remain intact; no original row is
+discarded or runtime reactivated. Selected source checks stay archived.
+
+Every selected source becomes only `ArchiveReferenceOnly`, bound to the exact
+version/source/task hashes and supplied decision identifiers. A null/missing
+task, typed memory target, missing source review, partial version set, changed
+content/project/snapshot/hash, duplicate approval ID or unknown relationship
+blocks output. No original source excerpt, path, task or session context is
+copied. A no-task source needs a separate reviewed contract, not a fallback.
+
+Review labels and digests **do not authenticate a human**, establish an approval
+ledger, or grant remote/model disclosure consent. The receipt binds the exact
+selection/inventory files and normalized manifest digest and explicitly reports
+`authenticated_human_approval: false`, `full_partition_complete: false`, and
+`remote_or_model_consent_granted: false`. Delegated engineering review must be
+labelled honestly in the supplied operator/authority fields. This command does
+not approve or execute import, activation, retrieval exposure or model calls.
+
 1. Preserve the encrypted backup, restoration evidence and metadata inventory.
    Complete the ownership/provenance review in a separate manifest. A computed
    digest or syntactically valid manifest is **not** human approval.
@@ -66,7 +145,7 @@ against directories another process under that UID is modifying.
 ## Explicit target and import
 
 Provision an independent local target with the exact supported migrations
-(explicitly supported heads 0056, 0057 or 0058), no application/worker connections and no prior knowledge,
+(explicitly supported heads 0056 through 0060), no application/worker connections and no prior knowledge,
 credentials, jobs or federation authority. Migration and writer fencing are
 separate operator steps. A target UUID is a binding, not proof of host identity.
 
@@ -99,7 +178,7 @@ Do **not** start Memory merely to apply migrations: normal service startup also
 creates administration and loop definitions, which correctly makes a target
 ineligible for fresh import. For a newly provisioned **empty** dedicated database,
 use the reviewed executable's `memory-area-import schema-plan` first. It makes
-no connection and prints the exact compiled schema digest and fixed head 0058.
+no connection and prints the exact compiled schema digest and fixed head 0060.
 Review that digest against the selected release, then explicitly run:
 
 ```sh
@@ -117,7 +196,7 @@ extensions. The PostgreSQL server must already support pgcrypto, pgvector and
 pg_trgm; installing server extensions or creating database roles is a separate
 operator step. Standard `plpgsql` in an otherwise empty database is allowed.
 
-All 58 migrations and their history run in one transaction with bounded waits;
+All 60 migrations and their history run in one transaction with bounded waits;
 the established migration-4 pgvector compatibility rule retains its original
 checksum. Required-DB tests inject a failure at migration 55 and confirm that
 earlier tables, history and extension creation roll back. No credentials, loop

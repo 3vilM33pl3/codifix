@@ -2,6 +2,7 @@
 //! Explicit offline preparation and local-only target import. No configuration
 //! discovery, credential creation, service startup or source writes. Schema-only
 //! initialization is a separate explicitly confirmed fresh-database operation.
+pub mod preview;
 mod private;
 pub mod schema;
 use mem_area::{AREAS, AreaId, Inventory, Manifest, MaterializedMigration};
@@ -26,6 +27,10 @@ const PREPARED: &str = "prepared.json";
 pub type Result<T> = std::result::Result<T, Failure>;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
+    #[error(
+        "reviewed preview selection is incomplete, inconsistent or not explicitly approved; source details suppressed"
+    )]
+    Preview,
     #[error(
         "private file boundary failed; use owned 0700 directories and exclusive 0600 regular files"
     )]

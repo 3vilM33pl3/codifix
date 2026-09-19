@@ -40,6 +40,17 @@ impl From<Source> for Inputs {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Generate an exact reviewed preview manifest in protected files only; no DB or consent grant.
+    PreviewManifest {
+        #[arg(long)]
+        inventory: PathBuf,
+        #[arg(long)]
+        selection: PathBuf,
+        #[arg(long)]
+        selection_sha256: String,
+        #[arg(long)]
+        output_dir: PathBuf,
+    },
     /// Inspect the exact compiled schema preparation digest; no DB connection.
     SchemaPlan,
     /// Initialize schema only in a fresh empty local DB; never start a service.
@@ -109,6 +120,17 @@ fn print(value: &impl serde::Serialize) -> Result<(), Failure> {
 }
 async fn run(cli: Cli) -> Result<(), Failure> {
     match cli.command {
+        Command::PreviewManifest {
+            inventory,
+            selection,
+            selection_sha256,
+            output_dir,
+        } => mem_area_ops::preview::write_preview(
+            &inventory,
+            &selection,
+            &selection_sha256,
+            &output_dir,
+        ),
         Command::SchemaPlan => print(&mem_area_ops::schema::plan()?),
         Command::InitializeSchema {
             target,
