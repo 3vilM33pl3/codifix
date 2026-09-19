@@ -14,6 +14,7 @@ pub use context::*;
 pub use expertise_transport::*;
 mod http;
 mod pds;
+mod private_files;
 mod security;
 mod sync;
 pub use gateway::*;

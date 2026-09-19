@@ -24,8 +24,13 @@ This is one operator step, not a complete deployment tool. Read the
 - Independently distributed gateway receipt public keys. Do not accept a trust
   key learned from the same untrusted response being verified. Receipt keys are
   distinct from the PDS repository signing key.
-- An existing authority bearer-token file, readable only by its owner, and a
-  private regular JSON config file with mode `0600`. Paths must be absolute.
+- An existing authority bearer-token file and JSON config file, both regular,
+  owned by the invoking user, mode `0600`, and without hard links. Their immediate
+  directories must be owned by that user with mode `0700`. Paths must be absolute
+  and contain no symlink components; ancestors must be root/user-owned and not
+  group/world-writable (trusted sticky ancestors such as `/tmp` are allowed).
+  Enrollment pins directory/file descriptors and rejects changed entries while
+  reading; it fails closed on platforms without these Unix guarantees.
   The token is never a CLI argument or printed in output.
 
 Build the operator without changing a running service:

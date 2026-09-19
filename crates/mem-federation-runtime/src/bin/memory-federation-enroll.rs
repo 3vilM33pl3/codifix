@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn only_exact_explicit_execution_accepts_a_digest() {
         assert!(matches!(
-            parse(vec!["/private/config.json".into()]).unwrap(),
+            parse(vec!["/private/config.json".into()]).expect("valid offline preview arguments"),
             Command::Preview(_)
         ));
         assert!(parse(vec!["execute".into(), "/private/config.json".into()]).is_err());

@@ -123,6 +123,7 @@ fn input_must_be_a_private_regular_explicit_file() {
     use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};
     let directory = std::env::temp_dir().join(format!("enrollment-test-{}", Uuid::new_v4()));
     std::fs::create_dir(&directory).unwrap();
+    std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
     let file = directory.join("config.json");
     std::fs::OpenOptions::new()
         .write(true)
@@ -142,6 +143,46 @@ fn input_must_be_a_private_regular_explicit_file() {
     std::fs::remove_file(link).unwrap();
     std::fs::remove_file(file).unwrap();
     std::fs::remove_dir(directory).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn inspect_and_execute_client_use_the_protected_token_loader() {
+    use std::{
+        fs,
+        io::Write,
+        os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink},
+    };
+    let root = tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let mut config = config();
+    config.token_file = root.path().join("authority-token");
+    let mut token = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&config.token_file)
+        .unwrap();
+    token
+        .write_all(b"synthetic-authority-token-never-sent")
+        .unwrap();
+    // client() is shared by inspect/execute and constructs no network requests.
+    assert!(config.client().is_ok());
+    token.set_len(4097).unwrap();
+    assert!(config.client().is_err());
+    token.set_len(8).unwrap();
+    assert!(config.client().is_err());
+    fs::write(&config.token_file, b"synthetic-authority-token-never-sent").unwrap();
+    assert!(config.client().is_ok());
+    fs::rename(&config.token_file, root.path().join("previous")).unwrap();
+    symlink(root.path().join("previous"), &config.token_file).unwrap();
+    assert!(config.client().is_err());
+    fs::remove_file(&config.token_file).unwrap();
+    fs::rename(root.path().join("previous"), &config.token_file).unwrap();
+    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(config.client().is_err());
 }
 
 struct Fixture {

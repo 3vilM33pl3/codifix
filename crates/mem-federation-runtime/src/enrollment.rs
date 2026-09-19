@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Explicit authority-side membership operator. No database, provisioning,
 //! automatic discovery, credential generation, arbitrary records or delegation.
-use crate::{Endpoint, GatewayClient, ReceiptTrust, private_secret, root_certificate};
+use crate::{Endpoint, GatewayClient, ReceiptTrust, private_files, root_certificate};
 use chrono::{DateTime, Utc};
 use mem_federation::{
     AuthorIdentity, CanonicalJsonCodec, ContentDigest, RecordLocator, SpaceCapability,
@@ -11,7 +11,6 @@ use mem_federation_store::{AuditReceipt, PublicationIntent, ReceiptKey, audit_di
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
-    io::Read,
     path::{Path, PathBuf},
 };
 use uuid::Uuid;
@@ -130,29 +129,8 @@ struct Snapshot {
 
 impl EnrollmentConfig {
     pub fn load(path: &Path) -> Result<Self> {
-        if !path.is_absolute() {
-            return Err(EnrollmentError::Configuration);
-        }
-        let meta = std::fs::symlink_metadata(path).map_err(|_| EnrollmentError::Configuration)?;
-        if !meta.is_file() || meta.len() > MAX_CONFIG_BYTES {
-            return Err(EnrollmentError::Configuration);
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if meta.permissions().mode() & 0o777 != 0o600 {
-                return Err(EnrollmentError::Configuration);
-            }
-        }
-        let mut bytes = Vec::new();
-        std::fs::File::open(path)
-            .map_err(|_| EnrollmentError::Configuration)?
-            .take(MAX_CONFIG_BYTES + 1)
-            .read_to_end(&mut bytes)
+        let bytes = private_files::read(path, MAX_CONFIG_BYTES)
             .map_err(|_| EnrollmentError::Configuration)?;
-        if bytes.len() as u64 > MAX_CONFIG_BYTES {
-            return Err(EnrollmentError::Configuration);
-        }
         let config: Self =
             serde_json::from_slice(&bytes).map_err(|_| EnrollmentError::Configuration)?;
         config.validate()?;
@@ -268,9 +246,17 @@ impl EnrollmentConfig {
 
     fn client(&self) -> Result<GatewayClient> {
         self.validate()?;
+        let token = String::from_utf8(
+            private_files::read(&self.token_file, 4096)
+                .map_err(|_| EnrollmentError::Configuration)?,
+        )
+        .map_err(|_| EnrollmentError::Configuration)?;
+        if token.trim().len() < 32 {
+            return Err(EnrollmentError::Configuration);
+        }
         GatewayClient::new(
             self.endpoint()?,
-            private_secret(&self.token_file).map_err(|_| EnrollmentError::Configuration)?,
+            token.trim().to_owned(),
             self.plan.space,
             self.plan.authority,
             ReceiptTrust::new(self.receipt_keys.clone())
