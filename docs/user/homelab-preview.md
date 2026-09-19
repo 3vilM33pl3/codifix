@@ -41,6 +41,10 @@ learning or raw capture ingestion**. No provider credential is installed in its
 application. It cannot yet ask Workshop remotely. The current two-record preview
 is not the completed dataset migration or four-area demo.
 
+A restricted internal answering identity is prepared with only Homelab read and
+export permissions. It has no login credential and is not yet granted remote or
+collection access; its presence does not enable sharing.
+
 Workshop's existing model permission does not grant Homelab permission to send
 data to models. The original shared dataset and its writers are unchanged;
 Trust/CA and General are not activated. Neither preview is a LAN/customer
@@ -82,7 +86,10 @@ private; they contain no provider key.
 Before activation, a database restore matched all 114 logical tables. The fresh
 `homelab-runtime-verified-local.tar.gpg` additionally preserves the running binary,
 Web assets, dump, private configuration and relay/operator helpers. That full
-bundle has not been restore-rehearsed, and ciphertext hash verification does not
+bundle contains the initial prepared runtime. The later
+`before-answerer-setup.tar.gpg` preserves a fresh stopped-app backup before the
+restricted-identity upgrade. These full bundles have not been restore-rehearsed,
+and ciphertext hash verification does not
 prove decryption-key recovery. Never start an active clone or replay the original
 import into the running target. Recovery requires an isolated, non-autonomous
 target and verification before switching any client.

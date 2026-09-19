@@ -13,6 +13,10 @@ release. The approved-plan Memory checkpoint was renewed before edits.
 - [x] Demonstrate the independently authenticated local Homelab Web/CLI instance.
 - [x] Add reviewed, digest-bound gateway membership enrollment tooling.
 - [x] Add a private company topology without fixture accounts or bypass networks.
+- [x] Rehearse real TLS, network separation and pinned-PDS provisioning with
+  disposable credentials; independently verify the signed repository.
+- [x] Provision Homelab's restricted internal answering identity through the
+  transactional, audited installation API; keep remote grants disabled.
 - [ ] Provision the private gateway/PDS with separately pinned receipt/repository
   keys and a separate space authority; retain interrupted-operation evidence.
 - [ ] Review exact per-recipient collections and enable deterministic exchange.
@@ -80,12 +84,41 @@ No credentials or source archive bytes are committed to the repository.
 | Encrypted source/review archive | `2d0af863e67e5e53f6b8c930231f8efc6be7206dd6081a55001393a77c220518` | Protected full source and review inputs |
 | Encrypted pre-activation dump | `023f6f6d96172fbebb5ce31729bb02512c2225a748a84161d2703cb9299589c2` | Logical contents independently restored before activation |
 | Restored-table comparison | `d0bdce70e924605c0e5482de3fa31903aa3b8e1478e179ab165559ac5583e97f` | All 114 logical tables |
-| Running application | `35a2416aae9aca5d094cde45819ece41976a58e314649650860cedf11de57ac8` | Prepared-database mode, lean PostgreSQL/TUI build |
+| Initial prepared application | `35a2416aae9aca5d094cde45819ece41976a58e314649650860cedf11de57ac8` | Preserved in the initial runtime recovery bundle |
 | Runtime recovery bundle | `d77faf76e639ac7fd800c201a886fd8b78e77d492316919214f3953b46e4e6b9` | Fresh dump, exact binary/Web, own configuration/credentials and relay helpers; no provider key |
+| Pre-answerer-upgrade encrypted bundle | `ee7466d90a3186e7302e1fba55a2e1b16dcca7e9e43c88fc77ba071bd02f600b` | Fresh stopped-app dump, previous binary/configuration and unchanged Web assets; NAS copy verified |
+| Running application after answerer upgrade | `f5cfca67ab20f0acf27d6a91f95187ba597288504ce2a13c9d84d929398d1c3f` | Source `5532e35c`; prepared database plus audited restricted identity provisioning |
 
 The runtime bundle and encrypted decryption/recovery path have **not** had a full
 restore rehearsal. Do not equate a verified ciphertext copy with verified key
 recovery. Do not replay the import into the now-active target.
+
+### Restricted answering identity
+
+After the fresh encrypted backup, only the Homelab app was stopped/upgraded and
+restarted. Schema `0060`, configuration, existing credentials, database and
+Workshop were unchanged. At 09:52 UTC, authenticated health, two-record
+deterministic retrieval, absent-project isolation, separate container networks
+and crossed-credential rejection (`401`/`401`) passed again.
+
+The supported `memory auth expertise-answerer` command provisioned internal
+principal `6ac610fb-6bf8-48dd-abee-22da17dc7149` under request
+`6a408c12-9442-42ad-9a02-933d4a93dd64`. Database inspection verified exactly one
+membership in Homelab, only `memory_read`/`bundle_export`, no global role, no
+service token or browser session, and one protected auth audit event. Exact CLI
+retry returned `replayed: true`, without adding authority. Federation grants,
+collection consent, model permission and answering-worker activation remain
+separate, unexecuted steps.
+
+Five focused required-database identity tests passed, including concurrency,
+current authority, audit rollback and HTTP protections. The complete service
+test invocation passed serially: 143 library, 22 database and one OpenAPI test,
+with two ignored tests. A first parallel run exhausted the disposable database's
+connection capacity; it did not establish a product failure or a pass. Scoped
+strict Clippy, formatting, boundaries and the PostgreSQL/TUI build passed.
+The CLI runtime group passed 111 tests with the unrelated local-document-link
+checker excluded: older financial/pitch documents still reference unavailable
+machine-local files. No complete workspace/Web/Lean regression is claimed here.
 
 ## Gateway work remaining
 
@@ -98,9 +131,13 @@ keep member, publisher, operator and DID-host paths separate.
 
 The [durable PDS provisioning operator](../../../deploy/federation/pds-enrollment/README.md)
 now retains creation, signing-key handoff and refresh intent instead of borrowing
-a short-lived session from the disposable fixture probe. Its 16 injected tests
-pass. Real pinned-image SDK, TLS/DID and signed-repository rehearsal remains a
-gate before real company provisioning; fake tests do not establish readiness.
+a short-lived session from the disposable fixture probe. Its 24 injected tests
+pass. The [combined disposable rehearsal](../../../tests/company-topology/evidence-2026-09-19.md)
+also passed real pinned-image SDK, TLS/DID, strict account creation, reviewed key
+handoff, activation, session refresh and independent signed-repository checks.
+It proves those bounded prerequisites, not a running Memory gateway or real
+knowledge exchange. The installed previews must be reused through dedicated
+per-member gateway networks, not replaced by the blueprint's new empty apps/DBs.
 Gateway token installation/restart and blocked-publication retry remain explicit
 operator operations. No real company PDS, membership or collection has yet been
 activated by this increment.
