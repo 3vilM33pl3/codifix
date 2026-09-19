@@ -6,9 +6,10 @@ DNS, TLS certificates, keys, passwords, invitations, memberships or model calls.
 It never starts a gateway. No invocation reports `gateway_ready: true` or
 `repository_verified: true`.
 
-All verification in this slice uses temporary files and injected fake PDS
-responses. The pinned-image SDK adapter and a real company PDS must still pass
-their deployment rehearsal. Do not describe the fake tests as a live enrollment.
+The recovery tests use temporary files and injected fake PDS responses. A
+separate disposable rehearsal also exercises the actual pinned image's SDK and
+PDS, through the generated TLS/operator/DID edges. Neither test enrolls a real
+company gateway or activates a live deployment.
 
 ## Boundaries and prerequisites
 
@@ -40,7 +41,12 @@ their deployment rehearsal. Do not describe the fake tests as a live enrollment.
   disposable fixture network.
 - The account handle is exactly the repository hostname. The PDS must be able to
   resolve its HTTPS DID document and trust its certificate. Configure the proper
-  service handle domain. Keep development mode and SSRF bypass disabled.
+  service handle domain. Upstream handles require an accepted top-level domain;
+  service-domain handles require a 3–18 character prefix and reject reserved
+  prefixes, including `repository`. Check the pinned
+  package's `dist/handle/index.js` and `dist/handle/reserved.js` before approving
+  identities. A rejected create is not permission to change the DID in an existing
+  journal. Keep development mode and SSRF bypass disabled.
 - Keep the PDS repository signing key, initial bootstrap key and gateway receipt
   key as different trust responsibilities. This operator neither obtains the
   PDS-owned private signing key nor generates a gateway receipt key.
@@ -211,6 +217,31 @@ refresh reuse/rotation, per-request review expiry and grace windows, locks,
 owner/hard-link checks, adversarial directory/symlink/inode substitution,
 secret-free CLI refusal and preservation of unowned outputs. It does not test actual PDS cryptography or
 live provisioning; existing PDS regression gates still apply.
+
+The separately invoked [company topology rehearsal](../../../tests/company-topology/README.md)
+uses the actual pinned PDS image, a temporary CA and synthetic credentials:
+
+```sh
+node tests/company-topology/run.mjs --with-pds
+```
+
+Its PDS lifecycle passes the real operator through bootstrap, signed BYOD create,
+recommended-key review, exact hosted-key handoff, activation and refresh to session
+generation 2. A separate publisher process creates one synthetic record; the
+image's independent ATProto SDK verifies its downloaded signed CAR and rejects the
+bootstrap key. The rehearsal supplies a pre-issued invite through a distinct
+synthetic administrator step; the production operator still never receives an
+administrator password. Test-only automatic phase confirmations are restricted to
+fixed synthetic identities in a protected fixture, not an unattended production
+provisioner. Results contain fixed metadata only, never session or private-key
+bytes. The owning harness removes its exact disposable resources and credentials.
+
+The fixture explicitly fixes its own public CA mode after OpenSSL generation and
+uses the supported `space` handle prefix. These address observed host-umask and
+upstream reserved-handle failures; production file guards, PDS development mode,
+SSRF protection and network restrictions are not relaxed. This evidence does not
+prove company enrollment, gateway access-token deployment or restart, participant
+consent, backup recovery, remote expertise or real-knowledge exchange.
 
 The published [PDS 0.5.27 package metadata](https://registry.npmjs.org/@atproto/pds/0.5.27)
 identifies the [versioned source archive](https://registry.npmjs.org/@atproto/pds/-/pds-0.5.27.tgz).
