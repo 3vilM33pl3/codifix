@@ -10,7 +10,8 @@ const answer = () => ({ results: [{ memory_id: ids[0], text: 'PRIVATE_CONTENT' }
 const request = async (path, options) => {
   if (options.token !== input.token) return { status: 401, body: {} };
   if (path === '/v1/query') { assert.equal(options.body.answer_mode, 'deterministic');
-    assert.equal(options.body.retrieval_mode, 'lexical'); return { status: 200, body: answer() }; }
+    assert.equal(options.body.retrieval_mode, 'lexical'); assert.equal(options.body.min_confidence, 0);
+    return { status: 200, body: answer() }; }
   if (path === '/v1/capture/task') return { status: 403, body: {} };
   return path.endsWith(ids[0]) ? { status: 200, body: { id: ids[0] } } : { status: 404, body: {} };
 };

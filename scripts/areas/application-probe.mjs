@@ -31,7 +31,7 @@ export async function probeApplication(input, request, cliQuery) {
     if (![403, 404].includes(denied.status) || denied.body?.id || denied.body?.canonical_text) fail('foreign_record_visible');
   }
   const response = await request('/v1/query', { token, method: 'POST', body: {
-    project, query: question, top_k: 8, answer_mode: 'deterministic', retrieval_mode: 'lexical',
+    project, query: question, top_k: 8, min_confidence: 0, answer_mode: 'deterministic', retrieval_mode: 'lexical',
   } });
   if (response.status !== 200) fail('query_unavailable');
   const http = checkResults(response.body, allowedIds);
