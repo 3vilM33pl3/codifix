@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { historyMetadata, consumePack, validateLedger, revalidateLedger, createManifest, runLedger, parseArgs } from './review-ledger.mjs';
-import { FULL_REVIEW_SQL, fullHistoryReview, redactReviewText } from './classify.mjs';
+import { FULL_REVIEW_SQL, fullHistoryReview, redactReviewText, compactRelation, relationSetDigest } from './classify.mjs';
 
 const id = n => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`;
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -31,10 +31,12 @@ function source(n = 10, project = 1) {
 }
 const catalog = [{ schema: 'public', name: 'memory_sources', kind: 'r', foreign_keys: [{ name: 'memory_sources_task_id_fkey', columns: ['task_id'], target_table: 'public.tasks', target_columns: ['id'] }] }];
 function indexOf(inputs = [source()]) {
-  return { format: 'memory-area-review-index-v1', hash_version: 'full-history-dependencies-v1', source: { source_instance: id(9000), snapshot_id: id(9001),
+  const relations = [...new Map(inputs.flatMap(x => x.relations).map(r => [r.id, compactRelation(r)])).values()];
+  return { format: 'memory-area-review-index-v2', hash_version: 'full-history-dependencies-v2', source: { source_instance: id(9000), snapshot_id: id(9001),
     inventory_semantic_sha256: hash('inventory'), reviewed_input_manifest_sha256: hash('draft'), inventory_file_sha256: hash('inventory file') },
     schema_sha256: schemaHash, pack_sha256: hash('pack'), catalog,
     projects: [...new Map(inputs.flatMap(x => x.projects).map(({ row_sha256, ...p }) => [p.id, p])).values()],
+    relations, relation_count: relations.length, relations_sha256: relationSetDigest(relations),
     histories: inputs.map(x => historyMetadata(x, schemaHash)) };
 }
 function decision(h, n = 10000) {
@@ -57,7 +59,7 @@ function draftOf(index) {
     table_policies: [{ table: 'public.memory_entries', strategy: 'owned', reason: 'Exact source strategy.' }],
     lineages: index.histories.map(h => ({ canonical_id: h.canonical_id, source_project_ids: h.source_project_ids, disposition: { kind: 'unresolved' } })),
     records: [...index.histories.flatMap(h => [{ record: { table: 'public.tasks', key: h.sources[0]?.task_id ?? id(777) }, disposition: { kind: 'unresolved' } }]),
-      ...[...new Map(index.histories.flatMap(h => h.relations).map(r => [r.id, r])).values()].map(r => ({ record: { table: 'public.memory_relations', key: r.id }, disposition: { kind: 'unresolved' } }))], projects: [] };
+      ...index.relations.map(r => ({ record: { table: 'public.memory_relations', key: r[0] }, disposition: { kind: 'unresolved' } }))], projects: [] };
 }
 
 test('full pack includes every version and tombstone but no source context, task title or absolute paths', () => {
@@ -168,11 +170,26 @@ test('pack streaming checks full coverage and privately binds exact index to rev
   const ledger = ledgerOf(index), packPath = join(root, 'pack.ndjson'), indexPath = join(root, 'index.json'), ledgerPath = join(root, 'ledger.json');
   for (const [file, bytes] of [[packPath, pack], [indexPath, JSON.stringify(index)], [ledgerPath, JSON.stringify(ledger)]]) await writeFile(file, bytes, { mode: 0o600 });
   assert.equal((await runLedger('validate-ledger', { index: indexPath, pack: packPath, ledger: ledgerPath })).ready, true);
-  index.histories[0].dependencies[0].row_sha256 = hash('changed dependency');
+  index.histories[0].projection_dependencies[0].row_sha256 = hash('changed dependency');
   await writeFile(indexPath, JSON.stringify(index));
   await assert.rejects(runLedger('validate-ledger', { index: indexPath, pack: packPath, ledger: ledgerPath }), /index changed/);
   await assert.rejects(consumePack(lines(events.slice(0, -1)), bindings, async () => {}), /Incomplete/);
   assert.ok(!(await readFile(packPath, 'utf8')).includes('/home/fixture'));
+});
+
+test('large relation/check sets use constant-size history summaries without truncating curated versions', async () => {
+  const input = source();
+  input.relations = Array.from({ length: 100_000 }, (_, n) => ({ id: id(100_000 + n), src_canonical_id: input.canonical_id,
+    dst_canonical_id: id(30), relation_type: 'relates_to', row_sha256: hash(`edge:${n}`) }));
+  input.dependencies.push(...Array.from({ length: 100_000 }, (_, n) => ({ table: 'public.memory_source_checks', key: String(n), row_sha256: hash(`check:${n}`) })));
+  const body = fullHistoryReview(input), metadata = historyMetadata(input, schemaHash);
+  assert.equal(body.complete_curated_history, true); assert.equal(body.versions.length, 2); assert.equal(body.relations.count, 100_000);
+  assert.ok(Buffer.byteLength(JSON.stringify(body)) < 8_000);
+  assert.ok(Buffer.byteLength(JSON.stringify(metadata)) < 8_000);
+  assert.equal(metadata.projection_dependencies.length, 2); assert.ok(metadata.dependency_row_count >= 200_000);
+  input.dependencies.at(-1).row_sha256 = hash('changed last check');
+  assert.notEqual(historyMetadata(input, schemaHash).dependency_sha256, metadata.dependency_sha256);
+  assert.ok(Buffer.byteLength(JSON.stringify(input.relations.map(compactRelation))) < 20 * 1024 * 1024);
 });
 
 test('SQL exports complete hashes but not raw support bodies; selectors cannot accept live connections', () => {

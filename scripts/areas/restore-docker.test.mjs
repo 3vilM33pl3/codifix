@@ -113,8 +113,10 @@ INSERT INTO memory_relations VALUES ('${uid(60)}','${uid(10)}','${uid(20)}','rel
     database: 'memory_fixture_source', canonical_ids: new Set([uid(10), uid(20)]), expected_versions: 3, expected_projects: 1, evidence: {},
   }, async line => chunks.push(line));
   assert.equal(index.histories.length, 2); assert.equal(index.versions, 3);
-  assert.ok(index.histories.every(h => h.dependencies.some(d => d.table === 'public.memory_relations')));
-  assert.ok(index.histories[0].dependencies.some(d => d.table === 'public.raw_captures'));
+  assert.ok(index.histories.every(h => h.relation_count === 1));
+  assert.equal(index.relations.length, 1);
+  assert.ok(index.histories[0].dependency_row_count > index.histories[0].projection_dependencies.length);
+  assert.ok(index.histories[0].projection_dependencies.some(d => d.table === 'public.tasks'));
   assert.ok(!chunks.join('').includes('NEVER EXPORT'));
   assert.ok(!chunks.join('').includes('/private/'));
   // Mutating only the restored sequence must fail independent verification, even

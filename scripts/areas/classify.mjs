@@ -321,9 +321,16 @@ export function redactReviewText(value) {
   return { text: safe.text.replace(/(?<![A-Za-z0-9:/])(?:[A-Za-z]:\\|\/(?!\/))[^\s<>"'`),;]+/g, '[LOCAL PATH OMITTED]'), secret: safe.redacted };
 }
 
+export function compactRelation(value) { return [value.id, value.src_canonical_id, value.dst_canonical_id, value.row_sha256]; }
+export function relationSetDigest(values) {
+  const digest = createHash('sha256'); digest.update('memory-area-relations-v1\n');
+  for (const value of [...values].sort((a, b) => a[0].localeCompare(b[0]))) digest.update(JSON.stringify(value) + '\n');
+  return digest.digest('hex');
+}
+
 export function fullHistoryReview(input) {
   const summary = summarizeLineage(input);
-  const allStrings = JSON.stringify({ versions: input.versions, sources: input.sources, projects: input.projects, state: input.state, relations: input.relations });
+  const allStrings = JSON.stringify({ versions: input.versions, sources: input.sources, projects: input.projects, state: input.state });
   const secret = redact(allStrings).redacted;
   const oversized = Buffer.byteLength(allStrings) > 2 * 1024 * 1024;
   const hold = secret || oversized;
@@ -340,8 +347,8 @@ export function fullHistoryReview(input) {
       evidence_label: hold ? '[WITHHELD]' : redactReviewText(String(s.file_path ?? '').split(/[\\/]/).at(-1)).text,
       // Original evidence bytes, prompts and task titles are not disclosed.
       evidence_content: 'protected archive; reference-only projection available after explicit review' })),
-    relations: (input.relations ?? []).map(r => ({ id: r.id, src_canonical_id: r.src_canonical_id, dst_canonical_id: r.dst_canonical_id,
-      relation_type: hold ? '[WITHHELD]' : redactReviewText(r.relation_type).text, row_sha256: r.row_sha256 })),
+    relations: { count: (input.relations ?? []).length, sha256: relationSetDigest((input.relations ?? []).map(compactRelation)),
+      representation: 'Exact original edges retained privately; ownership policy uses reviewed endpoint areas. Individual relation contents are not disclosed here.' },
     heuristic: { candidate_area: summary.proposal.candidate_area, risks: summary.proposal.risks, ownership_approved: false },
     complete_curated_history: !hold, original_evidence_disclosed: false,
     secret_assurance: 'Pattern screening only; not proof that all secrets have been found.',
