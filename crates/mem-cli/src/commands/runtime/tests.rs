@@ -2773,6 +2773,7 @@ fn test_app_config() -> AppConfig {
         mcp: mem_config::McpConfig::default(),
         database: mem_config::DatabaseConfig {
             url: "postgresql://memory:test@localhost:5432/memory".to_string(),
+            migrations: Default::default(),
         },
         offline: mem_config::OfflineConfig::default(),
         features: mem_config::FeatureFlags::default(),

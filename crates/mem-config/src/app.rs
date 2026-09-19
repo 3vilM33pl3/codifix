@@ -336,6 +336,18 @@ pub struct WriterConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     pub url: String,
+    /// Prepared installations may run with a non-DDL runtime login. This checks
+    /// migration history only; it never skips normal application authorization.
+    #[serde(default)]
+    pub migrations: DatabaseMigrationMode,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DatabaseMigrationMode {
+    #[default]
+    Apply,
+    VerifyOnly,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

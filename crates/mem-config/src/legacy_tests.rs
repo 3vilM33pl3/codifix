@@ -52,6 +52,24 @@ fn auth_defaults_preserve_single_user_installations() {
 }
 
 #[test]
+fn database_migration_mode_is_explicit_and_defaults_to_existing_behavior() {
+    let original: DatabaseConfig =
+        serde_json::from_value(serde_json::json!({"url":"postgresql://synthetic"})).unwrap();
+    assert_eq!(original.migrations, DatabaseMigrationMode::Apply);
+    let prepared: DatabaseConfig = serde_json::from_value(
+        serde_json::json!({"url":"postgresql://synthetic","migrations":"verify_only"}),
+    )
+    .unwrap();
+    assert_eq!(prepared.migrations, DatabaseMigrationMode::VerifyOnly);
+    assert!(
+        serde_json::from_value::<DatabaseConfig>(
+            serde_json::json!({"url":"postgresql://synthetic","migrations":"skip"})
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn auth_config_parses_multiuser_group_mappings() {
     let config: AppConfig = toml::from_str(
         r#"

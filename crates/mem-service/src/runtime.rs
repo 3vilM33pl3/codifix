@@ -5,6 +5,8 @@ use crate::*;
 
 const HTTP_SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(2);
 
+mod schema;
+
 #[cfg(test)]
 mod evaluation_tests {
     use super::*;
@@ -405,8 +407,16 @@ pub(crate) async fn build_state(
         .timeout(config.service.request_timeout)
         .build()
         .context("build service http client")?;
-    let offline = build_offline_runtime(&config).await?;
     let pool_attempt = connect_primary_pool(&config).await;
+    // This explicitly selected deployment must not disguise an unverified
+    // history (or unavailable prepared DB) as a usable offline/relay service.
+    let pool_attempt =
+        if config.database.migrations == mem_config::DatabaseMigrationMode::VerifyOnly {
+            Ok(pool_attempt.context("verify prepared database before service startup")?)
+        } else {
+            pool_attempt
+        };
+    let offline = build_offline_runtime(&config).await?;
     let (events, _) = broadcast::channel(128);
     let (role, pool) = match pool_attempt {
         Ok(pool) => (ServiceRole::Primary, Some(pool)),
@@ -487,14 +497,17 @@ pub(crate) async fn connect_primary_pool(config: &AppConfig) -> Result<PgPool> {
         verify_evaluation_seal(&pool).await?;
         return Ok(pool);
     }
-    let mut migrator = compatible_migrator();
-    if config.profile == mem_config::Profile::Dev {
-        migrator.set_ignore_missing(true);
+    if config.database.migrations == mem_config::DatabaseMigrationMode::VerifyOnly {
+        schema::verify_history(&pool).await?;
+    } else {
+        let mut migrator = compatible_migrator();
+        if config.profile == mem_config::Profile::Dev {
+            migrator.set_ignore_missing(true);
+        }
+        migrator.run(&pool).await.context(
+            "run migrations (pgvector extension 'vector' must be installed in PostgreSQL)",
+        )?;
     }
-    migrator
-        .run(&pool)
-        .await
-        .context("run migrations (pgvector extension 'vector' must be installed in PostgreSQL)")?;
     register_builtin_loop_definitions(&pool)
         .await
         .context("register builtin loop definitions")?;
