@@ -31,18 +31,27 @@ const sha256 = value => createHash('sha256').update(canonical(value)).digest('he
  * config first, then inspect and regenerate this plan with their new IDs. */
 export function companyPreviewAdoption(company, bootstrap, adoption) {
   const result = companyBootstrapTopology(company, bootstrap);
-  strict(adoption, ['schemaVersion', 'members', 'inventory'], 'adoption input');
+  const preparedDatabase = adoption && Object.hasOwn(adoption, 'preparedGatewayDatabase');
+  strict(adoption, ['schemaVersion', 'members', 'inventory', ...(preparedDatabase ? ['preparedGatewayDatabase'] : [])], 'adoption input');
   strict(adoption.inventory, ['containers', 'networks', 'volumes'], 'reviewed inventory');
   check(adoption.schemaVersion === 1, 'Unsupported adoption schema');
   const occupiedNetworks = names(adoption.inventory.networks, 512, 'existing network names');
   const occupiedVolumes = names(adoption.inventory.volumes, 512, 'existing volume names');
   check(Array.isArray(adoption.inventory.containers) && adoption.inventory.containers.length <= 256, 'Bounded container inventory required');
   const inventory = adoption.inventory.containers.map(item => {
-    strict(item, ['name', 'id', 'networks'], 'existing container');
+    const suppliedAliases = item && Object.hasOwn(item, 'networkAliases');
+    strict(item, ['name', 'id', 'networks', ...(suppliedAliases ? ['networkAliases'] : [])], 'existing container');
     check(typeof item.name === 'string' && dockerName.test(item.name) && typeof item.id === 'string' && containerId.test(item.id), 'Exact existing container name and ID required');
     const networks = names(item.networks, 32, 'existing container networks');
     check(networks.every(name => occupiedNetworks.includes(name)), 'Container network absent from reviewed inventory');
-    return { name: item.name, id: item.id, networks };
+    const networkAliases = {};
+    if (suppliedAliases) {
+      check(item.networkAliases && typeof item.networkAliases === 'object' && !Array.isArray(item.networkAliases)
+        && [Object.prototype, null].includes(Object.getPrototypeOf(item.networkAliases))
+        && Object.keys(item.networkAliases).every(name => networks.includes(name)), 'Aliases require an existing container network');
+      for (const name of Object.keys(item.networkAliases).sort()) networkAliases[name] = names(item.networkAliases[name], 32, 'network aliases');
+    }
+    return { name: item.name, id: item.id, networks, ...(suppliedAliases ? { networkAliases } : {}) };
   }).sort((a, b) => compare(a.name, b.name));
   check(new Set(inventory.map(item => item.name)).size === inventory.length
     && new Set(inventory.map(item => item.id)).size === inventory.length, 'Duplicate container name or ID');
@@ -65,13 +74,37 @@ export function companyPreviewAdoption(company, bootstrap, adoption) {
   for (const member of ids) {
     for (const suffix of ['app', 'db', 'edge']) delete compose.services[`${member}_${suffix}`];
   }
+  let preparedGatewayDatabase;
+  if (preparedDatabase) {
+    const requested = adoption.preparedGatewayDatabase;
+    strict(requested, ['containerName', 'containerId', 'networkName', 'alias'], 'prepared gateway database');
+    check(requested.containerName === `${compose.name}-gateway_db-1`
+      && requested.networkName === `${compose.name}_gateway_database` && requested.alias === 'gateway_db', 'Only this stack\'s exact staged gateway database may be adopted');
+    const existing = inventory.find(item => item.name === requested.containerName && item.id === requested.containerId);
+    check(existing && existing.networks.length === 1 && existing.networks[0] === requested.networkName
+      && existing.networkAliases?.[requested.networkName]?.includes(requested.alias), 'Staged database identity, sole network and alias must match inventory');
+    check(!members.some(member => member.containerId === existing.id), 'A member cannot be the staged database');
+    const occupants = inventory.filter(item => item.networks.includes(requested.networkName));
+    check(occupants.length === 1 && occupants[0].id === existing.id, 'Only the staged database may occupy its existing network');
+    delete compose.services.gateway_db;
+    preparedGatewayDatabase = { ...requested, expectedComposeProject: compose.name, expectedComposeService: 'gateway_db',
+      expectedComposeNetwork: 'gateway_database', expectedInternal: true, expectedIpv6: false,
+      expectedCurrentContainerIds: [existing.id], expectedNewServices: ['gateway'], expectedPublishedPorts: [],
+      expectedHostNetwork: false, managedByThisPlan: false, removeOrphansAllowed: false, liveVerified: false };
+  }
   const usedNetworks = new Set(Object.values(compose.services).flatMap(networksOf));
   for (const name of Object.keys(compose.networks)) {
     if (!usedNetworks.has(name)) delete compose.networks[name];
     else {
       const explicit = `${compose.name}_${name}`;
-      check(!occupiedNetworks.includes(explicit), 'New-stack network already exists; reuse requires a different reviewed project');
-      compose.networks[name].name = explicit;
+      if (preparedGatewayDatabase && name === 'gateway_database') {
+        compose.networks[name] = { external: true, name: explicit };
+        check(Object.entries(compose.services).filter(([, service]) => networksOf(service).includes(name))
+          .every(([service]) => service === 'gateway'), 'Only gateway may join the staged database network');
+      } else {
+        check(!occupiedNetworks.includes(explicit), 'New-stack network already exists; reuse requires a different reviewed project');
+        compose.networks[name].name = explicit;
+      }
     }
   }
   const existingNames = new Set(inventory.map(item => item.name));
@@ -112,6 +145,7 @@ export function companyPreviewAdoption(company, bootstrap, adoption) {
   result.posture.installed = false;
   result.adoption = { schemaVersion: 1, inventorySha256: sha256({ containers: inventory, networks: occupiedNetworks, volumes: occupiedVolumes }),
     attachments, backupRequired: true, configRecreationRequired: true, postRecreationInventoryRequired: true,
-    liveInventoryVerified: false, attachmentsExecuted: false, modelEgressChanged: false };
+    liveInventoryVerified: false, attachmentsExecuted: false, modelEgressChanged: false,
+    ...(preparedGatewayDatabase ? { preparedGatewayDatabase } : {}) };
   return { ...result, reviewSha256: sha256(result) };
 }

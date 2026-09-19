@@ -26,6 +26,16 @@ function fixture(extraMembers = []) {
 }
 const plan = ({ company, bootstrap, adoption }) => companyPreviewAdoption(company, bootstrap, adoption);
 const networksOf = service => Array.isArray(service.networks) ? service.networks : Object.keys(service.networks);
+function withPreparedDatabase() {
+  const input = fixture();
+  const database = { containerName: 'memory-company-gateway_db-1', containerId: 'd'.repeat(64), networkName: 'memory-company_gateway_database', alias: 'gateway_db' };
+  input.adoption.preparedGatewayDatabase = database;
+  input.adoption.inventory.containers.push({ name: database.containerName, id: database.containerId, networks: [database.networkName],
+    networkAliases: { [database.networkName]: ['gateway_db', database.containerName] } });
+  input.adoption.inventory.networks.push(database.networkName);
+  input.adoption.inventory.volumes.push('memory-company_gateway_db_data');
+  return input;
+}
 
 test('adoption removes every duplicate member service, mount, volume, network and UI claim', () => {
   const input = fixture(); const original = structuredClone(input); const result = plan(input);
@@ -120,4 +130,78 @@ test('missing, duplicate, invented, ambiguous and stale identity/network claims 
     input => { input.adoption.members[0].providerKey = 'not-accepted'; },
   ];
   for (const change of changes) { const input = fixture(); change(input); assert.throws(() => plan(input)); }
+});
+
+test('explicit staged gateway DB stays outside Compose ownership and is reachable only by gateway', () => {
+  const input = withPreparedDatabase(); const original = structuredClone(input); const result = plan(input);
+  assert.deepEqual(input, original);
+  assert.equal(result.compose.services.gateway_db, undefined);
+  assert.deepEqual(Object.keys(result.compose.volumes), ['pds_data']);
+  assert.deepEqual(result.compose.networks.gateway_database, { external: true, name: 'memory-company_gateway_database' });
+  assert.ok(result.requiredFiles.every(file => file.service !== 'gateway_db' && !file.path.endsWith('/gateway/database/owner-password')));
+  assert.deepEqual(Object.entries(result.compose.services).filter(([, service]) => networksOf(service).includes('gateway_database')).map(([name]) => name), ['gateway']);
+  for (const [name, network] of Object.entries(result.compose.networks)) if (name !== 'gateway_database') {
+    assert.equal(network.external, undefined); assert.equal(network.internal, true); assert.equal(network.enable_ipv6, false);
+  }
+  const prepared = result.adoption.preparedGatewayDatabase;
+  assert.equal(prepared.liveVerified, false); assert.equal(prepared.expectedInternal, true); assert.equal(prepared.expectedIpv6, false);
+  assert.equal(prepared.expectedComposeProject, input.company.name);
+  assert.deepEqual(prepared.expectedCurrentContainerIds, ['d'.repeat(64)]);
+  assert.deepEqual(prepared.expectedNewServices, ['gateway']);
+  assert.deepEqual(prepared.expectedPublishedPorts, []);
+  assert.equal(prepared.expectedHostNetwork, false);
+  assert.equal(prepared.managedByThisPlan, false);
+  assert.equal(prepared.removeOrphansAllowed, false);
+  assert.ok(result.adoption.attachments.every(item => item.network !== prepared.networkName));
+  assert.ok(result.adoption.attachments.every(item => item.containerId !== prepared.containerId));
+  assert.equal(result.posture.installed, false);
+});
+
+test('prepared DB exception rejects wrong identity, aliases, extra peers and broad resource reuse', () => {
+  const changes = [
+    input => { delete input.adoption.preparedGatewayDatabase; },
+    input => { input.adoption.preparedGatewayDatabase = null; },
+    input => { input.adoption.preparedGatewayDatabase.containerId = 'e'.repeat(64); },
+    input => { input.adoption.preparedGatewayDatabase.containerName = input.adoption.members[0].containerName; },
+    input => { input.adoption.preparedGatewayDatabase.networkName = 'memory-workshop-preview'; },
+    input => { input.adoption.preparedGatewayDatabase.alias = 'postgres'; },
+    input => { input.adoption.preparedGatewayDatabase.allowAnyExistingNetwork = true; },
+    input => { delete input.adoption.inventory.containers.at(-1).networkAliases; },
+    input => { input.adoption.inventory.containers.at(-1).networkAliases.memory_company_other = ['gateway_db']; },
+    input => { input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'] = 'gateway_db'; },
+    input => { input.adoption.inventory.containers.at(-1).networkAliases = null; },
+    input => { input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'].push('gateway_db'); },
+    input => { input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'] = ['other']; },
+    input => { input.adoption.inventory.containers.at(-1).networks.push(input.adoption.inventory.networks[0]); },
+    input => { input.adoption.inventory.containers[0].networks.push('memory-company_gateway_database'); },
+    input => { input.adoption.inventory.containers.push({ name: 'unexpected', id: 'e'.repeat(64), networks: ['memory-company_gateway_database'] }); },
+    input => { input.adoption.inventory.networks.push('memory-company_pds_client'); },
+    input => { input.adoption.inventory.networks.push('memory-company_workshop_federation'); },
+    input => { input.adoption.inventory.volumes.push('memory-company_pds_data'); },
+    input => { input.adoption.inventory.containers.push({ name: 'memory-company-gateway-1', id: 'e'.repeat(64), networks: [] }); },
+  ];
+  for (const change of changes) { const input = withPreparedDatabase(); change(input); assert.throws(() => plan(input)); }
+});
+
+test('staged DB ID and alias inventory changes are review-bound, not silently reconciled', () => {
+  const input = withPreparedDatabase(); const before = plan(input);
+  input.adoption.preparedGatewayDatabase.containerId = 'e'.repeat(64);
+  assert.throws(() => plan(input));
+  input.adoption.inventory.containers.at(-1).id = 'e'.repeat(64);
+  assert.notEqual(plan(input).reviewSha256, before.reviewSha256);
+  const changed = plan(input);
+  input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'].reverse();
+  assert.deepEqual(plan(input), changed);
+  input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'].push('another-reviewed-alias');
+  assert.notEqual(plan(input).reviewSha256, changed.reviewSha256);
+});
+
+test('staged DB bind storage requires no named-volume adoption or storage declaration', () => {
+  const input = withPreparedDatabase();
+  input.adoption.inventory.volumes = [];
+  const result = plan(input);
+  assert.deepEqual(Object.keys(result.compose.volumes), ['pds_data']);
+  assert.equal(result.compose.services.gateway_db, undefined);
+  assert.ok(result.requiredFiles.every(file => !file.path.startsWith(`${input.company.root}/gateway/database/`)));
+  assert.equal(result.adoption.preparedGatewayDatabase.managedByThisPlan, false);
 });

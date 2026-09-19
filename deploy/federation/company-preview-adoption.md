@@ -41,9 +41,9 @@ Docker host, including unrelated names for collision checking. The planner
 cannot prove that supplied inventory is complete or current. It refuses an
 existing network or volume with any generated new-stack name, retained-service
 container name collisions, shared member networks and default `bridge`/`host`
-networking. Existing gateway/PDS storage is never adopted implicitly.
-It is intentionally a **fresh-stack plan**, not an automatic rerun/reconciliation
-tool for an already started company stack.
+networking. Existing gateway/PDS storage is never adopted implicitly. It is a
+**fresh-stack plan**, with only the explicit staged gateway-DB exception below;
+it is not an automatic rerun/reconciliation tool for an already started stack.
 
 The output keeps `compose`, retained `proxyFiles`/`requiredFiles`, and gateway/PDS
 endpoints. Removed member UI URLs and database names are not advertised. Member
@@ -60,6 +60,57 @@ requires a new plan. The source inputs are not mutated.
 `externalProviders: false` posture does **not** assert that an existing app has
 no approved model destination: existing model policy is unchanged and uninspected.
 This planner adds no provider credential, egress network or autonomous worker.
+
+### Explicit staged gateway database exception
+
+An operator may have already provisioned the dedicated gateway database before
+the rest of the stack. The one allowed staged-backend descriptor is optional:
+
+```js
+adoption.preparedGatewayDatabase = {
+  containerName: 'memory-company-gateway_db-1',
+  containerId: 'd'.repeat(64), // replace with the exact inspected ID
+  networkName: 'memory-company_gateway_database',
+  alias: 'gateway_db',
+};
+adoption.inventory.containers.push({
+  name: 'memory-company-gateway_db-1', id: 'd'.repeat(64),
+  networks: ['memory-company_gateway_database'],
+  networkAliases: { 'memory-company_gateway_database': ['gateway_db', 'memory-company-gateway_db-1'] },
+});
+adoption.inventory.networks.push('memory-company_gateway_database');
+// Include the actual occupied volume inventory, even though this plan will not own it.
+adoption.inventory.volumes.push('memory-company_gateway_db_data');
+```
+
+The container and network names must be the exact generated names for this
+company project; the DNS alias is fixed to `gateway_db`. The supplied complete
+inventory must show that exact container on **only that network**, with the
+required alias, and no other container on that network. It cannot be a member
+app or a database from a different project. Missing, changed or ambiguous
+bindings fail closed. Container network aliases are bounded optional inventory
+metadata, required for this staged database and included in the review digest.
+
+The planner removes the generated `gateway_db` service, owner-secret requirement
+and DB volume declaration. Existing DB credentials, configuration and storage
+remain untouched and outside this plan's ownership. Only `gateway_database`
+becomes `{ external: true, name: ... }`; only the new `gateway` service joins it.
+No member, gateway TLS edge or PDS service may join. All other container,
+network and volume collision/freshness checks remain in force.
+
+Compose cannot enforce `internal` or IPv6 settings on an external network.
+`adoption.preparedGatewayDatabase` therefore reports **expected**, not verified,
+Compose labels, internal/IPv4 settings, sole current container ID, no published
+ports/host networking and new service.
+Immediately before deployment, independently inspect these attributes and the
+alias, exact container ID/name, database/config bindings, health, role/schema
+receipt and backup evidence. A supplied JSON descriptor is not live verification.
+Refuse mismatches; do not repair them automatically or expand this exception.
+Preserve the original staged provisioning artifact for lifecycle/backup/recovery.
+Do not use `--remove-orphans` or enable `COMPOSE_REMOVE_ORPHANS` against the adopted
+Compose project: the separately owned database is deliberately absent from the
+new stack's service list. The
+new stack must never stop, recreate, migrate or delete it implicitly.
 
 ## Required operator gates — not performed by the planner
 
