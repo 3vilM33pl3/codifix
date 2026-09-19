@@ -216,6 +216,11 @@ function readCookie(name: string): string | null {
 /** The configured LOCAL service is the only target; remote endpoints and trust
  * material are never accepted from this workflow or stored in the browser. */
 export async function federationRequest<T>(project: string, space: string | null, suffix = "", body?: unknown, signal?: AbortSignal): Promise<T> {
+  // Federation reads require a real, revocable browser session too. Anonymous
+  // single-user reads of ordinary memories do not establish this credential.
+  // Do not clear stale cookies or retry authorization failures with a new session.
+  const auth = await getAuthMe();
+  if (auth.mode === "single_user") await ensureSession();
   const base = `/v1/projects/${encodeURIComponent(project)}/federation${space ? `/${encodeURIComponent(space)}` : ""}`;
   return parseJson(await apiFetch(base + suffix, {
     method: body === undefined ? "GET" : "POST",

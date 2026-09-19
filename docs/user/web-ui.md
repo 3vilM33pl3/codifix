@@ -18,6 +18,13 @@ their exact request and require confirmation. Drafts are cleared on project
 changes; imported text is escaped and never forwarded to a model from this view.
 See [Federation workflow](federation-workflow.md) for consent and offline-copy limits.
 
+On a single-user loopback installation, opening Federation establishes the local
+owner's revocable browser session before discovery, including read-only requests.
+It does not require a prior mutation in another tab. Existing or rejected sessions
+are not replaced automatically after an authorization failure. Multi-user
+installations continue to use their normal OIDC sign-in; current permissions,
+explicit federation grants and CSRF protection still apply.
+
 ### Private expertise questions (disposable F1 rehearsal)
 
 Authority administrators can select **Ask expertise** or **Answer expertise** in
