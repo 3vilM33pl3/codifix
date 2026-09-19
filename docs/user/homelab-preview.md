@@ -36,6 +36,11 @@ gateway mailbox, not the PDS or the ordinary retrieval corpus.
 5. Select **Fetch expertise result** until the status is `answered`. Inspect the
    original author, exact source version, answering instance and content digest.
 
+The first federation read establishes the normal loopback-only browser session
+for these single-user installations. No preliminary mutation or separate login
+is needed. A revoked or denied session is not automatically replaced. On a
+fresh Homelab page, load the `homelab` project before opening federation.
+
 Preparing does not send. A queued response is not yet an answer. If a response
 is lost, retain the request ID and retry the exact question before its two-minute
 execution deadline; do not create replacement IDs blindly. An answered request
@@ -118,8 +123,10 @@ current app uses [prepared-database verification](prepared-database.md) at schem
 its private address must be revalidated and the fixed relay target updated; a
 restart of the same container is different from recreation.
 
-Old containers named `memory-*-preview-app-before-company-f1` are stopped rollback
-artifacts, not spare active instances. Never start both writers. Do not run
+Old containers named `memory-*-preview-app-before-company-f1`,
+`memory-*-preview-app-before-demo-status` and
+`memory-*-preview-app-before-web-session` are stopped recovery artifacts, not
+spare active instances. Never start both writers. Do not run
 Compose orphan-removal operations on `memory-company-20260919`: its dedicated
 database has a separate Compose file. Gateway, raw PDS, member and operator
 networks must remain separate.
@@ -145,5 +152,12 @@ and ciphertext hash verification does not
 prove decryption-key recovery. Never start an active clone or replay the original
 import into the running target. Recovery requires an isolated, non-autonomous
 target and verification before switching any client.
+
+The subsequent company-wide `before-demo-status.tar.gpg` and
+`before-web-session.tar.gpg` are under the NAS's
+`memory-four-area-20260917/company-20260919` directory. Each contains three logical
+database backups and current stopped PDS state, with encrypted-copy verification;
+they do not establish full restore or decryption-key recovery. The final Web-only
+update preserves the same service binary, schema, credentials and sharing policy.
 
 See the [evidence and remaining exchange work](../reviews/four-area-network/homelab-exchange.md).

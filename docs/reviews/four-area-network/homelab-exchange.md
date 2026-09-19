@@ -362,3 +362,37 @@ Web tests and the production build passed. A fresh Homelab browser additionally
 exposed a missing single-user session bootstrap on initial federation reads;
 the Web follow-up below is required before calling that fresh-browser journey
 complete. Existing authenticated CLI and Workshop sessions were unaffected.
+
+## Fresh-browser follow-up, 12:32 UTC
+
+Web source `0d9d023b` establishes a real single-user session before the first
+federation GET. It shares the existing session bootstrap and preserves CSRF,
+OIDC behavior and denial handling: it does not erase a revoked session or retry
+authorization failures by creating new credentials. Ten transport regressions,
+all 139 Web tests and the production build passed.
+
+The new immutable Web tree is
+`0d05a36642607f8c21bef25786a794c7b768a72e5f595d62d1b1a1d09f8144e9`.
+The service binary remains `c7178a51…acd2c` from the status upgrade above. A second
+coordinated stopped-writer backup includes the then-current artifacts, three
+logical database backups and current offline PDS state; local and NAS ciphertext
+SHA-256 is
+`dc5043a3ba4e143f2c96ed101d7b817025ccd7e6a87ed935191c0c937b7558ee`.
+No configuration, database schema, source record, model grant or credential was
+changed. Old writers remain stopped, not deleted. Temporary plaintext database
+dumps were removed after encrypted-copy verification; full restore remains open.
+
+The same previously failing Homelab browser now discovers Workshop and displays
+its retained answer and citation attribution without a preliminary mutation.
+Workshop likewise discovers Homelab and displays its saved browser answer. Both
+services report healthy databases; source counts remain 3/2 memories, zero raw
+captures and one project each. Both CLI synchronization retries still return
+cursor 10. Answer execution totals remain three claims and three completions;
+no new question or model call was required to verify recovery.
+
+Workshop's question worker was resumed after the same empty-work checks, with
+the unchanged original manifest, daily budget and 13:46:41 UTC grant expiry. That
+expiry affects the paid supervisor, not the deterministic two-area exchange.
+The [five-step browser demo](../../user/homelab-preview.md#ask-across-the-boundary)
+is now verified from both sides. This is the reviewed five-record preview,
+not the complete dataset partition or the outstanding Trust/General deployment.
