@@ -5,6 +5,49 @@ pub use mem_supervisor::{Area as SupervisorArea, action::ActionState as Supervis
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Explicit private preparation, never an operational journal payload.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SupervisorQuestionPrepare {
+    pub question: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SupervisorQuestionPreview {
+    pub profile_digest: String,
+    pub request_digest: String,
+    pub question: String,
+    pub model: String,
+    pub destination: String,
+    pub source_count: usize,
+    pub daily_call_limit: u32,
+    pub daily_usd_micros: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SupervisorQuestionRequest {
+    pub request_id: Uuid,
+    pub question: String,
+    pub profile_digest: String,
+    pub request_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorQuestionStatus {
+    pub request_id: Uuid,
+    pub action_id: Uuid,
+    pub state: String,
+    pub expires_at: DateTime<Utc>,
+    pub proposal_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorQuestionList {
+    pub questions: Vec<SupervisorQuestionStatus>,
+    pub next_after: Option<Uuid>,
+}
+
 /// Private exact-project content. Never serialize into operational feeds.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SupervisorProposalDetail {

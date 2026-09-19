@@ -9,6 +9,7 @@ mod inspection;
 mod policy;
 mod proposals;
 pub mod sources;
+pub mod questions;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use mem_supervisor::{
@@ -57,6 +58,8 @@ pub enum StoreError {
     UnpersistedProposal,
     #[error("missing or mismatched durable instance or model-work binding")]
     Binding,
+    #[error("supervisor question queue is full; wait for pending questions to finish or expire")]
+    QueueFull,
 }
 
 #[derive(Clone)]

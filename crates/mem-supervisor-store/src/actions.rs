@@ -108,6 +108,18 @@ impl SupervisorStore {
         if row.try_get::<String, _>("state")? != "queued" {
             return Err(StoreError::Transition);
         }
+        // The policy lock serializes this check and state transition across
+        // distinct paid actions. Operational health observations remain separate.
+        if matches!(
+            row.try_get::<String, _>("kind")?.as_str(),
+            "propose_correction" | "ask_question"
+        ) {
+            let busy: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM supervisor_actions WHERE area=$1 AND kind IN ('propose_correction','ask_question') AND state='running')")
+                .bind(area_name(area)).fetch_one(&mut *tx).await?;
+            if busy {
+                return Err(StoreError::Transition);
+            }
+        }
         let row = sqlx::query("UPDATE supervisor_actions SET state='running',worker=$2,fence=fence+1,lease_until=clock_timestamp()+$3::bigint * INTERVAL '1 second' WHERE id=$1 RETURNING fence,lease_until")
             .bind(id).bind(worker).bind(i64::from(ttl_seconds)).fetch_one(&mut *tx).await?;
         let claim = LeaseClaim {
