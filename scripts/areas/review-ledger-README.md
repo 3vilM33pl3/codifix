@@ -117,6 +117,14 @@ Areas are `trust`, `homelab`, `workshop`, `general`. Archive decisions instead u
 an empty `approved_archive_reference_source_ids` list. Classifications are
 `knowledge`, `test`, `evaluation`, `ambiguous` or `mixed`.
 
+When reviews are delegated, each decision may specify its own
+`"reviewer": {"kind":"agent","id":"/root/actual-reviewer"}`. The manifest,
+source projection attestations and delta reuse retain that identity; the ledger
+reviewer is only the fallback for older single-reviewer ledgers. A human reviewer
+claim is rejected by this agent-review workflow. Reading a complete base version
+and every losslessly reconstructed change is a valid full-history review; a
+summary, latest-only view or truncated tool result is not.
+
 An area decision must explicitly enumerate **every** per-version source ID for
 reference-only projection. No original excerpt/path/prompt is copied. Sources
 without a task/session binding or with a non-null memory target are unsupported

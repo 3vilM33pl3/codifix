@@ -172,6 +172,7 @@ export function validateLedger(index, ledger) {
     decisions.set(id, d);
     if (!uuid.test(d.decision_id) || ids.has(d.decision_id) || d.explicitly_approved !== true || !text(d.approval_reason)
       || !text(d.reviewed_at) || !Number.isFinite(Date.parse(d.reviewed_at)) || !reviewText(d.review)
+      || (Object.hasOwn(d, 'reviewer') && !validReviewer(d.reviewer))
       || !dispositionValid(d.disposition) || !Array.isArray(d.approved_archive_reference_source_ids)) { problem('invalid_explicit_review'); continue; }
     ids.add(d.decision_id);
     if (d.dependency_sha256 !== h.dependency_sha256 || d.reviewed_content_sha256 !== h.reviewed_content_sha256) problem('stale_history_or_dependency');
@@ -214,7 +215,7 @@ function stableId(...parts) {
 }
 const ref = (table, key, row_sha256) => ({ record: { table, key }, row_sha256 });
 function classification(d, reviewer) {
-  return { ...d.review, content_evidence: `${d.review.content_evidence} Agent reviewer ${reviewer.id}; decision ${d.decision_id}; ${d.approval_reason}` };
+  return { ...d.review, content_evidence: `${d.review.content_evidence} Agent reviewer ${(d.reviewer ?? reviewer).id}; decision ${d.decision_id}; ${d.approval_reason}` };
 }
 
 export function createManifest(index, ledger, draft) {
@@ -258,7 +259,7 @@ export function createManifest(index, ledger, draft) {
           source: ref('public.memory_sources', source.id, source.row_sha256), task_constraint: taskFks[0].name,
           archived_task: ref('public.tasks', source.task_id, taskHash) }, content: { kind: 'archive_reference_only' } };
       const decisionHash = hash(`mem-area-provenance-projection-v1\n${JSON.stringify(projection)}`);
-      projection.operator_attestation = { explicitly_approved: true, operator: `agent:${ledger.reviewer.id}`,
+      projection.operator_attestation = { explicitly_approved: true, operator: `agent:${(d.reviewer ?? ledger.reviewer).id}`,
         approval_record_id: stableId(d.decision_id, source.id, 'approval'), reviewed_at: d.reviewed_at, decision_sha256: decisionHash,
         source_evidence: d.review.source_evidence, destination_evidence: d.review.project_evidence,
         content_evidence: `Explicit source ${source.id} reference-only approval in agent decision ${d.decision_id}; no original evidence bytes copied. ${ledger.authority_basis}` };

@@ -101,10 +101,11 @@ not approve or execute import, activation, retrieval exposure or model calls.
    `inventory_sha256`, `manifest_sha256`, `plan_valid` and blocker count. This is
    read-only; it does not inspect row payloads or connect to PostgreSQL.
 3. Collect exact row payloads from the already isolated restore with
-   `node scripts/areas/payload.mjs --source-instance UUID --snapshot-id UUID
+   `node scripts/areas/payload.mjs --descriptor /protected/restore-descriptor.json
+   --source-instance UUID --snapshot-id UUID
    --inventory-sha256 INVENTORY_SHA --output /protected/new-payload.ndjson`.
-   This collector is deliberately pinned to the four-area restore container,
-   not an arbitrary server. It uses a read-only transaction, exact UTF-8 JSON
+   This collector is bound to the explicitly reviewed isolated restore container
+   descriptor, not an arbitrary server. It uses a read-only transaction, exact UTF-8 JSON
    bytes and lexical key ordering. The supplied inventory digest is only a
    claimed binding; preparation independently checks every row against it.
    Before ownership review is finished, independently validate that export:

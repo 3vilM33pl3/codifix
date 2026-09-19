@@ -144,6 +144,20 @@ test('full manifests retain more than 64 histories, exact projects and reviewed 
   assert.ok(manifest.records.every(r => r.disposition.kind === 'protected_archive'));
 });
 
+test('delegated decisions retain the actual agent reviewer through projections and delta reuse', () => {
+  const index = indexOf(), ledger = ledgerOf(index);
+  ledger.decisions[0].reviewer = { kind: 'agent', id: '/root/independent-reviewer' };
+  const manifest = createManifest(index, ledger, draftOf(index));
+  assert.match(manifest.lineages[0].disposition.review.content_evidence, /Agent reviewer \/root\/independent-reviewer/);
+  assert.equal(manifest.provenance_projections[0].operator_attestation.operator, 'agent:/root/independent-reviewer');
+  assert.deepEqual(revalidateLedger(index, index, ledger).ledger.decisions[0].reviewer, ledger.decisions[0].reviewer);
+  for (const reviewer of [null, {}, { kind: 'human', id: 'Olivier' }]) {
+    ledger.decisions[0].reviewer = reviewer;
+    assert.equal(validateLedger(index, ledger).ready, false);
+    assert.throws(() => createManifest(index, ledger, draftOf(index)), /Every history/);
+  }
+});
+
 test('same-area relations preserve both original projects while cross-area relations are archived', () => {
   const a = source(10, 1), b = source(30, 2);
   const edge = { id: id(700), src_canonical_id: a.canonical_id, dst_canonical_id: b.canonical_id, relation_type: 'relates_to', row_sha256: hash('relation') };
