@@ -8,8 +8,8 @@ of previews; live counts must be refreshed for the actual snapshot.
 
 ## Dependable credentials and operating limits
 
-- [ ] Add explicit refresh-only maintenance for the existing enrolled PDS account, separate from time-limited enrollment approval; no new accounts, identity/trust changes or password fallback.
-- [ ] Check every minute, refresh 15 minutes before expiry, serialize operations and reconcile interrupted refreshes durably. Five transient retries start at ten seconds and cap at ten minutes; invalid credentials/identity or exhausted recovery require intervention.
+- [x] Add explicit refresh-only maintenance for the existing enrolled PDS account, separate from time-limited enrollment approval; no new accounts, identity/trust changes or password fallback.
+- [x] Check every minute, refresh 15 minutes before expiry, serialize operations and reconcile interrupted refreshes durably. Five transient retries start at ten seconds and cap at ten minutes; invalid credentials/identity or exhausted recovery require intervention.
 - [ ] Keep refresh credentials outside gateway/participants. Add opt-in atomic access-only credential bundles, dedicated directory mounts, ownership/permission/identity/expiry validation, immutable per-attempt credentials, and preserve static-token configuration.
 - [ ] Distinguish authentication from invalid proof failures, stop claims without usable credentials, and resume only authentication-blocked publications after verified renewal; preserve IDs, ordering, proof verification and ambiguous read-back.
 - [ ] Expose authorized sanitized credential/grant health in gateway and Web/CLI/TUI: expiry, renewal, retry/intervention state, observation time; stale/unknown is not healthy. Add TLS expiry warnings, without automatic issuer/CA changes.
@@ -17,9 +17,9 @@ of previews; live counts must be refreshed for the actual snapshot.
 
 ## Fresh backup and complete ownership review
 
-- [ ] Before operational changes, make fresh encrypted source and two-area deployment backups; preserve older artifacts.
-- [ ] Restore in isolated environments without production connections/provider credentials/workers. Verify schemas, rows, sequences and identity/configuration material, not only checksums.
-- [ ] Generalize snapshot tools to digest-bound restore descriptors instead of a fixed September 17 container, preserving isolation and schema allowlists and rejecting live DB targets. Use a new private timestamped staging directory.
+- [x] Before operational changes, make fresh encrypted source and two-area deployment backups; preserve older artifacts.
+- [x] Restore in isolated environments without production connections/provider credentials/workers. Verify schemas, rows, sequences and identity/configuration material, not only checksums.
+- [x] Generalize snapshot tools to digest-bound restore descriptors instead of a fixed September 17 container, preserving isolation and schema allowlists and rejecting live DB targets. Use a new private timestamped staging directory.
 - [ ] Build a snapshot/full-history-bound versioned ownership ledger: Trust for authoritative CA knowledge; Homelab for infrastructure/networking/deployment; Workshop for Memory development/architecture/releases; General for the remainder retaining project boundaries.
 - [ ] Review redacted curated content/provenance only, recording basis/reviewer/hashes. Agent review is not Olivier approval. Secrets, raw captures and session bodies must not be disclosed. Uncertain/mixed/sensitive/unsupported material stays in a protected archive with explicit reasons.
 - [ ] Preserve IDs, complete histories, tombstones, authorship, timestamps and provenance; mixed raw captures/sessions stay local and no inferred excerpts are published. Preserve same-area relations and archive cross-area ones without invented sharing permission.
@@ -57,3 +57,46 @@ modification, autonomous agency, evaluation completion or customer readiness.
   represented as a successful server event.
 - Implementation and verification are in progress. No completion gate is yet
   claimed for this increment.
+
+### Recovery and first maintenance evidence
+
+The fresh source baseline is `baseline-20260919T2202`, independently copied back
+from NAS into a new network-none restore. Snapshot
+`2154cc37-c3cd-4784-b335-37062e6d240d` contains 104 tables and 2,587,041 rows;
+all table row hashes and all three sequence states match the encrypted archive.
+It includes 107 projects, 3,482 memory versions and 3,207 canonical histories.
+The plan checkpoint accounts for a new memory since the initial scope count.
+The normalized complete inventory digest is
+`997ecdf64b7490e3a104a5d4c9efa01b88ab77dfb85fa47fad04d195b1770251`.
+
+The separate coordinated preview archive
+`dependable-backup-20260919t2212.tar.gpg` has SHA-256
+`c0ad3dbe68367de400e9881af2745fd5df462cb1ef28a60f4a5f4e65d73b772d`.
+Its isolated recovery proves three databases' schemas, rows, sequences,
+roles/grants and permissions; four PDS SQLite integrity checks; ten signed
+repository records and fourteen CAR blocks; enrolled-key verification with a
+negative bootstrap-key probe; ten audit receipts and their chain; retained
+sequence/cursors at ten and four saved answers. The recovery starts no Memory,
+PDS or provider process. See [the recovery operator](../../../deploy/federation/PREVIEW-RECOVERY.md).
+This is offline recovery evidence, not customer disaster-recovery certification.
+
+Existing-account refresh-only adoption was authorized under the approved plan
+with review digest
+`d743780c58a8bbb8410880298eb70b7d69af4db1e8c73e0cdcd3586f2d6d4c34`.
+Its first real refresh succeeded at `2026-09-19T22:27:32Z`, yielding generation
+two without password fallback, account creation or trust-key changes. The
+maintainer has a private operator-edge network and access-only output directory;
+no gateway, participant, database or provider credential mounts. Its user service
+is `memory-pds-refresh-only.service`. This evidence predates the gateway/app
+rollout; generation two alone does not prove publication recovery.
+
+Four fresh targets have independently assigned identities and schema-only head
+60 under `memory-four-area-staging-20260919T2350`. They have no network, published
+ports, application processes, copied authentication or background workers. They
+are **empty preparation targets**, not completed partitions yet.
+
+The first full-history export exposed a scaling defect: repeating 468,219
+relations in every incident history made the private metadata index too large.
+Its failed artifacts remain protected. Compact digest-bound dependency metadata
+is being tested; no incomplete export is being called an approved ownership
+ledger and no source rows have been discarded.
