@@ -15,6 +15,15 @@ and committed metadata history. It never shows private prompts or source text.
 
 ## Controls
 
+- `v`: open project-private proposals. In this pane, `q` opens questions (not quit).
+- Questions: `n` starts typing one exact question; Enter prepares disclosure consent.
+  Enter again confirms a potentially paid attempt; Escape cancels an unsent preview.
+  After uncertain submission, Enter retries the **same** request and `r` inspects
+  it. No new ID is generated. `l` lists your retained questions and Enter opens
+  status or an available cited answer. No history or files are attached.
+- A loopback single-user question client exchanges authenticated owner access for
+  a revocable in-memory session. No session cookies are printed or written to disk.
+
 - `r`: refresh current history page, clearing stale state before the request.
 - `PageDown`: read the next committed history page, if available.
 - `Home`: return to the first history page.

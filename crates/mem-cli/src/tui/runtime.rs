@@ -20,7 +20,10 @@ use mem_record::{NamedCount, ProjectOverviewResponse};
 use ratatui::{Terminal, backend::CrosstermBackend};
 
 pub(super) fn should_quit(key: KeyEvent, app: &App) -> bool {
-    matches!(app.chrome.input_mode, InputMode::Normal) && matches!(key.code, KeyCode::Char('q'))
+    matches!(app.chrome.input_mode, InputMode::Normal)
+        && matches!(key.code, KeyCode::Char('q'))
+        && !(app.active_tab == TabKind::Supervisor
+            && app.supervisor.private.consumes_quit(&app.project))
 }
 
 pub(super) fn should_attempt_stream_reconnect(

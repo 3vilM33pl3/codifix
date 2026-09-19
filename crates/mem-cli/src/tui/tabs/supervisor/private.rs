@@ -16,9 +16,11 @@ use ratatui::{
     widgets::{Paragraph, Wrap},
 };
 use uuid::Uuid;
+mod questions;
 
 #[derive(Default)]
 pub(in crate::tui) struct PrivateState {
+    questions: questions::QuestionState,
     project: String,
     active: bool,
     busy: bool,
@@ -32,16 +34,22 @@ pub(in crate::tui) struct PrivateState {
 pub(in crate::tui) enum PrivateResult {
     Page(SupervisorProposalList),
     Detail(SupervisorProposalDetail),
+    Question(questions::QuestionResult),
 }
 enum Request {
     List(Option<Uuid>),
     Detail(Uuid),
     Review(Uuid, SupervisorReviewRequest),
+    Question(questions::QuestionRequest),
 }
 impl PrivateState {
+    pub(in crate::tui) fn consumes_quit(&self, project: &str) -> bool {
+        self.active && self.project == project
+    }
     pub(in crate::tui) fn receive(&mut self, result: Result<PrivateResult, String>) {
         self.busy = false;
         match result {
+            Ok(PrivateResult::Question(result)) => self.questions.receive(result),
             Ok(PrivateResult::Page(p)) => {
                 self.page = Some(p);
                 self.detail = None;
@@ -93,6 +101,9 @@ impl App {
                             .await
                             .map(PrivateResult::Detail)
                     }
+                    Request::Question(request) => questions::execute(&api, &project, request)
+                        .await
+                        .map(PrivateResult::Question),
                 }
             }
             .await
@@ -123,6 +134,13 @@ impl App {
         if state.busy {
             return true;
         }
+        if state.questions.active {
+            let request = state.questions.key(key);
+            if let Some(request) = request {
+                self.private_request(api, request);
+            }
+            return true;
+        }
         if let Some(pending) = state.pending.clone() {
             match key.code {
                 KeyCode::Enter => {
@@ -141,6 +159,13 @@ impl App {
             return true;
         }
         match key.code {
+            KeyCode::Char('q') => {
+                state.questions.active = true;
+                self.private_request(
+                    api,
+                    Request::Question(questions::QuestionRequest::List(None)),
+                );
+            }
             KeyCode::Esc => {
                 *state = PrivateState::default();
             }
@@ -206,8 +231,19 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
     if !state.active || state.project != app.project {
         return false;
     }
+    if state.questions.active {
+        questions::draw(
+            frame,
+            &state.questions,
+            &app.project,
+            state.busy,
+            state.error.as_deref(),
+            area,
+        );
+        return true;
+    }
     let mut lines = vec![format!(
-        "Private project: {} | r: list | Enter: open | Esc: status | j/k: scroll/select | PgDn: next page",
+        "Private project: {} | q: questions | r: list | Enter: open | Esc: status | j/k: scroll/select | PgDn: next page",
         app.project
     )];
     if let Some(r) = &state.pending {

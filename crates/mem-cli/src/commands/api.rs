@@ -27,6 +27,8 @@ use uuid::Uuid;
 
 use crate::commands::output::{service_url, write_headers};
 
+mod supervisor_questions;
+
 fn jobs_path(project: &str, id: Option<Uuid>, retry: bool) -> Result<String> {
     let mut url = reqwest::Url::parse("http://localhost/")?;
     {
@@ -48,6 +50,8 @@ fn jobs_path(project: &str, id: Option<Uuid>, retry: bool) -> Result<String> {
 pub(crate) struct ApiClient {
     pub(crate) client: Client,
     pub(crate) config: AppConfig,
+    // A revocable loopback owner session, shared by cloned TUI clients, never persisted.
+    question_session: std::sync::Arc<tokio::sync::Mutex<Option<reqwest::header::HeaderMap>>>,
 }
 
 impl ApiClient {
@@ -274,7 +278,11 @@ impl ApiClient {
         .await
     }
     pub(crate) fn new(client: Client, config: AppConfig) -> Self {
-        Self { client, config }
+        Self {
+            client,
+            config,
+            question_session: Default::default(),
+        }
     }
 
     pub(crate) async fn health(&self) -> Result<serde_json::Value> {

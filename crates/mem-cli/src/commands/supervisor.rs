@@ -4,7 +4,9 @@ use anyhow::Result;
 use clap::{Args, Subcommand};
 use mem_record::SupervisorResponse;
 
-pub(crate) const HELP: &str = "Agent notes:\nRead-only local instance inspection by default. Requires global memory_read, not a project role. Explicit pause/resume require current global system_admin, exact instance/policy/request UUIDs and --confirm. No provider call or bootstrap. Enabled policy does not prove worker health or authorize new disclosure. History contains metadata only. See docs/user/cli/supervisor.md.";
+pub(crate) mod questions;
+
+pub(crate) const HELP: &str = "Agent notes:\nRead-only local instance inspection by default. Requires global memory_read, not a project role. Explicit pause/resume require current global system_admin, exact instance/policy/request UUIDs and --confirm. Project-scoped ask prepares exact consent; --confirm with both preview hashes queues a potentially paid question. Local question clients exchange authenticated loopback owner access for an in-memory revocable session. No credentials are printed or stored. Enabled policy does not prove worker health or authorize new disclosure. History contains metadata only. See docs/user/cli/supervisor.md.";
 
 #[derive(Debug, Args)]
 pub(crate) struct SupervisorArgs {
@@ -19,6 +21,22 @@ pub(crate) struct SupervisorArgs {
 }
 #[derive(Debug, Subcommand)]
 enum SupervisorCommand {
+    /// Prepare an exact private question. Submit only with preview hashes and --confirm.
+    Ask(questions::AskArgs),
+    /// Inspect an originally submitted question; never re-executes it.
+    Question {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        request_id: uuid::Uuid,
+    },
+    /// List only this authenticated requester's questions.
+    Questions {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        after: Option<uuid::Uuid>,
+    },
     /// List private proposal IDs in exactly one project; no model call.
     Proposals {
         #[arg(long)]
@@ -69,6 +87,28 @@ struct ControlArgs {
 pub(crate) async fn handle(args: SupervisorArgs, api: &ApiClient) -> Result<()> {
     if let Some(command) = args.command {
         let (control, enabled) = match command {
+            SupervisorCommand::Ask(ask) => return questions::ask(ask, api).await,
+            SupervisorCommand::Question {
+                project,
+                request_id,
+            } => {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &api.supervisor_question(&project, request_id).await?
+                    )?
+                );
+                return Ok(());
+            }
+            SupervisorCommand::Questions { project, after } => {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &api.supervisor_questions(&project, after).await?
+                    )?
+                );
+                return Ok(());
+            }
             SupervisorCommand::Proposals { project, after } => {
                 println!(
                     "{}",
