@@ -21,6 +21,9 @@ summary and ages it while open. Unknown/static expiry, stale observations and
 blocked publications are not reported as healthy. Credential eligibility does
 not prove PDS availability or completed publication. Gateway status remains an
 authenticated, current-member-only operation through `/v1/status`.
+CLI and TUI summaries warn when the observed operator TLS certificate is expired
+or expires within one day. The warning ages with the display; it does not renew
+certificates, select an issuer or change the CA.
 
 ### Local-human sessions on single-user instances
 
