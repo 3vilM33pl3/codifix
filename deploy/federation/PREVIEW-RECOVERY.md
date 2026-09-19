@@ -86,10 +86,10 @@ The original backup receipt remains unchanged with `restored: false`; separate
 | Gateway | 114 | 162 | 4 |
 
 All row/sequence/schema/role comparisons passed. Both participant cursors and the
-accepted/published head are10, with no unpublished records, publication leases or
+accepted/published head are 10, with no unpublished records, publication leases or
 unsettled model attempts. Four retained origin answers match gateway answer
 hashes (one Workshop, three Homelab). Four PDS SQLite databases passed integrity
-checks. The reconstructed CAR has ten records, fourteen blocks and8,953 bytes;
+checks. The reconstructed CAR has ten records, fourteen blocks and 8,953 bytes;
 all ten receipt signatures and the receipt chain verify.
 
 CAR SHA-256:
