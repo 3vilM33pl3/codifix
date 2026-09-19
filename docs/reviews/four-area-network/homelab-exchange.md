@@ -17,6 +17,8 @@ release. The approved-plan Memory checkpoint was renewed before edits.
   disposable credentials; independently verify the signed repository.
 - [x] Provision Homelab's restricted internal answering identity through the
   transactional, audited installation API; keep remote grants disabled.
+- [x] Prepare separate gateway schema and restricted runtime credentials; verify
+  its encrypted NAS backup without connecting either preview.
 - [ ] Provision the private gateway/PDS with separately pinned receipt/repository
   keys and a separate space authority; retain interrupted-operation evidence.
 - [ ] Review exact per-recipient collections and enable deterministic exchange.
@@ -141,3 +143,68 @@ per-member gateway networks, not replaced by the blueprint's new empty apps/DBs.
 Gateway token installation/restart and blocked-publication retry remain explicit
 operator operations. No real company PDS, membership or collection has yet been
 activated by this increment.
+
+## Gateway staging, 10:07 UTC
+
+The new `memory-company-20260919-gateway_db-1` container holds a dedicated
+`memory_gateway` database, not a copy of a participant database. It runs as
+`1000:1000`, read-only root, all capabilities dropped, with no published port.
+Its internal IPv4-only `memory-company-20260919_gateway_database` network has
+only this database attached. Its owned, protected Unix socket permits the
+schema-owner operation without opening another TCP relay.
+
+The new production [schema-only operator](../../../deploy/federation/gateway-schema.md)
+applied all 60 migrations in one transaction after exact target/digest review.
+The separate `gateway_runtime` role successfully authenticated over TCP and was
+checked: no superuser/database ownership/schema creation, no memory/principal
+read access, no migration writes, SELECT on exactly ten federation tables, allowed
+mailbox cleanup and no audit deletion. Actual gateway process startup and its
+full permission check remain pending. No app bootstrap occurred: memories,
+principals, enrolled spaces, accepted records and publication outbox are empty.
+
+The shared empty-database guard additionally rejects schema-scoped objects such
+as collations/operators/text-search definitions and standalone publications and
+foreign-data wrappers. Nineteen required-database operator tests, strict Clippy,
+formatting and boundaries passed. Source: `34f1eac8`.
+
+Prepared artifacts are local immutable image IDs, **not** registry manifest
+digests or signed release artifacts. Build contexts contained only their
+explicit recipes/binaries; builds used no network or implicit pulls. The
+gateway/enrollment binaries were checked by SHA-256; a wrong digest was rejected.
+The enrollment executable and cap-free Caddy started under non-root/read-only/
+no-network constraints. The gateway executable started and correctly rejected a
+missing config; this is not a configured gateway service test.
+
+| Prepared artifact | SHA-256 or local image ID |
+| --- | --- |
+| Gateway/enrollment image | `sha256:75b7779cc11bbab20f5265c37c05a4813d397d8ca607d0917e4dcc37332e1e14` |
+| Cap-free proxy image | `sha256:ef6057bcc90312b685a620f9a5c1eb511b582da32a2504919dcf331a9eb303e3` |
+| Schema-owner operator | `54aeaa21c524cde23726305e4b5ff770c21053e4ddb9d98cc54bf6e517a6f87c` |
+| Encrypted pre-enrollment backup | `e133f2986443eec37a7bfd9a57dd0825b4188408de66772575d4a21954ad41bb` |
+
+Private state/receipts are in `~/.local/state/memory-company-20260919`, and the
+verified ciphertext copy is under
+`/media/bunnychow/backups/memory-four-area-20260917/company-20260919`.
+The backup includes the logical dump, this new cluster's roles, own credentials,
+planned identities and exact binaries. It excludes live raw database files and
+contains no source knowledge or provider keys. Full restore/key recovery remains
+unrehearsed; the copy's hash is not a restore claim.
+
+The [existing-preview adoption planner](../../../deploy/federation/company-preview-adoption.md)
+removes duplicate member apps/databases/UI. Its narrow prepared-gateway-database
+option preserves this staged DB and joins only the gateway to its exact external
+network. Workshop and Homelab each get a different fresh gateway-edge network;
+neither existing app/database network is shared. Ten adoption tests and eleven
+underlying topology tests pass. Live ID/label/alias/network checks are still
+required before attachment; supplied inventory is not a live verification.
+Because the DB has its own Compose file, **never use orphan-removal options** on
+the shared company project.
+
+The proposed private namespace `memory.robotmotel.com` is awaiting Olivier's
+choice. No permanent repository DID, TLS issuer, PDS account, remote membership
+or collection consent has been installed. No public DNS, existing CA service,
+Workshop model policy or original dataset writer was changed. Next: settle the
+private names/trust configuration, provision the pinned PDS, verify/install its
+keys, start the restricted gateway, and review both directions of deterministic
+knowledge exchange. Neither staging nor the disposable rehearsal is the completed
+four-area network.
