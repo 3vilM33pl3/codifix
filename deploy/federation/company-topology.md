@@ -13,6 +13,10 @@ distinct application, database, data volume and TLS edge. The gateway has its ow
 database and reaches the PDS only through a separate fixed-upstream TLS proxy.
 No participant shares another participant's application or database network.
 
+The separate [PDS bootstrap overlay](company-bootstrap-topology.md) adds isolated
+operator routes and reviewed static DID hosting without changing these defaults.
+Its pinned-PDS compatibility contract uses publisher HTTPS443 rather than 8443.
+
 | Process | Private networks it can directly reach |
 | --- | --- |
 | Each member app | Its own UI edge, own database, gateway TLS edge |
