@@ -100,7 +100,7 @@ function snapshot(c, docker) {
     return { name, id: n.NetworkID, address: n.IPAddress, aliases: n.Aliases ?? [] };
   });
   check(networks.length >= 2 && networks.length <= 4, 'unexpected_networks');
-  return { id: v.Id, name: c.name, image_id: v.Image, config: v.Config, host: v.HostConfig, mounts: v.Mounts.map(m => [m.Source,m.Destination,m.RW]), networks };
+  return { id: v.Id, name: c.name, image_id: v.Image, config: v.Config, host: v.HostConfig, mounts: sorted(v.Mounts.map(m => [m.Source,m.Destination,m.RW])), networks };
 }
 function verifyFiles(c, artifacts = true) {
   check(hash(read(c.backup_receipt)) === c.backup_receipt_sha256, 'fresh_backup_receipt_changed');
