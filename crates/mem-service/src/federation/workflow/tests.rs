@@ -16,6 +16,7 @@ mod f1_instances;
 #[cfg(unix)]
 mod local_human_cli;
 mod requester;
+mod synchronization;
 mod two_instance;
 
 struct Fixture {

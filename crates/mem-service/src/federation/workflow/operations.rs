@@ -308,7 +308,16 @@ pub(crate) async fn synchronize(
             )
             .await
             .map_err(store_error)?;
-            runtime.sync.cycle(&access).await.map_err(runtime_error)?
+            // A cycle returns the number of sent intents, not a retained
+            // sequence. Read one verified, transaction-consistent snapshot
+            // after the cycle without repeating any publication/pull effects.
+            runtime.sync.cycle(&access).await.map_err(runtime_error)?;
+            runtime
+                .sync
+                .verified_snapshot()
+                .await
+                .map_err(runtime_error)?
+                .sequence()
         }
     };
     Ok(Json(
