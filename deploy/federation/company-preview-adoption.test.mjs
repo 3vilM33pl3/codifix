@@ -1,0 +1,123 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { companyBootstrapTopology } from './company-bootstrap-topology.mjs';
+import { companyPreviewAdoption } from './company-preview-adoption.mjs';
+
+function fixture(extraMembers = []) {
+  const company = { schemaVersion: 1, name: 'memory-company', root: '/srv/memory-company', domain: 'company.example.com',
+    images: Object.fromEntries(['app', 'gateway', 'postgres', 'pds', 'proxy'].map((key, index) => [key, `registry.example.com/memory/${key}@sha256:${String(index + 1).repeat(64)}`])),
+    users: { app: '1000:1000', gateway: '1000:1000', proxy: '1000:1000', pds: '1000:1000', postgres: '999:999' },
+    members: ['workshop', 'homelab', ...extraMembers], federationEnabled: true, expertiseRoutes: true };
+  const did = 'did:web:space.company.example.com';
+  const document = { '@context': ['https://www.w3.org/ns/did/v1'], id: did, alsoKnownAs: ['at://space.company.example.com'],
+    verificationMethod: [{ id: `${did}#atproto`, type: 'Multikey', controller: did, publicKeyMultibase: `z${'a'.repeat(48)}` }],
+    service: [{ id: `${did}#atproto_pds`, type: 'AtprotoPersonalDataServer', serviceEndpoint: 'https://pds.company.example.com' }] };
+  const bytes = JSON.stringify(document);
+  const bootstrap = { schemaVersion: 1, repositoryHostname: 'space.company.example.com', repositoryDid: did,
+    accountHandle: 'space.company.example.com', operatorHostname: 'operator.company.example.com',
+    didDocument: bytes, didDocumentSha256: createHash('sha256').update(bytes).digest('hex'), caCertificateSha256: 'f'.repeat(64) };
+  const members = company.members.map((member, index) => ({ member, containerName: `memory-${member}-preview-app`, containerId: String(index + 1).repeat(64) }));
+  const adoption = { schemaVersion: 1, members, inventory: {
+    containers: members.map(member => ({ name: member.containerName, id: member.containerId, networks: [`memory-${member.member}-preview`] })),
+    networks: members.map(member => `memory-${member.member}-preview`), volumes: ['unrelated-existing-volume'] } };
+  return { company, bootstrap, adoption };
+}
+const plan = ({ company, bootstrap, adoption }) => companyPreviewAdoption(company, bootstrap, adoption);
+const networksOf = service => Array.isArray(service.networks) ? service.networks : Object.keys(service.networks);
+
+test('adoption removes every duplicate member service, mount, volume, network and UI claim', () => {
+  const input = fixture(); const original = structuredClone(input); const result = plan(input);
+  assert.deepEqual(input, original);
+  assert.deepEqual(Object.keys(result.compose.services).sort(), ['gateway', 'gateway_db', 'gateway_edge', 'pds', 'pds_operator_tls', 'pds_tls', 'repository_did']);
+  assert.deepEqual(Object.keys(result.compose.volumes).sort(), ['gateway_db_data', 'pds_data']);
+  assert.deepEqual(result.endpoints.members, {});
+  assert.ok(result.requiredFiles.every(file => Object.hasOwn(result.compose.services, file.service) && !file.path.includes('/members/')));
+  assert.ok(Object.keys(result.proxyFiles).every(file => !file.startsWith('members/')));
+  for (const member of input.company.members) {
+    assert.deepEqual(Object.keys(result.compose.networks).filter(name => name.startsWith(`${member}_`)), [`${member}_federation`]);
+    assert.ok(result.requiredFiles.some(file => file.path.endsWith(`/gateway/member-tokens/${member}`)));
+  }
+  assert.equal(result.posture.installed, false);
+  assert.equal(result.adoption.liveInventoryVerified, false);
+  assert.equal(result.adoption.attachmentsExecuted, false);
+});
+
+test('each existing app gets its own new internal network with only TLS gateway, never existing DB networks', () => {
+  const input = fixture(); const result = plan(input);
+  for (const attachment of result.adoption.attachments) {
+    assert.deepEqual(attachment.command, ['docker', 'network', 'connect', attachment.network, attachment.containerId]);
+    assert.deepEqual(attachment.currentNetworks, [`memory-${attachment.member}-preview`]);
+    const local = `${attachment.member}_federation`;
+    assert.deepEqual(result.compose.networks[local], { internal: true, enable_ipv6: false, name: `memory-company_${local}` });
+    const peers = Object.entries(result.compose.services).filter(([, service]) => networksOf(service).includes(local)).map(([name]) => name);
+    assert.deepEqual(peers, ['gateway_edge']);
+  }
+  for (const network of Object.values(result.compose.networks)) assert.ok(!input.adoption.inventory.networks.includes(network.name));
+  for (const service of Object.values(result.compose.services)) assert.ok(networksOf(service).every(name => !input.adoption.inventory.networks.includes(name)));
+  assert.deepEqual(result.compose.services.gateway.networks, ['gateway_api', 'gateway_database', 'pds_client']);
+});
+
+test('authority hardening, mounted custody and TLS routes remain byte-for-byte unchanged', () => {
+  const input = fixture(); const before = companyBootstrapTopology(input.company, input.bootstrap); const after = plan(input);
+  for (const [name, service] of Object.entries(after.compose.services)) assert.deepEqual(service, before.compose.services[name]);
+  for (const [name, bytes] of Object.entries(after.proxyFiles)) assert.equal(bytes, before.proxyFiles[name]);
+  assert.equal(after.adoption.modelEgressChanged, false);
+  assert.equal(after.posture.existingMemberModelPolicy, 'unchanged and not inspected');
+  assert.deepEqual(after.posture.enrolledMembers, []);
+  assert.deepEqual(after.posture.approvedCollections, []);
+  assert.equal(after.adoption.backupRequired, true);
+  assert.equal(after.adoption.configRecreationRequired, true);
+  assert.equal(after.adoption.postRecreationInventoryRequired, true);
+});
+
+test('ordering is deterministic; changed container IDs require a new digest after explicit recreation', () => {
+  const input = fixture(); const first = plan(input);
+  input.company.members.reverse(); input.adoption.members.reverse(); input.adoption.inventory.containers.reverse(); input.adoption.inventory.networks.reverse();
+  assert.deepEqual(plan(input), first);
+  input.adoption.members[0].containerId = 'a'.repeat(64);
+  assert.throws(() => plan(input), /exact reviewed container/);
+  input.adoption.inventory.containers.find(item => item.name === input.adoption.members[0].containerName).id = 'a'.repeat(64);
+  assert.notEqual(plan(input).reviewSha256, first.reviewSha256);
+});
+
+test('a later explicitly named game app uses the same data-driven isolated adoption path', () => {
+  const result = plan(fixture(['game']));
+  assert.equal(result.adoption.attachments.length, 3);
+  assert.ok(result.adoption.attachments.some(member => member.member === 'game'));
+  assert.equal(result.compose.services.game_app, undefined);
+  assert.equal(result.compose.networks.game_database, undefined);
+  assert.deepEqual(result.posture.enrolledMembers, []);
+});
+
+test('missing, duplicate, invented, ambiguous and stale identity/network claims fail closed', () => {
+  const changes = [
+    input => { input.adoption.members.pop(); },
+    input => { input.adoption.members[1] = { ...input.adoption.members[0] }; },
+    input => { input.adoption.members[0].member = 'gateway'; },
+    input => { input.adoption.members[0].containerId = 'bad'; },
+    input => { input.adoption.members[0].containerName = 'not-in-inventory'; },
+    input => { input.adoption.members[0].containerName = '--privileged'; },
+    input => { input.adoption.inventory.containers[0].networks = []; },
+    input => { input.adoption.inventory.containers[0].networks = ['absent']; },
+    input => { input.adoption.inventory.containers[1].networks = [...input.adoption.inventory.containers[0].networks]; },
+    input => { input.adoption.inventory.containers[1].id = input.adoption.inventory.containers[0].id; },
+    input => { input.adoption.inventory.networks.push('memory-company_workshop_federation'); },
+    input => { input.adoption.inventory.networks.push('memory-company_gateway_database'); },
+    input => { input.adoption.inventory.volumes.push('memory-company_gateway_db_data'); },
+    input => { input.adoption.inventory.volumes.push('memory-company_pds_data'); },
+    input => { input.adoption.inventory.containers[0].id = [input.adoption.inventory.containers[0].id]; },
+    input => { input.adoption.inventory.containers.push({ name: 'memory-company-gateway-1', id: 'a'.repeat(64), networks: [] }); },
+    input => { input.adoption.inventory.containers.push({ name: 'memory-company_pds_1', id: 'a'.repeat(64), networks: [] }); },
+    input => { input.adoption.members[0].containerName = 'gateway'; input.adoption.inventory.containers[0].name = 'gateway'; },
+    input => { input.adoption.members[1].containerName = input.adoption.members[0].containerName; input.adoption.members[1].containerId = input.adoption.members[0].containerId; },
+    input => { input.adoption.inventory.networks.push('bridge'); input.adoption.inventory.containers[0].networks = ['bridge']; },
+    input => { input.adoption.execute = true; },
+    input => { input.adoption.schemaVersion = 2; },
+    input => { input.adoption.inventory.networks.push(input.adoption.inventory.networks[0]); },
+    input => { input.adoption.members[0].network = 'existing-database-network'; },
+    input => { input.adoption.members[0].providerKey = 'not-accepted'; },
+  ];
+  for (const change of changes) { const input = fixture(); change(input); assert.throws(() => plan(input)); }
+});
