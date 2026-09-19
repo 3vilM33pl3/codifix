@@ -29,7 +29,7 @@ Its pinned-PDS compatibility contract uses publisher HTTPS443 rather than 8443.
 All networks are internal, IPv6 is disabled, and no host ports are published.
 The member apps cannot directly reach raw PDS, the gateway process, its database,
 or another member's database. The TLS gateway edge allows only `/v1/accept`,
-`/v1/pull` and `/v1/retention`; `/v1/expertise` needs an explicit option. It never
+`/v1/pull`, `/v1/retention` and `/v1/status`; `/v1/expertise` needs an explicit option. Status is authenticated, current-membership checked and signed, not a public health endpoint. It never
 forwards arbitrary URLs, raw repository requests, CAR downloads or event streams.
 The PDS proxy allows only the three XRPC operations currently used by the
 publisher: `createRecord`, `getRecord` and `getRepo`.

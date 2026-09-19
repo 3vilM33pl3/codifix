@@ -88,7 +88,7 @@ test('explicit federation mounts only member-specific credentials; a third membe
 test('TLS edges expose fixed paths only and private keys/passwords stay with their owning process', () => {
   const result = companyTopology(settings());
   const { services } = result.compose;
-  assert.match(result.proxyFiles['gateway/tls/Caddyfile'], /@allowed path \/v1\/accept \/v1\/pull \/v1\/retention\n/);
+  assert.match(result.proxyFiles['gateway/tls/Caddyfile'], /@allowed path \/v1\/accept \/v1\/pull \/v1\/retention \/v1\/status\n/);
   assert.match(result.proxyFiles['gateway/tls/Caddyfile'], /reverse_proxy @allowed gateway:4055/);
   assert.match(result.proxyFiles['pds/tls/Caddyfile'], /@allowed path \/xrpc\/com.atproto.repo.createRecord \/xrpc\/com.atproto.repo.getRecord \/xrpc\/com.atproto.sync.getRepo\n/);
   assert.match(result.proxyFiles['pds/tls/Caddyfile'], /reverse_proxy @allowed pds:2583/);
