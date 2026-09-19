@@ -54,6 +54,19 @@ debug image from local binary/libraries; that image is not a release artifact.
 Review/scanning of release images, certificate renewal, host hardening and
 operator onboarding remain pilot-readiness tasks.
 
+For a previously built and reviewed pair of local release binaries,
+`Prebuilt.Dockerfile` packages the gateway and separate enrollment operator without
+another Cargo build. Use a fresh build context containing only that Dockerfile,
+`memory-federation-gateway`, and `memory-federation-enroll`; verify their SHA-256
+digests before copying and pass those exact values as `GATEWAY_SHA256` and
+`ENROLL_SHA256`. Supply a compatible digest-pinned `GATEWAY_RUNTIME_IMAGE`, build
+with `--network none --pull=false`, and record the resulting immutable local image
+ID. A local image ID is not a registry manifest digest or signed release. Do not
+invent a repository digest to feed the pure company blueprint; an explicitly
+reviewed installation overlay must bind that local image ID separately. Run the
+enrollment executable as a one-shot maintenance process with only its own token
+and endpoint network, never by adding authority credentials to a participant.
+
 Provision a **new dedicated** PostgreSQL database as a separate schema owner and
 apply the repository migrations, including 0036, using the normal migration
 workflow. Existing published history without receipts deliberately fails
