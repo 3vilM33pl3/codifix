@@ -4,13 +4,15 @@ import type { ActivityEvent, MemoryEntryResponse, ProjectMemoriesResponse, Proje
 import { websocketUrl } from "../utils/network";
 import { useTimelineRecovery } from "./useTimelineRecovery";
 
+const connectionLostMessage = "Live connection lost. Timeline polling continues; reconnecting automatically.";
+
 interface ProjectStreamOptions {
   project: string;
   selectedMemoryId: string | null;
   wsRef: React.MutableRefObject<WebSocket | null>;
   sendStream: (request: StreamRequest, socket?: WebSocket | null) => void;
   setConnectionState: (state: "connecting" | "live" | "offline") => void;
-  setStatusMessage: (message: string) => void;
+  setStatusMessage: React.Dispatch<React.SetStateAction<string>>;
   setOverview: (overview: ProjectOverviewResponse) => void;
   setProjectMemories: (memories: ProjectMemoriesResponse) => void;
   setSelectedMemory: (memory: MemoryEntryResponse | null) => void;
@@ -33,6 +35,7 @@ export function useProjectStream({
 }: ProjectStreamOptions) {
   const [generation, setGeneration] = useState(0);
   const reconnectDelay = useRef(1000);
+  const reportedConnectionLoss = useRef(false);
   const callbacks = useRef({
     setOverview,
     setProjectMemories,
@@ -69,6 +72,14 @@ export function useProjectStream({
       if (disposed) return;
       reconnectDelay.current = 1000;
       setConnectionState("live");
+      if (reportedConnectionLoss.current) {
+        reportedConnectionLoss.current = false;
+        // Another operation may have replaced our notice while reconnecting.
+        // Compare against the latest state, not an earlier render's message.
+        callbacks.current.setStatusMessage((current) =>
+          current === connectionLostMessage ? "Live connection restored." : current,
+        );
+      }
       sendStream({ type: "subscribe_project", project }, socket);
       recover();
       if (selectedMemoryId) {
@@ -115,7 +126,8 @@ export function useProjectStream({
     socket.addEventListener("close", () => {
       if (disposed) return;
       setConnectionState("offline");
-      callbacks.current.setStatusMessage("Live connection lost. Timeline polling continues; reconnecting automatically.");
+      reportedConnectionLoss.current = true;
+      callbacks.current.setStatusMessage(connectionLostMessage);
       callbacks.current.recordLocalDiagnostic("websocket", "close", "Live connection lost.");
       reconnect = setTimeout(() => setGeneration((current) => current + 1), reconnectDelay.current);
       reconnectDelay.current = Math.min(reconnectDelay.current * 2, 30000);
