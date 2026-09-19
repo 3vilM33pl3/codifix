@@ -201,7 +201,11 @@ impl RotatingCredentials {
             v.schema_version == 1
                 && v.repository == self.repository
                 && v.pds == self.pds
-                && Some(v.generation) == status.generation
+                && (Some(v.generation) == status.generation
+                    || (v.generation == 0
+                        && status.generation.is_none()
+                        && v.state != MaintenanceState::Healthy
+                        && v.last_success.is_none()))
                 && v.observed_at <= now
                 && v.last_success.is_none_or(|t| t <= v.observed_at)
                 && v.reason.as_ref().is_none_or(|s| s.len() <= 64)
@@ -249,7 +253,14 @@ impl AccessBundle {
             return Err(RuntimeError::Configuration);
         }
         let parts: Vec<_> = self.access_token.split('.').collect();
-        if parts.len() != 3 || parts.iter().any(|p| p.is_empty()) {
+        if parts.len() != 3
+            || parts.iter().any(|p| {
+                p.is_empty()
+                    || !p
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+            })
+        {
             return Err(RuntimeError::Configuration);
         }
         let bytes = URL_SAFE_NO_PAD

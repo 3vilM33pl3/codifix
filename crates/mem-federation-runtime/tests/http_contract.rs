@@ -110,7 +110,11 @@ async fn pds_authentication_is_not_reported_as_a_repository_integrity_failure() 
             .unwrap();
             assert_eq!(
                 publisher.publish_exact(&delivery).await,
-                Err(PublishFailure::Authentication { generation: 0 })
+                Err(if status == StatusCode::UNAUTHORIZED {
+                    PublishFailure::Authentication { generation: 0 }
+                } else {
+                    PublishFailure::AuthorizationDenied
+                })
             );
             assert_eq!(writes.load(Ordering::SeqCst), 0);
             task.abort();

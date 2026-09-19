@@ -628,6 +628,15 @@ async fn authentication_recovery_is_generation_bound_durable_and_never_resets_in
         .await
         .unwrap();
     assert!(!restarted.recover_authentication(f.fence, 10).await.unwrap());
+    restarted.retry_blocked(f.fence).await.unwrap();
+    let Claim::Ready(retry) = restarted.claim_publication(f.fence, policy).await.unwrap() else {
+        panic!("operator retry")
+    };
+    restarted
+        .fail_publication(&retry, policy, PublishFailure::AuthorizationDenied)
+        .await
+        .unwrap();
+    assert!(!restarted.recover_authentication(f.fence, 11).await.unwrap());
 }
 
 #[tokio::test]

@@ -26,6 +26,7 @@ pub struct PublicationStatus {
 #[serde(rename_all = "snake_case")]
 pub enum PublicationFailureCategory {
     Authentication,
+    AuthorizationDenied,
     Unavailable,
     ImmutableConflict,
     InvalidReceipt,
@@ -38,6 +39,7 @@ impl From<mem_federation_store::PendingPublication> for PublicationStatus {
             "unavailable" => PublicationFailureCategory::Unavailable,
             "immutable_conflict" => PublicationFailureCategory::ImmutableConflict,
             "invalid_receipt" => PublicationFailureCategory::InvalidReceipt,
+            "authorization_denied" => PublicationFailureCategory::AuthorizationDenied,
             "attempts_exhausted" => PublicationFailureCategory::AttemptsExhausted,
             v if v.starts_with("authentication:") => PublicationFailureCategory::Authentication,
             _ => PublicationFailureCategory::Unknown,

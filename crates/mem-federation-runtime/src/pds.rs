@@ -135,8 +135,11 @@ impl PdsPublisher {
             .map_err(|_| PublishFailure::Unavailable)?;
         if response.status().is_client_error() {
             let code = response.status();
-            if code == reqwest::StatusCode::UNAUTHORIZED || code == reqwest::StatusCode::FORBIDDEN {
+            if code == reqwest::StatusCode::UNAUTHORIZED {
                 return Err(self.authentication_failure());
+            }
+            if code == reqwest::StatusCode::FORBIDDEN {
+                return Err(PublishFailure::AuthorizationDenied);
             }
             let body: Value = http::json(response, 4096)
                 .await
@@ -185,10 +188,11 @@ impl PdsPublisher {
             .await
             .map_err(|_| PublishFailure::Unavailable)?;
         if !response.status().is_success() {
-            if response.status() == reqwest::StatusCode::UNAUTHORIZED
-                || response.status() == reqwest::StatusCode::FORBIDDEN
-            {
+            if response.status() == reqwest::StatusCode::UNAUTHORIZED {
                 return Err(self.authentication_failure());
+            }
+            if response.status() == reqwest::StatusCode::FORBIDDEN {
+                return Err(PublishFailure::AuthorizationDenied);
             }
             return Err(PublishFailure::Unavailable);
         }
@@ -256,18 +260,15 @@ impl PdsPublisher {
             .json(&body)
             .send()
             .await;
-        let authentication_rejected = response.as_ref().is_ok_and(|r| {
-            r.status() == reqwest::StatusCode::UNAUTHORIZED
-                || r.status() == reqwest::StatusCode::FORBIDDEN
+        let rejected = response.as_ref().ok().and_then(|r| match r.status() {
+            reqwest::StatusCode::UNAUTHORIZED => Some(self.authentication_failure()),
+            reqwest::StatusCode::FORBIDDEN => Some(PublishFailure::AuthorizationDenied),
+            _ => None,
         });
         if let Some(proof) = self.readback(&wire).await? {
             Ok(proof)
         } else {
-            Err(if authentication_rejected {
-                self.authentication_failure()
-            } else {
-                PublishFailure::Unavailable
-            })
+            Err(rejected.unwrap_or(PublishFailure::Unavailable))
         }
     }
 }

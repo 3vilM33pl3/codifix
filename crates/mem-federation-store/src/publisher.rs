@@ -66,6 +66,8 @@ pub enum PublishFailure {
     Unavailable,
     Conflict,
     InvalidReceipt,
+    /// Authenticated transport policy denial, not a credential-expiry signal.
+    AuthorizationDenied,
     /// A transport credential was rejected. Zero denotes a non-rotating
     /// credential and cannot be recovered automatically.
     Authentication {
@@ -288,6 +290,7 @@ impl GatewayStore {
             PublishFailure::Unavailable => "unavailable".to_owned(),
             PublishFailure::Conflict => "immutable_conflict".to_owned(),
             PublishFailure::InvalidReceipt => "invalid_receipt".to_owned(),
+            PublishFailure::AuthorizationDenied => "authorization_denied".to_owned(),
             PublishFailure::Authentication { generation } => format!("authentication:{generation}"),
         };
         let backoff = policy

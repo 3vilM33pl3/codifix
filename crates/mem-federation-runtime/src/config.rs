@@ -94,9 +94,20 @@ pub fn root_certificate(path: &Path) -> Result<Vec<u8>> {
     std::fs::read(path).map_err(|_| RuntimeError::Configuration)
 }
 impl GatewayConfig {
+    fn validate_credential_mode(&self) -> Result<()> {
+        match (
+            &self.token_file,
+            &self.rotating_session_file,
+            &self.maintenance_status_file,
+        ) {
+            (Some(_), None, None) | (None, Some(_), _) => Ok(()),
+            _ => Err(RuntimeError::Configuration),
+        }
+    }
     /// Dedicated database + gateway-only routes. Never starts the Memory app,
     /// HTTP/MCP/export surfaces, model providers, or source watchers.
     pub async fn serve(self) -> Result<()> {
+        self.validate_credential_mode()?;
         if self.disposable_test_mode && !cfg!(debug_assertions) {
             return Err(RuntimeError::Configuration);
         }
@@ -206,5 +217,56 @@ impl GatewayConfig {
                 Ok::<(),RuntimeError>(())
             }=>result,
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn legacy_static_configuration_and_explicit_rotating_mode_are_mutually_exclusive() {
+        let legacy = json!({"space":uuid::Uuid::new_v4(),"authority":uuid::Uuid::new_v4(),
+            "listen":"127.0.0.1:9999","database_url_file":"/private/database",
+            "pds":"https://private.example.test","repository":"did:web:private.example.test",
+            "signing_key":"fixture","token_file":"/private/access",
+            "audit_key_file":"/private/audit","receipt_keys":[],"policy":{"external_models":[]},"credentials":[]});
+        let config: GatewayConfig = serde_json::from_value(legacy.clone()).unwrap();
+        assert!(config.validate_credential_mode().is_ok());
+        let mut rotating = legacy.clone();
+        rotating.as_object_mut().unwrap().remove("token_file");
+        rotating["rotating_session_file"] = json!("/private/rotating/session.json");
+        rotating["maintenance_status_file"] = json!("/private/rotating/status.json");
+        assert!(
+            serde_json::from_value::<GatewayConfig>(rotating.clone())
+                .unwrap()
+                .validate_credential_mode()
+                .is_ok()
+        );
+        rotating["token_file"] = json!("/private/old-token");
+        assert!(
+            serde_json::from_value::<GatewayConfig>(rotating)
+                .unwrap()
+                .validate_credential_mode()
+                .is_err()
+        );
+        let mut missing = legacy.clone();
+        missing.as_object_mut().unwrap().remove("token_file");
+        assert!(
+            serde_json::from_value::<GatewayConfig>(missing)
+                .unwrap()
+                .validate_credential_mode()
+                .is_err()
+        );
+        let mut sidecar_only = legacy;
+        sidecar_only["maintenance_status_file"] = json!("/private/status");
+        assert!(
+            serde_json::from_value::<GatewayConfig>(sidecar_only)
+                .unwrap()
+                .validate_credential_mode()
+                .is_err()
+        );
     }
 }
