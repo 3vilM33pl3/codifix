@@ -31,7 +31,13 @@ local. Start with deterministic excerpts; no model account is required.
    **only that project's** read/export permissions and local `AnswerExpertise`.
    It must not have global/group authority. Set `expertise_principal` in that
    instance's federation JSON. This identity is separate from human requesters.
-5. Enable `expertise_browser` only where browser use is intended. For CLI/TUI,
+5. Enable `expertise_browser` only where browser use is intended. In a single-user
+   loopback installation, a human-operated CLI/TUI may explicitly use
+   `federation --project PROJECT --local-human-session ...`; this exchanges the
+   existing local-owner authority for an in-memory browser session with CSRF
+   protection. It does not change credentials, permit MCP or authorize onward
+   model disclosure. The ordinary static local API token is not an expertise
+   caller. For multi-user CLI/TUI service-token use,
    configure `expertise_callers` with the exact local principal UUID, token ID
    (not token secret) and `output_destination: "local_human"`. Use a different
    token binding for MCP, with its actual operator-approved assistant destination.
