@@ -179,6 +179,57 @@ so its production process adapter still has no SQL/provider client.
 
 ## Guarded Workshop execution
 
+### Durable human-question operator
+
+The private operator command also accepts a single queued question:
+
+```text
+memory-workshop-worker run-next MANIFEST SHA256 INSTANCE_UUID SERVICE_CONFIG CONFIG_SHA256
+```
+
+This is an explicit one-shot operation, not a paid polling daemon. It uses the
+same local database restriction, provider credential, sandbox, source grant and
+daily ledger as the original `run`. The normal application still has neither
+provider credentials nor Docker authority. A missing credential never claims a
+question. The queue is bounded to eight pending questions, each with a ten-minute
+deadline, immutable exact-input identities and one stable provider attempt.
+
+`SERVICE_CONFIG` is the actual private, hash-pinned effective application TOML:
+writable, non-evaluation, cluster disabled, exact Workshop identity and matching
+interaction-manifest digest. The runtime parses only those bytes: it does not
+load adjacent files, environment overrides or a database URL from that file.
+Deployment must not layer unpinned mode/authentication overrides on the app;
+stop the operator when changing its effective configuration. Every disclosure
+and final publication re-reads the pinned file. A changed/missing file denies
+work. Configuration errors and credentials are never printed.
+
+The caller's persisted session/token and current direct database permissions are
+revalidated alongside the distinct operator service identity and frozen sources.
+Group-mapping-only authority and non-revocable local API credentials cannot
+authorize queued execution. Question bodies remain private, never operational
+events or retrieval context. Publication holds requester/source locks through
+the same commit as the private result. Already sent bytes cannot be recalled;
+known billing is settled even if a later authorization check denies the result.
+
+One close-on-drop advisory session lock excludes competing `run-next` processes;
+the store's paid-action fence independently serializes claims. Shutdown closes
+the connection and unfinished leases remain recoverable. Existing attempts and
+expired running actions are never dispatched again: ambiguity remains uncertain.
+Metadata reports distinguish idle/busy, unavailable credentials, blocked policy,
+storage failure and the processed action outcome. No paid activation or recurring
+worker is installed by this implementation.
+
+Verification includes required-PostgreSQL/fake-provider tests for current and
+revoked browser sessions/service tokens, immutable input/attempt/profile binding,
+configuration changes while source locks are blocked, billing without publication
+after revocation, completed replay, and session-lock release. The explicit ignored
+`operator_run_next_uses_real_pi_with_fake_provider_and_restricted_database_role`
+test additionally runs the pinned real Pi through the production sandbox and
+broker with a localhost fake provider and non-superuser worker grants. It asserts
+one generation, durable result/usage and an idle restart. It requires explicit
+`MEMORY_PI_PATCHED_ARTIFACT` and `MEMORY_PI_SANDBOX_DRIVER` paths; no real API
+credential or paid endpoint is used.
+
 `GuardedBrokerJob` uses `execute_guarded_and_persist` with a mandatory
 `DisclosureGuard`. Checks run immediately before counting, after counting,
 again after reservation/admission, after usage settlement and before delivery.

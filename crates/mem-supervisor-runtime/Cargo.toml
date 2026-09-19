@@ -9,6 +9,7 @@ authors.workspace = true
 mem-supervisor = { path = "../mem-supervisor" }
 mem-supervisor-store = { path = "../mem-supervisor-store" }
 mem-supervisor-pi = { path = "../mem-supervisor-pi" }
+mem-config = { path = "../mem-config" }
 chrono.workspace = true
 reqwest.workspace = true
 serde.workspace = true
@@ -21,6 +22,7 @@ tokio.workspace = true
 subtle = "2.6.1"
 sqlx.workspace = true
 tempfile = "3.27.0"
+toml.workspace = true
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 
 [dev-dependencies]

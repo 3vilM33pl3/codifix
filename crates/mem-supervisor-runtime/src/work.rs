@@ -4,7 +4,9 @@ use crate::{
     launcher::{LaunchError, RunControl, SandboxConfig},
     local_disclosure::LocalDisclosure,
     model::PreparedRequest,
-    private_files, strict_json,
+    private_files,
+    question_queue::ServiceExecutionGuard,
+    strict_json,
     transport::ProposalExecution,
 };
 use mem_supervisor::{
@@ -12,7 +14,9 @@ use mem_supervisor::{
     action::{ActionKey, ActionKind, ActionState},
 };
 use mem_supervisor_store::{
-    ActionSubmission, LeaseClaim, ReadyTransition, SupervisorStore, sources::LocalCollectionGrant,
+    ActionSubmission, LeaseClaim, ReadyTransition, SupervisorStore,
+    questions::{self, QueuedQuestion},
+    sources::LocalCollectionGrant,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -34,6 +38,7 @@ pub struct WorkManifest {
 pub struct PinnedWork {
     manifest: WorkManifest,
     digest: [u8; 32],
+    queued: Option<(QueuedQuestion, Arc<ServiceExecutionGuard>)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -112,7 +117,45 @@ impl PinnedWork {
             return Err(WorkError::Manifest);
         }
         private_files::digest(&manifest.sandbox.driver_sha256).map_err(|_| WorkError::Manifest)?;
-        Ok(Self { manifest, digest })
+        Ok(Self {
+            manifest,
+            digest,
+            queued: None,
+        })
+    }
+    /// Trusted operator profile plus a persisted human intent. The caller may
+    /// change only the exact question and stable identities, never sources,
+    /// sandbox artifacts, model settings or destination policy.
+    pub fn for_question(
+        &self,
+        question: QueuedQuestion,
+        guard: Arc<ServiceExecutionGuard>,
+    ) -> Result<Self, WorkError> {
+        let input = &question.submission;
+        if self.queued.is_some()
+            || input.profile_digest != self.digest
+            || input.instance_id != self.manifest.grant.instance_id
+            || input.project_id != self.manifest.grant.project_id
+            || input.policy_revision != self.manifest.grant.policy_revision
+            || input.request_id.is_nil()
+            || question.attempt_id.is_nil()
+            || input.question.trim().is_empty()
+            || input.question.len() > 4096
+        {
+            return Err(WorkError::Manifest);
+        }
+        guard.check(input.instance_id, input.profile_digest)?;
+        let mut manifest = self.manifest.clone();
+        manifest.action_id = input.request_id;
+        manifest.source_event_id = input.request_id;
+        manifest.attempt_id = question.attempt_id;
+        manifest.question.clone_from(&input.question);
+        let digest = questions::terms_digest(input).map_err(|_| WorkError::Manifest)?;
+        Ok(Self {
+            manifest,
+            digest,
+            queued: Some((question, guard)),
+        })
     }
     pub fn action_id(&self) -> Uuid {
         self.manifest.action_id
@@ -136,7 +179,11 @@ impl PinnedWork {
                 key: ActionKey {
                     area: Area::Workshop,
                     source_event: stable(m.source_event_id)?,
-                    kind: ActionKind::ProposeCorrection,
+                    kind: if self.queued.is_some() {
+                        ActionKind::AskQuestion
+                    } else {
+                        ActionKind::ProposeCorrection
+                    },
                     policy_revision: stable(m.grant.policy_revision)?,
                 },
                 source_digest: self.digest,
@@ -162,10 +209,12 @@ impl PinnedWork {
             ActionState::Queued => None,
             state => return Ok(WorkStep::State(state)),
         };
-        let disclosure = Arc::new(
-            LocalDisclosure::new(pool, m.grant.clone(), m.question.clone())
-                .with_control(control.clone()),
-        );
+        let mut disclosure = LocalDisclosure::new(pool, m.grant.clone(), m.question.clone())
+            .with_control(control.clone());
+        if let Some((question, guard)) = &self.queued {
+            disclosure = disclosure.with_question(question.clone(), Arc::clone(guard));
+        }
+        let disclosure = Arc::new(disclosure);
         let request = Arc::new(
             disclosure
                 .prepare()

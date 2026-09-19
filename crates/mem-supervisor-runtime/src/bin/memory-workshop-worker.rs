@@ -3,11 +3,12 @@ use mem_supervisor::Area;
 use mem_supervisor_runtime::{
     launcher::RunControl,
     operator::{self, Outcome},
+    question_queue::{self, QueueOutcome, ServiceExecutionGuard},
     transport::OpenAiTransport,
     work::PinnedWork,
 };
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::{path::Path, str::FromStr, time::Duration};
+use std::{path::Path, str::FromStr, sync::Arc, time::Duration};
 use uuid::Uuid;
 
 #[tokio::main]
@@ -31,11 +32,12 @@ async fn execute() -> Result<bool, &'static str> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.len() == 1 && matches!(args[0].as_str(), "--help" | "-h") {
         println!(
-            "memory-workshop-worker <observe|run> MANIFEST SHA256 INSTANCE_UUID\n\nOperator-only one-work command. DATABASE_URL must address an explicit local\nWorkshop database. run may make ONE approved paid generation with the normal\nOPENAI_API_KEY. observe only journals/reconciles existing metadata. Neither\ncommand provisions, migrates, enables policy, prints private content or retries\na previous generation. Never supply R3 credentials. No HTTP listener."
+            "memory-workshop-worker <observe|run> MANIFEST SHA256 INSTANCE_UUID\nmemory-workshop-worker run-next MANIFEST SHA256 INSTANCE_UUID SERVICE_CONFIG CONFIG_SHA256\n\nOperator-only one-work commands. DATABASE_URL must address an explicit local\nWorkshop database. run or run-next may make ONE approved paid generation with\nthe normal OPENAI_API_KEY. run-next reads one immutable human question using\nthe pinned collection and private service config. It does not poll or retry.\nobserve only journals/reconciles existing metadata. No command provisions,\nmigrates, enables policy, prints private content or retries a previous\ngeneration. Never supply R3 credentials. No HTTP listener."
         );
         return Ok(true);
     }
-    if args.len() != 4 || !matches!(args[0].as_str(), "observe" | "run") {
+    let next = args.len() == 6 && args[0] == "run-next";
+    if !next && (args.len() != 4 || !matches!(args[0].as_str(), "observe" | "run")) {
         return Err("Invalid arguments; use --help. No work started.");
     }
     if rustix::process::geteuid().as_raw() == 0 {
@@ -44,6 +46,14 @@ async fn execute() -> Result<bool, &'static str> {
     let instance = Uuid::parse_str(&args[3]).map_err(|_| "Invalid instance identity.")?;
     let work = PinnedWork::load(Path::new(&args[1]), &args[2], instance, Area::Workshop)
         .map_err(|_| "Private work manifest is invalid or mismatched.")?;
+    let guard = if next {
+        Some(Arc::new(
+            ServiceExecutionGuard::load(Path::new(&args[4]), &args[5], &work)
+                .map_err(|_| "Pinned service configuration does not permit question execution.")?,
+        ))
+    } else {
+        None
+    };
     let database =
         std::env::var("DATABASE_URL").map_err(|_| "Explicit Workshop database is required.")?;
     let options = local_database(&database)?;
@@ -68,27 +78,51 @@ async fn execute() -> Result<bool, &'static str> {
         tokio::select! { _=terminate.recv()=>{}, _=interrupt.recv()=>{} }
         cancelled.stop();
     });
-    let report = if args[0] == "observe" {
-        operator::observe(&work, pool.clone()).await
-    } else {
-        operator::run(
+    let (output, success) = if let Some(guard) = guard {
+        let result = question_queue::run_next(
             &work,
             pool.clone(),
             OpenAiTransport::from_environment().ok(),
+            guard,
             control,
         )
-        .await
+        .await;
+        let success = matches!(result.outcome, QueueOutcome::Idle | QueueOutcome::Busy)
+            || result.work.as_ref().is_some_and(|work| {
+                matches!(
+                    work.outcome,
+                    Outcome::Completed
+                        | Outcome::Stored
+                        | Outcome::ExistingWork
+                        | Outcome::AuthorityUnavailable
+                )
+            });
+        (serde_json::to_string(&result), success)
+    } else {
+        let result = if args[0] == "observe" {
+            operator::observe(&work, pool.clone()).await
+        } else {
+            operator::run(
+                &work,
+                pool.clone(),
+                OpenAiTransport::from_environment().ok(),
+                control,
+            )
+            .await
+        };
+        let success = matches!(
+            result.outcome,
+            Outcome::Completed | Outcome::Stored | Outcome::ExistingWork
+        );
+        (serde_json::to_string(&result), success)
     };
     signals.abort();
     pool.close().await;
     println!(
         "{}",
-        serde_json::to_string(&report).map_err(|_| "Metadata serialization unavailable.")?
+        output.map_err(|_| "Metadata serialization unavailable.")?
     );
-    Ok(matches!(
-        report.outcome,
-        Outcome::Completed | Outcome::Stored | Outcome::ExistingWork
-    ))
+    Ok(success)
 }
 
 fn local_database(value: &str) -> Result<PgConnectOptions, &'static str> {

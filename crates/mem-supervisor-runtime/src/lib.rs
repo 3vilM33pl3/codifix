@@ -9,6 +9,7 @@ pub mod operator;
 pub mod pi_admission;
 pub mod pi_broker;
 mod private_files;
+pub mod question_queue;
 mod strict_json;
 pub mod transport;
 pub mod work;

@@ -6,7 +6,10 @@ use crate::{
 use sha2::{Digest, Sha256};
 use std::os::unix::fs::PermissionsExt;
 
-async fn manifest(db: &IsolatedDatabase, fake: &Fake) -> (tempfile::TempDir, WorkManifest, String) {
+pub(super) async fn manifest(
+    db: &IsolatedDatabase,
+    fake: &Fake,
+) -> (tempfile::TempDir, WorkManifest, String) {
     let grant = super::disclosure::grant(db, fake).await;
     let manifest = WorkManifest {
         schema_version: 1,
@@ -29,7 +32,7 @@ async fn manifest(db: &IsolatedDatabase, fake: &Fake) -> (tempfile::TempDir, Wor
     let hash = save(&dir, &manifest);
     (dir, manifest, hash)
 }
-fn save(dir: &tempfile::TempDir, manifest: &WorkManifest) -> String {
+pub(super) fn save(dir: &tempfile::TempDir, manifest: &WorkManifest) -> String {
     let bytes = serde_json::to_vec(manifest).expect("manifest");
     let path = dir.path().join("work.json");
     std::fs::write(&path, &bytes).expect("synthetic manifest");
