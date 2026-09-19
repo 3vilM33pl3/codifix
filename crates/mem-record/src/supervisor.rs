@@ -117,11 +117,77 @@ pub struct SupervisorResponse {
     /// Durable action/attempt history remains authoritative after restart.
     #[serde(default)]
     pub model_work: Option<SupervisorModelWorkStatus>,
+    /// Disclosure time window only, not proof of current policy or worker health.
+    #[serde(default)]
+    pub grant_health: Option<SupervisorGrantHealth>,
     /// UI hint only; every mutation independently rechecks current authority.
     #[serde(default)]
     pub can_control: bool,
     /// Absent when no durable supervisor identity is configured.
     pub snapshot: Option<SupervisorSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorGrantHealth {
+    pub observed_at: DateTime<Utc>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub state: SupervisorGrantWindow,
+    pub automatic_renewal: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SupervisorGrantWindow {
+    ValidWindow,
+    ExpiresWithinDay,
+    ExpiresWithinHour,
+    Expired,
+    InvalidProfile,
+}
+
+impl SupervisorGrantHealth {
+    pub fn at(expires_at: Option<DateTime<Utc>>, observed_at: DateTime<Utc>) -> Self {
+        let state = match expires_at
+            .map(|expiry| expiry.signed_duration_since(observed_at).num_seconds())
+        {
+            None => SupervisorGrantWindow::InvalidProfile,
+            Some(s) if s <= 0 => SupervisorGrantWindow::Expired,
+            Some(s) if s <= 3600 => SupervisorGrantWindow::ExpiresWithinHour,
+            Some(s) if s <= 86400 => SupervisorGrantWindow::ExpiresWithinDay,
+            Some(_) => SupervisorGrantWindow::ValidWindow,
+        };
+        Self {
+            observed_at,
+            expires_at,
+            state,
+            automatic_renewal: false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod grant_health_tests {
+    use super::*;
+    #[test]
+    fn grant_time_window_never_renews_and_warns_before_expiry() {
+        let now = DateTime::from_timestamp(1_000_000, 0).unwrap();
+        for (seconds, expected) in [
+            (-1, SupervisorGrantWindow::Expired),
+            (0, SupervisorGrantWindow::Expired),
+            (3600, SupervisorGrantWindow::ExpiresWithinHour),
+            (86400, SupervisorGrantWindow::ExpiresWithinDay),
+            (86401, SupervisorGrantWindow::ValidWindow),
+        ] {
+            let health =
+                SupervisorGrantHealth::at(Some(now + chrono::Duration::seconds(seconds)), now);
+            assert_eq!(health.state, expected);
+            assert!(!health.automatic_renewal);
+        }
+        assert_eq!(
+            SupervisorGrantHealth::at(None, now).state,
+            SupervisorGrantWindow::InvalidProfile
+        );
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

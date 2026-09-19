@@ -11,7 +11,11 @@ export type Catalog = {
   proposals: Page<{ key: RecordKey; target: Stream; author: string; resolution: string; base_version: number }>;
   local: { grants: Page<{ principal_id: string; capabilities: Capability[]; enabled: boolean }>; subscriptions: Page<{ canonical_id: string; principal_id: string; enabled: boolean; shared_version: number }>; reviews: Page<unknown> };
 };
-export type Status = { retained_through: number; observed_capabilities: Capability[]; local: { queued_intents: number; accepted_not_replicated: number; replicated_intents: number; blocked_intents: number; pending_source_changes: number; sync_error: string | null } };
+export type GatewayHealth = {
+  credentials: { observed_at: number; mode: string; state: string; publication_usable: boolean; generation: number | null; expires_at: number | null; maintenance_state: string; maintenance_observed_at: number | null; last_success: number | null; retry_at: number | null; tls_expires_at: number | null; reason: string | null };
+  pending: null | { sequence: number; attempts: number; blocked: boolean; leased: boolean; due: boolean; failure: string | null };
+};
+export type Status = { gateway?: GatewayHealth | null; gateway_checked_at?: string; retained_through: number; observed_capabilities: Capability[]; local: { queued_intents: number; accepted_not_replicated: number; replicated_intents: number; blocked_intents: number; pending_source_changes: number; sync_error: string | null } };
 export type Draft = { request: { request_id: string; canonical: string; expected: { content: Content }; evidence: unknown[]; expected_shared_version: number; confirm_future_updates: boolean }; current_shared_content: Content | null; warning: string };
 export type Proposal = { key: RecordKey; proposal: { target: Stream; base_version: number; content: Content; evidence: RecordKey[] }; author: string; resolution: string; current_shared_version: number; locator: string; digest: unknown };
 export type Citation = { stream: Stream; record: RecordKey; shared_version: number; source: { record_id: string; version: number }; author: string; authored_at: string; locator: string; digest: unknown; evidence: RecordKey[] };

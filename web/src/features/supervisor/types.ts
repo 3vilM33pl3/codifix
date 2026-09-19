@@ -13,6 +13,7 @@ export interface SupervisorResponse {
   execution: "not_integrated";
   can_control?: boolean;
   deterministic_checks_configured?: boolean;
+  grant_health?: null | { observed_at: string; expires_at: string | null; state: "valid_window" | "expires_within_day" | "expires_within_hour" | "expired" | "invalid_profile"; automatic_renewal: false };
   model_work?: null | {
     state: keyof typeof MODEL_WORK_LABELS;
     observed_at: string;

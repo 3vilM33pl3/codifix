@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supervisorStatus } from "../../api";
 import { dollars, EVENT_LABELS, MODEL_WORK_LABELS, type SupervisorResponse } from "./types";
+import { GrantHealth } from "./GrantHealth";
 import { SupervisorControls } from "./SupervisorControls";
 import { ProposalsPanel } from "./ProposalsPanel";
 
@@ -37,6 +38,7 @@ export function SupervisorTab({ project }: { project?: string }) {
     {!data && !error ? <p role="status">Loading supervisor…</p> : null}
     {data ? <>
       <p role="status">Full autonomous supervisor execution is not integrated. Bounded proposal work is shown separately; no healthy agent heartbeat is claimed.</p>
+      <GrantHealth grant={data.grant_health} />
       {data.model_work ? <section aria-label="Bounded proposal worker">
         <h3>Single-proposal worker</h3>
         <p>{MODEL_WORK_LABELS[data.model_work.state] ?? "Unknown worker state — operator review required"}.</p>

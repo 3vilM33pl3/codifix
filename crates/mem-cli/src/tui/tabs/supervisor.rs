@@ -259,6 +259,7 @@ mod tests {
             execution: mem_record::SupervisorExecution::NotIntegrated,
             deterministic_checks_configured: false,
             model_work: None,
+            grant_health: None,
             can_control: false,
             snapshot: None,
         }));

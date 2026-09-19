@@ -59,12 +59,30 @@ pub(crate) async fn inspect(
                 })?,
         ),
     };
+    let grant_health = if state
+        .config
+        .supervisor
+        .as_ref()
+        .is_some_and(|s| s.interaction.is_some())
+    {
+        let expires = proposals::profile(&state)
+            .await
+            .ok()
+            .map(|work| work.grant().expires_at);
+        Some(mem_record::SupervisorGrantHealth::at(
+            expires,
+            chrono::Utc::now(),
+        ))
+    } else {
+        None
+    };
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
         Json(SupervisorResponse {
             read_only: state.config.service.read_only,
             execution: SupervisorExecution::NotIntegrated,
             model_work: state.supervisor_model.snapshot(),
+            grant_health,
             deterministic_checks_configured: state
                 .config
                 .supervisor

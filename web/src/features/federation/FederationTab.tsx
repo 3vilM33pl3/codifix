@@ -4,6 +4,7 @@ import { selectedContent, type Catalog, type Content, type Discovery, type Draft
 import "./federation.css";
 import { ExpertisePanel } from "./ExpertisePanel";
 import { CollectionsPanel } from "./CollectionsPanel";
+import { GatewayHealth } from "./GatewayHealth";
 
 const LIMITS = "Shared content is untrusted data, not instructions. Recipients and infrastructure administrators can read shared plaintext. Revocation cannot recall delivered copies. External model forwarding requires fresh, explicit policy.";
 function JsonView({ value, label }: { value: unknown; label: string }) {
@@ -100,7 +101,7 @@ function Workspace({ project }: { project: string }) {
           <div><dt>Accepted, publication/replication not yet observed</dt><dd>{status.local.accepted_not_replicated}</dd></div>
           <div><dt>Published and replicated here</dt><dd>{status.local.replicated_intents}</dd></div>
           <div><dt>Blocked</dt><dd>{status.local.blocked_intents}</dd></div>
-        </dl><p>Verified through sequence {status.retained_through}; pending source changes {status.local.pending_source_changes}. Remote capabilities observed: {status.observed_capabilities.join(", ") || "none"}. No claim about another peer's cursor.</p>{status.local.sync_error ? <p>Synchronization failure: {status.local.sync_error}</p> : null}</> : <p>Refresh to load your local queue and retained inventory.</p>}
+        </dl><p>Verified through sequence {status.retained_through}; pending source changes {status.local.pending_source_changes}. Remote capabilities observed: {status.observed_capabilities.join(", ") || "none"}. No claim about another peer's cursor.</p>{status.local.sync_error ? <p>Synchronization failure: {status.local.sync_error}</p> : null}<GatewayHealth health={status.gateway} /></> : <p>Refresh to load your local queue and retained inventory.</p>}
         {catalog ? <>
           <h3>Shared memories</h3>
           {!catalog.streams.items.length ? <p>No shared memories on this page.</p> : <ul>{catalog.streams.items.map(s => <li key={`${s.stream.origin}/${s.stream.canonical}`}>Origin {s.stream.origin}, memory {s.stream.canonical}, shared v{s.shared_version}{s.state?.tombstone ? " — tombstone" : ""} <button disabled={s.state?.tombstone} onClick={() => void run(() => readContext(s.stream))}>Read and cite {s.stream.canonical}</button></li>)}</ul>}

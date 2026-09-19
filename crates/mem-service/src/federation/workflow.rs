@@ -50,6 +50,9 @@ pub struct SpaceStatus {
     pub observed_capabilities: Vec<SpaceCapability>,
     pub local: LocalWorkflowStatus,
     pub offline_copies_may_remain: bool,
+    /// Fresh, signed gateway metadata; None means unavailable, never healthy.
+    pub gateway: Option<mem_federation_runtime::GatewayStatus>,
+    pub gateway_checked_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -146,7 +149,7 @@ pub(crate) async fn status(
     State(state): State<AppState>,
     Extension(principal): Extension<AuthenticatedPrincipal>,
     Path(path): Path<SpacePath>,
-) -> Result<Json<SpaceStatus>, ApiError> {
+) -> Result<impl axum::response::IntoResponse, ApiError> {
     let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
     require_pull(&state, &runtime, &access).await?;
     let known = runtime
@@ -163,25 +166,39 @@ pub(crate) async fn status(
     )
     .await
     .map_err(store_error)?;
-    Ok(Json(SpaceStatus {
-        project: runtime.project,
-        space: runtime.space,
-        instance: runtime.instance,
-        authority: runtime.authority,
-        retained_through: known.sequence(),
-        observed_capabilities: [
-            SpaceCapability::Pull,
-            SpaceCapability::Publish,
-            SpaceCapability::ManageMembership,
-            SpaceCapability::AskExpertise,
-            SpaceCapability::AnswerExpertise,
-        ]
-        .into_iter()
-        .filter(|c| known.has_capability(runtime.instance, *c))
-        .collect(),
-        local,
-        offline_copies_may_remain: true,
-    }))
+    let gateway = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        runtime.sync.gateway_status(),
+    )
+    .await
+    .ok()
+    .and_then(Result::ok);
+    // A remote status request may wait while an administrator revokes access.
+    require_pull(&state, &runtime, &access).await?;
+    Ok((
+        [(axum::http::header::CACHE_CONTROL, "no-store")],
+        Json(SpaceStatus {
+            project: runtime.project,
+            space: runtime.space,
+            instance: runtime.instance,
+            authority: runtime.authority,
+            retained_through: known.sequence(),
+            observed_capabilities: [
+                SpaceCapability::Pull,
+                SpaceCapability::Publish,
+                SpaceCapability::ManageMembership,
+                SpaceCapability::AskExpertise,
+                SpaceCapability::AnswerExpertise,
+            ]
+            .into_iter()
+            .filter(|c| known.has_capability(runtime.instance, *c))
+            .collect(),
+            local,
+            offline_copies_may_remain: true,
+            gateway,
+            gateway_checked_at: chrono::Utc::now(),
+        }),
+    ))
 }
 
 pub(crate) async fn grant(

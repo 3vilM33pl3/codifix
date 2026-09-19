@@ -259,6 +259,19 @@ pub(crate) fn lines(response: &SupervisorResponse) -> Vec<String> {
     if response.read_only {
         lines.push("Read-only service.".into());
     }
+    if let Some(grant) = &response.grant_health {
+        lines.push(format!("Disclosure grant window: {:?}; expires {}; observed {}. No automatic renewal; current execution permissions are checked separately.",
+            grant.state, grant.expires_at.map(|at| at.to_rfc3339()).unwrap_or_else(|| "unknown".into()), grant.observed_at));
+        if chrono::Utc::now()
+            .signed_duration_since(grant.observed_at)
+            .num_seconds()
+            > 120
+        {
+            lines.push("Grant observation is stale; refresh before relying on it.".into());
+        }
+    } else {
+        lines.push("Disclosure grant expiry unavailable; no healthy grant is claimed.".into());
+    }
     if let Some(work) = &response.model_work {
         lines.push(format!(
             "Bounded single-proposal worker: {:?} | observed {} | action {} | durable state {:?}",
@@ -379,6 +392,7 @@ mod tests {
             execution: SupervisorExecution::NotIntegrated,
             deterministic_checks_configured: false,
             model_work: None,
+            grant_health: None,
             can_control: false,
             snapshot: None,
         };
@@ -405,6 +419,7 @@ mod tests {
                 attempt_id: Some(uuid::Uuid::new_v4()),
                 action_state: Some(mem_record::SupervisorActionState::Verified),
             }),
+            grant_health: None,
         };
         let text = lines(&response).join("\n");
         assert!(text.contains("Bounded single-proposal worker: Stored"));
