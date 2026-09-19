@@ -252,6 +252,21 @@ async fn distinct_paid_actions_have_one_atomic_execution_slot() {
                 .unwrap();
         }
     }
+    let mut held = db.pool.begin().await.unwrap();
+    sqlx::query("SELECT pg_advisory_xact_lock(1937076338,61)")
+        .execute(&mut *held)
+        .await
+        .unwrap();
+    assert!(
+        tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            store.claim(Area::Workshop, ids[0], Uuid::new_v4(), 30)
+        )
+        .await
+        .is_err(),
+        "claim must wait for the execution admission lock, not just its own action row"
+    );
+    held.rollback().await.unwrap();
     let (a, b) = tokio::join!(
         store.claim(Area::Workshop, ids[0], Uuid::new_v4(), 30),
         store.claim(Area::Workshop, ids[1], Uuid::new_v4(), 30)

@@ -102,13 +102,19 @@ impl SupervisorStore {
         non_nil(worker)?;
         check_ttl(ttl_seconds)?;
         let mut tx = self.pool.begin().await?;
+        // lock_policy takes SHARE locks, so it alone cannot serialize claims
+        // for distinct action IDs. This transaction lock precedes action locks
+        // and covers the running check plus transition, including legacy runs.
+        sqlx::query("SELECT pg_advisory_xact_lock(1937076338,61)")
+            .execute(&mut *tx)
+            .await?;
         let policy = policy::lock_policy(&mut tx, area).await?;
         let row = lock_action(&mut tx, area, id).await?;
         policy.validate(row.try_get("policy_revision")?)?;
         if row.try_get::<String, _>("state")? != "queued" {
             return Err(StoreError::Transition);
         }
-        // The policy lock serializes this check and state transition across
+        // The claim lock serializes this check and state transition across
         // distinct paid actions. Operational health observations remain separate.
         if matches!(
             row.try_get::<String, _>("kind")?.as_str(),
