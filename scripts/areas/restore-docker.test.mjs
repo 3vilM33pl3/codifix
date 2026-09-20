@@ -41,7 +41,11 @@ test('real encrypted archive, sequence restore and descriptor-bound collectors s
   t.after(() => run('docker', ['rm', '--force', container]));
   let ready = false;
   for (let attempt = 0; attempt < 100; attempt++) {
-    if (spawnSync('docker', ['exec', container, 'pg_isready', '-U', 'postgres'], { stdio: 'ignore' }).status === 0) { ready = true; break; }
+    // The image's initialization server briefly accepts connections before it
+    // shuts down. Wait for PostgreSQL to replace the entrypoint as PID 1 too.
+    const main = spawnSync('docker', ['exec', container, 'cat', '/proc/1/comm'], { encoding: 'utf8' });
+    if (main.stdout?.trim() === 'postgres'
+      && spawnSync('docker', ['exec', container, 'pg_isready', '-U', 'postgres'], { stdio: 'ignore' }).status === 0) { ready = true; break; }
     await delay(100);
   }
   assert.equal(ready, true);
