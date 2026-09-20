@@ -4,7 +4,8 @@ Status: Workshop and a separate two-record Homelab preview exchange explicitly
 reviewed knowledge through the private company gateway as of 2026-09-19. The
 full four-area network is not deployed; no new signed release was published for
 these previews. Current work is the approved [dependability and four-area
-staging increment](dependable-staging.md), not writer cutover or CA activation.
+staging increment](dependable-staging.md), completed on 2026-09-20 without writer
+cutover or CA activation.
 
 Workshop evidence: [Workshop-first live activation](workshop-live.md). The
 bounded operator worker completed one real Pi/Sol proposal over three reviewed
@@ -18,8 +19,9 @@ paths are verified. Use its [demo guide](../../user/homelab-preview.md). Private
 gateway provisioning and reviewed deterministic exchange have evidence in the
 linked ledger. The newer [dependability evidence](dependable-staging.md) records
 encrypted source/preview recovery, credential renewal and restart checks.
-[Four-area source accounting](staging-evidence.md) is complete; final staging
-import and application-clone verification are still being completed.
+[Four-area source accounting, inactive imports and application-clone
+verification](staging-evidence.md) are complete. Original writers have not moved;
+Trust and General remain inactive.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound

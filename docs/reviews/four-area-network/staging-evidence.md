@@ -1,6 +1,7 @@
 # Four-area staging evidence
 
 This report covers the approved [dependable-preview and staging contract](dependable-staging.md).
+The scoped implementation and verification are complete as of 2026-09-20.
 It is **not a cutover**. Original writers and the two live previews remain
 operational. No service is started against a staging target. Trust is not
 installed on the CA; General is not live. R3 remains paused.
@@ -84,8 +85,22 @@ inventory binding was rejected without changing the selected target. At
 provenance/operation receipt, history and relation against the archive/manifest.
 It verified 114 tables and four pristine sequence identities/configurations per
 target, inert authority seeds, the kill switch and empty runtime/credential/
-enrollment state. Isolated application-clone checks remain pending; no staging
-completion is claimed by this report yet.
+enrollment state.
+
+At `2026-09-20T00:15:13.594Z`, all four disposable application clones passed.
+Each provided local HTTP/CLI retrieval and citations confined to its own area;
+each denied three invalid/foreign credentials, records from the other three
+areas and capture writes. HTTP explicitly used lexical/deterministic retrieval;
+the actual CLI used its default keyless retrieval path. Workshop returned eight
+results/two citations, Homelab eight/three, Trust two/two and General eight/three
+through both interfaces. This is a smoke check, not an answer-quality benchmark.
+
+The applications had loopback access only inside network-none clones, synthetic
+project-scoped credentials and no provider keys. A frozen profile prevented
+learning and workers; using that isolation mechanism did not resume R3. Before/
+after fingerprints matched all non-operational corpus/authority tables and four
+sequences in each clone and original target. All eight clone containers are
+stopped. The actual four staging targets remain inactive and unchanged.
 
 Preparation also exposed a distinct bounded-materialization issue: the reviewed
 snapshot exceeded the default 256 MiB retained-target budget. The operator now
@@ -107,7 +122,7 @@ are never treated as import authority.
 | Derived rows to rebuild | 291,092 | Separately review indexing/rebuild work and execution authority |
 
 Embeddings, graph indexes, reinforcement and background execution are not
-silently restored. Application validation will establish only the tested local
+silently restored. Application validation establishes only the tested local
 read/search paths, not quality equivalence with the original deployment. No paid
 provider calls are required or authorized for verification.
 
@@ -126,14 +141,19 @@ their content into this repository, application corpus or a model prompt.
 | Preparation receipt | `6b7122a15000f91528ec06d64e16d82b8c68c4d764acdeb4daf96f460b728ed6` |
 | Source accounting | `05596ac770eae05de89efd788c4cbb086474c7872ed7d2d56298285385b0494d` |
 | Independent four-database verification | `f1349e1fd71d25d56f2042a624bba021a36159610b4bffec5214914fc034a724` |
+| Four application-clone results | `e37f80d49184f3f342950b4ac29eba990945a8f6eb2db9fe8e1d6281f0f3c626` |
 | Corrected import executable | `19d12e328a44b94654dc4136fe9e10158056bf4992c79b637eb5c0fd64870901` |
 | Encrypted preservation bundle | `f49201e36bdcfbae9aafd0a6cc5c0fa4a789e66feea419f09eb85499e5138235` |
+| Encrypted completion evidence | `f285609243a8b4755e7d2a68c622ffa32d4e672c4d1433aad5626993ee5c6dc6` |
 
 The preservation bundle includes the full archive, manifest, review pack/index,
 annotations, ledger and CA handoff. The NAS copy's encrypted hash and the hash of
 its completely decrypted stream match the local bundle. Database imports and
 their later verification reports are separate evidence, not implied by this
-backup.
+backup. A second encrypted completion bundle preserves 32 metadata artifacts,
+including the independent verification, replay receipts, clone results and
+current preview health. Its NAS encrypted hash and full decrypted-stream hash
+were independently matched at `2026-09-20T00:16:25Z`.
 
 ## Focused regression evidence
 

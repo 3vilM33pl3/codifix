@@ -28,18 +28,18 @@ of previews; live counts must be refreshed for the actual snapshot.
 ## Four inactive staging databases
 
 - [x] Prepare four fresh independent targets with the existing importer; import only reviewed ownership and evidence projections. Do not copy authentication/jobs/federation enrollment/supervisor authority. Disable watchers/enrichment/models/federation.
-- [ ] Verify all imported rows, receipts, histories and relations against manifests; demonstrate harmless exact replay and changed-input rejection. Use disposable validation clones when app startup would activate import targets.
-- [ ] Produce counts, protected exclusions, limitations and verification hashes for every area.
+- [x] Verify all imported rows, receipts, histories and relations against manifests; demonstrate harmless exact replay and changed-input rejection. Use disposable validation clones when app startup would activate import targets.
+- [x] Produce counts, protected exclusions, limitations and verification hashes for every area.
 - [x] Add delta/revalidation: reuse decisions only when full-history and dependency hashes match; new/changed material needs review while original writers continue.
 - [x] Prepare read-only CA-console preflight/handoff identifying compatibility and CA-only/offline data gaps. Staging Trust on Monolith is not CA migration.
 
 ## Verification and delivery
 
 - [x] Test expired credentials, interrupted/ambiguous refreshes, competing maintainers, atomic replacement during publication and selective recovery that cannot unblock invalid proofs.
-- [ ] Test grant expiry, retained daily budgets and old-profile rejection; full source accounting/mixed-content protection/no cross-area leakage; replay/changed source/delta detection.
+- [x] Test grant expiry, retained daily budgets and old-profile rejection; full source accounting/mixed-content protection/no cross-area leakage; replay/changed source/delta detection.
 - [x] Prove isolated recovery of sequences, identities, signed repositories and consistent publication state; rerun cited two-way exchange, access denials and restart recovery.
-- [ ] Run relevant Rust/database tests, formatting, Clippy, boundaries, Web tests/build and CLI/TUI workflows.
-- [ ] Commit small slices; update execution evidence and future-cutover runbook; verify this checklist before claiming completion.
+- [x] Run relevant Rust/database tests, formatting, Clippy, boundaries, Web tests/build and CLI/TUI workflows.
+- [x] Commit small slices; update execution evidence and future-cutover runbook; verify this checklist before claiming completion.
 
 Completion requires tested preview credential recovery, the bounded renewed
 Workshop grant, four verified inactive partitions, and restore/cutover
@@ -55,8 +55,9 @@ modification, autonomous agency, evaluation completion or customer readiness.
   accepted by the dev service was reused for the checkpoint without rotating
   tokens or changing configuration. The failed local-only checkpoint is not
   represented as a successful server event.
-- Implementation and verification are in progress. No completion gate is yet
-  claimed for this increment.
+- All 23 scoped engineering checks are verified. Final evidence and protected
+  backlog are in [the staging report](staging-evidence.md). This does not close
+  any future activation, CA, cutover, autonomous-agent or customer-release gate.
 
 ### Recovery and first maintenance evidence
 
@@ -93,9 +94,9 @@ rollout; generation two alone does not prove publication recovery.
 Four fresh targets received independently assigned identities and schema-only
 head 60 under `memory-four-area-staging-20260919T2350`. They have no network,
 published ports, application processes, copied authentication or background
-workers. All four imports and exact replays have subsequently succeeded;
-independent database and application-clone verification remain separate gates
-in the [staging evidence report](staging-evidence.md).
+workers. All four imports, exact replays, independent database verification and
+disposable application-clone checks subsequently succeeded, as recorded in the
+[staging evidence report](staging-evidence.md).
 
 The first full-history export exposed a scaling defect: repeating 468,219
 relations in every incident history made the private metadata index too large.
