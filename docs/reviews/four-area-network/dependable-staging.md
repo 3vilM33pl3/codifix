@@ -137,6 +137,15 @@ Supervisor TUI independently displayed the renewed grant, model and limits.
 These observations establish bounded preview operation, not autonomous agency
 or proof of future availability.
 
+At `2026-09-20T00:13:24Z`, the minute-based maintainer performed its next
+scheduled refresh automatically. Generation three expires at `02:13:24Z`.
+Both authorized CLI status reads and both live Web pages displayed the renewed
+generation with no blocked intents or synchronization failures. The gateway
+container remained `fc190b691a82a497229a89a25c061d62211c8567eb1e6eb86d53ff6c818989f6`,
+started at `2026-09-19T23:10:53.454822249Z`: this renewal was accepted without a
+gateway restart. No forced refresh, identity change or paid question was used.
+Private metadata evidence is `final-preview-health.json` in the staging folder.
+
 The completed ownership ledger accounts for all 3,207 histories: Workshop 1,536,
 Homelab 393, Trust 19, General 742, protected archive 517. Six explicit annotation
 sets retain the actual reviewing agent per decision. Four proposed imports were
