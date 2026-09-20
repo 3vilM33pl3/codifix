@@ -22,12 +22,12 @@ of previews; live counts must be refreshed for the actual snapshot.
 - [x] Generalize snapshot tools to digest-bound restore descriptors instead of a fixed September 17 container, preserving isolation and schema allowlists and rejecting live DB targets. Use a new private timestamped staging directory.
 - [x] Build a snapshot/full-history-bound versioned ownership ledger: Trust for authoritative CA knowledge; Homelab for infrastructure/networking/deployment; Workshop for Memory development/architecture/releases; General for the remainder retaining project boundaries.
 - [x] Review redacted curated content/provenance only, recording basis/reviewer/hashes. Agent review is not Olivier approval. Secrets, raw captures and session bodies must not be disclosed. Uncertain/mixed/sensitive/unsupported material stays in a protected archive with explicit reasons.
-- [ ] Preserve IDs, complete histories, tombstones, authorship, timestamps and provenance; mixed raw captures/sessions stay local and no inferred excerpts are published. Preserve same-area relations and archive cross-area ones without invented sharing permission.
-- [ ] Preserve proposals, uncurated captures and derived-data gaps as an actionable backlog, not automatic approval/curation. Account for every source item as imported, protected archive or deliberately retired runtime state, without calling archive contents searchable migration.
+- [x] Preserve IDs, complete histories, tombstones, authorship, timestamps and provenance; mixed raw captures/sessions stay local and no inferred excerpts are published. Preserve same-area relations and archive cross-area ones without invented sharing permission.
+- [x] Preserve proposals, uncurated captures and derived-data gaps as an actionable backlog, not automatic approval/curation. Account for every source item as imported, protected archive or deliberately retired runtime state, without calling archive contents searchable migration.
 
 ## Four inactive staging databases
 
-- [ ] Prepare four fresh independent targets with the existing importer; import only reviewed ownership and evidence projections. Do not copy authentication/jobs/federation enrollment/supervisor authority. Disable watchers/enrichment/models/federation.
+- [x] Prepare four fresh independent targets with the existing importer; import only reviewed ownership and evidence projections. Do not copy authentication/jobs/federation enrollment/supervisor authority. Disable watchers/enrichment/models/federation.
 - [ ] Verify all imported rows, receipts, histories and relations against manifests; demonstrate harmless exact replay and changed-input rejection. Use disposable validation clones when app startup would activate import targets.
 - [ ] Produce counts, protected exclusions, limitations and verification hashes for every area.
 - [x] Add delta/revalidation: reuse decisions only when full-history and dependency hashes match; new/changed material needs review while original writers continue.
@@ -90,10 +90,12 @@ no gateway, participant, database or provider credential mounts. Its user servic
 is `memory-pds-refresh-only.service`. This evidence predates the gateway/app
 rollout; generation two alone does not prove publication recovery.
 
-Four fresh targets have independently assigned identities and schema-only head
-60 under `memory-four-area-staging-20260919T2350`. They have no network, published
-ports, application processes, copied authentication or background workers. They
-are **empty preparation targets**, not completed partitions yet.
+Four fresh targets received independently assigned identities and schema-only
+head 60 under `memory-four-area-staging-20260919T2350`. They have no network,
+published ports, application processes, copied authentication or background
+workers. All four imports and exact replays have subsequently succeeded;
+independent database and application-clone verification remain separate gates
+in the [staging evidence report](staging-evidence.md).
 
 The first full-history export exposed a scaling defect: repeating 468,219
 relations in every incident history made the private metadata index too large.
