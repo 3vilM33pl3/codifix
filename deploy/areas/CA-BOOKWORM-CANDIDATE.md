@@ -47,6 +47,12 @@ requires both supported architectures from its declared release; a single-ARM64
 candidate must not be padded with unrelated older AMD64 artifacts. Operator
 signing/release assembly and any Pi redistribution review remain separate.
 
+Subsequent repository work adds an
+[inactive console first-installer](../../scripts/areas/releases/console-README.md).
+It is not included in this preserved compatibility bundle, does not accept an
+unsigned candidate, and cannot upgrade or stop the existing CA singleton. Its
+journaled placement/retention is distinct from live migration or activation.
+
 ## Metadata still needed from the CA operator
 
 Return only these non-secret answers; `unknown` is valid and remains unresolved:

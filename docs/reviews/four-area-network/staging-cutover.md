@@ -114,8 +114,11 @@ not upgrade the CA's libc, substitute an unreviewed binary/container or relax
 isolation. The patched AMD64 preview proves neither ARM64 patch parity nor CA
 sandboxing. A separately reviewed compatible artifact and CA-specific negative
 filesystem/network tests are required; Memory installation and Pi activation
-are separate gates. No privileged selected-instance installer/rollback helper
-is claimed by this handoff.
+are separate gates. A later
+[inactive first-installer](../../../scripts/areas/releases/console-README.md)
+can now place signed release/configuration bytes for a new named instance with
+journaled recovery. It is not an active upgrade/rollback helper, does not accept
+the unsigned candidate and does not stop the CA singleton or migrate its data.
 
 ## 4. Approve the final cutover explicitly
 

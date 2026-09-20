@@ -38,11 +38,76 @@ artifact or sign with a disposable fixture key to bypass that requirement.
 ## Delivery checklist
 
 - [x] Checkpoint scope and inspect existing release, launcher and sandbox contracts.
-- [ ] Implement the inactive installer, protected journal and recovery commands.
-- [ ] Prove signature/config/path refusals, concurrent exclusion and interrupted
+- [x] Implement the inactive installer, protected journal and recovery commands.
+- [x] Prove signature/config/path refusals, concurrent exclusion and interrupted
       publication recovery using signed synthetic fixtures.
-- [ ] Wire offline CI checks and document exact console preparation/recovery.
-- [ ] Record verification evidence and remaining real-release/CA activation gates.
+- [x] Wire offline CI checks and document exact console preparation/recovery.
+- [x] Record verification evidence and remaining real-release/CA activation gates.
+
+## Implementation and verification — 2026-09-20
+
+The core landed at `d655e457`, the real-CLI rehearsal at `e027b88d`, and package/CI
+integration at `703145a1`. The [operator guide](../../../scripts/areas/releases/console-README.md)
+documents install, inspect, finish and retain commands, exact trust/configuration
+requirements and the independent activation gates. Future Debian builds include
+the root-owned mode-0644 tools and require Python 3.11 or newer. No new binary or
+Debian candidate was built by this slice. Existing candidate hashes and the
+candidate handoff remain unchanged.
+
+The scoped offline validation completed successfully:
+
+| Check | Result |
+| --- | --- |
+| Console library/signed-fixture tests | 22 passed |
+| Prepared-instance tests | 20 passed |
+| Release/signature/archive tests | 17 passed |
+| Clean instance launcher tests | 3 passed |
+| CA preflight tests | 13 passed |
+| Debian lifecycle and packaging fixtures | Passed for native/cross layouts and dependency bounds |
+| Root-only CLI container rehearsal | 8 passed; 25 exact read-only status queries; no activation markers |
+| `cargo fmt --check`, `scripts/check-boundaries.sh`, `git diff --check` | Passed |
+
+The console suite includes actual `SIGKILL` after each installation-tree rename,
+fresh-process lock recovery, signature/configuration/path refusals, interrupted
+retention and refusal to adopt an identical-byte replacement inode. It does not
+simulate hardware power loss. The journal is bounded, fsynced and preserves
+incomplete copy generations; this is not a claim about failing storage or network
+filesystem semantics.
+
+Local evidence:
+
+- Aggregate check log:
+  `/data/tmp/memory-console-validation-20260920.f3Rg3IdK/offline-tests.log`.
+  SHA-256: `430a2796b3ecc5847f1e8bb571c64cfcfde821360b17252a38918ea3eb2074bf`.
+- Root CLI invocation, source hashes, structured output, result and cleanup:
+  `/data/tmp/memory-console-cli-9a9m4b6n/`.
+- Exact local container image:
+  `sha256:ed8f07b19272db7d8759355733e5564a2745a4059f44b7065b130abc97668fac`.
+- Tested `console.py` SHA-256:
+  `2fd6c35865e43ae63d11c5d9d01ba9498fc823435d2b2294cb060cf7bfde12fe`.
+- Tested CLI rehearsal SHA-256:
+  `91234684bc93f7ef3acb4d25962e3d55b1aac1b5df1481af3e0a018b326e046d`.
+
+The CLI ran as root **only inside** a network-none, capability-free,
+read-only-root container. It used disposable signing keys and synthetic ELF
+identity headers, not a running Memory artifact. A fixed fake `systemctl` accepted
+only the exact read-only query. This proves entrypoint/file-placement behavior,
+not real-systemd activation, ARM64 runtime compatibility or a native CA sandbox.
+No host installation paths, database, provider, real credentials or signing key
+were used. The rehearsal container was removed; its private evidence remains.
+All 49 preserved candidate handoff files were rechecked successfully against its
+unchanged `SHA256SUMS` (digest
+`334f51844fb560eab55f91020aa96ba04c4728ec821fe041e844add794650ed8`).
+CI is wired to run the console unit suite; this is local execution evidence, not
+a claim that remote CI ran. No Rust implementation or application Web behavior
+changed, so full workspace/database/Web suites were not repeated for this slice.
+
+The initial closed configuration permits only loopback PostgreSQL, matching the
+default named-unit network boundary. This is **not** a working CA-to-Monolith
+database configuration. Separately provisioned Trust credentials and a reviewed
+remote-database egress/sandbox profile are required for that deployment option.
+The tool neither proves database independence nor observes its schema; the exact
+schema argument remains an operator assertion.
 
 ## Remaining independent gates
 

@@ -7,6 +7,10 @@ downloads, extracts archives, executes artifacts, installs a package, uses sudo,
 controls a service, reads a live private key, or grants installation permission.
 Python 3 is required; signature verification also requires GnuPG.
 
+The separate [inactive console installer](console-README.md) places a verified
+release/configuration only for a new named instance, with a durable recovery
+journal. It never activates a service and is not an upgrade or cutover tool.
+
 ## Manifest contract
 
 All fields are required; unknown fields and duplicate JSON keys are rejected.

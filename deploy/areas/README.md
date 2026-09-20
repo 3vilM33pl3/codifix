@@ -111,6 +111,11 @@ The Memory credential directory must not be exposed to Pi.
 
 ## Activation gates
 
+The [inactive console first-installer](../../scripts/areas/releases/console-README.md)
+can place authenticated release/configuration bytes for a **new** named instance
+and recover interrupted publication. It refuses existing names and leaves
+activation disabled. Its tests do not satisfy the independent gates below.
+
 1. Complete the writer inventory, encrypted backup and isolated restore proof.
    Fence old writers before migration/cutover. Preserve the original rollback
    source; package installation is not a migration or a backup.

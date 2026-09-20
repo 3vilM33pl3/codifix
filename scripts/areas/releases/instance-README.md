@@ -16,6 +16,11 @@ or `/etc`.
 It does not prove host ABI compatibility, systemd enforcement, CA isolation or
 database rollback. Keep existing CA, OpenBao and Memory services untouched.
 
+For the subsequent, separately approved first installation, see
+[console.py](console-README.md). It reauthenticates the preparation under its
+root boundary and remains inactive. It does not turn this filesystem rehearsal
+into proof of a live upgrade, native CA sandbox or database rollback.
+
 ## Release input contract
 
 The separately authenticated `memory-release-v1` manifest must list an `archive`

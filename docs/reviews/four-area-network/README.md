@@ -23,11 +23,19 @@ encrypted source/preview recovery, credential renewal and restart checks.
 verification](staging-evidence.md) are complete. Original writers have not moved;
 Trust and General remain inactive.
 
-Next approved preparation: [CA-compatible Debian 12 ARM64 release](ca-bookworm-release.md).
+Completed off-CA preparation: [CA-compatible Debian 12 ARM64 candidates](ca-bookworm-release.md).
 Olivier confirmed the existing CA Memory service uses the shared Monolith
-database; its console inventory reports glibc 2.36. Compatible artifacts and
-disposable release rehearsal are being prepared off-CA. This does not authorize
-installation, writer cutover or Pi activation.
+database; its console inventory reports glibc 2.36. Separately identified unsigned
+Memory/Pi candidates and disposable compatibility evidence are preserved; no CA
+installation, writer cutover or Pi activation has occurred.
+
+The subsequent [inactive CA console first-install slice](ca-console-installation.md)
+is implemented and verified, including process-death recovery and a root-only CLI
+rehearsal in an isolated container. Its [operator guide](../../../scripts/areas/releases/console-README.md)
+does not authorize activation or upgrade the running singleton. These tools are
+not retroactively included in the preserved candidate. A coherent signed release,
+native CA checks, independent database/network preparation, offline reconciliation
+and approved writer cutover remain separate gates.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
