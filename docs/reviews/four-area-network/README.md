@@ -16,7 +16,10 @@ Current work: [Homelab / Workshop exchange](homelab-exchange.md). Homelab's
 independent database, authentication, encrypted backups and local Web/CLI/TUI
 paths are verified. Use its [demo guide](../../user/homelab-preview.md). Private
 gateway provisioning and reviewed deterministic exchange have evidence in the
-linked ledger; complete partitioning and full recovery remain open.
+linked ledger. The newer [dependability evidence](dependable-staging.md) records
+encrypted source/preview recovery, credential renewal and restart checks.
+[Four-area source accounting](staging-evidence.md) is complete; final staging
+import and application-clone verification are still being completed.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
@@ -24,7 +27,11 @@ human review. The independent preview is upgraded through migration 0060, with
 explicit question preparation/confirmation and a separate bounded queue worker.
 Preparing is free; confirming may invoke the configured model under the existing
 grant and budget. Review does not execute a proposal or authorize another call.
-The source grant expires at 14:46 London on 2026-09-19 and is not silently renewed.
+An explicitly approved immutable replacement grant now expires at
+`2026-09-26T22:42:47.500Z`. It retains the exact three reviewed source versions,
+`gpt-5.6-sol`, 20 calls and $2.50 per UTC day without resetting prior usage.
+New paid questions still require explicit confirmation. This is not automatic
+consent renewal or permission to disclose the staged dataset.
 
 ## Historical implementation notes
 
