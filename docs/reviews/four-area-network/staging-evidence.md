@@ -63,12 +63,20 @@ have no network, published ports, copied credentials, enrollment, supervisor
 authority or application workers. Imports use a single transaction, stable
 operation IDs and snapshot-bound receipts.
 
-At the current checkpoint, Homelab, Trust and General have imported successfully.
-Workshop is **not yet imported**: two PostgreSQL out-of-memory failures rolled
-back the complete transaction, leaving no projects, knowledge or import receipts.
-The second attempt used an explicitly recorded larger container allowance; further
-retries are paused while the cause is reproduced with synthetic data. This is an
-open completion gate, not evidence of a partially usable Workshop partition.
+All four imports have committed, including Workshop's 394,577 rows and 10,297
+provenance references. Workshop initially encountered two PostgreSQL
+out-of-memory failures. Both rolled back the complete transaction, leaving no
+projects, knowledge or import receipts. A larger container allowance did not
+resolve the underlying defect, so retries stopped for synthetic diagnosis.
+
+The operator disables SQLx's statement cache, but SQLx 0.8.6 persistent queries
+still allocated named server statements without retaining handles to close them.
+The 20,000-row reproduction accumulated about 497 MB of backend memory. Fix
+`3cb4beae` makes importer queries nonpersistent without splitting transactions or
+weakening checks. A 100,000-relation synthetic import and exact replay stayed near
+6.6 MiB with zero retained named statements. Workshop then imported successfully
+with the same snapshot, target UUID and operation ID. See the
+[reproduction and regression evidence](../../../crates/mem-area-store/README.md#large-partition-postgresql-memory-regression).
 
 Exact replay, independent database verification and isolated application-clone
 checks remain pending. No staging completion is claimed by this report yet.
