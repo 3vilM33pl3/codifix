@@ -91,6 +91,24 @@ class Contracts(unittest.TestCase):
             with self.assertRaises(smoke.CheckFailed):
                 smoke.decode_json(raw)
 
+    def test_only_exact_upstream_provider_error_diagnostic_duplicate_allowed(self):
+        raw = b'{"type":"provider_error","provider":"openai","provider":"openai"}'
+        self.assertEqual(smoke.decode_json(raw, allow_provider_error_duplicate=True),
+                         {"type": "provider_error", "provider": "openai"})
+        with self.assertRaises(smoke.CheckFailed):
+            smoke.decode_json(raw)
+        for rejected in (
+                raw.replace(b'"provider_error"', b'"response"'),
+                b'{"type":"provider_error","provider":"openai","provider":"other"}',
+                b'{"type":"provider_error","provider":"other","provider":"other"}',
+                b'{"type":"provider_error","provider":"openai","provider":"openai","provider":"openai"}',
+                b'{"type":"provider_error","type":"provider_error","provider":"openai","provider":"openai"}',
+                b'{"type":"provider_error","nested":{"provider":"openai","provider":"openai"}}',
+                b'{"type":"provider_error","provider":"openai","provider":"openai","model":"x","model":"x"}',
+                b'{"type":"response","data":{"model":{"provider":"openai","provider":"openai"}}}'):
+            with self.subTest(raw=rejected), self.assertRaises(smoke.CheckFailed):
+                smoke.decode_json(rejected, allow_provider_error_duplicate=True)
+
     def test_http_headers_reject_ambiguous_framing(self):
         self.assertEqual(smoke.parse_headers(headers()), 2)
         for raw in (headers(extra=b"Content-Length: 2\r\n"),

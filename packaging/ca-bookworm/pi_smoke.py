@@ -41,19 +41,35 @@ def require(condition, label):
         raise CheckFailed(label)
 
 
-def decode_json(raw):
-    def unique(pairs):
-        result = {}
-        for key, value in pairs:
-            require(key not in result, "duplicate_json_field")
-            result[key] = value
-        return result
+def decode_json(raw, allow_provider_error_duplicate=False):
+    class Pairs(list):
+        pass
+
+    def unique(node, root=False):
+        if isinstance(node, Pairs):
+            result = {}
+            # Pinned Pi agent.rs AgentEvent::ProviderError flattens a summary
+            # (error.rs ProviderErrorSummary) which repeats its provider field.
+            # Only this exact, identical non-authoritative diagnostic is allowed.
+            # Requests, state/model identity and every other field remain strict.
+            diagnostic = (root and allow_provider_error_duplicate and
+                          [value for key, value in node if key == "type"] == ["provider_error"] and
+                          [value for key, value in node if key == "provider"] == ["openai", "openai"])
+            for key, value in node:
+                require(key not in result or (diagnostic and key == "provider"),
+                        "duplicate_json_field")
+                result[key] = unique(value)
+            return result
+        if isinstance(node, list):
+            return [unique(value) for value in node]
+        return node
 
     def invalid_constant(_):
         raise CheckFailed("non_finite_json")
 
     try:
-        value = json.loads(raw, object_pairs_hook=unique, parse_constant=invalid_constant)
+        value = unique(json.loads(raw, object_pairs_hook=Pairs,
+                                  parse_constant=invalid_constant), root=True)
     except (ValueError, UnicodeError, RecursionError):
         raise CheckFailed("invalid_json") from None
     require(isinstance(value, dict), "json_object_required")
@@ -235,7 +251,7 @@ class Frames:
         self.total += len(raw)
         require(len(raw) <= MAX_FRAME and self.total <= MAX_STDOUT, "stdout_bound")
         require(raw.endswith(b"\n"), "unterminated_json_frame")
-        return decode_json(raw)
+        return decode_json(raw, allow_provider_error_duplicate=True)
 
 
 async def send(child, frame):
