@@ -130,6 +130,18 @@ export const SCHEMA60_TABLES = [
 const AREAS = ['general', 'homelab', 'trust', 'workshop'];
 const COPY_TABLES = ['public.projects', 'public.memory_entries', 'public.memory_canonical_state', 'public.memory_tags', 'public.memory_relations'];
 const RECEIPT_TABLES = ['public.area_import_receipts', 'public.area_import_rows', 'public.area_import_provenance'];
+// These runtime tables are empty in this reference-only staging profile. The
+// importer transactionally restarts memory_source_checks at max(id)+1, hence 1.
+// The legacy timeline sequence remains owned after migration 0039 drops its
+// default; commit-safe ordering uses the separately checked timeline_position.
+export const SCHEMA60_SEQUENCES = [
+  ['memory_access_events_id_seq', 'memory_access_events', 'id', 'i'],
+  ['memory_source_checks_id_seq', 'memory_source_checks', 'id', 'i'],
+  ['project_timeline_events_seq_seq', 'project_timeline_events', 'seq', 'a'],
+  ['supervisor_journal_sequence_seq', 'supervisor_journal', 'sequence', 'i'],
+].map(([name, table, column, dependency]) => ({ name: 'public.' + name, data_type: 'bigint',
+  start_value: '1', increment_by: '1', min_value: '1', max_value: '9223372036854775807', cache_size: '1', cycle: false,
+  owner_table: 'public.' + table, owner_column: column, dependency_type: dependency }));
 const sha = /^[0-9a-f]{64}$/;
 const uuid = /^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -326,6 +338,17 @@ export function stagingSession(container, database) {
     abort() { child.stdin.destroy(); child.kill('SIGTERM'); child.stdout.destroy(); } };
 }
 const seedCounts = { 'public.supervisor_authorities': 4, 'public.supervisor_journal_heads': 4, 'public.timeline_position': 1, 'public.loop_global_state': 1 };
+export function validateSequenceCatalog(sequences) {
+  if (!Array.isArray(sequences) || sequences.length !== SCHEMA60_SEQUENCES.length) fail();
+  const seen = new Set();
+  for (const s of sequences) {
+    const expected = SCHEMA60_SEQUENCES.find(e => e.name === s?.name);
+    if (!expected || seen.has(s.name)) fail();
+    exact(s, Object.keys(expected));
+    if (Object.entries(expected).some(([k,v]) => s[k] !== v)) fail();
+    seen.add(s.name);
+  }
+}
 export function targetSql(tables) {
   if (!same(tables.map(t => t.schema + '.' + t.name).sort(), SCHEMA60_TABLES) || tables.some(t => t.kind !== 'r' || t.is_partition)) fail();
   const sql = ["SET LOCAL statement_timeout='120s';"];
@@ -342,6 +365,22 @@ export function targetSql(tables) {
       LEFT JOIN public.memory_canonical_state b ON b.canonical_id=r.dst_canonical_id WHERE a.canonical_id IS NULL OR b.canonical_id IS NULL)
       +(SELECT count(*) FROM public.memory_entries e LEFT JOIN public.memory_canonical_state s ON s.canonical_id=e.canonical_id WHERE s.canonical_id IS NULL)
     )::text;`);
+  sql.push(`SELECT json_build_object('event','sequence_catalog','sequences',COALESCE(json_agg(s ORDER BY s.name),'[]'::json))::jsonb::text
+    FROM (SELECT n.nspname||'.'||c.relname AS name,format_type(q.seqtypid,NULL) AS data_type,
+      q.seqstart::text AS start_value,q.seqincrement::text AS increment_by,q.seqmin::text AS min_value,
+      q.seqmax::text AS max_value,q.seqcache::text AS cache_size,q.seqcycle AS cycle,
+      ownn.nspname||'.'||ownc.relname AS owner_table,owna.attname AS owner_column,d.deptype::text AS dependency_type
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_sequence q ON q.seqrelid=c.oid
+      LEFT JOIN pg_depend d ON d.objid=c.oid AND d.classid='pg_class'::regclass
+        AND d.refclassid='pg_class'::regclass AND d.deptype IN ('a','i') AND d.refobjsubid>0
+      LEFT JOIN pg_class ownc ON ownc.oid=d.refobjid LEFT JOIN pg_namespace ownn ON ownn.oid=ownc.relnamespace
+      LEFT JOIN pg_attribute owna ON owna.attrelid=d.refobjid AND owna.attnum=d.refobjsubid
+      WHERE c.relkind='S' AND n.nspname<>'information_schema' AND n.nspname !~ '^pg_') s;`);
+  for (const s of SCHEMA60_SEQUENCES) {
+    const [schema, name] = s.name.split('.');
+    sql.push("SELECT json_build_object('event','sequence_state','name'," + literal(s.name)
+      + ",'last_value',last_value::text,'is_called',is_called)::text FROM " + identifier(schema) + '.' + identifier(name) + ';');
+  }
   for (const t of tables) {
     const name = t.schema + '.' + t.name, q = identifier(t.schema) + '.' + identifier(t.name);
     sql.push("SELECT json_build_object('event','count','table'," + literal(name) + ",'count',(SELECT count(*) FROM ONLY " + q + "))::text;");
@@ -355,8 +394,8 @@ export function targetSql(tables) {
 }
 export async function verifyDatabase(io, spec, target, state) {
   const expected = state.expected.get(spec.area), partition = state.prepared.partitions.find(p => p.area === spec.area);
-  const counts = new Map(), seen = new Set(), receipts = new Set(), provenance = new Set();
-  let catalog = false, safety = false, receipt = false, complete = false;
+  const counts = new Map(), seen = new Set(), receipts = new Set(), provenance = new Set(), sequences = new Set();
+  let catalog = false, safety = false, receipt = false, complete = false, sequenceCatalog = false;
   io.send(BEGIN_SQL);
   try {
     for await (const line of io.lines) {
@@ -368,6 +407,13 @@ export async function verifyDatabase(io, spec, target, state) {
         if (e.database !== target.database || e.read_only !== 'on' || e.clients !== 0 || e.migrations !== 60 || e.migration_head !== 60
           || ['failed_migrations','invalid_indexes','invalid_constraints','unsafe_seeds','broken_links'].some(k => e[k] !== 0)) fail();
         safety = true;
+      } else if (e.event === 'sequence_catalog' && safety && !sequenceCatalog) {
+        validateSequenceCatalog(e.sequences); sequenceCatalog = true;
+      } else if (e.event === 'sequence_state' && sequenceCatalog) {
+        exact(e, ['event','name','last_value','is_called']);
+        if (!SCHEMA60_SEQUENCES.some(s => s.name === e.name) || sequences.has(e.name)
+          || e.last_value !== '1' || e.is_called !== false) fail();
+        sequences.add(e.name);
       } else if (e.event === 'count' && safety) {
         if (!SCHEMA60_TABLES.includes(e.table) || counts.has(e.table) || !Number.isSafeInteger(e.count) || e.count < 0) fail();
         counts.set(e.table, e.count);
@@ -393,7 +439,8 @@ export async function verifyDatabase(io, spec, target, state) {
       else fail();
     }
     if (await io.done !== 0 || !complete || !receipt || seen.size !== expected.rows.size || receipts.size !== expected.rows.size
-      || provenance.size !== expected.provenance.size || counts.size !== SCHEMA60_TABLES.length) fail();
+      || provenance.size !== expected.provenance.size || counts.size !== SCHEMA60_TABLES.length
+      || !sequenceCatalog || sequences.size !== SCHEMA60_SEQUENCES.length) fail();
     const expectedCounts = new Map(SCHEMA60_TABLES.map(t=>[t,seedCounts[t]??0]));
     expectedCounts.set('public._sqlx_migrations',60);
     expectedCounts.set('public.area_import_receipts',1);
@@ -404,7 +451,8 @@ export async function verifyDatabase(io, spec, target, state) {
     return { area:spec.area, target_instance:target.instance_id, container_id:spec.container_id,
       histories:expected.histories.size, versions:expected.versions, tombstones:expected.tombstones, projects:expected.projects.size,
       relationships:counts.get('public.memory_relations'), projected_sources:expected.provenance.size, verified_rows:seen.size,
-      row_and_receipt_hashes_match:true, authority_and_runtime_inactive:true, table_counts:Object.fromEntries([...counts].filter(([,n])=>n)) };
+      row_and_receipt_hashes_match:true, authority_and_runtime_inactive:true, inactive_sequence_states_match:true, verified_sequences:sequences.size,
+      table_counts:Object.fromEntries([...counts].filter(([,n])=>n)) };
   } catch { io.abort(); fail(); }
 }
 export async function verifyFleet(contractFile, contractSha, output, inspect = inspectContainer) {

@@ -62,6 +62,13 @@ table must be empty. Only schema migration history, import receipts and the
 exact inert seed counts are permitted; the loop kill switch must be on, timeline
 position zero and supervisor revisions null. Concurrent database clients,
 invalid indexes, invalid constraints and broken canonical relations fail closed.
+All four schema-0060 sequences must have their exact names, owners and default
+bigint configuration, with `last_value=1` and `is_called=false`. This profile
+imports no access events, source checks, timeline events or supervisor journal
+rows. The importer's transactional restart of the empty source-check sequence
+must therefore also yield 1, uncalled. Extra, missing, advanced or reconfigured
+sequences fail verification without calling `nextval` or changing counters.
+This is independent from the original snapshot's preserved sequence values.
 
 The result is point-in-time logical-row evidence, not application readiness,
 cryptographic authentication of reviewers, customer disaster recovery or

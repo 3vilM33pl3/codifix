@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SCHEMA60_TABLES, validateContract, validateTarget, makeExpected, consumeOriginal, finishArchive,
+import { SCHEMA60_TABLES, SCHEMA60_SEQUENCES, validateSequenceCatalog, validateContract, validateTarget, makeExpected, consumeOriginal, finishArchive,
   projectedSource, targetSql, verifyDatabase, readArchive, parseArgs, stagingSession } from './verify-staging.mjs';
 
 const id = n => `00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
@@ -48,6 +48,8 @@ function events(f) {
     'public.area_import_receipts':1,'public.area_import_rows':e.rows.size,'public.area_import_provenance':e.provenance.size}))counts.set(table,count);
   for(const key of e.rows.keys()){const table=key.split('\0')[0];counts.set(table,counts.get(table)+1);}
   const rows=[{event:'catalog',tables:catalog()},{event:'safety',database:f.target.database,read_only:'on',clients:0,migrations:60,migration_head:60,failed_migrations:0,invalid_indexes:0,invalid_constraints:0,unsafe_seeds:0,broken_links:0},
+    {event:'sequence_catalog',sequences:structuredClone(SCHEMA60_SEQUENCES)},
+    ...SCHEMA60_SEQUENCES.map(s=>({event:'sequence_state',name:s.name,last_value:'1',is_called:false})),
     ...[...counts].map(([table,count])=>({event:'count',table,count})),
     {event:'area_import_receipts',row:{singleton:true,id:f.spec.operation_id,target_instance:f.target.instance_id,area:'general',source_instance:f.prepared.source_instance,snapshot_id:f.prepared.snapshot_id,
       inventory_sha256:f.prepared.inventory_sha256,manifest_sha256:f.prepared.manifest_sha256,partition_sha256:f.prepared.partitions[0].partition_sha256,row_count:e.rows.size,projection_count:e.provenance.size,source_migration:60,target_migration:60}}];
@@ -91,8 +93,27 @@ test('changed bytes, missing originals, duplicate archive rows and cross-area re
 test('read-only verifier covers every row, receipt, projection, table and inert seed',async()=>{
   const f=fixture(),x=fake(events(f)),result=await verifyDatabase(x,f.spec,f.target,f.state);
   assert.equal(result.verified_rows,4);assert.equal(result.authority_and_runtime_inactive,true);assert.equal(result.histories,1);
+  assert.equal(result.inactive_sequence_states_match,true);assert.equal(result.verified_sequences,4);
   assert.match(x.sent[0],/REPEATABLE READ READ ONLY/);assert.ok(x.sent.every(s=>! /\b(?:INSERT|UPDATE|DELETE|ALTER|CREATE|nextval|setval)\b/i.test(s)));
   assert.ok(!x.sent.join('').includes('PRIVATE'));
+});
+test('sequence catalog rejects missing, extra, duplicate, unowned or reconfigured runtime sequences',()=>{
+  validateSequenceCatalog(structuredClone(SCHEMA60_SEQUENCES));
+  for(const change of [s=>s.pop(),s=>s.push({...s[0],name:'public.unreviewed_seq'}),s=>s[1]=s[0],
+    s=>s[0].owner_table='public.other',s=>s[0].owner_column='other',s=>s[0].dependency_type='a',
+    s=>s[0].start_value='2',s=>s[0].increment_by='2',s=>s[0].min_value='0',s=>s[0].max_value='2147483647',
+    s=>s[0].cache_size='10',s=>s[0].cycle=true,s=>s[0].data_type='integer',s=>s[0].unexpected=true]){
+    const sequences=structuredClone(SCHEMA60_SEQUENCES);change(sequences);assert.throws(()=>validateSequenceCatalog(sequences));
+  }
+});
+test('sequence state must be exact, complete, uncalled and pristine with bigint text intact',async()=>{
+  for(const change of [r=>r.find(e=>e.event==='sequence_state').last_value='2',
+    r=>r.find(e=>e.event==='sequence_state').last_value='9007199254740993',
+    r=>r.find(e=>e.event==='sequence_state').last_value=1,r=>r.find(e=>e.event==='sequence_state').is_called=true,
+    r=>r.splice(r.findIndex(e=>e.event==='sequence_state'),1),r=>r.splice(r.findIndex(e=>e.event==='sequence_catalog'),1),
+    r=>r.push(r.find(e=>e.event==='sequence_state'))]){
+    const f=fixture(),r=events(f);change(r);await assert.rejects(verifyDatabase(fake(r),f.spec,f.target,f.state));
+  }
 });
 test('tampering, authority activation, writer connections, missing rows and bad receipts invalidate verification',async()=>{
   const mutators=[r=>r.find(e=>e.event==='row').sha256=hash('changed'),r=>r.find(e=>e.event==='count'&&e.table==='public.auth_service_tokens').count=1,
@@ -170,8 +191,25 @@ test('real isolated PostgreSQL validates hashes without mutations and refuses ac
   for(const [key,row]of e.rows){const [table,k]=key.split('\0');psql(`INSERT INTO area_import_rows VALUES('${f.spec.operation_id}','${table}','${k}','${row.source}','${row.target}',${row.transformed});`);}
   for(const row of e.provenance.values())psql(`INSERT INTO area_import_provenance(${['import_id',...Object.keys(row)].join(',')}) VALUES(${[f.spec.operation_id,...Object.values(row)].map(v=>`'${v}'`).join(',')});`);
   const snapshot=()=>psql("SET timezone='UTC'; SELECT md5(string_agg(x,'' ORDER BY x)) FROM (SELECT to_jsonb(r)::text x FROM memory_entries r UNION ALL SELECT to_jsonb(r)::text FROM area_import_receipts r UNION ALL SELECT to_jsonb(r)::text FROM area_import_rows r UNION ALL SELECT to_jsonb(r)::text FROM area_import_provenance r UNION ALL SELECT to_jsonb(r)::text FROM loop_global_state r) s;").trim();
+  const sequenceQuery=targetSql(catalog()).match(/SELECT json_build_object\('event','sequence_catalog'[\s\S]*?\) s;/)[0];
+  const actualSequences=JSON.parse(psql(sequenceQuery)).sequences;
+  assert.deepEqual(actualSequences,SCHEMA60_SEQUENCES,'Fresh schema60 must match independently specified sequence configuration');
+  for(const s of SCHEMA60_SEQUENCES)assert.deepEqual(JSON.parse(psql(`SELECT json_build_object('last_value',last_value::text,'is_called',is_called) FROM ${s.name};`)),{last_value:'1',is_called:false});
   const before=snapshot();const result=await verifyDatabase(stagingSession(container,f.target.database),f.spec,f.target,state);
   assert.equal(result.verified_rows,4);assert.equal(result.projected_sources,1);assert.equal(snapshot(),before);
+  assert.equal(result.verified_sequences,4);assert.equal(result.inactive_sequence_states_match,true);
+  // Change only synthetic sequences. Table/receipt hashes still match, but an
+  // exhausted/used counter must not pass inactive staging verification.
+  psql("SELECT setval('public.memory_source_checks_id_seq',9007199254740993,false);");
+  await assert.rejects(verifyDatabase(stagingSession(container,f.target.database),f.spec,f.target,state));
+  psql('ALTER SEQUENCE public.memory_source_checks_id_seq RESTART WITH 1;');
+  psql("SELECT nextval('public.supervisor_journal_sequence_seq');");
+  await assert.rejects(verifyDatabase(stagingSession(container,f.target.database),f.spec,f.target,state));
+  psql('ALTER SEQUENCE public.supervisor_journal_sequence_seq RESTART WITH 1;');
+  psql('CREATE SEQUENCE public.unreviewed_fixture_sequence;');
+  await assert.rejects(verifyDatabase(stagingSession(container,f.target.database),f.spec,f.target,state));
+  psql('DROP SEQUENCE public.unreviewed_fixture_sequence;');
+  assert.equal((await verifyDatabase(stagingSession(container,f.target.database),f.spec,f.target,state)).verified_sequences,4);
   psql('UPDATE loop_global_state SET kill_switch_enabled=false;');
   await assert.rejects(verifyDatabase(stagingSession(container,f.target.database),f.spec,f.target,state));
 });
