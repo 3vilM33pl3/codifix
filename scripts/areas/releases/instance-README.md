@@ -8,7 +8,11 @@ preparations in a new disposable directory.
 
 This is **not a privileged installer**. It does not install a Debian package,
 run package hooks or artifacts, access configuration/credentials, stop a service,
-contact a database, apply migrations, change `/opt` or `/etc`, or activate Pi.
+contact a database, apply migrations, switch the live `/opt/...` release or
+`/etc/...` credentials, or activate Pi. Writes are confined to new private
+children of the explicitly selected output parent; the operator chooses that
+parent, and privileged callers are not barred from choosing one under `/opt`
+or `/etc`.
 It does not prove host ABI compatibility, systemd enforcement, CA isolation or
 database rollback. Keep existing CA, OpenBao and Memory services untouched.
 

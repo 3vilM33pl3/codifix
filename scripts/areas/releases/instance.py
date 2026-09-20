@@ -362,7 +362,8 @@ def rehearse(arguments):
     root_fd = new_directory(parent_fd, name)
     root = parent / name
     try:
-        # Only the newly-created private root is writable; never /opt or /etc.
+        # Write only new private children of the explicit output parent. Live
+        # /opt release and /etc credential paths in the plan are never targeted.
         release.write_new(root_fd, "scope.json", release.canonical({"instance": instance,
             "format": "memory-filesystem-rehearsal-v1", "installation_authorized": False}))
         instance_fd = new_directory(root_fd, instance)
