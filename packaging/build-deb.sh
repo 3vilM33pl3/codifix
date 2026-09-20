@@ -165,7 +165,9 @@ case "$DEB_ARCH" in
   amd64) GNU_TARGET=x86_64-linux-gnu ;;
   arm64) GNU_TARGET=aarch64-linux-gnu ;;
 esac
-SHLIB_ARGS=(--package=memory-layer -O)
+# Debian 12's dpkg-shlibdeps predates --package. This build has a single
+# binary-package control stanza, so the portable default is unambiguous.
+SHLIB_ARGS=(-O)
 if [[ "$HOST_TARGET" != "$RUST_TARGET" ]]; then
   SHLIB_ARGS+=("-l/usr/$GNU_TARGET/lib")
 fi

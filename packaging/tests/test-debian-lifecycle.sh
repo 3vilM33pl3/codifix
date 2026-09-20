@@ -180,6 +180,8 @@ dpkg-shlibdeps() {
     [[ -f debian/control ]] || return 1
     local executables=0 arg
     for arg in "$@"; do
+        # Exercise the Debian 12 option surface, not the host's newer dpkg.
+        [[ "$arg" != --package=* ]] || return 1
         if [[ "$arg" == -e* ]]; then
             [[ -x "${arg#-e}" ]] || return 1
             executables=$((executables + 1))
