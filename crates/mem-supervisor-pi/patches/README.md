@@ -128,3 +128,25 @@ To reproduce the patched diagnostic, use the exact sandbox command in the
 candidate for the test driver's native architecture, and select
 `provider_probe::sandboxed_patched_fake_provider_has_no_tools`. Never replace
 the test pin with an arbitrary hash to accept an unidentified rebuild.
+
+### Debian 12 ARM64 compatibility candidate, 2026-09-20
+
+The unchanged approved patch was rebuilt with the same pinned nightly against
+Debian 12's glibc 2.36/GCC 12.2 sysroot. Candidate (41,406,384 bytes):
+`9d4a45f620ea789529b4f441bba5270ab61aa8fc2dc52761f7fbef875e7e2eca`.
+Its maximum required GLIBC symbol is 2.35. The full transitive library/symbol
+audit passed, while the preserved older 2.43 artifact was correctly rejected.
+
+Three explicit QEMU userspace tests passed in a non-root, network-none,
+read-only container: default and explicit-off successes, plus a 429 failure.
+Each sent exactly one synthetic request and advertised zero tools. No provider
+credentials, real model calls or CA access were used. These are **emulated
+compatibility checks**, not native CA execution or sandbox proof. Production and
+existing diagnostic pins remain unchanged; the new digest is accepted only by
+the isolated candidate harness, not as a live runtime override.
+
+The complete [build evidence and handoff](../../../docs/reviews/four-area-network/ca-bookworm-release.md)
+records source/toolchain/license hashes and the narrowly handled duplicate
+`provider` field in an upstream diagnostic. The patch still changes only its
+original two registration sites. No license clearance, signed release, CA
+installation or Pi activation is implied.

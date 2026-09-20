@@ -27,6 +27,11 @@ Prepare a new mode-0700 directory on the build volume containing:
 Keep the two original source archives and their SHA-256s. Verify all tracked
 source files against them, except Pi's exact reviewed patch. Its unchanged
 lockfile and full license must match the [recorded hashes](../../crates/mem-supervisor-pi/patches/README.md).
+The first candidate additionally uses the separately recorded Debian packaging
+fix from commit `d8d390fa756cde35e9c2763ae5961ac8ce83801b`; preserve its exact
+`packaging/build-deb.sh` diff and verify it as the only Memory source difference.
+New builds should use a clean commit containing that fix rather than an
+unrecorded local change.
 Do not copy full Cargo homes, npm configuration, project configuration, provider
 keys, user homes, offline stores or databases. Use a separately prepared pinned
 Pi nightly toolchain, `nightly-2026-08-31`, mounted read-only. The Memory image
@@ -61,6 +66,10 @@ above. Wait for cache copying to finish before starting either build. The packag
 phase reuses ARM64 outputs and builds a host-native lean CLI for completions;
 it never executes an ARM64 binary implicitly. Existing Debian output is refused.
 The package's actual `dpkg-shlibdeps` dependencies must also fit Debian 12.
+Bookworm does not support `--package`; the build supplies one binary-package
+control stanza. If its cross C++ shlibs entry is unversioned, the exact GCC
+`Built-Using` version supplies a conservative bound. Missing or non-exact source
+metadata is an error, not permission to drop the version constraint.
 
 ## Verification and evidence
 
