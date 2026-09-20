@@ -78,8 +78,14 @@ weakening checks. A 100,000-relation synthetic import and exact replay stayed ne
 with the same snapshot, target UUID and operation ID. See the
 [reproduction and regression evidence](../../../crates/mem-area-store/README.md#large-partition-postgresql-memory-regression).
 
-Exact replay, independent database verification and isolated application-clone
-checks remain pending. No staging completion is claimed by this report yet.
+Exact replay passed for all four targets (`already_applied=true`). A changed
+inventory binding was rejected without changing the selected target. At
+`2026-09-20T00:12:42.453Z`, the independent verifier matched every target row,
+provenance/operation receipt, history and relation against the archive/manifest.
+It verified 114 tables and four pristine sequence identities/configurations per
+target, inert authority seeds, the kill switch and empty runtime/credential/
+enrollment state. Isolated application-clone checks remain pending; no staging
+completion is claimed by this report yet.
 
 Preparation also exposed a distinct bounded-materialization issue: the reviewed
 snapshot exceeded the default 256 MiB retained-target budget. The operator now
@@ -119,6 +125,8 @@ their content into this repository, application corpus or a model prompt.
 | Complete archive | `25080a385cf2f3ca5c0c400184e775253ac7c812c6e91786795dfd6863577a78` |
 | Preparation receipt | `6b7122a15000f91528ec06d64e16d82b8c68c4d764acdeb4daf96f460b728ed6` |
 | Source accounting | `05596ac770eae05de89efd788c4cbb086474c7872ed7d2d56298285385b0494d` |
+| Independent four-database verification | `f1349e1fd71d25d56f2042a624bba021a36159610b4bffec5214914fc034a724` |
+| Corrected import executable | `19d12e328a44b94654dc4136fe9e10158056bf4992c79b637eb5c0fd64870901` |
 | Encrypted preservation bundle | `f49201e36bdcfbae9aafd0a6cc5c0fa4a789e66feea419f09eb85499e5138235` |
 
 The preservation bundle includes the full archive, manifest, review pack/index,
