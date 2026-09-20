@@ -192,9 +192,24 @@ if [[ "${#DEPENDENCY_PARTS[@]}" != 3 ]]; then
   exit 1
 fi
 declare -A CHECKED_DEPENDENCIES=()
-for dependency in "${DEPENDENCY_PARTS[@]}"; do
+for dependency_index in "${!DEPENDENCY_PARTS[@]}"; do
+  dependency="${DEPENDENCY_PARTS[$dependency_index]}"
+  # Bookworm's libstdc++ cross package has an unversioned shlibs entry and no
+  # symbols file. Its exact GCC Built-Using version supplies a conservative
+  # runtime floor. Do not invent a bound or relax other missing metadata.
+  UNVERSIONED_STDCXX="^ *libstdc[+][+]6:$DEB_ARCH$"
+  if [[ "$HOST_TARGET" != "$RUST_TARGET" && "$dependency" =~ $UNVERSIONED_STDCXX ]]; then
+    CROSS_GCC_SOURCE="$(dpkg-query -W '-f=${Built-Using}' "libstdc++6-$DEB_ARCH-cross")"
+    CROSS_GCC_PATTERN='^gcc-[0-9]+ \(= ([0-9][0-9A-Za-z.+:~_-]*)\)$'
+    if [[ ! "$CROSS_GCC_SOURCE" =~ $CROSS_GCC_PATTERN ]]; then
+      echo "Missing exact GCC Built-Using version for unversioned cross C++ runtime" >&2
+      exit 1
+    fi
+    dependency=" libstdc++6:$DEB_ARCH (>= ${BASH_REMATCH[1]})"
+    DEPENDENCY_PARTS[$dependency_index]="$dependency"
+  fi
   if [[ ! "$dependency" =~ $DEPENDENCY_PATTERN ]]; then
-    echo "Unresolved runtime dependency; target metadata must supply version bounds" >&2
+    printf 'Unresolved runtime dependency: %s; target metadata must supply version bounds\n' "$dependency" >&2
     exit 1
   fi
   runtime="${BASH_REMATCH[1]}"
@@ -204,6 +219,7 @@ for dependency in "${DEPENDENCY_PARTS[@]}"; do
   fi
   CHECKED_DEPENDENCIES[$runtime]=1
 done
+RUNTIME_DEPENDENCIES="$(IFS=,; echo "${DEPENDENCY_PARTS[*]}")"
 
 sed \
   -e "s/^Version: .*/Version: $DEB_VERSION/" \

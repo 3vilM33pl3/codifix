@@ -190,10 +190,21 @@ dpkg-shlibdeps() {
     [[ "$executables" == 4 ]] || return 1
     if [[ "${PACKAGING_TEST_SHLIB_INVALID:-0}" == 1 ]]; then
         printf 'shlibs:Depends=libc6 (>= 2.39), libunknown-cross, libstdc++6\n'
+    elif [[ "$DEB_HOST_ARCH" == arm64 && "${PACKAGING_TEST_BOOKWORM:-0}" == 1 ]]; then
+        printf 'shlibs:Depends=libc6-arm64-cross (>= 2.34), libgcc-s1-arm64-cross (>= 3.0), libstdc++6-arm64-cross\n'
     elif [[ "$DEB_HOST_ARCH" == arm64 ]]; then
         printf 'shlibs:Depends=libc6:arm64 (>= 2.43), libgcc-s1-arm64-cross (>= 4.2), libstdc++6-arm64-cross (>= 14)\n'
     else
         printf 'shlibs:Depends=libc6 (>= 2.39), libgcc-s1 (>= 4.2), libstdc++6 (>= 14)\n'
+    fi
+}
+dpkg-query() {
+    [[ "$*" == '-W -f=${Built-Using} libstdc++6-arm64-cross' ]] || return 1
+    [[ "${PACKAGING_TEST_GCC_METADATA:-valid}" != missing ]] || return 1
+    if [[ "${PACKAGING_TEST_GCC_METADATA:-valid}" == invalid ]]; then
+        printf 'gcc-12 (>= 12.2.0-14)\n'
+    else
+        printf 'gcc-12 (= 12.2.0-14)'
     fi
 }
 dpkg-deb() {
@@ -209,7 +220,9 @@ dpkg-deb() {
         *) return 90 ;;
     esac
     grep -Fxq 'Version: 2.1.0~rc.1' "$staging/DEBIAN/control" || return 90
-    if [[ "$architecture" == arm64 ]]; then
+    if [[ "$architecture" == arm64 && "${PACKAGING_TEST_BOOKWORM:-0}" == 1 ]]; then
+        grep -Fxq 'Depends: libc6:arm64 (>= 2.34), libgcc-s1:arm64 (>= 3.0), libstdc++6:arm64 (>= 12.2.0-14), python3, gpg' "$staging/DEBIAN/control" || return 90
+    elif [[ "$architecture" == arm64 ]]; then
         grep -Fxq 'Depends: libc6:arm64 (>= 2.43), libgcc-s1:arm64 (>= 4.2), libstdc++6:arm64 (>= 14), python3, gpg' "$staging/DEBIAN/control" || return 90
     else
         grep -Fxq 'Depends: libc6 (>= 2.39), libgcc-s1 (>= 4.2), libstdc++6 (>= 14), python3, gpg' "$staging/DEBIAN/control" || return 90
@@ -237,7 +250,7 @@ dpkg-deb() {
     printf 'fixture deb\n' > "$4"
     log_command "dpkg-deb $*"
 }
-export -f cargo npm rustc dpkg-deb dpkg-shlibdeps
+export -f cargo npm rustc dpkg-deb dpkg-shlibdeps dpkg-query
 export CARGO_TARGET_DIR="$test_root/binaries"
 : > "$PACKAGING_TEST_LOG"
 (umask 077; bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null)
@@ -282,6 +295,12 @@ fi
 if PACKAGING_TEST_SHLIB_INVALID=1 bash "$fixture/packaging/build-deb.sh" --output-dir "$test_root/invalid-dependencies" >/dev/null 2>&1; then
     fail "builder accepted unresolved or unversioned runtime metadata"
 fi
+PACKAGING_TEST_BOOKWORM=1 bash "$fixture/packaging/build-deb.sh" --arch arm64 --output-dir "$test_root/bookworm" >/dev/null
+for metadata in missing invalid; do
+    if PACKAGING_TEST_BOOKWORM=1 PACKAGING_TEST_GCC_METADATA="$metadata" bash "$fixture/packaging/build-deb.sh" --arch arm64 --output-dir "$test_root/bookworm-$metadata" >/dev/null 2>&1; then
+        fail "builder accepted $metadata GCC metadata for unversioned C++ dependency"
+    fi
+done
 
 for arguments in '--arch' '--target' '--output-dir' '--arch mips' '--arch amd64 --target aarch64-unknown-linux-gnu' '--target ../../other'; do
     : > "$PACKAGING_TEST_LOG"
