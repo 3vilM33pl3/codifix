@@ -26,11 +26,17 @@ runtime. Rebuild against Debian 12 and inspect the actual resulting artifacts.
       disposable environments without touching any host service or database.
 - [x] Prepare versioned console instructions, artifact hashes, health/rollback
       checks and a redacted offline-data reconciliation checklist.
-- [ ] Record test evidence and remaining gates; checkpoint results in dev Memory.
+- [x] Record test evidence and remaining gates; checkpoint results in dev Memory.
 
 The approved-plan checkpoint is task `d80052bc-9128-4e6e-9ec0-4c4fc0698ecc`,
 plan `b1d6d75d-07b4-4d84-9acd-88d40180cee1`, thread key
 `ca-compatible-release-preparation-and-rehearsal`, at source `312d7c77`.
+
+Completion verification succeeded with **6/6 preparation items**. The completed
+plan version `f06400cf-da15-496b-a8e5-e9fcde3398b4` was archived and implementation
+memory `1ec74def-f0d4-41a5-8935-e3ccbf74573e` was curated from capture
+`c31bcd3d-519a-4c6f-bfe4-5581c1f6ba62`. This closes only the scoped off-CA
+preparation, not the outstanding deployment gates below.
 
 ## Boundaries
 
