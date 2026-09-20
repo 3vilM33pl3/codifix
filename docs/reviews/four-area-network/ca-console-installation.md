@@ -109,6 +109,13 @@ remote-database egress/sandbox profile are required for that deployment option.
 The tool neither proves database independence nor observes its schema; the exact
 schema argument remains an operator assertion.
 
+The dev Memory completion workflow succeeded with one targeted capture
+`8b837a4b-2074-4c03-a98f-eab9471f02af` and four implementation memories (curation
+run `36954e34-58c7-4e1f-80aa-d16065b6e843`, no replacement proposals). Its ordinary
+background jobs were queued, not asserted complete. Task checkpoint/completion
+records are the intentional Memory writes for this work; no deployment data
+migration or cutover was performed.
+
 ## Remaining independent gates
 
 Complete release assembly and operator signing, CA-native ABI/sandbox checks,
