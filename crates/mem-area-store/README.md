@@ -34,6 +34,12 @@ restoring canonical state after all versions prevents insertion order from
 silently replacing reviewed state. Every imported row is compared with its
 expected JSON value and SHA-256 after triggers execute. Row counts must match.
 
+All importer queries explicitly use nonpersistent (unnamed) statements. This
+includes insertion, full-row verification, canonical hashing, catalog reads and
+both receipt paths. It must remain safe when the caller sets the SQLx statement
+cache capacity to zero, as the operator does. No intermediate commits, disabled
+triggers or omitted verification are used to limit database memory.
+
 Reviewed mixed-source projections are the sole content transformation: their
 safe note/reference and null context fields come from `mem-area`, not importer
 heuristics. Immutable provenance receipts retain the original source/version/
@@ -100,3 +106,65 @@ The existing test harness requires `MEMORY_LAYER_TEST_DATABASE_URL`; it creates
 and drops generated fixture databases and must never target a live or restored
 real-data database. No paid provider, source snapshot or running application is
 needed by these tests.
+
+### Large-partition PostgreSQL memory regression
+
+On 2026-09-20 a disposable, network-disabled, 2 GiB-limited PostgreSQL **17.11**
+container using image
+`sha256:17a06c0a60bf6fb548a8493b8f6057dc830b791bbbe1f1ab706ca4b9d97c8180`
+reproduced the large-import failure with synthetic relations only. This was not
+a JSON decoding leak, a relation FK event queue, or tmpfs database storage.
+
+The operator's zero-capacity statement cache combined with SQLx **0.8.6**'s
+default `persistent(true)` created a new named server statement for each query,
+without retaining a handle to close or reuse it. PostgreSQL keeps named
+statements for the connection lifetime. The relevant implementation is SQLx's
+[`prepare` and `get_or_prepare`](https://github.com/launchbadge/sqlx/blob/v0.8.6/sqlx-postgres/src/connection/executor.rs);
+the server lifetime is described in the
+[PostgreSQL extended-query protocol](https://www.postgresql.org/docs/17/protocol-flow.html).
+
+Measured backend memory contexts over 20,000 identical-shaped parameterized
+inserts (different synthetic row values):
+
+| SQLx configuration | Initial bytes | Final bytes |
+| --- | ---: | ---: |
+| Cache 100, persistent | 1,368,744 | 1,419,944 |
+| Cache 0, persistent (old operator behavior) | 1,368,744 | 497,289,896 |
+| Cache 0, nonpersistent | 1,368,744 | 1,632,936 |
+
+The failing variant accumulated approximately 24.8 KiB per row, predominantly
+`CachedPlanQuery` and `CachedPlanSource`. The original probe's own periodic
+monitoring queries also used persistent statements, explaining the small growth
+in the nonpersistent variant; the retained diagnostic now marks those reads
+nonpersistent too. These are backend allocator measurements, not total host RSS
+or a promise about every dataset's memory use.
+
+`tests/memory_growth.rs` includes a required-database regression with 2,048
+relations and a reviewed source projection. It uses an actual zero-cache pool,
+imports and exactly replays the complete opaque partition, checks all normal
+receipts and requires **zero named prepared statements** after each operation.
+A synthetic insert trigger and final allocator checks enforce a 16 MiB backend
+context ceiling. The trigger only exists in the generated test database.
+
+For larger verification, run the explicit 100,000-relation variant on a
+resource-limited disposable server (not a production or restored database):
+
+```bash
+MEMORY_LAYER_TEST_REQUIRE_DB=1 cargo test -p mem-area-store --test memory_growth \
+  --locked full_import_large_relation_memory_probe -- --ignored --nocapture
+```
+
+The separately ignored `composite_statement_memory_probe` reproduces the old
+SQLx behavior with a bounded 20,000-row comparison and aborts if measured
+contexts exceed 512 MiB. It is diagnostic evidence, not an alternative import
+path. Existing fault-injection tests remain the authority for all-or-nothing
+row/receipt/sequence rollback. Real snapshot import and recovery evidence must
+be recorded separately after operator approval and target verification.
+
+The corrected 100,000-relation test completed import and exact replay in the
+same 2 GiB-limited server: backend contexts measured **6,589,048 bytes** after
+import and **6,593,144 bytes** after replay, with zero named statements after
+both. It also included an explicitly reviewed source projection, exercising
+canonical hashing and immutable provenance receipts. Total test time including
+synthetic capture/materialization was 141.38 seconds. These results do not
+claim that the real Workshop snapshot was imported by this test.

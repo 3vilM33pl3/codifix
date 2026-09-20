@@ -8,6 +8,13 @@ use sha2::{Digest, Sha256};
 use sqlx::{PgConnection, PgPool, Row};
 use uuid::Uuid;
 
+// SQLx 0.8.6 still creates named statements for persistent queries when a caller
+// disables its statement cache, but then does not retain/close their handles.
+// Bulk imports must use unnamed statements independently of pool settings.
+fn query(sql: &str) -> sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments> {
+    sqlx::query(sql).persistent(false)
+}
+
 pub const TARGET_MIGRATION: i64 = 56;
 pub const HEALTH_TARGET_MIGRATION: i64 = 57;
 pub const USAGE_TARGET_MIGRATION: i64 = 58;
@@ -137,10 +144,12 @@ pub async fn import_partition(
     // Do not acquire broad locks on an accidentally selected populated source.
     let has_receipt: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM public.area_import_receipts)")
+            .persistent(false)
             .fetch_one(&mut *tx)
             .await?;
     if !has_receipt
         && sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM public.projects)")
+            .persistent(false)
             .fetch_one(&mut *tx)
             .await?
     {
@@ -148,6 +157,7 @@ pub async fn import_partition(
     }
     let head: Option<i64> =
         sqlx::query_scalar("SELECT max(version) FROM public._sqlx_migrations WHERE success")
+            .persistent(false)
             .fetch_one(&mut *tx)
             .await?;
     if !matches!(
@@ -163,12 +173,12 @@ pub async fn import_partition(
         return Err(ImportError::Schema);
     }
     let target_head = head.ok_or(ImportError::Schema)?;
-    let valid_history: bool = sqlx::query_scalar("SELECT count(*)=$1 AND bool_and(success AND version BETWEEN 1 AND $1) FROM public._sqlx_migrations").bind(target_head).fetch_one(&mut *tx).await?;
+    let valid_history: bool = sqlx::query_scalar("SELECT count(*)=$1 AND bool_and(success AND version BETWEEN 1 AND $1) FROM public._sqlx_migrations").persistent(false).bind(target_head).fetch_one(&mut *tx).await?;
     if !valid_history {
         return Err(ImportError::Schema);
     }
     let tables: Vec<String> = sqlx::query_scalar("SELECT n.nspname||'.'||c.relname FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('r','p','f') AND n.nspname <> 'information_schema' AND n.nspname !~ '^pg_' ORDER BY 1")
-        .fetch_all(&mut *tx).await?;
+        .persistent(false).fetch_all(&mut *tx).await?;
     let expected: std::collections::BTreeSet<String> = mem_area::KNOWN_TABLES
         .iter()
         .chain(mem_area::SUPERVISOR_TABLES_0053)
@@ -207,13 +217,13 @@ pub async fn import_partition(
         }
         let name = table.strip_prefix("public.").ok_or(ImportError::Schema)?;
         identifier(name)?;
-        sqlx::query(&format!(
+        query(&format!(
             "LOCK TABLE public.\"{name}\" IN ACCESS EXCLUSIVE MODE"
         ))
         .execute(&mut *tx)
         .await?;
     }
-    let existing = sqlx::query("SELECT * FROM public.area_import_receipts WHERE singleton=true")
+    let existing = query("SELECT * FROM public.area_import_receipts WHERE singleton=true")
         .fetch_optional(&mut *tx)
         .await?;
     let already_applied = existing.is_some();
@@ -242,7 +252,7 @@ pub async fn import_partition(
             return Err(ImportError::Conflict);
         }
     } else {
-        sqlx::query("INSERT INTO public.area_import_receipts(id,target_instance,area,source_instance,snapshot_id,inventory_sha256,manifest_sha256,partition_sha256,source_migration,target_migration,row_count,projection_count) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$12,$10,$11)")
+        query("INSERT INTO public.area_import_receipts(id,target_instance,area,source_instance,snapshot_id,inventory_sha256,manifest_sha256,partition_sha256,source_migration,target_migration,row_count,projection_count) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$12,$10,$11)")
             .bind(operation_id).bind(target_instance).bind(area_name(partition.area()))
             .bind(partition.source_instance()).bind(partition.snapshot_id())
             .bind(partition.inventory_sha256()).bind(partition.manifest_sha256()).bind(partition.partition_sha256())
@@ -269,7 +279,7 @@ pub async fn import_partition(
         for projection in partition.projected_sources() {
             let binding = projection.binding();
             let target_hash = canonical_hash(&mut tx, projection.target_row_json()).await?;
-            sqlx::query("INSERT INTO public.area_import_provenance(import_id,source_id,decision_id,decision_sha256,canonical_id,memory_version_id,source_sha256,original_version_sha256,archived_task_id,archived_task_sha256,target_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)")
+            query("INSERT INTO public.area_import_provenance(import_id,source_id,decision_id,decision_sha256,canonical_id,memory_version_id,source_sha256,original_version_sha256,archived_task_id,archived_task_sha256,target_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)")
                 .bind(operation_id).bind(parse_id(&binding.source.record.key)?)
                 .bind(projection.decision_id()).bind(projection.decision_sha256())
                 .bind(binding.canonical_id).bind(parse_id(&binding.memory_version.record.key)?)
@@ -280,6 +290,7 @@ pub async fn import_partition(
         // Transactional RESTART, unlike setval, rolls back on any later failure.
         let largest: Option<i64> =
             sqlx::query_scalar("SELECT max(id) FROM public.memory_source_checks")
+                .persistent(false)
                 .fetch_one(&mut *tx)
                 .await?;
         let next = largest
@@ -287,12 +298,12 @@ pub async fn import_partition(
             .checked_add(1)
             .filter(|n| *n > 0)
             .ok_or(ImportError::Invalid)?;
-        sqlx::query(&format!(
+        query(&format!(
             "ALTER SEQUENCE public.memory_source_checks_id_seq RESTART WITH {next}"
         ))
         .execute(&mut *tx)
         .await?;
-        sqlx::query("UPDATE public.loop_global_state SET kill_switch_enabled=true WHERE id=true")
+        query("UPDATE public.loop_global_state SET kill_switch_enabled=true WHERE id=true")
             .execute(&mut *tx)
             .await?;
     }
@@ -300,7 +311,7 @@ pub async fn import_partition(
     for projection in partition.projected_sources() {
         let binding = projection.binding();
         let expected_target = canonical_hash(&mut tx, projection.target_row_json()).await?;
-        let receipt = sqlx::query(
+        let receipt = query(
             "SELECT * FROM public.area_import_provenance WHERE import_id=$1 AND source_id=$2",
         )
         .bind(operation_id)
@@ -328,7 +339,7 @@ pub async fn import_partition(
     for row in &rows {
         let target_hash = verify_row(&mut tx, row).await?;
         if already_applied {
-            let receipt = sqlx::query("SELECT source_sha256,target_sha256,transformed FROM public.area_import_rows WHERE import_id=$1 AND table_name=$2 AND record_key=$3")
+            let receipt = query("SELECT source_sha256,target_sha256,transformed FROM public.area_import_rows WHERE import_id=$1 AND table_name=$2 AND record_key=$3")
                 .bind(operation_id).bind(&row.record.table).bind(&row.record.key).fetch_optional(&mut *tx).await?.ok_or(ImportError::Changed)?;
             if receipt.try_get::<String, _>("source_sha256")? != row.source_sha
                 || receipt.try_get::<String, _>("target_sha256")? != target_hash
@@ -337,13 +348,14 @@ pub async fn import_partition(
                 return Err(ImportError::Changed);
             }
         } else {
-            sqlx::query("INSERT INTO public.area_import_rows(import_id,table_name,record_key,source_sha256,target_sha256,transformed) VALUES($1,$2,$3,$4,$5,$6)")
+            query("INSERT INTO public.area_import_rows(import_id,table_name,record_key,source_sha256,target_sha256,transformed) VALUES($1,$2,$3,$4,$5,$6)")
                 .bind(operation_id).bind(&row.record.table).bind(&row.record.key)
                 .bind(row.source_sha).bind(target_hash).bind(row.transformed).execute(&mut *tx).await?;
         }
     }
     for table in TABLES {
         let actual: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM {table}"))
+            .persistent(false)
             .fetch_one(&mut *tx)
             .await?;
         let expected = rows.iter().filter(|row| row.record.table == *table).count();
@@ -358,6 +370,7 @@ pub async fn import_partition(
         let actual: i64 = sqlx::query_scalar(&format!(
             "SELECT count(*) FROM public.{table} WHERE import_id=$1"
         ))
+        .persistent(false)
         .bind(operation_id)
         .fetch_one(&mut *tx)
         .await?;
@@ -406,6 +419,7 @@ async fn inactive(conn: &mut PgConnection, tables: &[String], replay: bool) -> R
         let any: bool = sqlx::query_scalar(&format!(
             "SELECT EXISTS(SELECT 1 FROM {table} WHERE {allowed})"
         ))
+        .persistent(false)
         .fetch_one(&mut *conn)
         .await?;
         if any {
@@ -419,6 +433,7 @@ async fn inactive(conn: &mut PgConnection, tables: &[String], replay: bool) -> R
         ("loop_global_state", 1),
     ] {
         let count: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM public.{table}"))
+            .persistent(false)
             .fetch_one(&mut *conn)
             .await?;
         if count != expected {
@@ -429,7 +444,7 @@ async fn inactive(conn: &mut PgConnection, tables: &[String], replay: bool) -> R
 }
 
 async fn check_columns(conn: &mut PgConnection, row: &InputRow<'_>) -> Result<()> {
-    let actual = sqlx::query("SELECT a.attname AS name,pg_catalog.format_type(a.atttypid,a.atttypmod) AS type,NOT a.attnotnull AS nullable FROM pg_catalog.pg_attribute a WHERE a.attrelid=$1::regclass AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attname")
+    let actual = query("SELECT a.attname AS name,pg_catalog.format_type(a.atttypid,a.atttypmod) AS type,NOT a.attnotnull AS nullable FROM pg_catalog.pg_attribute a WHERE a.attrelid=$1::regclass AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attname")
         .bind(&row.record.table).fetch_all(conn).await?;
     let mut expected: Vec<_> = row.columns.iter().collect();
     expected.sort_by_key(|c| &c.name);
@@ -471,7 +486,7 @@ async fn insert_row(conn: &mut PgConnection, row: &InputRow<'_>) -> Result<()> {
             " ON CONFLICT (canonical_id) DO UPDATE SET {updates}"
         ));
     }
-    sqlx::query(&statement).bind(row.json).execute(conn).await?;
+    query(&statement).bind(row.json).execute(conn).await?;
     Ok(())
 }
 
@@ -495,7 +510,7 @@ async fn verify_row(conn: &mut PgConnection, row: &InputRow<'_>) -> Result<Strin
         "SELECT to_jsonb(t)::text AS bytes,to_jsonb(t)=$1::jsonb AS matches,{record_key} AS record_key FROM {} t,json_populate_record(NULL::{},$1::json) x WHERE {predicate}",
         row.record.table, row.record.table
     );
-    let found = sqlx::query(&statement)
+    let found = query(&statement)
         .bind(row.json)
         .fetch_optional(conn)
         .await?
@@ -512,6 +527,7 @@ async fn verify_row(conn: &mut PgConnection, row: &InputRow<'_>) -> Result<Strin
 
 async fn canonical_hash(conn: &mut PgConnection, json: &str) -> Result<String> {
     let canonical: String = sqlx::query_scalar("SELECT $1::jsonb::text")
+        .persistent(false)
         .bind(json)
         .fetch_one(conn)
         .await?;

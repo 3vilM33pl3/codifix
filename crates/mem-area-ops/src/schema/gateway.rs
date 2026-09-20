@@ -115,6 +115,7 @@ pub async fn initialize(
              pg_catalog.pg_get_userbyid(datdba) FROM pg_catalog.pg_database \
              WHERE datname=pg_catalog.current_database()",
         )
+        .persistent(false)
         .fetch_one(&mut connection)
         .await
         .map_err(|_| Failure::Connection)?;

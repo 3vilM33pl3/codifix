@@ -136,6 +136,7 @@ async fn prepare(connection: &mut PgConnection, migrator: &Migrator) -> Result<(
     let locked: bool = sqlx::query_scalar(
         "SELECT pg_try_advisory_xact_lock(hashtextextended('memory-area-fresh-schema-v1',0))",
     )
+    .persistent(false)
     .fetch_one(&mut *transaction)
     .await
     .map_err(|_| Failure::Schema)?;
@@ -163,7 +164,7 @@ OR EXISTS(SELECT 1 FROM pg_foreign_data_wrapper)
 OR EXISTS(SELECT 1 FROM pg_default_acl)
 OR EXISTS(SELECT 1 FROM pg_publication)
 OR EXISTS(SELECT 1 FROM pg_subscription WHERE subdbid=(SELECT oid FROM pg_database WHERE datname=current_database()))
-"#).fetch_one(&mut *transaction).await.map_err(|_| Failure::Schema)?;
+"#).persistent(false).fetch_one(&mut *transaction).await.map_err(|_| Failure::Schema)?;
     if occupied {
         return Err(Failure::NotEmpty);
     }
@@ -185,6 +186,7 @@ OR EXISTS(SELECT 1 FROM pg_subscription WHERE subdbid=(SELECT oid FROM pg_databa
     let tables: Vec<String> = sqlx::query_scalar(
         "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename",
     )
+    .persistent(false)
     .fetch_all(&mut *transaction)
     .await
     .map_err(|_| Failure::Schema)?;
@@ -202,6 +204,7 @@ OR EXISTS(SELECT 1 FROM pg_subscription WHERE subdbid=(SELECT oid FROM pg_databa
             _ => 0,
         };
         let count: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM public.\"{table}\""))
+            .persistent(false)
             .fetch_one(&mut *transaction)
             .await
             .map_err(|_| Failure::Schema)?;
@@ -212,6 +215,7 @@ OR EXISTS(SELECT 1 FROM pg_subscription WHERE subdbid=(SELECT oid FROM pg_databa
     let history = sqlx::query(
         "SELECT version,checksum,success FROM public._sqlx_migrations ORDER BY version",
     )
+    .persistent(false)
     .fetch_all(&mut *transaction)
     .await
     .map_err(|_| Failure::Schema)?;
