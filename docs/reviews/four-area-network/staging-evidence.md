@@ -127,6 +127,33 @@ its completely decrypted stream match the local bundle. Database imports and
 their later verification reports are separate evidence, not implied by this
 backup.
 
+## Focused regression evidence
+
+These checks use disposable databases, synthetic records and fake providers:
+
+- `MEMORY_AREA_TEST_DOCKER=1 MEMORY_AREA_TEST_RUST=1 node --test scripts/areas/*.test.mjs`:
+  86 passed, including encrypted restore, sequence mismatches, full-history
+  review/delta checks, source accounting and the independent staging verifier.
+- `python3 packaging/tests/test-ca-preflight.py -v`: 13 passed; no CA connection.
+- Required-database area-store/operator correction checks: 17 passed, including
+  atomic rollback, histories, projections, receipt corruption, exact replay and
+  the new zero-cache regression. The explicit 100,000-relation import/replay and
+  bounded 20,000-row diagnostic passed separately.
+- Required-database federation runtime/store regressions: 62 passed, covering
+  rotating credentials, selective authentication recovery and existing exchange
+  invariants. Supervisor-store regressions: 35 passed, including grant, revocation
+  and budget behavior.
+- Refresh-operator tests and credential-boundary review passed, including
+  competing maintainers, interrupted/ambiguous refresh and atomic bundle swaps.
+  Fake-provider grant tests cover expiry, retained usage and old-profile rejection.
+- Web: 145 tests passed and the production build passed (existing chunk-size
+  warning retained). Live Web, CLI and PTY/TUI checks display renewal and grant
+  health; cited two-way exchange, denied bypasses and restart recovery are in the
+  [preview execution ledger](dependable-staging.md).
+- Relevant strict Rust Clippy, `cargo fmt --check`, `scripts/check-boundaries.sh`
+  and the lean TUI-capable CLI build passed. These are scoped regression results,
+  not a claim of a new full-workspace or customer-release certification.
+
 ## Next source delta and CA handoff
 
 Original writers continue, so this snapshot necessarily ages. Follow the exact
