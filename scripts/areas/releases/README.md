@@ -171,6 +171,12 @@ remain mandatory. The verifier does not change the running release or provide a
 rollback. Stage files remain owned by the invoking user; a future privileged
 installer must reverify bytes under its own trust and file-access boundary.
 
+For an additional signed release-tree archive, the separate
+[selected-instance preparation and filesystem rehearsal](instance-README.md)
+binds the complete Memory binary/Web tree and tests a reversible directory switch
+inside a fresh disposable root. It still does not install, fence services,
+switch credentials, verify a live database or implement migration rollback.
+
 ## Offline tests
 
 ```bash

@@ -79,6 +79,9 @@ jobs:
               - "Cargo.lock"
               - "web/**"
               - "packaging/**"
+              - "scripts/areas/releases/**"
+              - "deploy/areas/**"
+              - ".github/workflows/ci.yml"
               - ".agents/skills/**"
               - "README.md"
               - "memory-layer.toml.example"
@@ -408,6 +411,29 @@ jobs:
       - run: npm --prefix docs-site run build
       - run: npm --prefix docs-site run lint:links
       - run: npm --prefix docs-site run check:assets
+
+  ca-release-preparation:
+    name: Offline CA Release Preparation Tests
+    runs-on: [self-hosted, memory, Linux, X64]
+    needs: changes
+    if: needs.changes.outputs.package == 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test inactive release boundaries (no CA or provider access)
+        run: |
+          command -v gpg
+          command -v gpg-agent
+          command -v readelf
+          python3 -c 'import sys; assert sys.version_info >= (3, 11)'
+          bash -n packaging/ca-bookworm/build.sh
+          python3 packaging/ca-bookworm/test_build.py
+          python3 packaging/ca-bookworm/test_abi.py
+          python3 -I -S packaging/ca-bookworm/test_pi_smoke.py
+          python3 scripts/areas/releases/test_release.py
+          python3 scripts/areas/releases/test_instance.py
+          bash packaging/tests/test-debian-lifecycle.sh
+          python3 packaging/tests/test-instance-launcher.py
+          python3 packaging/tests/test-ca-preflight.py
 
   package-smoke:
     name: Debian Package Smoke (amd64)

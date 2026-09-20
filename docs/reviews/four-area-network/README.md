@@ -23,6 +23,12 @@ encrypted source/preview recovery, credential renewal and restart checks.
 verification](staging-evidence.md) are complete. Original writers have not moved;
 Trust and General remain inactive.
 
+Next approved preparation: [CA-compatible Debian 12 ARM64 release](ca-bookworm-release.md).
+Olivier confirmed the existing CA Memory service uses the shared Monolith
+database; its console inventory reports glibc 2.36. Compatible artifacts and
+disposable release rehearsal are being prepared off-CA. This does not authorize
+installation, writer cutover or Pi activation.
+
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
 human review. The independent preview is upgraded through migration 0060, with

@@ -109,6 +109,13 @@ privileged container, or loosen isolation to bypass it. A separately reviewed
 compatible runtime would need its own approved images, ARM64 execution proof and
 negative filesystem/network tests. AMD64 container results do not prove ARM64.
 
+The [Debian 12 candidate work](../../docs/reviews/four-area-network/ca-bookworm-release.md)
+builds the existing reviewed Pi patch and Memory against glibc 2.36 off-CA.
+Those are separately hashed internal candidates, not the upstream artifact above.
+Explicit userspace emulation does not establish the CA's native sandbox or
+authorize replacing the running service. Do not change this preflight's upstream
+pin to make a local candidate appear to be an official Pi release.
+
 Evidence is from the exact source revision
 [`7c018475d54d4e09c907691e47a520f1f09e3288`](https://github.com/Dicklesworthstone/pi_agent_rust/commit/7c018475d54d4e09c907691e47a520f1f09e3288),
 the [v0.5.1 checksums](https://github.com/Dicklesworthstone/pi_agent_rust/releases/download/v0.5.1/SHA256SUMS)
