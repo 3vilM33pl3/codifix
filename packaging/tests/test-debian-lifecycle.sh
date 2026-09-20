@@ -157,6 +157,8 @@ cp "$repo_root/deploy/areas/README.md" "$repo_root/deploy/areas/instance.toml.ex
 cp "$repo_root/deploy/areas/ca-preflight.sh" "$repo_root/deploy/areas/CA-CONSOLE-HANDOFF.md" "$fixture/deploy/areas/"
 cp "$repo_root/crates/mem-area-ops/README.md" "$fixture/crates/mem-area-ops/"
 cp "$repo_root/scripts/areas/releases/release.py" "$repo_root/scripts/areas/releases/README.md" "$fixture/scripts/areas/releases/"
+cp "$repo_root/scripts/areas/releases/instance.py" "$repo_root/scripts/areas/releases/console.py" \
+    "$repo_root/scripts/areas/releases/console-README.md" "$fixture/scripts/areas/releases/"
 printf '[workspace.package]\nversion = "2.1.0-rc.1"\n' > "$fixture/Cargo.toml"
 printf 'Fixture README\n' > "$fixture/README.md"
 printf '[service]\n' > "$fixture/memory-layer.toml.example"
@@ -221,16 +223,21 @@ dpkg-deb() {
     esac
     grep -Fxq 'Version: 2.1.0~rc.1' "$staging/DEBIAN/control" || return 90
     if [[ "$architecture" == arm64 && "${PACKAGING_TEST_BOOKWORM:-0}" == 1 ]]; then
-        grep -Fxq 'Depends: libc6:arm64 (>= 2.34), libgcc-s1:arm64 (>= 3.0), libstdc++6:arm64 (>= 12.2.0-14), python3, gpg' "$staging/DEBIAN/control" || return 90
+        grep -Fxq 'Depends: libc6:arm64 (>= 2.34), libgcc-s1:arm64 (>= 3.0), libstdc++6:arm64 (>= 12.2.0-14), python3 (>= 3.11), gpg' "$staging/DEBIAN/control" || return 90
     elif [[ "$architecture" == arm64 ]]; then
-        grep -Fxq 'Depends: libc6:arm64 (>= 2.43), libgcc-s1:arm64 (>= 4.2), libstdc++6:arm64 (>= 14), python3, gpg' "$staging/DEBIAN/control" || return 90
+        grep -Fxq 'Depends: libc6:arm64 (>= 2.43), libgcc-s1:arm64 (>= 4.2), libstdc++6:arm64 (>= 14), python3 (>= 3.11), gpg' "$staging/DEBIAN/control" || return 90
     else
-        grep -Fxq 'Depends: libc6 (>= 2.39), libgcc-s1 (>= 4.2), libstdc++6 (>= 14), python3, gpg' "$staging/DEBIAN/control" || return 90
+        grep -Fxq 'Depends: libc6 (>= 2.39), libgcc-s1 (>= 4.2), libstdc++6 (>= 14), python3 (>= 3.11), gpg' "$staging/DEBIAN/control" || return 90
     fi
     grep -Fxq 'Suggests: postgresql' "$staging/DEBIAN/control" || return 90
     [[ -f "$staging/lib/systemd/system/memory-layer@.service" ]] || return 91
     [[ -x "$staging/usr/libexec/memory-layer/verify-instance-release" ]] || return 92
     [[ -x "$staging/usr/libexec/memory-layer/run-instance" ]] || return 92
+    for release_tool in release.py instance.py console.py; do
+        [[ -f "$staging/usr/libexec/memory-layer/releases/$release_tool" ]] || return 92
+        [[ "$(stat -c %a "$staging/usr/libexec/memory-layer/releases/$release_tool")" == 644 ]] || return 92
+    done
+    [[ -f "$staging/usr/share/doc/memory-layer/areas/console-first-install.md" ]] || return 92
     [[ -f "$staging/usr/share/doc/memory-layer/areas/instance.toml.example" ]] || return 93
     [[ ! -e "$staging/opt/memory-layer" ]] || return 94
     [[ ! -e "$staging/etc/memory-layer/instances" ]] || return 95

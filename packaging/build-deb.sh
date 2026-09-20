@@ -104,6 +104,7 @@ mkdir -p \
   "$PKG_ROOT/DEBIAN" \
   "$PKG_ROOT/usr/bin" \
   "$PKG_ROOT/usr/libexec/memory-layer" \
+  "$PKG_ROOT/usr/libexec/memory-layer/releases" \
   "$PKG_ROOT/etc/memory-layer" \
   "$PKG_ROOT/lib/systemd/system" \
   "$PKG_ROOT/usr/share/doc/memory-layer" \
@@ -144,6 +145,9 @@ install -m 0755 "$ROOT_DIR/packaging/debian/verify-instance-release" "$PKG_ROOT/
 install -m 0755 "$ROOT_DIR/packaging/debian/run-instance" "$PKG_ROOT/usr/libexec/memory-layer/run-instance"
 install -m 0755 "$ROOT_DIR/deploy/areas/ca-preflight.sh" "$PKG_ROOT/usr/libexec/memory-layer/ca-preflight"
 install -m 0644 "$ROOT_DIR/scripts/areas/releases/release.py" "$PKG_ROOT/usr/libexec/memory-layer/area-release.py"
+for release_tool in release.py instance.py console.py; do
+  install -m 0644 "$ROOT_DIR/scripts/areas/releases/$release_tool" "$PKG_ROOT/usr/libexec/memory-layer/releases/$release_tool"
+done
 install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer.env" "$PKG_ROOT/etc/memory-layer/memory-layer.env"
 install -m 0644 "$ROOT_DIR/memory-layer.toml.example" "$PKG_ROOT/etc/memory-layer/memory-layer.toml"
 install -m 0644 "$ROOT_DIR/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/README.md"
@@ -152,6 +156,7 @@ install -m 0644 "$ROOT_DIR/deploy/areas/instance.toml.example" "$PKG_ROOT/usr/sh
 install -m 0644 "$ROOT_DIR/deploy/areas/CA-CONSOLE-HANDOFF.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/CA-CONSOLE-HANDOFF.md"
 install -m 0644 "$ROOT_DIR/crates/mem-area-ops/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/area-import.md"
 install -m 0644 "$ROOT_DIR/scripts/areas/releases/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/release-staging.md"
+install -m 0644 "$ROOT_DIR/scripts/areas/releases/console-README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/console-first-install.md"
 cp -R "$ROOT_DIR/.agents/skills/." "$PKG_ROOT/usr/share/memory-layer/skill-template/"
 find "$PKG_ROOT/usr/share/memory-layer/skill-template" -type f -name '*.sh' -exec chmod 0755 {} +
 cp -R "$ROOT_DIR/web/dist/." "$PKG_ROOT/usr/share/memory-layer/web/"

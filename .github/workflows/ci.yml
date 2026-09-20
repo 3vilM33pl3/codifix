@@ -431,6 +431,7 @@ jobs:
           python3 -I -S packaging/ca-bookworm/test_pi_smoke.py
           python3 scripts/areas/releases/test_release.py
           python3 scripts/areas/releases/test_instance.py
+          python3 scripts/areas/releases/test_console.py
           bash packaging/tests/test-debian-lifecycle.sh
           python3 packaging/tests/test-instance-launcher.py
           python3 packaging/tests/test-ca-preflight.py
