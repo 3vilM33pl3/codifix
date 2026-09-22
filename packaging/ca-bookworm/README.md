@@ -88,6 +88,15 @@ metadata is an error, not permission to drop the version constraint.
 
 ## Verification and evidence
 
+The static checker defaults to ARM64. For the native companion explicitly use
+`abi.py --architecture amd64 --sysroot <captured-amd64-root> <executables...>`.
+Both modes require an independent captured sysroot (never host `/`), check the
+complete required-library/symbol/version closure and reject GLIBC newer than
+2.36. Preserve the native `/lib64/ld-linux-x86-64.so.2` location; symlinks must
+resolve within that captured root. Wrong-architecture libraries, escaping links
+and ambiguous library resolutions remain errors. Record the verifier's own
+revision/hash separately when it is newer than the frozen package source.
+
 - Static audit every shipped ARM64 executable against the exact captured
   `/usr/aarch64-linux-gnu` sysroot, including transitive libraries and symbol
   versions. Checking just `file`, the filename or one GLIBC string is insufficient.

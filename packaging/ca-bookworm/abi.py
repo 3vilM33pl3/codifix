@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Static Debian 12 ARM64 ABI gate for trusted, quiescent local build outputs.
+"""Static Debian 12 ABI gate for trusted, quiescent local build outputs.
 
 Never invokes the artifacts, their loaders, or ldd. The explicit sysroot must be
-from the reviewed Debian 12 cross toolchain; this tool does not establish its
-distribution provenance. JSON is written to stdout; failure returns status 1.
+from a reviewed Debian 12 environment; this tool does not establish its
+distribution provenance. ARM64 remains the default; AMD64 requires explicit
+selection. JSON is written to stdout; failure returns status 1.
 """
 
 import argparse
@@ -19,7 +20,22 @@ import time
 from dataclasses import dataclass
 
 
-INTERPRETER = "/lib/ld-linux-aarch64.so.1"
+@dataclass(frozen=True)
+class Target:
+    machine: str
+    interpreter: str
+    library_dirs: tuple
+
+
+TARGETS = {
+    "arm64": Target("AArch64", "/lib/ld-linux-aarch64.so.1", (
+        "lib", "lib/aarch64-linux-gnu", "usr/lib", "usr/lib/aarch64-linux-gnu",
+    )),
+    "amd64": Target("Advanced Micro Devices X86-64", "/lib64/ld-linux-x86-64.so.2", (
+        "lib", "lib/x86_64-linux-gnu", "usr/lib", "usr/lib/x86_64-linux-gnu", "lib64", "usr/lib64",
+    )),
+}
+INTERPRETER = TARGETS["arm64"].interpreter  # Existing default ARM64 interface.
 MAX_GLIBC = (2, 36)
 MAX_FILE_BYTES = 2 * 1024**3
 MAX_OUTPUT_BYTES = 32 * 1024**2
@@ -35,6 +51,11 @@ class AuditError(ValueError):
 def require(condition, message):
     if not condition:
         raise AuditError(message)
+
+
+def target(architecture):
+    require(isinstance(architecture, str) and architecture in TARGETS, "unsupported architecture")
+    return TARGETS[architecture]
 
 
 def digest(path):
@@ -83,7 +104,8 @@ def readelf(executable, option, path):
                     process.wait()
 
 
-def parse_header(text):
+def parse_header(text, architecture="arm64"):
+    selected = target(architecture)
     fields = {}
     for line in text.splitlines():
         if ":" in line:
@@ -94,21 +116,23 @@ def parse_header(text):
                 fields[key] = value.strip()
     require(fields.get("Class") == "ELF64", "expected ELF64")
     require(fields.get("Data") == "2's complement, little endian", "expected little endian")
-    require(fields.get("Machine") == "AArch64", "expected AArch64")
+    require(fields.get("Machine") == selected.machine, "expected " + selected.machine)
     require(fields.get("Type", "").split(" ")[0] in {"EXEC", "DYN"}, "expected executable/shared ELF")
     return fields
 
 
-def parse_program_headers(text, artifact):
+def parse_program_headers(text, artifact, architecture="arm64"):
+    selected = target(architecture)
     require("Program Headers:" in text, "missing program headers")
     interpreters = re.findall(r"\[Requesting program interpreter: ([^\]\n]+)\]", text)
     interp_segments = len(re.findall(r"^\s*INTERP\s", text, re.MULTILINE))
     require(len(interpreters) == interp_segments, "unparsed interpreter metadata")
     require(len(interpreters) <= 1, "multiple interpreters")
     if artifact:
-        require(interpreters == [INTERPRETER], "artifact requires the approved ARM64 loader")
+        require(interpreters == [selected.interpreter],
+                "artifact requires the approved " + architecture.upper() + " loader")
     elif interpreters:
-        require(interpreters == [INTERPRETER], "unexpected library interpreter")
+        require(interpreters == [selected.interpreter], "unexpected library interpreter")
     return interpreters[0] if interpreters else None
 
 
@@ -234,10 +258,11 @@ class Object:
     exports: set
 
 
-def inspect(path, reader, artifact=False):
+def inspect(path, reader, artifact=False, architecture="arm64"):
+    target(architecture)
     before = digest(path)
-    header = parse_header(reader("--file-header", path))
-    interpreter = parse_program_headers(reader("--program-headers", path), artifact)
+    header = parse_header(reader("--file-header", path), architecture)
+    interpreter = parse_program_headers(reader("--program-headers", path), artifact, architecture)
     needed, soname = parse_dynamic(reader("--dynamic", path))
     versions, definitions = parse_versions(reader("--version-info", path))
     imports, exports = parse_symbols(reader("--dyn-syms", path))
@@ -262,13 +287,13 @@ def inspect(path, reader, artifact=False):
 
 
 class Auditor:
-    def __init__(self, sysroot, reader):
+    def __init__(self, sysroot, reader, architecture="arm64"):
+        self.target = target(architecture)
+        self.architecture = architecture
         self.root = Path(sysroot).resolve(strict=True)
-        require(self.root.is_dir() and self.root != Path("/"), "explicit cross sysroot required")
+        require(self.root.is_dir() and self.root != Path("/"), "explicit isolated sysroot required")
         self.reader = reader
-        self.dirs = [self.root / entry for entry in (
-            "lib", "lib/aarch64-linux-gnu", "usr/lib", "usr/lib/aarch64-linux-gnu",
-        )]
+        self.dirs = [self.root / entry for entry in self.target.library_dirs]
         self.objects = {}
 
     def resolve(self, name):
@@ -288,7 +313,7 @@ class Auditor:
         path = self.resolve(name)
         if path not in self.objects:
             require(len(self.objects) < MAX_OBJECTS, "dependency closure exceeds bound")
-            value = inspect(path, self.reader)
+            value = inspect(path, self.reader, architecture=self.architecture)
             require(value.soname == name, f"unexpected SONAME for {name}")
             # Insert before descent: libc and the loader may be cyclic.
             self.objects[path] = value
@@ -299,9 +324,9 @@ class Auditor:
 
     def audit(self, artifacts):
         require(1 <= len(artifacts) <= 16, "expected one to sixteen artifacts")
-        roots = [inspect(Path(path).resolve(strict=True), self.reader, True) for path in artifacts]
-        loader = self.library(Path(INTERPRETER).name)
-        exact_loader = (self.root / INTERPRETER.lstrip("/")).resolve(strict=True)
+        roots = [inspect(Path(path).resolve(strict=True), self.reader, True, self.architecture) for path in artifacts]
+        loader = self.library(Path(self.target.interpreter).name)
+        exact_loader = (self.root / self.target.interpreter.lstrip("/")).resolve(strict=True)
         require(exact_loader == loader.path, "interpreter is not at the expected sysroot path")
         for root in roots:
             for dependency in root.needed:
@@ -347,15 +372,16 @@ class Auditor:
                 "maximum_required_glibc": max(glibc, key=lambda item: tuple(map(int, item.split(".")))) if glibc else None,
             }
         return {
-            "schema_version": 1, "status": "static_abi_pass", "target": "Debian 12 ARM64 glibc 2.36",
+            "schema_version": 1, "status": "static_abi_pass", "architecture": self.architecture,
+            "target": "Debian 12 " + self.architecture.upper() + " glibc 2.36",
             "sysroot": str(self.root), "artifacts": [record(value) for value in roots],
             "libraries": [record(value) for value in sorted(self.objects.values(), key=lambda item: str(item.path))],
             "limitations": [
                 "Static inspection only; no artifact, loader or library was executed.",
-                "Requires trusted, quiescent artifacts and an independently provenance-verified Debian 12 cross sysroot.",
+                "Requires trusted, quiescent artifacts and an independently provenance-verified isolated Debian 12 sysroot.",
                 "No proof of native execution, CPU instructions, kernel features, sandbox enforcement or application behavior.",
                 "Does not inventory dlopen plugins, NSS modules, external executables or files accessed at runtime.",
-                "Sysroot library hashes do not establish the libraries currently installed on the CA.",
+                "Sysroot library hashes do not establish the libraries currently installed on the destination host.",
                 "Passing does not authorize installation, service activation, migration or paid calls.",
             ],
         }
@@ -364,13 +390,15 @@ class Auditor:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sysroot", required=True, type=Path)
+    parser.add_argument("--architecture", choices=tuple(TARGETS), default="arm64",
+                        help="target architecture; default arm64, never inferred from the host")
     parser.add_argument("--readelf", default="readelf", help="trusted host readelf executable")
     parser.add_argument("artifacts", nargs="+", type=Path)
     args = parser.parse_args()
     try:
         executable = shutil.which(args.readelf)
         require(executable is not None, "readelf unavailable")
-        audit = Auditor(args.sysroot, lambda option, path: readelf(executable, option, path))
+        audit = Auditor(args.sysroot, lambda option, path: readelf(executable, option, path), args.architecture)
         result = audit.audit(args.artifacts)
         result["readelf"] = {"path": executable, "sha256": digest(Path(executable))}
         print(json.dumps(result, indent=2, sort_keys=True))

@@ -26,9 +26,9 @@ HEADER = """ELF Header:
 """
 
 
-def program(artifact=False):
+def program(artifact=False, architecture="arm64"):
     return "Program Headers:\n  LOAD 0x000 0x000\n" + (
-        f"  INTERP 0x100 0x100\n [Requesting program interpreter: {abi.INTERPRETER}]\n"
+        f"  INTERP 0x100 0x100\n [Requesting program interpreter: {abi.target(architecture).interpreter}]\n"
         if artifact else ""
     )
 
@@ -70,10 +70,11 @@ def symbols(imports=(), exports=(), weak=()):
     return f"Symbol table '.dynsym' contains {len(rows)} entries:\n" + "\n".join(rows)
 
 
-def metadata(artifact=False, needed=(), soname=None, required=None, defined=(), imports=(), exports=()):
+def metadata(artifact=False, needed=(), soname=None, required=None, defined=(), imports=(), exports=(),
+             architecture="arm64"):
     return {
-        "--file-header": HEADER,
-        "--program-headers": program(artifact),
+        "--file-header": HEADER.replace("AArch64", abi.target(architecture).machine),
+        "--program-headers": program(artifact, architecture),
         "--dynamic": dynamic(needed, soname),
         "--version-info": versions(required, defined),
         "--dyn-syms": symbols(imports, exports),
@@ -83,6 +84,30 @@ def metadata(artifact=False, needed=(), soname=None, required=None, defined=(), 
 class ParserTests(unittest.TestCase):
     def test_header_success(self):
         self.assertEqual(abi.parse_header(HEADER)["Machine"], "AArch64")
+
+    def test_explicit_amd64_header_and_interpreter(self):
+        header = HEADER.replace("AArch64", "Advanced Micro Devices X86-64")
+        self.assertEqual(abi.parse_header(header, "amd64")["Machine"], "Advanced Micro Devices X86-64")
+        self.assertEqual(abi.parse_program_headers(program(True, "amd64"), True, "amd64"),
+                         "/lib64/ld-linux-x86-64.so.2")
+        for text in (HEADER, header.replace("ELF64", "ELF32"), header.replace("little endian", "big endian")):
+            with self.subTest(text=text), self.assertRaises(abi.AuditError):
+                abi.parse_header(text, "amd64")
+        for text in (program(True), program(), program(True, "amd64").replace("/lib64/", "/tmp/")):
+            with self.subTest(text=text), self.assertRaises(abi.AuditError):
+                abi.parse_program_headers(text, True, "amd64")
+
+    def test_unknown_architecture_rejected_by_all_entrypoints(self):
+        for architecture in ("AMD64", "x86_64", "riscv64", "", None):
+            with self.subTest(architecture=architecture):
+                for action in (
+                    lambda: abi.parse_header(HEADER, architecture),
+                    lambda: abi.parse_program_headers(program(True), True, architecture),
+                    lambda: abi.inspect(Path(__file__), lambda *_: "", architecture=architecture),
+                    lambda: abi.Auditor(Path("/"), lambda *_: "", architecture),
+                ):
+                    with self.assertRaisesRegex(abi.AuditError, "unsupported architecture"):
+                        action()
 
     def test_arch_class_endianness_unknown_or_duplicate_fail(self):
         for text in (
@@ -160,6 +185,8 @@ class ParserTests(unittest.TestCase):
 
 
 class ClosureTests(unittest.TestCase):
+    architecture = "arm64"
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -172,10 +199,16 @@ class ClosureTests(unittest.TestCase):
             artifact=True, needed=["libc.so.6", "libstdc++.so.6"],
             required={"libc.so.6": ["GLIBC_2.34"], "libstdc++.so.6": ["GLIBCXX_3.4.30"]},
             imports=["start@GLIBC_2.34", "cpp@GLIBCXX_3.4.30"],
+            architecture=self.architecture,
         )}
-        self.lib("ld-linux-aarch64.so.1", defined=["GLIBC_PRIVATE"], exports=["loader@@GLIBC_PRIVATE"])
-        self.lib("libc.so.6", needed=["ld-linux-aarch64.so.1"],
-                 required={"ld-linux-aarch64.so.1": ["GLIBC_PRIVATE"]},
+        self.loader_name = Path(abi.target(self.architecture).interpreter).name
+        loader = self.lib(self.loader_name, defined=["GLIBC_PRIVATE"], exports=["loader@@GLIBC_PRIVATE"])
+        interpreter = self.root / abi.target(self.architecture).interpreter.lstrip("/")
+        if interpreter != loader:
+            interpreter.parent.mkdir(parents=True)
+            interpreter.symlink_to("../lib/" + self.loader_name)
+        self.lib("libc.so.6", needed=[self.loader_name],
+                 required={self.loader_name: ["GLIBC_PRIVATE"]},
                  defined=["GLIBC_2.34", "GLIBC_2.36"], imports=["loader@GLIBC_PRIVATE"],
                  exports=["start@@GLIBC_2.34"])
         self.lib("libstdc++.so.6", needed=["libgcc_s.so.1"],
@@ -186,18 +219,20 @@ class ClosureTests(unittest.TestCase):
     def lib(self, name, **kwargs):
         path = self.root / "lib" / name
         path.write_bytes(name.encode())
-        self.data[path] = metadata(soname=name, **kwargs)
+        self.data[path] = metadata(soname=name, architecture=self.architecture, **kwargs)
         return path
 
     def reader(self, option, path):
         return self.data[path][option]
 
     def audit(self):
-        return abi.Auditor(self.root, self.reader).audit([self.artifact])
+        return abi.Auditor(self.root, self.reader, self.architecture).audit([self.artifact])
 
     def test_transitive_closure_hashes_and_limitations(self):
         result = self.audit()
         self.assertEqual(result["status"], "static_abi_pass")
+        self.assertEqual(result["architecture"], self.architecture)
+        self.assertEqual(result["target"], "Debian 12 " + self.architecture.upper() + " glibc 2.36")
         self.assertEqual(len(result["libraries"]), 4)
         self.assertEqual(result["artifacts"][0]["sha256"], abi.digest(self.artifact))
         self.assertEqual(result["artifacts"][0]["maximum_required_glibc"], "2.34")
@@ -223,7 +258,7 @@ class ClosureTests(unittest.TestCase):
 
     def test_transitive_wrong_architecture_fails(self):
         self.data[self.root / "lib/libgcc_s.so.1"]["--file-header"] = HEADER.replace("AArch64", "ARM")
-        with self.assertRaisesRegex(abi.AuditError, "AArch64"):
+        with self.assertRaisesRegex(abi.AuditError, abi.target(self.architecture).machine):
             self.audit()
 
     def test_new_glibc_and_private_application_requirements_fail(self):
@@ -272,10 +307,10 @@ class ClosureTests(unittest.TestCase):
     def test_object_cannot_be_satisfied_by_another_artifact(self):
         other = self.artifact.with_name("another")
         other.write_bytes(b"another")
-        self.data[other] = metadata(artifact=True, exports=["missing"])
+        self.data[other] = metadata(artifact=True, exports=["missing"], architecture=self.architecture)
         self.data[self.artifact]["--dyn-syms"] = symbols(imports=["missing"])
         with self.assertRaisesRegex(abi.AuditError, "unavailable dynamic symbols"):
-            abi.Auditor(self.root, self.reader).audit([self.artifact, other])
+            abi.Auditor(self.root, self.reader, self.architecture).audit([self.artifact, other])
 
     def test_changed_artifact_fails(self):
         first = True
@@ -286,18 +321,110 @@ class ClosureTests(unittest.TestCase):
                 first = False
             return self.reader(option, path)
         with self.assertRaisesRegex(abi.AuditError, "changed during inspection"):
-            abi.Auditor(self.root, reader).audit([self.artifact])
+            abi.Auditor(self.root, reader, self.architecture).audit([self.artifact])
 
     def test_bounds_and_root_rejected(self):
         with self.assertRaises(abi.AuditError):
-            abi.Auditor(Path("/"), self.reader)
+            abi.Auditor(Path("/"), self.reader, self.architecture)
         with self.assertRaises(abi.AuditError):
-            abi.Auditor(self.root, self.reader).audit([])
+            abi.Auditor(self.root, self.reader, self.architecture).audit([])
         with patch.object(abi, "MAX_OBJECTS", 1), self.assertRaisesRegex(abi.AuditError, "closure exceeds"):
             self.audit()
 
 
+class Amd64ClosureTests(ClosureTests):
+    """Repeat every transitive rejection on AMD64, not just its happy path."""
+    architecture = "amd64"
+
+    def test_amd64_requires_explicit_selection(self):
+        with self.assertRaisesRegex(abi.AuditError, "expected AArch64"):
+            abi.Auditor(self.root, self.reader).audit([self.artifact])
+
+    def test_amd64_rejects_arm64_artifact_and_transitive_library(self):
+        for path in (self.artifact, self.root / "lib/libgcc_s.so.1"):
+            original = self.data[path]["--file-header"]
+            self.data[path]["--file-header"] = HEADER
+            try:
+                with self.assertRaisesRegex(abi.AuditError, "expected Advanced Micro Devices X86-64"):
+                    self.audit()
+            finally:
+                self.data[path]["--file-header"] = original
+
+    def test_amd64_multiarch_sysroot_and_loader_symlink(self):
+        directory = self.root / "lib/x86_64-linux-gnu"
+        directory.mkdir()
+        for path in list(self.data):
+            if path.parent == self.root / "lib":
+                new = directory / path.name
+                path.rename(new)
+                self.data[new] = self.data.pop(path)
+        interpreter = self.root / "lib64" / self.loader_name
+        interpreter.unlink()
+        interpreter.symlink_to("../lib/x86_64-linux-gnu/" + self.loader_name)
+        result = self.audit()
+        self.assertEqual(result["status"], "static_abi_pass")
+        self.assertTrue(all(Path(item["path"]).parent == directory for item in result["libraries"]))
+        self.assertNotIn("ARM64", str(result))
+        self.assertNotIn("AArch64", str(result))
+
+    def test_amd64_does_not_search_arm64_multiarch_directory(self):
+        old = self.root / "lib/libgcc_s.so.1"
+        directory = self.root / "lib/aarch64-linux-gnu"
+        directory.mkdir()
+        new = directory / old.name
+        old.rename(new)
+        self.data[new] = self.data.pop(old)
+        with self.assertRaisesRegex(abi.AuditError, "missing or ambiguous"):
+            self.audit()
+
+    def test_amd64_loader_must_be_at_exact_interpreter_path(self):
+        (self.root / "lib64" / self.loader_name).unlink()
+        with self.assertRaises(FileNotFoundError):
+            self.audit()
+
+    def test_amd64_wrong_or_overridden_interpreter_refused(self):
+        for interpreter in (abi.INTERPRETER, "/lib/ld-linux-x86-64.so.2", "/tmp/ld-linux-x86-64.so.2"):
+            self.data[self.artifact]["--program-headers"] = program(True, "amd64").replace(
+                abi.target("amd64").interpreter, interpreter)
+            with self.subTest(interpreter=interpreter), self.assertRaisesRegex(abi.AuditError, "approved AMD64 loader"):
+                self.audit()
+
+    def test_amd64_transitive_library_cannot_select_arm64_loader(self):
+        self.data[self.root / "lib/libc.so.6"]["--program-headers"] = program(True)
+        with self.assertRaisesRegex(abi.AuditError, "unexpected library interpreter"):
+            self.audit()
+
+    def test_amd64_sysroot_alias_to_host_root_refused(self):
+        alias = Path(self.temp.name) / "host-root-alias"
+        alias.symlink_to("/", target_is_directory=True)
+        with self.assertRaisesRegex(abi.AuditError, "explicit isolated sysroot"):
+            abi.Auditor(alias, self.reader, "amd64")
+
+
 class SubprocessTests(unittest.TestCase):
+    def test_cli_rejects_unknown_architecture(self):
+        result = subprocess.run(
+            [sys.executable, str(Path(abi.__file__)), "--architecture", "x86_64",
+             "--sysroot", "/", str(Path(__file__))],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(b"invalid choice", result.stderr)
+        self.assertEqual(result.stdout, b"")
+
+    @unittest.skipUnless(shutil.which("readelf"), "readelf CLI prerequisite is unavailable")
+    def test_cli_explicit_amd64_still_refuses_host_root(self):
+        # Rejection precedes inspecting any artifact or library; only the
+        # verifier is executed, with this Python source as an unused input.
+        result = subprocess.run(
+            [sys.executable, str(Path(abi.__file__)), "--architecture", "amd64",
+             "--sysroot", "/", str(Path(__file__))],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(b"explicit isolated sysroot required", result.stdout)
+        self.assertEqual(result.stderr, b"")
+
     def test_missing_readelf_and_wrong_format_fail(self):
         with self.assertRaises(OSError):
             abi.readelf("/nonexistent/readelf", "--file-header", Path(__file__))

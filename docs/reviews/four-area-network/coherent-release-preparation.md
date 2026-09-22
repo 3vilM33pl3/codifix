@@ -46,6 +46,15 @@ Reviewed unit SHA-256:
 The 20 prepared-instance tests, three launcher tests, Debian lifecycle fixtures,
 seven build-command tests, formatting and boundaries also pass.
 
+Frozen package source: `b35faf2983d20c69bc086fb9bcb7e95c51bd8f47` (2,203 tracked
+files verified), archive SHA-256
+`c6ce8327a1dea7f6988750cdc327ab40573938b696cf42ca358a068e9428d42e`.
+Work/evidence root: `/data/tmp/memory-coherent-bookworm-20260922.I23H901g`.
+The subsequent ABI-verifier extension is a separately identified verification
+tool, not an unrecorded edit to that frozen build source. Its 57 tests all pass
+in the pinned Bookworm image, including two real cross-compiled C/C++ fixtures.
+Verifier SHA-256: `fe0ba65120d54cf42762d57b0ddf5fc1dcfeaa7afb81e525efa636ba171854e1`.
+
 Status: in progress. This document must record actual outputs before the release
 can be presented for signing. No publication, signature or installation authority
 is implied by successful compilation.
