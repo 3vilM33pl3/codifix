@@ -188,7 +188,7 @@ def preparation(manifest, manifest_bytes, signer, instance, architecture, schema
             "pi_included": False, "artifact_execution_tested": False, "host_sandbox_tested": False,
             "plan": {"unit": f"memory-layer@{instance}.service",
                      "concrete_release": f"/opt/memory-layer/instances/{instance}/release",
-                     "binary_digest_credential": f"/etc/memory-layer/instances/{instance}/memory.sha256",
+                     "binary_digest_credential": f"/etc/memory-layer-instances/{instance}/memory.sha256",
                      "before_switch": ["separate operator approval and verified backup/restore",
                                        "verify actual host ABI and sandbox independently",
                                        "confirm fresh target schema and fence every old writer",

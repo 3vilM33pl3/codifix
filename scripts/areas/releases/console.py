@@ -67,7 +67,7 @@ IDENTIFIER = re.compile(r"[a-f0-9]{32}\Z")
 CONFIG_LIMIT = 65536
 MAX_EVENTS = 128
 MAX_GENERATIONS = 5
-UNIT_SHA256 = "081f2dd4a328ab1758fe8fd932bae51212385c2dce574241b07d7761300fb332"
+UNIT_SHA256 = "418e629337592d207f11115226395015c11aa01223841692771b9e12f4db1dca"
 PHASES = {"planned", "copying", "ready", "release_intent", "release_done",
           "config_intent", "installed", "retain_intent", "retained"}
 
@@ -271,10 +271,38 @@ class Layout:
         # environment override or executable hook exists.
         self.root = root
         self.release = root / "opt/memory-layer/instances"
-        self.config = root / "etc/memory-layer/instances"
-        self.journal = root / "var/lib/memory-layer/installations"
+        # A singleton's service-owned directories must never be ancestors of
+        # root-trusted configuration or installer state. Named service state
+        # lives under <name>/service in three separate systemd-managed roots.
+        self.config = root / "etc/memory-layer-instances"
+        self.journal = root / "var/lib/memory-layer-installations"
         self.previous_state = [root / location for location in (
-            "var/lib/memory-layer/instances", "var/cache/memory-layer/instances", "run/memory-layer/instances")]
+            "var/lib/memory-layer-instances", "var/cache/memory-layer-instances", "run/memory-layer-instances")]
+        self.legacy = [root / location for location in (
+            "etc/memory-layer/instances", "var/lib/memory-layer/instances",
+            "var/cache/memory-layer/instances", "run/memory-layer/instances",
+            "var/lib/memory-layer/installations")]
+
+
+def path_absent(path):
+    """Inspect only the fixed path, without adopting or following legacy links.
+
+    Legacy ancestors may legitimately be service-owned; they are never trusted
+    or modified. Inaccessible or symlinked ancestors fail closed, not as absent.
+    """
+    _, parts = release.absolute_parts(path)
+    descriptor = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in parts[:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        os.stat(parts[-1], dir_fd=descriptor, follow_symlinks=False)
+        return False
+    except FileNotFoundError:
+        return True
+    finally:
+        os.close(descriptor)
 
 
 class Console:
@@ -291,6 +319,7 @@ class Console:
 
     def open(self, name, create=False):
         self.name = instance.instance_name(name)
+        self.check_absent_state()
         if create:
             for parent in (self.layout.release, self.layout.config, self.layout.journal):
                 ensure_directory(parent, 0o700 if parent == self.layout.journal else 0o755)
@@ -318,6 +347,14 @@ class Console:
         require(instance.absent(self.root_fd, "plan.json") if create else not instance.absent(self.root_fd, "plan.json"),
                 "Use recovery for an existing committed installation; uncommitted inputs require inspection")
 
+    def check_absent_state(self):
+        for parent in self.layout.legacy:
+            require(path_absent(parent / self.name),
+                    "Existing legacy instance or journal requires separate reviewed migration")
+        for parent in self.layout.previous_state:
+            require(path_absent(parent / self.name),
+                    "Existing instance runtime/state is outside first-install scope")
+
     def guard(self):
         for parent in (self.layout.release, self.layout.config):
             descriptor = trusted_directory(parent)
@@ -326,10 +363,7 @@ class Console:
         while ancestor != self.layout.root:
             require(ancestor.stat().st_mode & 0o001, "Release ancestors must be searchable by DynamicUser")
             ancestor = ancestor.parent
-        for parent in self.layout.previous_state:
-            path = parent / self.name
-            require(not path.exists() and not path.is_symlink(),
-                    "Existing instance runtime/state is outside first-install scope")
+        self.check_absent_state()
         # Existing activation, even on an otherwise stopped service, excludes
         # this first-install-only workflow. Do not remove the marker to bypass it.
         path = self.layout.config / self.name

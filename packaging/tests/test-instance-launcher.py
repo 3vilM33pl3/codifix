@@ -58,7 +58,8 @@ class LauncherTests(unittest.TestCase):
         child = output["env"]
         self.assertEqual(child["MEMORY_LAYER_PROFILE"], "prod")
         self.assertEqual(child["PATH"], "/usr/bin:/bin")
-        self.assertEqual(child["XDG_STATE_HOME"], str(self.root / "var/lib/memory-layer/instances/homelab/service/state"))
+        self.assertEqual(child["XDG_STATE_HOME"], str(self.root / "var/lib/memory-layer-instances/homelab/service/state"))
+        self.assertEqual(child["XDG_CACHE_HOME"], str(self.root / "var/cache/memory-layer-instances/homelab/service"))
         self.assertEqual(set(child) - {"LC_CTYPE"}, {"PATH", "LANG", "MEMORY_LAYER_PROFILE", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"})
         self.assertNotIn("SYNTHETIC_KEY", result.stdout)
 

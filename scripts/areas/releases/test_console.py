@@ -257,6 +257,70 @@ class ConsoleTests(unittest.TestCase):
                     self.install()
                 self.assertTrue(existing.is_dir())
 
+    def test_layout_is_separate_from_singleton_service_roots(self):
+        self.assertEqual(self.layout.config.relative_to(self.layout.root).as_posix(),
+                         "etc/memory-layer-instances")
+        self.assertEqual(self.layout.journal.relative_to(self.layout.root).as_posix(),
+                         "var/lib/memory-layer-installations")
+        self.assertEqual([p.relative_to(self.layout.root).as_posix() for p in self.layout.previous_state],
+                         ["var/lib/memory-layer-instances", "var/cache/memory-layer-instances",
+                          "run/memory-layer-instances"])
+
+    def test_every_old_layout_instance_or_journal_refuses_before_creation(self):
+        for index in range(5):
+            for entry in ("directory", "symlink"):
+                with self.subTest(location=index, entry=entry):
+                    self.layout = TOOL.Layout(self.root / f"legacy-{index}-{entry}")
+                    parent = self.layout.legacy[index]
+                    TOOL.ensure_directory(parent, 0o755)
+                    existing = parent / "trust"
+                    if entry == "directory":
+                        existing.mkdir(mode=0o700)
+                        (existing / "preserved").write_bytes(b"legacy operator state")
+                    else:
+                        existing.symlink_to("nonexistent-legacy-target")
+                    with self.assertRaisesRegex(TOOL.release.ReleaseError, "Existing legacy"):
+                        self.install()
+                    self.assertFalse(self.layout.journal.exists())
+                    self.assertFalse(self.layout.config.exists())
+                    self.assertFalse(self.layout.release.exists())
+                    if entry == "directory":
+                        self.assertEqual((existing / "preserved").read_bytes(), b"legacy operator state")
+                    else:
+                        self.assertTrue(existing.is_symlink())
+
+    def test_legacy_remnants_also_block_inspection_and_recovery(self):
+        self.install()
+        before = (self.layout.journal / "trust/plan.json").read_bytes()
+        for parent in self.layout.legacy:
+            with self.subTest(location=parent):
+                TOOL.ensure_directory(parent, 0o755)
+                existing = parent / "trust"
+                existing.mkdir(mode=0o700)
+                try:
+                    for action in ("inspect", "finish", "retain"):
+                        with self.assertRaisesRegex(TOOL.release.ReleaseError, "Existing legacy"):
+                            self.recover(action)
+                    self.assertEqual((self.layout.journal / "trust/plan.json").read_bytes(), before)
+                    self.assertEqual((self.layout.config / "trust/memory-layer.toml").read_bytes(),
+                                     self.config.encode())
+                finally:
+                    existing.rmdir()
+
+    def test_legacy_path_probe_refuses_symlinked_or_unreadable_ancestors(self):
+        legacy = self.layout.root / "var/lib/memory-layer"
+        TOOL.ensure_directory(legacy.parent, 0o755)
+        elsewhere = self.root / "unrelated"
+        elsewhere.mkdir(mode=0o700)
+        legacy.symlink_to(elsewhere, target_is_directory=True)
+        with self.assertRaises(OSError):
+            self.install()
+        self.assertEqual(list(elsewhere.iterdir()), [])
+        self.assertFalse(self.layout.journal.exists())
+        with mock.patch.object(TOOL.os, "open", side_effect=PermissionError("synthetic unreadable ancestor")):
+            with self.assertRaises(PermissionError):
+                TOOL.path_absent(legacy / "instances/trust")
+
     def test_config_hash_mode_symlink_and_hardlink_rejected(self):
         bad = copy.copy(self.args)
         bad.config_sha256 = "0" * 64

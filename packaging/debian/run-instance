@@ -25,10 +25,10 @@ runtime_env=(
     'PATH=/usr/bin:/bin'
     'LANG=C.UTF-8'
     'MEMORY_LAYER_PROFILE=prod'
-    "XDG_CONFIG_HOME=/var/lib/memory-layer/instances/$instance/service/config"
-    "XDG_STATE_HOME=/var/lib/memory-layer/instances/$instance/service/state"
-    "XDG_DATA_HOME=/var/lib/memory-layer/instances/$instance/service/data"
-    "XDG_CACHE_HOME=/var/cache/memory-layer/instances/$instance/service"
+    "XDG_CONFIG_HOME=/var/lib/memory-layer-instances/$instance/service/config"
+    "XDG_STATE_HOME=/var/lib/memory-layer-instances/$instance/service/state"
+    "XDG_DATA_HOME=/var/lib/memory-layer-instances/$instance/service/data"
+    "XDG_CACHE_HOME=/var/cache/memory-layer-instances/$instance/service"
 )
 if [[ $# == 3 ]]; then
     if [[ "$3" != '--federation' ]] || [[ ! -f "$credential_dir/federation.json" || ! -r "$credential_dir/federation.json" || -L "$credential_dir/federation.json" ]]; then

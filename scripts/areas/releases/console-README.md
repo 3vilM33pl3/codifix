@@ -84,8 +84,13 @@ Fixed paths (no CLI root or command override exists):
 | Purpose | Path |
 | --- | --- |
 | Binary and Web files | `/opt/memory-layer/instances/trust/release/` |
-| Configuration and binary digest | `/etc/memory-layer/instances/trust/` |
-| Private recovery snapshot and metadata journal | `/var/lib/memory-layer/installations/trust/` |
+| Configuration and binary digest | `/etc/memory-layer-instances/trust/` |
+| Private recovery snapshot and metadata journal | `/var/lib/memory-layer-installations/trust/` |
+
+The independent roots avoid legacy service-owned parents. They do not migrate
+the earlier unsigned candidate's layout. Any per-instance configuration,
+state/cache/runtime or journal under that older layout causes a refusal; preserve
+it for explicit review. Never chown the singleton's directories as a workaround.
 
 Published release directories are `0755`, the binary `0755`, and Web files `0644`
 for the service's DynamicUser. Configuration directories remain `0700` and files

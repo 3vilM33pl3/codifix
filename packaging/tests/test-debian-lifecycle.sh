@@ -62,8 +62,11 @@ unit="$repo_root/packaging/debian/memory-layer@.service"
 for required in \
     'DynamicUser=true' \
     'StateDirectoryMode=0700' \
-    'ConditionPathExists=/etc/memory-layer/instances/%i/activation-reviewed' \
-    'LoadCredential=memory-layer.toml:/etc/memory-layer/instances/%i/memory-layer.toml' \
+    'ConditionPathExists=/etc/memory-layer-instances/%i/activation-reviewed' \
+    'LoadCredential=memory-layer.toml:/etc/memory-layer-instances/%i/memory-layer.toml' \
+    'StateDirectory=memory-layer-instances/%i/service' \
+    'CacheDirectory=memory-layer-instances/%i/service' \
+    'RuntimeDirectory=memory-layer-instances/%i/service' \
     'ExecStartPre=/usr/bin/env -i PATH=/usr/bin:/bin /usr/libexec/memory-layer/verify-instance-release %i %d/memory.sha256' \
     'ExecStart=/usr/libexec/memory-layer/run-instance %i %d' \
     'ProtectSystem=strict' \
@@ -73,6 +76,9 @@ for required in \
 done
 if grep -Eq 'EnvironmentFile=|ExecStart=.*/usr/bin/memory|ReadWritePaths=.*/etc' "$unit"; then
     fail "named instance inherits mutable global executable/configuration"
+fi
+if grep -Eq '^(StateDirectory|CacheDirectory|RuntimeDirectory)=memory-layer/instances|^(LoadCredential|WorkingDirectory|ConditionPathExists)=.*/(etc|var/lib|var/cache|run)/memory-layer/instances' "$unit"; then
+    fail "named instance depends on a legacy service-owned directory"
 fi
 
 # Invalid instance names/digests are rejected before touching /opt. Valid-file
@@ -241,7 +247,10 @@ dpkg-deb() {
     [[ -f "$staging/usr/share/doc/memory-layer/areas/instance.toml.example" ]] || return 93
     [[ ! -e "$staging/opt/memory-layer" ]] || return 94
     [[ ! -e "$staging/etc/memory-layer/instances" ]] || return 95
+    [[ ! -e "$staging/etc/memory-layer-instances" ]] || return 95
     [[ ! -e "$staging/var/lib/memory-layer" ]] || return 96
+    [[ ! -e "$staging/var/lib/memory-layer-instances" ]] || return 96
+    [[ ! -e "$staging/var/lib/memory-layer-installations" ]] || return 96
     for operator in memory memory-area memory-area-import memory-federation-gateway; do
         [[ -x "$staging/usr/bin/$operator" ]] || return 97
         cmp "$staging/usr/bin/$operator" "$CARGO_TARGET_DIR/$rust_target/release/$operator" || return 97

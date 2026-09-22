@@ -47,14 +47,20 @@ projects in one database do not provide this separation.
 
 | Purpose | Path or identity |
 | --- | --- |
-| Configuration source, root-owned mode 0600 | `/etc/memory-layer/instances/<name>/memory-layer.toml` |
-| Expected binary SHA-256, one lowercase hex digest | `/etc/memory-layer/instances/<name>/memory.sha256` |
-| Operator activation record | `/etc/memory-layer/instances/<name>/activation-reviewed` |
+| Configuration source, root-owned mode 0600 | `/etc/memory-layer-instances/<name>/memory-layer.toml` |
+| Expected binary SHA-256, one lowercase hex digest | `/etc/memory-layer-instances/<name>/memory.sha256` |
+| Operator activation record | `/etc/memory-layer-instances/<name>/activation-reviewed` |
 | Independently staged executable | `/opt/memory-layer/instances/<name>/release/bin/memory` |
 | Matching static assets | `/opt/memory-layer/instances/<name>/release/web/` |
 | Dedicated dynamic service user | `memory-area-<name>` |
-| Private persistent service state | `/var/lib/memory-layer/instances/<name>/service/` |
-| Private cache / runtime state | `/var/cache/memory-layer/instances/<name>/service/`, `/run/memory-layer/instances/<name>/service/` |
+| Private persistent service state | `/var/lib/memory-layer-instances/<name>/service/` |
+| Private cache / runtime state | `/var/cache/memory-layer-instances/<name>/service/`, `/run/memory-layer-instances/<name>/service/` |
+
+These named-instance roots deliberately do not descend from the legacy
+singleton's service-owned configuration/state directories. Older unsigned
+candidates used those legacy parents; do not adopt their paths or change the
+running singleton's ownership to make a first installation pass. Existing named
+instance remnants require a separate reviewed migration, not this first installer.
 
 All executable ancestors must be root-owned, non-symlink directories without
 group/other write permission. The service verifies the binary against its loaded
@@ -98,7 +104,7 @@ for the selected instance can use:
 
 ```ini
 [Service]
-LoadCredential=federation.json:/etc/memory-layer/instances/homelab/federation.json
+LoadCredential=federation.json:/etc/memory-layer-instances/homelab/federation.json
 ExecStart=
 ExecStart=/usr/libexec/memory-layer/run-instance homelab %d --federation
 ```

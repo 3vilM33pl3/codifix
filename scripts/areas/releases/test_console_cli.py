@@ -25,6 +25,13 @@ import unittest
 sys.dont_write_bytecode = True
 SOURCE_FILES = ("console.py", "instance.py", "release.py", "test_instance.py",
                 "test_release.py", "test_console_cli.py")
+LEGACY_ROOTS = ("/etc/memory-layer", "/var/lib/memory-layer", "/var/cache/memory-layer",
+                "/run/memory-layer")
+LEGACY_INSTANCE_PARENTS = (*(path + "/instances" for path in LEGACY_ROOTS),
+                           "/var/lib/memory-layer/installations")
+PRIVATE_ROOTS = ("/etc/memory-layer-instances", "/var/lib/memory-layer-installations")
+SERVICE_ROOTS = ("/var/lib/memory-layer-instances", "/var/cache/memory-layer-instances",
+                 "/run/memory-layer-instances")
 FIELDS = ("ActiveState", "ControlPID", "DropInPaths", "FragmentPath", "Id", "Job",
           "LoadState", "MainPID", "Names", "SubState", "Transient", "UnitFileState")
 FAKE_SYSTEMCTL = '''#!/usr/bin/python3 -I
@@ -91,20 +98,43 @@ def check_container():
         mounts[parts[4]] = (set(parts[5].split(",")), right.split()[0])
     if "ro" not in mounts["/"][0]:
         raise RuntimeError("The container root must be read-only")
-    for path in ("/scratch", "/tmp", "/opt/memory-layer", "/etc/memory-layer",
-                 "/var/lib/memory-layer"):
+    for path in ("/scratch", "/tmp", "/opt/memory-layer", *PRIVATE_ROOTS, *SERVICE_ROOTS,
+                 *LEGACY_ROOTS, *LEGACY_INSTANCE_PARENTS):
         if path not in mounts or mounts[path][1] != "tmpfs":
             raise RuntimeError("Every writable rehearsal path must be a disposable tmpfs")
     for path in [*("/source/" + name for name in SOURCE_FILES),
-                 "/source/instance.toml.example", "/usr/bin/systemctl"]:
+                 "/source/instance.toml.example", "/usr/bin/systemctl",
+                 *(path + "/legacy-preserved.json" for path in LEGACY_ROOTS)]:
         if path not in mounts or "ro" not in mounts[path][0]:
             raise RuntimeError("Only read-only source and fake systemctl bindings are accepted")
+    if 65534 not in os.getgroups() or not set(os.getgroups()) <= {0, 65534}:
+        raise RuntimeError("The fixture requires only the legacy read-traversal supplementary group")
+    for path in LEGACY_ROOTS:
+        metadata = Path(path).stat()
+        if (metadata.st_uid, metadata.st_gid, stat.S_IMODE(metadata.st_mode)) != (65534, 65534, 0o750):
+            raise RuntimeError("Legacy service-owned directory fixture is missing")
     if {path.name for path in Path("/sys/class/net").iterdir()} != {"lo"}:
         raise RuntimeError("The rehearsal requires Docker network none")
     if Path("/var/run/docker.sock").exists() or Path("/run/dbus/system_bus_socket").exists():
         raise RuntimeError("Host daemon sockets must not be exposed")
     emit("isolation", effective_uid=0, effective_capabilities=0, no_new_privileges=True,
-         root_read_only=True, network_interfaces=["lo"], installation_storage="disposable tmpfs")
+         root_read_only=True, network_interfaces=["lo"], installation_storage="disposable tmpfs",
+         legacy_service_uid=65534, legacy_service_gid=65534, legacy_directory_mode="0750",
+         supplementary_group_purpose="read-only legacy traversal without capabilities")
+
+
+def legacy_inventory():
+    """Metadata and digest evidence only; these are synthetic container fixtures."""
+    result = {}
+    for root in map(Path, LEGACY_ROOTS):
+        for path in [root, *sorted(root.rglob("*"))]:
+            metadata = path.lstat()
+            entry = {"uid": metadata.st_uid, "gid": metadata.st_gid,
+                     "mode": oct(stat.S_IMODE(metadata.st_mode)), "inode": metadata.st_ino}
+            if path.is_file():
+                entry["sha256"] = sha256(path.read_bytes())
+            result[str(path)] = entry
+    return result
 
 
 class ConsoleCliTests(unittest.TestCase):
@@ -112,6 +142,7 @@ class ConsoleCliTests(unittest.TestCase):
     def setUpClass(cls):
         # Also protect accidental unittest discovery outside the explicit runner.
         check_container()
+        cls.legacy_before = legacy_inventory()
         cls.tools = Path("/scratch/tools")
         cls.tools.mkdir(mode=0o700)
         for name in SOURCE_FILES:
@@ -174,11 +205,13 @@ class ConsoleCliTests(unittest.TestCase):
         self.config_path.write_text(self.config)
         self.config_path.chmod(0o600)
         self.release_root = Path("/opt/memory-layer/instances") / self.name
-        self.config_root = Path("/etc/memory-layer/instances") / self.name
+        self.config_root = Path("/etc/memory-layer-instances") / self.name
         self.set_systemd("inactive")
 
     def tearDown(self):
         self.set_systemd("inactive")
+        self.assertEqual(legacy_inventory(), self.legacy_before,
+                         "Installer changed legacy singleton bytes, owners, modes or inode identities")
 
     def set_systemd(self, mode):
         Path("/scratch/systemctl-state.json").write_text(json.dumps(mode))
@@ -301,6 +334,41 @@ class ConsoleCliTests(unittest.TestCase):
         self.cli(self.install_arguments(), "rejected")
         self.assertEqual(sentinel.read_bytes(), b"preserve this unrelated synthetic instance")
 
+    def test_legacy_owned_singleton_roots_do_not_block_named_install_and_recovery(self):
+        before = legacy_inventory()
+        result = self.cli(self.install_arguments(), "installed_inactive")
+        self.assertEqual(result["journal_directory"], "/var/lib/memory-layer-installations/" + self.name)
+        self.assert_tree()
+        self.cli(self.recovery_arguments(), "installed")
+        self.cli(self.recovery_arguments("finish"), "installed_inactive")
+        self.cli(self.recovery_arguments("retain"), "retained_inactive")
+        self.cli(self.recovery_arguments(), "retained_inactive")
+        self.assertEqual(legacy_inventory(), before)
+        emit("legacy_preserved", before=before, after=legacy_inventory(),
+             scopes=["install", "inspect", "recover-finish", "recover-retain"], changed=False)
+
+    def test_all_old_instance_and_journal_locations_refuse_adoption(self):
+        for parent in map(Path, LEGACY_INSTANCE_PARENTS):
+            with self.subTest(parent=str(parent)):
+                old = parent / self.name
+                old.mkdir(mode=0o700)
+                sentinel = old / "preserve"
+                sentinel.write_bytes(b"old-layout fixture; never migrate automatically")
+                before = legacy_inventory()
+                try:
+                    self.cli(self.install_arguments(), "rejected")
+                    self.cli(self.recovery_arguments(), "rejected")
+                    self.cli(self.recovery_arguments("finish"), "rejected")
+                    self.assertEqual(legacy_inventory(), before)
+                    self.assertFalse(self.release_root.exists())
+                    self.assertFalse(self.config_root.exists())
+                    self.assertFalse((Path("/var/lib/memory-layer-installations") / self.name).exists())
+                finally:
+                    # Remove only this test's known synthetic files; the
+                    # service-owned roots and mounted sentinels are untouched.
+                    sentinel.unlink()
+                    old.rmdir()
+
     def test_activation_marker_refuses_recovery_without_mutation(self):
         self.cli(self.install_arguments(), "installed_inactive")
         marker = self.config_root / "activation-reviewed"
@@ -334,7 +402,8 @@ def inside_container():
     calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
     only_show = bool(calls) and all(call[:3] == ["show", "--no-pager", "--property=" + ",".join(FIELDS)]
                                   and len(call) == 5 and call[3] == "--" for call in calls)
-    markers = list(Path("/etc/memory-layer").rglob("activation-reviewed"))
+    markers = [p for root in ("/etc/memory-layer", "/etc/memory-layer-instances")
+               for p in Path(root).rglob("activation-reviewed")]
     passed = result.wasSuccessful() and only_show and not markers
     emit("summary", status="passed" if passed else "failed", tests_run=result.testsRun,
          failures=len(result.failures), errors=len(result.errors), systemctl_queries=len(calls),
@@ -362,19 +431,28 @@ def host_run(args):
     stub = evidence / "systemctl-fixture.py"
     stub.write_text(FAKE_SYSTEMCTL)
     stub.chmod(0o555)
+    legacy_sentinel = evidence / "legacy-sentinel.json"
+    legacy_sentinel.write_text('{"synthetic":true,"preserve":"legacy singleton data"}\n')
+    legacy_sentinel.chmod(0o444)
     container_name = evidence.name
     cidfile = evidence / "container.cid"
     command = [docker, "run", "--rm", "--init", "--pull=never", "--network=none", "--read-only",
                "--name=" + container_name, "--cidfile=" + str(cidfile),
                "--cap-drop=ALL", "--security-opt=no-new-privileges:true", "--user=0:0",
+               "--group-add=65534",
                "--pids-limit=64", "--memory=512m", "--memory-swap=512m", "--cpus=1",
                "--ulimit=nofile=256:256", "--ipc=none", "--workdir=/", "--env=LC_ALL=C",
                "--env=PATH=/usr/bin:/bin", "--env=TMPDIR=/tmp", "--entrypoint=/usr/bin/python3"]
     for target, mode, size in (("/tmp", "1777", "128m"), ("/scratch", "0700", "128m"),
                                ("/opt/memory-layer", "0755", "64m"),
-                               ("/etc/memory-layer", "0755", "16m"),
-                               ("/var/lib/memory-layer", "0755", "64m")):
+                               (PRIVATE_ROOTS[0], "0755", "64m"),
+                               (PRIVATE_ROOTS[1], "0700", "64m"),
+                               *((path, "0755", "64m") for path in SERVICE_ROOTS),
+                               *((path, "0755", "1m") for path in LEGACY_INSTANCE_PARENTS)):
         command.extend(["--tmpfs", target + ":rw,nosuid,nodev,noexec,mode=" + mode + ",size=" + size])
+    for target in LEGACY_ROOTS:
+        command.extend(["--tmpfs", target + ":rw,nosuid,nodev,noexec,mode=0750,size=1m,uid=65534,gid=65534"])
+        command.extend(["--mount", f"type=bind,src={legacy_sentinel},dst={target}/legacy-preserved.json,readonly"])
     for name, path in inputs.items():
         if "," in str(path):
             raise ValueError("Docker source paths containing commas are unsupported")

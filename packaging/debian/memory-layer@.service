@@ -4,7 +4,7 @@ Documentation=file:/usr/share/doc/memory-layer/areas/README.md
 After=network.target postgresql.service
 # Configuration, executable and approval marker are staged by the operator.
 # Installing a package neither creates these files nor enables this unit.
-ConditionPathExists=/etc/memory-layer/instances/%i/activation-reviewed
+ConditionPathExists=/etc/memory-layer-instances/%i/activation-reviewed
 ConditionPathExists=/opt/memory-layer/instances/%i/release/bin/memory
 
 [Service]
@@ -12,15 +12,15 @@ Type=simple
 DynamicUser=true
 User=memory-area-%i
 Group=memory-area-%i
-StateDirectory=memory-layer/instances/%i/service
+StateDirectory=memory-layer-instances/%i/service
 StateDirectoryMode=0700
-CacheDirectory=memory-layer/instances/%i/service
+CacheDirectory=memory-layer-instances/%i/service
 CacheDirectoryMode=0700
-RuntimeDirectory=memory-layer/instances/%i/service
+RuntimeDirectory=memory-layer-instances/%i/service
 RuntimeDirectoryMode=0700
-WorkingDirectory=/var/lib/memory-layer/instances/%i/service
-LoadCredential=memory-layer.toml:/etc/memory-layer/instances/%i/memory-layer.toml
-LoadCredential=memory.sha256:/etc/memory-layer/instances/%i/memory.sha256
+WorkingDirectory=/var/lib/memory-layer-instances/%i/service
+LoadCredential=memory-layer.toml:/etc/memory-layer-instances/%i/memory-layer.toml
+LoadCredential=memory.sha256:/etc/memory-layer-instances/%i/memory.sha256
 # A finite environment is built by the launcher. Partial UnsetEnvironment lists
 # cannot prevent arbitrary MEMORY_LAYER__ overrides or inherited federation.
 ExecStartPre=/usr/bin/env -i PATH=/usr/bin:/bin /usr/libexec/memory-layer/verify-instance-release %i %d/memory.sha256
@@ -58,7 +58,7 @@ IPAddressAllow=localhost
 # Source credentials are loaded by the service manager before this namespace.
 # CA-specific deployments must additionally deny every locally inventoried
 # signing/OpenBao storage path; this template is not a CA activation approval.
-InaccessiblePaths=-/etc/memory-layer -/etc/step-ca -/var/lib/step-ca -/etc/openbao -/var/lib/openbao -/etc/vault -/var/lib/vault -/run/docker.sock -/run/podman/podman.sock
+InaccessiblePaths=-/etc/memory-layer-instances -/var/lib/memory-layer-installations -/etc/memory-layer -/var/lib/memory-layer -/var/cache/memory-layer -/run/memory-layer -/etc/step-ca -/var/lib/step-ca -/etc/openbao -/var/lib/openbao -/etc/vault -/var/lib/vault -/run/docker.sock -/run/podman/podman.sock
 
 [Install]
 WantedBy=multi-user.target

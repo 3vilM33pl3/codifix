@@ -118,6 +118,13 @@ migration or cutover was performed.
 
 ## Remaining independent gates
 
+Follow-up, 2026-09-22: [coherent release preparation](coherent-release-preparation.md)
+found that the package's legacy singleton directories are service-owned, unlike
+the earlier root-owned container fixtures. The new release separates the
+named-instance configuration/state and installer journal roots, retaining strict
+root-ownership checks and refusing older-layout instance remnants. The hashes
+and counts above identify the earlier implementation, not the corrected artifact.
+
 Complete release assembly and operator signing, CA-native ABI/sandbox checks,
 offline-data reconciliation, distinct database/credentials, final backup/restore
 and delta review, original writer fencing and explicit cutover approval. Pi stays
