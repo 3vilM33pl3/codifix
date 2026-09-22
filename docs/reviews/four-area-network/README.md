@@ -61,6 +61,14 @@ FAT32 volume, with the complete signed public handoff copied and all checksums
 verified after read-only remount. It is safely unmounted for physical transfer.
 This does not install software, keys or data on the CA.
 
+The [CA-agent handoff](../../user/ca-agent-handoff/README.md) now groups the full
+workflow into one runbook, offline verification helper and public support download
+on the shared Notion coordination page. The CA agent can reuse its existing USB
+release; Olivier need not relay each command. [Handoff evidence](ca-agent-handoff.md)
+records the exact package and tests. Native CA acknowledgement/checks, a minimized
+Trust-only transfer/import method, fresh source delta and explicitly approved
+host preparation/cutover remain open. This is not a deployed Trust instance.
+
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
 human review. The independent preview is upgraded through migration 0060, with
