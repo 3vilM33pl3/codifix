@@ -41,16 +41,20 @@ The [coherent offline release preparation](coherent-release-preparation.md) now
 provides newly verified AMD64 and ARM64 packages from one frozen source commit,
 including the corrected independent named-instance paths and console tools.
 Both runtime closures and isolated smoke checks pass; ARM64 runtime evidence is
-explicitly emulated. The complete bundle is **unsigned, for operator review**,
-not a deployed or published release. Signing-key selection/approval, native CA
-checks and a **CA-local** Trust database remain prerequisites; no remote database
-topology or original-writer cutover is implied.
+explicitly emulated. That original review remains unsigned and unchanged. The
+subsequently approved [signed handoff](signed-release-handoff.md) authenticates
+both architectures offline, with eight tamper/identity/schema rejection checks.
+It is not a deployed or publicly published release. Independent signer trust,
+native CA checks and a **CA-local** Trust database remain prerequisites; no remote
+database topology or original-writer cutover is implied.
 
 The [dedicated release-signing key](release-signing-setup.md) is now provisioned
 with direct operator passphrase entry, a public-only Debian 12 verification test
 and a verified encrypted backup, now also copied and checksum-verified on the
 operator's USB drive. Safely eject that drive for offline storage. Signing the
-exact release remains a separate action; no key was installed on the CA.
+exact reviewed release was separately approved and is now verified in a new
+local handoff; no key was installed on the CA. Keep recovery media separate from
+the deployment handoff.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound

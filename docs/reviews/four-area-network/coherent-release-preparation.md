@@ -139,6 +139,11 @@ a claim of independently reproducible compilation.
 
 ## Next operator action and remaining gates
 
+Subsequent explicitly approved work has now produced a separate
+[signed and offline-verified handoff](signed-release-handoff.md). This original
+review remains unsigned and unchanged; its historical status below describes
+the release-preparation slice, not the later signature or any CA installation.
+
 **Status: this unsigned, off-CA release-preparation slice is complete.** No
 publication, signature, native CA test, installation or activation has occurred.
 

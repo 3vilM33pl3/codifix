@@ -84,8 +84,11 @@ bytes, not restoration of a lost machine or import into another GPG version.
 The original unsigned release manifest and `SHA256SUMS` remain unchanged:
 `5d06127ec4db38e0d56eb0942a41f26bee32987645f1bf81391fb929e19ee1d4`
 and `1d17cee510459632d010270603a6e30de8af995f692e204da64e8aa47ccc0367`.
-No release signature exists, no public key was distributed or installed, and
-existing GPG, CA, ATProto and service identities were left untouched.
+At completion of this key-setup slice no release signature existed, no public
+key was distributed or installed, and existing GPG, CA, ATProto and service
+identities were left untouched. The subsequently approved
+[release-signing handoff](signed-release-handoff.md) records the first real
+manifest signature separately; it does not install trust on the CA.
 
 After verification the dedicated agent was stopped via its explicit `--homedir`;
 its socket was confirmed absent. No existing/default agent was stopped. Verification
