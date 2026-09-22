@@ -86,6 +86,15 @@ and `1d17cee510459632d010270603a6e30de8af995f692e204da64e8aa47ccc0367`.
 No release signature exists, no public key was distributed or installed, and
 existing GPG, CA, ATProto and service identities were left untouched.
 
+After verification the dedicated agent was stopped via its explicit `--homedir`;
+its socket was confirmed absent. No existing/default agent was stopped. Verification
+receipt: `evidence/setup-verification.json`, SHA-256
+`1d2c557e1988d5a89c099a1f2e0f0c30b0405c6e8958886c7f8d7c2501babc2b`.
+Dev Memory completion capture `f25598af-7ae5-4ecf-aa23-17a94d3e3d4d`, curation
+operation `247de3b5-ee7c-4b1f-bab8-dcae99f9f7e5`, stores public metadata only.
+It returned three memories, three unapproved proposals and four queued jobs;
+background completion or proposal approval is not claimed.
+
 - Confirm exactly one certification key and one signing subkey, public
   fingerprints, algorithm, usage and expiration.
 - Verify protected storage without emitting private material.
