@@ -4,7 +4,9 @@
 set -euo pipefail
 
 usage() {
-  echo 'Usage: build.sh memory|pi|web|package PRIVATE_WORKDIR sha256:IMAGE_ID [PI_TOOLCHAIN]'
+  echo 'Usage: build.sh memory|package PRIVATE_WORKDIR sha256:IMAGE_ID [amd64|arm64]'
+  echo '       build.sh pi PRIVATE_WORKDIR sha256:IMAGE_ID PI_TOOLCHAIN'
+  echo '       build.sh web PRIVATE_WORKDIR sha256:IMAGE_ID'
   echo 'Source/cache preparation and exact pins: packaging/ca-bookworm/README.md'
 }
 if [[ $# == 1 && ( "$1" == --help || "$1" == -h ) ]]; then usage; exit 0; fi
@@ -12,6 +14,19 @@ if [[ $# -lt 3 || $# -gt 4 ]]; then usage >&2; exit 2; fi
 phase="$1"
 build_work="$2"
 build_image="$3"
+build_arch=arm64
+rust_target=aarch64-unknown-linux-gnu
+case "$phase" in
+  memory|package)
+    build_arch="${4:-arm64}"
+    case "$build_arch" in
+      amd64) rust_target=x86_64-unknown-linux-gnu ;;
+      arm64) ;;
+      *) usage >&2; exit 2 ;;
+    esac
+    ;;
+  web) [[ $# == 3 ]] || { usage >&2; exit 2; } ;;
+esac
 if [[ ! "$phase" =~ ^(memory|pi|web|package)$ ]] ||
    [[ ! "$build_image" =~ ^sha256:[a-f0-9]{64}$ ]] ||
    [[ "$build_work" != /* || "$build_work" == / || "$build_work" == /tmp || "$build_work" == /data || "$build_work" == *,* || "$build_work" == *$'\n'* ]] ||
@@ -34,7 +49,7 @@ build_args=(--rm --init --pull never --user "$(id -u):$(id -g)"
   --env npm_config_cache=/work/npm-cache --env npm_config_offline=true)
 case "$phase" in
   memory|package|web)
-    [[ $# == 3 && -f "$build_work/memory/Cargo.lock" ]] || { usage >&2; exit 2; }
+    [[ -f "$build_work/memory/Cargo.lock" ]] || { usage >&2; exit 2; }
     build_args+=(--workdir /work/memory --env CARGO_HOME=/work/memory-cargo
       --env CARGO_TARGET_DIR=/work/memory-target)
     ;;
@@ -48,7 +63,7 @@ case "$phase" in
 esac
 case "$phase" in
   memory)
-    build_command=(cargo build --release --frozen --target aarch64-unknown-linux-gnu
+    build_command=(cargo build --release --frozen --target "$rust_target"
       -p mem-cli --features full --bin memory -p mem-area --bin memory-area
       -p mem-area-ops --bin memory-area-import
       -p mem-federation-runtime --bin memory-federation-gateway)
@@ -61,7 +76,7 @@ case "$phase" in
     build_command=(bash -c 'npm --prefix web ci --offline --no-audit --no-fund && npm --prefix web run test && npm --prefix web run build')
     ;;
   package)
-    build_command=(bash packaging/build-deb.sh --arch arm64 --output-dir /work/output)
+    build_command=(bash packaging/build-deb.sh --arch "$build_arch" --output-dir /work/output)
     ;;
 esac
 build_log="$(mktemp "$build_work/$phase.XXXXXXXX.log")"

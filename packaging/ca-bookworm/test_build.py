@@ -52,6 +52,31 @@ class BuildCommands(unittest.TestCase):
         self.assertNotEqual(self.run_build("memory", image="rust:latest").returncode, 0)
         self.assertNotEqual(self.run_build("activate").returncode, 0)
 
+    def test_explicit_architectures_match_build_and_package(self):
+        for architecture, target in (("amd64", "x86_64-unknown-linux-gnu"),
+                                     ("arm64", "aarch64-unknown-linux-gnu")):
+            with self.subTest(architecture=architecture):
+                result = self.run_build("memory", extra=(architecture,))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                args = json.loads(result.stdout.splitlines()[-1])
+                self.assertEqual(args[args.index("--target") + 1], target)
+                result = self.run_build("package", extra=(architecture,))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                args = json.loads(result.stdout.splitlines()[-1])
+                self.assertEqual(args[args.index("--arch") + 1], architecture)
+
+    def test_architecture_never_becomes_an_arbitrary_argument(self):
+        for phase in ("memory", "package"):
+            for extra in (("riscv64",), ("--privileged",), ("amd64", "arm64")):
+                self.assertNotEqual(self.run_build(phase, extra=extra).returncode, 0)
+        self.assertNotEqual(self.run_build("web", extra=("amd64",)).returncode, 0)
+
+    def test_package_keeps_arm64_default(self):
+        result = self.run_build("package")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        args = json.loads(result.stdout.splitlines()[-1])
+        self.assertEqual(args[args.index("--arch") + 1], "arm64")
+
     def test_shared_directory_symlink_and_mount_separator_fail(self):
         self.work.chmod(0o755)
         self.assertNotEqual(self.run_build("memory").returncode, 0)

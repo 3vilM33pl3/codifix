@@ -1,4 +1,4 @@
-# Debian 12 ARM64 candidate builds (off-CA only)
+# Debian 12 candidate builds (off-CA only)
 
 This directory targets the CA's observed Debian 12 / AArch64 / glibc 2.36
 userspace. It never upgrades the CA, installs host libraries, grants Pi provider
@@ -60,6 +60,21 @@ bash packaging/ca-bookworm/build.sh pi "$CA_BUILD_WORK" "$CA_BUILD_IMAGE" "$CA_P
 bash packaging/ca-bookworm/build.sh web "$CA_BUILD_WORK" "$CA_BUILD_IMAGE"
 bash packaging/ca-bookworm/build.sh package "$CA_BUILD_WORK" "$CA_BUILD_IMAGE"
 ```
+
+For a coherent two-architecture Memory release, use the **same clean source
+revision** and captured builder for both targets. `memory` and `package` accept
+an optional fourth argument `amd64` or `arm64`; omission retains the original
+ARM64 default. Pi's fourth argument is still its explicit nightly toolchain.
+
+```sh
+bash packaging/ca-bookworm/build.sh package "$CA_BUILD_WORK" "$CA_BUILD_IMAGE" arm64
+bash packaging/ca-bookworm/build.sh package "$CA_BUILD_WORK" "$CA_BUILD_IMAGE" amd64
+```
+
+Run the two package phases serially: they share Web/node_modules and build caches.
+Both packages get newly verified source-bound provenance, even when Cargo reuses
+matching compiled inputs. Do not relabel the preserved older candidate, mix old
+AMD64 artifacts into a new manifest or assume a completed build is a signature.
 
 Run memory and Pi builds concurrently only with separate target/cache paths as
 above. Wait for cache copying to finish before starting either build. The package
