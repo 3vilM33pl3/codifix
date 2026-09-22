@@ -41,9 +41,10 @@ that unrelated user executable.
 
 ## Completion checks
 
-Status: **local key setup and encrypted-backup verification complete**.
-Off-device backup placement remains operator-owned and pending. All passphrases
-were supplied through GPG pinentry, not through the assistant or chat.
+Status: **local key setup, encrypted-backup verification and USB copy complete**.
+The USB copy is verified and flushed but still mounted; safely eject it and keep
+it disconnected. All passphrases were supplied through GPG pinentry, not through
+the assistant or chat.
 
 | Purpose | Public fingerprint | Expiry (UTC) |
 | --- | --- | --- |
@@ -104,14 +105,58 @@ background completion or proposal approval is not claimed.
   public keyring, revocation certificate and dedicated agent configuration.
 - Decrypt only into a checking pipeline and verify archive contents against the
   source identities; do not extract decrypted secrets into a temporary directory.
-- Still required: retain a separate offline/off-device copy after Olivier chooses its destination.
-  A second directory on Monolith is not protection from loss of Monolith.
+- The separate USB copy is now verified; safely eject it and store it independently.
+  A second directory on Monolith alone is not protection from loss of Monolith.
+
+## USB recovery copy — 2026-09-22
+
+Olivier connected a USB key and asked to copy the recovery materials there.
+Task checkpoint `d2a660d5-1a0e-4c6c-a2f6-312a7472cb4c`, task memory
+`3539b1c8-a2e9-4736-b092-9b29e2df2f39`, starting at `eb2cfa42`.
+The only USB block device was a removable 58.2-GiB `STORAGE DEVICE`, containing
+the mounted FAT filesystem **BIOS UPGRAD**, UUID `66F0-75AD` (`/dev/sdc1`, 8:33 at
+copy time). Re-identify by live evidence for future work; device names may change.
+
+New directory (no existing directory or file was overwritten):
+
+```text
+/run/media/olivier/BIOS UPGRAD/Memory-release-signing-backup-2026-09-22
+```
+
+Exactly five files were written: the encrypted recovery archive, public-key
+export, public `fingerprints.txt`, portable `RECOVERY.md` and `SHA256SUMS`.
+No plaintext private-key files, live keyring, standalone revocation certificate,
+passphrases, Memory dataset or release artifacts were copied.
+
+Source archive/public-key/fingerprint hashes were checked against the setup
+record before copying. Mount source, UUID, filesystem and device identity were
+checked before and after; destination operations used pinned directory handles
+and exclusive creates. All files were fsynced, the filesystem was flushed, and
+all five files read back byte-for-byte. The four `SHA256SUMS` entries pass an
+additional on-USB check. Existing root-entry inode/mode/size/mtime metadata is
+unchanged. FAT permissions are mount-wide: encryption, not POSIX file modes,
+protects the private contents on this drive.
+
+USB `SHA256SUMS` digest:
+`db832205c22a3fe5a09e57f4a8125e7d87f59e056bfdfcb9ad43b3874d54ce56`.
+The encrypted archive retains the original verified digest
+`b6506b8b7ebce39afda1556f2f6d03eb7bc9a7e0c6848ac82f95fac32d12bb3d`.
+Local transfer receipt: `evidence/usb-copy-20260922.json`, SHA-256
+`0badfe426cda82a2027e77ab46d13e96aa4d3864e3f245e5d5c721be526defae`;
+create-only reproduction recipe: `evidence/copy-usb-20260922.py`. Both are relative
+to the dedicated local signing directory. The recipe intentionally refuses a
+rerun into an existing target and must not be reused against a changed device.
+
+The drive was not formatted, unmounted or powered off. This is verified off-device
+storage, not yet disconnected/offline storage, nor a new restore exercise.
+Safely eject it through the desktop and keep it physically secure. No release
+was signed and no CA, service, credential or trust configuration was changed.
 
 ## Operation after setup
 
-The immediate operator action is to copy only the encrypted `.tar.gpg` backup to
-an offline USB drive or another approved independent location. Retain its full
-SHA-256 separately and compare after copying. Do not upload it or choose an
+The immediate operator action is to safely eject the verified USB copy and keep
+it disconnected. Retain its full SHA-256 separately and compare after any future
+copy. Do not upload it or choose an
 unapproved cloud/sync destination automatically. Keep the key and backup
 passphrases in the password manager, and ensure that manager is itself recoverable.
 
