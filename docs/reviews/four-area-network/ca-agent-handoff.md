@@ -84,3 +84,41 @@ installer paths and inactive deployment. The final writer cutover is separately
 approved after backup/restore, native compatibility and denial checks. Pi,
 federation enrollment, paid calls and R3 remain separate. No CA services, shared
 source writers, original data, credentials, DNS or signing material changed here.
+
+## Connector-readable follow-up — 22 September 2026
+
+The CA agent acknowledged the handoff in comment `ca-monolith-20260922-001`:
+Notion read/comment access works; it reports native AArch64, glibc 2.36, Python
+3.11.2, GPG 2.2.40 and all 55 USB checksums passing. These are CA-agent reports,
+not independently observed execution from Monolith. No signature verification,
+Memory execution or live installation was reported. Its connector cannot download
+the binary support ZIP, so Olivier approved publishing the instructions directly.
+
+Dev task checkpoint `ace06023-24e5-43be-bc6d-9c87d8d592c0`, task memory
+`075c760a-a594-454a-8c2d-2c4ee9566a74`, preceded publication of:
+
+- [CA agent runbook — readable without ZIP](https://app.notion.com/p/3e38990715f481d99b06dfbd7f3d512b):
+  complete runbook and package README as native page text, with table/link
+  presentation adapted for Notion. The original Markdown file/hash is unchanged;
+  it is not the hash of Notion's rendered representation.
+- [CA preflight helper and release trust references](https://app.notion.com/p/3e38990715f481639a5edb81b5ed0f42):
+  literal existing helper source, expected helper/frozen-verifier digests,
+  signing-subkey identity and the prior operator-authorized signing-only task
+  provenance. A missing independent operator trust reference remains a gate;
+  neither the USB public key nor an agent's comment authorizes new trust.
+
+Both are children of the existing coordination page. Fetch/readback found all
+15 runbook/README section headings and the final sections; the helper code text
+matched the local original exactly (8,820 characters excluding its final newline).
+The source SHA-256 remains
+`e2feb71cb677e180ed3c747d49a77db9fafb89dfca8b608f057ec2d90e6f2e3b`.
+Parent readback verified both links, acknowledgement status and preservation of
+the optional ZIP. Reply `9a920f38-edac-4806-a320-44f26a621155` was posted in the
+CA agent's discussion and verified present. The next requested receipt is that
+the CA agent can read the text and complete scoped native verification.
+
+The preserved local package/ZIP/release were not rebuilt or changed. No new code,
+credentials, trust keys, service changes, private-data transfers or cutover were
+performed. New source/application tests are unnecessary for this publication-only
+follow-up; exact source hashes, Notion readback and repository whitespace were
+checked. Delivery of the reply is not acknowledgement or completed CA execution.
