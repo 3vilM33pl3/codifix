@@ -152,6 +152,11 @@ storage, not yet disconnected/offline storage, nor a new restore exercise.
 Safely eject it through the desktop and keep it physically secure. No release
 was signed and no CA, service, credential or trust configuration was changed.
 
+Dev Memory USB completion capture: `2e41a74d-6895-413b-a4c4-642326c6c9e7`,
+curation operation `e2677403-8ea6-4954-9c06-e060d7164827`. The helper returned
+five memories, no replacement proposals and four queued background jobs; job
+completion is not implied by the successful transfer record.
+
 ## Operation after setup
 
 The immediate operator action is to safely eject the verified USB copy and keep
