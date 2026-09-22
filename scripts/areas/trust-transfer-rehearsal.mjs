@@ -3,7 +3,7 @@
 // Local-only candidate proof. Never accepts a CA/live restore destination.
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile, open, chmod } from 'node:fs/promises';
+import { mkdir, readFile, open, chmod } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -43,7 +43,10 @@ function run(cmd,args,input,maxBuffer=32*1024*1024){
 }
 const docker=(id,args,input)=>run('docker',['exec','-i',id,'env','-i','PATH=/usr/bin:/bin','LC_ALL=C','PGOPTIONS=-c timezone=UTC',...args],input);
 const sql=(id,db,query)=>docker(id,['psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','postgres','-d',db],query).toString('utf8').trim();
-async function artifact(path,bytes){await writeFile(path,bytes,{mode:0o600,flag:'wx'});return{path,sha256:hash(bytes),bytes:Buffer.byteLength(bytes)};}
+async function artifact(path,bytes){
+  const f=await open(path,'wx',0o600);try{await f.writeFile(bytes);await f.sync();}finally{await f.close();}
+  return{path,sha256:hash(bytes),bytes:Buffer.byteLength(bytes)};
+}
 async function json(path,value){return artifact(path,JSON.stringify(value,null,2)+'\n');}
 async function bound(path,digest,limit,json=false){const b=await privateInput(path,limit,json);if(b.sha256!==digest)fail();return b.value;}
 async function pinnedCopy(source,destination,digest,limit,executable=false){
@@ -81,13 +84,18 @@ export async function rehearse(o){
   const spec=c.targets.find(x=>x.area==='trust'),target=await bound(spec.target.path,spec.target.sha256,8192,true);
   if(target.instance_id!==v.target_instance||spec.operation_id!==v.operation_id||spec.image_id!==IMAGE)fail();
   validateTarget(spec,target,inspectContainer(spec.container_id),v.source_instance);
+  const hostRestore=run('pg_restore',['--version']).toString('utf8').trim();
+  const sourceDump=docker(spec.container_id,['pg_dump','--version']).toString('utf8').trim();
+  if(!/^pg_restore \(PostgreSQL\) 17\./.test(hostRestore)||!/^pg_dump \(PostgreSQL\) 17\./.test(sourceDump))fail();
   await mkdir(o.output,{mode:0o700});
   const localTool=await pinnedCopy(o['schema-tool'],join(o.output,'schema-tool'),TOOL,32*1024*1024,true);
   const localSource=await pinnedCopy(o['source-archive'],join(o.output,'frozen-source.tar'),SOURCE,512*1024*1024);
   const plan=JSON.parse(run(localTool,['schema-plan']));if(plan.schema_sha256!==TRUST_SCHEMA||plan.migration_head!==60)fail();
   const checksums=await sourceSchema(localSource,o.output);
   const before=await verifyDatabase(stagingSession(spec.container_id,target.database),spec,target,state);
-  const data=docker(spec.container_id,['pg_dump','-U','postgres','-d',target.database,'--data-only','--format=custom','--no-owner','--no-privileges']);
+  const data=run('docker',['exec','-i',spec.container_id,'env','-i','PATH=/usr/bin:/bin','LC_ALL=C',
+    'PGOPTIONS=-c timezone=UTC -c default_transaction_read_only=on','pg_dump','-U','postgres','-d',target.database,
+    '--data-only','--format=custom','--no-owner','--no-privileges']);
   const dataFile=await artifact(join(o.output,'trust-data.pgdump'),data);
   // Parsing occurs before any private dump contents can reach a restore executor.
   const toc=validateTrustDataToc(run('pg_restore',['--list'],data).toString('utf8'));
@@ -146,7 +154,8 @@ export async function rehearse(o){
       observed_at:new Date().toISOString(),expectation_sha256:o['expectation-sha256'],source_snapshot:v.snapshot_id,
       schema_tool_sha256:TOOL,source_archive_sha256:SOURCE,required_schema_sha256:TRUST_SCHEMA,
       source_ddl_executed:false,data:dataFile,schema:schemaFile,toc_tables:toc.table_count,toc_sequences:toc.sequence_count,
-      postgres_version:version,extensions,result,migration_checksums_match:true,original_staging_reverified:true,
+      postgres_version:version,client_versions:{host_pg_restore:hostRestore,source_pg_dump:sourceDump},extensions,result,
+      migration_checksums_match:true,original_staging_reverified:true,
       encrypted:false,ca_compatibility_verified:false,data_transfer_authorized:false,activation_authorized:false});
     passed=true;return{status:'local_trust_restore_verified_not_deliverable',histories:result.histories,versions:result.versions,
       rows:result.verified_rows,projected_sources:result.projected_sources,source_ddl_executed:false,activation_authorized:false};
