@@ -37,6 +37,12 @@ TARGETS = {
 }
 INTERPRETER = TARGETS["arm64"].interpreter  # Existing default ARM64 interface.
 MAX_GLIBC = (2, 36)
+# glibc 2.36 introduces this empty libc version node to advertise DT_RELR
+# support, not a numeric symbol version. Keep exact feature/provider bindings;
+# an arbitrary GLIBC_ABI_* name must never bypass the numeric-version gate.
+# https://sourceware.org/pipermail/glibc-cvs/2022q2/078142.html
+# https://sourceware.org/pipermail/libc-alpha/2022-August/141193.html
+GLIBC_ABI_FEATURES = {"GLIBC_ABI_DT_RELR": ("libc.so.6", (2, 36))}
 MAX_FILE_BYTES = 2 * 1024**3
 MAX_OUTPUT_BYTES = 32 * 1024**2
 MAX_OBJECTS = 128
@@ -277,6 +283,14 @@ def inspect(path, reader, artifact=False, architecture="arm64"):
         if value.startswith("GLIBC_"):
             if value == "GLIBC_PRIVATE":
                 require(not artifact, "artifact uses private glibc ABI")
+            elif value in GLIBC_ABI_FEATURES:
+                provider, minimum = GLIBC_ABI_FEATURES[value]
+                require([owner for owner, names in versions.items() if value in names] == [provider],
+                        f"unexpected provider for glibc ABI feature: {value}")
+                require(minimum <= MAX_GLIBC, f"glibc ABI feature exceeds baseline: {value}")
+                # The normal transitive verneed/verdef check below still
+                # requires this exact node in the selected libc's definitions.
+                # Strong symbol imports receive no feature-specific exemption.
             else:
                 match = re.fullmatch(r"GLIBC_(\d+(?:\.\d+)+)", value)
                 require(match is not None, f"unknown glibc requirement: {value}")
@@ -367,6 +381,12 @@ class Auditor:
                 "elf": value.header, "interpreter": value.interpreter,
                 "needed": value.needed, "soname": value.soname,
                 "required_versions": {key: sorted(item) for key, item in sorted(value.required_versions.items())},
+                "required_glibc_abi_features": {
+                    feature: {"provider": GLIBC_ABI_FEATURES[feature][0],
+                              "minimum_glibc": ".".join(map(str, GLIBC_ABI_FEATURES[feature][1]))}
+                    for feature in sorted(set().union(*value.required_versions.values())
+                                          & GLIBC_ABI_FEATURES.keys())
+                },
                 "defined_versions": sorted(value.defined_versions),
                 "required_strong_dynamic_symbols": len(value.imports),
                 "maximum_required_glibc": max(glibc, key=lambda item: tuple(map(int, item.split(".")))) if glibc else None,

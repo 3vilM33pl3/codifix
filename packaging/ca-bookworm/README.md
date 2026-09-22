@@ -97,6 +97,15 @@ resolve within that captured root. Wrong-architecture libraries, escaping links
 and ambiguous library resolutions remain errors. Record the verifier's own
 revision/hash separately when it is newer than the frozen package source.
 
+`GLIBC_ABI_DT_RELR` is a distinct, empty libc version node introduced with
+[glibc 2.36](https://sourceware.org/pipermail/libc-alpha/2022-August/141193.html),
+not a numeric symbol version. The checker recognizes only that exact feature,
+requires its declared `libc.so.6` provider and matching version definition, and
+reports its 2.36 floor separately from the highest numeric GLIBC requirement.
+It does not waive strong-symbol resolution or accept other `GLIBC_ABI_*` names.
+This matters for the native Bookworm `libm` dependency even when the application
+itself uses only older numeric GLIBC symbols.
+
 - Static audit every shipped ARM64 executable against the exact captured
   `/usr/aarch64-linux-gnu` sysroot, including transitive libraries and symbol
   versions. Checking just `file`, the filename or one GLIBC string is insufficient.

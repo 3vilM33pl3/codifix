@@ -262,11 +262,80 @@ class ClosureTests(unittest.TestCase):
             self.audit()
 
     def test_new_glibc_and_private_application_requirements_fail(self):
-        for version in ("GLIBC_2.37", "GLIBC_2.43", "GLIBC_PRIVATE", "GLIBC_FUTURE"):
+        for version in ("GLIBC_2.37", "GLIBC_2.43", "GLIBC_PRIVATE", "GLIBC_FUTURE",
+                        "GLIBC_ABI_DT_RELR_2", "GLIBC_ABI_DT_X86_64_PLT", "GLIBC_ABI_UNKNOWN"):
             self.data[self.artifact]["--version-info"] = versions({"libc.so.6": [version]})
             self.data[self.artifact]["--dyn-syms"] = symbols(imports=[f"start@{version}"])
             with self.subTest(version=version), self.assertRaises(abi.AuditError):
                 self.audit()
+
+    def add_relr_feature(self, *, artifact=False):
+        """Empty libc version node; no invented feature symbol export."""
+        source = self.artifact if artifact else self.root / "lib/libstdc++.so.6"
+        if artifact:
+            self.data[source]["--version-info"] = versions({
+                "libc.so.6": ["GLIBC_2.34", "GLIBC_ABI_DT_RELR"],
+                "libstdc++.so.6": ["GLIBCXX_3.4.30"],
+            })
+        else:
+            self.data[source]["--dynamic"] = dynamic(["libgcc_s.so.1", "libc.so.6"], "libstdc++.so.6")
+            self.data[source]["--version-info"] = versions({
+                "libgcc_s.so.1": ["GCC_3.0"], "libc.so.6": ["GLIBC_ABI_DT_RELR"],
+            }, ["GLIBCXX_3.4.30"])
+        self.data[self.root / "lib/libc.so.6"]["--version-info"] = versions(
+            {self.loader_name: ["GLIBC_PRIVATE"]}, ["GLIBC_2.34", "GLIBC_2.36", "GLIBC_ABI_DT_RELR"],
+        )
+        return source
+
+    def test_relr_empty_version_node_supported_for_artifact_and_dependency(self):
+        for artifact in (False, True):
+            with self.subTest(artifact=artifact):
+                source = self.add_relr_feature(artifact=artifact)
+                result = self.audit()
+                record = next(item for item in result["artifacts"] + result["libraries"]
+                              if item["path"] == str(source))
+                self.assertEqual(record["required_glibc_abi_features"], {
+                    "GLIBC_ABI_DT_RELR": {"provider": "libc.so.6", "minimum_glibc": "2.36"},
+                })
+                if artifact:
+                    self.assertEqual(record["maximum_required_glibc"], "2.34")
+                else:
+                    self.assertIsNone(record["maximum_required_glibc"])
+
+    def test_relr_requires_provider_version_definition(self):
+        self.add_relr_feature()
+        self.data[self.root / "lib/libc.so.6"]["--version-info"] = versions(
+            {self.loader_name: ["GLIBC_PRIVATE"]}, ["GLIBC_2.34", "GLIBC_2.36"],
+        )
+        with self.assertRaisesRegex(abi.AuditError, "lacks versions.*GLIBC_ABI_DT_RELR"):
+            self.audit()
+
+    def test_relr_cannot_be_provided_by_an_unrelated_library(self):
+        source = self.add_relr_feature()
+        self.data[source]["--version-info"] = versions({
+            "libgcc_s.so.1": ["GCC_3.0", "GLIBC_ABI_DT_RELR"],
+        }, ["GLIBCXX_3.4.30"])
+        self.data[self.root / "lib/libgcc_s.so.1"]["--version-info"] = versions(
+            defined=["GCC_3.0", "GLIBC_ABI_DT_RELR"])
+        with self.assertRaisesRegex(abi.AuditError, "unexpected provider for glibc ABI feature"):
+            self.audit()
+
+    def test_relr_does_not_satisfy_missing_strong_symbols(self):
+        source = self.add_relr_feature()
+        self.data[source]["--dyn-syms"] = symbols(
+            imports=["unwind@GCC_3.0", "nonexistent@GLIBC_ABI_DT_RELR"],
+            exports=["cpp@@GLIBCXX_3.4.30"],
+        )
+        with self.assertRaisesRegex(abi.AuditError, "unavailable dynamic symbols"):
+            self.audit()
+
+    def test_relr_does_not_allow_a_newer_numeric_glibc_requirement(self):
+        source = self.add_relr_feature()
+        self.data[source]["--version-info"] = versions({
+            "libgcc_s.so.1": ["GCC_3.0"], "libc.so.6": ["GLIBC_ABI_DT_RELR", "GLIBC_2.37"],
+        }, ["GLIBCXX_3.4.30"])
+        with self.assertRaisesRegex(abi.AuditError, "requires glibc newer than 2.36"):
+            self.audit()
 
     def test_versions_must_belong_to_needed_libraries(self):
         self.data[self.artifact]["--version-info"] = versions({"libabsent.so": ["VERSION_1"]})
