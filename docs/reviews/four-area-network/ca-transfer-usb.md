@@ -49,3 +49,20 @@ encrypted signing backups, live credentials and datasets off this transfer USB.
 One-off identity-bound operation and evidence:
 `/data/tmp/memory-ca-transfer-usb-20260922.GPa4zJ`.
 Do not reuse its formatter after reconnection or against another device.
+
+## Pre-format interruptions
+
+The first administrative attempt stopped during read-only inspection: requesting
+`PATH` without `NAME`/`--tree` made `lsblk` return a flat JSON list rather than a
+tree. No unmount or write occurred. The corrected command explicitly requests
+`--tree`; the original formatter and `format-result.json` are retained.
+
+The second attempt passed identity checks and unmounted `TransferDisk`, but
+`writable` was busy. `format-result-v2.json` confirms execution stopped before
+`sfdisk` or `mkfs` writes. Files (`nautilus`, PID 1712105 at observation) holds the
+volume; normal desktop `gio mount --unmount` also refused it. No process was
+killed and no forced/lazy unmount was attempted. The operator was asked to close
+only the Files window/tab using that USB volume. Both original ext4 UUIDs and all
+three partition sizes still match; no files have been erased. A retry must retain
+the same complete device checks while accepting already-unmounted approved
+partitions. It must stop if the disk is reconnected or otherwise changes identity.
