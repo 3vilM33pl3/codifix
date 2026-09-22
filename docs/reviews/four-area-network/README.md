@@ -37,6 +37,15 @@ not retroactively included in the preserved candidate. A coherent signed release
 native CA checks, independent database/network preparation, offline reconciliation
 and approved writer cutover remain separate gates.
 
+The [coherent offline release preparation](coherent-release-preparation.md) now
+provides newly verified AMD64 and ARM64 packages from one frozen source commit,
+including the corrected independent named-instance paths and console tools.
+Both runtime closures and isolated smoke checks pass; ARM64 runtime evidence is
+explicitly emulated. The complete bundle is **unsigned, for operator review**,
+not a deployed or published release. Signing-key selection/approval, native CA
+checks and a **CA-local** Trust database remain prerequisites; no remote database
+topology or original-writer cutover is implied.
+
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
 human review. The independent preview is upgraded through migration 0060, with

@@ -5,6 +5,13 @@ activation permission. Keep the existing CA Memory, Step CA and OpenBao services
 running. Do not upgrade glibc, enable SSH, run package hooks, change credentials,
 start Trust/Pi or point this executable at the shared database.
 
+This guide describes the preserved September 20 ARM64 compatibility bundle.
+The newer [September 22 coherent review](../../docs/reviews/four-area-network/coherent-release-preparation.md)
+contains both Memory architectures and corrected console tools from one source
+commit. It remains unsigned and does not authorize installation. Do not mix its
+artifacts/checksums with this older bundle. The approved Trust database belongs
+locally on the CA; remote database placement would be a separate design decision.
+
 The operator confirmed that current CA Memory connects to the original shared
 Monolith database. Its persisted rows are covered only up to the verified source
 snapshot boundary. The inactive Trust partition is a reviewed subset, not a full
