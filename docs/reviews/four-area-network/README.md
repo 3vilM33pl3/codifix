@@ -67,7 +67,12 @@ on the shared Notion coordination page. The CA agent can reuse its existing USB
 release; Olivier need not relay each command. [Handoff evidence](ca-agent-handoff.md)
 records the exact package and tests. Native CA acknowledgement/checks, a minimized
 Trust-only transfer/import method, fresh source delta and explicitly approved
-host preparation/cutover remain open. This is not a deployed Trust instance.
+host preparation/cutover were the next gates. The subsequent
+[Trust-only local restore and fresh delta](trust-transfer.md) now has verified
+local evidence and a [grouped inactive CA proposal](../../user/ca-agent-handoff/TRUST-INACTIVE-PROPOSAL.md).
+The CA agent reports native signature verification passed, not installation.
+Receiver compatibility/decryption, renewed dependency review and explicit
+host-change/cutover approvals remain open. This is not a deployed Trust instance.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
