@@ -89,8 +89,11 @@ Duplicate unpacked binary/Web trees are omitted; their bytes remain inside the
 signed tree archives. All 53 original review entries were verified and accounted
 for, with 43 copied or matched and ten redundant unpacked files omitted.
 
-The original unsigned bundle is not overwritten. No transfer onto the CA or USB
-has occurred. Keep the signing recovery USB disconnected and use a separately
+The original unsigned bundle is not overwritten. At completion of this signing
+slice, no transfer onto the CA or USB had occurred. The separately approved
+[CA transfer USB](ca-transfer-usb.md) now holds a verified copy, safely unmounted
+for transport; nothing has been installed on the CA. Keep the signing recovery
+USB disconnected and use a separately
 approved release-transfer method. First obtain read-only native console facts
 and authenticate/stage the selected architecture; do not install, start services
 or query a live database as an incidental verification step.

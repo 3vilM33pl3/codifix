@@ -56,6 +56,11 @@ exact reviewed release was separately approved and is now verified in a new
 local handoff; no key was installed on the CA. Keep recovery media separate from
 the deployment handoff.
 
+The [CA transfer USB](ca-transfer-usb.md) is now reformatted as one `MEMORY_CA`
+FAT32 volume, with the complete signed public handoff copied and all checksums
+verified after read-only remount. It is safely unmounted for physical transfer.
+This does not install software, keys or data on the CA.
+
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
 human review. The independent preview is upgraded through migration 0060, with
