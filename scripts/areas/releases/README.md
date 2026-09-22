@@ -100,14 +100,24 @@ These commands belong to the operator's explicit release-signing action; they
 are not run during manifest generation or verification:
 
 ```bash
-gpg --batch --no-tty --local-user "${MEMORY_RELEASE_SIGNING_FINGERPRINT}!" \
+/usr/bin/gpg --no-options --homedir "$MEMORY_RELEASE_GNUPGHOME" \
+  --batch --no-tty --pinentry-mode ask \
+  --local-user "${MEMORY_RELEASE_SIGNING_FINGERPRINT}!" \
   --digest-algo SHA256 \
   --output "$RELEASE_INPUT_DIR/manifest.sig" \
   --detach-sign "$RELEASE_INPUT_DIR/manifest.json"
-gpg --batch --no-tty --armor \
+/usr/bin/gpg --no-options --homedir "$MEMORY_RELEASE_GNUPGHOME" \
+  --batch --no-tty --armor \
   --output "$RELEASE_INPUT_DIR/signing-public-key.asc" \
   --export "$MEMORY_RELEASE_PRIMARY_FINGERPRINT"
 ```
+
+Set `MEMORY_RELEASE_GNUPGHOME` to the absolute, independently reviewed signing
+keyring directory; never select a keyring or signing key implicitly. The
+[internal key setup record](../../../docs/reviews/four-area-network/release-signing-setup.md)
+identifies the dedicated local keyring and public fingerprints. Key creation does
+not approve signing this or any future release. Passphrases belong in pinentry,
+never command arguments, environment variables, files or chat.
 
 Use the full uppercase fingerprint of the actual signing key or signing subkey.
 The `!` suffix on `--local-user` makes that selection exact. Do not pass `--yes`

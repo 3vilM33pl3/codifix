@@ -46,6 +46,11 @@ not a deployed or published release. Signing-key selection/approval, native CA
 checks and a **CA-local** Trust database remain prerequisites; no remote database
 topology or original-writer cutover is implied.
 
+The [dedicated release-signing key](release-signing-setup.md) is now provisioned
+with direct operator passphrase entry, a public-only Debian 12 verification test
+and a verified encrypted local backup. Off-device backup placement and signing
+the exact release remain separate actions; no key was installed on the CA.
+
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
 human review. The independent preview is upgraded through migration 0060, with
