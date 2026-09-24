@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Reduce pg_restore 17 output to the exact COPY/sequence subset accepted by a
-// PostgreSQL 15 receiver. No source-provided schema or executable DDL survives.
+// Trust receiver. No source-provided schema or executable DDL survives.
 import { SCHEMA60_SEQUENCES, SCHEMA60_TABLES } from './verify-staging.mjs';
 
 const tableNames = new Set(SCHEMA60_TABLES.map(value => value.slice('public.'.length)));

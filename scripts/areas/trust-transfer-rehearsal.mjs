@@ -14,9 +14,12 @@ import { expandTrust, TRUST_SCHEMA } from './trust-expectation.mjs';
 import { validateTrustDataToc } from './trust-transfer-toc.mjs';
 
 const sha=/^[0-9a-f]{64}$/;
-const IMAGE='sha256:17a06c0a60bf6fb548a8493b8f6057dc830b791bbbe1f1ab706ca4b9d97c8180';
-const TOOL='19d12e328a44b94654dc4136fe9e10158056bf4992c79b637eb5c0fd64870901';
-const SOURCE='c6ce8327a1dea7f6988750cdc327ab40573938b696cf42ca358a068e9428d42e';
+export const TRUST_SOURCE_IMAGE_ID='sha256:17a06c0a60bf6fb548a8493b8f6057dc830b791bbbe1f1ab706ca4b9d97c8180';
+export const TRUST_SCHEMA_TOOL_SHA256='19d12e328a44b94654dc4136fe9e10158056bf4992c79b637eb5c0fd64870901';
+export const TRUST_FROZEN_SOURCE_SHA256='c6ce8327a1dea7f6988750cdc327ab40573938b696cf42ca358a068e9428d42e';
+const IMAGE=TRUST_SOURCE_IMAGE_ID;
+const TOOL=TRUST_SCHEMA_TOOL_SHA256;
+const SOURCE=TRUST_FROZEN_SOURCE_SHA256;
 const clean={PATH:'/usr/bin:/bin',LC_ALL:'C',LANG:'C',TZ:'UTC'};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 // Execute inside the same restore transaction before any pre-data statement.

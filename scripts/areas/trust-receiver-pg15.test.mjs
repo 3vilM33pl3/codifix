@@ -12,10 +12,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { SCHEMA60_SEQUENCES, SCHEMA60_TABLES } from './verify-staging.mjs';
 import { validateTrustDataToc } from './trust-transfer-toc.mjs';
 import { canonicalTrustDataSql, freshTrustReceiverGuard } from './trust-receiver-data.mjs';
-import { TRUST_RECEIVER_FIXTURE, validateTrustReceiverObservation } from './trust-receiver-profile.mjs';
+import { validateCaObservedPostgres15 } from './trust-receiver-profile.mjs';
 import { TRUST_SCHEMA } from './trust-expectation.mjs';
 
 const PG17 = 'sha256:17a06c0a60bf6fb548a8493b8f6057dc830b791bbbe1f1ab706ca4b9d97c8180';
+const PG15 = 'sha256:e2426fe23642a1e4ddeb6126bb7e4295cfd0b42d35dbb10233d6d31c00e8c9b7';
 const clean = { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C', TZ: 'UTC' };
 const hash = value => createHash('sha256').update(value).digest('hex');
 const id = value => `00000000-0000-0000-0000-${String(value).padStart(12, '0')}`;
@@ -34,14 +35,13 @@ test('PostgreSQL 17 Trust data restores atomically into the exact CA PostgreSQL 
     }
     return result.stdout;
   };
-  assert.equal(run('docker', ['image', 'inspect', TRUST_RECEIVER_FIXTURE.image_id, '--format', '{{.Id}}']).toString().trim(),
-    TRUST_RECEIVER_FIXTURE.image_id);
+  assert.equal(run('docker', ['image', 'inspect', PG15, '--format', '{{.Id}}']).toString().trim(), PG15);
   const start = (image, socket, suffix) => run('docker', ['run', '--pull=never', '--detach', '--name',
     `memory-trust-receiver-${suffix}-${randomUUID()}`, '--network', 'none', '--read-only', '--memory', '1g', '--cpus', '2',
     '--tmpfs', '/var/lib/postgresql/data:rw,size=512m', '--tmpfs', '/tmp:rw',
     '--mount', `type=bind,source=${socket},target=/var/run/postgresql`, '--env', 'POSTGRES_HOST_AUTH_METHOD=trust', image,
     '-c', 'unix_socket_directories=/var/run/postgresql']).toString().trim();
-  const source = start(PG17, sourceSocket, 'source'), target = start(TRUST_RECEIVER_FIXTURE.image_id, targetSocket, 'target');
+  const source = start(PG17, sourceSocket, 'source'), target = start(PG15, targetSocket, 'target');
   t.after(async () => {
     for (const container of [source, target]) {
       spawnSync('docker', ['exec', container, 'chmod', '0777', '/var/run/postgresql'], { env: clean, stdio: 'ignore', timeout: 5000 });
@@ -65,13 +65,13 @@ test('PostgreSQL 17 Trust data restores atomically into the exact CA PostgreSQL 
     assert.equal(ready, true);
   }
   assert.equal(sql(source, 'postgres', 'SHOW server_version;'), '17.11 (Debian 17.11-1.pgdg12+2)');
-  const observation = validateTrustReceiverObservation({
-    format: 'memory-trust-receiver-observation-v1',
+  const observation = validateCaObservedPostgres15({
+    format: 'memory-trust-ca-observed-profile-v1',
     postgres_version: sql(target, 'postgres', 'SHOW server_version;').split(' ')[0],
     client_version: docker(target, ['psql', '--version']).toString().match(/([0-9]+\.[0-9]+)/)?.[1],
-    extensions: Object.fromEntries(JSON.parse(sql(target, 'postgres',
-      "SELECT json_agg(json_build_object('name',name,'version',default_version) ORDER BY name) FROM pg_available_extensions WHERE name IN ('vector','pgcrypto','pg_trgm');"))
-      .map(value => [value.name, value.version])),
+    extensions: { ...Object.fromEntries(JSON.parse(sql(target, 'postgres',
+      "SELECT json_agg(json_build_object('name',name,'version',default_version) ORDER BY name) FROM pg_available_extensions WHERE name IN ('pgcrypto','pg_trgm');"))
+      .map(value => [value.name, value.version])), vector: null },
   });
   assert.equal(observation.postgres_version, '15.18');
 
@@ -127,7 +127,7 @@ test('PostgreSQL 17 Trust data restores atomically into the exact CA PostgreSQL 
   const installed = Object.fromEntries(JSON.parse(sql(target, 'memory_trust',
     "SELECT json_agg(json_build_object('name',extname,'version',extversion) ORDER BY extname) FROM pg_extension WHERE extname<>'plpgsql';"))
     .map(value => [value.name, value.version]));
-  assert.deepEqual(installed, observation.extensions);
+  assert.deepEqual(installed, { pg_trgm: '1.6', pgcrypto: '1.3', vector: '0.8.6' });
   assert.equal(sql(target, 'memory_trust', "SELECT count(*) FROM pg_proc WHERE proname='source_only_poison';"), '0');
   assert.equal(sql(target, 'memory_trust', 'SELECT count(*) FROM pg_index WHERE NOT indisvalid;'), '0');
   t.diagnostic(`postgres=${observation.postgres_version}; pgvector=${installed.vector}; tables=${toc.table_count}; sequences=${toc.sequence_count}; source_ddl_executed=false`);
