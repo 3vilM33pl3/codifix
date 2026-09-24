@@ -111,8 +111,12 @@ candidate.
    and at schema 60. Explicitly restart only the existing
    `memory-layer.service`, then its watcher if it was previously enabled. Require
    the running process to resolve to `/usr/bin/memory`; require `/healthz` to
-   report version `2.1.0-rc.1`, database `up`, the same expected instance
-   identity, and successful authenticated read/write and Web/TUI checks.
+   report version `2.1.0-rc.1`, database `up`, the expected stable `service_id`,
+   and successful authenticated read/write and Web/TUI checks. The health
+   `instance_id` is a process-start UUID created with `Uuid::new_v4()` and is
+   expected to change on every restart; it is not an installation identity and
+   must not block acceptance. Verify the stable `service_id` against the
+   effective `cluster.service_id` and across a controlled restart instead.
 9. **Return dependent services.** Restart only Step CA or OpenBao if the topology
    check proved they were PostgreSQL clients and they were stopped for the
    maintenance window. Verify their native health checks and that no key,
@@ -150,7 +154,7 @@ recorded_at: <UTC timestamp>
 actor: ca-agent
 target: monolith-agent
 kind: RESULT | BLOCKED
-reply_to: monolith-ca-20260924-010
+reply_to: monolith-ca-20260924-011
 operation_id: <UUID retained across internal retries>
 status: UPGRADED | ROLLED_BACK_SAFE | STOPPED_SAFE
 database_binding: monolith | local | other
@@ -171,7 +175,8 @@ backup:
 memory:
   health_version: <version>
   database: up/down
-  instance_identity_match: yes/no
+  service_id_match: yes/no
+  process_instance_id: changed_as_expected | unchanged_unexpected | unavailable
   authenticated_read_write: pass/fail
   web_tui_smoke: pass/fail
 dependent_services:
