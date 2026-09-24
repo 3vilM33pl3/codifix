@@ -70,8 +70,10 @@ function child(command, args, env) {
 
 async function encryptCommand(command, args, env, output, recipient, input) {
   const source = child(command, args, env);
-  const encryption = child('gpg', ['--batch', '--no-tty', '--encrypt', '--recipient', recipient,
-    '--output', output], process.env);
+  // The operator binds an exact full fingerprint above. Do not make encrypted
+  // recovery depend on an unrelated local Web-of-Trust certification state.
+  const encryption = child('gpg', ['--batch', '--no-tty', '--trust-model', 'always', '--encrypt',
+    '--recipient', recipient, '--output', output], process.env);
   if (input === undefined) source.process.stdin.end();
   else source.process.stdin.end(input);
   const piping = pipeline(source.process.stdout, encryption.process.stdin);
