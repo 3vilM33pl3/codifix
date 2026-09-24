@@ -1,5 +1,10 @@
 # CA PostgreSQL 17 and Trust receiver handoff
 
+> **Superseded on 24 September 2026.** Do not execute the side-by-side
+> `17/trust` instructions below. Olivier selected replacement of PostgreSQL 15
+> and upgrade of the existing Memory singleton. Use
+> [CA fast replacement](CA-FAST-REPLACEMENT.md).
+
 24 September 2026. PostgreSQL 17 is the selected CA target. Olivier authorized
 one bounded autonomous preparation run on 24 September 2026 so he does not have
 to approve intermediate checkpoints. This authority is limited to backup,

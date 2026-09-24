@@ -1,5 +1,11 @@
 # CA agent: complete the Trust deployment, with explicit live-change gates
 
+> **Current priority supersedes this phased Trust workflow.** Execute
+> [CA fast replacement](CA-FAST-REPLACEMENT.md): replace PostgreSQL `15/main`
+> with `17/main` and upgrade the existing Memory singleton to signed
+> `2.1.0-rc.1`. Do not create the former parallel `17/trust` target. Return to
+> the remaining Trust sections only after the replacement baseline is healthy.
+
 You are the agent working at the Certificate Authority's local console. Own the
 routine checks, evidence collection and coordination; do not make Olivier relay
 individual terminal outputs. Complete independent safe checks in one batch,

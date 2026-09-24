@@ -1,5 +1,10 @@
 # Trust inactive preparation — proposal for the CA agent
 
+> **Postponed for the fast replacement.** Upgrade the existing Memory singleton
+> and replace PostgreSQL `15/main` with `17/main` first. Do not create the former
+> parallel `17/trust` target. See
+> [CA fast replacement](CA-FAST-REPLACEMENT.md).
+
 Updated 24 September 2026. Olivier authorized one bounded autonomous CA run for
 backup, the pinned PostgreSQL-17 packages, and an empty inactive `17/trust`
 cluster. The exact executable scope and single required report are in

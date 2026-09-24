@@ -2,11 +2,11 @@
 
 Give the CA agent this instruction:
 
-> Read CA-AGENT.md and the linked Notion coordination page. Own the verification,
-> installation and migration workflow, communicate with the Monolith agent on
-> that page, and collect routine results yourself. Prepare one concrete approval
-> request for live changes; do not switch the old writer without the separate
-> cutover approval. Do not treat missing inputs as permission to bypass a gate.
+> Read `CA-FAST-REPLACEMENT.md` and the linked Notion coordination page. Execute
+> the one autonomous replacement operation, communicate with the Monolith agent
+> there, and report once. Replace `15/main` with `17/main`, upgrade the existing
+> Memory singleton to signed `2.1.0-rc.1`, and retain the old database and binary
+> as rollback material. Do not create the superseded parallel `17/trust` target.
 
 The [Notion page](https://app.notion.com/p/3e38990715f48117b9e8d8f3a95637d1)
 contains the public support download and the handoff dispatch. This is an agent
@@ -14,9 +14,11 @@ runbook, not another sequence of commands for Olivier to type.
 
 ## What's in the delivered directory
 
+- `CA-FAST-REPLACEMENT.md`: current replacement target, ordered maintenance
+  operation, rollback boundary and single report contract.
 - `CA-AGENT.md`: the complete phased job, known missing inputs and recovery.
-- `TRUST-POSTGRESQL17-UPGRADE.md`: the selected side-by-side PostgreSQL 17
-  topology, receiver evidence and exact remaining approval packet.
+- `TRUST-POSTGRESQL17-UPGRADE.md`: superseded side-by-side design, retained only
+  as historical receiver evidence.
 - `NOTION-COMMUNICATION.md`: shared page and message/acknowledgement rules.
 - `preflight.py`: one bounded, offline verification command; no DB access,
   installations, service changes or model calls. It makes a fresh private copy

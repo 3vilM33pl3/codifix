@@ -1,5 +1,11 @@
 # Trust-only inactive transfer
 
+Update, 24 September 2026: the side-by-side CA Trust preparation is superseded.
+Olivier selected the faster operational path: replace `15/main` with `17/main`
+while retaining PostgreSQL 15 as stopped rollback material, and upgrade the
+existing Memory singleton to signed release `2.1.0-rc.1`. Trust data transfer,
+the four-area cutover, federation and Pi follow after that working baseline.
+
 Status: local transfer preparation, fresh delta and PostgreSQL-17 receiver are
 verified. A bounded autonomous CA PostgreSQL-17 preparation is authorized;
 renewed review, CA encryption recipient, data transfer, restore and activation
