@@ -43,9 +43,51 @@ Receipt hashes reported by the CA agent:
 | Encrypted backup | `962fccf1176d652ef50b604fea58927c2071441d273efa7aac4ba5618d275dd7` |
 | Isolated restore receipt | `573150e503d1bf8c28375f3d8775a718cd8156f15bd7fbf93ceae4cb4730ed24` |
 
-No further action is required for this replacement operation beyond retaining
-the CA-local backup and evidence. Trust import, the four-area split, federation
-and Pi activation remain separate work.
+The database and backend replacement is complete. The interactive toolchain
+still requires the bounded reconciliation below because Olivier subsequently
+observed a `2.0.1` TUI. Trust import, the four-area split, federation and Pi
+activation remain separate work.
+
+## Post-upgrade toolchain reconciliation
+
+The retained `/usr/local/bin/memory` can shadow the packaged
+`/usr/bin/memory`. In addition, a `2.0.1` TUI labels its TUI, service, manager
+and watcher rows with its own compile-time version; those repeated labels are
+not independent measurements of the running processes.
+
+Complete this follow-up without changing PostgreSQL, Memory data, Step CA,
+OpenBao, Trust data or federation:
+
+1. Record `type -a memory`, `command -v memory`, both binary hashes and both
+   `--version` results. Verify `/usr/bin/memory` is `2.1.0-rc.1` with SHA-256
+   `897c368547e608062fdcd050902fc0c8906c47da6b928989f115c617c35ab119`.
+   Independently record backend, watcher-manager and watcher executable paths
+   using systemd and `/proc/<pid>/exe`.
+2. Preserve the old `/usr/local/bin/memory` and its hash inside the existing
+   private evidence root. Atomically replace the shadowing path with a symlink
+   to `/usr/bin/memory`; keep the preserved rollback copy. Refresh the shell
+   command cache and verify that the ordinary `memory` command resolves to the
+   authenticated packaged binary.
+3. As the existing watcher-manager owner, retain its config path, disable the
+   manager with `/usr/bin/memory` so its tracked old watchers stop, and re-enable
+   it with the same config using `/usr/bin/memory`. Restart the legacy system
+   `memory-watch.service` only if it was active; do not enable a previously
+   disabled watcher.
+4. For each manager-tracked repository only, make the skills command fall back
+   to the installed package template by setting
+   `MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL` to a verified nonexistent
+   local file URL. Run `/usr/bin/memory upgrade --dry-run --json`, require all
+   selected template paths to be under
+   `/usr/share/memory-layer/skill-template`, then run
+   `/usr/bin/memory upgrade` without `--force`. Retain the automatic backups and
+   do not replace unrelated or newer custom skills.
+5. Close the running old TUI and launch `/usr/bin/memory tui`. Reconfirm backend
+   version and health, then verify actual manager/watcher executables through
+   `/proc/<pid>/exe`; do not treat repeated TUI version labels as proof.
+6. Report the resolved command path and version, independently observed process
+   executable paths, the number of repositories checked and upgraded, skill
+   backup roots, health status and any deviations. Keep usernames, credentials,
+   configuration contents and private repository paths out of Notion.
 
 ## Why this is the fastest path
 
