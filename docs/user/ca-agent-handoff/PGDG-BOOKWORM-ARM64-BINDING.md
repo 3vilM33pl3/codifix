@@ -1,7 +1,9 @@
 # CA package binding: PostgreSQL 17 on Debian 12 ARM64
 
-Bound on 24 September 2026. This is the reviewed package identity for the
-inactive Trust preparation. It is not authority to change the CA.
+Bound on 24 September 2026 and refreshed after the repository was re-signed at
+19:34:26 UTC. This is the reviewed package identity for the CA PostgreSQL-17
+replacement. It is not authority to change the CA outside the separately
+approved replacement instruction.
 
 ## Repository identity
 
@@ -22,14 +24,22 @@ Signed-By: /usr/share/keyrings/postgresql-pgdg.asc
 | --- | --- |
 | Signing-key fingerprint | `B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8` |
 | ASCII key SHA-256 | `0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76` |
-| Signed `bookworm-pgdg` InRelease date | `Tue, 22 Sep 2026 15:15:39 UTC` |
-| InRelease SHA-256 | `2397236cabb65bf45f901a850a31ad96e63953345c487af9be555bc0af15dce0` |
-| Signed ARM64 `Packages.gz` SHA-256 | `a8c72003102b04151b052936f0ddfef746da74bdf36ff925773ec18e43b2a6a3` |
+| Signed `bookworm-pgdg` InRelease date | `Thu, 24 Sep 2026 19:34:26 UTC` |
+| InRelease SHA-256 | `7d58f5af5c2747b48584b533e9a5f5e417cb5a636637a391fdb55fde91778a73` |
+| Signed ARM64 `Packages.gz` SHA-256 | `bbb7c95c8b09f8b65f6c69658b8e90ed01192291d31068e0b5f991bf03dc04ae` |
+| Signed ARM64 `Packages.gz` size | `1229986` bytes |
 
 The CA agent must validate the key fingerprint and key hash before trusting the
 repository. It must verify the InRelease signature with that key. If the live
 repository index has changed, stop and report the newly signed identity; do not
 silently substitute newer packages.
+
+The prior signed-index binding (`2397236c...` / `a8c72003...`) was correctly
+rejected by the CA after PGDG re-signed the repository. The refreshed signed
+index above was independently downloaded and verified on Monolith. Its signed
+SHA-256 entry for `main/binary-arm64/Packages.gz` matches the downloaded file,
+and every exact package version and `.deb` hash below is unchanged. This refresh
+authorizes no newer package candidate.
 
 Authoritative upstream references:
 

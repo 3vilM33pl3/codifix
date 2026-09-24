@@ -42,6 +42,13 @@ Use the repository and package identities in
 PostgreSQL-17 server/client and any exact PostgreSQL-17 equivalents required by
 extensions actually present in `15/main`. Do not install development packages.
 
+Repository refresh, 24 September 2026 19:34:26 UTC: use InRelease SHA-256
+`7d58f5af5c2747b48584b533e9a5f5e417cb5a636637a391fdb55fde91778a73`
+and ARM64 `Packages.gz` SHA-256
+`bbb7c95c8b09f8b65f6c69658b8e90ed01192291d31068e0b5f991bf03dc04ae`.
+The exact package versions and hashes remain unchanged. The earlier index hashes
+are superseded, not the package binding.
+
 ## Execute once, in this order
 
 1. **Supersede the old plan.** Do not create `17/trust`. If an earlier operation
