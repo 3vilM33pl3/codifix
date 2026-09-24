@@ -20,7 +20,10 @@ test('portable receiver inspects, restores, verifies and refuses replay', {
 }, async t => {
   const bundle = resolve(process.env.MEMORY_TRUST_RECEIVER_BUNDLE ?? '');
   const manifestSha = process.env.MEMORY_TRUST_RECEIVER_MANIFEST_SHA256 ?? '';
-  assert.match(manifestSha, /^[0-9a-f]{64}$/); assert.equal(hash(await readFile(join(bundle, 'manifest.json'))), manifestSha);
+  assert.match(manifestSha, /^[0-9a-f]{64}$/);
+  const manifestBytes = await readFile(join(bundle, 'manifest.json'));
+  assert.equal(hash(manifestBytes), manifestSha);
+  const manifest = JSON.parse(manifestBytes);
   const root = await mkdtemp(join(tmpdir(), 'memory-trust-receiver-e2e-'));
   const socket = join(root, 'socket'), work = join(root, 'work'); await mkdir(socket, { mode: 0o777 }); await mkdir(work, { mode: 0o700 });
   const run = (command, args, options = {}) => {
@@ -68,7 +71,9 @@ test('portable receiver inspects, restores, verifies and refuses replay', {
   assert.equal(JSON.parse(inspected.stdout).fresh, true);
   const restored = receiver('restore', ['--receipt', '/work/receipt.json', '--execute', '--writers-stopped', '--fresh-database']);
   assert.equal(restored.status, 0, restored.stderr.toString().trim()); const result = JSON.parse(restored.stdout);
-  assert.equal(result.status, 'restored_verified_inactive_not_activated'); assert.equal(result.verified_rows, 375);
+  assert.equal(result.status, 'restored_verified_inactive_not_activated');
+  assert.equal(result.verified_rows, manifest.result.verified_rows);
+  assert.equal(result.projected_sources, manifest.result.projected_sources);
   const receiptBefore = await readFile(receipt); assert.deepEqual(JSON.parse(receiptBefore), result);
   assert.equal((await stat(receipt)).mode & 0o777, 0o600);
   const replay = receiver('restore', ['--receipt', '/work/replay.json', '--execute', '--writers-stopped', '--fresh-database']);
