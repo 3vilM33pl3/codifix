@@ -1,8 +1,16 @@
 # Trust-only inactive transfer
 
 Status: local transfer preparation, fresh delta and PostgreSQL-17 receiver are
-verified. Renewed review, CA encryption recipient, PostgreSQL installation and
-live-change gates remain open. Not permission to change the CA.
+verified. A bounded autonomous CA PostgreSQL-17 preparation is authorized;
+renewed review, CA encryption recipient, data transfer, restore and activation
+remain open.
+
+Update, 24 September 2026: Olivier authorized the CA agent to perform one
+bounded autonomous inactive PostgreSQL-17 preparation without intermediate
+human approvals. The agent received the exact PGDG repository/package binding,
+ordered safety checks and a single completion/blocker report contract. This
+does not extend to Trust data transfer, restore, application activation or
+singleton migration.
 
 Continuation checkpoint: task `d7eda699-ab9e-4844-8b49-7c287a0b289e`, memory
 `c0e647fc-36a6-4763-92d6-ccb7da374499` (22 September 2026). This is a bounded
@@ -46,7 +54,8 @@ portable-import protocol.
 - [x] Produce snapshot delta and a metadata-only writer inventory (observational,
   not complete writer fencing).
 - [x] Publish Monolith evidence and the grouped **inactive** proposal draft. The
-  CA agent must supply exact local fields before it becomes an approval request.
+  CA agent supplied the exact local fields; the bounded PostgreSQL-only portion
+  is now authorized without intermediate approvals.
 - [x] Record the CA's PostgreSQL15.18/no-pgvector observation, retain the tested
   compatibility fallback, then select and verify PostgreSQL17.11 as the Trust
   deployment target at Olivier's direction.
@@ -140,8 +149,8 @@ native CA package availability, installation, activation or customer readiness.
   current APT metadata. No existing CA data-decryption recipient was observed.
 - Olivier selected PostgreSQL17. The deployment topology is a side-by-side
   `17/trust` cluster on port 5433, database/role `memory_trust`, leaving the
-  PostgreSQL15 singleton untouched. Exact CA APT candidates and auto-cluster
-  behavior remain pending from the CA agent.
+  PostgreSQL15 singleton untouched. The CA agent reported auto-cluster behavior;
+  Monolith bound the official PGDG repository, key and exact ARM64 packages.
 - Exact isolated receiver profile: PostgreSQL/client 17.11, pgvector 0.8.6,
   `pgcrypto` 1.3, `pg_trgm` 1.6. The pinned image ID is
   `sha256:17a06c0a60bf6fb548a8493b8f6057dc830b791bbbe1f1ab706ca4b9d97c8180`.
@@ -164,9 +173,10 @@ No CA, source database, current service or private transfer was changed.
 
 Read-only source inspection, isolated local preparation/testing and existing-key
 encrypted backup are in scope. Existing Memory writers and previews remain up.
-CA packages/services/databases/credentials, private data delivery, signing new
-release artifacts, final writer fencing and activation need their corresponding
-explicit approval. No Step CA, OpenBao, DNS, Pi, paid providers or R3 changes.
+The bounded CA PostgreSQL package/empty-database preparation is authorized.
+Private data delivery, signing new release artifacts, final writer fencing and
+activation remain outside it. No Step CA, OpenBao, DNS, Pi, paid providers or R3
+changes.
 
 The CA agent reports native release preflight passed, **not installed**:
 `f68fce0b43762cf8a5d429b18b6eaa99d2864cbcecfe5f765e1d3f4760b546c5`.

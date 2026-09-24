@@ -1,10 +1,11 @@
 # Trust inactive preparation — proposal for the CA agent
 
-Updated 24 September 2026. **Draft; do not execute host changes from this
-document.**
-This supplements the original runbook, leaving the signed USB release unchanged.
-The local transfer mechanism and PostgreSQL-17 receiver are tested. They are not
-installed or approved on the CA, and the protected dataset has not been sent.
+Updated 24 September 2026. Olivier authorized one bounded autonomous CA run for
+backup, the pinned PostgreSQL-17 packages, and an empty inactive `17/trust`
+cluster. The exact executable scope and single required report are in
+[the PostgreSQL-17 handoff](TRUST-POSTGRESQL17-UPGRADE.md). This document remains
+the wider transfer proposal: protected data has not been sent and activation is
+not authorized.
 
 ## What Monolith has completed
 
@@ -36,28 +37,31 @@ no existing data-decryption recipient, an active singleton, one offline DuckDB,
 unused named-instance paths, port 8091, database/role `memory_trust` and backup
 path `/var/backups/memory-layer/trust`. Keep that packet as pre-change evidence.
 
-Using read-only inspection only, now return sanitized `pg_lsclusters` state, APT
-source families, exact candidate versions for PostgreSQL17/client/dev/pgvector,
-whether package hooks would create `17/main`, unused port 5433 and exact data and
-backup capacity. Do not add a repository, install a package, create a cluster or
-key, or obtain new catalog access just to answer.
+That read-only packet is complete. The exact official PGDG repository, key,
+packages and hashes are now bound in
+[the package binding](PGDG-BOOKWORM-ARM64-BINDING.md).
 
-## Grouped inactive host-change proposal (complete locally before approval)
+## Bounded inactive host preparation
+
+The PostgreSQL-only portion no longer needs intermediate human approvals. The
+CA agent executes it once, stops with the empty cluster inactive, and reports
+`COMPLETED_INACTIVE` or `STOPPED_SAFE`. Data encryption/transfer, restore and
+activation remain outside that operation.
 
 CA owns exact local paths/DB/role/network/security and interruption handling.
 Monolith owns the minimized transfer, content bindings and source/delta review.
-Ask Olivier once for the fully specified inactive change, not piecemeal commands.
-Do not ask for blanket approval while required fields remain unknown.
+The CA agent does not ask Olivier for intermediate approval during the bounded
+PostgreSQL-only run. It reports once on completion or a fail-closed stop.
 
 | Resource | Proposed action and boundary |
 | --- | --- |
 | Signed release 2.1.0-rc.1 | Reuse authenticated native ARM64 artifacts already staged; preserve the USB. No new release signature or Pi artifact. |
 | Root-owned tools | Exact authenticated `console.py`, `instance.py`, `release.py` at `/usr/libexec/memory-layer/releases/`; confirm hashes from original handoff. |
 | Instance files | New `/opt/memory-layer/instances/trust/release/`, `/etc/memory-layer-instances/trust/`, `/var/lib/memory-layer-installations/trust/`; no overwrite/upgrade of existing state. |
-| PostgreSQL 17 | Side-by-side `17/trust` cluster on port 5433, Unix socket only during preparation. Preserve the PostgreSQL15 singleton. Package source, exact versions, auto-cluster suppression and rollback must be filled from the prerequisite packet. |
+| PostgreSQL 17 | Side-by-side `17/trust` cluster on port 5433, Unix socket only during preparation. Preserve the PostgreSQL15 singleton. Exact package source, versions, hashes, auto-cluster suppression and rollback are bound in the PostgreSQL-17 handoff. |
 | Database and role | CA-local `memory_trust`, owned by login role `memory_trust` with no elevated attributes. Credentials generated and retained locally; fresh and isolated, never copied auth or service authority. |
 | Data delivery | Separately authenticated, approved-recipient encrypted Trust-only artifacts over an explicit transport. No full archive or unrelated area. Receiver tooling/version pair must be tested first. |
-| Recipient | Create a dedicated CA-local encryption identity only under the grouped approval. Do not reuse release signing. Export and independently verify only its public fingerprint/key; prove a synthetic round trip first. |
+| Recipient | Later work outside the current operation: create a dedicated CA-local encryption identity. Do not reuse release signing. Export and independently verify only its public fingerprint/key; prove a synthetic round trip first. |
 | Restore | Use the hash-bound PostgreSQL17 receiver against the exact fresh target. Trusted extensions + role-owned schema + allowlisted data + trusted post-data commit in one transaction; then independent receipt/hash/sequence/ownership validation. Preserve target UUID/import UUID. Never `--clean`, disable triggers or edit immutable receipts. |
 | Configuration | Exact digest reviewed locally; read-only application mode and all background/model/watch/federation/offline replay/MCP paths off. Secrets stay in protected files. |
 | Systemd | Install inactive under the existing console contract; no start/enable or activation marker. Native sandbox/CA-secret-path/egress denial tests are later explicit checks, not assumed from package compatibility. |
@@ -73,7 +77,7 @@ It passed inspect, atomic restore, 375-row verification and replay refusal again
 PostgreSQL17.11/pgvector0.8.6. It is unencrypted, not transferred and still bound
 to the historical partition; do not treat it as the final migration payload.
 
-## Separate activation gate
+## Activation remains out of scope
 
 Before stopping or moving any original writer: complete CA-only/offline
 reconciliation, renewed source/dependency review, exact receiver validation,
