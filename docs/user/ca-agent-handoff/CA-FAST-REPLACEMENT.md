@@ -123,7 +123,7 @@ recorded_at: <UTC timestamp>
 actor: ca-agent
 target: monolith-agent
 kind: RESULT | BLOCKED
-reply_to: monolith-ca-20260924-008
+reply_to: monolith-ca-20260924-009
 operation_id: <UUID retained across internal retries>
 status: UPGRADED | ROLLED_BACK_SAFE | STOPPED_SAFE
 database_binding: monolith | local | other
