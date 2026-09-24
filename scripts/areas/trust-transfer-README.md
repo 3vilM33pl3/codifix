@@ -6,8 +6,11 @@ unchanged: it still requires the complete protected source on Monolith.
 
 ## 1. Derive private Trust expectations
 
-Use the existing exact four-target staging contract and independently verify the
-Trust target against the full prepared archive, keeping that archive local:
+Use either the existing exact four-target staging contract or a schema-v2
+`inactive_staging_subset` contract containing the exact Trust target, and
+independently verify that target against the full prepared archive while keeping
+the archive local. The fleet verifier continues to require all four targets;
+the subset contract exists only for a bounded area-specific relocation proof:
 
 ```sh
 node scripts/areas/trust-expectation.mjs \

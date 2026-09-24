@@ -6,10 +6,9 @@ while retaining PostgreSQL 15 as stopped rollback material, and upgrade the
 existing Memory singleton to signed release `2.1.0-rc.1`. Trust data transfer,
 the four-area cutover, federation and Pi follow after that working baseline.
 
-Status: local transfer preparation, fresh delta and PostgreSQL-17 receiver are
-verified. A bounded autonomous CA PostgreSQL-17 preparation is authorized;
-renewed review, CA encryption recipient, data transfer, restore and activation
-remain open.
+Status: the 25 September current Trust-only candidate, encrypted source backup,
+and PostgreSQL-17 receiver are verified locally. No current artifact has been
+sent to the CA. CA decryption, transfer, restore and activation remain open.
 
 Update, 24 September 2026: Olivier authorized the CA agent to perform one
 bounded autonomous inactive PostgreSQL-17 preparation without intermediate
@@ -70,6 +69,58 @@ portable-import protocol.
 
 See [operator commands](../../../scripts/areas/trust-transfer-README.md) and the
 [CA-agent proposal](../../user/ca-agent-handoff/TRUST-INACTIVE-PROPOSAL.md).
+
+## Verified current candidate on 25 September
+
+Steps 1–4 of the current Trust-data preparation completed locally without
+stopping the shared source or changing the CA:
+
+1. Snapshot `8ffff72d-3754-4a3f-b5fd-409d609b6475` was encrypted to the existing
+   operator recipient and restored into a new network-none PostgreSQL 17
+   container. All **125 tables, 3,127,417 rows and four sequence states** matched.
+2. The complete redacted review covered **3,325 histories / 3,610 versions**.
+   Schema and dependency changes invalidated every old carried decision, so none
+   was silently reused. Eighteen histories were reviewed as Trust; 3,307 remain
+   protected and non-searchable. One prior Trust item about deploying the
+   unrelated `random-web` application was removed. A new certificate-consumer
+   workflow also remains protected because it is not authoritative CA operation.
+   These are agent-reviewed decisions, not Olivier's personal approval or model
+   disclosure consent.
+3. The current Trust staging import verified **18 histories, 21 versions, 371
+   rows and 183 reference-only provenance projections**. A minimized 273,431-byte
+   encrypted bundle was created. Decryption reproduced the exact plaintext tar
+   digest; the all-area archive is not in the receiver bundle.
+4. The minimized bundle was restored transactionally into fresh disposable
+   PostgreSQL **17.11** with pgvector **0.8.6**, `pgcrypto` **1.3** and `pg_trgm`
+   **1.6**. Independent verification and replay refusal passed. No service,
+   writer, federation worker or supervisor was started.
+
+Protected local roots:
+
+- source snapshot: `/data/tmp/memory-four-area-baseline-20260924T2250`
+- full protected preparation: `/data/tmp/memory-four-area-trust-prepared-20260925T0015`
+- inactive Trust stage: `/data/tmp/memory-four-area-trust-stage-20260925T0020`
+- independent restore rehearsal: `/data/tmp/memory-four-area-trust-rehearsal-20260925T0035`
+- minimized receiver: `/data/tmp/memory-four-area-trust-receiver-20260925T0045`
+
+| Current evidence | SHA-256 |
+| --- | --- |
+| Encrypted source database | `c576468bdbf377c2351d1334879e5998841aaa89a53127014513d55c49bbcfb5` |
+| Source restore evidence | `31c15bede5c7fc50aa9b25b7962f7a9b3e718fa4ef036fa22cf0a7d79843c38a` |
+| Complete inventory file | `d1065eba05e13a6b5fd8137d6d03438518a2a81d0d6a03e6152a14e06ffe7df7` |
+| Current Trust decision ledger | `ff4ac428324dfc4051117babeb1d47c2d43d310669687f9aa184f9a8b2d7f885` |
+| Current Trust manifest file | `b4a1ae3110c7df778240f92e83e709fbdafe04a57c4f4e0dad74544ba6155d67` |
+| Prepared receipt | `502a2590b270241bad18bb9143b1f4b3d9ec493dafe458d699604801da05e6a4` |
+| Minimized expectation | `46b177741175f059910cd0ac31a29f37f75fddde065b49c42ec836d8f4f47bf9` |
+| Independent restore result | `148f064aa5ad3fcda7dfc7a75ad4a134673aebbc4ee82879b20eae29518bb528` |
+| Receiver manifest | `15dc9804d36def59985c33055a81b74018278f336b6b1a00ca5839da84c04046` |
+| Receiver plaintext tar | `c59a67429364f38f173186424f5d16a28eff010670719fe62b7ec9b7d88dc48e` |
+| Encrypted receiver tar | `8783b54c0a8ba3840f1331fb78a3fc68ac22450b6b447fbbab458a0a3d87f9a7` |
+| Encryption read-back receipt | `0d87faec119a9815a2e3a1d2d5e64b33583f83eea80b0101c6695ee317219e7d` |
+
+The ciphertext uses the existing operator backup recipient, not a proven CA
+recipient. It therefore remains on Monolith. Transfer requires a destination
+decryption decision and independently authenticated delivery instructions.
 
 ## Verified on 22 September
 

@@ -14,7 +14,21 @@ not authorized.
 
 ## What Monolith has completed
 
-The full shared source has a new encrypted snapshot and independent row/sequence
+Current update, 25 September: Monolith repeated the full source snapshot,
+complete-history review, minimized receiver build and disposable PostgreSQL-17
+restore. The current candidate contains **18 histories, 21 versions, 371 rows
+and 183 reference-only provenance projections**. One historical Trust assignment
+was removed because it concerned an unrelated Homelab application. The encrypted
+273,431-byte candidate remains on Monolith; it has not been sent to or restored
+on the CA. Its receiver manifest is
+`15dc9804d36def59985c33055a81b74018278f336b6b1a00ca5839da84c04046`
+and its encrypted tar digest is
+`8783b54c0a8ba3840f1331fb78a3fc68ac22450b6b447fbbab458a0a3d87f9a7`.
+The current ciphertext uses the operator backup recipient, not a CA-proven data
+recipient, so the CA agent must not request or attempt to restore it yet.
+
+Historical 22 September evidence follows for comparison. The full shared source
+had an encrypted snapshot and independent row/sequence
 restore proof. A Trust-only candidate from the previously approved September19
 partition has been restored and checked locally, preserving its logical identity
 and import receipts without transferring other areas or executing source DDL.
