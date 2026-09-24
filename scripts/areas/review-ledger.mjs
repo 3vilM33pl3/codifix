@@ -232,21 +232,23 @@ export function createManifest(index, ledger, draft) {
   // manifest instead of repeating long review prose for hundreds of thousands
   // of rows. This is the same bounded representation used for relation policy.
   const supportingPolicyHash = hash(stable(ledger.supporting_records));
-  const supportingReason = `Protected by ledger supporting-record policy ${supportingPolicyHash}.`;
+  const supportingPolicyRef = `policy:${supportingPolicyHash}`;
+  const supportingReason = supportingPolicyRef;
   const supportingReview = {
     classification: ledger.supporting_records.review.classification,
-    source_evidence: `Ledger supporting-record policy ${supportingPolicyHash}`,
-    project_evidence: 'Original project identity retained; no reassignment.',
-    content_evidence: 'Protected archive only; no searchable body import.',
+    source_evidence: supportingPolicyRef,
+    project_evidence: 'preserved',
+    content_evidence: 'archive-only',
   };
   // Hundreds of thousands of unchanged edges must not repeat a long narrative
   // per row. This exact digest references the explicit ledger policy retained
   // in the receipt-bound ledger, not an inferred individual-content approval.
   const relationPolicyHash = hash(stable(ledger.relation_policy));
+  const relationPolicyRef = `policy:${relationPolicyHash}`;
   const relationReview = { classification: ledger.relation_policy.review.classification,
-    source_evidence: `Ledger relation policy ${relationPolicyHash}`,
-    project_evidence: 'Both original endpoint projects retained.',
-    content_evidence: 'Explicit endpoint-ownership preservation policy; no cross-area sharing.' };
+    source_evidence: relationPolicyRef,
+    project_evidence: 'endpoints-preserved',
+    content_evidence: 'same-area-only' };
   const boundProject = (area, id) => {
     if (!projects.has(id)) fail('Missing exact project provenance');
     bindings.set(`${area}:${id}`, { area, source: projects.get(id), reason: 'Agent-reviewed ownership; original project identity and subdivision retained.' });
@@ -285,7 +287,7 @@ export function createManifest(index, ledger, draft) {
       const left = decisions.get(relation.src_canonical_id), right = decisions.get(relation.dst_canonical_id);
       if (left?.disposition.kind === 'area' && right?.disposition.kind === 'area' && left.disposition.area === right.disposition.area) {
         item.disposition = { kind: 'area', area: left.disposition.area, review: relationReview };
-      } else item.disposition = { kind: 'protected_archive', reason: 'Cross-area or archived endpoint; original retained under explicit ledger policy.', review: relationReview };
+      } else item.disposition = { kind: 'protected_archive', reason: relationPolicyRef, review: relationReview };
     } else item.disposition = { kind: 'protected_archive', reason: supportingReason, review: supportingReview };
   }
   result.projects = [...bindings.values()].sort((a, b) => `${a.area}:${a.source.id}`.localeCompare(`${b.area}:${b.source.id}`));
