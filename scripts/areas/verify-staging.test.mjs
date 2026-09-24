@@ -72,6 +72,16 @@ test('contract pins four independent exact identities and refuses extra fields o
   }
   assert.throws(()=>parseArgs(['--contract','/x','--output','/y']));
 });
+test('contract accepts an exact inactive subset without weakening the fleet contract',()=>{
+  const c=contract();c.schema_version=2;c.kind='inactive_staging_subset';c.targets=[c.targets.find(t=>t.area==='trust')];
+  assert.deepEqual(validateContract(c).targets.map(t=>t.area),['trust']);
+  for(const mutate of [
+    value=>{value.targets=[];},
+    value=>{value.targets.push({...value.targets[0]});},
+    value=>{value.schema_version=1;},
+    value=>{value.kind='four_inactive_staging';},
+  ]) { const value=structuredClone(c);mutate(value);assert.throws(()=>validateContract(value)); }
+});
 test('target requires exact isolated read-only-root container and pinned Unix socket mount',()=>{
   const f=fixture(),metadata={Id:f.spec.container_id,Name:'/'+f.spec.container_name,Image:f.spec.image_id,State:{Running:true},HostConfig:{NetworkMode:'none',ReadonlyRootfs:true},NetworkSettings:{Networks:{none:{}},Ports:{}},Mounts:[{Type:'bind',Source:f.target.connection.directory,Destination:'/var/run/postgresql'}]};
   validateTarget(f.spec,f.target,metadata,f.prepared.source_instance);

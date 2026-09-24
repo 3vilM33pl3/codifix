@@ -158,7 +158,10 @@ function binding(value) {
 }
 export function validateContract(c) {
   exact(c, ['schema_version', 'kind', 'prepared', 'manifest', 'archive', 'targets']);
-  if (c.schema_version !== 1 || c.kind !== 'four_inactive_staging' || !Array.isArray(c.targets) || c.targets.length !== 4) fail();
+  const full = c.schema_version === 1 && c.kind === 'four_inactive_staging' && c.targets?.length === 4;
+  const subset = c.schema_version === 2 && c.kind === 'inactive_staging_subset'
+    && Array.isArray(c.targets) && c.targets.length >= 1 && c.targets.length <= AREAS.length;
+  if ((!full && !subset) || !Array.isArray(c.targets)) fail();
   for (const name of ['prepared', 'manifest', 'archive']) binding(c[name]);
   for (const t of c.targets) {
     exact(t, ['area', 'target', 'container_id', 'container_name', 'image_id', 'operation_id']);
@@ -166,8 +169,10 @@ export function validateContract(c) {
     if (!AREAS.includes(t.area) || !sha.test(t.container_id) || !/^sha256:[0-9a-f]{64}$/.test(t.image_id)
       || !uuid.test(t.operation_id) || !new RegExp('^memory-four-area-staging-[a-z0-9-]+-' + t.area + '$').test(t.container_name)) fail();
   }
-  for (const field of ['area', 'container_id', 'container_name', 'operation_id']) if (new Set(c.targets.map(t => t[field])).size !== 4) fail();
-  if (new Set([...['prepared','manifest','archive'].map(k => c[k].path), ...c.targets.map(t => t.target.path)]).size !== 7) fail();
+  for (const field of ['area', 'container_id', 'container_name', 'operation_id']) {
+    if (new Set(c.targets.map(t => t[field])).size !== c.targets.length) fail();
+  }
+  if (new Set([...['prepared','manifest','archive'].map(k => c[k].path), ...c.targets.map(t => t.target.path)]).size !== 3 + c.targets.length) fail();
   return c;
 }
 export function validateTarget(t, target, metadata, sourceInstance) {
@@ -458,6 +463,7 @@ export async function verifyDatabase(io, spec, target, state) {
 export async function verifyFleet(contractFile, contractSha, output, inspect = inspectContainer) {
   if (!sha.test(contractSha) || !isAbsolute(output)) fail();
   const c = validateContract(await bound({path:contractFile,sha256:contractSha},64*1024,true));
+  if (c.schema_version !== 1 || c.kind !== 'four_inactive_staging' || c.targets.length !== 4) fail();
   const prepared = await bound(c.prepared,1024*1024,true);
   const manifest = await bound(c.manifest,256*1024*1024,true);
   if (prepared.manifest_file_sha256 !== c.manifest.sha256 || prepared.archive_sha256 !== c.archive.sha256) fail();
