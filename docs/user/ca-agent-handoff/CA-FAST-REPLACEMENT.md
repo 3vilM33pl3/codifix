@@ -43,10 +43,25 @@ Receipt hashes reported by the CA agent:
 | Encrypted backup | `962fccf1176d652ef50b604fea58927c2071441d273efa7aac4ba5618d275dd7` |
 | Isolated restore receipt | `573150e503d1bf8c28375f3d8775a718cd8156f15bd7fbf93ceae4cb4730ed24` |
 
-The database and backend replacement is complete. The interactive toolchain
-still requires the bounded reconciliation below because Olivier subsequently
-observed a `2.0.1` TUI. Trust import, the four-area split, federation and Pi
-activation remain separate work.
+The database, backend and interactive toolchain replacement are complete. The
+CA agent reported `RECONCILED` at 2026-09-24 22:32 UTC:
+
+- The ordinary `memory` command resolves to `/usr/bin/memory`, reports
+  `2.1.0-rc.1`, and matches SHA-256
+  `897c368547e608062fdcd050902fc0c8906c47da6b928989f115c617c35ab119`.
+- The backend executes `/usr/bin/memory`, reports `2.1.0-rc.1`, and remains
+  healthy against PostgreSQL `17/main` on port 5432.
+- Two legacy `2.0.1` command-shadow binaries were found. Both had the same
+  authenticated hash, were preserved in the private evidence root, and their
+  command paths now redirect to the packaged binary.
+- No watcher manager was installed, the legacy watcher was inactive and
+  disabled, and no repositories were manager-tracked. Consequently no watcher
+  was enabled and no repository skill files were changed.
+- A fresh packaged TUI passed, the legacy TUI was closed, rollback copies remain
+  retained, and Step CA and OpenBao stayed active and unchanged.
+
+Trust import, the four-area split, federation and Pi activation remain separate
+work.
 
 ## Post-upgrade toolchain reconciliation
 
@@ -55,8 +70,8 @@ The retained `/usr/local/bin/memory` can shadow the packaged
 and watcher rows with its own compile-time version; those repeated labels are
 not independent measurements of the running processes.
 
-Complete this follow-up without changing PostgreSQL, Memory data, Step CA,
-OpenBao, Trust data or federation:
+This completed follow-up is retained as the reconciliation procedure. It must
+not change PostgreSQL, Memory data, Step CA, OpenBao, Trust data or federation:
 
 1. Record `type -a memory`, `command -v memory`, both binary hashes and both
    `--version` results. Verify `/usr/bin/memory` is `2.1.0-rc.1` with SHA-256
