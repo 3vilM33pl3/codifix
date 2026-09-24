@@ -227,6 +227,18 @@ export function createManifest(index, ledger, draft) {
   const decisions = new Map(ledger.decisions.map(d => [d.canonical_id, d])), histories = new Map(index.histories.map(h => [h.canonical_id, h]));
   const projects = new Map(index.projects.map(p => [p.id, p])), bindings = new Map();
   const relations = new Map(index.relations.map(([id, src_canonical_id, dst_canonical_id, row_sha256]) => [id, { id, src_canonical_id, dst_canonical_id, row_sha256 }]));
+  // Supporting rows are all governed by one explicit protected-archive policy.
+  // Bind that policy once in the ledger and reference its digest in the
+  // manifest instead of repeating long review prose for hundreds of thousands
+  // of rows. This is the same bounded representation used for relation policy.
+  const supportingPolicyHash = hash(stable(ledger.supporting_records));
+  const supportingReason = `Protected by ledger supporting-record policy ${supportingPolicyHash}.`;
+  const supportingReview = {
+    classification: ledger.supporting_records.review.classification,
+    source_evidence: `Ledger supporting-record policy ${supportingPolicyHash}`,
+    project_evidence: 'Original project identity retained; no reassignment.',
+    content_evidence: 'Protected archive only; no searchable body import.',
+  };
   // Hundreds of thousands of unchanged edges must not repeat a long narrative
   // per row. This exact digest references the explicit ledger policy retained
   // in the receipt-bound ledger, not an inferred individual-content approval.
@@ -274,7 +286,7 @@ export function createManifest(index, ledger, draft) {
       if (left?.disposition.kind === 'area' && right?.disposition.kind === 'area' && left.disposition.area === right.disposition.area) {
         item.disposition = { kind: 'area', area: left.disposition.area, review: relationReview };
       } else item.disposition = { kind: 'protected_archive', reason: 'Cross-area or archived endpoint; original retained under explicit ledger policy.', review: relationReview };
-    } else item.disposition = { kind: 'protected_archive', reason: ledger.supporting_records.reason, review: ledger.supporting_records.review };
+    } else item.disposition = { kind: 'protected_archive', reason: supportingReason, review: supportingReview };
   }
   result.projects = [...bindings.values()].sort((a, b) => `${a.area}:${a.source.id}`.localeCompare(`${b.area}:${b.source.id}`));
   result.provenance_projections.sort((a, b) => a.binding.source.record.key.localeCompare(b.binding.source.record.key));
