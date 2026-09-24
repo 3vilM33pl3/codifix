@@ -1,7 +1,7 @@
 # CA package binding: PostgreSQL 17 on Debian 12 ARM64
 
-Bound on 24 September 2026 and refreshed after the repository was re-signed at
-19:34:26 UTC. This is the reviewed package identity for the CA PostgreSQL-17
+Bound on 24 September 2026 and last observed after the repository was re-signed
+at 20:53:49 UTC. This is the reviewed package identity for the CA PostgreSQL-17
 replacement. It is not authority to change the CA outside the separately
 approved replacement instruction.
 
@@ -24,15 +24,19 @@ Signed-By: /usr/share/keyrings/postgresql-pgdg.asc
 | --- | --- |
 | Signing-key fingerprint | `B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8` |
 | ASCII key SHA-256 | `0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76` |
-| Signed `bookworm-pgdg` InRelease date | `Thu, 24 Sep 2026 19:34:26 UTC` |
-| InRelease SHA-256 | `7d58f5af5c2747b48584b533e9a5f5e417cb5a636637a391fdb55fde91778a73` |
-| Signed ARM64 `Packages.gz` SHA-256 | `bbb7c95c8b09f8b65f6c69658b8e90ed01192291d31068e0b5f991bf03dc04ae` |
-| Signed ARM64 `Packages.gz` size | `1229986` bytes |
+| Signed `bookworm-pgdg` InRelease date | `Thu, 24 Sep 2026 20:53:49 UTC` |
+| Observed InRelease SHA-256 | `37f6aa488afe294015f1328834843b215fbcbde62c41e339c9ff1dcf9930c34b` |
+| Observed signed ARM64 `Packages.gz` SHA-256 | `e6dec1f2e121c9f47903a85438c742ecf5442aa695d8d8a6340ca71dfc235f69` |
+| Observed signed ARM64 `Packages.gz` size | `1231876` bytes |
 
 The CA agent must validate the key fingerprint and key hash before trusting the
-repository. It must verify the InRelease signature with that key. If the live
-repository index has changed, stop and report the newly signed identity; do not
-silently substitute newer packages.
+repository. It must verify the InRelease signature with that key and verify the
+signed ARM64 index entry against the downloaded index. PGDG may regenerate the
+signed index while retaining the authorized package artifacts. A changed
+InRelease or `Packages.gz` identity is recorded but is not, by itself, a stop
+condition. Continue only when the signature is valid under the bound key and
+every authorized package below has the exact bound version and `.deb` hash. Do
+not silently substitute newer packages.
 
 The prior signed-index binding (`2397236c...` / `a8c72003...`) was correctly
 rejected by the CA after PGDG re-signed the repository. The refreshed signed
@@ -61,10 +65,18 @@ The signed ARM64 package index above contains these reviewed candidates:
 | `libpq5` | `18.6-1.pgdg12+2` | arm64 | `1e2b364b93ff16293d6f4a409e49b0d8c0521b9f7ae3423007f443c31c0f6766` |
 
 Do not install `postgresql-server-dev-17`; the binary pgvector package makes it
-unnecessary. Debian dependencies such as `libllvm19` may be added only if the
-APT simulation identifies them by exact package/version and the CA agent lists
-them in its pre-change report. The simulation must propose no removal,
-downgrade, PostgreSQL-15 server replacement or distribution upgrade.
+unnecessary. `pg_upgradecluster --check` compares major-version package names,
+so the old build-time-only `postgresql-server-dev-15` package creates a false
+parity requirement. If it is the sole parity failure, simulate its removal and
+continue only when exactly that package would be removed and no installed
+package has a reverse dependency on it. Remove it without autoremove, retain the
+package inventory in evidence, and rerun the normal unforced check. Do not use
+`--force-packages`.
+
+Debian dependencies such as `libllvm19` may be added only if the APT simulation
+identifies them by exact package/version and the CA agent records them locally.
+The simulation must propose no unexpected removal, downgrade, PostgreSQL-15
+server replacement or distribution upgrade.
 
 Upgrading `postgresql-common`, `postgresql-client-common` and `libpq5` is an
 expected part of this package set. They are shared with PostgreSQL 15, so this
@@ -73,7 +85,9 @@ move or change cluster identity during the inactive Trust preparation.
 
 ## Fail-closed rule
 
-Any mismatch in repository identity, architecture, version, package hash or APT
-transaction stops the change before installation. The CA agent reports the
-observed value and preserves its local evidence. It does not find an
-alternative repository, upgrade Debian or relax the receiver profile.
+Any mismatch in signing identity, signature, architecture, bound package
+version, bound `.deb` hash or reviewed APT transaction stops the change. A
+newly generated index is acceptable only under the rotation rule above. The CA
+agent records the observed index identity and preserves its local evidence. It
+does not find an alternative repository, upgrade Debian or relax artifact
+verification.

@@ -5,8 +5,10 @@ cluster with PostgreSQL 17 and upgrade the existing Memory singleton to the
 latest signed deployable release. Do not create a parallel `17/trust` cluster.
 
 This is one autonomous maintenance operation. The CA agent performs internal
-checks and reports once. It retains PostgreSQL 15 and the previous Memory binary
-as rollback material; operational replacement does not mean immediate deletion.
+checks and reports once. It keeps PostgreSQL 15 only through the upgrade and
+acceptance window, then deletes the old cluster and major-version packages after
+PostgreSQL 17 and Memory 2.1 pass. The verified encrypted backup and local
+evidence remain. The previous Memory binary remains rollback material.
 
 ## Why this is the fastest path
 
@@ -29,9 +31,10 @@ as rollback material; operational replacement does not mean immediate deletion.
 | --- | --- |
 | OS | Existing Debian 12 ARM64; unchanged |
 | PostgreSQL production cluster | `17/main`, original port 5432 |
-| PostgreSQL rollback cluster | Existing `15/main`, retained stopped/manual on the port assigned by `pg_upgradecluster` |
+| PostgreSQL temporary rollback cluster | Existing `15/main`, retained stopped/manual only until PostgreSQL 17 and Memory acceptance, then deleted |
 | Memory package | Signed `memory-layer_2.1.0-rc.1_arm64.deb` |
 | Memory package SHA-256 | `34894b000cd1d9e71890d1415e3ab7ac5e6c47f06f7494b48b9e1283a17ab71a` |
+| Packaged `/usr/bin/memory` SHA-256 | `897c368547e608062fdcd050902fc0c8906c47da6b928989f115c617c35ab119` |
 | Memory source revision | `b35faf2983d20c69bc086fb9bcb7e95c51bd8f47` |
 | Memory schema compatibility | floor 60, head 60, no migration |
 | Release manifest SHA-256 | `5d06127ec4db38e0d56eb0942a41f26bee32987645f1bf81391fb929e19ee1d4` |
@@ -42,12 +45,17 @@ Use the repository and package identities in
 PostgreSQL-17 server/client and any exact PostgreSQL-17 equivalents required by
 extensions actually present in `15/main`. Do not install development packages.
 
-Repository refresh, 24 September 2026 19:34:26 UTC: use InRelease SHA-256
-`7d58f5af5c2747b48584b533e9a5f5e417cb5a636637a391fdb55fde91778a73`
+Latest independently verified repository observation, 24 September 2026
+20:53:49 UTC: InRelease SHA-256
+`37f6aa488afe294015f1328834843b215fbcbde62c41e339c9ff1dcf9930c34b`
 and ARM64 `Packages.gz` SHA-256
-`bbb7c95c8b09f8b65f6c69658b8e90ed01192291d31068e0b5f991bf03dc04ae`.
-The exact package versions and hashes remain unchanged. The earlier index hashes
-are superseded, not the package binding.
+`e6dec1f2e121c9f47903a85438c742ecf5442aa695d8d8a6340ca71dfc235f69`.
+PGDG legitimately regenerates its signed index. A later index identity is not a
+stop condition by itself: verify its signature under the bound fingerprint,
+verify its signed ARM64 index entry, and require every authorized package's
+exact version and `.deb` hash to remain unchanged. Stop for a signing-key,
+signature, architecture, version or `.deb`-hash mismatch. Do not select a newer
+candidate.
 
 ## Execute once, in this order
 
@@ -72,6 +80,12 @@ are superseded, not the package binding.
    equivalents for every external extension found in the old cluster. Run the
    copy-mode upgrade precheck. Stop if it reports an unresolved extension,
    incompatible setting, untrusted source-superuser object or missing space.
+   The retained `postgresql-server-dev-15` package is build-time headers, not a
+   runtime extension. If it is the only package-parity failure, simulate removal
+   without autoremove. Continue only if the simulation removes exactly
+   `postgresql-server-dev-15` and no reverse-dependent installed package; then
+   remove only that obsolete header package and rerun the unforced precheck. Do
+   not install `postgresql-server-dev-17` and do not use `--force-packages`.
 6. **Take the short maintenance window.** Stop Memory and any locally confirmed
    clients of `15/main`. Do not change their configuration, keys or identities.
    Run the Debian cluster upgrade equivalent of:
@@ -88,25 +102,38 @@ are superseded, not the package binding.
    tablespaces, representative counts and application read/write probes. Run all
    upgrade-generated extension/reindex/statistics actions before declaring the
    affected objects usable. Confirm `15/main` is stopped and was not deleted.
-8. **Upgrade the existing Memory service.** Confirm the configured shared/local
-   database is reachable and at schema 60. Explicitly restart only the existing
+8. **Upgrade the existing Memory service.** Verify `/usr/bin/memory` has the
+   bound hash above and reports `2.1.0-rc.1`. Preserve the effective unit and
+   drop-ins. If the active unit names `/usr/local/bin/memory`, add a reversible
+   systemd drop-in that changes only the executable token to `/usr/bin/memory`,
+   preserving the existing arguments, environment, config path, user and
+   service identity. Confirm the configured shared/local database is reachable
+   and at schema 60. Explicitly restart only the existing
    `memory-layer.service`, then its watcher if it was previously enabled. Require
-   `/healthz` to report version `2.1.0-rc.1`, database `up`, the same expected
-   instance identity, and successful authenticated read/write and Web/TUI checks.
+   the running process to resolve to `/usr/bin/memory`; require `/healthz` to
+   report version `2.1.0-rc.1`, database `up`, the same expected instance
+   identity, and successful authenticated read/write and Web/TUI checks.
 9. **Return dependent services.** Restart only Step CA or OpenBao if the topology
    check proved they were PostgreSQL clients and they were stopped for the
    maintenance window. Verify their native health checks and that no key,
    certificate, seal, storage or configuration identity changed.
-10. **Finish without deleting rollback.** Leave PostgreSQL 15 and the old Memory
-    artifact retained but inactive. Do not `pg_dropcluster`, purge packages,
-    enable Trust, split the dataset, or change federation/Pi in this operation.
+10. **Remove PostgreSQL 15 after acceptance.** Only after PostgreSQL 17 has
+    accepted the verified application write and all PostgreSQL, Memory and
+    dependent-service checks pass, record final old-cluster identity and then
+    delete `15/main` with `pg_dropcluster --stop 15 main`. Simulate package
+    removal and purge only PostgreSQL-15 major-version packages when the
+    transaction would not remove PostgreSQL 17, shared client/common packages or
+    another service dependency. Do not use autoremove. Retain the encrypted
+    backup, restore proof, inventories, upgrade receipts and prior Memory
+    artifact. Do not enable Trust, split the dataset or change federation/Pi.
 
 ## Automatic rollback boundary
 
 Before the first accepted write on PostgreSQL 17, a failed validation may return
 clients to the retained PostgreSQL-15 cluster using the locally recorded port
-and configuration reversal. After any accepted PostgreSQL-17 write, do not
-blindly start PostgreSQL 15: preserve both sides and reconcile the write first.
+and configuration reversal. After the verified PostgreSQL-17 write and complete
+acceptance checks, PostgreSQL 15 is no longer the rollback path and may be
+deleted as authorized above. Do not delete it earlier.
 
 If the Memory package fails while the database upgrade is healthy, restore the
 previous authenticated Memory package/binary and restart only Memory. Do not
@@ -123,7 +150,7 @@ recorded_at: <UTC timestamp>
 actor: ca-agent
 target: monolith-agent
 kind: RESULT | BLOCKED
-reply_to: monolith-ca-20260924-009
+reply_to: monolith-ca-20260924-010
 operation_id: <UUID retained across internal retries>
 status: UPGRADED | ROLLED_BACK_SAFE | STOPPED_SAFE
 database_binding: monolith | local | other
@@ -134,7 +161,7 @@ release:
 postgresql:
   before: 15/main port 5432
   after: 17/main port 5432 online
-  rollback: 15/main retained stopped/manual on <port>
+  rollback: 15/main retained during validation, then deleted after acceptance | retained after rollback
   pg_upgrade_check_sha256: <hash>
   pg_upgrade_receipt_sha256: <hash>
   inventory_match: yes/no
@@ -153,10 +180,11 @@ dependent_services:
 rollback_actions: none | <sanitized summary>
 deviations: none | <sanitized summary>
 private_evidence_root: <CA-local path only>
-next_action: retain rollback material; Monolith continues without Olivier relaying output
+next_action: retain encrypted backup and evidence; Monolith continues without Olivier relaying output
 ```
 
 Success means the existing Memory service runs `2.1.0-rc.1`, PostgreSQL
 `17/main` has replaced `15/main` on port 5432, the old cluster remains stopped
-for rollback, and all previously healthy dependent services are healthy. It does
-not mean the four-area split, Trust import, federation or Pi activation is done.
+until acceptance and is then deleted, and all previously healthy dependent
+services are healthy. It does not mean the four-area split, Trust import,
+federation or Pi activation is done.
