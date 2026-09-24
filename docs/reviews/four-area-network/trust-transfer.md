@@ -1,7 +1,8 @@
 # Trust-only inactive transfer
 
-Status: local transfer preparation and fresh delta verified; receiver, renewed
-review and live-change gates remain open. Not permission to change the CA.
+Status: local transfer preparation, fresh delta and PostgreSQL-17 receiver are
+verified. Renewed review, CA encryption recipient, PostgreSQL installation and
+live-change gates remain open. Not permission to change the CA.
 
 Continuation checkpoint: task `d7eda699-ab9e-4844-8b49-7c287a0b289e`, memory
 `c0e647fc-36a6-4763-92d6-ccb7da374499` (22 September 2026). This is a bounded
@@ -46,6 +47,11 @@ portable-import protocol.
   not complete writer fencing).
 - [x] Publish Monolith evidence and the grouped **inactive** proposal draft. The
   CA agent must supply exact local fields before it becomes an approval request.
+- [x] Record the CA's PostgreSQL15.18/no-pgvector observation, retain the tested
+  compatibility fallback, then select and verify PostgreSQL17.11 as the Trust
+  deployment target at Olivier's direction.
+- [x] Build a portable, fail-closed PostgreSQL17 receiver; prove inspect,
+  transactional restore, complete verification and replay refusal.
 
 See [operator commands](../../../scripts/areas/trust-transfer-README.md) and the
 [CA-agent proposal](../../user/ca-agent-handoff/TRUST-INACTIVE-PROPOSAL.md).
@@ -124,8 +130,35 @@ without weakening validation.
 | Local encrypted recovery receipt | `66b49e926bdd6f11cb0c33cf69c2abfc685bee20b34ab79602b789d58cd851c9` |
 
 The protected candidate is intentionally dated September 19. This work establishes
-a safe local relocation mechanism, not current ownership approval, native CA
-compatibility, receiver tooling, installation, activation or customer readiness.
+a safe local relocation mechanism and receiver, not current ownership approval,
+native CA package availability, installation, activation or customer readiness.
+
+## PostgreSQL-17 receiver evidence, 24 September
+
+- CA-reported read-only observation: PostgreSQL/server/client 15.18, `pgcrypto`
+  1.3 and `pg_trgm` 1.6 metadata present, no pgvector package available in its
+  current APT metadata. No existing CA data-decryption recipient was observed.
+- Olivier selected PostgreSQL17. The deployment topology is a side-by-side
+  `17/trust` cluster on port 5433, database/role `memory_trust`, leaving the
+  PostgreSQL15 singleton untouched. Exact CA APT candidates and auto-cluster
+  behavior remain pending from the CA agent.
+- Exact isolated receiver profile: PostgreSQL/client 17.11, pgvector 0.8.6,
+  `pgcrypto` 1.3, `pg_trgm` 1.6. The pinned image ID is
+  `sha256:17a06c0a60bf6fb548a8493b8f6057dc830b791bbbe1f1ab706ca4b9d97c8180`.
+- Private unencrypted bundle:
+  `/data/tmp/memory-trust-receiver-pg17-20260924T0840/bundle`; manifest SHA-256
+  `10dd74498e9fcb11abcfd81f22ce6c086731258722def4001895211d9a63a057`.
+  It is local, not transferred or activated.
+- Portable Python receiver accepted the exact fresh profile, restored in one
+  transaction, verified 114 tables, four sequences, 60 migrations, ownership,
+  375 imported rows and 185 projected sources, wrote a mode-0600 receipt, then
+  rejected exact replay without changing the first receipt.
+- The earlier exact PostgreSQL15.18 compatibility proof also passes and is kept
+  as fallback evidence. It is no longer the selected deployment target.
+
+Focused offline tests passed, along with both opt-in Docker integrations:
+PostgreSQL17-to-exact-15.18 compatibility and the portable PostgreSQL17 receiver.
+No CA, source database, current service or private transfer was changed.
 
 ## Authority and evidence boundaries
 

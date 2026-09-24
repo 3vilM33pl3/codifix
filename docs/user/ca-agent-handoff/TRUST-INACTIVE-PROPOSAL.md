@@ -1,9 +1,10 @@
 # Trust inactive preparation — proposal for the CA agent
 
-22 September 2026. **Draft; do not execute host changes from this document.**
+Updated 24 September 2026. **Draft; do not execute host changes from this
+document.**
 This supplements the original runbook, leaving the signed USB release unchanged.
-The local transfer mechanism is tested; the CA receiver is not yet implemented
-or approved for its exact PostgreSQL/extension profile.
+The local transfer mechanism and PostgreSQL-17 receiver are tested. They are not
+installed or approved on the CA, and the protected dataset has not been sent.
 
 ## What Monolith has completed
 
@@ -22,27 +23,24 @@ dependency changes, although their memory-version/source rows are unchanged.
 Across the full source, 262 decisions carry forward, 2,945 require renewed review
 and 63 are new. Nothing was automatically approved. Old source writers stay up.
 
-## CA agent: return these observations in one sanitized reply
+Olivier selected PostgreSQL 17 for the CA. The Trust target is PostgreSQL 17.11,
+pgvector 0.8.6, `pgcrypto` 1.3 and `pg_trgm` 1.6. The CA's observed PostgreSQL
+15.18 singleton remains untouched. Prepare `17/trust` side by side on port 5433;
+moving the singleton is a later, separate migration. See
+[the PostgreSQL-17 handoff](TRUST-POSTGRESQL17-UPGRADE.md).
 
-Use existing authorized local inspection only; do not install packages or change
-access to obtain them. Never post credentials, configurations, payloads or keys.
+## CA agent: return the remaining PostgreSQL-17 prerequisites
 
-1. PostgreSQL server/client majors and installed/available `vector`, `pgcrypto`
-   and `pg_trgm` versions. The tested local profile is PostgreSQL 17.11,
-   pgvector 0.8.6, `pgcrypto` 1.3, `pg_trgm` 1.6; host `pg_restore` 17.9. Another major
-   needs an explicit compatible implementation/rehearsal, not a forced restore
-   or unapproved PostgreSQL upgrade.
-2. Whether an **existing approved encryption recipient** can be decrypted on the
-   CA (fingerprint/availability only). Release signing has no encryption subkey.
-   Do not copy or create private keys based on this request.
-3. Existing Memory units/processes, observed shared-source configuration binding
-   (report match/mismatch, no URL), and existence/size of offline stores and local
-   evidence directories. Unreadable or undiscovered is unknown, not empty.
-4. Exact candidate **unused** CA-local database/role, loopback service port,
-   resource allowance and protected backup destination. These remain proposals,
-   not newly provisioned resources. No shared Monolith database credential.
-5. Confirm the named-instance install paths are unused and record conflicts
-   without moving or deleting anything. Do not touch the singleton's paths.
+The CA already reported PostgreSQL/client 15.18, no available pgvector package,
+no existing data-decryption recipient, an active singleton, one offline DuckDB,
+unused named-instance paths, port 8091, database/role `memory_trust` and backup
+path `/var/backups/memory-layer/trust`. Keep that packet as pre-change evidence.
+
+Using read-only inspection only, now return sanitized `pg_lsclusters` state, APT
+source families, exact candidate versions for PostgreSQL17/client/dev/pgvector,
+whether package hooks would create `17/main`, unused port 5433 and exact data and
+backup capacity. Do not add a repository, install a package, create a cluster or
+key, or obtain new catalog access just to answer.
 
 ## Grouped inactive host-change proposal (complete locally before approval)
 
@@ -56,9 +54,11 @@ Do not ask for blanket approval while required fields remain unknown.
 | Signed release 2.1.0-rc.1 | Reuse authenticated native ARM64 artifacts already staged; preserve the USB. No new release signature or Pi artifact. |
 | Root-owned tools | Exact authenticated `console.py`, `instance.py`, `release.py` at `/usr/libexec/memory-layer/releases/`; confirm hashes from original handoff. |
 | Instance files | New `/opt/memory-layer/instances/trust/release/`, `/etc/memory-layer-instances/trust/`, `/var/lib/memory-layer-installations/trust/`; no overwrite/upgrade of existing state. |
-| Database and role | CA-local only; name/owner/credential generation and least-privilege grants filled by CA agent. Fresh, isolated, never copied auth or service authority. |
+| PostgreSQL 17 | Side-by-side `17/trust` cluster on port 5433, Unix socket only during preparation. Preserve the PostgreSQL15 singleton. Package source, exact versions, auto-cluster suppression and rollback must be filled from the prerequisite packet. |
+| Database and role | CA-local `memory_trust`, owned by login role `memory_trust` with no elevated attributes. Credentials generated and retained locally; fresh and isolated, never copied auth or service authority. |
 | Data delivery | Separately authenticated, approved-recipient encrypted Trust-only artifacts over an explicit transport. No full archive or unrelated area. Receiver tooling/version pair must be tested first. |
-| Restore | Fresh target, trusted pre-data + allowlisted data + trusted post-data in one transaction; independent receipt/hash/sequence validation. Preserve target UUID/import UUID. Never `--clean`, disable triggers or edit immutable receipts. |
+| Recipient | Create a dedicated CA-local encryption identity only under the grouped approval. Do not reuse release signing. Export and independently verify only its public fingerprint/key; prove a synthetic round trip first. |
+| Restore | Use the hash-bound PostgreSQL17 receiver against the exact fresh target. Trusted extensions + role-owned schema + allowlisted data + trusted post-data commit in one transaction; then independent receipt/hash/sequence/ownership validation. Preserve target UUID/import UUID. Never `--clean`, disable triggers or edit immutable receipts. |
 | Configuration | Exact digest reviewed locally; read-only application mode and all background/model/watch/federation/offline replay/MCP paths off. Secrets stay in protected files. |
 | Systemd | Install inactive under the existing console contract; no start/enable or activation marker. Native sandbox/CA-secret-path/egress denial tests are later explicit checks, not assumed from package compatibility. |
 | Recovery | Preserve inputs, encrypted backup and install journal. Use inspected journal recovery for interrupted file installation. Failed fresh restore must roll back; ambiguous success requires inspection, never automatic drop/recreate. |
@@ -66,6 +66,12 @@ Do not ask for blanket approval while required fields remain unknown.
 Keep Step CA, OpenBao, DNS, OS and the existing singleton unchanged. Installing
 inactive is not permission to launch the service: startup can bootstrap/migrate
 a database even when application requests are read-only.
+
+The current receiver manifest is
+`10dd74498e9fcb11abcfd81f22ce6c086731258722def4001895211d9a63a057`.
+It passed inspect, atomic restore, 375-row verification and replay refusal against
+PostgreSQL17.11/pgvector0.8.6. It is unencrypted, not transferred and still bound
+to the historical partition; do not treat it as the final migration payload.
 
 ## Separate activation gate
 

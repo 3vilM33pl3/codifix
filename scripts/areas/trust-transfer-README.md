@@ -68,14 +68,88 @@ rehearsal; continued inactive-target fencing and destination verification remain
 mandatory. The original staging target and a relocated copy must never both be
 activated as the same logical instance.
 
+## 3. Build the PostgreSQL-17 receiver bundle
+
+The receiver bundle is a separate minimized format. It contains the reviewed
+Trust data and expectations plus schema rendered from the independently pinned
+migrations. It does not contain the all-area archive.
+
+```sh
+node scripts/areas/trust-receiver-bundle.mjs \
+  --data /protected/rehearsal/trust-data.pgdump \
+  --data-sha256 EXACT_DATA_SHA256 \
+  --selection /protected/rehearsal/data-selection.list \
+  --selection-sha256 EXACT_SELECTION_SHA256 \
+  --expectation /protected/trust-expectation-v1.json \
+  --expectation-sha256 EXACT_EXPECTATION_SHA256 \
+  --schema-tool /absolute/reviewed/memory-area-import \
+  --source-archive /absolute/frozen-release/memory-source-b35faf2983d20c69bc086fb9bcb7e95c51bd8f47.tar \
+  --output /protected/NEW-receiver-directory
+```
+
+The script requires the exact pinned PostgreSQL17.11/pgvector0.8.6 image, restores
+the candidate into an isolated reference target and emits `bundle/manifest.json`
+only after independent verification. Its success status is
+`verified_inactive_unencrypted_not_transferred`. The bundle is private and
+unencrypted; do not put it on USB, Notion or the CA until it is sealed to the
+separately approved CA recipient.
+
+The 24 September historical rehearsal produced manifest SHA-256
+`10dd74498e9fcb11abcfd81f22ce6c086731258722def4001895211d9a63a057`
+with 375 verified rows and 185 projected sources. Those exact bytes prove the
+receiver path but are not a current-data approval.
+
+## 4. Inspect and restore on the CA
+
+The authenticated target descriptor is a private mode-0600 JSON file:
+
+```json
+{
+  "format": "memory-trust-receiver-target-v1",
+  "connection": {"kind": "unix", "directory": "/var/run/postgresql", "port": 5433},
+  "database": "memory_trust",
+  "admin_username": "postgres",
+  "owner_role": "memory_trust"
+}
+```
+
+First run read-only inspection from a private directory, substituting only
+independently verified digests:
+
+```sh
+/usr/bin/python3 -I -S /usr/libexec/memory-layer/trust_receiver.py inspect \
+  --bundle /private/received/bundle \
+  --manifest-sha256 EXACT_MANIFEST_SHA256 \
+  --target /private/receiver-target.json \
+  --target-sha256 EXACT_TARGET_SHA256
+```
+
+Only after the grouped restore approval, run:
+
+```sh
+/usr/bin/python3 -I -S /usr/libexec/memory-layer/trust_receiver.py restore \
+  --bundle /private/received/bundle \
+  --manifest-sha256 EXACT_MANIFEST_SHA256 \
+  --target /private/receiver-target.json \
+  --target-sha256 EXACT_TARGET_SHA256 \
+  --receipt /private/evidence/trust-restore-receipt.json \
+  --execute --writers-stopped --fresh-database
+```
+
+`writers-stopped` attests that no application is connected to the new Trust
+database; it does not require stopping the unrelated PostgreSQL15 singleton.
+The receiver refuses a nonempty target, a second restore, altered artifacts,
+version/extension drift and additional database clients. It never provisions
+packages, clusters, roles, databases, credentials or services.
+
 ## Remaining receiver gates
 
-- Test the exact CA PostgreSQL/extension/client versions. PostgreSQL17 success
-  does not establish a PostgreSQL15 or another-major import path.
-- Approve an exact existing encryption recipient/decryption route and transport.
-  The release-signing key has no encryption subkey and is not a data recipient.
+- Resolve and approve exact CA PostgreSQL17/client/dev/pgvector packages and a
+  side-by-side `17/trust` cluster without disturbing PostgreSQL15.
+- Approve and create a dedicated CA-local encryption recipient/decryption route
+  and transport. Release signing is not a data recipient.
 - Authenticate the minimized artifact set and receiver tools independently.
-  The rehearsal script is not an authorized remote installer.
+  The receiver neither installs PostgreSQL nor authorizes a restore.
 - Provision the dedicated CA-local DB/role/paths under one approved inactive
   host-change plan, then run receiver-side integrity, sandbox and restore checks.
 - Complete fresh-history/dependency review and reconcile CA-only offline data.
@@ -88,6 +162,11 @@ activated as the same logical instance.
 ```sh
 node --test scripts/areas/*.test.mjs
 MEMORY_AREA_TEST_DOCKER=1 node scripts/areas/trust-transfer-restore.test.mjs
+MEMORY_AREA_TEST_PG15=1 node --test scripts/areas/trust-receiver-pg15.test.mjs
+MEMORY_AREA_TEST_RECEIVER=1 \
+  MEMORY_TRUST_RECEIVER_BUNDLE=/protected/receiver/bundle \
+  MEMORY_TRUST_RECEIVER_MANIFEST_SHA256=EXACT_MANIFEST_SHA256 \
+  node --test scripts/areas/trust-receiver.test.mjs
 ```
 
 The opt-in synthetic test uses a new isolated container, no provider or private

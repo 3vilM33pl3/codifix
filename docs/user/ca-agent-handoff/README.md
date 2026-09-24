@@ -15,6 +15,8 @@ runbook, not another sequence of commands for Olivier to type.
 ## What's in the delivered directory
 
 - `CA-AGENT.md`: the complete phased job, known missing inputs and recovery.
+- `TRUST-POSTGRESQL17-UPGRADE.md`: the selected side-by-side PostgreSQL 17
+  topology, receiver evidence and exact remaining approval packet.
 - `NOTION-COMMUNICATION.md`: shared page and message/acknowledgement rules.
 - `preflight.py`: one bounded, offline verification command; no DB access,
   installations, service changes or model calls. It makes a fresh private copy

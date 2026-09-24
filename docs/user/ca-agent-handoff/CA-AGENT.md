@@ -15,7 +15,8 @@ Step CA and OpenBao must remain unchanged and healthy throughout.
 
 ## Start here and understand the authority boundary
 
-Read this file, `README.md`, `NOTION-COMMUNICATION.md`, and the independent
+Read this file, `README.md`, `NOTION-COMMUNICATION.md`,
+`TRUST-POSTGRESQL17-UPGRADE.md`, and the independent
 operator confirmation supplied with this handoff. Paths below are relative to
 the **new CA-agent handoff directory**, not the USB mount root or an installed
 Memory directory. Keep `resources/release/` unchanged: it is the previously
@@ -219,20 +220,24 @@ Required plan inputs:
 - The source is still receiving writes. Reuse a classification decision only
   if its entire history **and dependencies** still match the new verified
   snapshot. Unreviewed deltas are not imported as an automatic update.
-- The current `memory-area-import prepare/import` contract consumes the full
-  protected archive/payload, including other areas and raw context. This package
-  does **not** provide a proven standalone Trust-only transfer/import contract.
-  Ask the Monolith agent to prepare and verify an appropriately minimized,
-  encrypted transfer design. Do not copy the whole archive to the CA or USB to
-  make the existing command convenient, or invent a `--trust-only` option.
+- The general `memory-area-import prepare/import` contract still consumes the
+  full protected archive and must not be used on the CA. Monolith now has a
+  separate tested PostgreSQL-17 Trust receiver which accepts only a minimized,
+  hash-bound bundle and executes no source DDL. That private bundle is still
+  historical, unencrypted and not delivered. Authenticate the receiver tool and
+  encrypted final bundle independently; do not copy the full archive to the CA.
 - CA-only databases, DuckDB offline capture/activity, unacknowledged operations
   and external evidence are not established as covered by the shared snapshot.
   Unknown is not empty. Do not copy an actively written DuckDB file or blindly
   replay/merge offline records; preserve operation IDs and attribution.
-- CA-local DB/extensions, current schema, dedicated credentials, native runtime
-  compatibility, actual sandbox denials, protected-path inventory and signer
-  trust must be observed or deliberately prepared; none is supplied by staging
-  Trust on Monolith.
+- PostgreSQL 17.11 is the selected CA target. The currently observed PostgreSQL
+  15.18 singleton stays in place while a side-by-side `17/trust` cluster is
+  prepared on port 5433. Exact APT candidates/source, auto-cluster behavior,
+  backup capacity, dedicated credentials, native runtime compatibility, actual
+  sandbox denials and protected-path inventory remain inputs to the grouped plan.
+- No approved CA data-encryption recipient exists. Prepare a dedicated local
+  encryption identity proposal; do not reuse release signing or create a real
+  key before grouped approval and independent fingerprint verification.
 - No Pi binary is included. The upstream ARM64 Pi v0.5.1 artifact requires glibc
   2.43; the source pin in the manifest does not make that artifact CA-compatible
   or admit any separately patched build. Pi is a later independent gate.
@@ -257,20 +262,19 @@ resources or approval.
 1. Take the approved encrypted backups and verify an isolated restore. Separate
    local Memory/offline data from CA signing/OpenBao materials; do not let this
    migration broaden secret access. Preserve all old data/configuration.
-2. Provision the approved empty CA-local target and required extension support
-   through the approved local administration procedure. Establish its identity
-   and that no application worker connects. The old shared DB remains untouched.
-3. Use the authenticated selected release's `memory-area-import schema-plan` and
-   the [schema-only guide](references/crates/mem-area-ops/README.md). The frozen
-   schema head is **60**; expected compiled schema-plan digest is
-   `2ce8b07f9c8fc252b0162d158ccb8e57082c2186306cdc489c9343ec91a115dc`.
-   `initialize-schema` is only for an already provisioned **empty** dedicated DB,
-   with the reviewed target descriptor and explicit operator attestations. It
-   does not create a role, prove fencing or initialize application authority.
-4. Apply only the separately approved data-transfer/import contract after its
-   full evidence exists. Preserve complete selected histories, tombstones,
-   provenance, same-area relations and actionable exclusions. Independently
-   verify all target rows/receipts; prove exact replay and changed-input refusal.
+2. Follow [the PostgreSQL-17 handoff](TRUST-POSTGRESQL17-UPGRADE.md) to install
+   the exact approved packages and create only side-by-side cluster `17/trust`,
+   port 5433, database/role `memory_trust`. Preserve and keep the PostgreSQL15
+   singleton running. Establish the fresh-target identity and prove that no
+   application worker connects.
+3. Validate PostgreSQL/client 17.11 and exact `vector` 0.8.6, `pgcrypto` 1.3,
+   `pg_trgm` 1.6 availability. Run the authenticated receiver's read-only
+   `inspect` against the exact empty target and preserve its output.
+4. Decrypt the separately approved, recipient-bound Trust bundle into a new
+   private directory. Run the receiver's single-transaction restore and retain
+   its receipt. The receiver independently verifies all target rows, import
+   receipts, 60 migrations, object ownership and four sequence states; exact
+   replay and changed-input fail closed.
    Do not start Memory against an import target for “validation”: startup can
    bootstrap administration and mutate state even in read-only service mode.
    Use a separate disposable local clone for approved application checks.
