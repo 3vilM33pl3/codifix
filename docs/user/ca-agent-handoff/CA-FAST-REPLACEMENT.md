@@ -10,6 +10,43 @@ acceptance window, then deletes the old cluster and major-version packages after
 PostgreSQL 17 and Memory 2.1 pass. The verified encrypted backup and local
 evidence remain. The previous Memory binary remains rollback material.
 
+## Observed completion
+
+The CA agent reported `UPGRADED` at 2026-09-24 21:55 UTC for operation
+`303ed4b9-c592-4ade-b468-d4cdd4077487`. This is CA-reported evidence retained
+under
+`/var/backups/memory-layer/ca-fast-upgrade-303ed4b9-c592-4ade-b468-d4cdd4077487`.
+
+- PostgreSQL `17/main` is online on port 5432 and its inventory matches the
+  former `15/main` cluster. The old cluster was retained through acceptance and
+  then deleted.
+- Memory `2.1.0-rc.1` is active with database health `up`, the expected stable
+  `service_id`, successful authenticated read/write, and passing Web/TUI smoke
+  checks. The per-process `instance_id` changed as expected.
+- Step CA and OpenBao were confirmed not to be PostgreSQL clients and were not
+  changed.
+- The encrypted backup, isolated-restore proof, upgrade receipts and previous
+  Memory artifact remain retained.
+- PostgreSQL 15 server/client package binaries remain installed. The required
+  no-autoremove purge simulation would also upgrade the PostgreSQL metapackage
+  and install unauthorized PostgreSQL 18 packages, so no package transaction was
+  run. This is an accepted safe deviation: the retired data cluster is deleted,
+  and the inert packages must not be purged until a future simulation is both
+  bounded and version-safe.
+
+Receipt hashes reported by the CA agent:
+
+| Receipt | SHA-256 |
+| --- | --- |
+| PostgreSQL upgrade check | `ae831adb0cd7b0a19b1e636ad6ec06bf65ccacf7fffcea3b02a0b9d4c6be5a5d` |
+| PostgreSQL upgrade receipt | `664e37433d5e8439dbf58962ac4715797dd46ef6880405654a81806e7e97152e` |
+| Encrypted backup | `962fccf1176d652ef50b604fea58927c2071441d273efa7aac4ba5618d275dd7` |
+| Isolated restore receipt | `573150e503d1bf8c28375f3d8775a718cd8156f15bd7fbf93ceae4cb4730ed24` |
+
+No further action is required for this replacement operation beyond retaining
+the CA-local backup and evidence. Trust import, the four-area split, federation
+and Pi activation remain separate work.
+
 ## Why this is the fastest path
 
 - The signed ARM64 `2.1.0-rc.1` release already contains the current application
