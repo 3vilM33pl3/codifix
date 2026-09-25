@@ -36,8 +36,12 @@ subkey `D39EB8070E71832B63E9E4516CA8C0F9CBCB9BF3`, then prepared the
 current Trust ciphertext specifically for that subkey. The portable transfer
 archive SHA-256 is
 `79c0b5ed84484dcd3284baf8480d44e1dfce2ff7309f4116cc06b206319b6e17`.
-It remains on Monolith because no transfer USB is mounted. It has not been
-uploaded to Notion, delivered, decrypted, restored or activated.
+At 05:40 UTC it was copied to removable USB filesystem UUID `66F0-75AD`,
+verified from that filesystem, unmounted/remounted, verified a second time, and
+cleanly unmounted. It has not been read on the CA, uploaded to Notion, decrypted,
+restored or activated. On the CA, verify the portable tar digest above and every
+entry in the contained `SHA256SUMS` before decrypting. The first CA operation is
+inspection only; the transfer manifest does not authorize restore or activation.
 
 Historical 22 September evidence follows for comparison. The full shared source
 had an encrypted snapshot and independent row/sequence

@@ -7,8 +7,10 @@ existing Memory singleton to signed release `2.1.0-rc.1`. Trust data transfer,
 the four-area cutover, federation and Pi follow after that working baseline.
 
 Status: the 25 September current Trust-only candidate, encrypted source backup,
-and PostgreSQL-17 receiver are verified locally. No current artifact has been
-sent to the CA. CA decryption, transfer, restore and activation remain open.
+and PostgreSQL-17 receiver are verified locally. The CA-recipient-bound package
+has been copied to removable USB and verified after an unmount/remount readback.
+The USB is safely unmounted on Monolith; it has not yet been read on the CA.
+CA decryption, restore and activation remain open.
 
 Update, 24 September 2026: Olivier authorized the CA agent to perform one
 bounded autonomous inactive PostgreSQL-17 preparation without intermediate
@@ -153,9 +155,16 @@ Protected local transfer root:
 `/data/tmp/memory-four-area-trust-ca-transfer-20260925T0530`; portable tar:
 `/data/tmp/memory-trust-ca-transfer-20260925T0530.tar`.
 
-The candidate is prepared but not delivered. No transfer USB is currently
-mounted on Monolith, and private ciphertext is not uploaded to Notion. Restore
-and activation remain false in the transfer manifest.
+At 05:40 UTC on 25 September the candidate directory and portable tar were
+copied without overwriting existing files to the removable VFAT filesystem with
+label `BIOS UPGRAD` and UUID `66F0-75AD`. Every package checksum and the portable
+tar digest passed both before and after an unmount/remount cycle. The device was
+then cleanly unmounted. The local receipt is
+`/data/tmp/memory-four-area-trust-ca-transfer-20260925T0530/usb-copy-receipt.json`.
+
+This is transport staging, not proof of CA receipt. Private ciphertext was not
+uploaded to Notion. Restore and activation remain false in the immutable
+transfer manifest.
 
 ## Verified on 22 September
 
