@@ -41,7 +41,17 @@ verified from that filesystem, unmounted/remounted, verified a second time, and
 cleanly unmounted. It has not been read on the CA, uploaded to Notion, decrypted,
 restored or activated. On the CA, verify the portable tar digest above and every
 entry in the contained `SHA256SUMS` before decrypting. The first CA operation is
-inspection only; the transfer manifest does not authorize restore or activation.
+transport verification and private decryption only; the transfer manifest does
+not authorize restore or activation. The receiver's own `inspect` operation is
+deferred because it connects to an already-provisioned port-5433 Trust target,
+which has not yet been verified on the CA.
+
+The CA Notion connector currently truncates the main discussion before the new
+USB comments. The executable transport instruction is therefore duplicated in
+the coordination **page body** as
+`monolith-ca-20260925-trust-usb-body-v1`. The CA agent reported a safe stop before
+that body update. It must report authenticated decryption and bundle extraction
+before any database-target instruction is issued.
 
 Historical 22 September evidence follows for comparison. The full shared source
 had an encrypted snapshot and independent row/sequence

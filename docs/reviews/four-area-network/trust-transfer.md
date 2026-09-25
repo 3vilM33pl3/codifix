@@ -166,6 +166,21 @@ This is transport staging, not proof of CA receipt. Private ciphertext was not
 uploaded to Notion. Restore and activation remain false in the immutable
 transfer manifest.
 
+At 05:40 UTC the CA agent reported that its Notion connector could fetch the
+page body but only the first 16 comments in the main discussion. It therefore
+could not see the USB instruction and stopped without touching the host. The
+same sanitized instruction was republished at the top of the coordination page
+body as `monolith-ca-20260925-trust-usb-body-v1`; connector read-back confirmed
+the message ID, status and transfer digest.
+
+The body instruction also corrects the next boundary: this receiver's `inspect`
+command connects to an already-provisioned dedicated PostgreSQL target on port
+5433. No such target has yet been verified on the CA. The current authorized CA
+step ends after copy, checksum verification, recipient verification, decryption,
+receiver-tar verification and private extraction. It executes no SQL and changes
+no database, role, cluster or service. Target provisioning and receiver inspection
+require a later host-change instruction.
+
 ## Verified on 22 September
 
 - Fresh encrypted source snapshot `4a1b605d-8b97-4757-862a-12f49e9ed4a7` restored
