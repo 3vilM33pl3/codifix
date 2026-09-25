@@ -181,6 +181,26 @@ receiver-tar verification and private extraction. It executes no SQL and changes
 no database, role, cluster or service. Target provisioning and receiver inspection
 require a later host-change instruction.
 
+The CA agent subsequently reported `VERIFIED_DECRYPTED_EXTRACTED_ONLY`. The
+portable tar, all five package checksums, recipient fingerprints, decrypted tar
+and receiver manifest matched the Monolith identities. Its verification receipt
+SHA-256 is
+`8e31ae044df06bafc9ac401f291ec8bcd32ac774f576ba2891a03f3bd0a274e3`;
+private evidence remains at
+`/var/lib/memory-layer/trust-transfer-fb2ddecb-f60d-4caa-9a40-a7ac2397aaa4`.
+It reported no SQL, database, role, cluster or service change. This is CA-reported
+evidence, not a Monolith read-back of the CA filesystem.
+
+The CA observed removable-filesystem UUID `5A93-3F75`, whereas Monolith observed
+`66F0-75AD` during the verified copy. Both transport observations are retained;
+the matching content hashes identify the payload. The next connector-readable
+instruction, `monolith-ca-20260925-trust-target-restore-v1`, authorizes one new
+manual, Unix-socket-only PostgreSQL `17/trust` cluster on port 5433, a fresh
+unprivileged passwordless `memory_trust` role/database, receiver inspection and
+transactional restore, followed by stopping that cluster. It explicitly excludes
+service credentials, Memory activation and changes to `17/main` or protected
+services.
+
 ## Verified on 22 September
 
 - Fresh encrypted source snapshot `4a1b605d-8b97-4757-862a-12f49e9ed4a7` restored

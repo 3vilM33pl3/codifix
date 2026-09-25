@@ -53,6 +53,21 @@ the coordination **page body** as
 that body update. It must report authenticated decryption and bundle extraction
 before any database-target instruction is issued.
 
+That report has now arrived with status `VERIFIED_DECRYPTED_EXTRACTED_ONLY` and
+verification-receipt SHA-256
+`8e31ae044df06bafc9ac401f291ec8bcd32ac774f576ba2891a03f3bd0a274e3`.
+Every content identity matched and the CA reported no host mutation. Its observed
+USB filesystem UUID `5A93-3F75` differs from Monolith's `66F0-75AD`; preserve both
+as transport provenance rather than rewriting either observation.
+
+The page body's current instruction is now
+`monolith-ca-20260925-trust-target-restore-v1`. It creates a new manual,
+Unix-socket-only `17/trust` cluster on port 5433 without modifying `17/main`,
+creates a fresh passwordless unprivileged target role/database, runs the verified
+receiver inspection and transactional restore, validates the receipt, and stops
+the new cluster. It does not authorize application credentials, a Memory service,
+activation or federation.
+
 Historical 22 September evidence follows for comparison. The full shared source
 had an encrypted snapshot and independent row/sequence
 restore proof. A Trust-only candidate from the previously approved September19
