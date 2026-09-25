@@ -78,6 +78,17 @@ reported unchanged. No Trust application credential, service or activation
 exists. The next safe boundary is signed release preparation in a new private
 directory only; inactive console installation and activation remain separate.
 
+That next boundary is published as
+`monolith-ca-20260925-trust-release-prepare-v1`. It selects the manifest-bound
+ARM64 release-tree archive
+`memory-2.1.0-rc.1-bookworm-arm64-tree.tar` (SHA-256
+`2365ef9901db0dca47775b5186dd9bf7ca62584bf75e0d338cff8cfff5552154`)
+and invokes the installed isolated `instance.py prepare` flow for `trust` and
+schema assertion 60. The required result remains
+`inactive_preparation_only`, with installation, artifact execution, database
+verification and activation all false. No database password, API token,
+configuration, live install path or service change is authorized.
+
 Historical 22 September evidence follows for comparison. The full shared source
 had an encrypted snapshot and independent row/sequence
 restore proof. A Trust-only candidate from the previously approved September19

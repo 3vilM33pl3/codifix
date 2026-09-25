@@ -218,6 +218,17 @@ The CA reported the existing Memory service, `17/main`, Step CA and OpenBao
 unchanged. This remains CA-reported evidence; no service credentials, Trust
 service or activation exists.
 
+Instruction `monolith-ca-20260925-trust-release-prepare-v1` is now published at
+the top of the connector-readable coordination page. It authorizes only offline
+authentication and preparation of signed ARM64 archive
+`memory-2.1.0-rc.1-bookworm-arm64-tree.tar` (SHA-256
+`2365ef9901db0dca47775b5186dd9bf7ca62584bf75e0d338cff8cfff5552154`)
+for named instance `trust`. The helper must return
+`inactive_preparation_only`; the operation does not create credentials or
+configuration, run the release binary, contact a database, install to live
+instance paths, run `console.py`, create the activation marker or start a
+service.
+
 ## Verified on 22 September
 
 - Fresh encrypted source snapshot `4a1b605d-8b97-4757-862a-12f49e9ed4a7` restored
