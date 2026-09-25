@@ -8,9 +8,11 @@ the four-area cutover, federation and Pi follow after that working baseline.
 
 Status: the 25 September current Trust-only candidate, encrypted source backup,
 and PostgreSQL-17 receiver are verified locally. The CA-recipient-bound package
-has been copied to removable USB and verified after an unmount/remount readback.
-The USB is safely unmounted on Monolith; it has not yet been read on the CA.
-CA decryption, restore and activation remain open.
+was copied to removable USB and verified after an unmount/remount readback. The
+CA subsequently verified, decrypted and extracted it, then restored it into a
+new isolated `17/trust` cluster. The restored target is stopped, manual and not
+activated. Application release preparation, credentials, service installation
+and activation remain open.
 
 Update, 24 September 2026: Olivier authorized the CA agent to perform one
 bounded autonomous inactive PostgreSQL-17 preparation without intermediate
@@ -200,6 +202,21 @@ unprivileged passwordless `memory_trust` role/database, receiver inspection and
 transactional restore, followed by stopping that cluster. It explicitly excludes
 service credentials, Memory activation and changes to `17/main` or protected
 services.
+
+The CA then reported
+`ca-monolith-20260925-trust-target-restore-result-v1` with status
+`RESTORED_VERIFIED_INACTIVE_NOT_ACTIVATED`. PostgreSQL `17/main` remained online
+on port 5432; `17/trust` finished down on port 5433 with manual start policy,
+empty `listen_addresses` and Unix socket directory `/var/run/postgresql`. The
+unprivileged passwordless `memory_trust` role owns database `memory_trust` and
+has no elevated role attributes. Receiver inspection matched PostgreSQL 17.11,
+pgvector 0.8.6, `pgcrypto` 1.3 and `pg_trgm` 1.6. Complete restore verification
+matched 371 rows, 18 histories, 21 versions and 183 projected sources; source
+DDL was not executed. Restore-receipt SHA-256 is
+`0e4840874dc80beb50344dc5663c54d5aef10232c9ef290be1eac14222b3a431`.
+The CA reported the existing Memory service, `17/main`, Step CA and OpenBao
+unchanged. This remains CA-reported evidence; no service credentials, Trust
+service or activation exists.
 
 ## Verified on 22 September
 

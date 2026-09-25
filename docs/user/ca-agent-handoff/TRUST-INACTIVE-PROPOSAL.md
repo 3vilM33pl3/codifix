@@ -68,6 +68,16 @@ receiver inspection and transactional restore, validates the receipt, and stops
 the new cluster. It does not authorize application credentials, a Memory service,
 activation or federation.
 
+The CA agent has completed that instruction and reported
+`RESTORED_VERIFIED_INACTIVE_NOT_ACTIVATED`. The stopped manual target verified
+371 rows, 18 histories, 21 versions and 183 projected sources. Its restore
+receipt SHA-256 is
+`0e4840874dc80beb50344dc5663c54d5aef10232c9ef290be1eac14222b3a431`.
+PostgreSQL `17/main`, the existing Memory service, Step CA and OpenBao were
+reported unchanged. No Trust application credential, service or activation
+exists. The next safe boundary is signed release preparation in a new private
+directory only; inactive console installation and activation remain separate.
+
 Historical 22 September evidence follows for comparison. The full shared source
 had an encrypted snapshot and independent row/sequence
 restore proof. A Trust-only candidate from the previously approved September19
