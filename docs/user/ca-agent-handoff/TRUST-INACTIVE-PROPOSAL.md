@@ -24,8 +24,20 @@ on the CA. Its receiver manifest is
 `15dc9804d36def59985c33055a81b74018278f336b6b1a00ca5839da84c04046`
 and its encrypted tar digest is
 `8783b54c0a8ba3840f1331fb78a3fc68ac22450b6b447fbbab458a0a3d87f9a7`.
-The current ciphertext uses the operator backup recipient, not a CA-proven data
-recipient, so the CA agent must not request or attempt to restore it yet.
+The first current-data ciphertext used the operator backup recipient, not a
+CA-proven data recipient, and remains local recovery material.
+
+Update, 25 September 05:32 UTC: the CA agent subsequently created a dedicated
+CA-local encryption identity and reported a passing synthetic round trip.
+Monolith independently verified public-key SHA-256
+`64d58dc720a940bd1408215507ac1f299346cd80de0f9b018427a3e17088f321`,
+primary fingerprint `ACDBD1CB5ECB39FCA84439ABC2E27E7B42623A5E` and encryption
+subkey `D39EB8070E71832B63E9E4516CA8C0F9CBCB9BF3`, then prepared the
+current Trust ciphertext specifically for that subkey. The portable transfer
+archive SHA-256 is
+`79c0b5ed84484dcd3284baf8480d44e1dfce2ff7309f4116cc06b206319b6e17`.
+It remains on Monolith because no transfer USB is mounted. It has not been
+uploaded to Notion, delivered, decrypted, restored or activated.
 
 Historical 22 September evidence follows for comparison. The full shared source
 had an encrypted snapshot and independent row/sequence

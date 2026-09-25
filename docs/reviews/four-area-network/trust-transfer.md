@@ -122,6 +122,41 @@ The ciphertext uses the existing operator backup recipient, not a proven CA
 recipient. It therefore remains on Monolith. Transfer requires a destination
 decryption decision and independently authenticated delivery instructions.
 
+### CA recipient-bound transfer candidate
+
+At 05:25 UTC on 25 September, the CA agent reported a dedicated CA-local data
+recipient and a passing synthetic round trip. Monolith independently reconstructed
+the exported public key, matched its reported SHA-256, parsed the exact primary
+and encryption-subkey fingerprints, confirmed its expiry and found no secret-key
+packets. The release-signing key was not reused.
+
+- primary: `ACDBD1CB5ECB39FCA84439ABC2E27E7B42623A5E`
+- forced CV25519 encryption subkey:
+  `D39EB8070E71832B63E9E4516CA8C0F9CBCB9BF3`
+- public-key SHA-256:
+  `64d58dc720a940bd1408215507ac1f299346cd80de0f9b018427a3e17088f321`
+- expiry: 24 September 2028
+
+The already verified plaintext receiver tar was encrypted directly to that
+subkey with hidden recipient key IDs. A clean extraction of the transfer archive
+revalidated every contained checksum and the recipient fingerprints.
+
+| Prepared transfer evidence | SHA-256 |
+| --- | --- |
+| CA ciphertext | `0f73361ea5633945bbd7e47b0a624e824f5d6512634796608789b970fae97011` |
+| Transfer manifest | `ae01fcec4ec3fdcfcfabb9c60aa48d9e45f52db4b9395750b7d92751ac615bfc` |
+| Transfer `SHA256SUMS` | `d06d2c1b7dfcc2419cf273b33ba8e54944a3d55c9d837286223226d454a65810` |
+| Complete transfer tar | `79c0b5ed84484dcd3284baf8480d44e1dfce2ff7309f4116cc06b206319b6e17` |
+| Included receiver | `0ca47c5ba5ed6f661f8b42da60b5f6adedbc08be6ee8a8651663423ec18a9855` |
+
+Protected local transfer root:
+`/data/tmp/memory-four-area-trust-ca-transfer-20260925T0530`; portable tar:
+`/data/tmp/memory-trust-ca-transfer-20260925T0530.tar`.
+
+The candidate is prepared but not delivered. No transfer USB is currently
+mounted on Monolith, and private ciphertext is not uploaded to Notion. Restore
+and activation remain false in the transfer manifest.
+
 ## Verified on 22 September
 
 - Fresh encrypted source snapshot `4a1b605d-8b97-4757-862a-12f49e9ed4a7` restored
