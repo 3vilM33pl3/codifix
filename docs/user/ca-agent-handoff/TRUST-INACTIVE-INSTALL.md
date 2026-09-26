@@ -1,8 +1,10 @@
 # Trust inactive installation — approval-ready CA instruction
 
-**Status: prepared, not authorized.** This contract becomes executable only
-after Olivier gives action-time approval for the credential and database-role
-changes described below. It does not authorize activation.
+**Status: authorized for one bounded inactive installation.** Olivier gave
+action-time approval on 26 September 2026 at 11:43 UTC. The executable Notion
+instruction is `monolith-ca-20260926-trust-inactive-install-v1`. This approval
+covers the credential and database-role changes described below and does not
+authorize activation.
 
 ## Purpose and exact effects
 
