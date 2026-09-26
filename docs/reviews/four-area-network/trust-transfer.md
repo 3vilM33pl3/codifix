@@ -249,6 +249,18 @@ preparation. Installation, configuration, credentials, database-schema
 verification, native artifact execution, sandbox validation and activation are
 still not claimed.
 
+The first inactive-install attempt then reported `STOPPED_SAFE`. The CA-local
+database password and API token were created, the isolated role remained
+least-privileged and all restored counts remained unchanged. `console.py`
+rejected the retained preparation before `plan.json` because the preparation's
+ancestor `/var/lib/memory-layer` belongs to the running singleton service user.
+No installation destination exists. The agent did not chown singleton state,
+weaken the ownership gate or substitute an artifact. Corrected instruction
+`monolith-ca-20260926-trust-inactive-install-v2` recreates the same preparation
+from authenticated release inputs under a new root-owned top-level parent and
+requires the identical preparation record and file inventory before reusing the
+existing protected configuration for the same inactive install.
+
 ## Verified on 22 September
 
 - Fresh encrypted source snapshot `4a1b605d-8b97-4757-862a-12f49e9ed4a7` restored

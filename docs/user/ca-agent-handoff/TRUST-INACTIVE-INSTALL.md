@@ -197,3 +197,29 @@ Passing this step proves only a recoverable inactive filesystem installation
 with locally provisioned credentials. Native execution, the service sandbox,
 database connectivity, loopback exposure, activation, writer fencing and
 federation remain separate.
+
+## CA result and corrected retry
+
+At 12:11 UTC on 26 September the CA agent reported `STOPPED_SAFE`. Credential
+and database-role provisioning completed, but `console.py` rejected the retained
+preparation before creating `plan.json` because its ancestor
+`/var/lib/memory-layer` belongs to the running singleton service user. No live
+installation path was created. The agent correctly left the singleton ownership
+unchanged and did not weaken the installer.
+
+The retained closed configuration is 812 bytes with SHA-256
+`7a7cc020a38a44146d0276d7c713ad4e59b8fd23502837c3e52c953558188f00`.
+The role remains least-privileged, the restored counts and receipt are
+unchanged, PostgreSQL `17/trust` is stopped/manual, and the existing Memory,
+PostgreSQL `17/main`, Step CA and OpenBao services remain protected.
+
+Instruction `monolith-ca-20260926-trust-inactive-install-v2` corrects only the
+input trust boundary. It reconstructs the preparation from the same signed
+release inputs below a new root-owned top-level preparation parent whose entire
+ancestry passes `console.py` checks. It also ensures the retained configuration
+is read from an equivalently root-trusted private path, copying the exact 812
+bytes locally if necessary and requiring the same SHA-256. It does not
+regenerate credentials or change the database role again. The new preparation
+must derive the same preparation-record SHA-256 and executable/Web inventory
+before the original inactive installer is retried. The service and activation
+exclusions above remain unchanged.

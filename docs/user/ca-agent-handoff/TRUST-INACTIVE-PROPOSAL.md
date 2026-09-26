@@ -107,6 +107,17 @@ preparing the release. This is CA-reported evidence; installation, credentials,
 configuration, database-schema observation, native artifact execution, sandbox
 validation and activation remain unperformed.
 
+The first inactive-install attempt then stopped safely at the installer trust
+boundary. The CA agent created fresh local credentials, set only the isolated
+role password and preserved the same restored data, but `console.py` refused the
+preparation because `/var/lib/memory-layer` is owned by the running singleton's
+service user. It created no plan or destination path. The singleton directory
+was not chowned and the installer was not relaxed. Corrected instruction
+`monolith-ca-20260926-trust-inactive-install-v2` reconstructs the identical
+authenticated preparation below a new root-owned top-level parent, retains the
+existing protected configuration and credentials, and retries only the same
+inactive install.
+
 Historical 22 September evidence follows for comparison. The full shared source
 had an encrypted snapshot and independent row/sequence
 restore proof. A Trust-only candidate from the previously approved September19
