@@ -71,14 +71,18 @@ host preparation/cutover were the next gates. The subsequent
 [Trust-only local restore and fresh delta](trust-transfer.md) now has verified
 local evidence and a [grouped inactive CA proposal](../../user/ca-agent-handoff/TRUST-INACTIVE-PROPOSAL.md).
 The CA now reports the named Trust release installed but disabled/inactive, with
-the isolated Trust database stopped/manual and no activation marker. A newer
-26 September Monolith snapshot, exact restore and renewed 18-history Trust
-manifest are verified; nothing was imported into the CA. The bounded native CA
-preflight remains pending. An offline four-capability Trust enrollment preview
-also exists, but signed gateway-history inspection currently fails closed, no
-Trust credential or collection exists, and no record was published. Writer
+the isolated Trust database stopped/manual and no activation marker. Its native
+version, AArch64 ABI, runtime-library resolution, installed hashes and static
+unit verification passed. The preflight stopped because the generic unit does
+not yet hide every locally inventoried OpenBao-config, backup, installation-input,
+preparation/evidence and container-socket path; no activation or unit mutation
+occurred. A newer 26 September Monolith snapshot, exact restore and renewed
+18-history Trust manifest are verified; nothing was imported into the CA. An
+offline four-capability Trust enrollment preview also exists, but signed
+gateway-history inspection currently fails closed, no Trust credential or
+collection exists, and no record was published. Sandbox hardening, writer
 cutover, current Trust data delivery, local activation and federation activation
-remain separate approvals. This is not a deployed Trust instance.
+remain separate operations. This is not a deployed Trust instance.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound

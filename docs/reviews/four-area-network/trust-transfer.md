@@ -8,11 +8,15 @@ the four-area cutover, federation and Pi follow after that working baseline.
 
 Status, 26 September 2026: the CA reports release `2.1.0-rc.1` installed for the
 named Trust instance, but disabled, inactive and without an activation marker.
-Its isolated `17/trust` database remains stopped and manual. A bounded native
-preflight is pending through the connector-readable result inbox. Monolith has
-completed a newer encrypted source snapshot, exact isolated restore, complete
-history delta and agent-reviewed Trust manifest without stopping source writers
-or changing the CA. Federation enrollment remains offline and unexecutable.
+Its isolated `17/trust` database remains stopped and manual. The bounded native
+preflight proved the exact binary version/hash, AArch64 ABI, resolved system
+libraries, installed hashes and static unit validity. It stopped correctly
+because the generic unit does not explicitly hide every CA-local OpenBao config,
+backup, installation-input/preparation/evidence and container-socket location.
+No activation or unit mutation occurred. Monolith has completed a newer encrypted
+source snapshot, exact isolated restore, complete history delta and agent-reviewed
+Trust manifest without stopping source writers or changing the CA. Federation
+enrollment remains offline and unexecutable.
 
 Update, 24 September 2026: Olivier authorized the CA agent to perform one
 bounded autonomous inactive PostgreSQL-17 preparation without intermediate
@@ -26,14 +30,50 @@ Continuation checkpoint: task `d7eda699-ab9e-4844-8b49-7c287a0b289e`, memory
 continuation of the four-area staging and CA handoff, not a new federation or
 portable-import protocol.
 
+## CA-native preflight and sandbox stop, 26 September
+
+The CA agent reported `BLOCKED` for instruction
+`monolith-ca-20260926-trust-native-preflight-v1`. The block is specifically an
+activation-sandbox coverage gap, not a runtime incompatibility:
+
+- exact `memory --version` returned `2.1.0-rc.1`; the installed executable
+  retained SHA-256
+  `897c368547e608062fdcd050902fc0c8906c47da6b928989f115c617c35ab119`;
+- the executable is AArch64, uses `ld-linux-aarch64.so.1`, resolves only the
+  expected libc/libgcc/libm/libstdc++ set from root-owned system locations and
+  has zero unresolved libraries;
+- executable, Web, protected configuration, digest and immutable plan identities
+  matched; `console.py inspect` still reports transaction
+  `fbd80e19aaea234a33731f6eda6a6129` with every activation, service, database and
+  native-proof flag false;
+- the named-unit template retained SHA-256
+  `418e629337592d207f11115226395015c11aa01223841692771b9e12f4db1dca` and
+  passed static verification with no drop-in;
+- the remaining coverage gaps are the CA's separate active OpenBao configuration
+  directory, CA/Memory backup trees, root-owned installation-input,
+  release-preparation/evidence trees and the containerd socket location. The
+  exact local path inventory remains on the CA and no sensitive contents were
+  disclosed;
+- Trust stayed disabled/inactive, port 8091 remained closed, `17/trust` stayed
+  down/manual, and the existing Memory, PostgreSQL `17/main`, Step CA and OpenBao
+  services remained healthy.
+
+The next bounded operation is a Trust-only local systemd drop-in that adds the
+exact inventoried paths to `InaccessiblePaths`, followed by static verification
+and a disposable negative-read probe under an equivalent service sandbox. It
+does not change the authenticated release/template, start Trust or PostgreSQL,
+create the activation marker, import data, enroll federation or contact a model.
+Any later activation still requires current-data transfer and a final writer
+cutover; a green sandbox probe alone is not activation approval.
+
 ## Verified 26 September delta and offline federation preparation
 
 Olivier approved a non-activating CA-native preflight and parallel Monolith
-final-delta/federation preparation. The CA instruction authorizes only native
-artifact, runtime-library, unit-sandbox and inactive-state inspection. It does
+final-delta/federation preparation. The CA instruction authorized only native
+artifact, runtime-library, unit-sandbox and inactive-state inspection. It did
 not start PostgreSQL or Memory, create the activation marker, enroll federation,
-or change the host. Its result is still pending; no comment is used as a control
-channel.
+or change the host. The result is recorded above; no comment was used as a
+control channel.
 
 Monolith preparation completed against an online encrypted snapshot while the
 shared source and Workshop/Homelab previews remained available:
