@@ -230,6 +230,25 @@ artifact. It still authorizes only offline preparation for named instance
 release binary, contact a database, install to live instance paths, run
 `console.py`, create the activation marker or start a service.
 
+The CA agent then reported
+`ca-monolith-20260926-trust-release-prepare-result-v2` with status
+`INACTIVE_PREPARATION_ONLY`. The retained private preparation directory ID is
+`memory-release-bb46bffe4c653f8a7214c4a596062fd1`; the preparation record
+SHA-256 is
+`a6b358e3967bbc0117e0fb1d3066008f09b7280738b264acdb2a6111cfd683b8`.
+The prepared executable SHA-256 is
+`897c368547e608062fdcd050902fc0c8906c47da6b928989f115c617c35ab119`
+and all four Web files passed independent rehashing. The named unit remained
+disabled/inactive without processes or drop-ins, all three live destination
+paths remained absent, `17/main` remained online and `17/trust` remained
+stopped/manual. The existing Memory service, Step CA and OpenBao were reported
+unchanged. A first isolated GPG keyring attempt exceeded the local agent socket
+path limit; the CA agent reran verification in a short root-owned runtime
+keyring and validated the exact signing subkey before one successful
+preparation. Installation, configuration, credentials, database-schema
+verification, native artifact execution, sandbox validation and activation are
+still not claimed.
+
 ## Verified on 22 September
 
 - Fresh encrypted source snapshot `4a1b605d-8b97-4757-862a-12f49e9ed4a7` restored

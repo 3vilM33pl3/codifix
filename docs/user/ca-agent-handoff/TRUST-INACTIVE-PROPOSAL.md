@@ -90,6 +90,23 @@ schema assertion 60. The required result remains
 verification and activation all false. No database password, API token,
 configuration, live install path or service change is authorized.
 
+The CA agent completed that corrected instruction with status
+`INACTIVE_PREPARATION_ONLY`. The retained private preparation has directory ID
+`memory-release-bb46bffe4c653f8a7214c4a596062fd1`; its preparation-record
+SHA-256 is
+`a6b358e3967bbc0117e0fb1d3066008f09b7280738b264acdb2a6111cfd683b8`.
+It independently rehashed the prepared files, including `bin/memory` at
+`897c368547e608062fdcd050902fc0c8906c47da6b928989f115c617c35ab119`
+and four Web files. The named unit remained disabled and inactive with no
+processes or drop-ins; the three live destination paths remained absent.
+PostgreSQL `17/main` remained online and `17/trust` remained stopped/manual.
+The existing Memory service, Step CA and OpenBao were reported unchanged. The
+first isolated GPG home was too long for the local agent socket, so the CA agent
+repeated signature verification in a short root-owned runtime keyring before
+preparing the release. This is CA-reported evidence; installation, credentials,
+configuration, database-schema observation, native artifact execution, sandbox
+validation and activation remain unperformed.
+
 Historical 22 September evidence follows for comparison. The full shared source
 had an encrypted snapshot and independent row/sequence
 restore proof. A Trust-only candidate from the previously approved September19
