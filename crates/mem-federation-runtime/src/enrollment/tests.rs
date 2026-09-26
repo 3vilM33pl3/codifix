@@ -42,6 +42,30 @@ fn config() -> EnrollmentConfig {
 }
 
 #[test]
+fn transport_and_page_failures_are_not_misreported_as_one_proof_error() {
+    assert!(matches!(
+        map_pull_failure(PullFailure::Unavailable),
+        EnrollmentError::GatewayUnavailable
+    ));
+    assert!(matches!(
+        map_pull_failure(PullFailure::Unauthorized),
+        EnrollmentError::GatewayUnauthorized
+    ));
+    assert!(matches!(
+        map_pull_failure(PullFailure::PageProof(PageVerificationError::Signature)),
+        EnrollmentError::InvalidPageSignature
+    ));
+    assert!(matches!(
+        map_pull_failure(PullFailure::PageProof(PageVerificationError::Receipt)),
+        EnrollmentError::InvalidPageReceipt
+    ));
+    assert!(matches!(
+        map_pull_failure(PullFailure::Ordering),
+        EnrollmentError::InvalidPageOrder
+    ));
+}
+
+#[test]
 fn default_preview_is_offline_bounded_and_canonical_without_secret_access() {
     let config = config();
     let preview = config.preview().unwrap();
@@ -360,7 +384,7 @@ async fn forged_pages_fail_before_write_and_forged_acceptance_is_unconfirmed() {
     state.lock().unwrap().forged_page = true;
     assert!(matches!(
         config.execute_with(&client, config.digest().unwrap()).await,
-        Err(EnrollmentError::InvalidProof)
+        Err(EnrollmentError::InvalidPageSignature)
     ));
     assert_eq!(state.lock().unwrap().posts, 0);
     state.lock().unwrap().forged_page = false;

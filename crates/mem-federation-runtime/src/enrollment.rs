@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Explicit authority-side membership operator. No database, provisioning,
 //! automatic discovery, credential generation, arbitrary records or delegation.
+use crate::security::PageVerificationError;
+use crate::sync::PullFailure;
 use crate::{Endpoint, GatewayClient, ReceiptTrust, private_files, root_certificate};
 use chrono::{DateTime, Utc};
 use mem_federation::{
@@ -31,6 +33,30 @@ pub enum EnrollmentError {
     ChangedHistory,
     #[error("gateway proof rejected; no publication claim is established")]
     InvalidProof,
+    #[error("gateway transport unavailable; no publication claim is established")]
+    GatewayUnavailable,
+    #[error("gateway authorization denied; no publication claim is established")]
+    GatewayUnauthorized,
+    #[error("gateway page could not be decoded; no publication claim is established")]
+    InvalidPageEncoding,
+    #[error("gateway returned an unexpected status; no publication claim is established")]
+    InvalidGatewayStatus,
+    #[error("gateway page binding rejected; no publication claim is established")]
+    InvalidPageBinding,
+    #[error("gateway page policy rejected; no publication claim is established")]
+    InvalidPagePolicy,
+    #[error("gateway page signature rejected; no publication claim is established")]
+    InvalidPageSignature,
+    #[error("gateway page receipt rejected; no publication claim is established")]
+    InvalidPageReceipt,
+    #[error("gateway page receipt chain rejected; no publication claim is established")]
+    InvalidPageChain,
+    #[error("gateway page order rejected; no publication claim is established")]
+    InvalidPageOrder,
+    #[error("gateway complete history proof rejected; no publication claim is established")]
+    InvalidHistoryProof,
+    #[error("gateway published history does not replay; no publication claim is established")]
+    InvalidHistoryReplay,
     #[error("gateway outcome unconfirmed; inspect or retry only the exact reviewed plan")]
     Unconfirmed,
     #[error("gateway rejected a reviewed membership; inspect before any new plan")]
@@ -383,9 +409,9 @@ impl EnrollmentConfig {
                 break;
             }
             let page = client
-                .pull(after, limit)
+                .pull_diagnostic(after, limit)
                 .await
-                .map_err(|_| EnrollmentError::InvalidProof)?;
+                .map_err(map_pull_failure)?;
             let head = *target.get_or_insert(page.published_through);
             if head as usize > MAX_HISTORY_RECORDS || page.published_through < head {
                 return Err(EnrollmentError::InvalidProof);
@@ -408,12 +434,12 @@ impl EnrollmentConfig {
         ReceiptTrust::new(self.receipt_keys.clone())
             .map_err(|_| EnrollmentError::Configuration)?
             .verify_history(self.plan.authority, &records, &receipts)
-            .map_err(|_| EnrollmentError::InvalidProof)?;
+            .map_err(|_| EnrollmentError::InvalidHistoryProof)?;
         let mut state = PublicationState::new(self.plan.space, self.plan.authority);
         for record in &records {
             if state.apply(record.envelope.publisher, record.clone()) != PublicationOutcome::Applied
             {
-                return Err(EnrollmentError::InvalidProof);
+                return Err(EnrollmentError::InvalidHistoryReplay);
             }
         }
         Ok(Snapshot {
@@ -450,6 +476,28 @@ impl EnrollmentConfig {
                 })
                 .collect(),
         })
+    }
+}
+
+fn map_pull_failure(error: PullFailure) -> EnrollmentError {
+    match error {
+        PullFailure::Configuration => EnrollmentError::Configuration,
+        PullFailure::Unavailable => EnrollmentError::GatewayUnavailable,
+        PullFailure::Unauthorized => EnrollmentError::GatewayUnauthorized,
+        PullFailure::Status => EnrollmentError::InvalidGatewayStatus,
+        PullFailure::Encoding => EnrollmentError::InvalidPageEncoding,
+        PullFailure::PageProof(PageVerificationError::Binding) | PullFailure::Binding => {
+            EnrollmentError::InvalidPageBinding
+        }
+        PullFailure::PageProof(PageVerificationError::Policy) => EnrollmentError::InvalidPagePolicy,
+        PullFailure::PageProof(PageVerificationError::Signature) => {
+            EnrollmentError::InvalidPageSignature
+        }
+        PullFailure::PageProof(PageVerificationError::Receipt) => {
+            EnrollmentError::InvalidPageReceipt
+        }
+        PullFailure::PageProof(PageVerificationError::Chain) => EnrollmentError::InvalidPageChain,
+        PullFailure::Ordering => EnrollmentError::InvalidPageOrder,
     }
 }
 

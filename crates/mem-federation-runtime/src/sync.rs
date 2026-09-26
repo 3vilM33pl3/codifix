@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+use crate::security::PageVerificationError;
 use crate::{Endpoint, ReceiptTrust, Result, RuntimeError, SignedPage, http};
 use mem_federation::publication::*;
 use mem_federation_store::{
@@ -69,37 +70,54 @@ impl GatewayClient {
         Ok(accepted)
     }
     pub async fn pull(&self, after: u32, limit: u32) -> Result<PublishedPage> {
+        self.pull_diagnostic(after, limit)
+            .await
+            .map_err(PullFailure::runtime_error)
+    }
+
+    pub(crate) async fn pull_diagnostic(
+        &self,
+        after: u32,
+        limit: u32,
+    ) -> std::result::Result<PublishedPage, PullFailure> {
         if !(1..=32).contains(&limit) {
-            return Err(RuntimeError::Configuration);
+            return Err(PullFailure::Configuration);
         }
         let nonce = uuid::Uuid::new_v4();
         let response = self
             .endpoint
             .client
-            .get(self.endpoint.url("/v1/pull")?)
+            .get(
+                self.endpoint
+                    .url("/v1/pull")
+                    .map_err(PullFailure::from_runtime)?,
+            )
             .bearer_auth(&self.token)
             .query(&[("after", after), ("limit", limit)])
             .query(&[("nonce", nonce)])
             .send()
             .await
-            .map_err(|_| RuntimeError::Unavailable)?;
-        check_status(response.status())?;
-        let signed: SignedPage = http::json(response, 3 * 1024 * 1024).await?;
+            .map_err(|_| PullFailure::Unavailable)?;
+        check_status(response.status()).map_err(PullFailure::from_runtime)?;
+        let signed: SignedPage = http::json(response, 3 * 1024 * 1024)
+            .await
+            .map_err(|_| PullFailure::Encoding)?;
         let page = self
             .trust
-            .verify_page(signed, nonce, self.space, self.authority)?;
+            .verify_page_diagnostic(signed, nonce, self.space, self.authority)
+            .map_err(PullFailure::PageProof)?;
         if page.space != self.space
             || page.authority != self.authority
             || page.after != after
             || page.published_through < after
             || page.records.len() != ((page.published_through - after).min(limit) as usize)
         {
-            return Err(RuntimeError::InvalidResponse);
+            return Err(PullFailure::Binding);
         }
         for (i, record) in page.records.iter().enumerate() {
             if record.sequence.get() != after + 1 + i as u32 || record.envelope.space != self.space
             {
-                return Err(RuntimeError::InvalidResponse);
+                return Err(PullFailure::Ordering);
             }
         }
         Ok(page)
@@ -148,6 +166,40 @@ impl GatewayClient {
         Ok(replica
             .resynchronize_with_receipts(self.authority, &history, &receipts)
             .await?)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PullFailure {
+    Configuration,
+    Unavailable,
+    Unauthorized,
+    Status,
+    Encoding,
+    PageProof(PageVerificationError),
+    Binding,
+    Ordering,
+}
+
+impl PullFailure {
+    fn from_runtime(error: RuntimeError) -> Self {
+        match error {
+            RuntimeError::Configuration => Self::Configuration,
+            RuntimeError::Unavailable => Self::Unavailable,
+            RuntimeError::Unauthorized => Self::Unauthorized,
+            RuntimeError::InvalidResponse | RuntimeError::Store(_) => Self::Status,
+        }
+    }
+
+    fn runtime_error(self) -> RuntimeError {
+        match self {
+            Self::Configuration => RuntimeError::Configuration,
+            Self::Unavailable => RuntimeError::Unavailable,
+            Self::Unauthorized => RuntimeError::Unauthorized,
+            Self::Status | Self::Encoding | Self::PageProof(_) | Self::Binding | Self::Ordering => {
+                RuntimeError::InvalidResponse
+            }
+        }
     }
 }
 pub(crate) fn check_status(status: reqwest::StatusCode) -> Result<()> {

@@ -13,6 +13,15 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PageVerificationError {
+    Binding,
+    Policy,
+    Signature,
+    Receipt,
+    Chain,
+}
+
 #[derive(Clone)]
 pub struct ReceiptTrust {
     keys: Vec<ReceiptKey>,
@@ -126,6 +135,7 @@ impl ReceiptTrust {
         }
         Ok(())
     }
+    #[cfg(test)]
     pub(crate) fn verify_page(
         &self,
         signed: SignedPage,
@@ -133,6 +143,17 @@ impl ReceiptTrust {
         space: SpaceId,
         authority: InstanceId,
     ) -> Result<PublishedPage> {
+        self.verify_page_diagnostic(signed, nonce, space, authority)
+            .map_err(|_| RuntimeError::InvalidResponse)
+    }
+
+    pub(crate) fn verify_page_diagnostic(
+        &self,
+        signed: SignedPage,
+        nonce: Uuid,
+        space: SpaceId,
+        authority: InstanceId,
+    ) -> std::result::Result<PublishedPage, PageVerificationError> {
         let c = &signed.claims;
         if c.purpose != "memory-pull-page-v1"
             || c.nonce != nonce
@@ -141,20 +162,28 @@ impl ReceiptTrust {
             || c.key_generation != self.keys.len() as u32
             || c.page.receipts.len() != c.page.records.len()
         {
-            return Err(RuntimeError::InvalidResponse);
+            return Err(PageVerificationError::Binding);
         }
-        c.page.policy.validate()?;
+        c.page
+            .policy
+            .validate()
+            .map_err(|_| PageVerificationError::Policy)?;
         self.verifiers
             .last()
-            .ok_or(RuntimeError::Configuration)?
-            .verify(&canonical(c)?, &signed.signature)
-            .map_err(|_| RuntimeError::InvalidResponse)?;
+            .ok_or(PageVerificationError::Signature)?
+            .verify(
+                &canonical(c).map_err(|_| PageVerificationError::Binding)?,
+                &signed.signature,
+            )
+            .map_err(|_| PageVerificationError::Signature)?;
         for (record, receipt) in c.page.records.iter().zip(&c.page.receipts) {
-            self.verify_receipt(authority, record, receipt)?;
+            self.verify_receipt(authority, record, receipt)
+                .map_err(|_| PageVerificationError::Receipt)?;
         }
         for pair in c.page.receipts.windows(2) {
-            if pair[1].claims.previous != Some(audit_digest(&pair[0])?) {
-                return Err(RuntimeError::InvalidResponse);
+            let previous = audit_digest(&pair[0]).map_err(|_| PageVerificationError::Chain)?;
+            if pair[1].claims.previous != Some(previous) {
+                return Err(PageVerificationError::Chain);
             }
         }
         Ok(signed.claims.page)

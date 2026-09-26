@@ -79,8 +79,10 @@ preparation/evidence and container-socket path; no activation or unit mutation
 occurred. A newer 26 September Monolith snapshot, exact restore and renewed
 18-history Trust manifest are verified; nothing was imported into the CA. An
 offline four-capability Trust enrollment preview also exists, but signed
-gateway-history inspection currently fails closed, no Trust credential or
-collection exists, and no record was published. Sandbox hardening, writer
+gateway-history inspection currently stops on an expired private gateway leaf
+certificate. The operator now reports that transport blocker separately from
+proof failures; no Trust credential or collection exists, and no record was
+published. Sandbox hardening, private TLS renewal, writer
 cutover, current Trust data delivery, local activation and federation activation
 remain separate operations. This is not a deployed Trust instance.
 

@@ -107,6 +107,14 @@ plan's `expected_sequence` and `expected_tip`, then produce and review a **new
 preview digest**. An empty stream uses `0` and `null`. History is bounded to 4,096
 records/16 MiB. Larger spaces require a separately reviewed operator extension.
 
+The operator must run from an explicitly permitted private gateway network; do
+not publish the gateway port merely to make inspection work. Current diagnostics
+distinguish transport unavailability and authorization denial from page decoding,
+binding, policy, signature, receipt, chain, ordering, complete-history and replay
+failures. None of these messages establish publication. Check the private TLS
+certificate's validity window before treating a transport failure as repository
+or receipt corruption.
+
 ## Execute and reconcile
 
 After reviewing every exact record, submit that config with the exact lowercase

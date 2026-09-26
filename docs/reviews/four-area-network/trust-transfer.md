@@ -112,13 +112,22 @@ the CA's existing restored data was not modified.
 The separate offline federation preparation reserves stable Trust instance and
 membership record IDs for `Pull`, `Publish`, `AskExpertise` and
 `AnswerExpertise`. It creates no credential and publishes no record. The live
-gateway database reports accepted/published sequence 10 with ten receipts, but
-both the pinned and current enrollment operators reject the signed pull proof.
-Database metadata is not a substitute for that proof, so `expected_sequence`
-and `expected_tip` remain unresolved and the preview is explicitly unusable for
-execution. Repairing signed-history inspection, selecting the Trust local
-project/collection, provisioning a distinct gateway credential, and issuing a
-fresh review window remain required. Protected preparation root:
+gateway database reports accepted/published sequence 10 with ten receipts. The
+first pinned/current operator runs were made from the host even though the
+gateway port is deliberately private; their generic proof error hid a connection
+failure. A focused operator fix now distinguishes transport, authorization,
+page-signature/receipt/chain and complete-history/replay failures. Re-running from
+the private gateway network then identified the actual current transport blocker:
+the gateway leaf certificate expired at `2026-09-26T11:28:57Z` while its private
+CA remains valid through `2026-10-19T11:28:57Z`. No certificate was renewed and
+the receipt history still has not been cryptographically inspected. Database
+metadata is not a substitute for that proof, so `expected_sequence` and
+`expected_tip` remain unresolved and the preview is explicitly unusable for
+execution. Renewing the private leaf certificate under the existing CA after
+explicit credential-change approval, re-running signed-history inspection,
+selecting the Trust local project/collection, provisioning a distinct gateway
+credential, and issuing a fresh review window remain required. Protected
+preparation root:
 `/data/tmp/memory-four-area-trust-federation-prep-20260926T1610`; preparation
 receipt SHA-256 is
 `ca3df866ceaf3b7ebdfef5646f4d5a7f68bff99bd7489241c37fdd14a7d2e673`.
