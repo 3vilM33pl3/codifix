@@ -155,6 +155,15 @@ started at `2026-09-19T23:10:53.454822249Z`: this renewal was accepted without a
 gateway restart. No forced refresh, identity change or paid question was used.
 Private metadata evidence is `final-preview-health.json` in the staging folder.
 
+On 26 September the seven-day private leaves reached expiry. After explicit
+approval, the gateway leaf alone was renewed under the unchanged preview CA and
+the signed publication history was verified through sequence 10. Both preview
+applications remained healthy and could list their reviewed remote capability.
+This did not recover publication: the separate `pds.memory.robotmotel.com` leaf
+was still expired, the refresh-only maintainer had stopped fail-closed on TLS
+verification, and access generation 91 subsequently expired. Existing expired
+24-hour answer payloads were not regenerated and no paid call was made.
+
 The completed ownership ledger accounts for all 3,207 histories: Workshop 1,536,
 Homelab 393, Trust 19, General 742, protected archive 517. Six explicit annotation
 sets retain the actual reviewing agent per decision. Four proposed imports were

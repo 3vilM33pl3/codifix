@@ -117,16 +117,24 @@ first pinned/current operator runs were made from the host even though the
 gateway port is deliberately private; their generic proof error hid a connection
 failure. A focused operator fix now distinguishes transport, authorization,
 page-signature/receipt/chain and complete-history/replay failures. Re-running from
-the private gateway network then identified the actual current transport blocker:
-the gateway leaf certificate expired at `2026-09-26T11:28:57Z` while its private
-CA remains valid through `2026-10-19T11:28:57Z`. No certificate was renewed and
-the receipt history still has not been cryptographically inspected. Database
-metadata is not a substitute for that proof, so `expected_sequence` and
-`expected_tip` remain unresolved and the preview is explicitly unusable for
-execution. Renewing the private leaf certificate under the existing CA after
-explicit credential-change approval, re-running signed-history inspection,
-selecting the Trust local project/collection, provisioning a distinct gateway
-credential, and issuing a fresh review window remain required. Protected
+the private gateway network then identified the actual transport blocker: the
+gateway leaf certificate had expired while its private CA remained valid. After
+Olivier's explicit approval, only the `gateway.memory.robotmotel.com` leaf was
+replaced under that existing CA and only the gateway edge was restarted. The new
+certificate SHA-256 is
+`d741754eaa7c16f5a9162ea63c996714d7e022af4019b45a0ff9b5eb78e1742b` and it is
+valid through `2026-10-10T21:36:43Z`; the previous pair is retained in a
+protected rollback directory. The private-network operator then
+cryptographically verified every signed page, receipt, chain link, complete
+history and replay through sequence **10**, tip
+`sha256:d18ee4b1872ae82d4ef8451b6f9e01ebee34a6fbbfe461eeb5b3fa8f9fa527e4`.
+Both participants can again read the single reviewed remote capability. No new
+question or paid call was made. The separate PDS leaf is still expired, however,
+so the refresh-only maintainer is stopped and the generation-91 access credential
+has expired. Publication remains blocked until that independently approved leaf
+recovery refreshes the existing account. Trust project/collection selection, a
+distinct gateway credential and a fresh review window also remain required.
+Protected
 preparation root:
 `/data/tmp/memory-four-area-trust-federation-prep-20260926T1610`; preparation
 receipt SHA-256 is
