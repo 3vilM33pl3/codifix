@@ -78,12 +78,13 @@ reported unchanged. No Trust application credential, service or activation
 exists. The next safe boundary is signed release preparation in a new private
 directory only; inactive console installation and activation remain separate.
 
-That next boundary is published as
-`monolith-ca-20260925-trust-release-prepare-v1`. It selects the manifest-bound
-ARM64 release-tree archive
-`memory-2.1.0-rc.1-bookworm-arm64-tree.tar` (SHA-256
-`2365ef9901db0dca47775b5186dd9bf7ca62584bf75e0d338cff8cfff5552154`)
-and invokes the installed isolated `instance.py prepare` flow for `trust` and
+The first release-preparation instruction stopped safely before mutation because
+it named an archive from a separate unsigned packaging record. Corrected
+instruction `monolith-ca-20260926-trust-release-prepare-v2` selects the archive
+actually bound by the retained authenticated manifest:
+`memory-layer_2.1.0-rc.1_arm64.tree.tar` (SHA-256
+`489ec3b5456b2a28464d5456cf2068867d1107cd019475e2783298486c575d1a`).
+It invokes the installed isolated `instance.py prepare` flow for `trust` and
 schema assertion 60. The required result remains
 `inactive_preparation_only`, with installation, artifact execution, database
 verification and activation all false. No database password, API token,
