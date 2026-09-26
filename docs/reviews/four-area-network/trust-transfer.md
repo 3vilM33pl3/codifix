@@ -6,13 +6,13 @@ while retaining PostgreSQL 15 as stopped rollback material, and upgrade the
 existing Memory singleton to signed release `2.1.0-rc.1`. Trust data transfer,
 the four-area cutover, federation and Pi follow after that working baseline.
 
-Status: the 25 September current Trust-only candidate, encrypted source backup,
-and PostgreSQL-17 receiver are verified locally. The CA-recipient-bound package
-was copied to removable USB and verified after an unmount/remount readback. The
-CA subsequently verified, decrypted and extracted it, then restored it into a
-new isolated `17/trust` cluster. The restored target is stopped, manual and not
-activated. Application release preparation, credentials, service installation
-and activation remain open.
+Status, 26 September 2026: the CA reports release `2.1.0-rc.1` installed for the
+named Trust instance, but disabled, inactive and without an activation marker.
+Its isolated `17/trust` database remains stopped and manual. A bounded native
+preflight is pending through the connector-readable result inbox. Monolith has
+completed a newer encrypted source snapshot, exact isolated restore, complete
+history delta and agent-reviewed Trust manifest without stopping source writers
+or changing the CA. Federation enrollment remains offline and unexecutable.
 
 Update, 24 September 2026: Olivier authorized the CA agent to perform one
 bounded autonomous inactive PostgreSQL-17 preparation without intermediate
@@ -25,6 +25,63 @@ Continuation checkpoint: task `d7eda699-ab9e-4844-8b49-7c287a0b289e`, memory
 `c0e647fc-36a6-4763-92d6-ccb7da374499` (22 September 2026). This is a bounded
 continuation of the four-area staging and CA handoff, not a new federation or
 portable-import protocol.
+
+## Verified 26 September delta and offline federation preparation
+
+Olivier approved a non-activating CA-native preflight and parallel Monolith
+final-delta/federation preparation. The CA instruction authorizes only native
+artifact, runtime-library, unit-sandbox and inactive-state inspection. It does
+not start PostgreSQL or Memory, create the activation marker, enroll federation,
+or change the host. Its result is still pending; no comment is used as a control
+channel.
+
+Monolith preparation completed against an online encrypted snapshot while the
+shared source and Workshop/Homelab previews remained available:
+
+- Snapshot `ab1d9b99-87e3-4289-acbe-d5a65d7ed56e` restored into a fresh
+  network-none PostgreSQL 17 sandbox. All **125 tables, 3,249,966 rows and four
+  sequence states** matched. The encrypted database SHA-256 is
+  `95c13c92ae76271f21b3fe25d9c369e06823feee82c2c4b8c6c504741c8fc260`;
+  restore-evidence SHA-256 is
+  `b14e72835fbad61bc7c3ff072c7860166b20d7a8fd6439f9e630fa7685b87f1c`.
+- The complete redacted review pack contains **3,406 histories / 3,695
+  versions** with no held history. The old ledger delta carried 266 decisions,
+  while 3,059 changed histories and 81 new histories correctly remained
+  unreviewed. Of the prior 18 Trust histories, two carried unchanged and 16
+  required review. None changed its version or source set; five changed
+  relation-derived reviewed content and eleven changed other dependencies.
+- The coding agent re-read every complete redacted version of those 16 histories.
+  All remain CA/OpenBao operation, CA-local Memory, or CA physical-protection
+  knowledge. A new snapshot-bound ledger validates all 3,406 histories, assigns
+  exactly **18 histories / 21 versions** to Trust and keeps 3,388 histories in
+  protected archive. This is agent review, not Olivier's personal approval or
+  model-disclosure consent.
+- The current manifest independently verifies **183 reference-only provenance
+  projections**. Manifest file SHA-256 is
+  `ba7282484548cb2fadfb5f7938926dd0bcd02e460902764cb94528bbc8586645`;
+  semantic SHA-256 is
+  `32b51d8f798c4fbe146ae0b73b0efc46719f10c3314bb0fcfdd80eefd9ce694b`.
+  Its receipt records `plan_valid: true`,
+  `authenticated_human_approval: false` and `imported_or_activated: false`.
+
+Protected Monolith root:
+`/data/tmp/memory-four-area-baseline-20260926T1516`. This is an online baseline,
+not a final writer-stop capture. No new receiver bundle was sent to the CA and
+the CA's existing restored data was not modified.
+
+The separate offline federation preparation reserves stable Trust instance and
+membership record IDs for `Pull`, `Publish`, `AskExpertise` and
+`AnswerExpertise`. It creates no credential and publishes no record. The live
+gateway database reports accepted/published sequence 10 with ten receipts, but
+both the pinned and current enrollment operators reject the signed pull proof.
+Database metadata is not a substitute for that proof, so `expected_sequence`
+and `expected_tip` remain unresolved and the preview is explicitly unusable for
+execution. Repairing signed-history inspection, selecting the Trust local
+project/collection, provisioning a distinct gateway credential, and issuing a
+fresh review window remain required. Protected preparation root:
+`/data/tmp/memory-four-area-trust-federation-prep-20260926T1610`; preparation
+receipt SHA-256 is
+`ca3df866ceaf3b7ebdfef5646f4d5a7f68bff99bd7489241c37fdd14a7d2e673`.
 
 ## Contract
 

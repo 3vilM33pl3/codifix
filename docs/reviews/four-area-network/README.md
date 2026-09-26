@@ -70,9 +70,15 @@ Trust-only transfer/import method, fresh source delta and explicitly approved
 host preparation/cutover were the next gates. The subsequent
 [Trust-only local restore and fresh delta](trust-transfer.md) now has verified
 local evidence and a [grouped inactive CA proposal](../../user/ca-agent-handoff/TRUST-INACTIVE-PROPOSAL.md).
-The CA agent reports native signature verification passed, not installation.
-Receiver compatibility/decryption, renewed dependency review and explicit
-host-change/cutover approvals remain open. This is not a deployed Trust instance.
+The CA now reports the named Trust release installed but disabled/inactive, with
+the isolated Trust database stopped/manual and no activation marker. A newer
+26 September Monolith snapshot, exact restore and renewed 18-history Trust
+manifest are verified; nothing was imported into the CA. The bounded native CA
+preflight remains pending. An offline four-capability Trust enrollment preview
+also exists, but signed gateway-history inspection currently fails closed, no
+Trust credential or collection exists, and no record was published. Writer
+cutover, current Trust data delivery, local activation and federation activation
+remain separate approvals. This is not a deployed Trust instance.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
