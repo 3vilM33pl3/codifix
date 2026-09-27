@@ -256,6 +256,26 @@ allow exactly the one reviewed Trust-only drop-in and its digest, and reverify
 the effective sandbox plus inactive state before performing the same bounded
 read-only activation.
 
+## Second read-only activation stop and v3 correction, 27 September
+
+The CA reported `BLOCKED` for corrected instruction
+`monolith-ca-20260927-trust-read-only-activation-v2` before starting Trust. The
+Trust identities and inactive state matched, PostgreSQL `17/main` was online,
+and Step CA plus OpenBao remained active. However, the existing Memory
+singleton was already offline-degraded: two authenticated read-only queries
+returned HTTP 503 with PostgreSQL unavailable. The v2 requirement that every
+protected service be healthy therefore failed. Trust, `17/trust`, the activation
+marker and port 8091 remained untouched; no rollback was required.
+
+Olivier approved instruction
+`monolith-ca-20260927-trust-read-only-activation-v3`. It accepts the singleton's
+observed active-but-degraded response as an unchanged baseline for this bounded
+Trust activation only. The CA must not restart, reconfigure, repair or write
+through the singleton. It may start only `17/trust` and the isolated Trust
+service, and must prove the singleton unit, process identity and sanitized 503
+response are unchanged afterward. A worse or different baseline triggers the
+existing Trust-only rollback without changing the singleton.
+
 ## Contract
 
 - Keep the complete source archive, inventory and ownership manifest on Monolith.

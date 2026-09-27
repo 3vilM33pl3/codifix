@@ -110,6 +110,13 @@ instruction must instead bind the successful pre-drop-in installer inspection,
 rehash every installed identity directly, allow exactly the reviewed Trust-only
 drop-in and reverify the effective sandbox before starting anything.
 
+The corrected second attempt also stopped before mutation because the existing
+CA Memory singleton had independently entered its offline-degraded state:
+authenticated read-only queries returned HTTP 503 while PostgreSQL `17/main`
+remained online. The approved third instruction accepts that observed state as
+an unchanged baseline for this Trust-only activation, forbids repairing or
+restarting the singleton, and requires the same baseline after Trust starts.
+
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
 human review. The independent preview is upgraded through migration 0060, with
