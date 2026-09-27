@@ -276,6 +276,31 @@ service, and must prove the singleton unit, process identity and sanitized 503
 response are unchanged afterward. A worse or different baseline triggers the
 existing Trust-only rollback without changing the singleton.
 
+## Trust activation completed under autonomous v6, 27 September
+
+The v3 attempt exposed a preparation mismatch rather than a product failure:
+PostgreSQL `17/trust` had `listen_addresses` empty even though the installed
+Trust application uses `127.0.0.1:5433`. The CA stopped only `17/trust` and
+restored the inactive state without creating the marker or starting the
+application.
+
+Olivier then approved goal-directed instruction
+`monolith-ca-20260927-trust-autonomous-activation-v6`. It authorized the CA
+agent to exhaust reversible Trust-only fixes without further approval gates,
+while protecting the existing Memory service, PostgreSQL `17/main`, Step CA,
+OpenBao, credentials and restored data.
+
+The CA recorded `DONE` at `2026-09-27 17:14:20 UTC`. PostgreSQL `17/trust` is
+running with manual start policy and loopback-only `127.0.0.1:5433` access
+restricted to the existing `memory_trust` role/database. The Trust systemd unit
+is active but disabled on `127.0.0.1:8091`; health returned HTTP 200, status
+`ok`, database `up` and version `2.1.0-rc.1`. Authenticated reads verified all
+18 histories and 21 versions, restored counts remained 371 rows / 18 histories
+/ 21 versions / 183 projected sources, and the TUI visibly rendered the
+`homelab` project plus nine stored summaries. Model calls and federation remain
+disabled. No rollback was needed; Trust configuration backups remain in the
+CA-local root-only evidence directory.
+
 ## Contract
 
 - Keep the complete source archive, inventory and ownership manifest on Monolith.

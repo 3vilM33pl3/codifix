@@ -117,6 +117,17 @@ remained online. The approved third instruction accepts that observed state as
 an unchanged baseline for this Trust-only activation, forbids repairing or
 restarting the singleton, and requires the same baseline after Trust starts.
 
+The CA then identified the actual activation mismatch: preparation had left
+PostgreSQL `17/trust` Unix-socket-only while the installed Trust application
+uses `127.0.0.1:5433`. Goal-directed instruction
+`monolith-ca-20260927-trust-autonomous-activation-v6` authorized reversible
+Trust-only repair without further approval loops. The CA restricted TCP access
+to loopback and the existing `memory_trust` role/database, started Trust
+read-only, and recorded `DONE` at 17:14 UTC. Health returned HTTP 200 with the
+database up and version `2.1.0-rc.1`; all 18 histories and 21 versions remained
+readable, the TUI rendered stored summaries, and the existing Memory, Step CA,
+OpenBao and PostgreSQL `17/main` process identities remained unchanged.
+
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
 human review. The independent preview is upgraded through migration 0060, with
