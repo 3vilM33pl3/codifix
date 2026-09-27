@@ -164,6 +164,29 @@ was still expired, the refresh-only maintainer had stopped fail-closed on TLS
 verification, and access generation 91 subsequently expired. Existing expired
 24-hour answer payloads were not regenerated and no paid call was made.
 
+On 27 September Olivier explicitly approved renewal of only the expired PDS and
+operator leaves under the unchanged private CA, followed by refresh of the
+existing PDS account. The two TLS proxies were recreated so their bind mounts
+picked up the new leaf files; the PDS, gateway and participant applications
+kept their existing container identities and start times. Both private
+endpoints now present verified leaves valid through `2026-10-11T07:52:51Z`.
+
+The failed refresh had stopped during peer-certificate verification before an
+HTTP request could be transmitted. The maintenance operator now supports an
+exact-review, receipt-backed recovery for that narrow pre-HTTP TLS failure only;
+it remains unavailable for ambiguous network outcomes, rejected credentials or
+invalid responses. Live recovery made zero network calls, changed no identity
+or credential, and advanced the existing session from generation 91 to 92 on
+the next normally fenced refresh. Workshop and Homelab report the credential
+usable for publication, zero blocked intents and zero sync failures. Signed
+history still verifies through sequence 10 and tip
+`sha256:d18ee4b1872ae82d4ef8451b6f9e01ebee34a6fbbfe461eeb5b3fa8f9fa527e4`.
+Missing and synthetic-invalid status credentials return 401; raw repository
+access returns 404. No account, identity, trust root or password fallback
+changed, and no paid call occurred. The sanitized local receipt is
+`pds-leaf-and-refresh-recovery-20260927T075251Z.json` under the deployment's
+protected `receipts` directory.
+
 The completed ownership ledger accounts for all 3,207 histories: Workshop 1,536,
 Homelab 393, Trust 19, General 742, protected archive 517. Six explicit annotation
 sets retain the actual reviewing agent per decision. Four proposed imports were

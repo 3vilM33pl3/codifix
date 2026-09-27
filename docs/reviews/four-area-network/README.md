@@ -83,11 +83,19 @@ gateway leaf has now been renewed under the unchanged private preview CA, only
 the gateway edge was restarted, and the private-network operator verified the
 signed history through sequence 10 and tip
 `sha256:d18ee4b1872ae82d4ef8451b6f9e01ebee34a6fbbfe461eeb5b3fa8f9fa527e4`.
-The independently expired PDS leaf still blocks the refresh-only maintainer and
-publication access credential; no Trust credential or collection exists, and no
-record was published. Sandbox hardening, PDS TLS recovery, writer
-cutover, current Trust data delivery, local activation and federation activation
-remain separate operations. This is not a deployed Trust instance.
+The independently expired PDS and operator leaves were then renewed under the
+same private CA. Only their TLS proxies were recreated; the PDS, gateway and
+participant applications were not restarted. A receipt-backed recovery retired
+the refresh intent that had failed before HTTP transmission, and the existing
+account advanced from access generation 91 to 92. Workshop and Homelab now
+report usable publication credentials, zero blocked intents and zero sync
+failures. Missing and synthetic-invalid gateway credentials return 401, while
+raw repository access remains unavailable with 404. No account, identity,
+trust root or password fallback changed, and no paid call was made. No Trust
+credential or collection exists, and no Trust record was published. Sandbox
+hardening, writer cutover, current Trust data delivery, local activation and
+federation activation remain separate operations. This is not a deployed Trust
+instance.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound

@@ -129,11 +129,18 @@ cryptographically verified every signed page, receipt, chain link, complete
 history and replay through sequence **10**, tip
 `sha256:d18ee4b1872ae82d4ef8451b6f9e01ebee34a6fbbfe461eeb5b3fa8f9fa527e4`.
 Both participants can again read the single reviewed remote capability. No new
-question or paid call was made. The separate PDS leaf is still expired, however,
-so the refresh-only maintainer is stopped and the generation-91 access credential
-has expired. Publication remains blocked until that independently approved leaf
-recovery refreshes the existing account. Trust project/collection selection, a
-distinct gateway credential and a fresh review window also remain required.
+question or paid call was made. On 27 September Olivier separately approved
+renewal of only the expired PDS and operator leaves under the unchanged private
+CA and refresh of the existing account. Only the two TLS proxies were recreated;
+the PDS, gateway and participant applications retained their identities and
+start times. A receipt-backed recovery retired the refresh intent that had
+failed during TLS verification before HTTP transmission. The next normally
+fenced refresh advanced access generation 91 to 92. Workshop and Homelab now
+report usable publication credentials, zero blocked intents and zero sync
+failures. Missing and synthetic-invalid status credentials return 401 and raw
+repository access returns 404. This changed no account, identity, trust root or
+password fallback and made no paid call. Trust project/collection selection, a
+distinct gateway credential and a fresh review window still remain required.
 Protected
 preparation root:
 `/data/tmp/memory-four-area-trust-federation-prep-20260926T1610`; preparation
