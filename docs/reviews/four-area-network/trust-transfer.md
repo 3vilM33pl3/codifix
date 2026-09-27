@@ -176,6 +176,61 @@ preparation root:
 receipt SHA-256 is
 `ca3df866ceaf3b7ebdfef5646f4d5a7f68bff99bd7489241c37fdd14a7d2e673`.
 
+## Fresh 27 September online delta
+
+A newer encrypted online snapshot was taken after the CA sandbox result, without
+stopping the shared source writers. Snapshot
+`59578ce4-b5ed-4b93-9e81-48391046e935` restored into a new network-none
+PostgreSQL 17 sandbox. The restore matched **125 tables, 3,342,275 rows and four
+sequence states**. Its encrypted database SHA-256 is
+`6fd543c8e6b8566c251798c37dde0432602fef618909d8e7f9051d1d800ea8ff`;
+the digest-bound restore descriptor SHA-256 is
+`e252d61594fbaf0209059f347d6c4841728c7aa44199d8360627d54764a0bc11`.
+The normalized complete-inventory SHA-256 is
+`0fabf005b7106f0c7cff6b1337b86d6934a5f266b53cd4fb11ee6967c1c3d7a5`.
+
+The complete redacted pack now contains **3,449 histories / 3,745 versions**
+with no held history. Delta validation carried 268 decisions and stopped 3,138
+changed plus 43 new histories for review. Within the previously reviewed Trust
+set, two decisions carried and 16 were invalidated by dependency changes. Exact
+comparison showed that all 18 Trust histories retained identical curated
+versions, source-reference rows and projection dependencies. Five histories had
+38 new Trust-adjacent relations; every one is cross-area. Those edges remain in
+the protected archive and do not confer sharing permission.
+
+The renewed agent-reviewed ledger therefore retains exactly **18 Trust
+histories / 21 versions**, assigns all other histories to protected archive and
+validates all 3,449 decisions. Ledger SHA-256 is
+`2b2b91976195e4ff1401459fbb9244c722ddff5dc628e0fe5b0c585bc28c8de7`.
+The independently verified manifest contains the same 65 Trust data records and
+183 reference-only provenance projections. Its file SHA-256 is
+`fa6d62cdc3a2b449eb454764ab36ecab315d5324073cf146dc9720a8314c499a`;
+semantic SHA-256 is
+`397a2ec5142767b4011b79c6b0c2f758f86326fe4307c931b2cec699f096eeac`.
+The actual Trust data-record digest is unchanged from the 26 September package;
+the snapshot, inventory and agent-attestation bindings are deliberately new.
+
+The complete 2.1-GiB payload was then exported from the isolated restore and
+independently matched all 3,342,275 source rows. Payload file SHA-256 is
+`d71d5ca82dfbc1e9b229ebeb3ff7d8889f125863f263ac73af9954f39fd1d1ea`.
+Offline preparation produced archive SHA-256
+`2c3a9c570da75d5a1c83027e0292a00e9cd55d300d6f268506889975f4aef882`
+and prepared-receipt SHA-256
+`7ad046f605c3817c0ea83eb52813a8fac1997a3b520dc00a2710579dbfcff8a7`.
+Its Trust partition has 188 source rows plus 183 reference projections; the
+other three partitions are empty because this ledger is deliberately bounded to
+Trust. The 65 searchable Trust data records have digest
+`4aefcc0a5177f8f18ed3a8946a065acdd8db6468b937c88819fc6e005c1168ea`,
+which exactly matches both the 24 September CA receiver source and the 26
+September delta package. No refreshed private transfer is needed for those data
+records. The CA's existing projection receipts remain bound to their older
+review snapshot; do not relabel them as 27 September receipts.
+
+Protected Monolith root:
+`/data/tmp/memory-four-area-baseline-20260927T1400`. This remains an online
+baseline, not the final writer-stop capture. No CA database, activation state or
+federation state changed while producing it.
+
 ## Contract
 
 - Keep the complete source archive, inventory and ownership manifest on Monolith.
