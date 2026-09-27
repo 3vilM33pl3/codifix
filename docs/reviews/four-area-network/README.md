@@ -73,10 +73,14 @@ local evidence and a [grouped inactive CA proposal](../../user/ca-agent-handoff/
 The CA now reports the named Trust release installed but disabled/inactive, with
 the isolated Trust database stopped/manual and no activation marker. Its native
 version, AArch64 ABI, runtime-library resolution, installed hashes and static
-unit verification passed. The preflight stopped because the generic unit does
-not yet hide every locally inventoried OpenBao-config, backup, installation-input,
-preparation/evidence and container-socket path; no activation or unit mutation
-occurred. A newer 26 September Monolith snapshot, exact restore and renewed
+unit verification passed. The first preflight stopped because the generic unit
+did not hide every locally inventoried OpenBao-config, backup, installation-input,
+preparation/evidence and container-socket path. The CA then installed one
+Trust-only drop-in covering those paths and proved all six existing sensitive
+directories denied both metadata and read access in a disposable matching
+sandbox. The base unit remained unchanged, static verification passed and Trust,
+its database and port 8091 stayed inactive. A newer 26 September Monolith
+snapshot, exact restore and renewed
 18-history Trust manifest are verified; nothing was imported into the CA. An
 offline four-capability Trust enrollment preview also exists. Its expired
 gateway leaf has now been renewed under the unchanged private preview CA, only
@@ -92,8 +96,8 @@ report usable publication credentials, zero blocked intents and zero sync
 failures. Missing and synthetic-invalid gateway credentials return 401, while
 raw repository access remains unavailable with 404. No account, identity,
 trust root or password fallback changed, and no paid call was made. No Trust
-credential or collection exists, and no Trust record was published. Sandbox
-hardening, writer cutover, current Trust data delivery, local activation and
+credential or collection exists, and no Trust record was published. Writer
+cutover, current Trust data delivery, local activation and
 federation activation remain separate operations. This is not a deployed Trust
 instance.
 

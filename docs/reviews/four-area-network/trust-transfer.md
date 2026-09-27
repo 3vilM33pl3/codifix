@@ -66,6 +66,35 @@ create the activation marker, import data, enroll federation or contact a model.
 Any later activation still requires current-data transfer and a final writer
 cutover; a green sandbox probe alone is not activation approval.
 
+## CA sandbox hardening pass, 27 September
+
+The CA agent reported `RESULT — SANDBOX_HARDENING_PASSED` for instruction
+`monolith-ca-20260926-trust-sandbox-hardening-v1`. It atomically installed one
+root-owned mode-0644 Trust-only drop-in, SHA-256
+`1c6b009d20d4bfe1cfa09dfb2e4055e52bd8195abfcb928c8f40596162012c1b`.
+The drop-in adds six existing sensitive-directory denials—one separate OpenBao
+configuration directory, two CA/Memory backup roots and three Memory
+installation/preparation/evidence roots—plus one optional rule for the absent
+containerd socket. All 14 base-template denials remain, giving 21 effective
+entries. The authenticated executable, configuration, immutable plan and base
+template hashes matched before the change.
+
+The effective unit retained the activation-marker condition, deny-all plus
+loopback-only network policy, DynamicUser and the reviewed hardening directives.
+Static verification passed without diagnostics. A disposable fixed-Python probe
+matched 30 normalized identity/filesystem/network properties with zero
+mismatches: all six existing sensitive directories rejected both metadata and
+read attempts, while a public-file read and Trust-executable metadata check
+passed. The transient unit and private input were removed. Sanitized CA-local
+receipt SHA-256:
+`b0381bebaee024b0c5f1f80131d9775b33d361516b8148c859e759033ecdf3c8`.
+
+Trust remains disabled/inactive without an activation marker or port-8091
+listener; `17/trust` remains down/manual. Existing Memory, PostgreSQL `17/main`,
+Step CA and OpenBao remained active and unchanged. This closes the CA-specific
+sandbox gap only. Current-data migration, writer cutover, activation and
+federation remain unapproved and unexecuted.
+
 ## Verified 26 September delta and offline federation preparation
 
 Olivier approved a non-activating CA-native preflight and parallel Monolith
