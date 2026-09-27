@@ -231,6 +231,31 @@ Protected Monolith root:
 baseline, not the final writer-stop capture. No CA database, activation state or
 federation state changed while producing it.
 
+## First read-only activation stop, 27 September
+
+The CA reported `BLOCKED` for instruction
+`monolith-ca-20260927-trust-read-only-activation-v1` before activation began.
+Its mandatory `console.py inspect` returned the generic inactive-instance
+rejection because the approved Trust-only `10-ca-deny.conf` systemd drop-in was
+present. Inspection of the release source and operator documentation confirmed
+that this command is intentionally a first-install inspector: it requires the
+reviewed base unit with no drop-ins, before CA-specific overrides are installed.
+
+The CA correctly refused to remove the sandbox drop-in. The Trust unit remained
+disabled and inactive with PID zero and no pending job; the activation marker
+was absent; PostgreSQL `17/trust` remained down on port 5433; and nothing
+listened on port 8091. The release, configuration, plan, base-unit and drop-in
+hashes all matched the approved identities. Existing Memory, Step CA and
+OpenBao services were unchanged. No mutation occurred and no rollback was
+required.
+
+The corrected activation path must not weaken the sandbox or modify the
+first-install inspector. It must bind the previously successful authenticated
+pre-drop-in inspection, directly rehash the immutable installed identities,
+allow exactly the one reviewed Trust-only drop-in and its digest, and reverify
+the effective sandbox plus inactive state before performing the same bounded
+read-only activation.
+
 ## Contract
 
 - Keep the complete source archive, inventory and ownership manifest on Monolith.

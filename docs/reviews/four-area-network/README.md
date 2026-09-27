@@ -101,6 +101,15 @@ cutover, current Trust data delivery, local activation and
 federation activation remain separate operations. This is not a deployed Trust
 instance.
 
+The first bounded read-only activation attempt stopped before any mutation.
+The installed `console.py inspect` command is deliberately limited to the
+first-install state and rejects the now-required Trust sandbox drop-in. The CA
+correctly retained the disabled/inactive, marker-absent and database-down state;
+removing the drop-in is not an acceptable workaround. A corrected activation
+instruction must instead bind the successful pre-drop-in installer inspection,
+rehash every installed identity directly, allow exactly the reviewed Trust-only
+drop-in and reverify the effective sandbox before starting anything.
+
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
 human review. The independent preview is upgraded through migration 0060, with
