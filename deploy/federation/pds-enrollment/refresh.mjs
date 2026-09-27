@@ -50,7 +50,7 @@ export async function loadRefreshPolicy(path) {
 // stale-lock deletion. The lock inode is persistent and must never be removed.
 export class RefreshFiles extends StateFiles {
   path(name) {
-    if (/^recovery-[1-9][0-9]{0,3}\.json$/u.test(name)) return join(this.directory, name);
+    if (/^(?:recovery|tls-recovery)-[1-9][0-9]{0,3}\.json$/u.test(name)) return join(this.directory, name);
     return super.path(name);
   }
   async kernelLocked(work) {
@@ -173,6 +173,70 @@ export class RefreshMaintainer {
       await this.files.write('maintenance.json', maintenance); await this.status(maintenance);
       return { recovered: true, repository: this.policy.repository, recovery_generation: maintenance.recovery_generation,
         network_calls: 0, identities_changed: false, next_check_at: maintenance.retry_at };
+    });
+  }
+  async tlsRecoveryPreview() {
+    await this.owner(); const state = await this.state(); const maintenance = await this.maintenance();
+    check(maintenance.state === 'intervention' && state.phase === 'refresh_pending'
+      && state.resume_phase === 'active' && maintenance.recovery_generation < 9999,
+    'tls_intervention_recovery_required');
+    let evidence = null;
+    if (maintenance.reason === 'tls_peer_verification_failed') {
+      evidence = { kind: 'maintenance', sha256: digest(maintenance) };
+    } else if (maintenance.reason === 'refresh_reconciliation_window_expired' && maintenance.recovery_generation > 0) {
+      const prior = await this.files.read(`recovery-${maintenance.recovery_generation}.json`);
+      if (prior?.executed === true && prior.prior_reason === 'tls_peer_verification_failed'
+        && prior.repository === this.policy.repository && prior.policy_sha256 === digest(this.policy)
+        && prior.journal_sha256 === digest(state)
+        && prior.recovery_generation === maintenance.recovery_generation) {
+        evidence = { kind: 'reviewed_recovery_receipt', sha256: digest(prior) };
+      }
+    }
+    // A TLS peer-certificate verification failure happens during the handshake,
+    // before Node can transmit the HTTP refresh request. Only that pre-HTTP
+    // failure may retire an old pending intent outside the ordinary grace window.
+    check(evidence, 'tls_pre_http_failure_evidence_required');
+    const resolved = { ...state, revision: state.revision + 1, phase: 'active', resume_phase: null,
+      pending_started_at: null, resume_pending_started_at: null };
+    const review = { purpose: 'memory-private-pds-tls-refresh-recovery-v1', policy_sha256: digest(this.policy),
+      repository: this.policy.repository, journal_sha256: digest(state), resolved_journal_sha256: digest(resolved),
+      maintenance_sha256: digest(maintenance), evidence,
+      recovery_generation: maintenance.recovery_generation + 1, prior_reason: maintenance.reason,
+      network_calls: 0, changes_identity: false, password_fallback: false,
+      retires_pre_http_pending_intent: true, next_attempt_may_call_refresh_session: true };
+    return { ...review, review_sha256: digest(review), executed: false };
+  }
+  async recoverTls(confirmation) {
+    return this.files.kernelLocked(async () => {
+      let maintenance = await this.maintenance();
+      const generation = maintenance.recovery_generation + 1;
+      const name = `tls-recovery-${generation}.json`;
+      let receipt = await this.files.read(name);
+      if (!receipt) {
+        const review = await this.tlsRecoveryPreview();
+        check(review.review_sha256 === confirmation, 'exact_review_digest_required');
+        receipt = { ...review, executed: true };
+        await this.files.write(name, receipt);
+      } else {
+        check(receipt.executed === true && receipt.review_sha256 === confirmation
+          && receipt.policy_sha256 === digest(this.policy) && receipt.repository === this.policy.repository
+          && receipt.recovery_generation === generation, 'tls_recovery_receipt_changed');
+      }
+      let state = await this.state();
+      if (digest(state) === receipt.journal_sha256) {
+        state = { ...state, revision: state.revision + 1, phase: 'active', resume_phase: null,
+          pending_started_at: null, resume_pending_started_at: null };
+        check(digest(state) === receipt.resolved_journal_sha256, 'tls_recovery_receipt_changed');
+        await this.files.write('journal.json', state);
+      } else {
+        check(digest(state) === receipt.resolved_journal_sha256, 'tls_recovery_receipt_changed');
+      }
+      maintenance = { ...maintenance, state: 'retry_wait', attempts: 0, reason: 'operator_reviewed_tls_recovery',
+        retry_at: this.seconds() + 60, recovery_generation: generation };
+      await this.files.write('maintenance.json', maintenance); await this.status(maintenance);
+      return { recovered: true, repository: this.policy.repository, recovery_generation: generation,
+        network_calls: 0, identities_changed: false, pending_intent_retired: true,
+        next_check_at: maintenance.retry_at };
     });
   }
   async status(maintenance) {

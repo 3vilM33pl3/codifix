@@ -11,19 +11,26 @@ export async function main(args, emit = value => process.stdout.write(`${JSON.st
     'node refresh-cli.mjs authorize /private/refresh-policy.json EXACT_REVIEW_SHA256',
     'node refresh-cli.mjs recovery-review /private/refresh-policy.json',
     'node refresh-cli.mjs recover /private/refresh-policy.json EXACT_REVIEW_SHA256',
+    'node refresh-cli.mjs tls-recovery-review /private/refresh-policy.json',
+    'node refresh-cli.mjs recover-tls /private/refresh-policy.json EXACT_REVIEW_SHA256',
     'node refresh-cli.mjs once /private/refresh-policy.json',
     'node refresh-cli.mjs run /private/refresh-policy.json'],
   defaults: REFRESH_DEFAULTS, note: 'Existing active account only. Review is read-only. No enrollment SDK, password fallback or automatic policy extension.' };
   const [command, path, confirmation] = args;
-  check(['review', 'authorize', 'recovery-review', 'recover', 'once', 'run'].includes(command)
-    && args.length === (['authorize', 'recover'].includes(command) ? 3 : 2) && !path.startsWith('-'), 'invalid_arguments');
+  check(['review', 'authorize', 'recovery-review', 'recover', 'tls-recovery-review', 'recover-tls', 'once', 'run'].includes(command)
+    && args.length === (['authorize', 'recover', 'recover-tls'].includes(command) ? 3 : 2) && !path.startsWith('-'), 'invalid_arguments');
   const policy = await loadRefreshPolicy(path);
   const maintainer = new RefreshMaintainer(policy);
   if (command === 'review') return maintainer.preview();
   if (command === 'recovery-review') return maintainer.recoveryPreview();
+  if (command === 'tls-recovery-review') return maintainer.tlsRecoveryPreview();
   if (command === 'recover') {
     check(/^[a-f0-9]{64}$/u.test(confirmation), 'exact_review_digest_required');
     return maintainer.recover(confirmation);
+  }
+  if (command === 'recover-tls') {
+    check(/^[a-f0-9]{64}$/u.test(confirmation), 'exact_review_digest_required');
+    return maintainer.recoverTls(confirmation);
   }
   if (command === 'authorize') {
     check(/^[a-f0-9]{64}$/u.test(confirmation), 'exact_review_digest_required');

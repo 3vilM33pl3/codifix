@@ -152,6 +152,35 @@ test('explicit intervention recovery retains the failed generation and cannot ex
   assert.equal((await f.maintainer.recoveryPreview()).recovery_generation, 2);
 });
 
+test('reviewed TLS-handshake recovery retires only a proven pre-HTTP pending intent', async t => {
+  const f = await fixture(t); await f.authorize(); f.failure('tls_peer_verification_failed');
+  await f.maintainer.tick(); f.advance(7201);
+  const ordinary = await f.maintainer.recoveryPreview();
+  await f.maintainer.recover(ordinary.review_sha256); f.failure(null); f.advance(60);
+  assert.equal((await f.make().tick()).reason, 'refresh_reconciliation_window_expired');
+  assert.equal(f.calls.length, 1);
+  const review = await f.maintainer.tlsRecoveryPreview();
+  assert.equal(review.evidence.kind, 'reviewed_recovery_receipt');
+  assert.equal(review.retires_pre_http_pending_intent, true);
+  assert.equal(review.next_attempt_may_call_refresh_session, true);
+  await assert.rejects(f.maintainer.recoverTls('0'.repeat(64)), /exact_review_digest_required/u);
+  const recovered = await f.maintainer.recoverTls(review.review_sha256);
+  assert.equal(recovered.network_calls, 0); assert.equal(recovered.pending_intent_retired, true);
+  assert.equal((await f.files.read('journal.json')).phase, 'active');
+  assert.equal((await f.files.read('tls-recovery-2.json')).evidence.kind, 'reviewed_recovery_receipt');
+  f.advance(60); const status = await f.make().tick();
+  assert.equal(status.state, 'healthy'); assert.equal(status.generation, 2);
+  assert.equal(f.calls.length, 2);
+});
+
+test('TLS-handshake recovery is unavailable for an ambiguous HTTP outcome', async t => {
+  const f = await fixture(t); await f.authorize(); f.failure('network_outcome_unconfirmed');
+  await f.maintainer.tick(); f.advance(7201); f.failure(null); await f.make().tick();
+  await assert.rejects(f.maintainer.tlsRecoveryPreview(), /tls_pre_http_failure_evidence_required/u);
+  assert.equal((await f.files.read('journal.json')).phase, 'refresh_pending');
+  assert.equal(f.calls.length, 1);
+});
+
 test('credential, configuration, TLS and identity failures require immediate intervention', async t => {
   for (const reason of ['credential_rejected', 'remote_request_rejected', 'tls_peer_verification_failed', 'invalid_response']) {
     const f = await fixture(t); await f.authorize(); f.failure(reason);

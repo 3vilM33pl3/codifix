@@ -174,6 +174,23 @@ session state. Do not print tokens or upstream response bodies into tickets.
 Do not delete the enrollment/maintenance journals or reset an attempt count by
 hand. Ambiguous expired-grace cases require separate account-recovery planning.
 
+An expired pending intent caused specifically by `tls_peer_verification_failed`
+is different from an ambiguous HTTP outcome: certificate verification fails in
+the TLS handshake before Node can transmit the refresh request. After repairing
+and independently verifying the fixed TLS path, review the dedicated recovery:
+
+```sh
+node deploy/federation/pds-enrollment/refresh-cli.mjs tls-recovery-review /private/refresh-policy.json
+node deploy/federation/pds-enrollment/refresh-cli.mjs recover-tls /private/refresh-policy.json EXACT_REVIEW_SHA256
+```
+
+This network-free operation requires the exact pending journal plus either the
+original TLS failure or its immutable ordinary-recovery receipt. It writes a
+separate immutable `tls-recovery-N.json`, retires only that proven pre-HTTP
+intent, changes no identity or credential, and waits one minute before permitting
+one newly fenced refresh attempt. It is unavailable for network ambiguity,
+credential rejection, invalid responses or changed policy/identity evidence.
+
 After correcting a transient cause, an operator may explicitly review and open
 one further bounded recovery generation for the **same** policy:
 
