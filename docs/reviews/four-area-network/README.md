@@ -95,11 +95,10 @@ account advanced from access generation 91 to 92. Workshop and Homelab now
 report usable publication credentials, zero blocked intents and zero sync
 failures. Missing and synthetic-invalid gateway credentials return 401, while
 raw repository access remains unavailable with 404. No account, identity,
-trust root or password fallback changed, and no paid call was made. No Trust
-credential or collection exists, and no Trust record was published. Writer
-cutover, current Trust data delivery, local activation and
-federation activation remain separate operations. This is not a deployed Trust
-instance.
+trust root or password fallback changed, and no paid call was made. At that
+checkpoint no Trust credential or collection existed and no Trust record had
+been published. Writer cutover and current Trust data delivery remained separate
+operations.
 
 The first bounded read-only activation attempt stopped before any mutation.
 The installed `console.py inspect` command is deliberately limited to the
@@ -127,6 +126,21 @@ read-only, and recorded `DONE` at 17:14 UTC. Health returned HTTP 200 with the
 database up and version `2.1.0-rc.1`; all 18 histories and 21 versions remained
 readable, the TUI rendered stored summaries, and the existing Memory, Step CA,
 OpenBao and PostgreSQL `17/main` process identities remained unchanged.
+
+On 28 September Monolith completed the next federation-side slice. Trust now has
+a distinct gateway credential and schema-v3 fleet entry, and its four membership
+capabilities (`Pull`, `Publish`, `AskExpertise`, `AnswerExpertise`) are published
+in the existing signed history at sequences **11–14**. The verified history tip
+is
+`sha256:32c40ec7be5bc7e2687e85754469844dfa30979470136baae80c4f1ee8487c09`.
+A systemd-managed TCP relay exposes only the authenticated gateway edge on
+`10.22.6.42:8443` to the private `10.22.6.0/24` LAN; missing and invalid bearer
+credentials return HTTP 401. An encrypted CA-recipient bundle supplies the
+access-only credential, CA certificate, fixed federation configuration and an
+autonomous runbook through a temporary LAN-only HTTP download. No credential is
+stored in this repository or Notion. The CA-side configuration, signed-history
+sync, negative-authentication probe and first Trust capability remain pending;
+do not yet claim live Trust exchange.
 
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound

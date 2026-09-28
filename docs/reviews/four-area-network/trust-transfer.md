@@ -301,6 +301,51 @@ is active but disabled on `127.0.0.1:8091`; health returned HTTP 200, status
 disabled. No rollback was needed; Trust configuration backups remain in the
 CA-local root-only evidence directory.
 
+## Trust federation enrollment and CA handoff, 28 September
+
+Monolith published the previously reserved Trust membership into the existing
+private federation. The authority accepted and the PDS published four immutable
+records at sequences **11–14**, granting the stable Trust instance only `Pull`,
+`Publish`, `AskExpertise` and `AnswerExpertise`. Current tooling then verified
+every signed page, receipt, chain link, complete-history entry and replay through
+sequence 14. The resulting tip is
+`sha256:32c40ec7be5bc7e2687e85754469844dfa30979470136baae80c4f1ee8487c09`.
+
+The gateway now has a distinct access credential and schema-v3 fleet entry for
+Trust. The credential is stored as a mode-0600 host secret and mounted into only
+the gateway; it is not in this repository, the CA runbook or Notion. The gateway
+container was replaced while retaining its database, PDS credential generation,
+networks, resource limits and security settings. The immediately preceding
+container is retained stopped for rollback.
+
+Because the gateway edge previously had no host binding, a user systemd service
+now relays `10.22.6.42:8443` to the gateway edge and restricts accepted clients
+to `10.22.6.0/24`. Gateway authorization remains mandatory: missing and
+synthetic-invalid credentials return HTTP 401. This relay does not expose the
+PDS repository, database or participant applications.
+
+An access-only client bundle was encrypted to the CA's existing recipient
+fingerprint `ACDBD1CB5ECB39FCA84439ABC2E27E7B42623A5E`. The encrypted bundle has
+SHA-256
+`5e4e5dc8ff412b18b64d626a58f5c23a6e2fefaefeb1cd7c7f79d3a893a56cfe`
+and is temporarily available on the private LAN at
+`http://10.22.6.42:8444/trust-federation-client-20260928-a34051e241dd99af.tar.gpg`.
+The download service exposes a directory containing only that ciphertext. Its
+decrypted `GOAL.md` instructs the CA agent to preserve existing service and
+database boundaries, install the private client material, bind the current local
+system-admin principal, synchronize through sequence 14, perform a negative
+credential test and—only where the installed CLI supports the reviewed
+workflow—publish one small deterministic capability for Workshop and Homelab.
+Models, Pi, MCP, paid calls and public listeners remain disabled.
+
+The goal was persisted and re-read on the Notion `CA Trust — CURRENT ACTION`
+page as instruction
+`monolith-ca-20260928-trust-federation-activation-v7`. CA-side execution and its
+sanitized result are still pending. Membership publication alone does not prove
+that Trust has synchronized, advertised expertise or completed a two-way
+exchange. Keep the rollback gateway container and temporary download service
+until the CA result is verified.
+
 ## Contract
 
 - Keep the complete source archive, inventory and ownership manifest on Monolith.
