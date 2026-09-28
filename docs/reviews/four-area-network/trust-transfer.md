@@ -346,6 +346,31 @@ that Trust has synchronized, advertised expertise or completed a two-way
 exchange. Keep the rollback gateway container and temporary download service
 until the CA result is verified.
 
+The CA's first v7 execution reported `BLOCKED` at 14:58 UTC without changing
+Trust or any protected service. Both the ciphertext endpoint on TCP 8444 and the
+gateway on TCP 8443 failed with `No route to host`; CA interface, direct route
+and neighbour discovery remained healthy. No bundle, credential or private
+content crossed the network.
+
+Monolith then identified the actual cause: the persistent `homelab_filter`
+nftables table had a default-drop input chain and neither port was in an allow
+rule. The relay and download processes were already listening correctly. A
+digest-guarded, syntax-checked replacement retained every existing rule and
+added only a `10.22.6.2/32` Trust-federation client set plus TCP ports 8443 and
+8444. The active and persistent rules now match. The installed file SHA-256 is
+`22bc00fc98d1a535fc60f69666440a7ab91280109ea9f1c13561e86471bea3c0`;
+the exact prior file is retained as
+`/etc/nftables.d/50-homelab-monolith.nft.before-trust-20260928` with SHA-256
+`996df9d2b74f2dd460e9547281d20aa8188e1125d199460d3db313134608f578`.
+
+After applying the rule, the encrypted download still reproduced SHA-256
+`5e4e5dc8ff412b18b64d626a58f5c23a6e2fefaefeb1cd7c7f79d3a893a56cfe`,
+the gateway still rejected a synthetic-invalid credential with HTTP 401, and
+Workshop plus Homelab remained healthy with their databases up. The current
+Notion action was updated and fetched back with the same instruction ID,
+timestamp `2026-09-28T15:04:11Z` and status `RETRY_NOW`. CA-side retry evidence
+is pending.
+
 ## Contract
 
 - Keep the complete source archive, inventory and ownership manifest on Monolith.

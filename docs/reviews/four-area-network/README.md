@@ -142,6 +142,19 @@ stored in this repository or Notion. The CA-side configuration, signed-history
 sync, negative-authentication probe and first Trust capability remain pending;
 do not yet claim live Trust exchange.
 
+The CA's first v7 attempt correctly stopped without mutation: direct TCP checks
+to `10.22.6.42:8443` and `:8444` returned `No route to host` even though its
+interface, route and neighbour entry were healthy. Monolith inspection found the
+cause in its persistent nftables input policy, which rejected both unlisted
+ports before the active relay listeners. The policy now has a dedicated
+`10.22.6.2/32` Trust-federation client set and allows that address only to TCP
+8443/8444. The installed rules file has SHA-256
+`22bc00fc98d1a535fc60f69666440a7ab91280109ea9f1c13561e86471bea3c0`;
+the exact prior file is retained with SHA-256
+`996df9d2b74f2dd460e9547281d20aa8188e1125d199460d3db313134608f578`.
+The unchanged v7 action is persisted as `RETRY_NOW`; CA confirmation remains
+pending.
+
 The [Workshop interaction increment](workshop-interaction.md) now exposes the
 saved answer and exact citations in Web/CLI/TUI, with permanent digest-bound
 human review. The independent preview is upgraded through migration 0060, with
