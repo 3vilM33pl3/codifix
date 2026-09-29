@@ -14,7 +14,7 @@ identity or stale-writer fencing.
 
 ## Transaction and verification
 
-Supported target heads are migrations **0056 through 0060**, with the exact public table
+Supported fresh target heads are migrations **0056 through 0061**, with the exact public table
 catalog, no historical schemas, and matching source columns for every imported
 row. The first import requires empty knowledge, authentication, jobs, federation
 and supervisor state; only the known empty-installation seed rows are allowed.
@@ -168,3 +168,38 @@ both. It also included an explicitly reviewed source projection, exercising
 canonical hashing and immutable provenance receipts. Total test time including
 synthetic capture/materialization was 141.38 seconds. These results do not
 claim that the real Workshop snapshot was imported by this test.
+
+## Existing installation reconciliation
+
+`reconciliation::preview` and `reconciliation::reconcile` are separate from the
+fresh-target importer. They require migration 0061 and an existing immutable
+area/instance binding (an import receipt or supervisor instance binding).
+Preview binds the validated partition, inventory, manifest and snapshot plus
+all destination knowledge rows, including destination-only rows. It contains
+identifiers and hashes only. Source rows must have exactly matching columns.
+
+Identical rows are reused. New histories append only beyond the destination's
+existing version numbers; an occupied ID, older slot, different project or
+different mutable state is a conflict. Conflicts are returned in the preview
+and prevent execution. An operator may explicitly set `keep_destination=true`
+for existing non-version rows, recording the retained hash in the immutable
+preview receipt. This permits retaining local project metadata and mutable
+state while appending compatible versions. Immutable version conflicts must be
+resolved in the ownership review; this API has no force-overwrite switch.
+Version insert triggers can reassert canonical state; reconciliation restores
+only the exact reviewed canonical state (including explicitly retained local
+state) after those inserts.
+
+Execution requires a stopped-writer attestation and takes exclusive knowledge
+table locks in a fixed order, rechecks the preview, and commits rows and an
+immutable receipt together. Existing authentication, federation, job, policy,
+budget and destination-only knowledge rows are retained. Sequence advancement
+is transactional and never reduces an existing allocation watermark. Exact
+retry verifies the full resulting knowledge snapshot and all source rows;
+changed input, operation identity or post-commit destination data fails closed.
+The receipt binds the complete decision manifest, including projection review;
+the protected prepared archive remains required evidence.
+
+Database locks fence the transaction only. The deployment operator must stop
+and fence all writers until routing switches. Reconciliation does not migrate
+schema, create identities, approve content, activate a service or publish it.

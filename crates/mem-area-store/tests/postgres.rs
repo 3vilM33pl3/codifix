@@ -17,6 +17,11 @@ async fn migration_0056_import_receipt_survives_upgrade_but_cannot_authorize_rep
     let target = database().await.expect("synthetic old target");
     seed(&source.pool).await;
     let (partition, _) = capture(&source.pool).await.partition();
+    execute(
+        &target.pool,
+        "DROP TABLE area_reconciliation_receipts; DELETE FROM _sqlx_migrations WHERE version=61;",
+    )
+    .await;
     // This newly created disposable database alone simulates a pre-0057
     // installation. Never downgrade an existing installation or receipt.
     execute(&target.pool, "DROP TABLE supervisor_question_denials; DROP TABLE supervisor_questions; DELETE FROM _sqlx_migrations WHERE version=60; DROP TABLE supervisor_proposal_reviews; DELETE FROM _sqlx_migrations WHERE version=59; ALTER TABLE supervisor_settlements DROP COLUMN token_usage; DELETE FROM _sqlx_migrations WHERE version=58; DROP TABLE supervisor_health_observations; DROP TABLE supervisor_health_schedule; DELETE FROM _sqlx_migrations WHERE version=57; ALTER TABLE area_import_receipts DROP CONSTRAINT area_import_receipts_target_migration_check; ALTER TABLE area_import_receipts ADD CONSTRAINT area_import_receipts_target_migration_check CHECK(target_migration=56);").await;

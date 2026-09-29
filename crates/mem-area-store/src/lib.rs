@@ -7,6 +7,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sqlx::{PgConnection, PgPool, Row};
 use uuid::Uuid;
+pub mod reconciliation;
 
 // SQLx 0.8.6 still creates named statements for persistent queries when a caller
 // disables its statement cache, but then does not retain/close their handles.
@@ -20,6 +21,7 @@ pub const HEALTH_TARGET_MIGRATION: i64 = 57;
 pub const USAGE_TARGET_MIGRATION: i64 = 58;
 pub const REVIEW_TARGET_MIGRATION: i64 = 59;
 pub const QUESTION_TARGET_MIGRATION: i64 = 60;
+pub const RECONCILIATION_TARGET_MIGRATION: i64 = 61;
 const TABLES: &[&str] = &[
     "public.projects",
     "public.sessions",
@@ -168,6 +170,7 @@ pub async fn import_partition(
                 | USAGE_TARGET_MIGRATION
                 | REVIEW_TARGET_MIGRATION
                 | QUESTION_TARGET_MIGRATION
+                | RECONCILIATION_TARGET_MIGRATION
         )
     ) {
         return Err(ImportError::Schema);
@@ -197,6 +200,11 @@ pub async fn import_partition(
         })
         .chain(if target_head >= QUESTION_TARGET_MIGRATION {
             mem_area::SUPERVISOR_TABLES_0060
+        } else {
+            &[]
+        })
+        .chain(if target_head >= RECONCILIATION_TARGET_MIGRATION {
+            mem_area::AREA_RECONCILIATION_TABLES_0061
         } else {
             &[]
         })

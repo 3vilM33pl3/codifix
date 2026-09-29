@@ -155,9 +155,10 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
             | SUPERVISOR_USAGE_MIGRATION
             | SUPERVISOR_REVIEW_MIGRATION
             | SUPERVISOR_QUESTION_MIGRATION
+            | AREA_RECONCILIATION_MIGRATION
     ) {
         errors.push(format!(
-            "unsupported migration version {}; supported explicit heads are 52 through 59",
+            "unsupported migration version {}; supported explicit heads are 52 through 61",
             inventory.migration_version
         ));
     }
@@ -415,6 +416,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
                 | SUPERVISOR_USAGE_MIGRATION
                 | SUPERVISOR_REVIEW_MIGRATION
                 | SUPERVISOR_QUESTION_MIGRATION
+                | AREA_RECONCILIATION_MIGRATION
         ) && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0053 table inventory {table}"));
@@ -434,6 +436,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
                 | SUPERVISOR_USAGE_MIGRATION
                 | SUPERVISOR_REVIEW_MIGRATION
                 | SUPERVISOR_QUESTION_MIGRATION
+                | AREA_RECONCILIATION_MIGRATION
         ) && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0054 table inventory {table}"));
@@ -453,9 +456,13 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         (SUPERVISOR_HEALTH_MIGRATION, SUPERVISOR_TABLES_0057),
         (SUPERVISOR_REVIEW_MIGRATION, SUPERVISOR_TABLES_0059),
         (SUPERVISOR_QUESTION_MIGRATION, SUPERVISOR_TABLES_0060),
+        (
+            AREA_RECONCILIATION_MIGRATION,
+            AREA_RECONCILIATION_TABLES_0061,
+        ),
     ] {
         for (table, _) in catalog {
-            if (head..=SUPERVISOR_QUESTION_MIGRATION).contains(&inventory.migration_version)
+            if (head..=AREA_RECONCILIATION_MIGRATION).contains(&inventory.migration_version)
                 && !tables.contains_key(table)
             {
                 errors.push(format!(

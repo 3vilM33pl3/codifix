@@ -356,6 +356,11 @@ pub const SUPERVISOR_TABLES_0060: &[(&str, TableStrategy)] = &[
     ),
 ];
 
+pub const AREA_RECONCILIATION_TABLES_0061: &[(&str, TableStrategy)] = &[(
+    "public.area_reconciliation_receipts",
+    TableStrategy::HistoricalArchive,
+)];
+
 /// Optional, observed historical evaluation snapshot. Presence of any member
 /// requires the whole catalog, including empty tables. Never match a prefix or
 /// apply the public schema's ownership/rebuild policy to these archived rows.
@@ -391,6 +396,7 @@ pub fn table_strategy(table: &str) -> Option<TableStrategy> {
         .chain(SUPERVISOR_TABLES_0057)
         .chain(SUPERVISOR_TABLES_0059)
         .chain(SUPERVISOR_TABLES_0060)
+        .chain(AREA_RECONCILIATION_TABLES_0061)
         .find_map(|(name, strategy)| (*name == table).then_some(*strategy))
         .or_else(|| historical_project_table(table).map(|_| TableStrategy::HistoricalArchive))
 }
