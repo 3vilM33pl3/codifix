@@ -8,6 +8,10 @@ TUI, watcher, relay, and MCP clients use a Memory Layer service token.
 
 - `single_user` is the default and preserves existing local installations. The
   configured `service.api_token` remains the installation-wide credential.
+  Explicitly issued service tokens also work, limited to their current project
+  permissions, expiry and revocation. Local browser session bootstrap is unchanged;
+  OIDC is not needed to give an agent a scoped token. Invalid supplied tokens fail
+  rather than falling back to the local owner or anonymous reader.
 - `multi_user` enables Authentik OIDC browser sessions, scoped service
   principals, project memberships, and role checks. The legacy token is
   rejected unless `auth.multi_user_legacy_token_enabled = true` is set for a

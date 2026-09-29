@@ -2548,8 +2548,10 @@ components:
       type: http
       scheme: bearer
       description: |
-        A Memory Layer service token in multi-user mode, or the legacy
-        [service].api_token in single-user mode. Browser clients use an
+        An explicitly issued Memory Layer service token in either mode, or the
+        installation-owner [service].api_token in single-user mode. Scoped
+        tokens retain project permissions, expiry and revocation; invalid tokens
+        never fall back to anonymous access. Browser clients use an
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:

@@ -4,6 +4,8 @@ pub(crate) mod answerer;
 mod model;
 mod oidc;
 mod policy;
+#[cfg(test)]
+mod scoped_token_tests;
 mod store;
 
 pub(crate) use model::*;

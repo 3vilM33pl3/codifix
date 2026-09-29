@@ -1,8 +1,10 @@
 # Authentication And Authorization Architecture
 
 Memory Layer has two explicit operating modes. `single_user` preserves the
-local-first shared-token model. `multi_user` makes the service the authorization
-boundary for Authentik users and scoped service principals.
+local browser bootstrap and installation-owner token. Both modes accept explicitly
+issued, project-scoped service tokens through the same authorization boundary.
+`multi_user` additionally enables Authentik browser identity and removes anonymous
+access and the owner token unless its temporary legacy flag is enabled.
 
 ## Trust Boundaries
 
@@ -79,8 +81,9 @@ a non-secret prefix are stored. The raw token is returned only by create.
 
 - HTTP accepts `Authorization: Bearer` or `x-api-token`; conflicting values are
   rejected.
-- HTTP MCP deliberately ignores browser cookies and requires a service token in
-  multi-user mode. Tool calls forward the request credential to the service API.
+- HTTP MCP deliberately ignores browser cookies and requires a token by default.
+  Scoped service tokens work in either mode; tool calls forward that exact
+  credential to the service API, never replacing it with the installation token.
 - TUI Cap'n Proto sessions authenticate in their first protocol frame.
 - Browser WebSockets use the authenticated browser session.
 - Relays proxy the original authorization/cookie headers to the primary; they do
@@ -104,9 +107,18 @@ path for memory content.
    them from a secret manager, then disable legacy bootstrap.
 
 Rollback is a config change back to `single_user`; do not reverse migration
-0026. Existing auth rows remain inert and preserve the audit trail. Before
-rollback, consider whether widening every local client back to the shared token
-is acceptable.
+0026. Issued service tokens remain active with their original project permissions,
+expiry, revocation and disabled-principal checks. Single-user mode also restores
+the loopback human session bootstrap, installation-owner token and anonymous reader
+behavior. Assess those local trust assumptions before switching modes.
+
+Single-user machine callers do not need OIDC configuration. Create a scoped token
+using the owner's existing authenticated administration path; distribute it only
+to that workload. A supplied invalid token is rejected, not treated as an anonymous
+reader or owner. No project role or federation/output-destination grant is inferred
+from the mode. Dedicated MCP expertise callers still require explicit operator
+bindings and reviewed collection consent; scoped authentication alone is not
+permission to disclose a remote answer.
 
 ## Failure Behavior
 

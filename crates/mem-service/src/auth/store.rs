@@ -123,10 +123,18 @@ pub(crate) async fn resolve_principal(
                 let pool = state.pool()?;
                 load_session_principal(&pool, state, &token).await.map(Some)
             }
-            Credential::ApiToken(token) if token == state.api_token => {
+            Credential::ApiToken(token) if !token.trim().is_empty() && token == state.api_token => {
                 Ok(Some(local_owner_admin()))
             }
-            Credential::ApiToken(_) => Err(ApiError::unauthorized("invalid api token")),
+            Credential::ApiToken(token) => {
+                // Local browser/owner access does not confer owner authority on
+                // an explicitly issued machine credential. Reuse the current
+                // token, expiry, revocation and project-membership checks.
+                let pool = state.pool()?;
+                load_service_token_principal(&pool, state, &token)
+                    .await
+                    .map(Some)
+            }
             Credential::None => Ok(Some(single_user_reader())),
         },
         AuthMode::MultiUser => match credential {
