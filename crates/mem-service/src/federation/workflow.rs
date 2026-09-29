@@ -108,11 +108,17 @@ async fn binding(
         .fetch_optional(&state.pool()?)
         .await
         .map_err(|_| unavailable())?;
-    if runtime.space != space || project != Some(runtime.project) {
+    if runtime.space != space {
         return Err(ApiError::not_found(
             "federation space is not configured for this project",
         ));
     }
+    let runtime = project
+        .and_then(|id| runtime.for_project(id))
+        .map(Arc::new)
+        .ok_or_else(|| {
+            ApiError::not_found("federation space is not configured for this project")
+        })?;
     // Use the authenticated request's exact-project permissions, including token
     // scope. Never accept principal/project/access/publisher from request JSON.
     let access = LocalProjectAccess {

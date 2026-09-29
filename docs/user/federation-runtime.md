@@ -47,6 +47,44 @@ it never borrows its configured principal's role. Web/CLI/TUI enrollment, review
 and proposal clients remain E work. Trusted in-process APIs remain available;
 do not expose them without the local authentication/policy boundary.
 
+### Multiple projects in one instance (2.1.0-rc.2)
+
+The existing top-level `project`, `principal` and `expertise_*` fields remain the
+primary binding. An optional `projects` array adds explicit local project bindings;
+it does not create additional instances or synchronization cursors:
+
+```json
+{
+  "projects": [{
+    "project": "00000000-0000-0000-0000-000000000006",
+    "principal": "00000000-0000-0000-0000-000000000007",
+    "expertise_principal": "00000000-0000-0000-0000-000000000008",
+    "expertise_browser": true,
+    "expertise_output_destinations": ["local_human"]
+  }]
+}
+```
+
+Merge this fragment into the instance configuration. Each additional binding has
+its own `expertise_callers`, `expertise_output_destinations`,
+`expertise_model_destinations` and optional `expertise_model`; omitted fields use
+their safe defaults, never inherit another project's policy. At most 256 projects
+including the primary are accepted. Project IDs and configured answering service
+identities must be unique. Configure current exact-project permissions and local
+space grants separately; listing a project here grants no authority.
+
+All bindings share one ordered instance/space receive stream. Publication checks
+each originating project's current principal/review owner independently. A single
+mailbox worker resolves addressed collections locally to exactly one configured
+project and its dedicated answerer. An ambiguous collection ID is denied rather
+than answered with another project's knowledge. HTTP paths still select the exact
+local project. Separate instances/databases remain the isolation boundary between
+knowledge areas.
+
+Cloud MCP callers need an operator-bound identity and output-destination policy
+in that project's `expertise_callers`, plus separately reviewed collection consent
+for that destination. The `local_human` default does not authorize cloud disclosure.
+
 The gateway configuration is separate. Start only
 `memory-federation-gateway /absolute/path/gateway.json`, with a dedicated,
 pre-provisioned database and a non-owner restricted SQL login. The binary never

@@ -2,6 +2,7 @@
 //! Explicit publication/review repository APIs and opt-in worker lifecycle.
 //! Local workflow handlers share only the administrator-enrolled instance.
 mod expertise;
+mod projects;
 pub mod workflow;
 use crate::AppState;
 use mem_federation::publication::{InstanceId, SpaceId};
@@ -29,6 +30,9 @@ enum WorkerConfig {
         instance: InstanceId,
         project: Uuid,
         principal: Uuid,
+        /// Additional local projects share this instance's ordered stream.
+        #[serde(default)]
+        projects: Vec<projects::ProjectBinding>,
         #[serde(default)]
         expertise_principal: Option<Uuid>,
         #[serde(default)]
@@ -56,6 +60,7 @@ pub(crate) type Registry = Arc<RwLock<Option<Arc<ConfiguredInstance>>>>;
 
 #[derive(Clone)]
 pub(crate) struct ConfiguredInstance {
+    projects: std::collections::BTreeMap<Uuid, projects::ProjectBinding>,
     project: Uuid,
     space: SpaceId,
     instance: InstanceId,
@@ -153,6 +158,7 @@ pub(crate) async fn start(
             instance,
             project,
             principal,
+            projects,
             expertise_principal,
             expertise_browser,
             expertise_callers,
@@ -197,6 +203,17 @@ pub(crate) async fn start(
                 expertise_principal != Some(principal),
                 "expertise requires a separate project-scoped service identity"
             );
+            let primary = projects::ProjectBinding {
+                project,
+                principal,
+                expertise_principal,
+                expertise_browser,
+                expertise_callers: expertise_callers.clone(),
+                expertise_output_destinations: expertise_output_destinations.clone(),
+                expertise_model_destinations: expertise_model_destinations.clone(),
+                expertise_model: expertise_model.clone(),
+            };
+            let bindings = projects::validate_bindings(primary, projects)?;
             let ca = gateway_ca_file
                 .as_deref()
                 .map(mem_federation_runtime::root_certificate)
@@ -225,6 +242,11 @@ pub(crate) async fn start(
                     .expect("federation registry poisoned");
                 anyhow::ensure!(registry.is_none(), "federation runtime already registered");
                 *registry = Some(Arc::new(ConfiguredInstance {
+                    projects: bindings
+                        .iter()
+                        .skip(1)
+                        .map(|b| (b.project, b.clone()))
+                        .collect(),
                     project,
                     space,
                     instance,
@@ -237,8 +259,13 @@ pub(crate) async fn start(
                     expertise_model,
                 }));
             }
-            if expertise_enabled {
+            if expertise_enabled
+                || bindings
+                    .iter()
+                    .any(projects::ProjectBinding::expertise_enabled)
+            {
                 let maintenance_state = state.clone();
+                let maintenance_projects: Vec<_> = bindings.iter().map(|b| b.project).collect();
                 tasks.push(tokio::spawn(async move {
                     loop {
                         let cleanup = async {
@@ -246,10 +273,12 @@ pub(crate) async fn start(
                                 .pool()
                                 .map_err(|_| anyhow::anyhow!("database unavailable"))?;
                             let mut tx = pool.begin().await?;
-                            mem_federation_store::cleanup_expertise_requests(&mut tx, project)
-                                .await?;
-                            mem_federation_store::cleanup_expertise_results(&mut tx, project)
-                                .await?;
+                            for project in &maintenance_projects {
+                                mem_federation_store::cleanup_expertise_requests(&mut tx, *project)
+                                    .await?;
+                                mem_federation_store::cleanup_expertise_results(&mut tx, *project)
+                                    .await?;
+                            }
                             tx.commit().await?;
                             Ok::<(), anyhow::Error>(())
                         };
@@ -263,38 +292,60 @@ pub(crate) async fn start(
                     }
                 }));
             }
-            if let Some(expertise_principal) = expertise_principal {
-                tasks.push(expertise::start(
+            let answerers: Vec<_> = bindings
+                .iter()
+                .filter_map(|b| {
+                    b.expertise_principal
+                        .map(|principal| (b.project, principal))
+                })
+                .collect();
+            if !answerers.is_empty() {
+                tasks.push(expertise::start_projects(
                     state.clone(),
                     sync.clone(),
-                    expertise_principal,
-                    project,
+                    answerers,
                 ));
             }
             let worker_state = state.clone();
             tasks.push(tokio::spawn(async move {
                 let state = worker_state;
-                let mut after = Uuid::nil();
+                let mut after = vec![Uuid::nil(); bindings.len()];
                 loop {
-                    match crate::auth::federation_local_access(&state,principal,project).await {
-                        Ok(access)=>{if sync.cycle(&access).await.is_err() {tracing::warn!("federation instance work paused/retrying; inspect durable synchronization status");}}
-                        Err(_)=>{
-                            if sync.note_local_authorization_failure().await.is_err() {
-                                tracing::warn!("cannot persist federation authorization pause");
+                    let mut cycled = false;
+                    for (index, binding) in bindings.iter().enumerate() {
+                        let project = binding.project;
+                        let principal = binding.principal;
+                        if let Ok(access) = crate::auth::federation_local_access(&state, principal, project).await {
+                            let allowed = if let Ok(pool) = state.pool() {
+                                mem_federation_store::authorize_source_pull(&pool, &access, space, instance).await.is_ok()
+                            } else { false };
+                            // A revoked first project must not starve another
+                            // explicitly authorized project of synchronization.
+                            let outcome = if allowed && !cycled {
+                                // Exactly one receive cycle owns the common cursor each tick.
+                                cycled = true;
+                                sync.cycle(&access).await
+                            } else {
+                                sync.publish_pending(&access).await
+                            };
+                            if outcome.is_err() {
+                                tracing::warn!("federation instance work paused/retrying; inspect durable synchronization status");
                             }
-                            tracing::warn!("federation local principal is not authorized");
+                        }
+                        // Keyset round-robin: one additional review owner per tick.
+                        // Never borrow the worker's permissions to publish user work.
+                        if let Ok(Some(owner)) = next_owner(&state, project, space, instance, principal, after[index]).await {
+                            after[index] = owner;
+                            if let Ok(access) = crate::auth::federation_local_access(&state, owner, project).await
+                                && sync.publish_pending(&access).await.is_err() {
+                                tracing::warn!("federation review owner's work paused/retrying");
+                            }
+                        } else {
+                            after[index] = Uuid::nil();
                         }
                     }
-                    // Keyset round-robin: one additional review owner per tick.
-                    // Never borrow the worker's permissions to publish user work.
-                    if let Ok(Some(owner)) = next_owner(&state, project, space, instance, principal, after).await {
-                        after = owner;
-                        if let Ok(access) = crate::auth::federation_local_access(&state, owner, project).await
-                            && sync.publish_pending(&access).await.is_err() {
-                            tracing::warn!("federation review owner's work paused/retrying");
-                        }
-                    } else {
-                        after = Uuid::nil();
+                    if !cycled && sync.note_local_authorization_failure().await.is_err() {
+                        tracing::warn!("cannot persist federation authorization pause");
                     }
                     tokio::time::sleep(Duration::from_secs(2)).await;
                 }

@@ -179,6 +179,7 @@ pub(super) async fn app(
     .await
     .unwrap();
     let runtime = Arc::new(ConfiguredInstance {
+        projects: Default::default(),
         expertise_browser: false,
         expertise_callers: vec![],
         expertise_output_destinations: crate::federation::local_output(),

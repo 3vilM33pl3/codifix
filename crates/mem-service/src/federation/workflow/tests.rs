@@ -15,6 +15,7 @@ mod enrollment;
 mod f1_instances;
 #[cfg(unix)]
 mod local_human_cli;
+mod project_bindings;
 mod requester;
 mod status_health;
 mod synchronization;
@@ -452,6 +453,7 @@ impl Fixture {
         .await
         .unwrap();
         let runtime = Arc::new(ConfiguredInstance {
+            projects: Default::default(),
             expertise_browser,
             expertise_callers: vec![],
             expertise_output_destinations: super::super::local_output(),

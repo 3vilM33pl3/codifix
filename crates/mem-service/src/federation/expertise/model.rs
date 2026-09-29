@@ -117,7 +117,8 @@ pub(super) async fn answer(
         .read()
         .expect("federation registry poisoned")
         .as_ref()
-        .and_then(|r| r.expertise_model.clone())
+        .and_then(|r| r.for_project(project))
+        .and_then(|r| r.expertise_model)
         .ok_or_else(|| anyhow::anyhow!("expertise model disabled"))?;
     config.validate_consent(&lease.question)?;
     if config.validate_for(state, &lease.question).is_err() {

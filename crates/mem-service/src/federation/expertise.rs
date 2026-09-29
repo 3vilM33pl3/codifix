@@ -11,28 +11,37 @@ use sqlx::{Postgres, Transaction};
 use std::time::Duration;
 use uuid::Uuid;
 
+#[cfg(test)]
 pub(super) fn start(
     state: AppState,
     sync: InstanceSync,
     principal: Uuid,
     project: Uuid,
 ) -> tokio::task::JoinHandle<()> {
+    start_projects(state, sync, vec![(project, principal)])
+}
+
+pub(super) fn start_projects(
+    state: AppState,
+    sync: InstanceSync,
+    answerers: Vec<(Uuid, Uuid)>,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         // Both loops belong to this task: abort/drop cancels both without
         // detached work. A slow answer cannot starve a live delivery challenge.
         tokio::join!(
-            run(&state, &sync, principal, project, false),
-            run(&state, &sync, principal, project, true)
+            run(&state, &sync, &answerers, false),
+            run(&state, &sync, &answerers, true)
         );
     })
 }
-async fn run(state: &AppState, sync: &InstanceSync, principal: Uuid, project: Uuid, answer: bool) {
+async fn run(state: &AppState, sync: &InstanceSync, answerers: &[(Uuid, Uuid)], answer: bool) {
     loop {
         let work = async {
             if answer {
-                answer_cycle(state, sync, principal, project).await
+                answer_cycle(state, sync, answerers).await
             } else {
-                cycle(state, sync, principal, project).await
+                cycle(state, sync, answerers).await
             }
         };
         let outcome = tokio::time::timeout(Duration::from_secs(12), work).await;
@@ -47,8 +56,7 @@ async fn run(state: &AppState, sync: &InstanceSync, principal: Uuid, project: Uu
 async fn answer_cycle(
     state: &AppState,
     sync: &InstanceSync,
-    principal: Uuid,
-    project: Uuid,
+    answerers: &[(Uuid, Uuid)],
 ) -> anyhow::Result<()> {
     let pool = state
         .pool()
@@ -60,11 +68,12 @@ async fn answer_cycle(
     sqlx::query("SET LOCAL statement_timeout='3s'")
         .execute(&mut *tx)
         .await?;
-    let current = access(state, &mut tx, principal, project).await?;
     let Some(lease) = sync.claim_expertise_question().await? else {
         tx.rollback().await?;
         return Ok(());
     };
+    let (project, principal) = collection_binding(&mut tx, &lease.question, answerers).await?;
+    let current = access(state, &mut tx, principal, project).await?;
     let work = async {
         output_policy(state, project, &lease.question)?;
         let (snapshot, ad) = mem_federation_store::eligible_question_collection(
@@ -124,8 +133,7 @@ async fn answer_cycle(
 async fn cycle(
     state: &AppState,
     sync: &InstanceSync,
-    principal: Uuid,
-    project: Uuid,
+    answerers: &[(Uuid, Uuid)],
 ) -> anyhow::Result<()> {
     let pool = state
         .pool()
@@ -137,14 +145,37 @@ async fn cycle(
     sqlx::query("SET LOCAL statement_timeout='3s'")
         .execute(&mut *tx)
         .await?;
-    let access = access(state, &mut tx, principal, project).await?;
     if let Some(lease) = sync.claim_expertise_delivery().await? {
+        let (project, principal) = collection_binding(&mut tx, &lease.question, answerers).await?;
+        let access = access(state, &mut tx, principal, project).await?;
         output_policy(state, project, &lease.question)?;
         sync.authorize_expertise_delivery(&mut tx, &access, &lease)
             .await?;
     }
     tx.rollback().await?;
     Ok(())
+}
+
+async fn collection_binding(
+    tx: &mut Transaction<'_, Postgres>,
+    question: &mem_federation::expertise::ExpertiseQuestion,
+    answerers: &[(Uuid, Uuid)],
+) -> anyhow::Result<(Uuid, Uuid)> {
+    // Gateway addressing is instance/collection, not a caller-selected local
+    // project. Resolve the owner from our own immutable collection registration.
+    // More than one project with the same collection ID is ambiguous and denied.
+    let projects: Vec<Uuid> = sqlx::query_scalar("SELECT project_id FROM federation_expertise_collections WHERE space=$1 AND owner=$2 AND collection=$3 LIMIT 2 FOR SHARE")
+        .bind(question.space.as_uuid()).bind(question.capability.publisher.as_uuid())
+        .bind(question.capability.id.as_uuid()).fetch_all(&mut **tx).await?;
+    anyhow::ensure!(
+        projects.len() == 1,
+        "expertise collection project unavailable or ambiguous"
+    );
+    answerers
+        .iter()
+        .find(|(project, _)| *project == projects[0])
+        .copied()
+        .ok_or_else(|| anyhow::anyhow!("expertise collection has no configured project answerer"))
 }
 fn output_policy(
     state: &AppState,
@@ -157,6 +188,7 @@ fn output_policy(
         .expect("federation registry poisoned");
     let runtime = registry
         .as_ref()
+        .and_then(|runtime| runtime.for_project(project))
         .ok_or_else(|| anyhow::anyhow!("expertise policy unavailable"))?;
     anyhow::ensure!(
         runtime.project == project
@@ -215,6 +247,54 @@ pub(super) async fn access(
 mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
+    #[tokio::test]
+    async fn collection_address_selects_only_its_configured_project_answerer() {
+        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
+            return;
+        };
+        let project = Uuid::new_v4();
+        let other = Uuid::new_v4();
+        let answerer = Uuid::new_v4();
+        let now = chrono::Utc::now();
+        let q: mem_federation::expertise::ExpertiseQuestion = serde_json::from_value(serde_json::json!({
+            "request_id": Uuid::new_v4(), "space": Uuid::new_v4(), "requester": Uuid::new_v4(),
+            "principal": Uuid::new_v4(), "capability": {"publisher": Uuid::new_v4(), "id": Uuid::new_v4()},
+            "revision": 1, "collection_digest": {"algorithm":"sha256", "hex":"a".repeat(64)},
+            "question":"synthetic", "mode":"deterministic", "model_destination":null,
+            "output_destination":"local_human", "created_at":now, "expires_at": now + chrono::Duration::seconds(120)
+        })).unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        for p in [project, other] {
+            sqlx::query("INSERT INTO federation_expertise_collections(space,owner,project_id,collection,revision) VALUES($1,$2,$3,$4,1)")
+                .bind(q.space.as_uuid()).bind(q.capability.publisher.as_uuid()).bind(p)
+                .bind(q.capability.id.as_uuid()).execute(&mut *tx).await.unwrap();
+            if p == project {
+                assert!(
+                    collection_binding(&mut tx, &q, &[(other, Uuid::new_v4())])
+                        .await
+                        .is_err()
+                );
+                assert_eq!(
+                    collection_binding(
+                        &mut tx,
+                        &q,
+                        &[(project, answerer), (other, Uuid::new_v4())]
+                    )
+                    .await
+                    .unwrap(),
+                    (project, answerer)
+                );
+            } else {
+                assert!(
+                    collection_binding(&mut tx, &q, &[(project, answerer)])
+                        .await
+                        .is_err()
+                );
+            }
+        }
+        tx.rollback().await.unwrap();
+        db.cleanup().await.unwrap();
+    }
     #[tokio::test]
     async fn worker_authority_is_current_project_scoped_and_locked_through_release() {
         let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
