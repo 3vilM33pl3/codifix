@@ -115,10 +115,21 @@ async fn destination(conn: &mut PgConnection) -> Result<String> {
     let mut digest = Sha256::new();
     for table in TABLES {
         digest.update(table.as_bytes());
-        let mut last: Option<String> = None;
+        // Sort once inside the caller's transaction. Keyset paging on computed
+        // JSON would scan/sort the entire table again for every 256 rows.
+        // The fixed cursor is connection-local and closed before the next table;
+        // any failure rolls back the enclosing transaction and its cursor too.
+        sqlx::raw_sql(&format!(
+            "DECLARE memory_area_reconcile_digest NO SCROLL CURSOR FOR SELECT to_jsonb(t)::text FROM {table} t ORDER BY to_jsonb(t)::text COLLATE \"C\""
+        ))
+        .execute(&mut *conn)
+        .await?;
         loop {
-            let rows: Vec<String> = sqlx::query_scalar(&format!("SELECT to_jsonb(t)::text FROM {table} t WHERE ($1::text IS NULL OR to_jsonb(t)::text COLLATE \"C\" > $1 COLLATE \"C\") ORDER BY to_jsonb(t)::text COLLATE \"C\" LIMIT 256"))
-                .persistent(false).bind(&last).fetch_all(&mut *conn).await?;
+            let rows: Vec<String> =
+                sqlx::query_scalar("FETCH FORWARD 256 FROM memory_area_reconcile_digest")
+                    .persistent(false)
+                    .fetch_all(&mut *conn)
+                    .await?;
             if rows.is_empty() {
                 break;
             }
@@ -126,10 +137,53 @@ async fn destination(conn: &mut PgConnection) -> Result<String> {
                 digest.update((row.len() as u64).to_be_bytes());
                 digest.update(row.as_bytes());
             }
-            last = rows.last().cloned();
         }
+        sqlx::raw_sql("CLOSE memory_area_reconcile_digest")
+            .execute(&mut *conn)
+            .await?;
     }
     Ok(format!("{:x}", digest.finalize()))
+}
+
+#[cfg(test)]
+mod digest_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cursor_digest_matches_reference_across_batches_and_repeated_calls() {
+        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
+            return;
+        };
+        let mut tx = db.pool.begin().await.expect("disposable transaction");
+        sqlx::raw_sql("INSERT INTO projects(id,slug,name,root_path) SELECT gen_random_uuid(), 'digest-' || i, 'Synthetic ' || i, '/synthetic' FROM generate_series(1,777) i")
+            .execute(&mut *tx).await.expect("multi-batch synthetic projects");
+        let mut reference = Sha256::new();
+        for table in TABLES {
+            reference.update(table.as_bytes());
+            let rows: Vec<String> = sqlx::query_scalar(&format!(
+                "SELECT to_jsonb(t)::text FROM {table} t ORDER BY to_jsonb(t)::text COLLATE \"C\""
+            ))
+            .persistent(false)
+            .fetch_all(&mut *tx)
+            .await
+            .expect("reference rows");
+            for row in rows {
+                reference.update((row.len() as u64).to_be_bytes());
+                reference.update(row.as_bytes());
+            }
+        }
+        let reference = format!("{:x}", reference.finalize());
+        assert_eq!(
+            destination(&mut tx).await.expect("cursor digest"),
+            reference
+        );
+        assert_eq!(
+            destination(&mut tx).await.expect("closed cursor reused"),
+            reference
+        );
+        tx.rollback().await.expect("rollback synthetic rows");
+        db.cleanup().await.expect("disposable database cleanup");
+    }
 }
 
 async fn current_json(conn: &mut PgConnection, row: &InputRow<'_>) -> Result<Option<String>> {
