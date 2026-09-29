@@ -77,3 +77,38 @@ After that result, Monolith must independently:
 
 Until those checks pass, this evidence establishes working federation history,
 not a completed live expertise exchange or customer readiness.
+
+## V8 review stop and corrected retry
+
+The CA correctly stopped v8 before activation because the instruction described
+the ownership ledger's `reviewed_content_sha256` as though it were the digest of
+the collection's `MemoryContent` object. Those values use different inputs:
+
+- `bb195e6275660677ef8ce5a994d4f305722db2722d77ce66ea5e7ad3cba65061`
+  is the snapshot migration ledger's stable hash of the redacted full-history
+  review object;
+- `a5780f572e73e0f5ce8146af655512a3a5eaab7bc2dda5f2ec274257614abc0c`
+  is the canonical JSON SHA-256 of the exact collection `MemoryContent` object.
+
+Monolith independently reconstructed the latter from the snapshot-bound memory
+row and sorted tag rows. It includes integer confidence `960000` parts per
+million, rather than the source database's floating representation. The result
+exactly matches the CA's independently derived content-object hash. The CA also
+reported the expected canonical/version, one-entry snapshot, zero evidence and
+exact blueprint policy. This establishes a hash-contract mismatch in the v8
+instruction, not evidence of changed source content.
+
+Instruction `monolith-ca-20260929-trust-capability-activation-v9` supersedes v8
+and directs the CA to reuse the retained exact draft:
+
+- draft request: `c82918ee-5f3d-4088-8622-c31ce3ae1f0e`;
+- snapshot/collection digest:
+  `0d7c2fff770ccecac145383269a8ad243946ce52ec887d2ad37b4795ccbac94d`;
+- review digest:
+  `de65840224e8a1080841934e62f10462f9a9603bbcb00164bbcfd2ed5053172d`.
+
+The v8 run committed no answerer, local grant, collection consent,
+advertisement or publication. It restored the Trust configuration byte-for-byte
+and left federation synchronized through sequence 14. Therefore the stable
+provision/grant request identifiers remain unused and the proposed collection
+revision remains 1.
