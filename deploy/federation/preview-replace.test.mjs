@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { artifactHash, execute, validateBoundary } from './preview-replace.mjs';
+import { artifactHash, execute, validate, validateBoundary } from './preview-replace.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const oldId = 'a'.repeat(64), newId = 'b'.repeat(64), imageId = `sha256:${'c'.repeat(64)}`;
@@ -144,4 +144,49 @@ test('active operation lock and false no-new-privileges policy fail closed', t =
   fs.writeFileSync(path.join(c.directory, 'operation-lock.json'), '{"pid":1}', { mode: 0o600 });
   assert.throws(() => execute(c, 'review', undefined, docker), /owner_reconciliation/);
   before.HostConfig.SecurityOpt = ['no-new-privileges=false']; assert.throws(() => validateBoundary(before), /boundary/);
+});
+
+test('rc2 replacement retains the immediately prior container without touching historical retained containers', t => {
+  const { c, docker, before } = fixture(t);
+  c.retained_name = `${c.name}-before-rc2`;
+  const historical = structuredClone(before), historicalId = 'd'.repeat(64);
+  historical.Id = historicalId; historical.Name = `/${c.name}-before-dependable`; historical.State.Running = false;
+  docker.containers.set(historicalId, historical);
+  const review = execute(c, 'review', undefined, docker);
+  assert.equal(execute(c, 'replace', review.review, docker).started, true);
+  assert.equal(docker.containers.get(oldId).Name, `/${c.retained_name}`);
+  assert.deepEqual(docker.containers.get(historicalId), historical);
+  assert.ok(fs.existsSync(path.join(c.directory, 'start-intent.json')));
+  assert.ok(!docker.commands.some(args => args.includes(historicalId)));
+});
+
+test('rc2 retained names remain narrowly scoped and bind the exact reviewed contract', t => {
+  const { c, docker } = fixture(t);
+  for (const suffix of ['before-rc3', 'before-rc2-extra', 'unconfirmed-rc2', '../elsewhere', 'before-RC2'])
+    assert.throws(() => validate({ ...c, retained_name: `${c.name}-${suffix}` }), /invalid_recovery_directory/);
+  const review = execute(c, 'review', undefined, docker);
+  assert.throws(() => execute({ ...c, retained_name: `${c.name}-before-rc2` }, 'replace', review.review, docker), /exact_review_required/);
+  assert.ok(!docker.commands.some(args => args[0] === 'stop'));
+});
+
+test('rc2 pre-start recovery uses its own retained namespace', t => {
+  const { c, docker } = fixture(t); c.retained_name = `${c.name}-before-rc2`;
+  const review = execute(c, 'review', undefined, docker);
+  docker.failOnce(args => args[0] === 'create', true);
+  assert.throws(() => execute(c, 'replace', review.review, docker), /synthetic_unconfirmed/);
+  assert.equal(execute(c, 'restore-old', review.review, docker).restored_old, oldId);
+  assert.equal(docker.containers.get(newId).Name, `/${c.name}-unconfirmed-rc2`);
+});
+
+test('rc2 possible startup requires forward recovery even if start acknowledgement is lost', t => {
+  for (const after of [false, true]) {
+    const { c, docker } = fixture(t); c.retained_name = `${c.name}-before-rc2`;
+    const review = execute(c, 'review', undefined, docker);
+    docker.failOnce(args => args[0] === 'start', after);
+    assert.throws(() => execute(c, 'replace', review.review, docker), /synthetic_unconfirmed/);
+    const commandCount = docker.commands.length;
+    assert.throws(() => execute(c, 'restore-old', review.review, docker), /post_start_requires_forward_recovery/);
+    assert.equal(docker.commands.length, commandCount);
+    assert.equal(docker.containers.get(oldId).State.Running, false);
+  }
 });

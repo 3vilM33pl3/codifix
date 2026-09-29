@@ -18,6 +18,8 @@ function run(args) {
 }
 const label = 'dev.memory-layer.preview-replace.review';
 const oldLabel = 'dev.memory-layer.preview-replace.old-id';
+const rc2 = c => c.retained_name === `${c.name}-before-rc2`;
+const unconfirmedName = c => `${c.name}-unconfirmed-${rc2(c) ? 'rc2' : 'dependable'}`;
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const sorted = values => [...values].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 function dir(p) {
@@ -51,7 +53,8 @@ export function artifactHash(p) {
 }
 export function validate(c, checkPaths = true) {
   check(c.schema_version === 1 && hex.test(c.old_id) && names.test(c.name), 'invalid_target');
-  check(c.retained_name === `${c.name}-before-dependable` && path.isAbsolute(c.directory) && path.basename(c.directory).startsWith('replace-'), 'invalid_recovery_directory');
+  check([`${c.name}-before-dependable`, `${c.name}-before-rc2`].includes(c.retained_name)
+    && path.isAbsolute(c.directory) && path.basename(c.directory).startsWith('replace-'), 'invalid_recovery_directory');
   check(path.isAbsolute(c.backup_receipt) && hex.test(c.backup_receipt_sha256), 'backup_binding_required');
   check(Array.isArray(c.mounts) && c.mounts.length > 0 && new Set(c.mounts.map(m => m.destination)).size === c.mounts.length, 'invalid_mount_plan');
   for (const m of c.mounts) {
@@ -132,7 +135,7 @@ function checkNetworks(v, old, docker, complete = false) {
 }
 function createdBoundary(v, c, old, approval, docker) {
   validateBoundary(v);
-  check(v.Image === old.image_id && [`/${c.name}`, `/${c.name}-unconfirmed-dependable`].includes(v.Name)
+  check(v.Image === old.image_id && [`/${c.name}`, `/${unconfirmedName(c)}`].includes(v.Name)
     && v.Config.Labels?.[label] === approval && v.Config.Labels?.[oldLabel] === c.old_id, 'replacement_identity_changed');
   check(equal(sorted(v.Config.Env ?? []), sorted(old.config.Env ?? [])) && equal(v.Config.Cmd ?? [], old.config.Cmd ?? [])
     && equal(v.Config.Entrypoint ?? [], old.config.Entrypoint ?? []) && v.Config.WorkingDir === old.config.WorkingDir
@@ -168,7 +171,7 @@ function executeLocked(c, phase, approval, docker) {
   if (phase === 'replace') {
     check(hash(JSON.stringify(snapshot(c, docker))) === hash(JSON.stringify(old)), 'preview_changed_since_review');
     check(!fs.existsSync(`${c.directory}/intent.json`), 'existing_intent_requires_reconciliation');
-    check(!named(c.retained_name, docker) && !named(`${c.name}-unconfirmed-dependable`, docker), 'retained_name_already_in_use');
+    check(!named(c.retained_name, docker) && !named(unconfirmedName(c), docker), 'retained_name_already_in_use');
     check(JSON.parse(docker.run(['image', 'inspect', old.image_id]))[0].Id === old.image_id, 'immutable_image_unavailable');
     const environment = `${c.directory}/environment.list`;
     writeBytes(environment, old.config.Env.join('\n') + '\n');
@@ -192,6 +195,10 @@ function executeLocked(c, phase, approval, docker) {
     docker.run(['network', 'disconnect', 'none', id]);
     for (const n of old.networks) connect(n, id, docker);
     const ready = docker.inspect(id); createdBoundary(ready, c, old, approval, docker); checkNetworks(ready, old, docker, true);
+    // rc.2 may migrate the database or publish immediately at startup. Once a
+    // start is possible, the retained older executable is no longer a safe
+    // rollback even if Docker's acknowledgement is lost.
+    if (rc2(c)) write(`${c.directory}/start-intent.json`, { review: approval, id, old_id: c.old_id });
     docker.run(['start', id]);
     const started = docker.inspect(id); createdBoundary(started, c, old, approval, docker); checkNetworks(started, old, docker, true);
     check(started.State.Running, 'replacement_start_unconfirmed');
@@ -201,6 +208,8 @@ function executeLocked(c, phase, approval, docker) {
   if (phase === 'restore-old') {
     const intent = JSON.parse(read(`${c.directory}/intent.json`));
     check(intent.review === approval && intent.old_id === c.old_id, 'replacement_intent_required');
+    if (rc2(c)) check(!fs.existsSync(`${c.directory}/start-intent.json`)
+      && !fs.existsSync(`${c.directory}/started.json`), 'post_start_requires_forward_recovery');
     let prior = docker.inspect(c.old_id); retainedBoundary(prior, c, old, docker);
     let replacement;
     if (fs.existsSync(`${c.directory}/created.json`)) {
@@ -208,19 +217,20 @@ function executeLocked(c, phase, approval, docker) {
       check(created.review === approval && created.old_id === c.old_id && hex.test(created.id) && created.id !== c.old_id, 'creation_receipt_changed');
       replacement = created.id;
     } else {
-      const candidate = named(c.name, docker) ?? named(`${c.name}-unconfirmed-dependable`, docker);
+      const candidate = named(c.name, docker) ?? named(unconfirmedName(c), docker);
       if (candidate && candidate !== c.old_id) replacement = candidate;
     }
     if (replacement) {
       const live = docker.inspect(replacement); createdBoundary(live, c, old, approval, docker);
+      if (rc2(c)) check(!live.State.Running, 'post_start_requires_forward_recovery');
       if (!fs.existsSync(`${c.directory}/created.json`) && !fs.existsSync(`${c.directory}/reconciled-created.json`))
         write(`${c.directory}/reconciled-created.json`, { review: approval, id: replacement, old_id: c.old_id, observed_only: true });
       if (live.State.Running) docker.run(['stop', '--time', '30', replacement]);
       docker.run(['update', '--restart=no', replacement]);
       for (const n of old.networks) if (live.NetworkSettings.Networks[n.name]) docker.run(['network', 'disconnect', n.id, replacement]);
       if (live.Name === `/${c.name}`) {
-        check(!named(`${c.name}-unconfirmed-dependable`, docker), 'unconfirmed_name_already_in_use');
-        docker.run(['rename', replacement, `${c.name}-unconfirmed-dependable`]);
+        check(!named(unconfirmedName(c), docker), 'unconfirmed_name_already_in_use');
+        docker.run(['rename', replacement, unconfirmedName(c)]);
       }
     }
     prior = docker.inspect(c.old_id); retainedBoundary(prior, c, old, docker);
@@ -239,5 +249,5 @@ function executeLocked(c, phase, approval, docker) {
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   process.umask(0o077);
   try { const [file, phase, approval] = process.argv.slice(2); console.log(JSON.stringify(execute(JSON.parse(read(file)), phase, approval))); }
-  catch (e) { console.error(JSON.stringify({ error: /^[a-z_]+$/.test(e.message) ? e.message : 'private_operation_unconfirmed', automatic_rollback: false, recovery: 'Inspect private intent, exact container identities and restore-old before retrying. A crash-held operation lock requires explicit owner reconciliation; never remove it while its process runs.' })); process.exitCode = 1; }
+  catch (e) { console.error(JSON.stringify({ error: /^[a-z_]+$/.test(e.message) ? e.message : 'private_operation_unconfirmed', automatic_rollback: false, recovery: 'Inspect private intent and exact container identities before retrying. For rc2, any start-intent requires forward recovery with the reviewed candidate; restore-old is only available before possible startup. A crash-held operation lock requires explicit owner reconciliation; never remove it while its process runs.' })); process.exitCode = 1; }
 }
