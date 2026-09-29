@@ -478,6 +478,55 @@ async fn actual_command_prepares_imports_and_reconciles_only_an_inactive_target(
         )["already_applied"],
         true
     );
+    let persisted: serde_json::Value =
+        sqlx::query_scalar("SELECT preview_json FROM area_reconciliation_receipts WHERE id=$1")
+            .bind(uuid::Uuid::from_u128(88888))
+            .fetch_one(&target.pool)
+            .await
+            .expect("immutable projection journal");
+    assert_eq!(persisted["format_version"], 2);
+    assert_eq!(persisted["projections"], review["preview"]["projections"]);
+    assert_eq!(
+        persisted["projections"]
+            .as_array()
+            .expect("projections")
+            .len(),
+        1
+    );
+    assert_eq!(
+        persisted["projections"][0]["binding"]["archived_task"]["record"]["key"],
+        support::id(3).to_string()
+    );
+    assert!(
+        persisted["projections"][0]["decision_sha256"]
+            .as_str()
+            .is_some_and(|s| s.len() == 64)
+    );
+    assert!(
+        !serde_json::to_string(&persisted)
+            .expect("journal JSON")
+            .contains(support::PRIVATE)
+    );
+    let mut forged = persisted.clone();
+    forged["projections"][0]["binding"]["archived_task"]["row_sha256"] = json!("0".repeat(64));
+    let forged: mem_area_store::reconciliation::Preview =
+        serde_json::from_value(forged).expect("synthetic forged projection");
+    let forged_path = dir.join("forged-provenance.json");
+    write(
+        &forged_path,
+        &serde_json::to_vec(&forged).expect("forged JSON"),
+    );
+    failure(
+        portable_cmd()
+            .args(["--execute", "--writers-stopped", "--archive-backed-up"])
+            .arg("--preview")
+            .arg(&forged_path)
+            .arg("--preview-sha256")
+            .arg(forged.digest().expect("forged digest"))
+            .output()
+            .expect("forged provenance replay"),
+        "invalid",
+    );
     target.cleanup().await.expect("synthetic operator fixture");
     original
         .cleanup()

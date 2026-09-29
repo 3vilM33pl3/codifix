@@ -30,6 +30,35 @@ pub struct Preview {
     pub partition_sha256: String,
     pub destination_sha256: String,
     pub rows: Vec<RowDecision>,
+    pub projections: Vec<ProjectionDecision>,
+}
+
+/// Exact reference-only provenance retained locally in the immutable operation
+/// journal. Original task bodies and source excerpts are never included.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectionDecision {
+    pub binding: mem_area::ProvenanceBinding,
+    pub decision_id: Uuid,
+    pub decision_sha256: String,
+    pub target_wire_sha256: String,
+    pub content: mem_area::ProjectedSourceContent,
+}
+
+fn projection_decisions(partition: &MaterializedPartition) -> Vec<ProjectionDecision> {
+    let mut values: Vec<_> = partition
+        .projected_sources()
+        .iter()
+        .map(|p| ProjectionDecision {
+            binding: p.binding().clone(),
+            decision_id: p.decision_id(),
+            decision_sha256: p.decision_sha256().into(),
+            target_wire_sha256: p.target_sha256().into(),
+            content: p.content().clone(),
+        })
+        .collect();
+    values.sort_by(|a, b| a.binding.source.record.cmp(&b.binding.source.record));
+    values
 }
 impl Preview {
     pub fn digest(&self) -> Result<String> {
@@ -145,47 +174,6 @@ async fn destination(conn: &mut PgConnection) -> Result<String> {
     Ok(format!("{:x}", digest.finalize()))
 }
 
-#[cfg(test)]
-mod digest_tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn cursor_digest_matches_reference_across_batches_and_repeated_calls() {
-        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
-            return;
-        };
-        let mut tx = db.pool.begin().await.expect("disposable transaction");
-        sqlx::raw_sql("INSERT INTO projects(id,slug,name,root_path) SELECT gen_random_uuid(), 'digest-' || i, 'Synthetic ' || i, '/synthetic' FROM generate_series(1,777) i")
-            .execute(&mut *tx).await.expect("multi-batch synthetic projects");
-        let mut reference = Sha256::new();
-        for table in TABLES {
-            reference.update(table.as_bytes());
-            let rows: Vec<String> = sqlx::query_scalar(&format!(
-                "SELECT to_jsonb(t)::text FROM {table} t ORDER BY to_jsonb(t)::text COLLATE \"C\""
-            ))
-            .persistent(false)
-            .fetch_all(&mut *tx)
-            .await
-            .expect("reference rows");
-            for row in rows {
-                reference.update((row.len() as u64).to_be_bytes());
-                reference.update(row.as_bytes());
-            }
-        }
-        let reference = format!("{:x}", reference.finalize());
-        assert_eq!(
-            destination(&mut tx).await.expect("cursor digest"),
-            reference
-        );
-        assert_eq!(
-            destination(&mut tx).await.expect("closed cursor reused"),
-            reference
-        );
-        tx.rollback().await.expect("rollback synthetic rows");
-        db.cleanup().await.expect("disposable database cleanup");
-    }
-}
-
 async fn current_json(conn: &mut PgConnection, row: &InputRow<'_>) -> Result<Option<String>> {
     let keys = match row.record.table.as_str() {
         "public.memory_tags" => &["memory_entry_id", "tag"][..],
@@ -237,7 +225,7 @@ async fn build(
         });
     }
     Ok(Preview {
-        format_version: 1,
+        format_version: 2,
         target_instance: target,
         area: partition.area(),
         source_instance: partition.source_instance(),
@@ -247,6 +235,7 @@ async fn build(
         partition_sha256: partition.partition_sha256().into(),
         destination_sha256: destination(conn).await?,
         rows: decisions,
+        projections: projection_decisions(partition),
     })
 }
 
@@ -280,10 +269,12 @@ pub async fn reconcile(
     writers_stopped: bool,
 ) -> Result<Receipt> {
     if !writers_stopped
+        || expected.format_version != 2
         || operation.is_nil()
         || expected.target_instance.is_nil()
         || expected.target_instance == partition.source_instance()
         || expected.conflicts() != 0
+        || expected.projections != projection_decisions(partition)
     {
         return Err(ImportError::Invalid);
     }
@@ -422,4 +413,45 @@ pub async fn reconcile(
         inserted,
         already_applied: false,
     })
+}
+
+#[cfg(test)]
+mod digest_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cursor_digest_matches_reference_across_batches_and_repeated_calls() {
+        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
+            return;
+        };
+        let mut tx = db.pool.begin().await.expect("disposable transaction");
+        sqlx::raw_sql("INSERT INTO projects(id,slug,name,root_path) SELECT gen_random_uuid(), 'digest-' || i, 'Synthetic ' || i, '/synthetic' FROM generate_series(1,777) i")
+            .execute(&mut *tx).await.expect("multi-batch synthetic projects");
+        let mut reference = Sha256::new();
+        for table in TABLES {
+            reference.update(table.as_bytes());
+            let rows: Vec<String> = sqlx::query_scalar(&format!(
+                "SELECT to_jsonb(t)::text FROM {table} t ORDER BY to_jsonb(t)::text COLLATE \"C\""
+            ))
+            .persistent(false)
+            .fetch_all(&mut *tx)
+            .await
+            .expect("reference rows");
+            for row in rows {
+                reference.update((row.len() as u64).to_be_bytes());
+                reference.update(row.as_bytes());
+            }
+        }
+        let reference = format!("{:x}", reference.finalize());
+        assert_eq!(
+            destination(&mut tx).await.expect("cursor digest"),
+            reference
+        );
+        assert_eq!(
+            destination(&mut tx).await.expect("closed cursor reused"),
+            reference
+        );
+        tx.rollback().await.expect("rollback synthetic rows");
+        db.cleanup().await.expect("disposable database cleanup");
+    }
 }

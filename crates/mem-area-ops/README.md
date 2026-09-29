@@ -218,6 +218,15 @@ duplicate keys, missing owned dependencies and unsafe evidence fields fail
 closed. The bundle is capped at 256 MiB; this profile is not a new network API,
 federation trust grant, fresh-target importer or automatic activation mechanism.
 
+Reconciliation preview format 2 stores every imported projection's full source,
+version and archived-task hash binding, decision ID/digest, safe content mode and
+target wire hash inside the immutable `area_reconciliation_receipts.preview_json`.
+These fields participate in preview approval and exact-replay verification. This
+operation journal is distinct from fresh import's `area_import_provenance`; it
+does not overwrite historical receipts or imply that current user interfaces
+render all archived-reference details. Earlier previews must be regenerated,
+not upgraded by inserting guessed provenance fields.
+
 Provision an independent local target with the exact supported migrations
 (explicitly supported heads 0056 through 0061), no application/worker connections and no prior knowledge,
 credentials, jobs or federation authority. Migration and writer fencing are
