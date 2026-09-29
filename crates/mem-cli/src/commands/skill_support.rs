@@ -362,6 +362,13 @@ pub(crate) fn simple_yaml_value(lines: &[&str], key: &str) -> Option<String> {
 
 pub(crate) fn discover_skill_template_dir() -> Option<PathBuf> {
     let mut candidates = Vec::new();
+    if let Some(path) = env::var_os("MEMORY_LAYER_SKILL_TEMPLATE") {
+        let path = PathBuf::from(path);
+        return (path.is_absolute() && path.is_dir()).then_some(path);
+    }
+    if let Some(path) = platform::current_exe_share_subdir("skill-template") {
+        candidates.push(path);
+    }
     candidates.push(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
@@ -369,9 +376,6 @@ pub(crate) fn discover_skill_template_dir() -> Option<PathBuf> {
             .join(".agents")
             .join("skills"),
     );
-    if let Some(path) = platform::current_exe_share_subdir("skill-template") {
-        candidates.push(path);
-    }
     if let Ok(data_home) = env::var("XDG_DATA_HOME") {
         candidates.push(
             PathBuf::from(data_home)
@@ -424,13 +428,7 @@ pub(crate) fn upgrade_project_skills(
     force: bool,
     dry_run: bool,
 ) -> Result<SkillUpgradeReport> {
-    let template_root = if dry_run {
-        discover_skill_template_dir()
-    } else {
-        download_github_skill_template()
-            .ok()
-            .or_else(discover_skill_template_dir)
-    };
+    let template_root = discover_skill_template_dir();
     upgrade_project_skills_with_template(repo_root, template_root, force, dry_run)
 }
 
@@ -638,6 +636,10 @@ pub(crate) fn format_github_skill_version_summary(report: &GitHubSkillVersionRep
 }
 
 pub(crate) fn download_github_skill_template() -> Result<PathBuf> {
+    if env::var_os("MEMORY_LAYER_SKILL_TEMPLATE").is_some() {
+        return discover_skill_template_dir()
+            .ok_or_else(|| anyhow::anyhow!("configured release skill template is unavailable"));
+    }
     let archive_url = github_archive_url();
     let bytes = read_url_or_file(&archive_url)
         .with_context(|| format!("download Memory Layer skill template from {archive_url}"))?;

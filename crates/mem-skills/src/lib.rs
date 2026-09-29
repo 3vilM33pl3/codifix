@@ -653,6 +653,15 @@ pub fn simple_yaml_value(lines: &[&str], key: &str) -> Option<String> {
 
 pub fn discover_skill_template_dir() -> Option<PathBuf> {
     let mut candidates = Vec::new();
+    // An operator may pin the exact authenticated release bundle. An invalid
+    // explicit selection must not fall back to another installation or main.
+    if let Some(path) = env::var_os("MEMORY_LAYER_SKILL_TEMPLATE") {
+        let path = PathBuf::from(path);
+        return (path.is_absolute() && path.is_dir()).then_some(path);
+    }
+    if let Some(path) = mem_platform::current_exe_share_subdir("skill-template") {
+        candidates.push(path);
+    }
     candidates.push(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
@@ -660,9 +669,6 @@ pub fn discover_skill_template_dir() -> Option<PathBuf> {
             .join(".agents")
             .join("skills"),
     );
-    if let Some(path) = mem_platform::current_exe_share_subdir("skill-template") {
-        candidates.push(path);
-    }
     if let Ok(data_home) = env::var("XDG_DATA_HOME") {
         candidates.push(
             PathBuf::from(data_home)
@@ -712,13 +718,9 @@ pub fn upgrade_project_skills(
     dry_run: bool,
     filter: SkillInventoryFilter,
 ) -> Result<SkillUpgradeReport> {
-    let template_root = if dry_run {
-        discover_skill_template_dir()
-    } else {
-        download_github_skill_template()
-            .ok()
-            .or_else(discover_skill_template_dir)
-    };
+    // Upgrade and dry-run must inspect the same local release. Fetching main
+    // here silently mixes the installed executable with an unrelated revision.
+    let template_root = discover_skill_template_dir();
     upgrade_project_skills_with_template(repo_root, template_root, force, dry_run, filter)
 }
 
@@ -852,6 +854,10 @@ pub fn read_skill_content(
 }
 
 pub fn download_github_skill_template() -> Result<PathBuf> {
+    if env::var_os("MEMORY_LAYER_SKILL_TEMPLATE").is_some() {
+        return discover_skill_template_dir()
+            .ok_or_else(|| anyhow::anyhow!("configured release skill template is unavailable"));
+    }
     let archive_url = env::var(GITHUB_ARCHIVE_ENV)
         .unwrap_or_else(|_| GITHUB_SKILL_TEMPLATE_ARCHIVE_URL.to_string());
     let bytes = read_http_url(&archive_url)?;
@@ -993,6 +999,42 @@ fn set_copied_file_permissions(_path: &Path, _mode: u32) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn release_template_override_never_downloads_or_falls_back() {
+        const CHILD: &str = "MEMORY_SKILL_PIN_TEST_CHILD";
+        if let Ok(mode) = env::var(CHILD) {
+            let expected = PathBuf::from(env::var_os("MEMORY_LAYER_SKILL_TEMPLATE").unwrap());
+            if mode == "valid" {
+                assert_eq!(discover_skill_template_dir(), Some(expected.clone()));
+                assert_eq!(download_github_skill_template().unwrap(), expected);
+            } else {
+                assert!(discover_skill_template_dir().is_none());
+                assert!(download_github_skill_template().is_err());
+            }
+            return;
+        }
+        let root = env::temp_dir().join(format!(
+            "memory-skill-pin-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir(&root).unwrap();
+        for (mode, path) in [("valid", root.clone()), ("missing", root.join("absent"))] {
+            let status = std::process::Command::new(env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "tests::release_template_override_never_downloads_or_falls_back",
+                ])
+                .env(CHILD, mode)
+                .env("MEMORY_LAYER_SKILL_TEMPLATE", path)
+                .env(GITHUB_ARCHIVE_ENV, "http://127.0.0.1:9/not-a-template")
+                .status()
+                .unwrap();
+            assert!(status.success());
+        }
+        fs::remove_dir(root).unwrap();
+    }
 
     #[test]
     fn skill_inventory_filter_defaults_to_memory_layer() {

@@ -2,7 +2,7 @@
 
 `memory upgrade` refreshes the repo-local Memory Layer skill bundle in the current project.
 
-Use it after installing a newer Memory Layer package or when `memory doctor` reports that project skills are missing, unversioned, older than the installed template, or older than the GitHub skill bundle.
+Use it after installing a newer Memory Layer package or when `memory doctor` reports that project skills are missing, unversioned, or older than the installed template.
 
 ## Common Usage
 
@@ -16,8 +16,8 @@ memory upgrade --force
 ## What It Does
 
 - compares `.agents/skills/` against the best available Memory skill template
-- downloads the current GitHub skill bundle for real upgrade runs when possible
-- falls back to the installed `skill-template` when GitHub is unavailable
+- uses the installed local `skill-template` for both dry-run and execution
+- never downloads `main` as a side effect of `memory upgrade`
 - reads the canonical shared bundle `version` from each `SKILL.md`
 - installs missing Memory-owned skills
 - replaces outdated, unversioned, or invalid-version Memory-owned skills
@@ -40,8 +40,7 @@ The Memory-owned skill set is:
 
 Template sources:
 
-- GitHub archive: `https://github.com/3vilM33pl3/memory/archive/refs/heads/main.zip`
-- cached GitHub template: user-local state directory under `skill-template-github/main`
+- Exact operator-selected release: `MEMORY_LAYER_SKILL_TEMPLATE` set to an absolute directory. A missing explicit directory fails closed rather than using another bundle.
 
 - Debian package: `/usr/share/memory-layer/skill-template/`
 - local Linux install script: `~/.local/share/memory-layer/skill-template/` unless `XDG_DATA_HOME` overrides it
@@ -58,4 +57,9 @@ memory upgrade --dry-run
 memory upgrade
 ```
 
-`memory doctor` also includes a `workflow.project_skills_github` check. If that check warns, `memory doctor --fix` downloads the current GitHub skill bundle and applies the same safe upgrade path. It still avoids force-replacing newer local skills.
+`memory doctor` also includes a `workflow.project_skills_github` comparison. A
+newer upstream version is informational for pinned deployments: update the
+authenticated release first, then run `memory upgrade` against its exact bundle.
+For the four-area cutover, archive existing Memory-owned skills and set
+`MEMORY_LAYER_SKILL_TEMPLATE` to the verified rc.2 bundle before repair. Unrelated
+skills remain untouched.

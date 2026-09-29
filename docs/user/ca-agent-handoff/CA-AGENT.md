@@ -103,8 +103,8 @@ preserve incomplete reports, failed checks and the exact helper/input hashes.
 Do not install a missing interpreter or tool to force this batch to pass.
 
 Collect any remaining safe metadata using the reviewed
-[`ca-preflight.sh`](references/deploy/areas/ca-preflight.sh) and its
-[interpretation guide](references/deploy/areas/CA-CONSOLE-HANDOFF.md). This older
+`ca-preflight.sh` (`references/deploy/areas/ca-preflight.sh`) and its
+interpretation guide (`references/deploy/areas/CA-CONSOLE-HANDOFF.md`). This older
 preflight can report the upstream Pi ARM64/glibc 2.43 mismatch even though the
 new Memory release was built for Debian 12/glibc 2.36. Those are different
 artifacts; do not relabel one result as the other's compatibility.
@@ -285,14 +285,14 @@ resources or approval.
    bootstrap administration and mutate state even in read-only service mode.
    Use a separate disposable local clone for approved application checks.
 5. Prepare the selected signed tree using
-   [instance.py](references/scripts/areas/releases/instance-README.md). Root-owned
+   instance.py (`references/scripts/areas/releases/instance-README.md`). Root-owned
    staging is required for later privileged installation. Its schema argument
    is an assertion; independently establish that the actual target is schema 60.
 6. Review exact protected configuration bytes based on
-   [`instance.toml.example`](references/deploy/areas/instance.toml.example). Keep
+   `instance.toml.example` (`references/deploy/areas/instance.toml.example`). Keep
    read-only, loopback-only operation and all background work, models, embeddings,
    reinforcement, offline replay, federation, MCP and telemetry disabled.
-7. Follow the [inactive first-installer](references/scripts/areas/releases/console-README.md)
+7. Follow the inactive first-installer (`references/scripts/areas/releases/console-README.md`)
    using independently authenticated root-owned tools and the exact reviewed
    configuration hash. No `sudo` execution of a caller-writable script. On an
    existing trusted root console, use the equivalent clean-environment root
@@ -323,7 +323,7 @@ backup hashes, explicit inactive state and remaining cutover gates.
 
 ## 5. Prepare and obtain separate final-cutover approval
 
-Use the [cutover runbook](references/docs/reviews/four-area-network/staging-cutover.md).
+Use the cutover runbook (`references/docs/reviews/four-area-network/staging-cutover.md`).
 The Monolith agent owns the authoritative shared-source snapshot/delta work;
 the CA agent owns native host/offline verification. Agree one writer-fencing
 scope. Stopping the CA singleton alone does not fence other direct/CLI/dev/prod
@@ -403,12 +403,12 @@ ignoring unavailable transfer data, native checks or operator decisions.
 
 ## Reference precedence
 
-The [signed release receipt](references/docs/reviews/four-area-network/signed-release-handoff.md)
+The signed release receipt (`references/docs/reviews/four-area-network/signed-release-handoff.md`)
 supersedes older statements that no coherent signed release exists. Historical
 preflight/installer documents remain useful for their tool contracts, but their
 old unsigned-candidate status does not describe `resources/release/`.
 Conversely, the later signature does **not** close their live deployment gates.
-Use the [staging evidence](references/docs/reviews/four-area-network/staging-evidence.md)
+Use the staging evidence (`references/docs/reviews/four-area-network/staging-evidence.md`)
 as historical evidence and the future-cutover guide for unresolved data/writer
 requirements. Do not edit the immutable signed handoff to reconcile old prose;
 record new evidence in this separate coordination package.
