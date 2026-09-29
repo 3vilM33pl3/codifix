@@ -229,3 +229,13 @@ their reconciled databases and evidence remain. Live Workshop and Homelab remain
 healthy at rc.1. General's initial three-record SCTP collection has received
 preliminary curated-content review only; its exact post-import service draft and
 final source hashes must still be reviewed before activation.
+
+Resume verification: the approved Memory checkpoint is still available. The
+six frozen software/common artifacts were rehashed successfully. The private
+final-delivery assembler passes seven offline tests, including rejection of
+unfenced baseline data, changed bytes, wrong recipient/snapshot bindings and
+premature CA-readiness claims. It accepts the existing CA-only encrypted/signed
+artifact transfer at `10.22.6.42:8444`, not arbitrary plain HTTP destinations.
+The final-delta workflow now pins the exact Bookworm release operators rather
+than an earlier local build. No unsigned package was installed, no source writer
+was stopped, and no source fence or final snapshot was executed in this resume.
