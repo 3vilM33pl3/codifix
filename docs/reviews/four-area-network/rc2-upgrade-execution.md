@@ -188,3 +188,44 @@ is workflow evidence, not retrieval-quality evaluation or an R3 result.
 
 Signing, final writer stop/delta, installation, new caller/collection activation
 and CA execution remain pending. No original database routing has switched.
+
+### Final packaging and CA inventory reconciliation
+
+Both final Debian-12 packages now pass ABI and offline smoke checks from the
+same frozen source. See [the build evidence](rc2-bookworm-build-evidence.md).
+The exact frozen plugin and updated CA procedure have separate digest-bound
+host-common archives; runtime artifacts were not rebuilt for documentation.
+They remain unsigned pending the final Trust delta. The ordinary administrator
+preflight verified the existing local PostgreSQL 17/main source, its dedicated
+non-superuser owner and database-scoped reader grant. It made no changes. The
+prepared cutover preserves those original settings and uses a hard writer fence
+before the final dump; default read-only alone is not treated as sufficient.
+
+CA inventory v11, recorded at 22:13:37Z, reports **547 versions / 498 histories**
+in the actual Trust database: 537 versions in Homelab and ten in 3DPrinting.
+All 547 version rows reportedly match the shared source exactly. This supersedes
+the earlier small-partition assumption; it does not mean all those records belong
+to Trust. The final ownership ledger must classify these existing copies before
+claiming area isolation. Additive reconciliation alone would retain foreign-area
+copies. Do not remove or tombstone them implicitly: preserve a verified encrypted
+CA backup, exact destination-only authority and provenance, then review a bounded
+quarantine disposition for source-identical copies owned elsewhere.
+
+The CA's legacy shared-database singleton remains active according to v11;
+its default CLI/TUI already points to the independent Trust service. CURRENT
+ACTION v12 requests only the scoped legacy-writer stop, with Trust kept available.
+This precedes the final source snapshot and therefore must not depend on delivery
+of the signed final-data bundle. No v12 completion report has yet been observed.
+
+Existing Workshop/Homelab containers explicitly override migration mode to
+`verify_only` and run non-owner application roles. Their prepared upgrade uses a
+separate short-lived, loopback-only schema initialization service with the
+existing owner channel, background/model/federation work disabled, and no host
+ports. Normal replacements retain `verify_only`; configuration alone cannot
+override the existing container environment. This step is prepared, not executed.
+
+Both disposable local-query services have been stopped after verification;
+their reconciled databases and evidence remain. Live Workshop and Homelab remain
+healthy at rc.1. General's initial three-record SCTP collection has received
+preliminary curated-content review only; its exact post-import service draft and
+final source hashes must still be reviewed before activation.
