@@ -27,6 +27,8 @@ pub(crate) struct RuntimeStatusResponse {
     pub(crate) generated_at: chrono::DateTime<chrono::Utc>,
     pub(crate) project: String,
     pub(crate) profile: String,
+    pub(crate) area: Option<mem_config::AreaIdentityConfig>,
+    pub(crate) federation_configured: bool,
     pub(crate) agent_workspaces: AgentWorkspaceListResponse,
     pub(crate) web: RuntimeComponentStatus,
     pub(crate) service: RuntimeComponentStatus,
@@ -240,6 +242,11 @@ pub(crate) async fn runtime_status(
         .display_version(env!("CARGO_PKG_VERSION"));
     let profile = state.config.profile;
     let profile_label = profile.to_string();
+    let area = state.config.area.clone();
+    let federation_configured = state
+        .federation
+        .read()
+        .is_ok_and(|runtime| runtime.is_some());
     let startup_at = state.startup_at;
     let watchers = Arc::clone(&state.watchers);
     let provenance_runtime = Arc::clone(&state.provenance);
@@ -343,6 +350,8 @@ pub(crate) async fn runtime_status(
             generated_at: chrono::Utc::now(),
             project,
             profile: profile_label,
+            area,
+            federation_configured,
             agent_workspaces,
             web: RuntimeComponentStatus {
                 version: version.clone(),

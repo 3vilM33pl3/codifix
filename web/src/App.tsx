@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { authLoginUrl, fetchServiceReadOnly, getAuthMe, logout } from "./api";
 
 import { HelpPanel } from "./components/HelpPanel";
+import { AreaRuntimeStatus } from "./components/AreaRuntimeStatus";
 import { RuntimeSkillsStatus } from "./components/RuntimeSkillsStatus";
 import { ActivityTab } from "./features/activity/ActivityTab";
 import { AgentsTab } from "./features/agents/AgentsTab";
@@ -280,6 +281,7 @@ export default function App() {
       <section className="status-strip" aria-label="Service status">
         <span className={`status-pill status-${connectionState}`}>{connectionState}</span>
         <span><strong>{overview.project}</strong></span>
+        <AreaRuntimeStatus status={runtimeStatus} onOpenFederation={() => setTab("federation")} />
         <span>Web v{runtimeStatus?.web.version ?? serviceVersion} {runtimeStatus?.web.status ?? "ok"}</span>
         <span>Service v{runtimeServiceVersion} {runtimeStatus?.service.status ?? overview.service_status}</span>
         <span>Manager v{runtimeStatus?.manager.version ?? serviceVersion} {runtimeStatus?.manager.state ?? "unknown"}{runtimeStatus?.manager.detail ? ` ${runtimeStatus.manager.detail}` : ""}</span>

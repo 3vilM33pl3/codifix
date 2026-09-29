@@ -172,6 +172,14 @@ pub(crate) async fn start(
             disposable_test_mode,
         } => {
             anyhow::ensure!(
+                state
+                    .config
+                    .area
+                    .as_ref()
+                    .is_none_or(|area| area.instance_id == instance.as_uuid()),
+                "area identity does not match enrolled federation instance"
+            );
+            anyhow::ensure!(
                 !disposable_test_mode || cfg!(debug_assertions),
                 "cleartext fixture mode is prohibited in release builds"
             );

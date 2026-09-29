@@ -1277,6 +1277,8 @@ export interface RuntimeStatusResponse {
   generated_at: string;
   project: string;
   profile: string;
+  area?: { name: string; instance_id: string } | null;
+  federation_configured?: boolean;
   agent_workspaces: AgentWorkspaceListResponse;
   web: RuntimeComponentStatus;
   service: RuntimeComponentStatus;
