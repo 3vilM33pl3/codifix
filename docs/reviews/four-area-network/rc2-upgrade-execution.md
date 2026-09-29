@@ -134,3 +134,57 @@ exact replay, and hashes each target table in one ordered cursor scan.
 Production workspace Clippy passes; full all-target Clippy found test-only lint
 issues that were repaired and requires its final rerun. Native package checks
 and live CLI/TUI/MCP/federation acceptance remain pending.
+
+### Frozen release and complete-data rehearsal
+
+Final runtime source: `bf78efa20478881b5eff15713a0daa5f2b6d7cb4`; source archive
+SHA-256 `93dbd4c1a8a7bfbd194e01a0ef56085b8432c8d6cc30df4f64bc1f37ca092bab`.
+Single-user mode now accepts explicitly issued, project-scoped machine tokens
+without changing local browser login. Thirty required-database authentication
+tests and 17 federation regressions pass. Final workspace all-target Clippy,
+formatting and boundary checks pass. Bookworm Web tests pass (149).
+
+All 3,518,406 rows now have recorded dispositions in the private backlog ledger
+(file SHA-256 `b3939d89502c2727d67cbce5e07c1dcb9653f2b881c02e0647e5e8524c00b5d8`).
+Pending captures, proposals, raw sessions, cross-area relations and derived-data
+gaps remain explicitly pending/protected; this is not factual approval or a
+claim that archived material is searchable. The exact complete archive is
+encrypted and independently verified on the NAS.
+
+Disposable rehearsals, not live imports:
+
+| Area | Histories | Versions | Projects | Outcome |
+| --- | ---: | ---: | ---: | --- |
+| Workshop | 1,669 | 1,814 | 4 | Existing-target merge; 437,886 inserted rows; exact replay |
+| Homelab | 429 | 470 | 7 | Existing-target merge; 29,758 inserted rows; exact replay |
+| General | 900 | 980 | 34 | Fresh import; 26,804 rows including references; exact replay |
+
+Workshop and Homelab both retain byte-equivalent ordered contents of all 61
+authentication, federation and supervisor tables compared with their pre-merge
+dumps. General retains no imported authority: its four disabled supervisor
+defaults are migration seeds, not copied source grants. The bounded Trust-only
+bundle is encrypted to the already established CA recipient; ciphertext SHA-256
+`a93e01d3f0dbfaa8c8d9a36be973887180b3276d2b8fbdf35139bb02ff720624`.
+Workshop exceeds the portable profile's 256 MiB bound and uses the validated
+full-input local reconciliation command instead; that bound was not relaxed.
+
+Fresh coordinated preview backup ciphertext:
+`ad4789a829e55dce1ddbb71c31cddcd34fb8a7917fc438da767f76cfef548c81`.
+Its isolated restore matches all rows, schema, roles/grants and four sequences
+per database, along with identities and usage journals. Signed PDS verification
+covers 15 records and 15 audit receipts; accepted/published/cursor positions are
+all 15. Recovery evidence is retained under
+`/data/tmp/memory-preview-recovery-rc2-20260929`. The first backup attempt failed
+because GPG did not trust the existing recipient; its partial artifacts remain.
+The retry used a private wrapper accepting only that exact approved fingerprint,
+without modifying key identity or trust stores. Both previews are healthy again,
+credential maintenance is active and the expired paid worker remains stopped.
+
+Frozen-package local queries against reconciled validation clones return
+versioned source references. Workshop's probe returned three answer citations.
+Homelab's broad three-term probe correctly reported insufficient evidence;
+its exact `SigNoz` lookup returned seven results and one answer citation. This
+is workflow evidence, not retrieval-quality evaluation or an R3 result.
+
+Signing, final writer stop/delta, installation, new caller/collection activation
+and CA execution remain pending. No original database routing has switched.
