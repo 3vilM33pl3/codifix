@@ -14,7 +14,7 @@ import { archiveFraming } from './archive-framing.mjs';
 const AREAS = ['general', 'homelab', 'trust', 'workshop'];
 const HISTORICAL = ['_sqlx_migrations','curation_runs','memory_chunks','memory_entries','memory_relations','memory_sources','memory_tags','projects','raw_captures','sessions','tasks']
   .map(name => 'mab_full_20260516_150014.' + name);
-const TABLES = new Set([...SCHEMA60_TABLES, ...HISTORICAL]);
+const TABLES = new Set([...SCHEMA60_TABLES, 'public.area_reconciliation_receipts', ...HISTORICAL]);
 const sha = /^[0-9a-f]{64}$/;
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = () => { throw Error('Materialized source accounting failed; private diagnostics suppressed'); };
@@ -150,7 +150,7 @@ async function bound(b,maxBytes,json){
   if(!b||!same(Object.keys(b).sort(),['path','sha256'])||!isAbsolute(b.path??'')||!sha.test(b.sha256))fail();
   const r=await privateInput(b.path,maxBytes,json);if(r.sha256!==b.sha256)fail();return r.value;
 }
-export async function accountArchive(binding,state){
+export async function accountArchive(binding,state,onOriginal){
   await bound(binding,Infinity,false);const input=await open(binding.path,constants.O_RDONLY|constants.O_NOFOLLOW),bytes=createHash('sha256');
   const framing=archiveFraming(state.tables.keys(),state.prepared.source_rows);
   let header=false,complete=false,size=0;
@@ -162,7 +162,7 @@ export async function accountArchive(binding,state){
         for(const k of ['source_instance','snapshot_id','inventory_sha256','manifest_sha256'])if(e[k]!==state.prepared[k])fail();header=true;
       }else if(complete)fail();else if(e.event==='complete'){
         framing.complete(e);complete=true;
-      }else if(framing.consume(e))accountOriginal(state,e);
+      }else if(framing.consume(e)){accountOriginal(state,e);if(onOriginal)await onOriginal(e);}
     }
     if(!complete||size!==state.prepared.archive_bytes||bytes.digest('hex')!==binding.sha256)fail();return finishAccounting(state);
   }finally{await input.close();}
