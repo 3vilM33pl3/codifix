@@ -2,6 +2,7 @@
 //! Explicit offline preparation and local-only target import. No configuration
 //! discovery, credential creation, service startup or source writes. Schema-only
 //! initialization is a separate explicitly confirmed fresh-database operation.
+pub mod portable;
 pub mod preview;
 mod private;
 pub mod reconciliation;

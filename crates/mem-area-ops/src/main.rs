@@ -56,6 +56,46 @@ impl From<Source> for Inputs {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Export one validated area for a separately authenticated operator handoff.
+    ExportPortable {
+        #[command(flatten)]
+        source: Source,
+        #[command(flatten)]
+        retention: Retention,
+        #[arg(long)]
+        prepared: PathBuf,
+        #[arg(long)]
+        prepared_sha256: String,
+        #[arg(long, value_parser=["trust","homelab","workshop","general"])]
+        area: String,
+        #[arg(long)]
+        target_instance: Uuid,
+        #[arg(long)]
+        output_dir: PathBuf,
+    },
+    /// Reconcile one area, trusting its digest from a verified signed handoff.
+    ReconcilePortable {
+        #[arg(long)]
+        bundle: PathBuf,
+        #[arg(long)]
+        bundle_sha256: String,
+        #[arg(long)]
+        target: PathBuf,
+        #[arg(long)]
+        target_sha256: String,
+        #[arg(long)]
+        operation_id: Uuid,
+        #[arg(long)]
+        execute: bool,
+        #[arg(long)]
+        writers_stopped: bool,
+        #[arg(long)]
+        archive_backed_up: bool,
+        #[arg(long, requires = "preview_sha256")]
+        preview: Option<PathBuf>,
+        #[arg(long, requires = "preview")]
+        preview_sha256: Option<String>,
+    },
     /// Compute the digest after explicit keep-destination review; no database connection.
     ReconciliationDigest {
         #[arg(long)]
@@ -173,6 +213,57 @@ fn print(value: &impl serde::Serialize) -> Result<(), Failure> {
 }
 async fn run(cli: Cli) -> Result<(), Failure> {
     match cli.command {
+        Command::ExportPortable {
+            source,
+            retention,
+            prepared,
+            prepared_sha256,
+            area,
+            target_instance,
+            output_dir,
+        } => {
+            let area = match area.as_str() {
+                "trust" => mem_area::AreaId::Trust,
+                "homelab" => mem_area::AreaId::Homelab,
+                "workshop" => mem_area::AreaId::Workshop,
+                "general" => mem_area::AreaId::General,
+                _ => return Err(Failure::Target),
+            };
+            print(&mem_area_ops::portable::export(
+                &source.into(),
+                &prepared,
+                &prepared_sha256,
+                retention.budget()?,
+                area,
+                target_instance,
+                &output_dir,
+            )?)
+        }
+        Command::ReconcilePortable {
+            bundle,
+            bundle_sha256,
+            target,
+            target_sha256,
+            operation_id,
+            execute,
+            writers_stopped,
+            archive_backed_up,
+            preview,
+            preview_sha256,
+        } => print(
+            &mem_area_ops::portable::reconcile(mem_area_ops::portable::Request {
+                bundle: &bundle,
+                bundle_sha256: &bundle_sha256,
+                target: &target,
+                target_sha256: &target_sha256,
+                operation_id,
+                execute,
+                writers_stopped,
+                archive_backed_up,
+                preview: preview.as_deref().zip(preview_sha256.as_deref()),
+            })
+            .await?,
+        ),
         Command::ReconciliationDigest { preview } => {
             print(&mem_area_ops::reconciliation::inspect_preview(&preview)?)
         }

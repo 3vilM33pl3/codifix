@@ -394,6 +394,95 @@ fn run(fixture: &Fixture) -> (MaterializedMigration, Vec<u8>) {
 }
 
 #[test]
+fn portable_partition_is_area_bound_and_excludes_original_context() {
+    let (migration, _) = run(&fixture(true));
+    let partition = migration.partition(AreaId::General);
+    let bytes = portable::export(partition, id(999)).expect("export");
+    assert!(!String::from_utf8_lossy(&bytes).contains(PRIVATE));
+    let restored = portable::import(&bytes, &digest(&bytes), id(999), AreaId::General)
+        .expect("trusted single-area package");
+    assert_eq!(restored.partition_sha256(), partition.partition_sha256());
+    assert!(portable::import(&bytes, &digest(&bytes), id(998), AreaId::General).is_err());
+    assert!(portable::import(&bytes, &digest(&bytes), id(999), AreaId::Trust).is_err());
+    let mut changed = bytes.clone();
+    changed.push(b' ');
+    assert!(portable::import(&changed, &digest(&bytes), id(999), AreaId::General).is_err());
+}
+
+#[test]
+fn portable_partition_rejects_structural_tampering_even_with_new_operator_hash() {
+    let (migration, _) = run(&fixture(true));
+    let original: Value = serde_json::from_slice(
+        &portable::export(migration.partition(AreaId::General), id(999))
+            .expect("synthetic portable fixture"),
+    )
+    .expect("synthetic portable fixture");
+    for change in [0, 1, 2, 3, 4] {
+        let mut value = original.clone();
+        match change {
+            0 => value["target_instance"] = json!(id(998)),
+            1 => value["rows"] = json!(12345),
+            2 => {
+                let row = value["partition"]["rows"][0].clone();
+                value["partition"]["rows"]
+                    .as_array_mut()
+                    .expect("synthetic portable fixture")
+                    .push(row);
+                let len = value["partition"]["rows"]
+                    .as_array()
+                    .expect("synthetic portable fixture")
+                    .len();
+                value["rows"] = json!(len);
+            }
+            3 => {
+                value["partition"]["rows"][0]["record"]["table"] =
+                    json!("public.supervisor_authorities")
+            }
+            _ => value["partition"]["inventory_sha256"] = json!("bad"),
+        }
+        let bytes = serde_json::to_vec(&value).expect("synthetic portable fixture");
+        assert!(portable::import(&bytes, &digest(&bytes), id(999), AreaId::General).is_err());
+    }
+}
+
+#[test]
+fn portable_partition_checks_rehashed_foreign_keys_and_redaction() {
+    let (migration, _) = run(&fixture(true));
+    for mode in 0..4 {
+        let mut p = migration.partition(AreaId::General).clone();
+        if mode == 0 {
+            let project = p
+                .rows
+                .iter_mut()
+                .find(|r| r.record.table == "public.projects")
+                .expect("synthetic portable fixture");
+            let mut value: Value =
+                serde_json::from_str(&project.row_json).expect("synthetic portable fixture");
+            value["id"] = json!(id(987));
+            project.record.key = id(987).to_string();
+            project.row_json = serde_json::to_string(&value).expect("synthetic portable fixture");
+            project.source_sha256 = digest(project.row_json.as_bytes());
+            project.target_sha256 = project.source_sha256.clone();
+        } else if mode == 1 {
+            p.rows.push(p.rows[0].clone());
+        } else if mode == 2 {
+            let source = &mut p.projected_sources[0].row;
+            let mut value: Value =
+                serde_json::from_str(&source.row_json).expect("synthetic portable fixture");
+            value["file_path"] = json!("/not-reviewed/private");
+            source.row_json = serde_json::to_string(&value).expect("synthetic portable fixture");
+            source.target_sha256 = digest(source.row_json.as_bytes());
+        } else {
+            p.projected_sources[0].binding.destination_area = AreaId::Trust;
+        }
+        p.partition_sha256 = String::new();
+        p.partition_sha256 = digest_json(&p, b"mem-area-materialized-partition-v1\n")
+            .expect("synthetic portable fixture");
+        assert!(portable::export(&p, id(999)).is_err(), "mode {mode}");
+    }
+}
+
+#[test]
 fn standalone_payload_verification_needs_no_ownership_approval_and_returns_no_partition() {
     let mut fixture = fixture(false);
     let original_events = encode(&events(&fixture));

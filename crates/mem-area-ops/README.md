@@ -172,6 +172,52 @@ they cannot be resumed or used for import.
 
 ## Explicit target and import
 
+### Scoped transfer for existing remote installations
+
+Do not send a full source inventory, payload or protected archive to the CA.
+After complete preparation, export only the selected area's validated partition:
+
+```sh
+memory-area-import export-portable \
+  --inventory /protected/inventory.json --manifest /protected/reviewed-manifest.json \
+  --payload /protected/payload.ndjson \
+  --inventory-sha256 INVENTORY_SHA --manifest-sha256 MANIFEST_SHA \
+  --prepared /protected/prepared/prepared.json --prepared-sha256 PREPARED_FILE_SHA \
+  --max-retained-target-mib 512 \
+  --area trust --target-instance EXISTING_TRUST_INSTANCE_UUID \
+  --output-dir /protected/new-trust-bundle
+```
+
+The exporter independently repeats full materialization, compares the preparation
+receipt, and emits only `portable-partition.json`. It excludes raw support rows,
+other areas and runtime authority. This bounded profile supports curated history,
+project/state/tags/relations and reference-only evidence; unredacted sources or
+reviewed excerpts are deliberately unsupported. Preserve the reported file hash
+in the independently verified **signed operator handoff** and bind the intended
+existing instance UUID. A hash received only alongside an untrusted bundle is
+not sufficient. The receiving operator explicitly trusts the source preparation
+and ownership review; it does not independently verify an absent full inventory.
+
+At the destination, prepare its local protected target descriptor and inspect:
+
+```sh
+memory-area-import reconcile-portable \
+  --bundle /protected/portable-partition.json --bundle-sha256 SIGNED_HANDOFF_HASH \
+  --target /protected/trust-target.json --target-sha256 TARGET_FILE_HASH \
+  --operation-id STABLE_OPERATION_UUID
+```
+
+This returns a preview (no writes). Save it privately and use
+`reconciliation-digest --preview FILE` after any explicit allowed
+`keep_destination` resolutions. Execute the same command with
+`--execute --writers-stopped --archive-backed-up --preview FILE
+--preview-sha256 PREVIEW_DIGEST`. The same transactional reconciliation engine
+performs exact target checks, conflict handling, runtime preservation and durable
+replay verification as the full-input route. Wrong area/instance, altered bytes,
+duplicate keys, missing owned dependencies and unsafe evidence fields fail
+closed. The bundle is capped at 256 MiB; this profile is not a new network API,
+federation trust grant, fresh-target importer or automatic activation mechanism.
+
 Provision an independent local target with the exact supported migrations
 (explicitly supported heads 0056 through 0061), no application/worker connections and no prior knowledge,
 credentials, jobs or federation authority. Migration and writer fencing are

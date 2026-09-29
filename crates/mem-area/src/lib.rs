@@ -9,6 +9,8 @@ mod plan;
 mod policy;
 mod types;
 
+pub use materialize::portable;
+
 pub use materialize::{
     DEFAULT_RETAINED_TARGET_MIB, MAX_PAYLOAD_ENVELOPE_BYTES, MAX_RETAINED_TARGET_BYTES,
     MAX_RETAINED_TARGET_MIB, MaterializeError, MaterializedMigration, MaterializedPartition,

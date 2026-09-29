@@ -119,6 +119,19 @@ async fn actual_command_prepares_imports_and_reconciles_only_an_inactive_target(
     support::seed(&original.pool).await;
     let mut fixture = support::capture(&original.pool).await;
     fixture.project_provenance();
+    for record in &mut fixture.manifest.records {
+        if record.record.table == "public.project_commits" {
+            record.disposition = mem_area::Disposition::ProtectedArchive {
+                reason: "Portable transfer excludes original git context".into(),
+                review: mem_area::ClassificationReview {
+                    classification: mem_area::SourceClassification::Knowledge,
+                    source_evidence: "Synthetic git context remains archived".into(),
+                    project_evidence: "Synthetic original project retained".into(),
+                    content_evidence: "No git bodies authorized for transfer".into(),
+                },
+            };
+        }
+    }
     let private = private_dir();
     let artifacts = private_dir();
     let dir = private.path();
@@ -378,6 +391,90 @@ async fn actual_command_prepares_imports_and_reconciles_only_an_inactive_target(
                 .args(["--writers-stopped", "--archive-backed-up"])
                 .output()
                 .expect("merge replay")
+        )["already_applied"],
+        true
+    );
+    // The CA receives only its reviewed partition, never the full source files.
+    let portable = private_dir();
+    let mut export = command();
+    export.arg("export-portable");
+    source(&mut export, dir, &inspection);
+    export
+        .arg("--prepared")
+        .arg(artifacts.path().join("prepared.json"))
+        .arg("--prepared-sha256")
+        .arg(
+            receipt["prepared_sha256"]
+                .as_str()
+                .expect("synthetic portable fixture"),
+        )
+        .args([
+            "--area",
+            "general",
+            "--target-instance",
+            &support::TARGET.to_string(),
+        ])
+        .arg("--output-dir")
+        .arg(portable.path());
+    let exported = success(export.output().expect("single area export"));
+    let bundle_path = portable.path().join("portable-partition.json");
+    let bundle = fs::read(&bundle_path).expect("synthetic portable fixture");
+    assert!(!String::from_utf8_lossy(&bundle).contains(support::PRIVATE));
+    let portable_cmd = || {
+        let mut cmd = command();
+        cmd.arg("reconcile-portable")
+            .arg("--bundle")
+            .arg(&bundle_path)
+            .arg("--bundle-sha256")
+            .arg(
+                exported["bundle_sha256"]
+                    .as_str()
+                    .expect("synthetic portable fixture"),
+            )
+            .arg("--target")
+            .arg(dir.join("target.json"))
+            .arg("--target-sha256")
+            .arg(&target_sha)
+            .arg("--operation-id")
+            .arg(uuid::Uuid::from_u128(88888).to_string());
+        cmd
+    };
+    let portable_preview = success(portable_cmd().output().expect("synthetic portable fixture"));
+    assert_eq!(portable_preview, review["preview"]);
+    // Tampering fails before any connection or target mutation.
+    fs::write(&bundle_path, [bundle.as_slice(), b" "].concat())
+        .expect("synthetic portable fixture");
+    failure(
+        portable_cmd().output().expect("synthetic portable fixture"),
+        "digest mismatch",
+    );
+    fs::write(&bundle_path, &bundle).expect("synthetic portable fixture");
+    let portable_apply = || {
+        let mut cmd = portable_cmd();
+        cmd.args(["--execute", "--writers-stopped", "--archive-backed-up"])
+            .arg("--preview")
+            .arg(dir.join("merge-preview.json"))
+            .arg("--preview-sha256")
+            .arg(
+                review["preview_sha256"]
+                    .as_str()
+                    .expect("synthetic portable fixture"),
+            );
+        cmd
+    };
+    assert_eq!(
+        success(
+            portable_apply()
+                .output()
+                .expect("synthetic portable fixture")
+        )["already_applied"],
+        false
+    );
+    assert_eq!(
+        success(
+            portable_apply()
+                .output()
+                .expect("synthetic portable fixture")
         )["already_applied"],
         true
     );
