@@ -76,10 +76,12 @@ Status: implementation in progress; no release or data cutover yet.
 ### RC.2 software and online baseline, 29 September
 
 The checked items above mean implemented and tested software, not installed
-components. The release source is frozen at
-`de99b0527cfede6b791157bb8ad43a7902845c84`. The archive SHA-256 is
-`f9bca6879d622253efaf21ff10dc8b4d6833bfe210f763f1466d3e71d9e43d7f`.
-Both Bookworm builds use that archive; signing and installation remain pending.
+components. The initial candidate `de99b052` was superseded before signing by
+the portable CA partition, reconciliation performance/provenance fixes and
+scoped-token compatibility work. Its successful ARM64 build is build evidence,
+not the final release. The final common source revision and both artifact hashes
+must be recorded after the remaining authentication tests complete. Signing and
+installation remain pending.
 Migration 0061 is additive. Existing-target reconciliation is a separate command
 from fresh-target import. Selected-instance upgrade preserves the effective
 sandbox and becomes forward-recovery-only once candidate startup is attempted.
@@ -107,14 +109,28 @@ versions. These are rehearsal copies, not the coordinated final backup.
 The complete review pack contains 3,537 histories / 3,842 versions. Its strict
 delta carries zero decisions automatically: schema/dependency hashes changed.
 Of the 3,207 older histories, 3,203 retain identical direct curated/supporting
-row bindings and four require changed-content review. All 330 new histories are
-being reviewed across their full redacted versions. Agent ownership decisions
+row bindings and four received changed-content review. All 330 new histories
+have now been reviewed across their full redacted versions. The complete ledger
+assigns 1,669 histories to Workshop, 429 to Homelab, 20 to Trust, 900 to General
+and 519 to the protected archive. Its exact file SHA-256 is
+`1c6afbe5c254c53ae3e768f53115b00ddff99cdb5905e153641b87f5c7e68e3f`.
+The independently validated normalized manifest SHA-256 is
+`8d97bec20cbee6000b155f82f5096beec2d3b2d86785510544f770841664c593`.
+Per-item backlog accounting and materialization remain separate checks.
+Agent ownership decisions
 are not Olivier's individual factual approval or external-disclosure consent.
 
 Scoped Rust/database tests, Web tests (149), Web build, Lean build/test,
 formatting, boundaries and scoped Clippy pass. The first whole-workspace
 functional run exhausted PostgreSQL connection pools under default parallelism;
-the bounded four-thread rerun is in progress. One existing documentation test
+the bounded four-thread rerun passed 1,227 tests across 91 groups (14 ignored,
+seven documentation checks filtered). One existing documentation test
 rejects historical machine-local evidence paths in M2 review notes; that failure
-is recorded rather than hidden by changing old evidence. Full workspace Clippy,
-native package checks and live CLI/TUI/MCP/federation acceptance remain pending.
+is recorded rather than hidden by changing old evidence. The explicitly enabled
+browser/PTY and real CLI/session/CSRF rehearsal tests also pass. Fifty-one PDS
+refresh/operator/replacement tests pass. Reconciliation now retains full
+reference-only version/source/task provenance in its immutable receipt, including
+exact replay, and hashes each target table in one ordered cursor scan.
+Production workspace Clippy passes; full all-target Clippy found test-only lint
+issues that were repaired and requires its final rerun. Native package checks
+and live CLI/TUI/MCP/federation acceptance remain pending.
