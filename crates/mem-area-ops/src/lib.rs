@@ -4,6 +4,7 @@
 //! initialization is a separate explicitly confirmed fresh-database operation.
 pub mod preview;
 mod private;
+pub mod reconciliation;
 pub mod schema;
 use mem_area::{AREAS, AreaId, Inventory, Manifest, MaterializedMigration, RetainedTargetBudget};
 use private::{Directory, Input};
@@ -420,9 +421,26 @@ pub async fn import_with_budget(
     execution: &Execution,
     budget: RetainedTargetBudget,
 ) -> Result<mem_area_store::ImportReceipt> {
-    if !execution.execute
-        || !execution.writers_stopped
-        || !execution.archive_backed_up
+    let (migration, target, pool) = validated_target(inputs, execution, budget, true).await?;
+    let result = mem_area_store::import_partition(
+        &pool,
+        target.instance_id,
+        execution.operation_id,
+        migration.partition(target.area),
+    )
+    .await;
+    pool.close().await;
+    result.map_err(Failure::from)
+}
+
+async fn validated_target(
+    inputs: &Inputs,
+    execution: &Execution,
+    budget: RetainedTargetBudget,
+    require_execution: bool,
+) -> Result<(MaterializedMigration, Target, sqlx::PgPool)> {
+    if (require_execution
+        && (!execution.execute || !execution.writers_stopped || !execution.archive_backed_up))
         || execution.operation_id.is_nil()
         || !valid_digest(&execution.prepared_sha256)
         || !valid_digest(&execution.target_sha256)
@@ -465,13 +483,5 @@ pub async fn import_with_budget(
     receipt_file.unchanged()?;
     target_file.unchanged()?;
     archive.unchanged()?;
-    let result = mem_area_store::import_partition(
-        &pool,
-        target.instance_id,
-        execution.operation_id,
-        migration.partition(target.area),
-    )
-    .await;
-    pool.close().await;
-    result.map_err(Failure::from)
+    Ok((migration, target, pool))
 }

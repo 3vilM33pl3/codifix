@@ -173,7 +173,7 @@ they cannot be resumed or used for import.
 ## Explicit target and import
 
 Provision an independent local target with the exact supported migrations
-(explicitly supported heads 0056 through 0060), no application/worker connections and no prior knowledge,
+(explicitly supported heads 0056 through 0061), no application/worker connections and no prior knowledge,
 credentials, jobs or federation authority. Migration and writer fencing are
 separate operator steps. A target UUID is a binding, not proof of host identity.
 
@@ -275,3 +275,36 @@ archives and reviewed projections. They do not establish human approval,
 encrypted off-host durability, host identity, live writer fencing, deployment
 activation or CA compatibility. Real-data import remains blocked until those
 gates and the reviewed ownership manifest are complete.
+
+## Reconcile an existing area
+
+Use `memory-area-import reconcile` with the same `--inventory`, `--manifest`,
+`--payload`, digest, `--prepared`, target descriptor and `--operation-id`
+arguments as import. The target must already be on migration 0061 and have an
+immutable matching area/instance binding. The original `import` command still
+refuses active or populated installations.
+
+Without `--execute`, reconcile opens a read-only repeatable-read snapshot and
+prints `{ "preview_sha256": "...", "preview": {...} }`. Save the nested
+`preview` object as a private 0600 JSON file in an owned 0700 directory. Inspect
+each row's `conflict` field; any conflict prevents execution. This preview may
+run while the existing service is available, but changes invalidate it.
+
+After external writer fencing, regenerate the final preview and invoke the
+same command with `--execute --writers-stopped --archive-backed-up`,
+`--preview /private/preview.json` and `--preview-sha256 DIGEST`. The digest is
+the reported normalized preview digest, not the file's whitespace-dependent
+hash. Keep the same operation ID for recovery after an ambiguous acknowledgment.
+The operator checks the prepared archive before connecting and emits only
+sanitized errors and a metadata receipt. A successful replay verifies persisted
+results; it never bypasses a changed source or destination.
+
+Review conflicts by identifier/hash. For an existing non-version row, the
+operator can explicitly set `keep_destination=true` in the preview. Compute
+the revised digest with `memory-area-import reconciliation-digest --preview
+/private/preview.json`. Source histories stay preserved in the prepared archive;
+retaining local metadata does not declare it identical to the source. Immutable
+version conflicts require revising the ownership review. Do not alter other
+preview fields. This command will not silently replace diverged
+histories, canonical state or project metadata. Deployment writer fencing and
+future cutover remain the caller's responsibility.

@@ -1782,6 +1782,7 @@ fn migrations_0055_through_0061_require_exact_additions_and_preserve_retention_p
                     || error.contains("missing migration 0056 table inventory")
                     || error.contains("missing migration 0057 table inventory")
                     || error.contains("missing migration 0059 table inventory")
+                    || error.contains("missing migration 0060 table inventory")
             }));
         }
         // 0058 adds counters to an existing operational table, not new tables.

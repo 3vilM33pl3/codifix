@@ -56,6 +56,39 @@ impl From<Source> for Inputs {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Compute the digest after explicit keep-destination review; no database connection.
+    ReconciliationDigest {
+        #[arg(long)]
+        preview: PathBuf,
+    },
+    /// Inspect or execute a stopped-writer merge into an already bound installation.
+    Reconcile {
+        #[command(flatten)]
+        source: Source,
+        #[command(flatten)]
+        retention: Retention,
+        #[arg(long)]
+        prepared: PathBuf,
+        #[arg(long)]
+        prepared_sha256: String,
+        #[arg(long)]
+        target: PathBuf,
+        #[arg(long)]
+        target_sha256: String,
+        #[arg(long)]
+        operation_id: Uuid,
+        /// Without --execute, inspect and print the bound destination preview only.
+        #[arg(long)]
+        execute: bool,
+        #[arg(long)]
+        writers_stopped: bool,
+        #[arg(long)]
+        archive_backed_up: bool,
+        #[arg(long, requires = "preview_sha256")]
+        preview: Option<PathBuf>,
+        #[arg(long, requires = "preview")]
+        preview_sha256: Option<String>,
+    },
     /// Generate an exact reviewed preview manifest in protected files only; no DB or consent grant.
     PreviewManifest {
         #[arg(long)]
@@ -140,6 +173,52 @@ fn print(value: &impl serde::Serialize) -> Result<(), Failure> {
 }
 async fn run(cli: Cli) -> Result<(), Failure> {
     match cli.command {
+        Command::ReconciliationDigest { preview } => {
+            print(&mem_area_ops::reconciliation::inspect_preview(&preview)?)
+        }
+        Command::Reconcile {
+            source,
+            retention,
+            prepared,
+            prepared_sha256,
+            target,
+            target_sha256,
+            operation_id,
+            execute,
+            writers_stopped,
+            archive_backed_up,
+            preview,
+            preview_sha256,
+        } => {
+            let execution = Execution {
+                prepared,
+                prepared_sha256,
+                target,
+                target_sha256,
+                operation_id,
+                execute,
+                writers_stopped,
+                archive_backed_up,
+            };
+            let inputs = source.into();
+            let budget = retention.budget()?;
+            if execute {
+                print(
+                    &mem_area_ops::reconciliation::execute(
+                        &inputs,
+                        &execution,
+                        budget,
+                        &preview.ok_or(Failure::Target)?,
+                        &preview_sha256.ok_or(Failure::Target)?,
+                    )
+                    .await?,
+                )
+            } else {
+                let result =
+                    mem_area_ops::reconciliation::preview(&inputs, &execution, budget).await?;
+                print(&serde_json::json!({"preview_sha256": result.digest()?, "preview": result}))
+            }
+        }
         Command::PreviewManifest {
             inventory,
             selection,

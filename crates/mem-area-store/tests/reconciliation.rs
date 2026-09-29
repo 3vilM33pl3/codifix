@@ -52,11 +52,14 @@ async fn existing_target_merge_is_bound_atomic_and_replayable() {
         "DROP TRIGGER inject_failure ON area_reconciliation_receipts",
     )
     .await;
-    let receipt = reconcile(&target.pool, id(500), &partition, &plan, true)
-        .await
-        .expect("merge");
+    let (first, competing) = tokio::join!(
+        reconcile(&target.pool, id(500), &partition, &plan, true),
+        reconcile(&target.pool, id(500), &partition, &plan, true),
+    );
+    let receipt = first.expect("first merge");
+    let competing = competing.expect("competing same operation");
     assert_eq!(receipt.inserted, 1);
-    assert!(!receipt.already_applied);
+    assert_ne!(receipt.already_applied, competing.already_applied);
     assert!(
         reconcile(&target.pool, id(500), &partition, &plan, true)
             .await

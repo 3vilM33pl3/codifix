@@ -328,6 +328,59 @@ async fn actual_command_prepares_imports_and_reconciles_only_an_inactive_target(
         ready().output().expect("synthetic operator fixture"),
         "inactive installation",
     );
+    // The separate existing-target path can inspect an active installation,
+    // but execution requires explicit fencing and exact reviewed preview bytes.
+    let reconcile = || {
+        let original = import();
+        let args: Vec<_> = original.get_args().skip(1).map(|s| s.to_owned()).collect();
+        let mut cmd = command();
+        cmd.arg("reconcile").args(args);
+        cmd
+    };
+    let review = success(reconcile().output().expect("preview command"));
+    write(
+        &dir.join("merge-preview.json"),
+        &serde_json::to_vec(&review["preview"]).expect("preview"),
+    );
+    let mut inspect = command();
+    inspect
+        .arg("reconciliation-digest")
+        .arg("--preview")
+        .arg(dir.join("merge-preview.json"));
+    assert_eq!(
+        success(inspect.output().expect("digest"))["preview_sha256"],
+        review["preview_sha256"]
+    );
+    let apply = || {
+        let mut cmd = reconcile();
+        cmd.arg("--execute")
+            .arg("--preview")
+            .arg(dir.join("merge-preview.json"))
+            .arg("--preview-sha256")
+            .arg(review["preview_sha256"].as_str().expect("digest"));
+        cmd
+    };
+    failure(
+        apply().output().expect("missing fence"),
+        "execution assertions",
+    );
+    let first = success(
+        apply()
+            .args(["--writers-stopped", "--archive-backed-up"])
+            .output()
+            .expect("merge"),
+    );
+    assert_eq!(first["already_applied"], false);
+    assert_eq!(first["inserted"], 0);
+    assert_eq!(
+        success(
+            apply()
+                .args(["--writers-stopped", "--archive-backed-up"])
+                .output()
+                .expect("merge replay")
+        )["already_applied"],
+        true
+    );
     target.cleanup().await.expect("synthetic operator fixture");
     original
         .cleanup()
