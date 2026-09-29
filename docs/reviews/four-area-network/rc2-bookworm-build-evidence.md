@@ -75,3 +75,32 @@ the bundle; standalone Debian license packaging remains a redistribution caveat.
 Existing Pi runtime hashes/grants remain independently managed and are not
 replaced by the source-pin-only manifest entry. No paid calls, service changes,
 database connections or live deployment occurred in the build/smoke task.
+
+## Additional host-common delivery input
+
+The separate `delivery-common/` directory in the same build workspace contains
+byte-identical `memory-layer_2.1.0-rc.2_host-common_amd64.tar` and
+`memory-layer_2.1.0-rc.2_host-common_arm64.tar` archives (30,720 bytes), SHA-256
+`140acbb09169af58b533e7622e55b3d79467e53031163558252f065d25a34a22`.
+The release format has no architecture-neutral selector; both named aliases
+allow architecture-specific verification without modifying runtime trees.
+
+Each archive contains the exact three-file `plugins/memory-layer` template from
+the frozen runtime commit and the CA orchestration goal from docs-only commit
+`e3b1d59062be37081db010243415ed28b39443c2`. That later procedure explicitly
+separates legacy shared-writer shutdown from independent Trust activation; no
+runtime source was changed. The payload's own canonical manifest records each
+source revision, Git blob, byte count and SHA-256; its digest is
+`447faa3c7a3395a88bbcbf6659a08bc34deb834a45c330a27a7c50120b9a7610`.
+
+Plugin package metadata retains its frozen version
+`0.1.0+codex.20260901173230`; this is not the Memory executable version. No
+independent fetch from `main`, plugin installation, credentials, or signing was
+performed while assembling these inputs. The extracted template for scoped
+refresh is `delivery-common/payload/plugins/memory-layer`.
+
+Deterministic reassembly, byte equality of both aliases, all five inner checksum
+entries and validation of the combined six-artifact manifest structure passed.
+`artifact-additions.json` supplies the final-manifest entries. The existing
+four-artifact preview/checksums remain unchanged; the final manifest must include
+these aliases plus the final encrypted Trust delivery artifact before signing.
