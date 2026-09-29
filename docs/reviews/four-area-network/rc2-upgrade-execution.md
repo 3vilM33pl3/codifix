@@ -10,7 +10,7 @@ R3 stays paused. No public access, unrestricted sharing or new paid execution.
 
 - [ ] Inventory active/dormant client, service, watcher, MCP, plugin and skill launch paths on both hosts; preserve historical and disposable installations.
 - [ ] Build coherent AMD64 and Debian-12-compatible ARM64 binary/Web/operator/skill artifacts from one frozen commit; refresh skills from that exact bundle.
-- [ ] Implement a journaled selected-instance upgrade: signed inputs, backups, selected service stop, executable/Web switch, compatible append-only migration and health verification; preserve CA sandbox drop-ins.
+- [x] Implement a journaled selected-instance upgrade: signed inputs, backups, selected service stop, executable/Web switch, compatible append-only migration and health verification; preserve CA sandbox drop-ins.
 - [ ] Sign the release using the established identity and normal local unlock, with explicit schema compatibility and no database downgrade.
 
 ## Complete dataset review and reconciliation
@@ -19,16 +19,16 @@ R3 stays paused. No public access, unrestricted sharing or new paid execution.
 - [ ] Inventory all source items and reuse ownership decisions only when full-history and dependency hashes match.
 - [ ] Review redacted captures, sessions, replacement/loop proposals, protected histories, relations and derived gaps; give every item an import, pending-work, protected-archive or retired-runtime disposition. Secrets remain local.
 - [ ] Preserve IDs, versions, tombstones, authorship and provenance; archive mixed sensitive material and cross-area relations without implicit disclosure grants.
-- [ ] Implement a separate existing-target reconciliation operator with source/decision/target hashes, stopped writers, durable operation receipts, identical-record deduplication, compatible history append and explicit conflicts; retain destination-only records and all live authority/budget/federation state.
+- [x] Implement a separate existing-target reconciliation operator with source/decision/target hashes, stopped writers, durable operation receipts, identical-record deduplication, compatible history append and explicit conflicts; retain destination-only records and all live authority/budget/federation state.
 - [ ] Complete initial review live and final-delta review with old writers fenced; account for every item before routing switches.
 
 ## Routing and federation
 
-- [ ] Implement operator-owned area routing shared by CLI/TUI, launchers and watcher manager: explicit area, exact repository/project mapping, then General; unavailable areas never fall back elsewhere.
-- [ ] Bind watchers and offline outboxes to area; preserve replay IDs and prevent duplicate watchers.
+- [x] Implement operator-owned area routing shared by CLI/TUI, launchers and watcher manager: explicit area, exact repository/project mapping, then General; unavailable areas never fall back elsewhere.
+- [x] Bind watchers and offline outboxes to area; preserve replay IDs and prevent duplicate watchers.
 - [ ] Route this repository to Workshop, infrastructure to Homelab, CA-local work to Trust, remaining projects to General; distinguish same-name projects by area and identity.
 - [ ] Keep Trust service CA-local and access remote expertise through the gateway; retain Trust-bound writes for CA reconciliation.
-- [ ] Extend federation to explicit per-project bindings, retaining single-project configuration and one ordered stream per instance/space; separate project authority and answerer grants.
+- [x] Extend federation to explicit per-project bindings, retaining single-project configuration and one ordered stream per instance/space; separate project authority and answerer grants.
 - [ ] Enroll General; preserve existing instance identities and reviewed collection allowlists.
 - [ ] Enable scoped operator-bound Codex/ChatGPT OpenAI MCP expertise callers with explicitly reviewed output-destination consent. Use deterministic answers and explicit remote questions.
 - [ ] Display area, instance, release and federation status in Web/TUI and provide an area landing page.
@@ -72,3 +72,49 @@ watcher routing, counts, federation sync and answer results, with failures expli
   and Homelab preview applications and CA Trust use 2.1.0-rc.1. General is staged.
 
 Status: implementation in progress; no release or data cutover yet.
+
+### RC.2 software and online baseline, 29 September
+
+The checked items above mean implemented and tested software, not installed
+components. The release source is frozen at
+`de99b0527cfede6b791157bb8ad43a7902845c84`. The archive SHA-256 is
+`f9bca6879d622253efaf21ff10dc8b4d6833bfe210f763f1466d3e71d9e43d7f`.
+Both Bookworm builds use that archive; signing and installation remain pending.
+Migration 0061 is additive. Existing-target reconciliation is a separate command
+from fresh-target import. Selected-instance upgrade preserves the effective
+sandbox and becomes forward-recovery-only once candidate startup is attempted.
+
+Monolith inventory recorded 448 hashed inputs, 17 units, 23 processes and 154
+registered projects. Both user and system singleton services remain live writers
+to the old shared database. Five fixed watchers, one transient watcher, the old
+manager, seven resident MCP processes and one TUI require coordinated switching;
+changing a symlink alone will not replace those processes. Historical/test
+containers remain excluded. CA inventory has been requested through CURRENT
+ACTION v11; the last observed CA result is the completed rc.1 capability report,
+not an rc.2 upgrade.
+
+Fresh encrypted source snapshot `05fa26bb-270d-4b64-8216-ef5b6d1c937d`
+was restored with no network, providers or application workers. Schema/rows and
+four sequence states matched. Independent payload verification covers 125 tables
+and 3,518,406 rows; payload SHA-256
+`d2ea8638777d6f3f2628a44a49e4871de47b9909b5a57e6c1125f2c9f72ef421`.
+Private evidence is retained under
+`/data/tmp/memory-four-area-rc2-baseline-20260929T2130`.
+Separate encrypted Workshop/Homelab rehearsal dumps were restored into
+network-none containers: existing schema 60 and respectively three/two curated
+versions. These are rehearsal copies, not the coordinated final backup.
+
+The complete review pack contains 3,537 histories / 3,842 versions. Its strict
+delta carries zero decisions automatically: schema/dependency hashes changed.
+Of the 3,207 older histories, 3,203 retain identical direct curated/supporting
+row bindings and four require changed-content review. All 330 new histories are
+being reviewed across their full redacted versions. Agent ownership decisions
+are not Olivier's individual factual approval or external-disclosure consent.
+
+Scoped Rust/database tests, Web tests (149), Web build, Lean build/test,
+formatting, boundaries and scoped Clippy pass. The first whole-workspace
+functional run exhausted PostgreSQL connection pools under default parallelism;
+the bounded four-thread rerun is in progress. One existing documentation test
+rejects historical machine-local evidence paths in M2 review notes; that failure
+is recorded rather than hidden by changing old evidence. Full workspace Clippy,
+native package checks and live CLI/TUI/MCP/federation acceptance remain pending.
