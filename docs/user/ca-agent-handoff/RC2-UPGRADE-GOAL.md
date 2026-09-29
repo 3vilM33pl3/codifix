@@ -52,8 +52,15 @@ work. Restore into a disposable isolated target and record the result. Keep
 existing backups and rc.1 artifacts. A successful archive checksum is not a
 restore test.
 
-Report `READY_FOR_CUTOVER` with the inventory, exact candidate/bundle hashes,
-restore evidence and CA-only pending items. Do not stop the live installation
+The legacy shared-database writer stop is a separate coordination phase. When
+CURRENT ACTION says `STOP_LEGACY_WRITERS`, stop only those inventoried writers,
+preserve their offline queues and report `LEGACY_WRITERS_STOPPED`. Keep the
+independent Trust service available. This must precede the final source snapshot,
+so it does not depend on receiving the final signed data bundle.
+
+After receiving the signed release and final bundle, report `READY_FOR_CUTOVER`
+with the inventory, exact candidate/bundle hashes, restore evidence and CA-only
+pending items. Do not stop the independent Trust installation
 until the delivery index/Notion action says `CUTOVER_READY` for those same bytes.
 This is host coordination, not a request for Olivier to approve the same plan
 again. If the index changes, report which binding changed and obtain the final
