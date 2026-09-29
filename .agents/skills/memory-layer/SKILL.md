@@ -1,6 +1,6 @@
 ---
 name: memory-layer
-version: 0.9.5
+version: 2.1.0-rc.2
 description: Umbrella entrypoint for Memory Layer workflows; use for broad memory-related turns, shared invariants, and docs/admin work, while focused query/resume, plan-execution, and remember skills handle the narrow workflows
 ---
 

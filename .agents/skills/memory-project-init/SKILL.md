@@ -1,6 +1,6 @@
 ---
 name: memory-project-init
-version: 0.9.5
+version: 2.1.0-rc.2
 description: Initialise or refresh Memory Layer in a project directory after Memory Layer is already installed; use for repo-local setup with .mem, .agents/memory-layer.toml, and repo-local memory skills, previewing writes before applying them
 ---
 

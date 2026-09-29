@@ -2764,7 +2764,7 @@ dependencies = [
 
 [[package]]
 name = "mem-agenttop"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "chrono",
  "dirs",
@@ -2777,7 +2777,7 @@ dependencies = [
 
 [[package]]
 name = "mem-analyze"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "serde",
@@ -2791,7 +2791,7 @@ dependencies = [
 
 [[package]]
 name = "mem-area"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -2803,7 +2803,7 @@ dependencies = [
 
 [[package]]
 name = "mem-area-ops"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "clap",
  "mem-area",
@@ -2823,7 +2823,7 @@ dependencies = [
 
 [[package]]
 name = "mem-area-store"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "mem-area",
  "mem-test-support",
@@ -2838,7 +2838,7 @@ dependencies = [
 
 [[package]]
 name = "mem-atproto"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "atrium-api",
  "atrium-repo",
@@ -2857,7 +2857,7 @@ dependencies = [
 
 [[package]]
 name = "mem-atproto-verify"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "atrium-api",
  "atrium-crypto",
@@ -2879,7 +2879,7 @@ dependencies = [
 
 [[package]]
 name = "mem-cli"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2915,7 +2915,7 @@ dependencies = [
 
 [[package]]
 name = "mem-config"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "chrono",
  "config",
@@ -2931,7 +2931,7 @@ dependencies = [
 
 [[package]]
 name = "mem-consolidate"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "serde",
  "uuid",
@@ -2939,7 +2939,7 @@ dependencies = [
 
 [[package]]
 name = "mem-curate"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "chrono",
  "mem-record",
@@ -2955,7 +2955,7 @@ dependencies = [
 
 [[package]]
 name = "mem-eval"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2969,7 +2969,7 @@ dependencies = [
 
 [[package]]
 name = "mem-federation"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "chrono",
  "mem-record",
@@ -2984,7 +2984,7 @@ dependencies = [
 
 [[package]]
 name = "mem-federation-runtime"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3012,7 +3012,7 @@ dependencies = [
 
 [[package]]
 name = "mem-federation-store"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "chrono",
  "mem-federation",
@@ -3028,7 +3028,7 @@ dependencies = [
 
 [[package]]
 name = "mem-graph"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3045,7 +3045,7 @@ dependencies = [
 
 [[package]]
 name = "mem-loops"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "chrono",
  "mem-platform",
@@ -3057,7 +3057,7 @@ dependencies = [
 
 [[package]]
 name = "mem-mcp"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "axum",
@@ -3077,7 +3077,7 @@ dependencies = [
 
 [[package]]
 name = "mem-platform"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "serde",
@@ -3089,7 +3089,7 @@ dependencies = [
 
 [[package]]
 name = "mem-record"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "chrono",
  "humantime-serde",
@@ -3103,7 +3103,7 @@ dependencies = [
 
 [[package]]
 name = "mem-reinforce"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3123,7 +3123,7 @@ dependencies = [
 
 [[package]]
 name = "mem-search"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3147,7 +3147,7 @@ dependencies = [
 
 [[package]]
 name = "mem-service"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3204,7 +3204,7 @@ dependencies = [
 
 [[package]]
 name = "mem-skills"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3218,7 +3218,7 @@ dependencies = [
 
 [[package]]
 name = "mem-store"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "chrono",
  "mem-record",
@@ -3233,7 +3233,7 @@ dependencies = [
 
 [[package]]
 name = "mem-supervisor"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -3242,7 +3242,7 @@ dependencies = [
 
 [[package]]
 name = "mem-supervisor-pi"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "mem-supervisor",
  "mem-supervisor-runtime",
@@ -3257,7 +3257,7 @@ dependencies = [
 
 [[package]]
 name = "mem-supervisor-runtime"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "axum",
  "chrono",
@@ -3281,7 +3281,7 @@ dependencies = [
 
 [[package]]
 name = "mem-supervisor-store"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "chrono",
  "mem-record",
@@ -3298,7 +3298,7 @@ dependencies = [
 
 [[package]]
 name = "mem-test-support"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3313,7 +3313,7 @@ dependencies = [
 
 [[package]]
 name = "mem-watch"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "anyhow",
  "chrono",
