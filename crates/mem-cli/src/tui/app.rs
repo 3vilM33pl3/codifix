@@ -61,6 +61,7 @@ pub(crate) async fn run(api: ApiClient, project: String, repo_root: PathBuf) -> 
         profile,
         background_tx,
     );
+    app.meta.area = api.config.area.clone();
     start_agent_snapshot_worker(
         app.background_tx.clone(),
         app.agents.agents_tab_visible.clone(),
@@ -600,6 +601,7 @@ impl App {
                 needs_redraw: true,
             },
             meta: RuntimeMeta {
+                area: None,
                 overview: empty_overview(project),
                 versions,
                 skill_inventory: mem_skills::visible_skill_inventory(&repo_root, false),

@@ -4,6 +4,7 @@ mod activities;
 mod agent;
 pub(crate) mod api;
 mod archive;
+mod area;
 mod auth;
 mod bundle;
 mod capture;

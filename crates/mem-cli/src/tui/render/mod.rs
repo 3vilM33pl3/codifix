@@ -62,10 +62,18 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         .into_iter()
         .map(|tab| Line::from(Span::styled(tab.label(), Style::default().fg(Theme::TEXT))))
         .collect::<Vec<_>>();
-    let title = match app.meta.profile {
+    let mut title = match app.meta.profile {
         Profile::Dev => format!("Memory Layer TUI [dev] - project {}", app.project),
         Profile::Prod => format!("Memory Layer TUI - project {}", app.project),
     };
+    if let Some(area) = &app.meta.area {
+        title.push_str(&format!(
+            " | {} | {} | v{}",
+            area.name,
+            area.instance_id,
+            env!("CARGO_PKG_VERSION")
+        ));
+    }
     let tabs = Tabs::new(titles)
         .select(app.active_tab.index())
         .block(themed_block(title).borders(Borders::ALL))

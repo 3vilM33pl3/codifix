@@ -78,6 +78,7 @@ pub(super) struct UiChrome {
 }
 
 pub(super) struct RuntimeMeta {
+    pub(super) area: Option<mem_config::AreaIdentityConfig>,
     pub(in crate::tui) overview: ProjectOverviewResponse,
     pub(in crate::tui) versions: ToolVersions,
     pub(in crate::tui) skill_inventory: SkillInventoryReport,

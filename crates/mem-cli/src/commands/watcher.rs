@@ -12,20 +12,22 @@ use crate::{
         runtime::{WatcherArgs, WatcherCommand, WatcherManagerCommand, default_global_config_path},
         skill_support::resolve_repo_root,
         watch_support::{
-            disable_watch_manager_service, disable_watch_service, enable_watch_manager_service,
-            enable_watch_service, preview_disable_watch_manager_service,
-            preview_disable_watch_service, preview_enable_watch_manager_service,
-            preview_enable_watch_service, run_watcher_manager, watch_manager_service_status,
-            watch_service_status, watcher_command_requires_config_load,
+            disable_watch_manager_service, disable_watch_service,
+            enable_watch_manager_service_routed, enable_watch_service,
+            preview_disable_watch_manager_service, preview_disable_watch_service,
+            preview_enable_watch_manager_service, preview_enable_watch_service,
+            run_watcher_manager, watch_manager_service_status, watch_service_status,
+            watcher_command_requires_config_load,
         },
     },
     writer_identity::{resolve_writer_identity, resolve_writer_identity_for_tool},
 };
-use mem_watch::{flush_path, run_once};
+use mem_watch::{area_flush_path, run_once};
 
 pub(super) async fn handle_pre_config(
     args: &WatcherArgs,
     cli_config: Option<PathBuf>,
+    routing_path: Option<&std::path::Path>,
 ) -> Result<bool> {
     let cwd = env::current_dir().context("read current directory")?;
     let repo_root = resolve_repo_root(&cwd)?;
@@ -37,10 +39,11 @@ pub(super) async fn handle_pre_config(
                 let output = if args.dry_run {
                     preview_enable_watch_manager_service()?
                 } else {
-                    enable_watch_manager_service(
+                    enable_watch_manager_service_routed(
                         &cli_config
                             .clone()
                             .unwrap_or_else(default_global_config_path),
+                        routing_path,
                     )?
                 };
                 println!("{output}");
@@ -149,7 +152,7 @@ pub(super) async fn handle(
                 println!("{}", serde_json::to_string_pretty(&preview)?);
                 return Ok(());
             }
-            tokio::fs::write(flush_path(&repo_root), b"flush\n")
+            tokio::fs::write(area_flush_path(&config.automation, &repo_root), b"flush\n")
                 .await
                 .ok();
             run_once(

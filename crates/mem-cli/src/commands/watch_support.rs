@@ -290,6 +290,12 @@ pub(crate) struct WatcherManagerState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct ManagedWatcherSession {
+    #[serde(default)]
+    pub(crate) watcher_id: Option<String>,
+    #[serde(default)]
+    pub(crate) config_path: Option<PathBuf>,
+    #[serde(default)]
+    pub(crate) config_fingerprint: Option<String>,
     pub(crate) unit_name: String,
     pub(crate) project: String,
     pub(crate) repo_root: String,
@@ -402,6 +408,13 @@ pub(crate) async fn reconcile_watcher_manager(
         &state.sessions,
     )?;
     let mut seen = BTreeSet::new();
+    let routing_path = mem_config::discover_area_routing_path(
+        config.resolved_area_routing_path.clone(),
+        config.profile,
+    );
+    let routing = routing_path
+        .as_ref()
+        .map(|path| mem_config::AreaRouting::read(path));
 
     for (repo_root, session) in sessions {
         if !watcher_manager_repo_is_in_scope(config, &repo_root) {
@@ -418,6 +431,47 @@ pub(crate) async fn reconcile_watcher_manager(
         }
 
         let project = resolve_manager_project_slug(&repo_root);
+        let route = match &routing {
+            Some(Ok(routing)) => match routing
+                .resolve(None, Some(&repo_root), Some(&project))
+                .and_then(|route| {
+                    route.load(config.profile)?;
+                    Ok(route)
+                }) {
+                Ok(route) => Some(route),
+                Err(error) => {
+                    state
+                        .warnings
+                        .push(format!("Stopped routing {}: {error}", repo_root.display()));
+                    continue;
+                }
+            },
+            Some(Err(error)) => {
+                state
+                    .warnings
+                    .push(format!("Stopped area watchers: {error}"));
+                continue;
+            }
+            None => None,
+        };
+        let child_config = route.as_ref().map(|r| r.config.as_path()).or(config_path);
+        let config_fingerprint = match route
+            .as_ref()
+            .map(|route| watcher_config_fingerprint(&route.config))
+            .transpose()
+        {
+            Ok(fingerprint) => fingerprint,
+            Err(error) => {
+                state
+                    .warnings
+                    .push(format!("Stopped routing {}: {error}", repo_root.display()));
+                continue;
+            }
+        };
+        let watcher_id = route
+            .as_ref()
+            .map(|r| format!("{}-{}", r.identity.key(), session.session_id))
+            .unwrap_or_else(|| session.session_id.clone());
         if legacy_watch_service_is_active(&project) {
             state.warnings.push(format!(
                 "Skipped agent-linked watcher for project {} because legacy watcher service {} is active.",
@@ -427,7 +481,7 @@ pub(crate) async fn reconcile_watcher_manager(
             continue;
         }
 
-        let unit_name = managed_watch_service_name(config.profile, &session.session_id);
+        let unit_name = managed_watch_service_name(config.profile, &watcher_id);
         let tracked = state.sessions.contains_key(&session.session_id);
         if watcher_repo_needs_bootstrap(reason, tracked) {
             ensure_agent_watch_repo_bootstrap(&repo_root, &project)?;
@@ -435,23 +489,44 @@ pub(crate) async fn reconcile_watcher_manager(
         let tracked_unit_matches = state
             .sessions
             .get(&session.session_id)
-            .is_some_and(|entry| entry.unit_name == unit_name);
+            .is_some_and(|entry| {
+                entry.unit_name == unit_name
+                    && entry.config_path.as_deref() == child_config
+                    && entry.config_fingerprint == config_fingerprint
+            });
+        if tracked
+            && !tracked_unit_matches
+            && let Some(previous) = state.sessions.get(&session.session_id)
+        {
+            stop_managed_watch_service(
+                config.profile,
+                previous
+                    .watcher_id
+                    .as_deref()
+                    .unwrap_or(&session.session_id),
+            )?;
+        }
         let mut unit_loaded = tracked && tracked_unit_matches;
         let mut unit_running = tracked && tracked_unit_matches;
         if !tracked || !tracked_unit_matches || verify_units {
-            unit_loaded = managed_watch_service_loaded(config.profile, &session.session_id);
-            unit_running = managed_watch_service_running(config.profile, &session.session_id);
+            unit_loaded = managed_watch_service_loaded(config.profile, &watcher_id);
+            unit_running = managed_watch_service_running(config.profile, &watcher_id);
         }
         if should_start_agent_watcher(unit_loaded, unit_running) {
             if unit_loaded {
-                let _ = stop_managed_watch_service(config.profile, &session.session_id);
+                stop_managed_watch_service(config.profile, &watcher_id)?;
             }
             start_managed_agent_watcher(
                 &repo_root,
                 &project,
                 &session,
                 config.profile,
-                config_path,
+                &ManagedWatcherTarget {
+                    id: &watcher_id,
+                    config_path: child_config,
+                    routing_path: routing_path.as_deref(),
+                    area: route.as_ref().map(|r| r.identity.name.as_str()),
+                },
             )?;
         }
 
@@ -460,6 +535,9 @@ pub(crate) async fn reconcile_watcher_manager(
         state.sessions.insert(
             session.session_id.clone(),
             ManagedWatcherSession {
+                watcher_id: Some(watcher_id),
+                config_path: child_config.map(Path::to_path_buf),
+                config_fingerprint,
                 unit_name: unit_name.clone(),
                 project,
                 repo_root: repo_root.display().to_string(),
@@ -480,9 +558,10 @@ pub(crate) async fn reconcile_watcher_manager(
         .collect::<Vec<_>>();
     for session_id in stale {
         if let Some(entry) = state.sessions.remove(&session_id) {
-            let _ = stop_managed_watch_service(config.profile, &session_id);
+            let watcher_id = entry.watcher_id.as_deref().unwrap_or(&session_id);
+            stop_managed_watch_service(config.profile, watcher_id)?;
             #[cfg(target_os = "macos")]
-            if let Ok(path) = managed_watch_launch_agent_path(config.profile, &session_id) {
+            if let Ok(path) = managed_watch_launch_agent_path(config.profile, watcher_id) {
                 if path.exists() {
                     let _ = fs::remove_file(path);
                 }
@@ -498,9 +577,10 @@ pub(crate) async fn reconcile_watcher_manager(
             Profile::Dev => "dev",
         };
         let prefix = format!("MemoryLayer-ManagedWatch-{profile_name}-");
-        let expected = seen
-            .iter()
-            .map(|session_id| managed_watch_service_name(config.profile, session_id))
+        let expected = state
+            .sessions
+            .values()
+            .map(|entry| entry.unit_name.clone())
             .collect::<std::collections::BTreeSet<_>>();
         for task_name in platform::windows_memory_task_names()
             .into_iter()
@@ -855,12 +935,32 @@ pub(crate) fn managed_watch_service_running(profile: Profile, session_id: &str) 
     }
 }
 
+pub(crate) struct ManagedWatcherTarget<'a> {
+    pub(crate) id: &'a str,
+    pub(crate) config_path: Option<&'a Path>,
+    pub(crate) routing_path: Option<&'a Path>,
+    pub(crate) area: Option<&'a str>,
+}
+
+fn watcher_config_fingerprint(path: &Path) -> Result<String> {
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    for source in [path.to_owned(), mem_config::env_path_for_config(path)] {
+        if source == path || source.exists() {
+            let bytes = fs::read(&source).context("read routed watcher configuration")?;
+            hash.update((bytes.len() as u64).to_le_bytes());
+            hash.update(bytes);
+        }
+    }
+    Ok(format!("{:x}", hash.finalize()))
+}
+
 pub(crate) fn start_managed_agent_watcher(
     repo_root: &Path,
     project: &str,
     session: &LightweightAgentSession,
     profile: Profile,
-    config_path: Option<&Path>,
+    target: &ManagedWatcherTarget<'_>,
 ) -> Result<()> {
     let started_at = DateTime::<Utc>::from_timestamp_millis(session.started_at as i64)
         .unwrap_or_else(Utc::now)
@@ -868,8 +968,8 @@ pub(crate) fn start_managed_agent_watcher(
 
     #[cfg(target_os = "macos")]
     {
-        let plist_path = managed_watch_launch_agent_path(profile, &session.session_id)?;
-        let label = managed_watch_launch_agent_label(profile, &session.session_id);
+        let plist_path = managed_watch_launch_agent_path(profile, target.id)?;
+        let label = managed_watch_launch_agent_label(profile, target.id);
         write_launch_agent(
             &plist_path,
             render_managed_watch_launch_agent(
@@ -878,7 +978,7 @@ pub(crate) fn start_managed_agent_watcher(
                 session,
                 profile,
                 &started_at,
-                config_path,
+                target,
             )?,
             &label,
         )?;
@@ -888,11 +988,17 @@ pub(crate) fn start_managed_agent_watcher(
 
     #[cfg(target_os = "windows")]
     {
-        let task_name = managed_watch_service_name(profile, &session.session_id);
+        let task_name = managed_watch_service_name(profile, target.id);
         let mut arguments = Vec::new();
-        if let Some(path) = config_path {
+        if let Some(path) = target.config_path {
             arguments.push("--config".to_string());
             arguments.push(path.display().to_string());
+        }
+        if let Some(path) = target.routing_path {
+            arguments.extend(["--area-routing".into(), path.display().to_string()]);
+        }
+        if let Some(area) = target.area {
+            arguments.extend(["--area".into(), area.to_owned()]);
         }
         arguments.extend([
             "watcher".to_string(),
@@ -931,7 +1037,7 @@ pub(crate) fn start_managed_agent_watcher(
     let memory_binary = memory_binary_path()?;
 
     #[cfg(all(unix, not(target_os = "macos")))]
-    let unit_name = managed_watch_service_name(profile, &session.session_id);
+    let unit_name = managed_watch_service_name(profile, target.id);
 
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut cmd = ProcessCommand::new("systemd-run");
@@ -953,8 +1059,14 @@ pub(crate) fn start_managed_agent_watcher(
     // service instance the TUI and CLI use for this project.
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        if let Some(path) = config_path {
+        if let Some(path) = target.config_path {
             cmd.arg("--config").arg(path);
+        }
+        if let Some(path) = target.routing_path {
+            cmd.arg("--area-routing").arg(path);
+        }
+        if let Some(area) = target.area {
+            cmd.arg("--area").arg(area);
         }
     }
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -1139,13 +1251,23 @@ pub(crate) fn process_is_alive(pid: u32) -> bool {
 }
 
 pub(crate) fn enable_watch_manager_service(config_path: &Path) -> Result<String> {
+    enable_watch_manager_service_routed(config_path, None)
+}
+
+pub(crate) fn enable_watch_manager_service_routed(
+    config_path: &Path,
+    routing_path: Option<&Path>,
+) -> Result<String> {
+    if let Some(path) = routing_path {
+        mem_config::AreaRouting::read(path)?;
+    }
     #[cfg(target_os = "macos")]
     {
         let plist_path = watch_manager_launch_agent_path()?;
         let label = watch_manager_launch_agent_label();
         write_launch_agent(
             &plist_path,
-            render_watch_manager_launch_agent(config_path)?,
+            render_watch_manager_launch_agent_routed(config_path, routing_path)?,
             label,
         )?;
         bootstrap_launch_agent(&plist_path, label)?;
@@ -1170,13 +1292,19 @@ pub(crate) fn enable_watch_manager_service(config_path: &Path) -> Result<String>
             name: task_name.to_string(),
             description: "Memory Layer watcher manager".to_string(),
             executable: memory_binary_path()?,
-            arguments: vec![
-                "--config".to_string(),
-                config_path.display().to_string(),
-                "watcher".to_string(),
-                "manager".to_string(),
-                "run".to_string(),
-            ],
+            arguments: {
+                let mut arguments = vec![
+                    "--config".to_string(),
+                    config_path.display().to_string(),
+                    "watcher".to_string(),
+                    "manager".to_string(),
+                    "run".to_string(),
+                ];
+                if let Some(path) = routing_path {
+                    arguments.extend(["--area-routing".into(), path.display().to_string()]);
+                }
+                arguments
+            },
             working_directory,
             start_at_logon: true,
             restart_on_failure: true,
@@ -1193,8 +1321,11 @@ pub(crate) fn enable_watch_manager_service(config_path: &Path) -> Result<String>
         let unit_dir = user_systemd_unit_dir()?;
         let unit_path = unit_dir.join(WATCH_MANAGER_UNIT_NAME);
         fs::create_dir_all(&unit_dir).with_context(|| format!("create {}", unit_dir.display()))?;
-        fs::write(&unit_path, render_watch_manager_unit(config_path)?)
-            .with_context(|| format!("write {}", unit_path.display()))?;
+        fs::write(
+            &unit_path,
+            render_watch_manager_unit_routed(config_path, routing_path)?,
+        )
+        .with_context(|| format!("write {}", unit_path.display()))?;
         run_systemctl_user(["daemon-reload"])?;
         run_systemctl_user(["enable", "--now", WATCH_MANAGER_UNIT_NAME])?;
         Ok(format!(
@@ -1247,7 +1378,8 @@ pub(crate) fn disable_watch_manager_service(profile: Profile) -> Result<String> 
                 .with_context(|| format!("remove {}", plist_path.display()))?;
         }
         if let Ok(state) = load_watcher_manager_state(profile) {
-            for session_id in state.sessions.keys() {
+            for (session_id, entry) in &state.sessions {
+                let session_id = entry.watcher_id.as_deref().unwrap_or(session_id);
                 let _ = stop_managed_watch_service(profile, session_id);
                 if let Ok(path) = managed_watch_launch_agent_path(profile, session_id) {
                     if path.exists() {
@@ -1269,7 +1401,8 @@ pub(crate) fn disable_watch_manager_service(profile: Profile) -> Result<String> 
         let task_name = platform::windows_watch_manager_task_name();
         platform::delete_windows_task(task_name)?;
         if let Ok(state) = load_watcher_manager_state(profile) {
-            for session_id in state.sessions.keys() {
+            for (session_id, entry) in &state.sessions {
+                let session_id = entry.watcher_id.as_deref().unwrap_or(session_id);
                 let _ = stop_managed_watch_service(profile, session_id);
             }
         }
@@ -1430,34 +1563,57 @@ pub(crate) fn watch_manager_service_status(profile: Profile) -> Result<String> {
     }
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(all(test, unix, not(target_os = "macos")))]
 pub(crate) fn render_watch_manager_unit(config_path: &Path) -> Result<String> {
+    render_watch_manager_unit_routed(config_path, None)
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+pub(crate) fn render_watch_manager_unit_routed(
+    config_path: &Path,
+    routing_path: Option<&Path>,
+) -> Result<String> {
     let memory_binary = memory_binary_path()?;
     let home = env::var("HOME").unwrap_or_else(|_| "/".to_string());
     Ok(format!(
-        "[Unit]\nDescription=Memory Layer Watcher Manager\nAfter=default.target\n\n[Service]\nType=simple\nWorkingDirectory={}\nExecStart={} --config {} watcher manager run\nRestart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
+        "[Unit]\nDescription=Memory Layer Watcher Manager\nAfter=default.target\n\n[Service]\nType=simple\nWorkingDirectory={}\nExecStart={} --config {}{} watcher manager run\nRestart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
         shell_escape_str(&home),
         shell_escape_path(&memory_binary),
         shell_escape_path(config_path),
+        routing_path
+            .map(|path| format!(" --area-routing {}", shell_escape_path(path)))
+            .unwrap_or_default(),
     ))
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(test, target_os = "macos"))]
 pub(crate) fn render_watch_manager_launch_agent(config_path: &Path) -> Result<String> {
+    render_watch_manager_launch_agent_routed(config_path, None)
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn render_watch_manager_launch_agent_routed(
+    config_path: &Path,
+    routing_path: Option<&Path>,
+) -> Result<String> {
     let binary = memory_binary_path()?;
     let working_directory =
         macos_app_support_dir().ok_or_else(|| anyhow::anyhow!("HOME is not set"))?;
     let log_dir = user_memory_layer_log_dir()?;
     let stdout_path = log_dir.join("memory-watch-manager.stdout.log");
     let stderr_path = log_dir.join("memory-watch-manager.stderr.log");
-    let command = launch_agent_shell_command(&[
+    let mut arguments = vec![
         binary.display().to_string(),
         "--config".to_string(),
         config_path.display().to_string(),
         "watcher".to_string(),
         "manager".to_string(),
         "run".to_string(),
-    ])?;
+    ];
+    if let Some(path) = routing_path {
+        arguments.extend(["--area-routing".into(), path.display().to_string()]);
+    }
+    let command = launch_agent_shell_command(&arguments)?;
     render_launch_agent_plist(
         watch_manager_launch_agent_label(),
         &working_directory,
@@ -1522,7 +1678,7 @@ pub(crate) fn stop_managed_watch_service(profile: Profile, session_id: &str) -> 
 #[cfg(all(unix, not(target_os = "macos")))]
 pub(crate) fn stop_unit_if_present(unit_name: &str) -> Result<()> {
     if unit_is_loaded(unit_name) {
-        let _ = run_systemctl_user(["stop", unit_name]);
+        run_systemctl_user(["stop", unit_name])?;
         let _ = run_systemctl_user(["reset-failed", unit_name]);
     }
     Ok(())
@@ -1802,14 +1958,14 @@ pub(crate) fn render_managed_watch_launch_agent(
     session: &LightweightAgentSession,
     profile: Profile,
     started_at: &str,
-    config_path: Option<&Path>,
+    target: &ManagedWatcherTarget<'_>,
 ) -> Result<String> {
     let binary = memory_binary_path()?;
     let working_directory = repo_root
         .canonicalize()
         .with_context(|| format!("canonicalize {}", repo_root.display()))?;
     let log_dir = user_memory_layer_log_dir()?;
-    let sanitized = sanitize_service_fragment(&session.session_id);
+    let sanitized = sanitize_service_fragment(target.id);
     let profile_prefix = match profile {
         Profile::Prod => String::new(),
         Profile::Dev => "dev-".to_string(),
@@ -1823,9 +1979,15 @@ pub(crate) fn render_managed_watch_launch_agent(
     let mut args = vec![binary.display().to_string()];
     // Prefer the resolved project config so the watcher talks to the same
     // service instance the TUI and CLI use for this project.
-    if let Some(path) = config_path {
+    if let Some(path) = target.config_path {
         args.push("--config".to_string());
         args.push(path.display().to_string());
+    }
+    if let Some(path) = target.routing_path {
+        args.extend(["--area-routing".into(), path.display().to_string()]);
+    }
+    if let Some(area) = target.area {
+        args.extend(["--area".into(), area.to_owned()]);
     }
     args.extend([
         "watcher".to_string(),
@@ -1846,7 +2008,7 @@ pub(crate) fn render_managed_watch_launch_agent(
     let command = launch_agent_shell_command(&args)?;
     let command = format!("export MEMORY_LAYER_WATCH_SERVICE_MANAGED=1; {command}");
     render_launch_agent_plist(
-        &managed_watch_launch_agent_label(profile, &session.session_id),
+        &managed_watch_launch_agent_label(profile, target.id),
         &working_directory,
         &command,
         &stdout_path,

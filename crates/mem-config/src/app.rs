@@ -40,6 +40,11 @@ pub struct TelemetryConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    /// Named local database ownership, independent from supervisor grants.
+    #[serde(default)]
+    pub area: Option<crate::area::AreaIdentityConfig>,
+    #[serde(skip)]
+    pub resolved_area_routing_path: Option<PathBuf>,
     /// Explicit durable identity; does not enroll, bind or activate a supervisor.
     #[serde(default)]
     pub supervisor: Option<SupervisorIdentityConfig>,
@@ -209,6 +214,34 @@ impl AppConfig {
         config.resolved_config_path = resolved_config_path;
         config.resolved_dev_overlay_path = resolved_dev_overlay_path;
         config.apply_runtime_defaults();
+        if let Some(area) = &config.area {
+            area.validate()?;
+            config.automation.area = Some(area.clone());
+            let base = config
+                .offline
+                .path
+                .clone()
+                .or_else(|| {
+                    config
+                        .resolved_dev_overlay_path
+                        .as_ref()
+                        .or(config.resolved_config_path.as_ref())
+                        .and_then(|path| {
+                            path.parent()
+                                .map(|parent| parent.join("memory-layer.duckdb"))
+                        })
+                })
+                .or_else(|| {
+                    mem_platform::preferred_user_state_dir()
+                        .map(|dir| dir.join("memory-layer.duckdb"))
+                })
+                .ok_or_else(|| {
+                    ConfigError::Message(
+                        "area offline storage requires an explicit path".to_owned(),
+                    )
+                })?;
+            config.offline.path = Some(area.offline_path(&base));
+        }
         Ok(config)
     }
 

@@ -10,7 +10,7 @@ use std::process::Command as ProcessCommand;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 use mem_config::{AppConfig, Profile};
 use mem_platform as platform;
@@ -1303,6 +1303,12 @@ pub(in crate::commands) struct Cli {
     /// Use a specific config file instead of the discovered default.
     #[arg(long, env = "MEMORY_LAYER_CONFIG")]
     pub(crate) config: Option<PathBuf>,
+    /// Select an operator-configured knowledge area.
+    #[arg(long, global = true, env = "MEMORY_LAYER_AREA")]
+    pub(crate) area: Option<String>,
+    /// Operator-owned routing policy; never loaded from a repository.
+    #[arg(long, global = true, env = "MEMORY_LAYER_AREA_ROUTING")]
+    pub(crate) area_routing: Option<PathBuf>,
     /// Override the writer identity used for write-capable commands.
     #[arg(
         long = "writer-id",
@@ -3603,14 +3609,50 @@ pub(super) async fn run() -> Result<()> {
         return Ok(());
     }
 
+    let matches = Cli::command().get_matches();
+    let project = super::area::matched_string(&matches, "project");
+    let repository_arg = super::area::matched_path(&matches, "repo_root");
     let Cli {
-        config: cli_config,
+        config: mut cli_config,
+        area,
+        area_routing,
         writer_id: cli_writer_id,
         command,
-    } = Cli::parse();
+    } = Cli::from_arg_matches(&matches)?;
+    let cwd = env::current_dir().context("read routing working directory")?;
+    let repository = if let Some(path) = repository_arg {
+        Some(
+            path.canonicalize()
+                .context("resolve explicit repository for area routing")?,
+        )
+    } else {
+        platform::discover_project_root(&cwd)
+    };
+    let project = project.or_else(|| {
+        repository
+            .as_deref()
+            .and_then(mem_config::read_repo_project_slug)
+    });
+    let (routing_path, route) = super::area::resolve_cli_area(
+        &command,
+        cli_config.as_deref(),
+        area.as_deref(),
+        area_routing,
+        repository.as_deref(),
+        project.as_deref(),
+        Profile::detect(),
+    )?;
+    if let Some(route) = &route {
+        cli_config = Some(route.config.clone());
+    }
 
     if let Command::Watcher(args) = &command
-        && !crate::commands::watcher::handle_pre_config(args, cli_config.clone()).await?
+        && !crate::commands::watcher::handle_pre_config(
+            args,
+            cli_config.clone(),
+            routing_path.as_deref(),
+        )
+        .await?
     {
         return Ok(());
     }
@@ -3656,7 +3698,8 @@ pub(super) async fn run() -> Result<()> {
     }
 
     let cli_config_path = cli_config.clone();
-    let config = AppConfig::load_from_path(cli_config).context("load config")?;
+    let mut config = AppConfig::load_from_path(cli_config).context("load config")?;
+    config.resolved_area_routing_path = routing_path;
     let client = Client::builder()
         .timeout(config.service.request_timeout)
         .default_headers(write_headers(&config)?)

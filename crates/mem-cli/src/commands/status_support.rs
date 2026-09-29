@@ -63,6 +63,8 @@ pub(crate) struct DoctorReport {
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct CliStatusReport {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) area: Option<mem_config::AreaIdentityConfig>,
     pub(crate) project: String,
     pub(crate) repo_root: String,
     pub(crate) config_path: String,
@@ -211,6 +213,7 @@ pub(crate) async fn build_cli_status_report(
     };
 
     Ok(CliStatusReport {
+        area: config.area.clone(),
         project,
         repo_root: repo_root.display().to_string(),
         config_path: config_path.display().to_string(),
@@ -332,6 +335,9 @@ pub(crate) fn print_cli_status_report(report: &CliStatusReport) {
         doctor_status_label(report.summary.overall)
     );
     println!("Project: {}", report.project);
+    if let Some(area) = &report.area {
+        println!("Area: {} ({})", area.name, area.instance_id);
+    }
     println!("Repo root: {}", report.repo_root);
     println!("Config: {}", report.config_path);
     println!("Service install: {}", report.service.summary);

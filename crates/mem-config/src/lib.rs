@@ -4,6 +4,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 pub mod app;
+pub mod area;
 pub mod auth;
 pub mod discovery;
 pub mod embeddings;
@@ -15,6 +16,7 @@ pub mod profile;
 pub mod repo;
 
 pub use app::*;
+pub use area::*;
 pub use auth::*;
 pub use discovery::*;
 pub use embeddings::*;

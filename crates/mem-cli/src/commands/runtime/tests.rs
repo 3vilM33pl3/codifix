@@ -2271,6 +2271,9 @@ fn managed_watcher_prefers_real_session_over_tracked_pending_process() {
         pending.session_id.clone(),
         ManagedWatcherSession {
             unit_name: "pending.service".to_string(),
+            watcher_id: None,
+            config_path: None,
+            config_fingerprint: None,
             project: "memory".to_string(),
             repo_root: repo_root.display().to_string(),
             agent_cli: "codex".to_string(),
@@ -2309,6 +2312,9 @@ fn managed_watcher_keeps_stable_real_session_for_repo() {
         tracked_session.session_id.clone(),
         ManagedWatcherSession {
             unit_name: "tracked.service".to_string(),
+            watcher_id: None,
+            config_path: None,
+            config_fingerprint: None,
             project: "memory".to_string(),
             repo_root: repo_root.display().to_string(),
             agent_cli: "codex".to_string(),
@@ -2388,6 +2394,9 @@ fn managed_watcher_reuses_tracked_repository_for_same_process() {
         session.session_id.clone(),
         ManagedWatcherSession {
             unit_name: "tracked.service".to_string(),
+            watcher_id: None,
+            config_path: None,
+            config_fingerprint: None,
             project: "memory".to_string(),
             repo_root: repo_root.display().to_string(),
             agent_cli: "codex".to_string(),
@@ -2424,6 +2433,18 @@ fn watch_manager_unit_uses_manager_subcommand() {
     let unit = render_watch_manager_unit(Path::new("/tmp/memory-layer.toml")).unwrap();
     assert!(unit.contains("watcher manager run"));
     assert!(unit.contains("Restart=always"));
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn watch_manager_unit_retains_an_explicit_operator_routing_file() {
+    let unit = crate::commands::watch_support::render_watch_manager_unit_routed(
+        Path::new("/operator/general.toml"),
+        Some(Path::new("/operator/company routes.json")),
+    )
+    .unwrap();
+    assert!(unit.contains("--area-routing '/operator/company routes.json'"));
+    assert!(unit.contains("--config /operator/general.toml"));
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -2547,7 +2568,12 @@ fn managed_watch_launch_agent_uses_agent_metadata() {
         &session,
         Profile::Prod,
         "2026-04-10T00:00:00Z",
-        None,
+        &super::super::watch_support::ManagedWatcherTarget {
+            id: "session-123",
+            config_path: None,
+            routing_path: None,
+            area: None,
+        },
     )
     .unwrap();
 
@@ -2789,6 +2815,8 @@ fn write_file_if_changed_skips_identical_content() {
 
 fn test_app_config() -> AppConfig {
     AppConfig {
+        area: None,
+        resolved_area_routing_path: None,
         supervisor: None,
         evaluation: Default::default(),
         background_work: Default::default(),

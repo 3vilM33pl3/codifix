@@ -77,6 +77,9 @@ impl BackgroundWorkConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomationConfig {
+    /// Derived from the owning AppConfig, never trusted from repo settings.
+    #[serde(skip)]
+    pub area: Option<crate::area::AreaIdentityConfig>,
     #[serde(default)]
     pub enabled: bool,
     #[serde(default)]
@@ -572,6 +575,7 @@ impl Default for ReinforcementConfig {
 impl Default for AutomationConfig {
     fn default() -> Self {
         Self {
+            area: None,
             enabled: false,
             mode: AutomationMode::Suggest,
             repo_root: None,

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::{
     WatcherAgentOwner, build_watcher_heartbeat_request, build_watcher_unregister_request,
@@ -57,9 +57,14 @@ pub async fn run_loop(
     );
     let repo_root = resolve_repo_root(&config, args.repo_root)?;
     let project = resolve_project(args.project, &repo_root)?;
+    let _owner_lock = acquire_watcher_lock(&config.automation, &repo_root)?;
     let client = Client::new();
     let state = load_state(&project, &repo_root, &config.automation).await?;
-    let watcher_id = Uuid::new_v4().to_string();
+    let watcher_id = config
+        .area
+        .as_ref()
+        .map(|area| format!("{}-{}", area.key(), Uuid::new_v4()))
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
     let hostname = detect_hostname();
     let host_service_id = config.cluster.service_id.clone();
     let managed_by_service = args.service_managed || watcher_is_service_managed();
@@ -200,6 +205,32 @@ pub async fn run_loop(
         }
     }
     Ok(())
+}
+
+/// Keep the file descriptor for the lifetime of the daemon. Kernel locks are
+/// released on crash and restart, and retaining the inode avoids unlink races.
+fn acquire_watcher_lock(
+    config: &mem_config::AutomationConfig,
+    repo: &Path,
+) -> Result<std::fs::File> {
+    let path = crate::state_path(config, repo).with_extension("watcher.lock");
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true).write(true).create(true).truncate(false);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(&path)?;
+    file.try_lock().map_err(|error| {
+        anyhow::anyhow!(
+            "watcher already owns this area/repository, or its lock is unavailable: {error}"
+        )
+    })?;
+    Ok(file)
 }
 
 struct RepoEventSource {
@@ -444,6 +475,35 @@ mod tests {
     use std::{fs, path::PathBuf, sync::Mutex};
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn area_watcher_lock_rejects_duplicates_and_recovers_on_drop() {
+        let root = std::env::temp_dir().join(format!("memory-area-lock-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&root).expect("create lock fixture");
+        let mut first = mem_config::AutomationConfig {
+            state_file_path: Some(root.join("state.json").display().to_string()),
+            ..Default::default()
+        };
+        first.area = Some(mem_config::AreaIdentityConfig {
+            name: "workshop".into(),
+            instance_id: uuid::Uuid::new_v4(),
+        });
+        let mut second = first.clone();
+        second.area = Some(mem_config::AreaIdentityConfig {
+            name: "homelab".into(),
+            instance_id: uuid::Uuid::new_v4(),
+        });
+        let owner = super::acquire_watcher_lock(&first, &root).expect("first watcher owns lock");
+        assert!(super::acquire_watcher_lock(&first, &root).is_err());
+        let unrelated =
+            super::acquire_watcher_lock(&second, &root).expect("separate area owns lock");
+        drop(owner);
+        let recovered =
+            super::acquire_watcher_lock(&first, &root).expect("released lock is reusable");
+        drop(recovered);
+        drop(unrelated);
+        fs::remove_dir_all(root).expect("clean lock fixture");
+    }
 
     fn restore_env_var(key: &str, value: Option<String>) {
         unsafe {

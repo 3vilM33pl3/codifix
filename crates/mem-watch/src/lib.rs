@@ -87,23 +87,37 @@ pub fn default_runtime_dir(repo_root: &Path) -> PathBuf {
 }
 
 pub fn state_path(config: &AutomationConfig, repo_root: &Path) -> PathBuf {
-    config
+    let base = config
         .state_file_path
         .as_ref()
         .map(PathBuf::from)
-        .unwrap_or_else(|| default_runtime_dir(repo_root).join("automation-state.json"))
+        .unwrap_or_else(|| default_runtime_dir(repo_root).join("automation-state.json"));
+    area_runtime_path(config, base)
+}
+
+fn area_runtime_path(config: &AutomationConfig, base: PathBuf) -> PathBuf {
+    config
+        .area
+        .as_ref()
+        .map(|area| area.offline_path(&base))
+        .unwrap_or(base)
 }
 
 pub fn flush_path(repo_root: &Path) -> PathBuf {
     default_runtime_dir(repo_root).join("automation-flush")
 }
 
+pub fn area_flush_path(config: &AutomationConfig, repo_root: &Path) -> PathBuf {
+    area_runtime_path(config, flush_path(repo_root))
+}
+
 pub fn audit_log_path(config: &AutomationConfig, repo_root: &Path) -> PathBuf {
-    config
+    let base = config
         .audit_log_path
         .as_ref()
         .map(PathBuf::from)
-        .unwrap_or_else(|| default_runtime_dir(repo_root).join("automation.log"))
+        .unwrap_or_else(|| default_runtime_dir(repo_root).join("automation.log"));
+    area_runtime_path(config, base)
 }
 
 pub async fn load_state(
@@ -641,9 +655,9 @@ pub async fn run_once(
     let changed = detect_changed_files(repo_root, &config.automation.ignored_paths)?;
     update_session_from_repo(&mut state, changed, &config.automation);
 
-    let flush_requested = explicit_flush || flush_path(repo_root).exists();
+    let flush_requested = explicit_flush || area_flush_path(&config.automation, repo_root).exists();
     if flush_requested {
-        let _ = tokio::fs::remove_file(flush_path(repo_root)).await;
+        let _ = tokio::fs::remove_file(area_flush_path(&config.automation, repo_root)).await;
     }
 
     let (capture, capture_reason) = should_capture(&state, &config.automation, flush_requested);
@@ -913,6 +927,33 @@ mod tests {
         assert!(!owner_session_is_alive(&dead));
     }
 
+    #[test]
+    fn area_watchers_do_not_share_state_audit_or_flush_files() {
+        let old = AutomationConfig::default();
+        let repo = Path::new("/same/repo");
+        let mut workshop = old.clone();
+        workshop.area = Some(mem_config::AreaIdentityConfig {
+            name: "workshop".into(),
+            instance_id: uuid::Uuid::new_v4(),
+        });
+        let mut homelab = old.clone();
+        homelab.area = Some(mem_config::AreaIdentityConfig {
+            name: "homelab".into(),
+            instance_id: uuid::Uuid::new_v4(),
+        });
+        assert_ne!(state_path(&old, repo), state_path(&workshop, repo));
+        assert_ne!(state_path(&homelab, repo), state_path(&workshop, repo));
+        assert_ne!(
+            audit_log_path(&homelab, repo),
+            audit_log_path(&workshop, repo)
+        );
+        assert_ne!(
+            area_flush_path(&homelab, repo),
+            area_flush_path(&workshop, repo)
+        );
+        assert_eq!(area_flush_path(&old, repo), flush_path(repo));
+    }
+
     #[tokio::test]
     async fn invalid_automation_state_is_preserved_and_rebuilt() {
         let repo_root = unique_temp_dir("mem-watch-invalid-state");
@@ -1062,6 +1103,8 @@ mod tests {
 
     fn test_app_config() -> AppConfig {
         AppConfig {
+            area: None,
+            resolved_area_routing_path: None,
             supervisor: None,
             evaluation: Default::default(),
             background_work: Default::default(),
