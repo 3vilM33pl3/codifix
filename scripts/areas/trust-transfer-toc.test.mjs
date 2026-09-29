@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SCHEMA60_TABLES, SCHEMA60_SEQUENCES } from './verify-staging.mjs';
+import { SCHEMA60_TABLES, SCHEMA60_SEQUENCES, SCHEMA_PROFILES } from './verify-staging.mjs';
 import { TRUST_TOC_MAX_BYTES, validateTrustDataToc } from './trust-transfer-toc.mjs';
 
 // pg_restore 17 data-only list grammar. Only generated identifiers are used;
@@ -20,6 +20,16 @@ function fixture() {
   return { header, tables, sequences, text: [...header, ...tables, ...sequences, ''].join('\n') };
 }
 const reject = text => assert.throws(() => validateTrustDataToc(text), /Trust transfer data TOC rejected; private diagnostics suppressed/);
+
+test('schema61 TOC requires explicit reviewed profile and exact added table',()=>{
+  const legacy=fixture().text;
+  const next=legacy+'3000; 0 90000 TABLE DATA public area_reconciliation_receipts postgres\n';
+  reject(next);
+  assert.throws(()=>validateTrustDataToc(legacy,SCHEMA_PROFILES[61]));
+  const result=validateTrustDataToc(next,SCHEMA_PROFILES[61]);
+  assert.equal(result.profile,'trust_schema61_data_only_toc');assert.equal(result.table_count,115);
+  assert.throws(()=>validateTrustDataToc(next,{...SCHEMA_PROFILES[61]}));
+});
 
 test('complete schema60 data-only inventory produces a comment-free exact selection list', () => {
   const f = fixture(), result = validateTrustDataToc(f.text);

@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Reduce pg_restore 17 output to the exact COPY/sequence subset accepted by a
 // Trust receiver. No source-provided schema or executable DDL survives.
-import { SCHEMA60_SEQUENCES, SCHEMA60_TABLES } from './verify-staging.mjs';
+import { SCHEMA_PROFILES, checkedProfile } from './verify-staging.mjs';
 
-const tableNames = new Set(SCHEMA60_TABLES.map(value => value.slice('public.'.length)));
-const sequenceNames = new Set(SCHEMA60_SEQUENCES.map(value => value.name.slice('public.'.length)));
 const copyStart = /^COPY public\.([a-z0-9_]+) \(([^;\r\n]+)\) FROM stdin;$/;
 const sequenceSet = /^SELECT pg_catalog\.setval\('public\.([a-z0-9_]+)', ([0-9]+), (true|false)\);$/;
 const meta = /^\\(?:un)?restrict [A-Za-z0-9]+$/;
@@ -21,7 +19,10 @@ function fail() {
   throw new Error('Trust receiver data selection rejected; no private dump diagnostics disclosed');
 }
 
-export function canonicalTrustDataSql(input) {
+export function canonicalTrustDataSql(input, profile = SCHEMA_PROFILES[60]) {
+  checkedProfile(profile);
+  const tableNames = new Set(profile.tables.map(value => value.slice('public.'.length)));
+  const sequenceNames = new Set(profile.sequences.map(value => value.name.slice('public.'.length)));
   if (typeof input !== 'string' || Buffer.byteLength(input) > 256 * 1024 * 1024
       || input.includes('\r') || input.includes('\0')) fail();
   const lines = input.split('\n'), copies = new Map(), sequences = new Map();

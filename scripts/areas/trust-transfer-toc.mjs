@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Pure validation of an exact schema60 data-only pg_restore --list inventory.
 // A valid TOC neither authenticates the archive nor verifies its private rows.
-import { SCHEMA60_TABLES, SCHEMA60_SEQUENCES } from './verify-staging.mjs';
+import { SCHEMA_PROFILES, checkedProfile } from './verify-staging.mjs';
 
 export const TRUST_TOC_MAX_BYTES = 256 * 1024;
 const MAX_LINES = 2048;
 const MAX_LINE_BYTES = 1024;
 const UINT32_MAX = 4294967295;
-const tableNames = new Set(SCHEMA60_TABLES);
-const sequenceNames = new Set(SCHEMA60_SEQUENCES.map(sequence => sequence.name));
 const invalid = () => { throw Error('Trust transfer data TOC rejected; private diagnostics suppressed'); };
 
 function unsigned(value, allowZero) {
@@ -31,7 +29,10 @@ function unsigned(value, allowZero) {
  * A caller must separately bind the exact archive, tool and inspected list; this
  * function does not prevent a caller substituting another archive afterwards.
  */
-export function validateTrustDataToc(text) {
+export function validateTrustDataToc(text, profile = SCHEMA_PROFILES[60]) {
+  checkedProfile(profile);
+  const tableNames = new Set(profile.tables);
+  const sequenceNames = new Set(profile.sequences.map(sequence => sequence.name));
   if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > TRUST_TOC_MAX_BYTES
     || !text.endsWith('\n') || /[^\x20-\x7e\n]/.test(text)) invalid();
   const lines = text.split('\n');
@@ -62,7 +63,7 @@ export function validateTrustDataToc(text) {
   if (seenTables.size !== tableNames.size || seenSequences.size !== sequenceNames.size) invalid();
   return {
     schema_version: 1,
-    profile: 'trust_schema60_data_only_toc',
+    profile: `trust_schema${profile.head}_data_only_toc`,
     table_count: seenTables.size,
     sequence_count: seenSequences.size,
     entries,

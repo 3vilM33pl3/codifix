@@ -142,6 +142,17 @@ export const SCHEMA60_SEQUENCES = [
 ].map(([name, table, column, dependency]) => ({ name: 'public.' + name, data_type: 'bigint',
   start_value: '1', increment_by: '1', min_value: '1', max_value: '9223372036854775807', cache_size: '1', cycle: false,
   owner_table: 'public.' + table, owner_column: column, dependency_type: dependency }));
+export const SCHEMA61_TABLES = [...SCHEMA60_TABLES, 'public.area_reconciliation_receipts'].sort();
+// These are separate reviewed catalogs. Legacy contracts never auto-detect or
+// silently accept a newer migration head from the target database.
+export const SCHEMA_PROFILES = Object.freeze({
+  60: Object.freeze({ head: 60, sha256: '2ce8b07f9c8fc252b0162d158ccb8e57082c2186306cdc489c9343ec91a115dc',
+    tables: Object.freeze(SCHEMA60_TABLES), sequences: SCHEMA60_SEQUENCES }),
+  61: Object.freeze({ head: 61, sha256: 'e502de46fba6435667e2562b2e1758d262c33dc86952e3ec1c0b6616cf539576',
+    tables: Object.freeze(SCHEMA61_TABLES), sequences: SCHEMA60_SEQUENCES }),
+});
+Object.freeze(SCHEMA60_SEQUENCES);
+for (const sequence of SCHEMA60_SEQUENCES) Object.freeze(sequence);
 const sha = /^[0-9a-f]{64}$/;
 const uuid = /^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -156,13 +167,30 @@ function binding(value) {
   exact(value, ['path', 'sha256']);
   if (!isAbsolute(value.path ?? '') || !sha.test(value.sha256)) fail();
 }
+export function checkedProfile(profile) {
+  if (!Object.values(SCHEMA_PROFILES).includes(profile)) fail();
+  return profile;
+}
+export function schemaProfile(plan) {
+  exact(plan, ['status', 'migration_head', 'migrations', 'schema_sha256', 'creates_credentials', 'starts_services']);
+  const profile = SCHEMA_PROFILES[plan.migration_head];
+  if (!Number.isSafeInteger(plan.migration_head) || !profile || plan.status !== 'schema_plan_only_no_database_connection'
+    || plan.migrations !== profile.head || plan.schema_sha256 !== profile.sha256
+    || plan.creates_credentials !== false || plan.starts_services !== false) fail();
+  return profile;
+}
+export async function contractProfile(contract) {
+  return contract.schema_version === 3
+    ? schemaProfile(await bound(contract.schema_plan, 64 * 1024, true)) : SCHEMA_PROFILES[60];
+}
 export function validateContract(c) {
-  exact(c, ['schema_version', 'kind', 'prepared', 'manifest', 'archive', 'targets']);
-  const full = c.schema_version === 1 && c.kind === 'four_inactive_staging' && c.targets?.length === 4;
-  const subset = c.schema_version === 2 && c.kind === 'inactive_staging_subset'
+  exact(c, ['schema_version', 'kind', 'prepared', 'manifest', 'archive', 'targets', ...(c?.schema_version === 3 ? ['schema_plan'] : [])]);
+  const full = [1, 3].includes(c.schema_version) && c.kind === 'four_inactive_staging' && c.targets?.length === 4;
+  const subset = [2, 3].includes(c.schema_version) && c.kind === 'inactive_staging_subset'
     && Array.isArray(c.targets) && c.targets.length >= 1 && c.targets.length <= AREAS.length;
   if ((!full && !subset) || !Array.isArray(c.targets)) fail();
   for (const name of ['prepared', 'manifest', 'archive']) binding(c[name]);
+  if (c.schema_version === 3) binding(c.schema_plan);
   for (const t of c.targets) {
     exact(t, ['area', 'target', 'container_id', 'container_name', 'image_id', 'operation_id']);
     binding(t.target);
@@ -173,6 +201,7 @@ export function validateContract(c) {
     if (new Set(c.targets.map(t => t[field])).size !== c.targets.length) fail();
   }
   if (new Set([...['prepared','manifest','archive'].map(k => c[k].path), ...c.targets.map(t => t.target.path)]).size !== 3 + c.targets.length) fail();
+  if (c.schema_version === 3 && [c.prepared.path,c.manifest.path,c.archive.path,...c.targets.map(t=>t.target.path)].includes(c.schema_plan.path)) fail();
   return c;
 }
 export function validateTarget(t, target, metadata, sourceInstance) {
@@ -198,7 +227,8 @@ async function bound(file, limit, json) {
   if (value.sha256 !== file.sha256) fail();
   return value.value;
 }
-export function makeExpected(prepared, manifest) {
+export function makeExpected(prepared, manifest, profile = SCHEMA_PROFILES[60]) {
+  checkedProfile(profile);
   if (prepared.format_version !== 1 || manifest.format_version !== 2
     || prepared.source_instance !== manifest.source_instance || prepared.snapshot_id !== manifest.snapshot_id
     || prepared.inventory_sha256 !== manifest.inventory_sha256 || !sha.test(prepared.manifest_sha256)
@@ -206,7 +236,7 @@ export function makeExpected(prepared, manifest) {
     || !same([...manifest.areas].sort(), AREAS) || prepared.partitions.length !== 4) fail();
   const historical = ['_sqlx_migrations','curation_runs','memory_chunks','memory_entries','memory_relations','memory_sources','memory_tags','projects','raw_captures','sessions','tasks']
     .map(name => 'mab_full_20260516_150014.' + name);
-  const allowed = new Set([...SCHEMA60_TABLES, ...historical]);
+  const allowed = new Set([...profile.tables, ...historical]);
   if (!Array.isArray(manifest.table_policies)) fail();
   const archiveTables = new Set(manifest.table_policies.map(t => t.table));
   if (archiveTables.size !== manifest.table_policies.length || archiveTables.size !== prepared.source_tables
@@ -243,7 +273,7 @@ export function makeExpected(prepared, manifest) {
       || !sha.test(p.operator_attestation.decision_sha256) || projections.has(b.source.record.key)) fail();
     projections.set(b.source.record.key, p);
   }
-  return { prepared, expected, owners, relationOwners, projections, archiveTables, seenProjections: new Set(), sourceRows: 0, sourceTables: new Set(), lastRecord: null };
+  return { schemaProfile: profile, prepared, expected, owners, relationOwners, projections, archiveTables, seenProjections: new Set(), sourceRows: 0, sourceTables: new Set(), lastRecord: null };
 }
 // Only the fixed shallow projection schema is encoded here; arbitrary PostgreSQL
 // jsonb/numeric canonicalization remains PostgreSQL's responsibility.
@@ -343,24 +373,26 @@ export function stagingSession(container, database) {
     abort() { child.stdin.destroy(); child.kill('SIGTERM'); child.stdout.destroy(); } };
 }
 const seedCounts = { 'public.supervisor_authorities': 4, 'public.supervisor_journal_heads': 4, 'public.timeline_position': 1, 'public.loop_global_state': 1 };
-export function validateSequenceCatalog(sequences) {
-  if (!Array.isArray(sequences) || sequences.length !== SCHEMA60_SEQUENCES.length) fail();
+export function validateSequenceCatalog(sequences, profile = SCHEMA_PROFILES[60]) {
+  checkedProfile(profile);
+  if (!Array.isArray(sequences) || sequences.length !== profile.sequences.length) fail();
   const seen = new Set();
   for (const s of sequences) {
-    const expected = SCHEMA60_SEQUENCES.find(e => e.name === s?.name);
+    const expected = profile.sequences.find(e => e.name === s?.name);
     if (!expected || seen.has(s.name)) fail();
     exact(s, Object.keys(expected));
     if (Object.entries(expected).some(([k,v]) => s[k] !== v)) fail();
     seen.add(s.name);
   }
 }
-export function targetSql(tables) {
-  if (!same(tables.map(t => t.schema + '.' + t.name).sort(), SCHEMA60_TABLES) || tables.some(t => t.kind !== 'r' || t.is_partition)) fail();
+export function targetSql(tables, profile = SCHEMA_PROFILES[60]) {
+  checkedProfile(profile);
+  if (!same(tables.map(t => t.schema + '.' + t.name).sort(), profile.tables) || tables.some(t => t.kind !== 'r' || t.is_partition)) fail();
   const sql = ["SET LOCAL statement_timeout='120s';"];
   sql.push(`SELECT json_build_object('event','safety','database',current_database(),'read_only',current_setting('transaction_read_only'),
     'clients',(SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend'),
     'migrations',(SELECT count(*) FROM public._sqlx_migrations),'migration_head',(SELECT max(version) FROM public._sqlx_migrations),
-    'failed_migrations',(SELECT count(*) FROM public._sqlx_migrations WHERE NOT success OR version NOT BETWEEN 1 AND 60),
+    'failed_migrations',(SELECT count(*) FROM public._sqlx_migrations WHERE NOT success OR version NOT BETWEEN 1 AND ${profile.head}),
     'invalid_indexes',(SELECT count(*) FROM pg_index WHERE NOT indisvalid),
     'invalid_constraints',(SELECT count(*) FROM pg_constraint WHERE NOT convalidated),
     'unsafe_seeds',(SELECT count(*) FROM public.supervisor_authorities WHERE current_revision IS NOT NULL)
@@ -381,7 +413,7 @@ export function targetSql(tables) {
       LEFT JOIN pg_class ownc ON ownc.oid=d.refobjid LEFT JOIN pg_namespace ownn ON ownn.oid=ownc.relnamespace
       LEFT JOIN pg_attribute owna ON owna.attrelid=d.refobjid AND owna.attnum=d.refobjsubid
       WHERE c.relkind='S' AND n.nspname<>'information_schema' AND n.nspname !~ '^pg_') s;`);
-  for (const s of SCHEMA60_SEQUENCES) {
+  for (const s of profile.sequences) {
     const [schema, name] = s.name.split('.');
     sql.push("SELECT json_build_object('event','sequence_state','name'," + literal(s.name)
       + ",'last_value',last_value::text,'is_called',is_called)::text FROM " + identifier(schema) + '.' + identifier(name) + ';');
@@ -398,6 +430,7 @@ export function targetSql(tables) {
   return sql.join('\n');
 }
 export async function verifyDatabase(io, spec, target, state) {
+  const profile = checkedProfile(state.schemaProfile ?? SCHEMA_PROFILES[60]);
   const expected = state.expected.get(spec.area), partition = state.prepared.partitions.find(p => p.area === spec.area);
   const counts = new Map(), seen = new Set(), receipts = new Set(), provenance = new Set(), sequences = new Set();
   let catalog = false, safety = false, receipt = false, complete = false, sequenceCatalog = false;
@@ -407,20 +440,20 @@ export async function verifyDatabase(io, spec, target, state) {
       if (!line.trim()) continue;
       const e = JSON.parse(line);
       if (complete) fail();
-      if (e.event === 'catalog' && !catalog) { catalog = true; io.send(targetSql(e.tables)); }
+      if (e.event === 'catalog' && !catalog) { catalog = true; io.send(targetSql(e.tables, profile)); }
       else if (e.event === 'safety' && catalog && !safety) {
-        if (e.database !== target.database || e.read_only !== 'on' || e.clients !== 0 || e.migrations !== 60 || e.migration_head !== 60
+        if (e.database !== target.database || e.read_only !== 'on' || e.clients !== 0 || e.migrations !== profile.head || e.migration_head !== profile.head
           || ['failed_migrations','invalid_indexes','invalid_constraints','unsafe_seeds','broken_links'].some(k => e[k] !== 0)) fail();
         safety = true;
       } else if (e.event === 'sequence_catalog' && safety && !sequenceCatalog) {
-        validateSequenceCatalog(e.sequences); sequenceCatalog = true;
+        validateSequenceCatalog(e.sequences, profile); sequenceCatalog = true;
       } else if (e.event === 'sequence_state' && sequenceCatalog) {
         exact(e, ['event','name','last_value','is_called']);
-        if (!SCHEMA60_SEQUENCES.some(s => s.name === e.name) || sequences.has(e.name)
+        if (!profile.sequences.some(s => s.name === e.name) || sequences.has(e.name)
           || e.last_value !== '1' || e.is_called !== false) fail();
         sequences.add(e.name);
       } else if (e.event === 'count' && safety) {
-        if (!SCHEMA60_TABLES.includes(e.table) || counts.has(e.table) || !Number.isSafeInteger(e.count) || e.count < 0) fail();
+        if (!profile.tables.includes(e.table) || counts.has(e.table) || !Number.isSafeInteger(e.count) || e.count < 0) fail();
         counts.set(e.table, e.count);
       } else if (e.event === 'row' && safety) {
         const key = identity(e.table,e.key), row = expected.rows.get(key);
@@ -430,7 +463,7 @@ export async function verifyDatabase(io, spec, target, state) {
         const pairs = { id:spec.operation_id, target_instance:target.instance_id, area:spec.area, source_instance:state.prepared.source_instance,
           snapshot_id:state.prepared.snapshot_id, inventory_sha256:state.prepared.inventory_sha256, manifest_sha256:state.prepared.manifest_sha256,
           partition_sha256:partition.partition_sha256, row_count:expected.rows.size, projection_count:expected.provenance.size,
-          source_migration:state.sourceMigration, target_migration:60, singleton:true };
+          source_migration:state.sourceMigration, target_migration:profile.head, singleton:true };
         if (Object.entries(pairs).some(([k,v]) => r[k] !== v)) fail(); receipt = true;
       } else if (e.event === 'area_import_rows' && safety) {
         const r = e.row, key = identity(r.table_name,r.record_key), row = expected.rows.get(key);
@@ -444,16 +477,17 @@ export async function verifyDatabase(io, spec, target, state) {
       else fail();
     }
     if (await io.done !== 0 || !complete || !receipt || seen.size !== expected.rows.size || receipts.size !== expected.rows.size
-      || provenance.size !== expected.provenance.size || counts.size !== SCHEMA60_TABLES.length
-      || !sequenceCatalog || sequences.size !== SCHEMA60_SEQUENCES.length) fail();
-    const expectedCounts = new Map(SCHEMA60_TABLES.map(t=>[t,seedCounts[t]??0]));
-    expectedCounts.set('public._sqlx_migrations',60);
+      || provenance.size !== expected.provenance.size || counts.size !== profile.tables.length
+      || !sequenceCatalog || sequences.size !== profile.sequences.length) fail();
+    const expectedCounts = new Map(profile.tables.map(t=>[t,seedCounts[t]??0]));
+    expectedCounts.set('public._sqlx_migrations',profile.head);
     expectedCounts.set('public.area_import_receipts',1);
     expectedCounts.set('public.area_import_rows',expected.rows.size);
     expectedCounts.set('public.area_import_provenance',expected.provenance.size);
     for (const key of expected.rows.keys()) { const t=key.split('\0')[0]; expectedCounts.set(t,expectedCounts.get(t)+1); }
     if ([...counts].some(([table,count])=>count!==expectedCounts.get(table))) fail();
     return { area:spec.area, target_instance:target.instance_id, container_id:spec.container_id,
+      verified_migration_head:profile.head, required_schema_sha256:profile.sha256,
       histories:expected.histories.size, versions:expected.versions, tombstones:expected.tombstones, projects:expected.projects.size,
       relationships:counts.get('public.memory_relations'), projected_sources:expected.provenance.size, verified_rows:seen.size,
       row_and_receipt_hashes_match:true, authority_and_runtime_inactive:true, inactive_sequence_states_match:true, verified_sequences:sequences.size,
@@ -463,11 +497,12 @@ export async function verifyDatabase(io, spec, target, state) {
 export async function verifyFleet(contractFile, contractSha, output, inspect = inspectContainer) {
   if (!sha.test(contractSha) || !isAbsolute(output)) fail();
   const c = validateContract(await bound({path:contractFile,sha256:contractSha},64*1024,true));
-  if (c.schema_version !== 1 || c.kind !== 'four_inactive_staging' || c.targets.length !== 4) fail();
+  if (![1,3].includes(c.schema_version) || c.kind !== 'four_inactive_staging' || c.targets.length !== 4) fail();
   const prepared = await bound(c.prepared,1024*1024,true);
   const manifest = await bound(c.manifest,256*1024*1024,true);
   if (prepared.manifest_file_sha256 !== c.manifest.sha256 || prepared.archive_sha256 !== c.archive.sha256) fail();
-  const state = makeExpected(prepared,manifest);
+  const profile = await contractProfile(c);
+  const state = makeExpected(prepared,manifest,profile);
   const targets=[];
   for (const spec of c.targets) {
     const target=await bound(spec.target,64*1024,true); validateTarget(spec,target,await inspect(spec.container_id),prepared.source_instance);
@@ -482,10 +517,12 @@ export async function verifyFleet(contractFile, contractSha, output, inspect = i
     validateTarget(spec,target,await inspect(spec.container_id),prepared.source_instance);
   }
   for(const file of [c.prepared,c.manifest,...c.targets.map(t=>t.target),{path:contractFile,sha256:contractSha}]) await bound(file,Infinity,false);
+  if (c.schema_version === 3) await bound(c.schema_plan, 64 * 1024, true);
   const report={schema_version:1,status:'four_inactive_partitions_verified_not_activated',observed_at:new Date().toISOString(),
     contract_sha256:contractSha,prepared_sha256:c.prepared.sha256,manifest_file_sha256:c.manifest.sha256,
     manifest_sha256:prepared.manifest_sha256,archive_sha256:c.archive.sha256,source_instance:prepared.source_instance,snapshot_id:prepared.snapshot_id,
-    targets:results,application_checks_passed:false,cutover_ready:false,
+    targets:results,required_migration_head:profile.head,required_schema_sha256:profile.sha256,
+    application_checks_passed:false,cutover_ready:false,
     limitations:['Read-only point-in-time checks require continued writer exclusion.','No service, retrieval or UI is started on an import target.',
       'Source row integrity and reviewed ownership are bound to the prepared archive, not independently re-approved.',
       'Projected provenance is reference-only; raw context stays archived.','Use separately approved disposable clones for application-level checks.']};

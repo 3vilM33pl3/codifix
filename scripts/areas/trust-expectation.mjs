@@ -5,9 +5,11 @@ import { isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { privateInput, inspectContainer } from './restore-descriptor.mjs';
 import { privateArtifact } from './inventory.mjs';
-import { validateContract, validateTarget, makeExpected, readArchive, verifyDatabase, stagingSession } from './verify-staging.mjs';
+import { validateContract, validateTarget, makeExpected, readArchive, verifyDatabase, stagingSession,
+  SCHEMA_PROFILES, checkedProfile, contractProfile } from './verify-staging.mjs';
 
 export const TRUST_SCHEMA = '2ce8b07f9c8fc252b0162d158ccb8e57082c2186306cdc489c9343ec91a115dc';
+export const TRUST_SCHEMA61 = SCHEMA_PROFILES[61].sha256;
 const sha = /^[0-9a-f]{64}$/;
 const uuid = /^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const isSha = value => typeof value === 'string' && sha.test(value);
@@ -49,10 +51,11 @@ function validRowKey(table, key) {
  */
 export function minimizeTrust(state, spec, target, bindings) {
   if (spec.area!=='trust' || target.area!=='trust') fail();
+  const profile = checkedProfile(state.schemaProfile ?? SCHEMA_PROFILES[60]);
   const e=state.expected.get('trust'), p=state.prepared;
-  const value={format:'memory-trust-expectation-v1',area:'trust',required_schema_sha256:TRUST_SCHEMA,
+  const value={format:profile.head===60?'memory-trust-expectation-v1':'memory-trust-expectation-v2',area:'trust',required_schema_sha256:profile.sha256,
     source_instance:p.source_instance,snapshot_id:p.snapshot_id,target_instance:target.instance_id,
-    operation_id:spec.operation_id,source_migration:state.sourceMigration,target_migration:60,
+    operation_id:spec.operation_id,source_migration:state.sourceMigration,target_migration:profile.head,
     inventory_sha256:p.inventory_sha256,manifest_sha256:p.manifest_sha256,
     partition_sha256:p.partitions.find(x=>x.area==='trust').partition_sha256,
     bindings:{...bindings},histories:sorted(e.histories),projects:sorted(e.projects),versions:e.versions,tombstones:e.tombstones,
@@ -77,8 +80,10 @@ export function expandTrust(v) {
   exact(v,['format','area','required_schema_sha256','source_instance','snapshot_id','target_instance','operation_id',
     'source_migration','target_migration','inventory_sha256','manifest_sha256','partition_sha256','bindings',
     'histories','projects','versions','tombstones','rows','provenance','evidence_mode','activation_authorized','current_source_verified']);
-  if (v.format!=='memory-trust-expectation-v1' || v.area!=='trust' || v.required_schema_sha256!==TRUST_SCHEMA
-    || v.target_migration!==60 || !Number.isSafeInteger(v.source_migration) || v.source_migration<52 || v.source_migration>60
+  const profile = v.format === 'memory-trust-expectation-v1' ? SCHEMA_PROFILES[60]
+    : v.format === 'memory-trust-expectation-v2' ? SCHEMA_PROFILES[61] : null;
+  if (!profile || v.area!=='trust' || v.required_schema_sha256!==profile.sha256
+    || v.target_migration!==profile.head || !Number.isSafeInteger(v.source_migration) || v.source_migration<52 || v.source_migration>profile.head
     || v.evidence_mode!=='archive_reference_only' || v.activation_authorized!==false || v.current_source_verified!==false
     || v.source_instance===v.target_instance) fail();
   for(const k of ['source_instance','snapshot_id','target_instance','operation_id']) if(!isUuid(v[k])) fail();
@@ -119,7 +124,7 @@ export function expandTrust(v) {
     const versionId=JSON.parse(key.split('\0')[1])[0];
     if(!rows.has('public.memory_entries\0'+versionId))fail();
   }
-  return {sourceMigration:v.source_migration,prepared:{source_instance:v.source_instance,snapshot_id:v.snapshot_id,
+  return {schemaProfile:profile,sourceMigration:v.source_migration,prepared:{source_instance:v.source_instance,snapshot_id:v.snapshot_id,
     inventory_sha256:v.inventory_sha256,manifest_sha256:v.manifest_sha256,
     partitions:[{area:'trust',partition_sha256:v.partition_sha256,rows:rows.size-provenance.size,projections:provenance.size}]},
     expected:new Map([['trust',{histories,projects,rows,provenance,versions:v.versions,tombstones:v.tombstones}]])};
@@ -135,13 +140,14 @@ export async function prepareExpectation(contractFile,contractSha,output) {
   const c=validateContract(await bound({path:contractFile,sha256:contractSha},64*1024));
   const p=await bound(c.prepared,1024*1024),m=await bound(c.manifest,256*1024*1024);
   if(p.manifest_file_sha256!==c.manifest.sha256||p.archive_sha256!==c.archive.sha256)fail();
-  const state=makeExpected(p,m),spec=c.targets.find(t=>t.area==='trust');
+  const state=makeExpected(p,m,await contractProfile(c)),spec=c.targets.find(t=>t.area==='trust');
   const target=await bound(spec.target,8192);
   validateTarget(spec,target,inspectContainer(spec.container_id),p.source_instance);
   await readArchive(c.archive,state);
   const verified=await verifyDatabase(stagingSession(spec.container_id,target.database),spec,target,state);
   validateTarget(spec,target,inspectContainer(spec.container_id),p.source_instance);
   for(const b of [c.prepared,c.manifest,spec.target,{path:contractFile,sha256:contractSha}])await bound(b,Infinity,false);
+  if (c.schema_version === 3) await bound(c.schema_plan, 64 * 1024);
   const value=minimizeTrust(state,spec,target,{contract_sha256:contractSha,prepared_file_sha256:c.prepared.sha256,
     manifest_file_sha256:c.manifest.sha256,archive_sha256:c.archive.sha256});
   return privateArtifact(output,async write=>{await write(JSON.stringify(value,null,2)+'\n');

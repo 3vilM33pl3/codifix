@@ -2,12 +2,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
-import { readFile, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { readFile, readdir, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SCHEMA60_TABLES, SCHEMA60_SEQUENCES, validateSequenceCatalog, validateContract, validateTarget, makeExpected, consumeOriginal, finishArchive,
+import { SCHEMA60_TABLES, SCHEMA60_SEQUENCES, SCHEMA61_TABLES, SCHEMA_PROFILES, schemaProfile, contractProfile,
+  validateSequenceCatalog, validateContract, validateTarget, makeExpected, consumeOriginal, finishArchive,
   projectedSource, targetSql, verifyDatabase, readArchive, parseArgs, stagingSession } from './verify-staging.mjs';
 
 const id = n => `00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
@@ -41,18 +42,19 @@ function fixture() {
   const state=makeExpected(prepared,manifest);for(const r of rows)consumeOriginal(state,r);finishArchive(state);state.sourceMigration=60;
   return {c,spec,target,prepared,manifest,rows,state,source};
 }
-const catalog=()=>SCHEMA60_TABLES.map(table=>({schema:'public',name:table.slice(7),kind:'r',is_partition:false,primary_key:table.endsWith('memory_tags')?['memory_entry_id','tag']:table.endsWith('memory_canonical_state')?['canonical_id']:['id']}));
+const catalog=(profile=SCHEMA_PROFILES[60])=>profile.tables.map(table=>({schema:'public',name:table.slice(7),kind:'r',is_partition:false,primary_key:table.endsWith('memory_tags')?['memory_entry_id','tag']:table.endsWith('memory_canonical_state')?['canonical_id']:['id']}));
 function events(f) {
-  const e=f.state.expected.get('general'),counts=new Map(SCHEMA60_TABLES.map(t=>[t,0]));
-  for(const [table,count]of Object.entries({'public._sqlx_migrations':60,'public.supervisor_authorities':4,'public.supervisor_journal_heads':4,'public.timeline_position':1,'public.loop_global_state':1,
+  const profile=f.state.schemaProfile??SCHEMA_PROFILES[60];
+  const e=f.state.expected.get('general'),counts=new Map(profile.tables.map(t=>[t,0]));
+  for(const [table,count]of Object.entries({'public._sqlx_migrations':profile.head,'public.supervisor_authorities':4,'public.supervisor_journal_heads':4,'public.timeline_position':1,'public.loop_global_state':1,
     'public.area_import_receipts':1,'public.area_import_rows':e.rows.size,'public.area_import_provenance':e.provenance.size}))counts.set(table,count);
   for(const key of e.rows.keys()){const table=key.split('\0')[0];counts.set(table,counts.get(table)+1);}
-  const rows=[{event:'catalog',tables:catalog()},{event:'safety',database:f.target.database,read_only:'on',clients:0,migrations:60,migration_head:60,failed_migrations:0,invalid_indexes:0,invalid_constraints:0,unsafe_seeds:0,broken_links:0},
+  const rows=[{event:'catalog',tables:catalog(profile)},{event:'safety',database:f.target.database,read_only:'on',clients:0,migrations:profile.head,migration_head:profile.head,failed_migrations:0,invalid_indexes:0,invalid_constraints:0,unsafe_seeds:0,broken_links:0},
     {event:'sequence_catalog',sequences:structuredClone(SCHEMA60_SEQUENCES)},
     ...SCHEMA60_SEQUENCES.map(s=>({event:'sequence_state',name:s.name,last_value:'1',is_called:false})),
     ...[...counts].map(([table,count])=>({event:'count',table,count})),
     {event:'area_import_receipts',row:{singleton:true,id:f.spec.operation_id,target_instance:f.target.instance_id,area:'general',source_instance:f.prepared.source_instance,snapshot_id:f.prepared.snapshot_id,
-      inventory_sha256:f.prepared.inventory_sha256,manifest_sha256:f.prepared.manifest_sha256,partition_sha256:f.prepared.partitions[0].partition_sha256,row_count:e.rows.size,projection_count:e.provenance.size,source_migration:60,target_migration:60}}];
+      inventory_sha256:f.prepared.inventory_sha256,manifest_sha256:f.prepared.manifest_sha256,partition_sha256:f.prepared.partitions[0].partition_sha256,row_count:e.rows.size,projection_count:e.provenance.size,source_migration:60,target_migration:profile.head}}];
   for(const [key,v]of e.rows){const [table,k]=key.split('\0');rows.push({event:'row',table,key:k,sha256:v.target},{event:'area_import_rows',row:{import_id:f.spec.operation_id,table_name:table,record_key:k,source_sha256:v.source,target_sha256:v.target,transformed:v.transformed}});}
   for(const v of e.provenance.values())rows.push({event:'area_import_provenance',row:{import_id:f.spec.operation_id,...v}});
   rows.push({event:'complete'});return rows;
@@ -60,10 +62,56 @@ function events(f) {
 function io(rows,code=0){return {sent:[],aborted:false,async *lines(){for(const e of rows)yield JSON.stringify(e);},done:Promise.resolve(code),send(sql){this.sent.push(sql);},abort(){this.aborted=true;}};}
 function fake(rows,code=0){const x=io(rows,code);x.lines=x.lines();return x;}
 
-test('fixed schema60 table catalog stays aligned with the reviewed Rust allowlist',async()=>{
+test('schema61 catalog extends the preserved schema60 catalog and matches the reviewed Rust allowlist',async()=>{
   const code=(await readFile(new URL('../../crates/mem-area/src/policy.rs',import.meta.url),'utf8')).split('pub(crate) const HISTORICAL_TABLES')[0];
-  assert.deepEqual(SCHEMA60_TABLES,[...new Set([...code.matchAll(/"(public\.[a-z0-9_]+)"/g)].map(m=>m[1]))].sort());
+  assert.deepEqual(SCHEMA61_TABLES,[...new Set([...code.matchAll(/"(public\.[a-z0-9_]+)"/g)].map(m=>m[1]))].sort());
   assert.equal(SCHEMA60_TABLES.length,114);
+  assert.deepEqual(SCHEMA61_TABLES.filter(t=>!SCHEMA60_TABLES.includes(t)),['public.area_reconciliation_receipts']);
+});
+test('reviewed schema profiles bind every migration checksum and compatibility SQL',async()=>{
+  const root=new URL('../../migrations/',import.meta.url);
+  const files=(await readdir(root)).filter(f=>/^\d{4}_[a-z0-9_]+\.sql$/.test(f)).sort();
+  const rust=await readFile(new URL('../../crates/mem-area-ops/src/schema.rs',import.meta.url),'utf8');
+  const compatibility=rust.match(/const VECTOR_COMPAT: &str = r#"([\s\S]*?)"#;/)[1];
+  assert.equal(files.length,61);
+  for(const profile of Object.values(SCHEMA_PROFILES)){
+    const identity=createHash('sha256');
+    for(const [index,file]of files.slice(0,profile.head).entries()){
+      const body=await readFile(new URL(file,root)),version=Buffer.alloc(8);version.writeBigInt64BE(BigInt(index+1));
+      identity.update(version).update(createHash('sha384').update(body).digest()).update(hash(index===3?compatibility:body));
+    }
+    assert.equal(identity.digest('hex'),profile.sha256);
+  }
+});
+const plan61=()=>({status:'schema_plan_only_no_database_connection',migration_head:61,migrations:61,
+  schema_sha256:SCHEMA_PROFILES[61].sha256,creates_credentials:false,starts_services:false});
+test('schema61 requires an explicit bounded schema plan rather than accepting an observed head',async t=>{
+  assert.equal(schemaProfile(plan61()),SCHEMA_PROFILES[61]);
+  for(const mutate of [p=>p.migration_head=62,p=>p.migration_head='61',p=>p.schema_sha256='0'.repeat(64),
+    p=>p.migrations=60,p=>p.starts_services=true,p=>p.extra=true]){
+    const p=plan61();mutate(p);assert.throws(()=>schemaProfile(p));
+  }
+  assert.throws(()=>targetSql(catalog(SCHEMA_PROFILES[61])));
+  assert.throws(()=>targetSql(catalog(),SCHEMA_PROFILES[61]));
+  assert.match(targetSql(catalog(SCHEMA_PROFILES[61]),SCHEMA_PROFILES[61]),/BETWEEN 1 AND 61/);
+  assert.throws(()=>targetSql(catalog(),{...SCHEMA_PROFILES[60]}));
+  const root=await mkdtemp(join(tmpdir(),'memory-schema-plan-'));t.after(()=>rm(root,{recursive:true,force:true}));
+  const body=JSON.stringify(plan61()),path=join(root,'schema-plan.json');await writeFile(path,body,{mode:0o600});
+  const c={...contract(),schema_version:3,schema_plan:{path,sha256:hash(body)}};
+  assert.equal((await contractProfile(validateContract(c))).head,61);
+  c.schema_plan.sha256='0'.repeat(64);await assert.rejects(contractProfile(c));
+  delete c.schema_plan;assert.throws(()=>validateContract(c));
+});
+test('schema61 fresh staging verifies exact catalog and keeps reconciliation runtime empty',async()=>{
+  const f=fixture();f.state.schemaProfile=SCHEMA_PROFILES[61];
+  const result=await verifyDatabase(fake(events(f)),f.spec,f.target,f.state);
+  assert.equal(result.verified_migration_head,61);
+  const changed=events(f);changed.find(e=>e.event==='count'&&e.table==='public.area_reconciliation_receipts').count=1;
+  await assert.rejects(verifyDatabase(fake(changed),f.spec,f.target,f.state));
+  const downgrade=events(f);downgrade.find(e=>e.event==='area_import_receipts').row.target_migration=60;
+  await assert.rejects(verifyDatabase(fake(downgrade),f.spec,f.target,f.state));
+  f.state.schemaProfile=SCHEMA_PROFILES[60];
+  await assert.rejects(verifyDatabase(fake(events({...f,state:{...f.state,schemaProfile:SCHEMA_PROFILES[61]}})),f.spec,f.target,f.state));
 });
 test('contract pins four independent exact identities and refuses extra fields or reused targets',()=>{
   assert.equal(validateContract(contract()).targets.length,4);
@@ -177,6 +225,7 @@ test('real isolated PostgreSQL validates hashes without mutations and refuses ac
   const targetFile=join(root,'target.json'),targetBytes=JSON.stringify(f.target);await writeFile(targetFile,targetBytes,{mode:0o600});
   const binary=process.env.MEMORY_AREA_IMPORT_BINARY??new URL('../../target/debug/memory-area-import',import.meta.url).pathname;
   const plan=JSON.parse(run(binary,['schema-plan']));
+  const profile=schemaProfile(plan);
   run(binary,['initialize-schema','--target',targetFile,'--target-sha256',hash(targetBytes),'--schema-sha256',plan.schema_sha256,'--execute','--writers-stopped','--fresh-database']);
   const psql=sql=>run('docker',['exec','-i',container,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','postgres','-d',f.target.database],{input:sql});
   psql(`INSERT INTO projects(id,slug,name,root_path,created_at) VALUES('${id(1)}','fixture','Fixture','/synthetic','2026-09-19T10:00:00Z');
@@ -191,17 +240,17 @@ test('real isolated PostgreSQL validates hashes without mutations and refuses ac
   }
   rows.push(f.rows.find(r=>r.record.table==='public.memory_sources'));
   rows.sort((a,b)=>Buffer.compare(Buffer.from(a.record.table+'\0'+a.record.key),Buffer.from(b.record.table+'\0'+b.record.key)));
-  const state=makeExpected(f.prepared,f.manifest);for(const row of rows)consumeOriginal(state,row);finishArchive(state);state.sourceMigration=60;
+  const state=makeExpected(f.prepared,f.manifest,profile);for(const row of rows)consumeOriginal(state,row);finishArchive(state);state.sourceMigration=60;
   const projection=projectedSource(f.source);
   assert.equal(psql(`SELECT '${projection.replaceAll("'","''")}'::jsonb::text;`).trim(),projection);
   psql(`INSERT INTO memory_sources SELECT * FROM json_populate_record(NULL::memory_sources,'${projection.replaceAll("'","''")}');`);
   const e=state.expected.get('general'),p=f.prepared;
   psql(`INSERT INTO area_import_receipts(id,target_instance,area,source_instance,snapshot_id,inventory_sha256,manifest_sha256,partition_sha256,source_migration,target_migration,row_count,projection_count)
-    VALUES('${f.spec.operation_id}','${f.target.instance_id}','general','${p.source_instance}','${p.snapshot_id}','${p.inventory_sha256}','${p.manifest_sha256}','${p.partitions[0].partition_sha256}',60,60,4,1);`);
+    VALUES('${f.spec.operation_id}','${f.target.instance_id}','general','${p.source_instance}','${p.snapshot_id}','${p.inventory_sha256}','${p.manifest_sha256}','${p.partitions[0].partition_sha256}',60,${profile.head},4,1);`);
   for(const [key,row]of e.rows){const [table,k]=key.split('\0');psql(`INSERT INTO area_import_rows VALUES('${f.spec.operation_id}','${table}','${k}','${row.source}','${row.target}',${row.transformed});`);}
   for(const row of e.provenance.values())psql(`INSERT INTO area_import_provenance(${['import_id',...Object.keys(row)].join(',')}) VALUES(${[f.spec.operation_id,...Object.values(row)].map(v=>`'${v}'`).join(',')});`);
   const snapshot=()=>psql("SET timezone='UTC'; SELECT md5(string_agg(x,'' ORDER BY x)) FROM (SELECT to_jsonb(r)::text x FROM memory_entries r UNION ALL SELECT to_jsonb(r)::text FROM area_import_receipts r UNION ALL SELECT to_jsonb(r)::text FROM area_import_rows r UNION ALL SELECT to_jsonb(r)::text FROM area_import_provenance r UNION ALL SELECT to_jsonb(r)::text FROM loop_global_state r) s;").trim();
-  const sequenceQuery=targetSql(catalog()).match(/SELECT json_build_object\('event','sequence_catalog'[\s\S]*?\) s;/)[0];
+  const sequenceQuery=targetSql(catalog(profile),profile).match(/SELECT json_build_object\('event','sequence_catalog'[\s\S]*?\) s;/)[0];
   const actualSequences=JSON.parse(psql(sequenceQuery)).sequences;
   assert.deepEqual(actualSequences,SCHEMA60_SEQUENCES,'Fresh schema60 must match independently specified sequence configuration');
   for(const s of SCHEMA60_SEQUENCES)assert.deepEqual(JSON.parse(psql(`SELECT json_build_object('last_value',last_value::text,'is_called',is_called) FROM ${s.name};`)),{last_value:'1',is_called:false});

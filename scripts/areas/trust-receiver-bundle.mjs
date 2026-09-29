@@ -70,6 +70,9 @@ export async function prepareReceiverBundle(options) {
   await mkdir(options.output, { mode: 0o700 });
   const bundle = join(options.output, 'bundle'); await mkdir(bundle, { mode: 0o700 });
   const expectation = await bound(options.expectation, options['expectation-sha256'], 32 * 1024 * 1024, true);
+  // Historical receiver v4 remains pinned to the exact schema60 tool/source.
+  // Existing Trust upgrades use reconciliation, never a replacement restore.
+  if (expectation.format !== 'memory-trust-expectation-v1') fail();
   const state = expandTrust(expectation);
   const data = await readBound(options.data, options['data-sha256'], 32 * 1024 * 1024);
   const selection = await readBound(options.selection, options['selection-sha256'], 256 * 1024);

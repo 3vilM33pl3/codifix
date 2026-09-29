@@ -2,8 +2,10 @@
 
 Run this **after** all four approved imports, with writers still excluded. It
 does not run an importer, migrate, start a service or create credentials. It
-supports the approved schema-0060 reference-only projection profile; other
-schemas, imported raw context and reviewed excerpts require a separate review.
+supports explicit schema-0060 and schema-0061 reference-only projection profiles.
+Other schemas, imported raw context and reviewed excerpts require a separate
+review. Existing active instances use the reconciliation operator and are never
+accepted as inactive staging databases.
 
 Create a mode-0600 contract in a mode-0700 directory. Bind exact file SHA-256
 values, the import operation IDs and Docker **image IDs**, not image tags or
@@ -56,7 +58,8 @@ Verification independently derives selected rows from the digest-bound
 materialized archive and exact manifest. It checks every original row hash,
 complete canonical/state/project membership, source projection, same-area
 relation endpoint, import receipt and per-source decision binding. The fixed
-114-table schema-0060 allowlist fails on extra/missing/foreign/partitioned tables.
+114-table schema-0060 or 115-table schema-0061 allowlist fails on
+extra/missing/foreign/partitioned tables.
 Every runtime, authentication, federation, supervisor policy and derived-data
 table must be empty. Only schema migration history, import receipts and the
 exact inert seed counts are permitted; the loop kill switch must be on, timeline
@@ -69,6 +72,44 @@ rows. The importer's transactional restart of the empty source-check sequence
 must therefore also yield 1, uncalled. Extra, missing, advanced or reconfigured
 sequences fail verification without calling `nextval` or changing counters.
 This is independent from the original snapshot's preserved sequence values.
+
+## Explicit rc.2 schema selection
+
+Version-1 fleet contracts and version-2 subset contracts stay pinned to
+schema-0060. They reject a schema-0061 database rather than automatically adopting
+the observed head. A new version-3 contract retains the same `kind`, artifact
+bindings and target entries, and adds exactly:
+
+```json
+{
+  "schema_version": 3,
+  "schema_plan": {
+    "path": "/protected/rc2-schema-plan.json",
+    "sha256": "EXACT_SCHEMA_PLAN_FILE_SHA256"
+  }
+}
+```
+
+The additional file is the exact JSON output of the reviewed rc.2
+`memory-area-import schema-plan`. Its head, count and executable-migration digest
+must match the reviewed profile: head `61`, count `61`, digest
+`e502de46fba6435667e2562b2e1758d262c33dc86952e3ec1c0b6616cf539576`.
+The plan must report no credential creation or service startup. This binds
+the historic migration checksums and exact compatibility SQL; it does not claim
+independent inspection of every deployed PostgreSQL function or trigger.
+
+Schema-0061 adds only `area_reconciliation_receipts` to this verifier's table
+catalog. That table must remain empty for a fresh inactive staging target;
+import receipts must identify target migration `61`. Its sequences remain the
+four exact schema-0060 sequences. Schema-0060 sources can be imported into a
+schema-0061 target under this explicit contract.
+
+Trust expectations derived from a version-3 schema-0061 contract use
+`memory-trust-expectation-v2`. Legacy v1 expectations retain their original
+schema-0060 digest and format. The historical CA receiver v4 and its frozen
+schema/tool pins remain schema-0060 only. Use the reviewed existing-target
+reconciliation input and journaled upgrade procedure for live Trust; do not
+replace its database with a fresh receiver dump.
 
 The result is point-in-time logical-row evidence, not application readiness,
 cryptographic authentication of reviewers, customer disaster recovery or

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SCHEMA60_SEQUENCES, SCHEMA60_TABLES } from './verify-staging.mjs';
+import { SCHEMA60_SEQUENCES, SCHEMA60_TABLES, SCHEMA_PROFILES } from './verify-staging.mjs';
 import { canonicalTrustDataSql, freshTrustReceiverGuard } from './trust-receiver-data.mjs';
 
 function dump(extra = '') {
@@ -9,6 +9,15 @@ function dump(extra = '') {
   const sequences = SCHEMA60_SEQUENCES.map(({ name }) => `SELECT pg_catalog.setval('${name}', 1, false);\n`).join('');
   return `-- PostgreSQL database dump\n\\restrict Token123\nSET statement_timeout = 0;\nSET transaction_timeout = 0;\n${tables}${sequences}${extra}\\unrestrict Token123\n`;
 }
+
+test('schema61 data allowlist is explicit and cannot weaken the schema60 default',()=>{
+  const next=dump('COPY public.area_reconciliation_receipts (id) FROM stdin;\n\\.\n');
+  assert.throws(()=>canonicalTrustDataSql(next));
+  assert.throws(()=>canonicalTrustDataSql(dump(),SCHEMA_PROFILES[61]));
+  const result=canonicalTrustDataSql(next,SCHEMA_PROFILES[61]);
+  assert.equal((result.match(/^COPY /gm)??[]).length,115);
+  assert.throws(()=>canonicalTrustDataSql(next,{...SCHEMA_PROFILES[61]}));
+});
 
 test('canonical receiver data keeps only the exact data and sequence allowlist', () => {
   const sql = canonicalTrustDataSql(dump());

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { minimizeTrust, expandTrust, TRUST_SCHEMA } from './trust-expectation.mjs';
+import { minimizeTrust, expandTrust, TRUST_SCHEMA, TRUST_SCHEMA61 } from './trust-expectation.mjs';
+import { SCHEMA_PROFILES } from './verify-staging.mjs';
 const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
 const h='a'.repeat(64);
 function fixture(){
@@ -104,4 +105,21 @@ test('only explicitly supported source heads are decoded',()=>{
   for(let head=52;head<=60;head++){
     const v=fixture();v.source_migration=head;assert.equal(expandTrust(v).sourceMigration,head);
   }
+});
+
+test('schema61 expectation requires v2 and never changes legacy v1 bindings',()=>{
+  const legacy=fixture();
+  const v2={...legacy,format:'memory-trust-expectation-v2',required_schema_sha256:TRUST_SCHEMA61,
+    target_migration:61,source_migration:61};
+  const state=expandTrust(v2);assert.equal(state.schemaProfile,SCHEMA_PROFILES[61]);
+  const roundtrip=minimizeTrust(state,{area:'trust',operation_id:v2.operation_id},
+    {area:'trust',instance_id:v2.target_instance},v2.bindings);
+  assert.deepEqual(roundtrip,v2);
+  for(const value of [
+    {...v2,format:'memory-trust-expectation-v1'},
+    {...legacy,target_migration:61},
+    {...legacy,required_schema_sha256:TRUST_SCHEMA61},
+    {...v2,required_schema_sha256:TRUST_SCHEMA},
+    {...v2,source_migration:62},
+  ])assert.throws(()=>expandTrust(value));
 });
