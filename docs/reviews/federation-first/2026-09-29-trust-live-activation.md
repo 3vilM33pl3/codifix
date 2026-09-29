@@ -2,7 +2,7 @@
 
 Date: 2026-09-29  
 Environment: Olivier's internal CA Trust instance and private company gateway  
-Status: federation synchronization complete; deterministic expertise activation in progress
+Status: live Trust expertise exchange verified end to end
 
 ## Established state
 
@@ -32,12 +32,12 @@ installation. TCP 8443 remains available only for the private gateway relay.
 The persistent nftables service set still contains the now-unserved 8444 port;
 removing that inert rule requires an interactive host administrator action.
 
-## Bounded v8 activation
+## Bounded v8/v9 activation
 
-Instruction `monolith-ca-20260929-trust-capability-activation-v8` is now the only
-current CA action. It authorizes a Trust-only write-enabled Memory service and
-loopback local-human expertise workflow while keeping MCP read-only and all model
-destinations disabled.
+Instruction `monolith-ca-20260929-trust-capability-activation-v9` superseded the
+v8 draft review after the digest-contract correction below. It authorized a
+Trust-only write-enabled Memory service and loopback local-human expertise
+workflow while keeping MCP read-only and all model destinations disabled.
 
 The exact reviewed collection is intentionally small:
 
@@ -62,21 +62,51 @@ permissions, local `answer-expertise` and access to the one reviewed collection.
 It receives no token, global/group authority, other project membership, MCP or
 model permission.
 
-## Remaining proof
+## Completed cross-instance proof
 
-Completion still requires a CA `DONE` result containing the activated collection
-revision/digest and accepted/published/synchronized advertisement identity.
-After that result, Monolith must independently:
+The CA reported `DONE` for v9 at `2026-09-29T10:51:11Z`. The retained draft was
+activated without replacement and its advertisement was accepted, signed,
+published and synchronized as sequence 15:
 
-1. synchronize Workshop and Homelab past the new advertisement;
-2. discover the Trust capability from both permitted instances;
-3. submit one explicit deterministic local-human question from an allowed
-   requester;
-4. receive and validate the cited Trust answer; and
-5. confirm that an unauthorized requester or destination remains denied.
+- advertisement request: `c82918ee-5f3d-4088-8622-c31ce3ae1f0e`;
+- publisher: `cc1bff80-d0e4-4687-9e62-9b8a5fe4bb16`;
+- collection/revision: `8a65d2ac-1b3f-408d-8151-a4c25dd9b1b8`, revision 1;
+- repository revision: `3mwnnrylkfk2l`;
+- record CID:
+  `bafyreibbyhcnpepflxavyvn7yqolw3ut5z7xythzoy2p7mxaiehztuli6u`;
+- collection digest:
+  `0d7c2fff770ccecac145383269a8ad243946ce52ec887d2ad37b4795ccbac94d`;
+- content digest:
+  `a5780f572e73e0f5ce8146af655512a3a5eaab7bc2dda5f2ec274257614abc0c`.
 
-Until those checks pass, this evidence establishes working federation history,
-not a completed live expertise exchange or customer readiness.
+Monolith then independently completed the five remaining checks on
+`2026-09-29`:
+
+1. Workshop and Homelab both retained federation sequence 15 with no queued,
+   blocked or accepted-but-unreplicated intents and no synchronization error.
+2. Both instances discovered the active Trust capability with the exact
+   publisher, collection, revision, digest, requester list, deterministic mode
+   and `local_human` output policy.
+3. Workshop submitted request `090a2605-374b-479f-bad6-2747dc2b1d46`, asking
+   which two CA automation modes exist and when each should be used. The request
+   used deterministic mode, no model destination, the exact collection revision
+   and the authenticated Workshop requester identity.
+4. Trust returned `answered` with one citation to canonical
+   `14e013ad-4b0d-4aca-a07b-9e1640220a6f`, version 1. The citation carried the
+   exact reviewed content digest and identified Trust as the responder. It
+   described converge mode as the default that preserves existing CA material
+   and bootstrap mode as first-time/disaster-recovery setup. Repeating the exact
+   submission returned the existing answered request rather than starting a new
+   execution.
+5. Capability discovery without the operator-bound local-human session was
+   rejected with HTTP 403. Preparing the same question with an `openai` model
+   destination was also rejected before submission. No model call or paid call
+   occurred.
+
+This establishes a working ATProto-published capability advertisement plus a
+private gateway-mediated cross-instance question and cited answer. It does not
+mean that question/answer payloads themselves travel through ATProto or the PDS,
+and it does not establish customer readiness.
 
 ## V8 review stop and corrected retry
 
