@@ -17,6 +17,7 @@ GUIDES = (
     "docs/reviews/four-area-network/ca-console-installation.md",
     "docs/reviews/four-area-network/ca-bookworm-release.md",
     "scripts/areas/releases/console-README.md",
+    "scripts/areas/releases/upgrade-README.md",
     "scripts/areas/releases/instance-README.md",
     "scripts/areas/releases/README.md",
     "crates/mem-area-ops/README.md",

@@ -164,6 +164,7 @@ cp "$repo_root/deploy/areas/ca-preflight.sh" "$repo_root/deploy/areas/CA-CONSOLE
 cp "$repo_root/crates/mem-area-ops/README.md" "$fixture/crates/mem-area-ops/"
 cp "$repo_root/scripts/areas/releases/release.py" "$repo_root/scripts/areas/releases/README.md" "$fixture/scripts/areas/releases/"
 cp "$repo_root/scripts/areas/releases/instance.py" "$repo_root/scripts/areas/releases/console.py" \
+    "$repo_root/scripts/areas/releases/upgrade.py" "$repo_root/scripts/areas/releases/upgrade-README.md" \
     "$repo_root/scripts/areas/releases/console-README.md" "$fixture/scripts/areas/releases/"
 printf '[workspace.package]\nversion = "2.1.0-rc.1"\n' > "$fixture/Cargo.toml"
 printf 'Fixture README\n' > "$fixture/README.md"
@@ -239,7 +240,7 @@ dpkg-deb() {
     [[ -f "$staging/lib/systemd/system/memory-layer@.service" ]] || return 91
     [[ -x "$staging/usr/libexec/memory-layer/verify-instance-release" ]] || return 92
     [[ -x "$staging/usr/libexec/memory-layer/run-instance" ]] || return 92
-    for release_tool in release.py instance.py console.py; do
+    for release_tool in release.py instance.py console.py upgrade.py; do
         [[ -f "$staging/usr/libexec/memory-layer/releases/$release_tool" ]] || return 92
         [[ "$(stat -c %a "$staging/usr/libexec/memory-layer/releases/$release_tool")" == 644 ]] || return 92
     done

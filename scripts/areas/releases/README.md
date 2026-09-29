@@ -11,6 +11,12 @@ The separate [inactive console installer](console-README.md) places a verified
 release/configuration only for a new named instance, with a durable recovery
 journal. It never activates a service and is not an upgrade or cutover tool.
 
+For an already installed native named instance, use the separate
+[journaled upgrade operator](upgrade-README.md). It authenticates both releases,
+preserves the selected instance's configuration and sandbox, observes PostgreSQL
+schema compatibility, switches the complete binary/Web tree while stopped, and
+recovers forward once candidate startup could have produced writes.
+
 ## Manifest contract
 
 All fields are required; unknown fields and duplicate JSON keys are rejected.
