@@ -2,7 +2,7 @@
 use crate::{
     ExpertiseClaims, ExpertiseReply, ExpertiseRpc, Result, RuntimeError, SignedExpertiseReply,
 };
-use chrono::Utc;
+use chrono::{DateTime, Duration, Utc};
 use mem_atproto_verify::{DetachedSigner, DetachedVerifier};
 use mem_federation::{CanonicalJsonCodec, publication::*};
 use mem_federation_store::{
@@ -12,6 +12,15 @@ use mem_federation_store::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
+
+// Distinct hosts can disagree by milliseconds even when NTP reports healthy.
+// A signed nonce-bound reply may therefore arrive just before its issued_at
+// according to the client's wall clock. This does not extend expires_at.
+const MAX_FUTURE_CLOCK_SKEW: Duration = Duration::seconds(1);
+
+fn issued_at_within_skew(issued_at: DateTime<Utc>, now: DateTime<Utc>) -> bool {
+    issued_at <= now + MAX_FUTURE_CLOCK_SKEW
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum PageVerificationError {
@@ -45,11 +54,11 @@ impl ReceiptTrust {
             || c.space != space
             || c.authority != authority
             || c.key_generation != self.keys.len() as u32
-            || c.issued_at > now
+            || !issued_at_within_skew(c.issued_at, now)
             || c.expires_at <= now
             || c.expires_at <= c.issued_at
             || c.expires_at > c.issued_at + chrono::Duration::seconds(30)
-            || c.status.credentials.observed_at > now.timestamp().max(0) as u64
+            || c.status.credentials.observed_at > (now.timestamp().max(0) as u64).saturating_add(1)
             || (now.timestamp().max(0) as u64).saturating_sub(c.status.credentials.observed_at) > 30
         {
             return Err(RuntimeError::InvalidResponse);
@@ -78,7 +87,7 @@ impl ReceiptTrust {
             || c.space != space
             || c.authority != authority
             || c.key_generation != self.keys.len() as u32
-            || c.issued_at > now
+            || !issued_at_within_skew(c.issued_at, now)
             || c.expires_at <= now
             || c.expires_at <= c.issued_at
             || c.expires_at > c.issued_at + chrono::Duration::seconds(30)
@@ -355,6 +364,16 @@ pub struct SignedPage {
 mod tests {
     use super::*;
     #[test]
+    fn bounded_future_skew_does_not_extend_expiry() {
+        let now = Utc::now();
+        assert!(issued_at_within_skew(now + Duration::milliseconds(1), now));
+        assert!(issued_at_within_skew(now + Duration::seconds(1), now));
+        assert!(!issued_at_within_skew(
+            now + Duration::seconds(1) + Duration::nanoseconds(1),
+            now
+        ));
+    }
+    #[test]
     fn status_is_signed_fresh_and_bound_to_current_member_space_and_nonce() {
         let security = GatewaySecurity::initial(&[19; 32], SpacePolicy::default()).unwrap();
         let trust = security.trust();
@@ -377,6 +396,15 @@ mod tests {
                 .unwrap(),
             status
         );
+        let mut near_future = signed();
+        near_future.claims.issued_at = Utc::now() + Duration::milliseconds(100);
+        near_future.signature = security
+            .signer
+            .sign(&canonical(&near_future.claims).unwrap())
+            .unwrap();
+        trust
+            .verify_status(near_future, nonce, audience, space, authority)
+            .unwrap();
         assert!(
             trust
                 .verify_status(signed(), Uuid::new_v4(), audience, space, authority)
@@ -408,7 +436,7 @@ mod tests {
                 as fn(&mut crate::GatewayStatusClaims),
             |c| c.expires_at = Utc::now() - chrono::Duration::seconds(1),
             |c| c.expires_at = c.issued_at + chrono::Duration::seconds(31),
-            |c| c.issued_at = Utc::now() + chrono::Duration::seconds(1),
+            |c| c.issued_at = Utc::now() + chrono::Duration::seconds(5),
             |c| c.status.credentials.observed_at = crate::credentials::now_seconds() - 31,
             |c| c.key_generation = 0,
         ] {
@@ -458,6 +486,15 @@ mod tests {
         trust
             .verify_expertise(signed(), &request, audience, space, authority)
             .unwrap();
+        let mut near_future = signed();
+        near_future.claims.issued_at = Utc::now() + Duration::milliseconds(100);
+        near_future.signature = security
+            .signer
+            .sign(&canonical(&near_future.claims).unwrap())
+            .unwrap();
+        trust
+            .verify_expertise(near_future, &request, audience, space, authority)
+            .unwrap();
         let mut replay = request.clone();
         replay.nonce = Uuid::new_v4();
         assert!(
@@ -501,7 +538,7 @@ mod tests {
             (|c: &mut ExpertiseClaims| c.purpose = "memory-pull-page-v1".into())
                 as fn(&mut ExpertiseClaims),
             |c| c.expires_at = Utc::now() - chrono::Duration::seconds(1),
-            |c| c.issued_at = Utc::now() + chrono::Duration::seconds(1),
+            |c| c.issued_at = Utc::now() + chrono::Duration::seconds(5),
             |c| c.expires_at = c.issued_at + chrono::Duration::seconds(31),
             |c| c.key_generation = 0,
         ] {
