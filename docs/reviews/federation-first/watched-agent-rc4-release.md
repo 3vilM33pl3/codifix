@@ -27,6 +27,18 @@ closure check in the pinned image. The packaged ARM64 Memory executable
 reported rc.4 under QEMU with network disabled. That does not establish native
 CA execution or service health.
 
+The inert CA candidate is staged in the existing private LAN drop at
+`/home/olivier/.local/state/memory-ca-federation-drop-20260928/rc4-watched-agents/`.
+Its `START-HERE.md` SHA-256 is
+`900de44a38b54a7d38a5d9076ac200cc517c8c89390c7313da24789bca7133a6`;
+`SHA256SUMS` is
+`c6d8bca4c2f1b581b4d4dd174739d4a61d33799ed58d7db4db4ad2457c736cea`.
+The full frozen-source archive is
+`6b44997b4c69c579e5bc411304a62301650ac00e12975c183e729581e359d3cd`.
+The LAN server returned HTTP 200 for the handoff. The handoff itself states
+that it is **not an active CA instruction** until CURRENT ACTION promotes its
+instruction ID. It contains no credentials or source data.
+
 Before any live change, fresh public-key-encrypted backups were captured under
 `/data/tmp/memory-agent-rc4.GM1GOp/backups/`: custom PostgreSQL dumps for
 Workshop, Homelab, General and gateway; a consistent SQLite backup of the
