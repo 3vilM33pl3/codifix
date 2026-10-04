@@ -216,14 +216,13 @@ impl GatewayClient {
                 ExpertiseOperation::AddressedRead { request_id, kind },
                 ExpertiseReply::AddressedDelivery(delivery),
             ) => {
-                if let Some(delivery) = delivery {
-                    if delivery.receipt.request_id != *request_id
+                if let Some(delivery) = delivery
+                    && (delivery.receipt.request_id != *request_id
                         || delivery.receipt.kind != *kind
                         || delivery.receipt.space != self.space
-                        || !valid_addressed_delivery(delivery, instance)?
-                    {
-                        return Err(RuntimeError::InvalidResponse);
-                    }
+                        || !valid_addressed_delivery(delivery, instance)?)
+                {
+                    return Err(RuntimeError::InvalidResponse);
                 }
             }
             (

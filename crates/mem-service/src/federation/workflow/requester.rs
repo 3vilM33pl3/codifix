@@ -332,7 +332,7 @@ pub(crate) async fn expertise_agent_ask(
         &current,
         question,
         &ad,
-        &[caller.output_destination.clone()],
+        std::slice::from_ref(&caller.output_destination),
         &[],
     )
     .await
@@ -348,7 +348,7 @@ pub(crate) async fn expertise_agent_ask(
         &release_access,
         question,
         &ad,
-        &[caller.output_destination.clone()],
+        std::slice::from_ref(&caller.output_destination),
         &[],
     )
     .await
@@ -500,7 +500,7 @@ pub(crate) async fn expertise_agent_result(
         &current,
         &review_q,
         &ad,
-        &[caller.output_destination.clone()],
+        std::slice::from_ref(&caller.output_destination),
         &[],
     )
     .await
