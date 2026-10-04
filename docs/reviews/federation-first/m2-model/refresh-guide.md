@@ -13,11 +13,12 @@ Adapters return every requested cell, using `null` for a blank. Formula-mode rea
 
 ## Before running
 
-Generate the manifests from the repository source, then run the static checks:
+From the repository root, generate the manifests from the repository source,
+then run the static checks:
 
 ```bash
-python3 /home/olivier/Projects/memory/docs/reviews/federation-first/m2-model/build_model.py --region both --output-dir /tmp
-python3 /home/olivier/Projects/memory/docs/reviews/federation-first/m2-model/model_static_check.py /tmp/m2-london-manifest.json /tmp/m2-newyork-manifest.json
+python3 docs/reviews/federation-first/m2-model/build_model.py --region both --output-dir /tmp
+python3 docs/reviews/federation-first/m2-model/model_static_check.py /tmp/m2-london-manifest.json /tmp/m2-newyork-manifest.json
 ```
 
 Both commands are local. The generator also emits `/tmp/m2-london-batch.json` and `/tmp/m2-newyork-batch.json`: **these are bootstrap rebuild requests, not refresh requests**. They contain `addSheet` and content-clearing operations. Do not submit these batches to the already rebuilt workbooks. The refresh below reads only the generated manifest and preserves current working assumptions.
@@ -33,7 +34,7 @@ The following is an execution recipe for `functions.exec`. The helper reads repo
 
 ```javascript
 // @exec: {"yield_time_ms": 1000, "max_output_tokens": 2000}
-const directory = '/home/olivier/Projects/memory/docs/reviews/federation-first/m2-model/';
+const directory = 'docs/reviews/federation-first/m2-model/';
 const generatedDirectory = '/tmp/';
 const region = 'london';
 const shellQuote = value => "'" + value.replaceAll("'", "'\"'\"'") + "'";
