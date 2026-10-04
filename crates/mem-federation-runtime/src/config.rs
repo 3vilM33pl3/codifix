@@ -201,6 +201,14 @@ impl GatewayConfig {
         let router = server.router();
         let worker = async {
             loop {
+                match server.delete_addressed_one(&pds).await {
+                    Ok(true) => continue,
+                    Err(RuntimeError::Store(StoreError::Fenced)) => {
+                        return Err(RuntimeError::Store(StoreError::Fenced));
+                    }
+                    Err(_) => tracing::warn!("addressed expertise deletion blocked or retrying"),
+                    Ok(false) => {}
+                }
                 match server.publish_one(&pds).await {
                     Ok(WorkerOutcome::Published(_)) => continue,
                     Err(RuntimeError::Store(StoreError::Fenced)) => {

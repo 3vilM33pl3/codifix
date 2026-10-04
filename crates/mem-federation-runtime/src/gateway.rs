@@ -256,6 +256,62 @@ impl GatewayServer {
             }
         }
     }
+    pub async fn delete_addressed_one(&self, pds: &PdsPublisher) -> Result<bool> {
+        if !self.addressed_enabled {
+            return Ok(false);
+        }
+        let pds = match pds.credential_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(_) => return Ok(false),
+        };
+        if pds.credential_generation() > 0 {
+            self.store
+                .recover_addressed_delete_auth(self.fence, pds.credential_generation())
+                .await?;
+        }
+        let Some(lease) = self.store.claim_addressed_delete(self.fence).await? else {
+            return Ok(false);
+        };
+        let prior: Option<mem_atproto_verify::VerifiedRepository> = match lease
+            .prior_proof
+            .as_ref()
+            .map(|value| serde_json::from_value(value.clone()))
+            .transpose()
+        {
+            Ok(proof) => proof,
+            Err(_) => {
+                self.store
+                    .fail_addressed_delete(
+                        self.fence,
+                        &lease,
+                        mem_federation_store::PublishFailure::InvalidReceipt,
+                    )
+                    .await?;
+                return Ok(false);
+            }
+        };
+        match pds
+            .delete_addressed_verified(&lease.record, prior.as_ref())
+            .await
+        {
+            Ok(proof) => {
+                self.store
+                    .acknowledge_addressed_delete(
+                        self.fence,
+                        &lease,
+                        serde_json::to_value(proof).map_err(|_| RuntimeError::InvalidResponse)?,
+                    )
+                    .await?;
+                Ok(true)
+            }
+            Err(failure) => {
+                self.store
+                    .fail_addressed_delete(self.fence, &lease, failure)
+                    .await?;
+                Ok(false)
+            }
+        }
+    }
     pub fn with_publication_status(mut self, pds: PdsPublisher) -> Self {
         self.publication_status = Some(pds);
         self

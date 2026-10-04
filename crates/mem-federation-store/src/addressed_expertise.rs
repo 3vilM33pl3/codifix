@@ -46,6 +46,13 @@ pub struct AddressedLease {
     pub lease_token: Uuid,
     pub attempts: u16,
 }
+#[derive(Debug, Clone)]
+pub struct AddressedDeleteLease {
+    pub record: AddressedExpertiseRecord,
+    pub prior_proof: Option<serde_json::Value>,
+    pub lease_token: Uuid,
+    pub attempts: u16,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AddressedQuestionLease {
@@ -420,12 +427,146 @@ impl GatewayStore {
     pub async fn cleanup_addressed(&self, fence: WriterFence) -> Result<()> {
         let mut tx = self.pool.begin().await?;
         self.lock(&mut tx, fence).await?;
-        sqlx::query("UPDATE federation_expertise_addressed SET record=NULL WHERE space=$1 AND record IS NOT NULL AND payload_until<=clock_timestamp()")
-            .bind(fence.space.as_uuid()).execute(&mut *tx).await?;
-        sqlx::query("DELETE FROM federation_expertise_addressed WHERE space=$1 AND metadata_until<=clock_timestamp()")
+        if self.addressed_retention_hold(&mut tx, fence).await? {
+            tx.commit().await?;
+            return Ok(());
+        }
+        // A PDS failure keeps the payload available for an exact, fenced retry.
+        sqlx::query("DELETE FROM federation_expertise_addressed WHERE space=$1 AND metadata_until<=clock_timestamp() AND record IS NULL")
             .bind(fence.space.as_uuid()).execute(&mut *tx).await?;
         tx.commit().await?;
         Ok(())
+    }
+
+    async fn addressed_retention_hold(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        fence: WriterFence,
+    ) -> Result<bool> {
+        let latest: Option<String> = sqlx::query_scalar("SELECT action FROM federation_retention_decisions WHERE space=$1 AND action IN ('hold','release_hold') ORDER BY decision DESC LIMIT 1")
+            .bind(fence.space.as_uuid()).fetch_optional(&mut **tx).await?;
+        Ok(latest.as_deref() == Some("hold"))
+    }
+
+    pub async fn claim_addressed_delete(
+        &self,
+        fence: WriterFence,
+    ) -> Result<Option<AddressedDeleteLease>> {
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, fence).await?;
+        if self.addressed_retention_hold(&mut tx, fence).await? {
+            tx.commit().await?;
+            return Ok(None);
+        }
+        sqlx::query("UPDATE federation_expertise_addressed SET delete_lease_token=NULL,delete_lease_until=NULL,delete_status=CASE WHEN delete_attempts>=5 THEN 'failed' ELSE 'queued' END WHERE space=$1 AND delete_lease_until<=clock_timestamp()")
+            .bind(fence.space.as_uuid()).execute(&mut *tx).await?;
+        let row = sqlx::query("SELECT record,proof,delete_attempts,request_id,kind FROM federation_expertise_addressed WHERE space=$1 AND record IS NOT NULL AND payload_until<=clock_timestamp() AND (delete_status IS NULL OR delete_status='queued') AND delete_lease_token IS NULL AND delete_next_attempt_at<=clock_timestamp() ORDER BY payload_until,request_id,kind LIMIT 1 FOR UPDATE SKIP LOCKED")
+            .bind(fence.space.as_uuid()).fetch_optional(&mut *tx).await?;
+        let Some(row) = row else {
+            tx.commit().await?;
+            return Ok(None);
+        };
+        let token = Uuid::new_v4();
+        sqlx::query("UPDATE federation_expertise_addressed SET delete_status='queued',delete_lease_token=$4,delete_lease_until=clock_timestamp()+interval '120 seconds',delete_attempts=delete_attempts+1 WHERE space=$1 AND request_id=$2 AND kind=$3")
+            .bind(fence.space.as_uuid()).bind(row.try_get::<Uuid,_>("request_id")?)
+            .bind(row.try_get::<String,_>("kind")?).bind(token).execute(&mut *tx).await?;
+        let lease = AddressedDeleteLease {
+            record: row
+                .try_get::<Json<AddressedExpertiseRecord>, _>("record")?
+                .0,
+            prior_proof: row
+                .try_get::<Option<Json<serde_json::Value>>, _>("proof")?
+                .map(|p| p.0),
+            lease_token: token,
+            attempts: u16::try_from(row.try_get::<i16, _>("delete_attempts")? + 1)
+                .map_err(|_| StoreError::Corrupt)?,
+        };
+        tx.commit().await?;
+        Ok(Some(lease))
+    }
+
+    pub async fn acknowledge_addressed_delete(
+        &self,
+        fence: WriterFence,
+        lease: &AddressedDeleteLease,
+        deletion: serde_json::Value,
+    ) -> Result<()> {
+        if deletion
+            .get("prior_record_cid")
+            .and_then(serde_json::Value::as_str)
+            .is_none()
+        {
+            return Err(StoreError::Binding);
+        }
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, fence).await?;
+        if self.addressed_retention_hold(&mut tx, fence).await? {
+            return Err(StoreError::Binding);
+        }
+        let updated = sqlx::query("UPDATE federation_expertise_addressed SET record=NULL,delete_status='verified',delete_proof=$5,delete_lease_token=NULL,delete_lease_until=NULL,delete_error=NULL WHERE space=$1 AND request_id=$2 AND kind=$3 AND delete_lease_token=$4 AND record_digest=$6")
+            .bind(fence.space.as_uuid()).bind(lease.record.request_id).bind(kind(&lease.record.payload))
+            .bind(lease.lease_token).bind(Json(deletion))
+            .bind(Json(CanonicalJsonCodec::digest(&lease.record).map_err(|_|StoreError::Binding)?))
+            .execute(&mut *tx).await?;
+        if updated.rows_affected() != 1 {
+            return Err(StoreError::LostLease);
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn fail_addressed_delete(
+        &self,
+        fence: WriterFence,
+        lease: &AddressedDeleteLease,
+        failure: PublishFailure,
+    ) -> Result<()> {
+        let auth_generation = match failure {
+            PublishFailure::Authentication { generation } => {
+                Some(i64::try_from(generation).map_err(|_| StoreError::Binding)?)
+            }
+            _ => None,
+        };
+        let terminal = lease.attempts >= 5
+            || matches!(
+                failure,
+                PublishFailure::Conflict
+                    | PublishFailure::InvalidReceipt
+                    | PublishFailure::AuthorizationDenied
+            );
+        let reason = match failure {
+            PublishFailure::Unavailable => "unavailable",
+            PublishFailure::Conflict => "conflict",
+            PublishFailure::InvalidReceipt => "invalid_receipt",
+            PublishFailure::AuthorizationDenied => "authorization_denied",
+            PublishFailure::Authentication { .. } => "authentication",
+        };
+        let delay = (10_i32.saturating_mul(1_i32 << lease.attempts.saturating_sub(1))).min(600);
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, fence).await?;
+        let updated=sqlx::query("UPDATE federation_expertise_addressed SET delete_status=$5,delete_error=$6,delete_lease_token=NULL,delete_lease_until=NULL,delete_next_attempt_at=clock_timestamp()+($7 * interval '1 second'),delete_auth_generation=$8 WHERE space=$1 AND request_id=$2 AND kind=$3 AND delete_lease_token=$4")
+            .bind(fence.space.as_uuid()).bind(lease.record.request_id).bind(kind(&lease.record.payload))
+            .bind(lease.lease_token).bind(if auth_generation.is_some(){"auth_blocked"}else if terminal{"failed"}else{"queued"})
+            .bind(reason).bind(delay).bind(auth_generation).execute(&mut *tx).await?;
+        if updated.rows_affected() != 1 {
+            return Err(StoreError::LostLease);
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn recover_addressed_delete_auth(
+        &self,
+        fence: WriterFence,
+        generation: u64,
+    ) -> Result<u64> {
+        let generation = i64::try_from(generation).map_err(|_| StoreError::Binding)?;
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, fence).await?;
+        let updated=sqlx::query("UPDATE federation_expertise_addressed SET delete_status='queued',delete_attempts=0,delete_auth_generation=NULL,delete_next_attempt_at=clock_timestamp(),delete_error=NULL WHERE space=$1 AND delete_status='auth_blocked' AND delete_auth_generation<$2 AND record IS NOT NULL")
+            .bind(fence.space.as_uuid()).bind(generation).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(updated.rows_affected())
     }
 
     pub async fn acknowledge_addressed(

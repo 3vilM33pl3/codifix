@@ -312,3 +312,96 @@ async fn addressed_exchange_is_fenced_private_and_outside_shared_pull() {
             .unwrap();
     assert_eq!(accepted, 6);
 }
+
+#[tokio::test]
+async fn expired_addressed_payload_waits_for_verified_pds_deletion_and_honors_hold() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let q = f.question();
+    let record = AddressedExpertiseRecord::question(
+        q.clone(),
+        1,
+        CanonicalJsonCodec::digest(&"policy").unwrap(),
+    )
+    .unwrap();
+    f.store
+        .enqueue_addressed(f.fence, f.requester, &record, None)
+        .await
+        .unwrap();
+    let lease = f.store.claim_addressed(f.fence).await.unwrap().unwrap();
+    f.store
+        .acknowledge_addressed(
+            f.fence,
+            &lease,
+            "cid1",
+            serde_json::json!({"record_cid":"cid1"}),
+        )
+        .await
+        .unwrap();
+    sqlx::query("UPDATE federation_expertise_addressed SET created_at=clock_timestamp()-interval '3 days',expires_at=clock_timestamp()-interval '2 days',payload_until=clock_timestamp()-interval '1 day' WHERE space=$1 AND request_id=$2")
+        .bind(f.space.as_uuid()).bind(q.request_id).execute(&f.db.pool).await.unwrap();
+    f.store.cleanup_addressed(f.fence).await.unwrap();
+    let retained:bool=sqlx::query_scalar("SELECT record IS NOT NULL FROM federation_expertise_addressed WHERE space=$1 AND request_id=$2 AND kind='question'")
+        .bind(f.space.as_uuid()).bind(q.request_id).fetch_one(&f.db.pool).await.unwrap();
+    assert!(retained);
+    let deletion = f
+        .store
+        .claim_addressed_delete(f.fence)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(deletion.record, record);
+    assert!(
+        f.store
+            .acknowledge_addressed_delete(
+                f.fence,
+                &AddressedDeleteLease {
+                    lease_token: Uuid::new_v4(),
+                    ..deletion.clone()
+                },
+                serde_json::json!({"prior_record_cid":"cid1"})
+            )
+            .await
+            .is_err()
+    );
+    f.store
+        .acknowledge_addressed_delete(
+            f.fence,
+            &deletion,
+            serde_json::json!({"prior_record_cid":"cid1"}),
+        )
+        .await
+        .unwrap();
+    let (retained,verified):(bool,String)=sqlx::query_as("SELECT record IS NOT NULL,delete_status FROM federation_expertise_addressed WHERE space=$1 AND request_id=$2 AND kind='question'")
+        .bind(f.space.as_uuid()).bind(q.request_id).fetch_one(&f.db.pool).await.unwrap();
+    assert!(!retained);
+    assert_eq!(verified, "verified");
+
+    let other = f.question();
+    let record = AddressedExpertiseRecord::question(
+        other.clone(),
+        1,
+        CanonicalJsonCodec::digest(&"policy").unwrap(),
+    )
+    .unwrap();
+    f.store
+        .enqueue_addressed(f.fence, f.requester, &record, None)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE federation_expertise_addressed SET created_at=clock_timestamp()-interval '3 days',expires_at=clock_timestamp()-interval '2 days',payload_until=clock_timestamp()-interval '1 day' WHERE space=$1 AND request_id=$2")
+        .bind(f.space.as_uuid()).bind(other.request_id).execute(&f.db.pool).await.unwrap();
+    sqlx::query("INSERT INTO federation_retention_decisions(space,decision,actor,action,reason) VALUES($1,1,$2,'hold','fixture')")
+        .bind(f.space.as_uuid()).bind(f.responder.as_uuid()).execute(&f.db.pool).await.unwrap();
+    assert!(
+        f.store
+            .claim_addressed_delete(f.fence)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    f.store.cleanup_addressed(f.fence).await.unwrap();
+    let retained:bool=sqlx::query_scalar("SELECT record IS NOT NULL FROM federation_expertise_addressed WHERE space=$1 AND request_id=$2 AND kind='question'")
+        .bind(f.space.as_uuid()).bind(other.request_id).fetch_one(&f.db.pool).await.unwrap();
+    assert!(retained);
+}

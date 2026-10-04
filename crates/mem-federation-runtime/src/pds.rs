@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::{Endpoint, Result, RuntimeError, http};
 use mem_atproto::{addressed_expertise::AddressedExpertiseWire, publication::PublicationWire};
-use mem_atproto_verify::{MAX_CAR_BYTES, PinnedRepository, VerifiedRepository};
+use mem_atproto_verify::{MAX_CAR_BYTES, PinnedRepository, VerifiedDeletion, VerifiedRepository};
 use mem_federation::expertise::AddressedExpertiseRecord;
 use mem_federation::publication::{PublicationDelivery, SpaceId};
 use mem_federation_store::{ImmutablePublisher, PublishFailure};
@@ -318,6 +318,75 @@ impl PdsPublisher {
         }
     }
 
+    /// Expire one exact addressed record. A missing getRecord response alone is
+    /// insufficient: a newer signed repository snapshot must omit the key.
+    /// deleteRecord uses swapRecord so cleanup cannot erase a changed value.
+    pub async fn delete_addressed_verified(
+        &self,
+        addressed: &AddressedExpertiseRecord,
+        prior: Option<&VerifiedRepository>,
+    ) -> std::result::Result<VerifiedDeletion, PublishFailure> {
+        let snapshot = self
+            .credential_snapshot()
+            .map_err(|_| self.authentication_failure())?;
+        if addressed.space != snapshot.space
+            || prior.is_some_and(|proof| {
+                proof.repository != snapshot.repository || proof.signing_key != snapshot.signing_key
+            })
+        {
+            return Err(PublishFailure::InvalidReceipt);
+        }
+        let wire = AddressedExpertiseWire::encode(addressed.clone())
+            .map_err(|_| PublishFailure::InvalidReceipt)?;
+        if prior.is_some_and(|proof| wire.cid().ok().as_deref() != Some(proof.record_cid.as_str()))
+        {
+            return Err(PublishFailure::InvalidReceipt);
+        }
+        if let Some(current) = snapshot.readback_addressed(&wire).await? {
+            if prior.is_some_and(|proof| {
+                current.record_cid != proof.record_cid || current.revision < proof.revision
+            }) {
+                return Err(PublishFailure::Conflict);
+            }
+            let body =
+                mem_atproto::addressed_expertise::delete_request(&wire, &snapshot.repository)
+                    .map_err(|_| PublishFailure::InvalidReceipt)?;
+            let response = snapshot
+                .endpoint
+                .client
+                .post(
+                    snapshot
+                        .endpoint
+                        .url("/xrpc/com.atproto.repo.deleteRecord")
+                        .map_err(|_| PublishFailure::InvalidReceipt)?,
+                )
+                .bearer_auth(&snapshot.token)
+                .json(&body)
+                .send()
+                .await;
+            if let Ok(response) = &response {
+                match response.status() {
+                    reqwest::StatusCode::UNAUTHORIZED => {
+                        return Err(snapshot.authentication_failure());
+                    }
+                    reqwest::StatusCode::FORBIDDEN => {
+                        return Err(PublishFailure::AuthorizationDenied);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if snapshot.readback_addressed(&wire).await?.is_some() {
+            return Err(PublishFailure::Unavailable);
+        }
+        snapshot
+            .verify_addressed_absence(
+                &wire,
+                prior.map_or("2222222222222", |proof| proof.revision.as_str()),
+            )
+            .await
+    }
+
     async fn readback_addressed(
         &self,
         wire: &AddressedExpertiseWire,
@@ -418,6 +487,60 @@ impl PdsPublisher {
         .map_err(|_| PublishFailure::InvalidReceipt)?
         .map_err(|error| {
             tracing::warn!(reason = %error, "PDS addressed repository verification failed");
+            PublishFailure::InvalidReceipt
+        })
+    }
+
+    async fn verify_addressed_absence(
+        &self,
+        wire: &AddressedExpertiseWire,
+        prior_revision: &str,
+    ) -> std::result::Result<VerifiedDeletion, PublishFailure> {
+        let permit = self
+            .verification_slot
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| PublishFailure::Unavailable)?;
+        let response = self
+            .endpoint
+            .client
+            .get(
+                self.endpoint
+                    .url("/xrpc/com.atproto.sync.getRepo")
+                    .map_err(|_| PublishFailure::InvalidReceipt)?,
+            )
+            .bearer_auth(&self.token)
+            .query(&[("did", self.repository.as_str())])
+            .send()
+            .await
+            .map_err(|_| PublishFailure::Unavailable)?;
+        if !response.status().is_success() {
+            return Err(match response.status() {
+                reqwest::StatusCode::UNAUTHORIZED => self.authentication_failure(),
+                reqwest::StatusCode::FORBIDDEN => PublishFailure::AuthorizationDenied,
+                _ => PublishFailure::Unavailable,
+            });
+        }
+        let bytes = http::bytes(response, MAX_CAR_BYTES)
+            .await
+            .map_err(|_| PublishFailure::InvalidReceipt)?;
+        let verifier = self.verifier.clone();
+        let wire = wire.clone();
+        let prior_revision = prior_revision.to_owned();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| PublishFailure::InvalidReceipt)?
+            .as_micros();
+        let now = u64::try_from(now).map_err(|_| PublishFailure::InvalidReceipt)?;
+        tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            verifier.verify_full_car_absent_addressed(&bytes, &wire, &prior_revision, now)
+        })
+        .await
+        .map_err(|_| PublishFailure::InvalidReceipt)?
+        .map_err(|error| {
+            tracing::warn!(reason = %error, "PDS addressed deletion verification failed");
             PublishFailure::InvalidReceipt
         })
     }

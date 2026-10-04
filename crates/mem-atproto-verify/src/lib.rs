@@ -76,6 +76,16 @@ pub struct VerifiedRepository {
     pub revision: String,
     pub record_cid: String,
 }
+/// A newer signed, canonical repository snapshot in which the exact addressed
+/// key is absent. It does not prove deletion from PDS backups or past recipients.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedDeletion {
+    pub repository: String,
+    pub signing_key: String,
+    pub commit_cid: String,
+    pub revision: String,
+    pub prior_record_cid: String,
+}
 
 fn validate_signing_key(signing_key: &str) -> Result<()> {
     // Guard Atrium 0.1.3's parse_multikey slice before invoking it. Limit the
@@ -135,6 +145,34 @@ impl PinnedRepository {
         self.verify_full_car_record(bytes, &expected, &cid, wire.raw(), now_micros)
     }
 
+    pub fn verify_full_car_absent_addressed(
+        &self,
+        bytes: &[u8],
+        wire: &AddressedExpertiseWire,
+        prior_revision: &str,
+        now_micros: u64,
+    ) -> Result<VerifiedDeletion> {
+        let expected = wire.record().map_err(|_| VerifyError::Record)?;
+        let prior_record_cid = wire.cid().map_err(|_| VerifyError::Record)?;
+        let (root, revision, entries, _) = self.verified_snapshot(bytes, now_micros)?;
+        let key = format!(
+            "{}/{}",
+            expected.collection.as_ref(),
+            expected.rkey.as_ref()
+        );
+        // A signed snapshot from before publication is not proof of deletion.
+        if entries.contains_key(&key) || revision.as_str() <= prior_revision {
+            return Err(VerifyError::Record);
+        }
+        Ok(VerifiedDeletion {
+            repository: self.repository.as_ref().to_owned(),
+            signing_key: self.signing_key.clone(),
+            commit_cid: root.to_string(),
+            revision,
+            prior_record_cid,
+        })
+    }
+
     fn verify_full_car_record(
         &self,
         bytes: &[u8],
@@ -143,6 +181,31 @@ impl PinnedRepository {
         raw: &Unknown,
         now_micros: u64,
     ) -> Result<VerifiedRepository> {
+        let (root, revision, entries, blocks) = self.verified_snapshot(bytes, now_micros)?;
+        let key = format!(
+            "{}/{}",
+            expected.collection.as_ref(),
+            expected.rkey.as_ref()
+        );
+        let cid: Cid = expected_cid.parse().map_err(|_| VerifyError::Record)?;
+        let value = serde_ipld_dagcbor::to_vec(raw).map_err(|_| VerifyError::Record)?;
+        if entries.get(&key) != Some(&cid) || block(&blocks, &cid)? != value {
+            return Err(VerifyError::Record);
+        }
+        Ok(VerifiedRepository {
+            repository: self.repository.as_ref().to_owned(),
+            signing_key: self.signing_key.clone(),
+            commit_cid: root.to_string(),
+            revision,
+            record_cid: cid.to_string(),
+        })
+    }
+
+    fn verified_snapshot<'a>(
+        &self,
+        bytes: &'a [u8],
+        now_micros: u64,
+    ) -> Result<(Cid, String, BTreeMap<String, Cid>, car::Blocks<'a>)> {
         let (root, blocks) = parse_car(bytes)?;
         let commit_bytes = block(&blocks, &root)?;
         if commit_bytes.len() > MAX_METADATA_BYTES {
@@ -189,23 +252,7 @@ impl PinnedRepository {
         if rebuilt != commit.data {
             return Err(VerifyError::Tree);
         }
-        let key = format!(
-            "{}/{}",
-            expected.collection.as_ref(),
-            expected.rkey.as_ref()
-        );
-        let cid: Cid = expected_cid.parse().map_err(|_| VerifyError::Record)?;
-        let value = serde_ipld_dagcbor::to_vec(raw).map_err(|_| VerifyError::Record)?;
-        if entries.get(&key) != Some(&cid) || block(&blocks, &cid)? != value {
-            return Err(VerifyError::Record);
-        }
-        Ok(VerifiedRepository {
-            repository: self.repository.as_ref().to_owned(),
-            signing_key: self.signing_key.clone(),
-            commit_cid: root.to_string(),
-            revision: commit.rev.as_str().to_owned(),
-            record_cid: cid.to_string(),
-        })
+        Ok((root, commit.rev.as_str().to_owned(), entries, blocks))
     }
 }
 

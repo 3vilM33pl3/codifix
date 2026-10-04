@@ -150,6 +150,33 @@ fn addressed_question_uses_the_same_signed_repository_proof() {
         .verify_full_car_addressed(&car, &wire, u64::MAX)
         .unwrap();
     assert_eq!(receipt.record_cid, wire.cid().unwrap());
+
+    let absent = signed_repo(REPO, &BTreeMap::new(), FixtureKey::K256);
+    let stale = alter_commit(&absent, |commit, _| {
+        commit.rev = Tid::new(receipt.revision.clone()).unwrap();
+    });
+    // A snapshot signed before (or at) publication cannot prove deletion.
+    assert_eq!(
+        verifier.verify_full_car_absent_addressed(&stale, &wire, &receipt.revision, u64::MAX),
+        Err(VerifyError::Record)
+    );
+    let newer = alter_commit(&absent, |commit, _| {
+        commit.rev = Tid::new("7777777777777".into()).unwrap();
+    });
+    let deletion = verifier
+        .verify_full_car_absent_addressed(&newer, &wire, &receipt.revision, u64::MAX)
+        .unwrap();
+    assert_eq!(deletion.prior_record_cid, receipt.record_cid);
+    assert_eq!(deletion.revision, "7777777777777");
+    assert_eq!(
+        verifier.verify_full_car_absent_addressed(&car, &wire, &receipt.revision, u64::MAX),
+        Err(VerifyError::Record)
+    );
+    let wrong = PinnedRepository::new(REPO.into(), FixtureKey::P256.did_key()).unwrap();
+    assert_eq!(
+        wrong.verify_full_car_absent_addressed(&newer, &wire, &receipt.revision, u64::MAX),
+        Err(VerifyError::Signature)
+    );
 }
 
 #[test]

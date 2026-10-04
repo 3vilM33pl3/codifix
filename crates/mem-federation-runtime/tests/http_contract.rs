@@ -302,6 +302,135 @@ async fn addressed_question_requires_exact_signed_pds_readback() {
 }
 
 #[tokio::test]
+async fn addressed_expiry_uses_compare_and_swap_and_newer_signed_absence() {
+    use mem_atproto::addressed_expertise::AddressedExpertiseWire;
+    use mem_federation::{
+        CanonicalJsonCodec,
+        expertise::{AddressedExpertiseRecord, ExpertiseQuestion},
+    };
+    let q: ExpertiseQuestion = serde_json::from_value(json!({
+        "request_id":Uuid::from_u128(401),"space":Uuid::from_u128(402),
+        "requester":Uuid::from_u128(403),"principal":Uuid::from_u128(404),
+        "capability":{"publisher":Uuid::from_u128(405),"id":Uuid::from_u128(406)},
+        "revision":1,"collection_digest":CanonicalJsonCodec::digest(&"reviewed").unwrap(),
+        "question":"What changed?","mode":"deterministic","model_destination":null,
+        "output_destination":"codex_openai",
+        "created_at":"2026-10-04T10:00:00Z","expires_at":"2026-10-04T10:02:00Z"
+    }))
+    .unwrap();
+    let addressed =
+        AddressedExpertiseRecord::question(q, 1, CanonicalJsonCodec::digest(&"policy").unwrap())
+            .unwrap();
+    let wire = AddressedExpertiseWire::encode(addressed.clone()).unwrap();
+    let repo = "did:web:space.federation.example.com";
+    let encoded = wire.record().unwrap();
+    let records = std::collections::BTreeMap::from([(
+        format!("{}/{}", encoded.collection.as_ref(), encoded.rkey.as_ref()),
+        wire.raw().clone(),
+    )]);
+    let included = signed_repo(repo, &records, FixtureKey::K256);
+    let key = FixtureKey::K256.did_key();
+    let prior = mem_atproto_verify::PinnedRepository::new(repo.into(), key.clone())
+        .unwrap()
+        .verify_full_car_addressed(&included, &wire, u64::MAX)
+        .unwrap();
+    // The fixture's TID clock is microsecond-resolution; create the absent
+    // snapshot after inclusion so its signed revision is strictly newer.
+    let absent = loop {
+        let candidate = signed_repo(repo, &std::collections::BTreeMap::new(), FixtureKey::K256);
+        if mem_atproto_verify::PinnedRepository::new(repo.into(), key.clone())
+            .unwrap()
+            .verify_full_car_absent_addressed(&candidate, &wire, &prior.revision, u64::MAX)
+            .is_ok()
+        {
+            break candidate;
+        }
+    };
+    let present = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let deleted = Arc::new(AtomicUsize::new(0));
+    let get_present = present.clone();
+    let exact = json!({"uri":wire.uri(&repo.parse().unwrap()).unwrap(),
+        "cid":wire.cid().unwrap(),"value":wire.raw()});
+    let get = Router::new()
+        .route(
+            "/xrpc/com.atproto.repo.getRecord",
+            get(move || {
+                let present = get_present.clone();
+                let body = exact.clone();
+                async move {
+                    if present.load(Ordering::SeqCst) {
+                        (StatusCode::OK, Json(body))
+                    } else {
+                        (
+                            StatusCode::NOT_FOUND,
+                            Json(json!({"error":"RecordNotFound"})),
+                        )
+                    }
+                }
+            }),
+        )
+        .route(
+            "/xrpc/com.atproto.sync.getRepo",
+            get({
+                let present = present.clone();
+                move || {
+                    let present = present.clone();
+                    let included = included.clone();
+                    let absent = absent.clone();
+                    async move {
+                        if present.load(Ordering::SeqCst) {
+                            included
+                        } else {
+                            absent
+                        }
+                    }
+                }
+            }),
+        )
+        .route(
+            "/xrpc/com.atproto.repo.deleteRecord",
+            post({
+                let present = present.clone();
+                let deleted = deleted.clone();
+                let cid = wire.cid().unwrap();
+                move |Json(body): Json<serde_json::Value>| {
+                    let present = present.clone();
+                    let deleted = deleted.clone();
+                    let cid = cid.clone();
+                    async move {
+                        assert_eq!(body["swapRecord"], cid);
+                        deleted.fetch_add(1, Ordering::SeqCst);
+                        present.store(false, Ordering::SeqCst);
+                        StatusCode::OK
+                    }
+                }
+            }),
+        );
+    let (endpoint, task) = serve(get).await;
+    let publisher = PdsPublisher::new(
+        endpoint,
+        repo.into(),
+        "fixture".repeat(8),
+        key,
+        addressed.space,
+    )
+    .unwrap();
+    let proof = publisher
+        .delete_addressed_verified(&addressed, Some(&prior))
+        .await
+        .unwrap();
+    assert_eq!(proof.prior_record_cid, prior.record_cid);
+    assert_eq!(deleted.load(Ordering::SeqCst), 1);
+    // A retry after an ambiguous acknowledgement is a verified no-op.
+    publisher
+        .delete_addressed_verified(&addressed, Some(&prior))
+        .await
+        .unwrap();
+    assert_eq!(deleted.load(Ordering::SeqCst), 1);
+    task.abort();
+}
+
+#[tokio::test]
 async fn oversized_gateway_pages_and_redirects_fail_closed() {
     let delivery = delivery();
     let oversized = "x".repeat(3 * 1024 * 1024 + 1);

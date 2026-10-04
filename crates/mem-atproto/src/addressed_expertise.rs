@@ -128,6 +128,32 @@ pub fn create_request(
     ))?)
 }
 
+/// Delete only the exact previously verified record. A changed value at the
+/// same key must fail compare-and-swap rather than being removed by cleanup.
+pub fn delete_request(
+    wire: &AddressedExpertiseWire,
+    repository: &str,
+) -> Result<Value, MemAtprotoError> {
+    use atrium_api::{com::atproto::repo::delete_record, types::Object};
+    let record = wire.record()?;
+    let repo = repository
+        .parse::<AtIdentifier>()
+        .map_err(|_| MemAtprotoError::message("invalid repository"))?;
+    let cid = wire
+        .cid()?
+        .parse()
+        .map_err(|_| MemAtprotoError::message("invalid addressed CID"))?;
+    Ok(serde_json::to_value(Object::from(
+        delete_record::InputData {
+            collection: record.collection,
+            repo,
+            rkey: record.rkey,
+            swap_commit: None,
+            swap_record: Some(cid),
+        },
+    ))?)
+}
+
 pub fn verify_readback(
     wire: &AddressedExpertiseWire,
     repository: &str,
