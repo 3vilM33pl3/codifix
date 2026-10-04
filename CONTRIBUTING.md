@@ -58,6 +58,27 @@ cargo test -p mem-service --all-targets --locked
 cargo test -p mem-eval --all-targets --locked
 ```
 
+### Build Disk Usage
+
+Development and test profiles use limited debug information for workspace code,
+no debug symbols for third-party dependencies, and no incremental compiler
+cache. Cargo still reuses unchanged compiled dependencies; editing a crate may
+take longer to rebuild. Release-profile settings are unchanged.
+
+This is important for the bundled DuckDB build and the many workspace test
+binaries: repeated toolchain, feature and profile combinations can otherwise
+accumulate hundreds of GiB under `target/`.
+
+For full workspace debugger information, temporarily set
+`CARGO_PROFILE_DEV_DEBUG=2` or `CARGO_PROFILE_TEST_DEBUG=2` for the relevant
+command. External dependency debug settings remain disabled.
+
+Before pruning old build outputs, stop builds and preserve any release packages,
+evaluation evidence and binaries used by services or scripts. Do not blindly
+delete `target/`: it also holds non-cache artifacts. Moving the build directory
+with `CARGO_TARGET_DIR` can relieve a full filesystem, but does not reduce total
+storage usage.
+
 ## Database Tests
 
 Most unit tests do not require a database. Pgvector-backed integration tests run
