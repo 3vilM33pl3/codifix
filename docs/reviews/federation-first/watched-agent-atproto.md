@@ -24,7 +24,7 @@ already delivered. No public repository access or native Spaces alpha is used.
 
 ## Execution checklist
 
-- [ ] Add bounded neutral addressed-record contracts and unpublished ATProto
+- [x] Add bounded neutral addressed-record contracts and unpublished ATProto
   question/answer Lexicons without changing existing publication bytes.
 - [ ] Add durable addressed PDS outbox, verified publication/read-back, recipient
   filtering, retention and retry/restart recovery to the gateway.

@@ -226,6 +226,82 @@ async fn exact_json_requires_signed_inclusion_and_cannot_cross_space() {
 }
 
 #[tokio::test]
+async fn addressed_question_requires_exact_signed_pds_readback() {
+    use mem_atproto::addressed_expertise::AddressedExpertiseWire;
+    use mem_federation::{
+        CanonicalJsonCodec,
+        expertise::{AddressedExpertiseRecord, ExpertiseQuestion},
+    };
+    let q: ExpertiseQuestion = serde_json::from_value(json!({
+        "request_id":Uuid::from_u128(301),"space":Uuid::from_u128(302),
+        "requester":Uuid::from_u128(303),"principal":Uuid::from_u128(304),
+        "capability":{"publisher":Uuid::from_u128(305),"id":Uuid::from_u128(306)},
+        "revision":1,"collection_digest":CanonicalJsonCodec::digest(&"reviewed").unwrap(),
+        "question":"What changed?","mode":"deterministic","model_destination":null,
+        "output_destination":"codex_openai",
+        "created_at":"2026-10-04T10:00:00Z","expires_at":"2026-10-04T10:02:00Z"
+    }))
+    .unwrap();
+    let addressed =
+        AddressedExpertiseRecord::question(q, 1, CanonicalJsonCodec::digest(&"policy").unwrap())
+            .unwrap();
+    let wire = AddressedExpertiseWire::encode(addressed.clone()).unwrap();
+    let repo = "did:web:space.federation.example.com";
+    let record = wire.record().unwrap();
+    let records = std::collections::BTreeMap::from([(
+        format!("{}/{}", record.collection.as_ref(), record.rkey.as_ref()),
+        wire.raw().clone(),
+    )]);
+    let exact = json!({"uri":wire.uri(&repo.parse().unwrap()).unwrap(),
+        "cid":wire.cid().unwrap(),"value":wire.raw()});
+    for (body, valid) in [
+        (exact.clone(), true),
+        (
+            json!({"uri":exact["uri"],"cid":"wrong","value":wire.raw()}),
+            false,
+        ),
+    ] {
+        let car = signed_repo(repo, &records, FixtureKey::K256);
+        let writes = Arc::new(AtomicUsize::new(0));
+        let seen = writes.clone();
+        let router = Router::new()
+            .route(
+                "/xrpc/com.atproto.repo.getRecord",
+                get(move || async move { Json(body) }),
+            )
+            .route(
+                "/xrpc/com.atproto.sync.getRepo",
+                get(move || async move { car }),
+            )
+            .route(
+                "/xrpc/com.atproto.repo.createRecord",
+                post(move || async move {
+                    seen.fetch_add(1, Ordering::SeqCst);
+                    StatusCode::OK
+                }),
+            );
+        let (endpoint, task) = serve(router).await;
+        let publisher = PdsPublisher::new(
+            endpoint,
+            repo.into(),
+            "fixture".repeat(8),
+            FixtureKey::K256.did_key(),
+            addressed.space,
+        )
+        .unwrap();
+        assert_eq!(
+            publisher
+                .publish_addressed_verified(&addressed)
+                .await
+                .is_ok(),
+            valid
+        );
+        assert_eq!(writes.load(Ordering::SeqCst), 0);
+        task.abort();
+    }
+}
+
+#[tokio::test]
 async fn oversized_gateway_pages_and_redirects_fail_closed() {
     let delivery = delivery();
     let oversized = "x".repeat(3 * 1024 * 1024 + 1);
