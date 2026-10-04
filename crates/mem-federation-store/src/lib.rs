@@ -2,7 +2,9 @@
 //! Trusted, in-process persistence APIs. Authentication, review UI, network
 //! verification and automatic service scheduling are NOT provided by this crate.
 
+mod addressed_expertise;
 mod audit;
+pub use addressed_expertise::*;
 mod expertise_catalog;
 mod expertise_collections;
 pub use expertise_catalog::*;

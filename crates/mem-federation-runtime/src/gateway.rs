@@ -39,6 +39,7 @@ impl GatewayServer {
     pub async fn maintain_expertise(&self) -> Result<()> {
         if self.expertise_enabled {
             self.store.cleanup_questions(self.fence).await?;
+            self.store.cleanup_addressed(self.fence).await?;
         }
         Ok(())
     }
@@ -171,6 +172,61 @@ impl GatewayServer {
                     WorkerOutcome::Retrying
                 },
             ),
+        }
+    }
+    /// Addressed records have a separate queue: they never acquire or change
+    /// a shared publication sequence. Success requires exact PDS read-back and
+    /// signed repository inclusion before the durable receipt becomes visible.
+    pub async fn publish_addressed_one(&self, pds: &PdsPublisher) -> Result<bool> {
+        if !self.expertise_enabled {
+            return Ok(false);
+        }
+        let pds = match pds.credential_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(_) => return Ok(false),
+        };
+        if pds.credential_generation() > 0 {
+            self.store
+                .recover_addressed_auth(self.fence, pds.credential_generation())
+                .await?;
+        }
+        let Some(lease) = self.store.claim_addressed(self.fence).await? else {
+            return Ok(false);
+        };
+        match pds.publish_addressed_verified(&lease.record).await {
+            Ok(proof) => {
+                let cid = mem_atproto::addressed_expertise::AddressedExpertiseWire::encode(
+                    lease.record.clone(),
+                )
+                .map_err(|_| RuntimeError::InvalidResponse)?
+                .cid()
+                .map_err(|_| RuntimeError::InvalidResponse)?;
+                if proof.record_cid != cid {
+                    self.store
+                        .fail_addressed(
+                            self.fence,
+                            &lease,
+                            mem_federation_store::PublishFailure::InvalidReceipt,
+                        )
+                        .await?;
+                    return Err(RuntimeError::InvalidResponse);
+                }
+                self.store
+                    .acknowledge_addressed(
+                        self.fence,
+                        &lease,
+                        &cid,
+                        serde_json::to_value(proof).map_err(|_| RuntimeError::InvalidResponse)?,
+                    )
+                    .await?;
+                Ok(true)
+            }
+            Err(failure) => {
+                self.store
+                    .fail_addressed(self.fence, &lease, failure)
+                    .await?;
+                Ok(false)
+            }
         }
     }
     pub fn with_publication_status(mut self, pds: PdsPublisher) -> Self {
@@ -327,6 +383,26 @@ async fn expertise(
                 .await
                 .map_err(expertise_error)?,
         )),
+        ExpertiseOperation::AddressedSubmit { record } => ExpertiseReply::AddressedReceipt(
+            store
+                .enqueue_addressed(fence, actor, record)
+                .await
+                .map_err(expertise_error)?,
+        ),
+        ExpertiseOperation::AddressedRead { request_id, kind } => {
+            ExpertiseReply::AddressedDelivery(Box::new(
+                store
+                    .read_addressed(fence, actor, *request_id, kind)
+                    .await
+                    .map_err(expertise_error)?,
+            ))
+        }
+        ExpertiseOperation::AddressedInbox { limit } => ExpertiseReply::AddressedInbox(
+            store
+                .addressed_inbox(fence, actor, *limit)
+                .await
+                .map_err(expertise_error)?,
+        ),
         ExpertiseOperation::Result { request_id } => ExpertiseReply::Question(Box::new(
             server
                 .receive_answer(actor, *request_id, request.nonce)

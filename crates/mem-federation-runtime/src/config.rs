@@ -167,7 +167,7 @@ impl GatewayConfig {
             .map_err(StoreError::from)?;
         // Schema provisioning is a separate administrator operation. Do not
         // grant this long-running network process database migration privileges.
-        let safe:bool=sqlx::query_scalar("SELECT NOT (r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication OR r.rolbypassrls) AND NOT pg_has_role(current_user,d.datdba,'MEMBER') AND NOT has_schema_privilege(current_user,'public','CREATE') AND NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f') AND c.relname NOT IN ('federation_gateway_spaces','federation_accepted','federation_publish_outbox','federation_security','federation_audit','federation_retention_decisions','federation_expertise_mailbox','federation_expertise_attempts','federation_expertise_daily_budget','federation_expertise_deliveries') AND has_table_privilege(current_user,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')) FROM pg_roles r JOIN pg_database d ON d.datname=current_database() WHERE r.rolname=current_user")
+        let safe:bool=sqlx::query_scalar("SELECT NOT (r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication OR r.rolbypassrls) AND NOT pg_has_role(current_user,d.datdba,'MEMBER') AND NOT has_schema_privilege(current_user,'public','CREATE') AND NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f') AND c.relname NOT IN ('federation_gateway_spaces','federation_accepted','federation_publish_outbox','federation_security','federation_audit','federation_retention_decisions','federation_expertise_mailbox','federation_expertise_attempts','federation_expertise_daily_budget','federation_expertise_deliveries','federation_expertise_addressed') AND has_table_privilege(current_user,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')) FROM pg_roles r JOIN pg_database d ON d.datname=current_database() WHERE r.rolname=current_user")
             .fetch_one(&pool).await.map_err(StoreError::from)?;
         if !safe {
             return Err(RuntimeError::Configuration);
@@ -201,6 +201,14 @@ impl GatewayConfig {
                         tracing::warn!("gateway publication blocked or retrying")
                     }
                     _ => {}
+                }
+                match server.publish_addressed_one(&pds).await {
+                    Ok(true) => continue,
+                    Err(RuntimeError::Store(StoreError::Fenced)) => {
+                        return Err(RuntimeError::Store(StoreError::Fenced));
+                    }
+                    Err(_) => tracing::warn!("addressed expertise publication blocked or retrying"),
+                    Ok(false) => {}
                 }
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }

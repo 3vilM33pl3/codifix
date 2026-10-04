@@ -8,7 +8,8 @@ use crate::{
 use axum::http::StatusCode;
 use mem_federation::publication::InstanceId;
 use mem_federation_store::{
-    AnswerDeliveryAuthorization, AnswerDeliveryLease, DELIVERY_WAIT_SECONDS, QuestionResult,
+    AddressedDelivery, AddressedReceipt, AnswerDeliveryAuthorization, AnswerDeliveryLease,
+    DELIVERY_WAIT_SECONDS, QuestionResult,
 };
 use std::{
     collections::BTreeMap,
@@ -181,6 +182,60 @@ impl GatewayClient {
 }
 
 impl crate::InstanceSync {
+    pub async fn submit_addressed_expertise(
+        &self,
+        record: mem_federation::expertise::AddressedExpertiseRecord,
+    ) -> crate::Result<AddressedReceipt> {
+        if record.sender != self.instance {
+            return Err(RuntimeError::Unauthorized);
+        }
+        match self
+            .client
+            .expertise(
+                self.instance,
+                ExpertiseOperation::AddressedSubmit { record },
+            )
+            .await?
+        {
+            ExpertiseReply::AddressedReceipt(receipt) => Ok(receipt),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+
+    pub async fn addressed_expertise_result(
+        &self,
+        request_id: Uuid,
+        kind: &str,
+    ) -> crate::Result<AddressedDelivery> {
+        match self
+            .client
+            .expertise(
+                self.instance,
+                ExpertiseOperation::AddressedRead {
+                    request_id,
+                    kind: kind.to_owned(),
+                },
+            )
+            .await?
+        {
+            ExpertiseReply::AddressedDelivery(delivery) => Ok(*delivery),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+
+    pub async fn addressed_expertise_inbox(
+        &self,
+        limit: u32,
+    ) -> crate::Result<Vec<AddressedDelivery>> {
+        match self
+            .client
+            .expertise(self.instance, ExpertiseOperation::AddressedInbox { limit })
+            .await?
+        {
+            ExpertiseReply::AddressedInbox(items) => Ok(items),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
     pub async fn expertise_capabilities(
         &self,
         after: Option<mem_federation::publication::RecordKey>,

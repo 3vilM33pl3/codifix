@@ -5,7 +5,8 @@ use crate::{GatewayClient, Result, RuntimeError};
 use chrono::{DateTime, Utc};
 use mem_federation::{CanonicalJsonCodec, ContentDigest, expertise::*, publication::*};
 use mem_federation_store::{
-    AnswerDeliveryAuthorization, AnswerDeliveryLease, QuestionLease, QuestionResult,
+    AddressedDelivery, AddressedReceipt, AddressedStatus, AnswerDeliveryAuthorization,
+    AnswerDeliveryLease, QuestionLease, QuestionResult,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -19,6 +20,16 @@ pub enum ExpertiseOperation {
     },
     Submit {
         question: ExpertiseQuestion,
+    },
+    AddressedSubmit {
+        record: AddressedExpertiseRecord,
+    },
+    AddressedRead {
+        request_id: Uuid,
+        kind: String,
+    },
+    AddressedInbox {
+        limit: u32,
     },
     Result {
         request_id: Uuid,
@@ -47,6 +58,9 @@ impl ExpertiseOperation {
         match self {
             Self::Discover { .. } => "memory-expertise-discover-v1",
             Self::Submit { .. } => "memory-expertise-submit-v1",
+            Self::AddressedSubmit { .. } => "memory-addressed-submit-v1",
+            Self::AddressedRead { .. } => "memory-addressed-read-v1",
+            Self::AddressedInbox { .. } => "memory-addressed-inbox-v1",
             Self::Result { .. } => "memory-expertise-result-v1",
             Self::Claim => "memory-expertise-claim-v1",
             Self::ClaimDelivery => "memory-expertise-delivery-claim-v1",
@@ -81,6 +95,9 @@ impl ExpertiseRpc {
 pub enum ExpertiseReply {
     Capabilities(Vec<CapabilityAdvertisement>),
     Question(Box<QuestionResult>),
+    AddressedReceipt(AddressedReceipt),
+    AddressedDelivery(Box<AddressedDelivery>),
+    AddressedInbox(Vec<AddressedDelivery>),
     Lease(Option<Box<QuestionLease>>),
     DeliveryLease(Option<Box<AnswerDeliveryLease>>),
     Renewed(DateTime<Utc>),
@@ -164,6 +181,47 @@ impl GatewayClient {
                 }
                 validate_result(result, instance, self.space)?;
             }
+            (
+                ExpertiseOperation::AddressedSubmit { record },
+                ExpertiseReply::AddressedReceipt(receipt),
+            ) => {
+                if record.space != self.space
+                    || record.sender != instance
+                    || record.request_id != receipt.request_id
+                    || record.space != receipt.space
+                    || CanonicalJsonCodec::digest(record)
+                        .map_err(|_| RuntimeError::InvalidResponse)?
+                        != receipt.record_digest
+                {
+                    return Err(RuntimeError::InvalidResponse);
+                }
+            }
+            (
+                ExpertiseOperation::AddressedRead { request_id, kind },
+                ExpertiseReply::AddressedDelivery(delivery),
+            ) => {
+                if delivery.receipt.request_id != *request_id
+                    || delivery.receipt.kind != *kind
+                    || delivery.receipt.space != self.space
+                    || !valid_addressed_delivery(delivery, instance)?
+                {
+                    return Err(RuntimeError::InvalidResponse);
+                }
+            }
+            (
+                ExpertiseOperation::AddressedInbox { limit },
+                ExpertiseReply::AddressedInbox(items),
+            ) => {
+                if !(1..=32).contains(limit)
+                    || items.len() > *limit as usize
+                    || items.iter().any(|item| {
+                        item.receipt.kind != "question"
+                            || !matches!(valid_addressed_delivery(item, instance), Ok(true))
+                    })
+                {
+                    return Err(RuntimeError::InvalidResponse);
+                }
+            }
             (ExpertiseOperation::Result { request_id }, ExpertiseReply::Question(result)) => {
                 if *request_id != result.binding.request_id {
                     return Err(RuntimeError::InvalidResponse);
@@ -213,6 +271,19 @@ impl GatewayClient {
         }
         Ok(reply)
     }
+}
+fn valid_addressed_delivery(delivery: &AddressedDelivery, actor: InstanceId) -> Result<bool> {
+    let Some(record) = &delivery.record else {
+        return Ok(true);
+    };
+    let digest = CanonicalJsonCodec::digest(record).map_err(|_| RuntimeError::InvalidResponse)?;
+    Ok(delivery.receipt.status == AddressedStatus::Published
+        && delivery.receipt.proof.is_some()
+        && delivery.receipt.record_digest == digest
+        && record.space == delivery.receipt.space
+        && record.request_id == delivery.receipt.request_id
+        && (record.sender == actor || record.recipient == actor)
+        && record.validate().is_ok())
 }
 fn validate_result(result: &QuestionResult, requester: InstanceId, space: SpaceId) -> Result<()> {
     if result.binding.requester != requester
