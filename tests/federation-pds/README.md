@@ -19,6 +19,14 @@ without reinvocation and budget exhaustion). The upstream verifier accepts both
 unchanged v2 history and v3 advertisements, verifies the signed CAR, and asserts
 that private question/answer/evidence sentinels never enter PDS records.
 
+The same `--runtime` gate also runs the watched-agent rehearsal against the
+private PDS with four independently credentialed Memory application databases
+and a separate gateway database. Synthetic Codex and Claude caller bindings
+ask Trust for one selected source each; the test requires exact retry,
+signed-record publication/read-back, one original citation, no unselected
+content and denial to a merely enrolled third participant. This tests the
+service/PDS path with synthetic content, not a live CA or external model.
+
 Run with the inherited developer token unset, an explicitly disposable database,
 and the client prerequisites below:
 

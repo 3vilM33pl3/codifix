@@ -125,6 +125,13 @@ async function runtimeTest() {
     const code = await new Promise((resolve, reject) => { expertise.once('error', reject); expertise.once('exit', resolve); });
     if (code !== 0) throw new Error('F1 expertise separate-database workflow failed');
   } finally { clearTimeout(expertiseTimer); }
+  const agents = spawn('cargo', ['test', '-p', 'mem-service', 'watched_agents_four_area_signed_pds_rehearsal', '--locked', '--', '--test-threads=1', '--nocapture'],
+    { cwd: join(directory, '../..'), env: { ...testEnv, MEMORY_FEDERATION_AGENT_INSTANCES: '1' }, stdio: 'inherit' });
+  const agentsTimer = setTimeout(() => agents.kill('SIGTERM'), 540_000);
+  try {
+    const code = await new Promise((resolve, reject) => { agents.once('error', reject); agents.once('exit', resolve); });
+    if (code !== 0) throw new Error('Four-area watched-agent signed-PDS rehearsal failed');
+  } finally { clearTimeout(agentsTimer); }
   await writeFile(join(stateDirectory, 'runtime-finished'), 'complete', { mode: 0o600 });
   const probeId = spawnSync('docker', [...compose, 'ps', '-aq', 'probe'], { env: runtimeEnv, encoding: 'utf8' });
   const completed = spawnSync('docker', ['wait', probeId.stdout.trim()], { encoding: 'utf8', timeout: 60_000 });

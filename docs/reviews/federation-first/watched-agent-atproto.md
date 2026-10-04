@@ -38,7 +38,7 @@ already delivered. No public repository access or native Spaces alpha is used.
 - [x] Bundle the focused skill with the release and install missing copies from
   the local package in watched repositories without overwriting custom skills.
 - [x] Show metadata-only exchange status in Web, CLI and TUI.
-- [ ] Rehearse four disposable areas, including Workshop and Trust, with both
+- [x] Rehearse four disposable areas, including Workshop and Trust, with both
   Codex and Claude bindings; test isolation, replay, outage, signed read-back,
   citation integrity, expiry and watcher bootstrap.
 - [ ] Build and upgrade Monolith, package one CA handoff through the existing
@@ -65,8 +65,15 @@ Focused tests pass for signed inclusion/absence, compare-and-swap delete,
 hold behavior, PostgreSQL leases, exact retries, four enrolled area identities,
 Codex/Claude destination labels and recipient isolation. The four-area gateway
 test uses synthetic store publication receipts; the separate fake-PDS HTTP
-test checks signed CAR verification. Neither is yet the full four-service/PDS
-rehearsal or live deployment. The complete Rust workspace passed against an
+test checks signed CAR verification. A further `--runtime` gate now runs four
+independent Memory HTTP instances/databases plus a fifth gateway database
+against the pinned disposable PDS. Synthetic Codex and Claude bindings each
+obtain a cited Trust answer after signed addressed publication/read-back;
+same-ID replay, unselected-source exclusion and denial to enrolled Homelab
+also pass. This is in one test process, not four separately deployed service
+processes. Outage, expiry and deletion remain covered by the focused gateway/PDS
+tests, while watcher skill bootstrap was checked in the live Monolith manager.
+The complete Rust workspace passed against an
 isolated PostgreSQL 17 database with four test threads and a 300-connection
 ceiling; the default 100-connection disposable test cluster produced pool
 timeouts when the entire workspace was exercised concurrently. Lean build/test,

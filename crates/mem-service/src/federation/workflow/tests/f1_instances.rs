@@ -57,6 +57,23 @@ async fn collection(
     id: Uuid,
     canonical: RecordId,
 ) -> Value {
+    collection_with_destinations(
+        f,
+        requesters,
+        id,
+        canonical,
+        &["local_human", "synthetic_cloud"],
+    )
+    .await
+}
+
+async fn collection_with_destinations(
+    f: &Fixture,
+    requesters: Vec<InstanceId>,
+    id: Uuid,
+    canonical: RecordId,
+    destinations: &[&str],
+) -> Value {
     let snapshot = EvidenceSnapshot {
         space: f.runtime.space,
         stream: StreamId {
@@ -70,7 +87,7 @@ async fn collection(
     let evidence = json!({"snapshot_digest":CanonicalJsonCodec::digest(&snapshot).unwrap(),"snapshot":snapshot});
     let mut blueprint = json!({"collection":id,"name":"Reviewed recovery","description":"Synthetic incident knowledge",
         "topics":["incident"],"modes":["deterministic"],"requesters":requesters,
-        "model_destinations":[],"output_destinations":["local_human","synthetic_cloud"],"entries":[{"canonical":canonical,"evidence":[evidence]}]});
+        "model_destinations":[],"output_destinations":destinations,"entries":[{"canonical":canonical,"evidence":[evidence]}]});
     if f.runtime.expertise_model.is_some() {
         blueprint["modes"] = json!(["deterministic", "model"]);
         blueprint["model_destinations"] = json!(["ollama"]);
@@ -174,6 +191,264 @@ async fn terminal_answer(f: &Fixture, review: &Value, expected: &str) -> Value {
     })
     .await
     .expect("automatic answer deadline")
+}
+
+/// A real pinned private PDS, four independent application databases and HTTP
+/// services, and two fixed agent destinations. The gateway and source stores
+/// never treat a membership as collection or onward-disclosure consent.
+#[tokio::test]
+async fn watched_agents_four_area_signed_pds_rehearsal() {
+    if std::env::var("MEMORY_FEDERATION_AGENT_INSTANCES").as_deref() != Ok("1") {
+        return;
+    }
+    let fixture: Value = serde_json::from_slice(
+        &std::fs::read(
+            std::env::var("MEMORY_FEDERATION_PDS_FIXTURE").expect("private PDS fixture"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let admin = mem_test_support::migrated_pool().await.unwrap();
+    let gateway_db = Database::new(&admin).await;
+    let workshop_db = Database::new(&admin).await;
+    let homelab_db = Database::new(&admin).await;
+    let trust_db = Database::new(&admin).await;
+    let general_db = Database::new(&admin).await;
+    let space = SpaceId::new(Uuid::new_v4()).unwrap();
+    let ids = [
+        InstanceId::new(Uuid::new_v4()).unwrap(),
+        InstanceId::new(Uuid::new_v4()).unwrap(),
+        InstanceId::new(Uuid::new_v4()).unwrap(),
+        InstanceId::new(Uuid::new_v4()).unwrap(),
+    ];
+    let tokens = [
+        Uuid::new_v4().simple().to_string(),
+        Uuid::new_v4().simple().to_string(),
+        Uuid::new_v4().simple().to_string(),
+        Uuid::new_v4().simple().to_string(),
+    ];
+    let security = GatewaySecurity::initial(
+        &[31; 32],
+        mem_federation_store::SpacePolicy {
+            external_models: ["codex_openai".into(), "claude_anthropic".into()]
+                .into_iter()
+                .collect(),
+        },
+    )
+    .unwrap();
+    let gateway = GatewayStore::new(gateway_db.pool.clone());
+    let server = GatewayServer::new(
+        gateway.clone(),
+        space,
+        ids[0],
+        ids.into_iter()
+            .zip(tokens.iter().cloned())
+            .map(|(id, token)| (token, id))
+            .collect(),
+        security.clone(),
+    )
+    .await
+    .unwrap()
+    .enable_expertise_rehearsal(&ids.map(|id| (id, 3)))
+    .await
+    .unwrap()
+    .enable_addressed_expertise(&ids.map(|id| (id, 1)))
+    .await
+    .unwrap();
+    let (url, gateway_task) = serve(server.router()).await;
+    let n = Network {
+        space,
+        authority: ids[0],
+        gateway,
+        server,
+        security,
+        url,
+    };
+    let pds = mem_federation_runtime::PdsPublisher::new(
+        Endpoint::new(fixture["base"].as_str().unwrap(), true).unwrap(),
+        fixture["repository"].as_str().unwrap().into(),
+        fixture["token"].as_str().unwrap().into(),
+        fixture["signing_key"].as_str().unwrap().into(),
+        space,
+    )
+    .unwrap();
+    let mut workshop = app(&workshop_db, &n, ids[0], tokens[0].clone()).await;
+    let mut homelab = app(&homelab_db, &n, ids[1], tokens[1].clone()).await;
+    let mut trust = app(&trust_db, &n, ids[2], tokens[2].clone()).await;
+    let mut general = app(&general_db, &n, ids[3], tokens[3].clone()).await;
+    for area in [&mut workshop, &mut homelab, &mut trust, &mut general] {
+        caller_policy(area).await;
+    }
+    let mut trust_runtime = (*trust.runtime).clone();
+    trust_runtime.expertise_output_destinations = vec![
+        "local_human".into(),
+        "codex_openai".into(),
+        "claude_anthropic".into(),
+    ];
+    trust.runtime = Arc::new(trust_runtime);
+    *trust.state.federation.write().unwrap() = Some(trust.runtime.clone());
+    for id in ids {
+        enroll(&n, id).await;
+    }
+    n.publish(Some(&pds)).await;
+    for app in [&workshop, &homelab, &trust, &general] {
+        app.runtime.sync.catch_up().await.unwrap();
+    }
+    let source = trust.source().await;
+    let unselected = trust.source().await;
+    sqlx::query("UPDATE memory_entries SET canonical_text='UNSELECTED_SECRET_SENTINEL' WHERE canonical_id=$1")
+        .bind(unselected.as_uuid())
+        .execute(&trust.pool)
+        .await
+        .unwrap();
+    let collection_id = Uuid::new_v4();
+    collection_with_destinations(
+        &trust,
+        vec![ids[0], ids[3]],
+        collection_id,
+        source,
+        &["codex_openai", "claude_anthropic"],
+    )
+    .await;
+    pump(&n, Some(&pds), &[&workshop, &homelab, &trust, &general]).await;
+    let answerer = worker(&trust, collection_id).await;
+    let capability = json!({"publisher":ids[2],"id":collection_id});
+    for (requester, destination) in [
+        (&mut workshop, "codex_openai"),
+        (&mut general, "claude_anthropic"),
+    ] {
+        let token_id: Uuid =
+            sqlx::query_scalar("SELECT id FROM auth_service_tokens WHERE principal_id=$1")
+                .bind(requester.writer_id)
+                .fetch_one(&requester.pool)
+                .await
+                .unwrap();
+        let (status, body) = requester
+            .request(
+                &requester.root,
+                reqwest::Method::POST,
+                "/grants",
+                json!({"principal":requester.writer_id,"enabled":true,"capabilities":["pull","ask_expertise"]}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let mut runtime = (*requester.runtime).clone();
+        runtime.expertise_output_destinations = vec![destination.into()];
+        runtime.expertise_callers = vec![crate::federation::ExpertiseCaller {
+            principal: requester.writer_id,
+            token: token_id,
+            output_destination: destination.into(),
+            agent_ask: Some(crate::federation::AgentAskPolicy {
+                revision: 1,
+                allowed_capabilities: vec![mem_federation::publication::RecordKey {
+                    publisher: ids[2],
+                    id: RecordId::new(collection_id).unwrap(),
+                }],
+                daily_limit: 1,
+            }),
+        }];
+        requester.runtime = Arc::new(runtime);
+        *requester.state.federation.write().unwrap() = Some(requester.runtime.clone());
+        let request_id = Uuid::new_v4();
+        let question = json!({"request_id":request_id,"capability":capability,"question":"What is the reviewed incident diagnosis?"});
+        let (status, queued) = requester
+            .request(
+                &requester.writer,
+                reqwest::Method::POST,
+                "/agent-questions",
+                question.clone(),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{queued}");
+        let (status, replay) = requester
+            .request(
+                &requester.writer,
+                reqwest::Method::POST,
+                "/agent-questions",
+                question,
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{replay}");
+        assert_eq!(queued["record_digest"], replay["record_digest"]);
+        let result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
+            loop {
+                let _ = n.server.publish_addressed_one(&pds).await.unwrap();
+                let (status, result) = requester
+                    .request(
+                        &requester.writer,
+                        reqwest::Method::GET,
+                        &format!("/agent-questions/{request_id}"),
+                        Value::Null,
+                    )
+                    .await;
+                assert_eq!(status, StatusCode::OK, "{result}");
+                if result["answer"]["status"] == "answered" {
+                    break result;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            }
+        })
+        .await
+        .expect("signed addressed answer deadline");
+        let result_text = result.to_string();
+        assert!(
+            result_text.contains("Reviewed incident diagnosis"),
+            "{result}"
+        );
+        assert!(result_text.contains("Reviewed synthetic evidence only"));
+        assert!(!result_text.contains("UNSELECTED_SECRET_SENTINEL"));
+        assert!(!result_text.contains("DO_NOT_SHARE"));
+        assert_eq!(result["answer"]["citations"].as_array().unwrap().len(), 1);
+        assert_eq!(result["answer"]["citations"][0]["responder"], json!(ids[2]));
+        let (status, repeated) = requester
+            .request(
+                &requester.writer,
+                reqwest::Method::GET,
+                &format!("/agent-questions/{request_id}"),
+                Value::Null,
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(repeated["answer"], result["answer"]);
+        let homelab_client = GatewayClient::new(
+            Endpoint::new(&n.url, true).unwrap(),
+            tokens[1].clone(),
+            space,
+            ids[0],
+            n.security.trust(),
+        )
+        .unwrap();
+        assert!(
+            homelab_client
+                .expertise(
+                    ids[1],
+                    mem_federation_runtime::ExpertiseOperation::AddressedRead {
+                        request_id,
+                        kind: "answer".into(),
+                    },
+                )
+                .await
+                .is_err(),
+            "Homelab membership is not addressed access"
+        );
+    }
+    answerer.1.abort();
+    gateway_task.abort();
+    for app in [&workshop, &homelab, &trust, &general] {
+        for task in &app.tasks {
+            task.abort();
+        }
+    }
+    drop(workshop);
+    drop(homelab);
+    drop(trust);
+    drop(general);
+    drop(n);
+    workshop_db.cleanup(&admin).await;
+    homelab_db.cleanup(&admin).await;
+    trust_db.cleanup(&admin).await;
+    general_db.cleanup(&admin).await;
+    gateway_db.cleanup(&admin).await;
 }
 #[tokio::test]
 async fn f1_independent_instances_answer_and_enroll_game() {

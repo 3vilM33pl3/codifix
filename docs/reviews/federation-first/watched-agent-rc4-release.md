@@ -1,6 +1,6 @@
 # Watched-agent expertise rc.4 deployment — 2026-10-04
 
-Status: **Monolith installed; CA Trust upgrade in progress**. This
+Status: **Monolith installed; CA Trust handoff active, result pending**. This
 `2.1.0-rc.4` release is built from
 source revision `71cbfc9c2030e5f9fed1320c88b80b34dd36c68c` on
 `codex/federation-v1`. It changes the database schema from the prior
@@ -109,8 +109,15 @@ The full Rust workspace, Lean build/test, Web tests/build, scoped JavaScript
 tests, formatting, Clippy and boundary checks passed before packaging. A
 disposable four-enrolled-area gateway test exercises Codex/Claude destination
 bindings and recipient isolation; separate fake-PDS tests exercise signed CAR
-inclusion/absence and addressed deletion. A true four-service-plus-PDS
-rehearsal and live agent-type cited answers have **not** yet been demonstrated.
+inclusion/absence and addressed deletion. On 4 October, the full disposable
+`tests/federation-pds/run.mjs --runtime` gate also passed with four independent
+Memory HTTP applications/databases and one gateway database against the pinned
+private PDS. Synthetic Codex and Claude bindings each obtained a cited Trust
+answer through signed addressed publication/read-back. Exact replay,
+unselected-source exclusion and denial to an enrolled but unauthorized
+Homelab instance passed. The four HTTP applications shared one test process;
+this is not four production deployments. Live agent-type cited answers have
+**not** yet been demonstrated.
 
 The rc.4 software does not automatically grant Codex or Claude onward
 disclosure. Existing collections remain `local_human` only unless an operator
