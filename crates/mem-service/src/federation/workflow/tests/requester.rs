@@ -2,6 +2,143 @@
 use super::*;
 use mem_federation::expertise::*;
 
+#[tokio::test]
+async fn watched_agent_question_is_policy_bound_budgeted_and_retryable() {
+    let Some(f) = Fixture::with_expertise(true).await else {
+        return;
+    };
+    let fence = f
+        .gateway
+        .initialize(f.runtime.space, f.runtime.authority)
+        .await
+        .unwrap();
+    let ad = CapabilityAdvertisement {
+        owner: f.runtime.authority,
+        collection: RecordId::new(Uuid::new_v4()).unwrap(),
+        revision: StateRevision::new(1).unwrap(),
+        collection_digest: CanonicalJsonCodec::digest(&"reviewed fixture").unwrap(),
+        name: "Remote Workshop".into(),
+        description: "Reviewed architecture".into(),
+        topics: vec![],
+        modes: vec![AnswerMode::Deterministic],
+        requesters: vec![f.runtime.instance],
+        model_destinations: vec![],
+        output_destinations: vec!["synthetic_cloud".into()],
+        active: true,
+        limits: Default::default(),
+    };
+    for record in [
+        PublicationRecord::Membership {
+            member: f.runtime.instance,
+            capability: SpaceCapability::AskExpertise,
+        },
+        PublicationRecord::Membership {
+            member: f.runtime.authority,
+            capability: SpaceCapability::Publish,
+        },
+        PublicationRecord::Membership {
+            member: f.runtime.authority,
+            capability: SpaceCapability::AnswerExpertise,
+        },
+        PublicationRecord::Expertise(ad.clone()),
+    ] {
+        let publisher = f.runtime.authority;
+        let mut intent = intent(f.runtime.space, publisher, record);
+        intent.envelope.schema_version = 3;
+        assert_eq!(
+            f.gateway
+                .accept(fence, publisher, &intent)
+                .await
+                .unwrap()
+                .outcome,
+            PublicationOutcome::Applied
+        );
+    }
+    f.publish_fixture_receipts().await;
+    f.runtime.sync.catch_up().await.unwrap();
+    let (status, body) = f.request(&f.root, reqwest::Method::POST, "/grants",
+        json!({"principal":f.writer_id,"capabilities":["pull","publish","ask_expertise"],"enabled":true})).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let token_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM auth_service_tokens WHERE principal_id=$1")
+            .bind(f.writer_id)
+            .fetch_one(&f.pool)
+            .await
+            .unwrap();
+    let mut runtime = (*f.runtime).clone();
+    runtime
+        .expertise_callers
+        .push(crate::federation::ExpertiseCaller {
+            principal: f.writer_id,
+            token: token_id,
+            output_destination: "synthetic_cloud".into(),
+            agent_ask: Some(crate::federation::AgentAskPolicy {
+                revision: 1,
+                allowed_capabilities: vec![ad.key()],
+                daily_limit: 1,
+            }),
+        });
+    *f.state.federation.write().unwrap() = Some(Arc::new(runtime));
+    let request_id = Uuid::new_v4();
+    let request = json!({"request_id":request_id,"capability":ad.key(),"question":"What changed?"});
+    let (status, queued) = f
+        .request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/agent-questions",
+            request.clone(),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{queued}");
+    assert_eq!(queued["status"], "queued");
+    let (status, retried) = f
+        .request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/agent-questions",
+            request.clone(),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{retried}");
+    assert_eq!(retried["record_digest"], queued["record_digest"]);
+    let (status, _) = f
+        .request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/agent-questions",
+            json!({"request_id":request_id,"capability":ad.key(),"question":"Changed bytes"}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = f
+        .request(
+            &f.writer,
+            reqwest::Method::POST,
+            "/agent-questions",
+            json!({"request_id":Uuid::new_v4(),"capability":ad.key(),"question":"Second question"}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = f
+        .request(
+            &f.reader,
+            reqwest::Method::POST,
+            "/agent-questions",
+            request,
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let used: i16 = sqlx::query_scalar(
+        "SELECT used FROM federation_agent_expertise_daily WHERE project_id=$1 AND token_id=$2",
+    )
+    .bind(f.runtime.project)
+    .bind(token_id)
+    .fetch_one(&f.pool)
+    .await
+    .unwrap();
+    assert_eq!(used, 1);
+}
+
 pub(super) async fn require_committed_consent(
     State(pool): State<PgPool>,
     request: axum::extract::Request,
@@ -209,6 +346,7 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
         principal: f.writer_id,
         token: token_id,
         output_destination: "synthetic_cloud".into(),
+        agent_ask: None,
     }];
     *f.state.federation.write().unwrap() = Some(Arc::new(bound));
     let (status, token_review) = f

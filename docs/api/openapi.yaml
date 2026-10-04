@@ -1996,6 +1996,46 @@ paths:
         "403": { description: Session, scope, destination, CSRF or current authority denied. }
         "409": { description: Changed consent or conflicting request identity. }
         "503": { description: Gateway unavailable; consent may already have committed. }
+  /v1/projects/{slug}/federation/{space}/agent-questions:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+    post:
+      operationId: submitWatchedAgentExpertiseQuestion
+      summary: Submit an addressed deterministic question under a standing operator-bound policy.
+      description: Requires an exact service-token binding, current project authority, an allowed reviewed collection and a fixed non-local output destination. The service commits the immutable question and one daily-budget slot before transmission. Exact retries reuse the same request ID and body. This does not represent human per-question confirmation.
+      tags: [Federation]
+      x-stability: experimental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [request_id, capability, question]
+              properties:
+                request_id: { type: string, format: uuid }
+                capability: { type: object, description: Selected publisher and collection identifiers from discovery. }
+                question: { type: string, maxLength: 4096 }
+      responses:
+        "200": { description: Queued or published addressed-record receipt, not an answer. }
+        "403": { description: Current authority, collection, destination or daily budget denied. }
+        "503": { description: Gateway unavailable; exact local intent remains retryable until expiry. }
+  /v1/projects/{slug}/federation/{space}/agent-questions/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/FederationProject' }
+      - { $ref: '#/components/parameters/FederationSpace' }
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getWatchedAgentExpertiseResult
+      summary: Read the current addressed answer under the same exact-token standing policy.
+      tags: [Federation]
+      x-stability: experimental
+      responses:
+        "200": { description: No-store question and answer receipts, with a cited untrusted answer only after verified PDS publication. }
+        "403": { description: Current authority, collection or destination denied. }
+        "404": { description: No question owned by this exact caller. }
   /v1/projects/{slug}/federation/{space}/actions:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }

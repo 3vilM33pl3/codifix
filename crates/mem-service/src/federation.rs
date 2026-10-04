@@ -5,7 +5,7 @@ mod expertise;
 mod projects;
 pub mod workflow;
 use crate::AppState;
-use mem_federation::publication::{InstanceId, SpaceId};
+use mem_federation::publication::{InstanceId, RecordKey, SpaceId};
 use mem_federation_runtime::{Endpoint, GatewayClient, InstanceSync, ReceiptTrust};
 pub use mem_federation_store::{
     SourceSelection, preview_source, retry_source_work, review_and_share, set_local_grant,
@@ -84,6 +84,15 @@ struct ExpertiseCaller {
     principal: Uuid,
     token: Uuid,
     output_destination: String,
+    #[serde(default)]
+    agent_ask: Option<AgentAskPolicy>,
+}
+#[derive(Clone, Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+struct AgentAskPolicy {
+    revision: u32,
+    allowed_capabilities: Vec<RecordKey>,
+    daily_limit: u32,
 }
 fn validate_expertise_callers(callers: &[ExpertiseCaller]) -> anyhow::Result<()> {
     anyhow::ensure!(callers.len() <= 64, "too many expertise caller bindings");
@@ -96,6 +105,22 @@ fn validate_expertise_callers(callers: &[ExpertiseCaller]) -> anyhow::Result<()>
                 && mem_federation::expertise::valid_destination(&caller.output_destination),
             "invalid or duplicate expertise caller binding"
         );
+        if let Some(policy) = &caller.agent_ask {
+            anyhow::ensure!(
+                policy.revision > 0
+                    && (1..=20).contains(&policy.daily_limit)
+                    && !policy.allowed_capabilities.is_empty()
+                    && policy.allowed_capabilities.len() <= 64
+                    && policy
+                        .allowed_capabilities
+                        .iter()
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        == policy.allowed_capabilities.len()
+                    && caller.output_destination != "local_human",
+                "invalid watched-agent expertise policy"
+            );
+        }
     }
     Ok(())
 }
@@ -392,8 +417,21 @@ mod tests {
             principal: Uuid::new_v4(),
             token: Uuid::new_v4(),
             output_destination: "synthetic_cloud".into(),
+            agent_ask: None,
         };
         assert!(validate_expertise_callers(std::slice::from_ref(&caller)).is_ok());
+        let mut watched = caller.clone();
+        watched.agent_ask = Some(AgentAskPolicy {
+            revision: 1,
+            allowed_capabilities: vec![RecordKey {
+                publisher: InstanceId::new(Uuid::new_v4()).unwrap(),
+                id: mem_federation::publication::RecordId::new(Uuid::new_v4()).unwrap(),
+            }],
+            daily_limit: 20,
+        });
+        assert!(validate_expertise_callers(&[watched.clone()]).is_ok());
+        watched.output_destination = "local_human".into();
+        assert!(validate_expertise_callers(&[watched]).is_err());
         assert!(validate_expertise_callers(&[caller.clone(), caller.clone()]).is_err());
         for destination in ["", "https://untrusted.invalid", "../path"] {
             let mut invalid = caller.clone();

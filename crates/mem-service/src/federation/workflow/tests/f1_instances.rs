@@ -19,6 +19,7 @@ async fn caller_policy(f: &mut Fixture) {
                 principal,
                 token,
                 output_destination: "local_human".into(),
+                agent_ask: None,
             });
         let (status,body)=f.request(&f.root,reqwest::Method::POST,"/grants",json!({"principal":principal,"enabled":true,"capabilities":["pull","publish","manage_membership","ask_expertise","answer_expertise"]})).await;
         assert_eq!(status, StatusCode::OK, "{body}");
@@ -533,6 +534,7 @@ async fn clients(
             principal,
             token: token_id,
             output_destination: "synthetic_cloud".into(),
+            agent_ask: None,
         });
     left.runtime = Arc::new(runtime);
     *left.state.federation.write().unwrap() = Some(left.runtime.clone());

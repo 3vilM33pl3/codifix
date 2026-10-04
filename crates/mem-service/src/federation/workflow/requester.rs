@@ -4,6 +4,7 @@ use super::*;
 use axum::extract::Query;
 use mem_federation::{ContentDigest, expertise::*};
 use mem_federation_store::{QuestionResult, QuestionReview};
+use sqlx::{Row, types::Json as SqlJson};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -197,6 +198,285 @@ pub struct ExpertisePrepareRequest {
 pub struct ExpertiseSubmitRequest {
     pub review: QuestionReview,
     pub confirmed_digest: ContentDigest,
+}
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentAskRequest {
+    pub request_id: Uuid,
+    pub capability: RecordKey,
+    pub question: String,
+}
+
+/// A watched agent gets only this preconfigured, exact-token path. It cannot
+/// assert a human confirmation or choose its onward output destination.
+#[axum::debug_handler]
+pub(crate) async fn expertise_agent_ask(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<SpacePath>,
+    Json(request): Json<AgentAskRequest>,
+) -> Result<Json<mem_federation_store::AddressedReceipt>, ApiError> {
+    let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
+    let caller = runtime
+        .expertise_callers
+        .iter()
+        .find(|caller| {
+            principal.credential_source == CredentialSource::ServiceToken
+                && principal.session_id.is_none()
+                && caller.principal == principal.id
+                && Some(caller.token) == principal.token_id
+                && caller.agent_ask.is_some()
+        })
+        .ok_or_else(|| ApiError::forbidden("watched-agent expertise policy unavailable"))?;
+    let policy = caller
+        .agent_ask
+        .as_ref()
+        .ok_or_else(|| ApiError::forbidden("agent policy unavailable"))?;
+    if !policy.allowed_capabilities.contains(&request.capability)
+        || request.request_id.is_nil()
+        || request.question.trim().is_empty()
+        || request.question.len() > MAX_QUESTION_BYTES
+    {
+        return Err(ApiError::forbidden(
+            "question outside standing agent policy",
+        ));
+    }
+    let ad = advertisement(&runtime, request.capability).await?;
+    let policy_digest = mem_federation::CanonicalJsonCodec::digest(&(
+        policy,
+        &caller.output_destination,
+        caller.token,
+    ))
+    .map_err(|_| unavailable())?;
+    let input_digest = mem_federation::CanonicalJsonCodec::digest(&request)
+        .map_err(|_| bad_request("invalid question"))?;
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let current = current_access(&state, &mut tx, &principal, &access).await?;
+    let prior = sqlx::query("SELECT principal,token_id,input_digest,policy_digest,record FROM federation_agent_expertise_intents WHERE project_id=$1 AND request_id=$2 FOR UPDATE")
+        .bind(runtime.project).bind(request.request_id)
+        .fetch_optional(&mut *tx).await.map_err(|_| unavailable())?;
+    let record: AddressedExpertiseRecord = if let Some(row) = prior {
+        if row
+            .try_get::<Uuid, _>("principal")
+            .map_err(|_| unavailable())?
+            != principal.id
+            || row
+                .try_get::<Uuid, _>("token_id")
+                .map_err(|_| unavailable())?
+                != caller.token
+            || row
+                .try_get::<SqlJson<ContentDigest>, _>("input_digest")
+                .map_err(|_| unavailable())?
+                .0
+                != input_digest
+            || row
+                .try_get::<SqlJson<ContentDigest>, _>("policy_digest")
+                .map_err(|_| unavailable())?
+                .0
+                != policy_digest
+        {
+            return Err(ApiError::forbidden("request ID or policy binding changed"));
+        }
+        row.try_get::<SqlJson<AddressedExpertiseRecord>, _>("record")
+            .map_err(|_| unavailable())?
+            .0
+    } else {
+        let now = chrono::Utc::now();
+        let question = ExpertiseQuestion {
+            request_id: request.request_id,
+            space: runtime.space,
+            requester: runtime.instance,
+            principal: principal.id,
+            capability: ad.key(),
+            revision: ad.revision,
+            collection_digest: ad.collection_digest.clone(),
+            question: request.question,
+            mode: AnswerMode::Deterministic,
+            model_destination: None,
+            output_destination: caller.output_destination.clone(),
+            created_at: now,
+            expires_at: now + chrono::Duration::seconds(120),
+        };
+        let record =
+            AddressedExpertiseRecord::question(question, policy.revision, policy_digest.clone())
+                .map_err(|_| bad_request("invalid addressed question"))?;
+        let day = now.date_naive();
+        sqlx::query("INSERT INTO federation_agent_expertise_daily(project_id,token_id,utc_day,used) VALUES($1,$2,$3,0) ON CONFLICT DO NOTHING")
+            .bind(runtime.project).bind(caller.token).bind(day).execute(&mut *tx).await.map_err(|_| unavailable())?;
+        let slot = sqlx::query("UPDATE federation_agent_expertise_daily SET used=used+1 WHERE project_id=$1 AND token_id=$2 AND utc_day=$3 AND used<$4 RETURNING used")
+            .bind(runtime.project).bind(caller.token).bind(day).bind(i16::try_from(policy.daily_limit).map_err(|_| unavailable())?)
+            .fetch_optional(&mut *tx).await.map_err(|_| unavailable())?;
+        if slot.is_none() {
+            return Err(ApiError::forbidden("daily agent question limit reached"));
+        }
+        sqlx::query("INSERT INTO federation_agent_expertise_intents(project_id,principal,token_id,space,request_id,input_digest,policy_digest,record) VALUES($1,$2,$3,$4,$5,$6,$7,$8)")
+            .bind(runtime.project).bind(principal.id).bind(caller.token).bind(runtime.space.as_uuid()).bind(request.request_id)
+            .bind(SqlJson(&input_digest)).bind(SqlJson(&policy_digest)).bind(SqlJson(&record))
+            .execute(&mut *tx).await.map_err(|_| unavailable())?;
+        record
+    };
+    let AddressedExpertisePayload::Question(question) = &record.payload else {
+        return Err(unavailable());
+    };
+    if question.expires_at <= chrono::Utc::now()
+        || record.policy_digest != policy_digest
+        || question.output_destination != caller.output_destination
+        || question.mode != AnswerMode::Deterministic
+    {
+        return Err(ApiError::forbidden(
+            "agent question expired or policy changed",
+        ));
+    }
+    mem_federation_store::prepare_expertise_question_with_models(
+        &mut tx,
+        &current,
+        question,
+        &ad,
+        &[caller.output_destination.clone()],
+        &[],
+    )
+    .await
+    .map_err(store_error)?;
+    tx.commit().await.map_err(|_| unavailable())?;
+    // The durable intent is committed before transmission. A fresh permission
+    // lock is held while the gateway accepts it, so a concurrent local revoke
+    // cannot slip between the last check and the network release.
+    let mut release_tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let release_access = current_access(&state, &mut release_tx, &principal, &access).await?;
+    mem_federation_store::prepare_expertise_question_with_models(
+        &mut release_tx,
+        &release_access,
+        question,
+        &ad,
+        &[caller.output_destination.clone()],
+        &[],
+    )
+    .await
+    .map_err(store_error)?;
+    let receipt = runtime
+        .sync
+        .submit_addressed_expertise(record)
+        .await
+        .map_err(runtime_error)?;
+    release_tx.rollback().await.map_err(|_| unavailable())?;
+    Ok(Json(receipt))
+}
+
+#[derive(Debug, Serialize)]
+pub struct AgentQuestionStatus {
+    pub request_id: Uuid,
+    pub question: Option<mem_federation_store::AddressedReceipt>,
+    pub answer: Option<ExpertiseAnswer>,
+    pub answer_receipt: Option<mem_federation_store::AddressedReceipt>,
+}
+
+pub(crate) async fn expertise_agent_result(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<ExpertiseResultPath>,
+) -> Result<Json<AgentQuestionStatus>, ApiError> {
+    let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
+    let caller = runtime
+        .expertise_callers
+        .iter()
+        .find(|caller| {
+            principal.credential_source == CredentialSource::ServiceToken
+                && principal.session_id.is_none()
+                && caller.principal == principal.id
+                && Some(caller.token) == principal.token_id
+                && caller.agent_ask.is_some()
+        })
+        .ok_or_else(|| ApiError::forbidden("watched-agent expertise policy unavailable"))?;
+    let policy = caller
+        .agent_ask
+        .as_ref()
+        .ok_or_else(|| ApiError::forbidden("agent policy unavailable"))?;
+    let digest = mem_federation::CanonicalJsonCodec::digest(&(
+        policy,
+        &caller.output_destination,
+        caller.token,
+    ))
+    .map_err(|_| unavailable())?;
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    let current = current_access(&state, &mut tx, &principal, &access).await?;
+    let row = sqlx::query("SELECT principal,token_id,policy_digest,record FROM federation_agent_expertise_intents WHERE project_id=$1 AND request_id=$2 FOR SHARE")
+        .bind(runtime.project).bind(path.id).fetch_optional(&mut *tx).await.map_err(|_| unavailable())?
+        .ok_or_else(|| ApiError::not_found("agent question not found"))?;
+    if row
+        .try_get::<Uuid, _>("principal")
+        .map_err(|_| unavailable())?
+        != principal.id
+        || row
+            .try_get::<Uuid, _>("token_id")
+            .map_err(|_| unavailable())?
+            != caller.token
+        || row
+            .try_get::<SqlJson<ContentDigest>, _>("policy_digest")
+            .map_err(|_| unavailable())?
+            .0
+            != digest
+    {
+        return Err(ApiError::forbidden("agent question policy changed"));
+    }
+    let record = row
+        .try_get::<SqlJson<AddressedExpertiseRecord>, _>("record")
+        .map_err(|_| unavailable())?
+        .0;
+    let AddressedExpertisePayload::Question(q) = &record.payload else {
+        return Err(unavailable());
+    };
+    if !policy.allowed_capabilities.contains(&q.capability)
+        || q.output_destination != caller.output_destination
+        || q.mode != AnswerMode::Deterministic
+    {
+        return Err(ApiError::forbidden("agent question outside current policy"));
+    }
+    let ad = advertisement(&runtime, q.capability).await?;
+    // A past deadline does not grant new authority. Check current local grant,
+    // destination and collection revision without resending the question.
+    let mut review_q = q.clone();
+    review_q.created_at = chrono::Utc::now();
+    review_q.expires_at = review_q.created_at + chrono::Duration::seconds(120);
+    mem_federation_store::prepare_expertise_question_with_models(
+        &mut tx,
+        &current,
+        &review_q,
+        &ad,
+        &[caller.output_destination.clone()],
+        &[],
+    )
+    .await
+    .map_err(store_error)?;
+    let question = runtime
+        .sync
+        .addressed_expertise_result(path.id, "question")
+        .await
+        .map_err(runtime_error)?;
+    let delivered = runtime
+        .sync
+        .addressed_expertise_result(path.id, "answer")
+        .await
+        .map_err(runtime_error)?;
+    let answer = delivered
+        .as_ref()
+        .and_then(|delivery| delivery.record.as_ref())
+        .and_then(|record| match &record.payload {
+            AddressedExpertisePayload::Answer(answer) => Some(answer.clone()),
+            _ => None,
+        });
+    let question_digest = q.digest().map_err(|_| unavailable())?;
+    if answer.as_ref().is_some_and(|answer| {
+        answer.request_digest != question_digest || answer.validate(q, &answer.citations).is_err()
+    }) {
+        return Err(ApiError::forbidden("invalid addressed answer"));
+    }
+    tx.rollback().await.map_err(|_| unavailable())?;
+    Ok(Json(AgentQuestionStatus {
+        request_id: path.id,
+        question: question.map(|delivery| delivery.receipt),
+        answer,
+        answer_receipt: delivered.map(|delivery| delivery.receipt),
+    }))
 }
 pub(super) fn browser(
     runtime: &ConfiguredInstance,

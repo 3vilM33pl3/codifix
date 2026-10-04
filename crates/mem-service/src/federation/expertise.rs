@@ -31,9 +31,75 @@ pub(super) fn start_projects(
         // detached work. A slow answer cannot starve a live delivery challenge.
         tokio::join!(
             run(&state, &sync, &answerers, false),
-            run(&state, &sync, &answerers, true)
+            run(&state, &sync, &answerers, true),
+            run_addressed(&state, &sync, &answerers)
         );
     })
+}
+async fn run_addressed(state: &AppState, sync: &InstanceSync, answerers: &[(Uuid, Uuid)]) {
+    loop {
+        let result = tokio::time::timeout(
+            Duration::from_secs(12),
+            addressed_answer_cycle(state, sync, answerers),
+        )
+        .await;
+        if !matches!(result, Ok(Ok(()))) {
+            tracing::warn!("addressed expertise work paused or denied");
+        }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+}
+
+async fn addressed_answer_cycle(
+    state: &AppState,
+    sync: &InstanceSync,
+    answerers: &[(Uuid, Uuid)],
+) -> anyhow::Result<()> {
+    let Some(lease) = sync.claim_addressed_expertise().await? else {
+        return Ok(());
+    };
+    let mem_federation::expertise::AddressedExpertisePayload::Question(q) = &lease.record.payload
+    else {
+        anyhow::bail!("addressed claim was not a question");
+    };
+    let pool = state
+        .pool()
+        .map_err(|_| anyhow::anyhow!("database unavailable"))?;
+    let mut tx = pool.begin().await?;
+    sqlx::query("SET LOCAL lock_timeout='2s'")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SET LOCAL statement_timeout='3s'")
+        .execute(&mut *tx)
+        .await?;
+    let (project, principal) = collection_binding(&mut tx, q, answerers).await?;
+    let current = access(state, &mut tx, principal, project).await?;
+    output_policy(state, project, q)?;
+    anyhow::ensure!(
+        q.mode == mem_federation::expertise::AnswerMode::Deterministic
+            && q.model_destination.is_none(),
+        "addressed agent answerer is deterministic-only"
+    );
+    let (snapshot, ad) = mem_federation_store::eligible_question_collection(
+        &mut tx,
+        &current,
+        q.capability.publisher,
+        q,
+    )
+    .await?;
+    let answer = mem_federation_runtime::expertise_selected_context(q, &ad, &snapshot)?;
+    mem_federation_runtime::validate_expertise_delivery(q, &ad, &snapshot, &answer)?;
+    output_policy(state, project, q)?;
+    let record = mem_federation::expertise::AddressedExpertiseRecord::answer(
+        q,
+        answer,
+        lease.record.policy_revision,
+        lease.record.policy_digest.clone(),
+        chrono::Utc::now(),
+    )?;
+    sync.answer_addressed_expertise(&lease, record).await?;
+    tx.rollback().await?;
+    Ok(())
 }
 async fn run(state: &AppState, sync: &InstanceSync, answerers: &[(Uuid, Uuid)], answer: bool) {
     loop {

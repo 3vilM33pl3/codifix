@@ -23,7 +23,7 @@ what an area can answer; it is not permission to read that area's database.
    conversation history, files, raw captures, credentials or local search
    results. Do not use the human-confirmation `memory_expertise_ask` tool to
    impersonate an approval.
-4. Poll `memory_expertise_result` with the **same** request UUID until a
+4. Poll `memory_expertise_agent_result` with the **same** request UUID until a
    terminal result or the documented deadline. A queued or published record
    is not an answer. On an ambiguous response, reuse the exact UUID and bytes;
    changing the question creates a new disclosure.

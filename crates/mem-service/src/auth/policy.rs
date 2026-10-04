@@ -1356,6 +1356,18 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             false,
         ),
         (
+            "/v1/projects/{slug}/federation/{space}/agent-questions",
+            Method::POST,
+            Permission::BundleExport,
+            false,
+        ),
+        (
+            "/v1/projects/{slug}/federation/{space}/agent-questions/{id}",
+            Method::GET,
+            Permission::BundleExport,
+            true,
+        ),
+        (
             "/v1/projects/{slug}/federation/{space}/actions",
             Method::POST,
             Permission::MemoryRead,

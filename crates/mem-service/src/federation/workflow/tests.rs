@@ -380,7 +380,13 @@ impl Fixture {
         let space = SpaceId::new(Uuid::new_v4()).unwrap();
         let authority = InstanceId::new(Uuid::new_v4()).unwrap();
         let instance = InstanceId::new(Uuid::new_v4()).unwrap();
-        let security = GatewaySecurity::initial(&[3; 32], Default::default()).unwrap();
+        let security = GatewaySecurity::initial(
+            &[3; 32],
+            mem_federation_store::SpacePolicy {
+                external_models: ["synthetic_cloud".into()].into_iter().collect(),
+            },
+        )
+        .unwrap();
         let gateway = GatewayStore::new(pool.clone());
         let gateway_token = "fixture-gateway-token-not-for-service".repeat(2);
         let server = GatewayServer::new(
@@ -403,6 +409,9 @@ impl Fixture {
         let server = if expertise_browser {
             server
                 .enable_expertise_rehearsal(&[(instance, 3), (authority, 3)])
+                .await
+                .unwrap()
+                .enable_addressed_expertise(&[(instance, 1), (authority, 1)])
                 .await
                 .unwrap()
         } else {

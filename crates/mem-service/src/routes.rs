@@ -319,6 +319,15 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
                 .layer(axum::extract::DefaultBodyLimit::max(32768)),
         )
         .route(
+            "/v1/projects/{slug}/federation/{space}/agent-questions",
+            post(crate::federation::workflow::expertise_agent_ask)
+                .layer(axum::extract::DefaultBodyLimit::max(8192)),
+        )
+        .route(
+            "/v1/projects/{slug}/federation/{space}/agent-questions/{id}",
+            get(crate::federation::workflow::expertise_agent_result),
+        )
+        .route(
             "/v1/projects/{slug}/federation/{space}/actions",
             post(crate::federation::workflow::action)
                 .layer(axum::extract::DefaultBodyLimit::max(48 * 1024)),

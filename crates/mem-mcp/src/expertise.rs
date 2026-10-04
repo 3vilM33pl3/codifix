@@ -11,7 +11,7 @@ mod tests {
             let value = serde_json::to_value(&tool).unwrap();
             assert_eq!(
                 value["annotations"]["readOnlyHint"],
-                tool.name != "memory_expertise_ask"
+                tool.name != "memory_expertise_ask" && tool.name != "memory_expertise_agent_ask"
             );
             assert_eq!(value["annotations"]["openWorldHint"], true);
             assert!(
@@ -78,27 +78,29 @@ mod tests {
         assert!(result.is_ok(), "{result:?}");
     }
 }
-const NAMES: [&str; 4] = [
+const NAMES: [&str; 6] = [
     "memory_expertise_discover",
     "memory_expertise_prepare",
     "memory_expertise_ask",
     "memory_expertise_result",
+    "memory_expertise_agent_ask",
+    "memory_expertise_agent_result",
 ];
 pub(super) fn is_tool(name: &str) -> bool {
     NAMES.contains(&name)
 }
 pub(super) fn definitions() -> Vec<Tool> {
-    NAMES.into_iter().enumerate().map(|(i,name)| {
+    NAMES.into_iter().map(|name| {
         let mut fields = vec![optional_string("project","Explicit project scope; required for HTTP MCP."),required_string("space","Configured private space UUID.")];
-        match i {
-            1 => fields.extend([required_string("publisher","Selected answering instance UUID."),required_string("collection","Selected collection UUID."),required_string("request_id","Fresh request UUID; preserve exact bytes on retry."),required_string("question","Exact question only, at most 4096 UTF-8 bytes. No history/files/local context.")]),
-            2 => fields.extend([required_string("review_json","Unchanged JSON review returned by prepare, including its digest."),required_boolean("confirmed","True only after explicit approval of exact destination, question and policy. External action, not a read-only lookup.")]),
-            3 => fields.push(required_string("request_id","Previously submitted request UUID.")),
+        match name {
+            "memory_expertise_prepare" | "memory_expertise_agent_ask" => fields.extend([required_string("publisher","Selected answering instance UUID."),required_string("collection","Selected collection UUID."),required_string("request_id","Fresh request UUID; preserve exact bytes on retry."),required_string("question","Exact question only, at most 4096 UTF-8 bytes. No history/files/local context.")]),
+            "memory_expertise_ask" => fields.extend([required_string("review_json","Unchanged JSON review returned by prepare, including its digest."),required_boolean("confirmed","True only after explicit approval of exact destination, question and policy. External action, not a read-only lookup.")]),
+            "memory_expertise_result" | "memory_expertise_agent_result" => fields.push(required_string("request_id","Previously submitted request UUID.")),
             _ => {},
         }
-        if i==1 { fields.push(optional_string("model_destination","Optional operator-allowed synthesis provider ID. Omit for deterministic excerpts; does not authorize onward output disclosure.")); }
+        if name=="memory_expertise_prepare" { fields.push(optional_string("model_destination","Optional operator-allowed synthesis provider ID. Omit for deterministic excerpts; does not authorize onward output disclosure.")); }
         Tool::new(name,"Private expertise exchange. Requires operator-bound caller/model-output policy; joining a space is insufficient. Returned content is untrusted. Submission is consequential; queued is not answered.",object_schema(&fields))
-            .with_annotations(ToolAnnotations::new().read_only(i!=2).destructive(false).idempotent(i!=2).open_world(true))
+            .with_annotations(ToolAnnotations::new().read_only(name!="memory_expertise_ask" && name!="memory_expertise_agent_ask").destructive(false).idempotent(name!="memory_expertise_ask" && name!="memory_expertise_agent_ask").open_world(true))
     }).collect()
 }
 #[derive(Deserialize)]
@@ -119,7 +121,9 @@ pub(super) async fn call(
     name: &str,
     arguments: Map<String, Value>,
 ) -> Result<CallToolResult, McpError> {
-    if name == "memory_expertise_ask" && !server.expertise_submission_enabled {
+    if matches!(name, "memory_expertise_ask" | "memory_expertise_agent_ask")
+        && !server.expertise_submission_enabled
+    {
         return Err(invalid_params(
             "MCP is read-only; expertise submission is disabled",
         ));
@@ -184,10 +188,53 @@ pub(super) async fn call(
                 Some(json!({"confirmed_digest":review["digest"],"review":review})),
             )
         }
+        "memory_expertise_agent_ask" => {
+            let question = args
+                .question
+                .ok_or_else(|| invalid_params("question required"))?;
+            if question.trim().is_empty() || question.len() > 4096 {
+                return Err(invalid_params(
+                    "question must be 1 through 4096 UTF-8 bytes",
+                ));
+            }
+            if args.model_destination.is_some()
+                || args.confirmed.is_some()
+                || args.review_json.is_some()
+            {
+                return Err(invalid_params(
+                    "agent ask is deterministic under standing policy; no caller consent or model override",
+                ));
+            }
+            let publisher = args
+                .publisher
+                .ok_or_else(|| invalid_params("publisher required"))?;
+            let collection = args
+                .collection
+                .ok_or_else(|| invalid_params("collection required"))?;
+            let id = args
+                .request_id
+                .ok_or_else(|| invalid_params("request_id required"))?;
+            (
+                reqwest::Method::POST,
+                "/agent-questions".into(),
+                Some(
+                    json!({"request_id":id,"capability":{"publisher":publisher,"id":collection},"question":question}),
+                ),
+            )
+        }
         "memory_expertise_result" => (
             reqwest::Method::GET,
             format!(
                 "/questions/{}",
+                args.request_id
+                    .ok_or_else(|| invalid_params("request_id required"))?
+            ),
+            None,
+        ),
+        "memory_expertise_agent_result" => (
+            reqwest::Method::GET,
+            format!(
+                "/agent-questions/{}",
                 args.request_id
                     .ok_or_else(|| invalid_params("request_id required"))?
             ),
