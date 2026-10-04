@@ -157,6 +157,14 @@ their local configuration, but already-running clients may need reconnection.
 The addressed fleet is still disabled, so discovery is **not** a live cited
 agent-answer result. CA rc.4 compatibility and the CA's v24 report remain pending.
 
+The CA's v24 in-progress result at 09:13 UTC confirms exact artifact hashes
+and native schema-65 clone startup while its live Trust service remains
+rc.3/schema61 during backup. A read of the 30 September cited request now
+returns `Federation conflict`, consistent with the documented 24-hour payload
+expiry. CURRENT ACTION was corrected to use a fresh deterministic local-human
+question for the post-upgrade exchange check; the expired request is not rc.4
+evidence.
+
 The ARM64 package contains a byte-identical `memory-federation-expertise`
 skill template from the frozen source revision. A post-build Web run passed
 32 test files and 150 tests. CA-native installation, addressed-fleet enablement
