@@ -125,6 +125,30 @@ reviews exact content and explicitly changes each collection and caller policy.
 Neither the package nor this record authorizes paid synthesis, Pi expansion,
 public access or ordinary-query automatic remote requests.
 
+Monolith now has a separate, narrow Workshop collection
+`4c7e3540-94f4-4f1e-a9da-6908956d277f` at revision 1. Its sole selected
+source is the reviewed ADR-0011 implementation record
+`44e45bda-d0e3-4b92-b699-0835fc297d2d` version 1, with no evidence files;
+the exact snapshot digest is
+`7f7b96d452dd47c94f785b0fea1e6b013341adf19857d225f5123869556fcd88`.
+Its advertisement permits only Homelab and General requesters and the fixed
+`codex_openai` and `claude_anthropic` output destinations. No model synthesis
+destination is enabled. The original local-human collection remains unchanged.
+This new advertisement reached retained federation sequence 23.
+
+Two separate seven-day scoped service identities were issued on Homelab and
+General, with exact-token standing policies limited to that collection and
+20 questions per UTC day. The host-local credential files and agent-only MCP
+route/configuration are mode 0600 under a mode-0700 directory; no credential
+value is in this repository. The generic installed `memory` launcher intentionally
+strips inherited token environment variables, so dedicated agent wrappers invoke
+the rc.4 binary with only their respective scoped token. Both stdio MCP servers
+initialized and returned the reviewed Workshop advertisement through the
+`memory_expertise_discover` tool. Codex and Claude registrations are present in
+their local configuration, but already-running clients may need reconnection.
+The addressed fleet is still disabled, so discovery is **not** a live cited
+agent-answer result. CA rc.4 compatibility and the CA's v24 report remain pending.
+
 The ARM64 package contains a byte-identical `memory-federation-expertise`
 skill template from the frozen source revision. A post-build Web run passed
 32 test files and 150 tests. CA-native installation, addressed-fleet enablement
