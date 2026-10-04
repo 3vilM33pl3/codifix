@@ -94,6 +94,17 @@ the new watched-agent skill appeared with the packaged hash in the Homelab,
 sctp and dish2-tools repositories. Already-running desktop MCP processes may
 still map the old rc.3 inode until their client reconnects.
 
+The private PDS TLS proxy now permits the gateway's exact
+`com.atproto.repo.deleteRecord` path alongside its previous create/get/repo
+paths. Its Caddy configuration validated and the scoped proxy restarted. A
+direct internal-address probe without credentials reached PDS and received
+401; an unrelated `putRecord` write path still returned 404. Gateway DNS inside
+its container resolves the PDS hostname to that same private proxy. Homelab's
+local-human capability listing discovered the reviewed Workshop and General
+advertisements after the upgrade; no agent-specific disclosure policy was
+enabled by this check. The new metadata-only agent-exchange CLI returned an
+empty list, as expected before fleet activation.
+
 The full Rust workspace, Lean build/test, Web tests/build, scoped JavaScript
 tests, formatting, Clippy and boundary checks passed before packaging. A
 disposable four-enrolled-area gateway test exercises Codex/Claude destination
