@@ -52,7 +52,11 @@ services. Take and verify a fresh stopped-writer CA-local database and config
 backup. Then use the exact source archive's append-only migrations 0062–0065
 through the existing schema-owner maintenance route; check SQLx history and
 head 65 before starting an rc.4 non-owner service. Old rc.3 executables must
-not write a migrated database. Preserve the owner/runtime separation. The
+not write a migrated database. Grant the existing Trust application role only
+`SELECT, INSERT` on `federation_agent_expertise_intents` and
+`SELECT, INSERT, UPDATE` on `federation_agent_expertise_daily`; no new worker,
+schema-owner or cross-project grants are implied. Preserve the owner/runtime
+separation. The
 bundled release tree and package must match the manifest and current action.
 
 Restart Memory-owned components in dependency order, leaving other CA services
