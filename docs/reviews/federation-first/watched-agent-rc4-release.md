@@ -1,13 +1,15 @@
-# Watched-agent expertise release candidate — 2026-10-04
+# Watched-agent expertise rc.4 deployment — 2026-10-04
 
-Status: **built and locally verified, not installed**. The live four-area
-deployment remains on `2.1.0-rc.3`. This `2.1.0-rc.4` candidate is built from
+Status: **Monolith installed; CA Trust upgrade in progress**. This
+`2.1.0-rc.4` release is built from
 source revision `71cbfc9c2030e5f9fed1320c88b80b34dd36c68c` on
-`codex/federation-v1`. It changes the database schema from the installed
+`codex/federation-v1`. It changes the database schema from the prior
 application head 61 (gateway head 60) to head 65, and adds an opt-in addressed
 agent-expertise policy. The release manifest declares an approval-required
-migration and permission change. It is **unsigned**; no installation may be
-described as authenticated by the normal signing verifier.
+migration and permission change. Olivier approved the rc.4 **unsigned internal
+release exception** after the established signing key remained unavailable.
+Checksums and the existing private channel bind this installation; it is not
+authenticated by the normal signing verifier or customer release evidence.
 
 | Candidate artifact | SHA-256 | Evidence |
 | --- | --- | --- |
@@ -27,17 +29,20 @@ closure check in the pinned image. The packaged ARM64 Memory executable
 reported rc.4 under QEMU with network disabled. That does not establish native
 CA execution or service health.
 
-The inert CA candidate is staged in the existing private LAN drop at
+The CA bundle is staged in the existing private LAN drop at
 `/home/olivier/.local/state/memory-ca-federation-drop-20260928/rc4-watched-agents/`.
 Its `START-HERE.md` SHA-256 is
-`900de44a38b54a7d38a5d9076ac200cc517c8c89390c7313da24789bca7133a6`;
+`e195cc4a5b5cecfaed64b2fc4035a3a53dd4308dd39f26273b13fed16ef40806`;
 `SHA256SUMS` is
-`c6d8bca4c2f1b581b4d4dd174739d4a61d33799ed58d7db4db4ad2457c736cea`.
+`e46cd10fcc607b11785e41d6bd1f4b30cdece4db787cb78c2853b3d7e47147f5`.
 The full frozen-source archive is
 `6b44997b4c69c579e5bc411304a62301650ac00e12975c183e729581e359d3cd`.
-The LAN server returned HTTP 200 for the handoff. The handoff itself states
-that it is **not an active CA instruction** until CURRENT ACTION promotes its
-instruction ID. It contains no credentials or source data.
+The LAN server returned HTTP 200 for the handoff. The
+[CURRENT ACTION](https://app.notion.com/p/3e78990715f48170a918f3f2c70277c9)
+page has promoted instruction `monolith-ca-20261004-watched-agent-rc4-v24` to
+`CA_RC4_INSTALL_ACTIVE`, and asks the CA agent to report directly in
+[RESULT INBOX](https://app.notion.com/p/3e78990715f481cd935ff0a897040e4e).
+The bundle contains no credentials or source data.
 
 Before any live change, fresh public-key-encrypted backups were captured under
 `/data/tmp/memory-agent-rc4.GM1GOp/backups/`: custom PostgreSQL dumps for
@@ -45,8 +50,9 @@ Workshop, Homelab, General and gateway; a consistent SQLite backup of the
 private PDS and its repository key; and selected configuration, identity and
 receipt material. All ciphertext hashes and decryptability were checked, and
 the four PDS SQLite copies passed `quick_check`. These are **live-writer
-snapshots, not a coordinated cutover point**. A stopped-writer backup and a
-restore check are still needed at installation. No CA-local backup is included.
+snapshots, not a coordinated cutover point**. A stopped-writer backup was
+subsequently taken; its independent restore remains untested. No CA-local
+backup is included.
 
 All four encrypted Monolith PostgreSQL dumps were restored into separate
 disposable PostgreSQL 17 databases, entirely separate from production. Pinned
@@ -55,7 +61,38 @@ participant 62–65. Every clone then reported migration head 65 with 65
 successful history rows. The gateway clone retained 22 accepted publications
 and had zero new addressed intents. This verifies those four snapshot upgrade
 paths; it does not verify a stopped-writer cutover, runtime grants, CA's own
-database, or upgraded live services.
+database, or upgraded live services by itself.
+
+For the Monolith cutover, the watcher manager and three active watcher units,
+three app containers and gateway were stopped. All four target databases had
+zero other clients and exactly the expected old schema heads. A fresh set of
+public-key-encrypted stopped-writer custom dumps was taken under
+`/data/tmp/memory-agent-rc4-cutover.5N6TB3/`; every ciphertext decrypted and
+passed `pg_restore --list`. The ciphertext hashes are Workshop
+`b6daa25177345d7d8ecc4a21f9d538c13a8f56bd1a6f44d7aec924449baa817c`,
+Homelab
+`cb01496db6da795750ad26fe972c034661ce51a13e16ebc1bb20ee57f8001888`,
+General
+`073eb2ce158da64e23b76bbe60aa73a5bb7a96702a631af88b591d8bc37bd383`,
+and gateway
+`39dea631fa6c3f59b070737bac862a487c7b43f995a98e618f8d112b8384044a`.
+They are mode 0600 under a private directory. They were **not** independently
+restored; the earlier live-writer versions were restored and migrated in
+disposable databases.
+
+Pinned SQLx applied 61–65 on the live gateway and 62–65 on each live area.
+The gateway runtime received only the reviewed new table grants; each app role
+received `SELECT, INSERT` on agent intents and `SELECT, INSERT, UPDATE` on the
+daily budget table. The gateway and three apps were restarted on the packaged
+AMD64 hashes above. Workshop, Homelab and General Web entry points returned
+HTTP 200. Workshop, Homelab and General/sctp federation status retained
+sequence 22 with no queued, blocked or synchronization-error intents; existing
+credential health remained usable. The Debian package upgraded to
+`2.1.0~rc.4` without starting services. The area launcher, watcher manager,
+three active watcher processes and nine Memory-owned global skills use rc.4;
+the new watched-agent skill appeared with the packaged hash in the Homelab,
+sctp and dish2-tools repositories. Already-running desktop MCP processes may
+still map the old rc.3 inode until their client reconnects.
 
 The full Rust workspace, Lean build/test, Web tests/build, scoped JavaScript
 tests, formatting, Clippy and boundary checks passed before packaging. A
@@ -64,7 +101,7 @@ bindings and recipient isolation; separate fake-PDS tests exercise signed CAR
 inclusion/absence and addressed deletion. A true four-service-plus-PDS
 rehearsal and live agent-type cited answers have **not** yet been demonstrated.
 
-The rc.4 candidate does not automatically grant Codex or Claude onward
+The rc.4 software does not automatically grant Codex or Claude onward
 disclosure. Existing collections remain `local_human` only unless an operator
 reviews exact content and explicitly changes each collection and caller policy.
 Neither the package nor this record authorizes paid synthesis, Pi expansion,
@@ -72,5 +109,5 @@ public access or ordinary-query automatic remote requests.
 
 The ARM64 package contains a byte-identical `memory-federation-expertise`
 skill template from the frozen source revision. A post-build Web run passed
-32 test files and 150 tests. The CA coordination page now carries only a
-`PREPARED_NOT_ACTIVE` v24 note; v23 rc.3 remains its active completed instruction.
+32 test files and 150 tests. CA-native installation, addressed-fleet enablement
+and live agent-type cited answers remain unverified.
