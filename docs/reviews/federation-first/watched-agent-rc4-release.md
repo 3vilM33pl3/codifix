@@ -69,3 +69,8 @@ disclosure. Existing collections remain `local_human` only unless an operator
 reviews exact content and explicitly changes each collection and caller policy.
 Neither the package nor this record authorizes paid synthesis, Pi expansion,
 public access or ordinary-query automatic remote requests.
+
+The ARM64 package contains a byte-identical `memory-federation-expertise`
+skill template from the frozen source revision. A post-build Web run passed
+32 test files and 150 tests. The CA coordination page now carries only a
+`PREPARED_NOT_ACTIVE` v24 note; v23 rc.3 remains its active completed instruction.
