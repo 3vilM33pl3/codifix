@@ -1,6 +1,8 @@
 # Watched-agent ATProto expertise exchange
 
-Status: approved implementation contract; not an active transport or permission grant.
+Status: `2.1.0-rc.4` software implemented on `codex/federation-v1`; fleet
+activation, operator grants and deployment remain pending. This document grants no
+question or onward-disclosure permission by itself.
 
 The watcher monitors Codex and Claude repositories. A bundled skill will let those
 agents discover reviewed capabilities and ask task-relevant questions when local
@@ -26,16 +28,16 @@ already delivered. No public repository access or native Spaces alpha is used.
 
 - [x] Add bounded neutral addressed-record contracts and unpublished ATProto
   question/answer Lexicons without changing existing publication bytes.
-- [ ] Add durable addressed PDS outbox, verified publication/read-back, recipient
+- [x] Add durable addressed PDS outbox, verified publication/read-back, recipient
   filtering, retention and retry/restart recovery to the gateway.
-- [ ] Add per-project, exact-token agent ask policies with collection allowlists,
+- [x] Add per-project, exact-token agent ask policies with collection allowlists,
   fixed output destinations, deterministic-only mode and a 20-question UTC-day
   limit. Recheck current authority before every release.
-- [ ] Add an agent-submit API and MCP tool with standing-policy audit semantics;
+- [x] Add an agent-submit API and MCP tool with standing-policy audit semantics;
   preserve the human exact-review API.
-- [ ] Bundle the focused skill with the release and install missing copies from
+- [x] Bundle the focused skill with the release and install missing copies from
   the local package in watched repositories without overwriting custom skills.
-- [ ] Show metadata-only exchange status in Web, CLI and TUI.
+- [x] Show metadata-only exchange status in Web, CLI and TUI.
 - [ ] Rehearse four disposable areas, including Workshop and Trust, with both
   Codex and Claude bindings; test isolation, replay, outage, signed read-back,
   citation integrity, expiry and watcher bootstrap.
@@ -44,3 +46,31 @@ already delivered. No public repository access or native Spaces alpha is used.
 
 Pi supervisors, delegated tasks, paid synthesis and automatic remote requests
 from ordinary local queries remain out of scope.
+
+## Implementation and evidence to date
+
+Migrations 0062–0065 add separate gateway addressed intents, local agent
+intents/budgets, fenced PDS deletion and the area-import compatibility ceiling.
+The feature is opt-in through an exact schema-v3/schema-v1 fleet inventory; old
+publication bytes and the human mailbox remain unchanged. The gateway makes
+private bodies readable for at most the stated access lifetime, then retains them only
+for a fenced delete retry. A missing PDS read-back is not a deletion receipt:
+the exact key must be absent from a newer, pinned-key signed CAR snapshot.
+An active space hold pauses physical deletion; failed deletion retains the
+private body for operator repair, without making it readable to participants
+after the 24-hour payload deadline. This is not deletion from backups or
+recipient copies.
+
+Focused tests pass for signed inclusion/absence, compare-and-swap delete,
+hold behavior, PostgreSQL leases, exact retries, four enrolled area identities,
+Codex/Claude destination labels and recipient isolation. The four-area gateway
+test uses synthetic store publication receipts; the separate fake-PDS HTTP
+test checks signed CAR verification. Neither is yet the full four-service/PDS
+rehearsal or live deployment. The complete Rust workspace passed against an
+isolated PostgreSQL 17 database with four test threads and a 300-connection
+ceiling; the default 100-connection disposable test cluster produced pool
+timeouts when the entire workspace was exercised concurrently. Lean build/test,
+Web tests/build, scoped JavaScript proxy tests, formatting, workspace Clippy
+(with the pre-existing `double_must_use` macro warning exempted) and boundary
+checks pass. Release artifacts and deployment evidence are recorded separately
+before the remaining boxes can be checked.
