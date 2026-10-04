@@ -156,9 +156,12 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
             | SUPERVISOR_REVIEW_MIGRATION
             | SUPERVISOR_QUESTION_MIGRATION
             | AREA_RECONCILIATION_MIGRATION
+            | ADDRESSED_EXPERTISE_MIGRATION
+            | AGENT_EXPERTISE_MIGRATION
+            | ADDRESSED_DELETION_MIGRATION
     ) {
         errors.push(format!(
-            "unsupported migration version {}; supported explicit heads are 52 through 61",
+            "unsupported migration version {}; supported explicit heads are 52 through 64",
             inventory.migration_version
         ));
     }
@@ -406,18 +409,9 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         }
     }
     for (table, _) in SUPERVISOR_TABLES_0053 {
-        if matches!(
-            inventory.migration_version,
-            SUPERVISOR_MIGRATION
-                | SUPERVISOR_PROPOSAL_MIGRATION
-                | SUPERVISOR_CONTEXT_MIGRATION
-                | AREA_IMPORT_MIGRATION
-                | SUPERVISOR_HEALTH_MIGRATION
-                | SUPERVISOR_USAGE_MIGRATION
-                | SUPERVISOR_REVIEW_MIGRATION
-                | SUPERVISOR_QUESTION_MIGRATION
-                | AREA_RECONCILIATION_MIGRATION
-        ) && !tables.contains_key(table)
+        if (SUPERVISOR_MIGRATION..=ADDRESSED_DELETION_MIGRATION)
+            .contains(&inventory.migration_version)
+            && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0053 table inventory {table}"));
         } else if inventory.migration_version == SUPPORTED_MIGRATION && tables.contains_key(table) {
@@ -427,17 +421,9 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         }
     }
     for (table, _) in SUPERVISOR_TABLES_0054 {
-        if matches!(
-            inventory.migration_version,
-            SUPERVISOR_PROPOSAL_MIGRATION
-                | SUPERVISOR_CONTEXT_MIGRATION
-                | AREA_IMPORT_MIGRATION
-                | SUPERVISOR_HEALTH_MIGRATION
-                | SUPERVISOR_USAGE_MIGRATION
-                | SUPERVISOR_REVIEW_MIGRATION
-                | SUPERVISOR_QUESTION_MIGRATION
-                | AREA_RECONCILIATION_MIGRATION
-        ) && !tables.contains_key(table)
+        if (SUPERVISOR_PROPOSAL_MIGRATION..=ADDRESSED_DELETION_MIGRATION)
+            .contains(&inventory.migration_version)
+            && !tables.contains_key(table)
         {
             errors.push(format!("missing migration 0054 table inventory {table}"));
         } else if matches!(
@@ -460,9 +446,14 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
             AREA_RECONCILIATION_MIGRATION,
             AREA_RECONCILIATION_TABLES_0061,
         ),
+        (
+            ADDRESSED_EXPERTISE_MIGRATION,
+            ADDRESSED_EXPERTISE_TABLES_0062,
+        ),
+        (AGENT_EXPERTISE_MIGRATION, AGENT_EXPERTISE_TABLES_0063),
     ] {
         for (table, _) in catalog {
-            if (head..=AREA_RECONCILIATION_MIGRATION).contains(&inventory.migration_version)
+            if (head..=ADDRESSED_DELETION_MIGRATION).contains(&inventory.migration_version)
                 && !tables.contains_key(table)
             {
                 errors.push(format!(

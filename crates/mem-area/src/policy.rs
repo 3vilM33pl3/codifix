@@ -361,6 +361,23 @@ pub const AREA_RECONCILIATION_TABLES_0061: &[(&str, TableStrategy)] = &[(
     TableStrategy::HistoricalArchive,
 )];
 
+/// Addressed expertise is private operational history, not searchable area
+/// knowledge or transferable question/answer authority.
+pub const ADDRESSED_EXPERTISE_TABLES_0062: &[(&str, TableStrategy)] = &[(
+    "public.federation_expertise_addressed",
+    TableStrategy::HistoricalArchive,
+)];
+pub const AGENT_EXPERTISE_TABLES_0063: &[(&str, TableStrategy)] = &[
+    (
+        "public.federation_agent_expertise_intents",
+        TableStrategy::HistoricalArchive,
+    ),
+    (
+        "public.federation_agent_expertise_daily",
+        TableStrategy::HistoricalArchive,
+    ),
+];
+
 /// Optional, observed historical evaluation snapshot. Presence of any member
 /// requires the whole catalog, including empty tables. Never match a prefix or
 /// apply the public schema's ownership/rebuild policy to these archived rows.
@@ -397,6 +414,8 @@ pub fn table_strategy(table: &str) -> Option<TableStrategy> {
         .chain(SUPERVISOR_TABLES_0059)
         .chain(SUPERVISOR_TABLES_0060)
         .chain(AREA_RECONCILIATION_TABLES_0061)
+        .chain(ADDRESSED_EXPERTISE_TABLES_0062)
+        .chain(AGENT_EXPERTISE_TABLES_0063)
         .find_map(|(name, strategy)| (*name == table).then_some(*strategy))
         .or_else(|| historical_project_table(table).map(|_| TableStrategy::HistoricalArchive))
 }
