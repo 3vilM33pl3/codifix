@@ -48,6 +48,14 @@ the four PDS SQLite copies passed `quick_check`. These are **live-writer
 snapshots, not a coordinated cutover point**. A stopped-writer backup and a
 restore check are still needed at installation. No CA-local backup is included.
 
+One encrypted gateway dump was restored into a disposable PostgreSQL 17
+database, entirely separate from production. Pinned `sqlx-cli 0.8.6` saw
+pending migrations 61–65, applied them successfully and then reported all 65
+installed with matching history. The clone retained 22 accepted publications
+and had zero new addressed intents. This verifies that one gateway snapshot
+migrates; it does not verify a stopped-writer cutover, runtime grants, or an
+upgraded live gateway.
+
 The full Rust workspace, Lean build/test, Web tests/build, scoped JavaScript
 tests, formatting, Clippy and boundary checks passed before packaging. A
 disposable four-enrolled-area gateway test exercises Codex/Claude destination
