@@ -311,6 +311,13 @@ allow that requester instance and output destination, and current memberships
 must include the expertise capabilities. Use distinct tokens/destinations for
 Codex and Claude; never bind an assistant to `local_human`.
 
+For a split schema-owner/runtime-role installation, the runtime role needs
+`SELECT, INSERT, UPDATE` on `federation_agent_expertise_intents` and
+`SELECT, INSERT, UPDATE` on `federation_agent_expertise_daily`. The submit path
+uses `SELECT ... FOR UPDATE` on the intent row, which PostgreSQL denies without
+`UPDATE` privilege even though the handler does not change that row. Grant
+only these new tables; no grant on gateway addressed records is implied.
+
 The bundled `memory-federation-expertise` skill teaches watched agents to
 discover, submit one bounded question and read its cited result. Installing the
 skill does not enable the service, expand collection consent or permit a paid

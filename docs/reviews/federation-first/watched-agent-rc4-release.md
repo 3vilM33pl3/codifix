@@ -1,6 +1,6 @@
 # Watched-agent expertise rc.4 deployment — 2026-10-04
 
-Status: **Monolith installed; CA Trust handoff active, result pending**. This
+Status: **all four areas installed; scoped addressed exchange verified**. This
 `2.1.0-rc.4` release is built from
 source revision `71cbfc9c2030e5f9fed1320c88b80b34dd36c68c` on
 `codex/federation-v1`. It changes the database schema from the prior
@@ -82,8 +82,12 @@ disposable databases.
 
 Pinned SQLx applied 61–65 on the live gateway and 62–65 on each live area.
 The gateway runtime received only the reviewed new table grants; each app role
-received `SELECT, INSERT` on agent intents and `SELECT, INSERT, UPDATE` on the
-daily budget table. The gateway and three apps were restarted on the packaged
+initially received `SELECT, INSERT` on agent intents and `SELECT, INSERT,
+UPDATE` on the daily budget table. A live submit later showed that PostgreSQL
+also requires `UPDATE` on the intents table for the handler's `SELECT ... FOR
+UPDATE`. That additional privilege was granted on this table only to the
+Workshop, Homelab and General app roles; no database ownership or other grant
+was changed. The gateway and three apps were restarted on the packaged
 AMD64 hashes above. Workshop, Homelab and General Web entry points returned
 HTTP 200. Workshop, Homelab and General/sctp federation status retained
 sequence 22 with no queued, blocked or synchronization-error intents; existing
@@ -154,8 +158,9 @@ the rc.4 binary with only their respective scoped token. Both stdio MCP servers
 initialized and returned the reviewed Workshop advertisement through the
 `memory_expertise_discover` tool. Codex and Claude registrations are present in
 their local configuration, but already-running clients may need reconnection.
-The addressed fleet is still disabled, so discovery is **not** a live cited
-agent-answer result. CA rc.4 compatibility and the CA's v24 report remain pending.
+At that discovery-only stage, the addressed fleet was still disabled, so it
+was **not** yet a live cited agent-answer result. The subsequent CA result,
+fleet activation and live exchanges are recorded below.
 
 The CA's v24 in-progress result at 09:13 UTC confirms exact artifact hashes
 and native schema-65 clone startup while its live Trust service remains
@@ -167,5 +172,41 @@ evidence.
 
 The ARM64 package contains a byte-identical `memory-federation-expertise`
 skill template from the frozen source revision. A post-build Web run passed
-32 test files and 150 tests. CA-native installation, addressed-fleet enablement
-and live agent-type cited answers remain unverified.
+32 test files and 150 tests.
+
+The CA agent's v24 RESULT INBOX reports DONE: Trust runs the exact ARM64 rc.4
+binary hash above at schema 65 on its original database and publisher identity.
+Its stopped-writer backup restored all 115 tables and four sequences; local
+CLI/TUI/manager/watcher/skills, sandbox, retrieval and 30 consecutive
+federation status reads passed. Workshop submitted a fresh deterministic
+local-human question `9da29bc9-105c-4757-911e-60f31558e716` to Trust and
+received the original canonical `14e013ad-4b0d-4aca-a07b-9e1640220a6f`
+version 1/content digest
+`a5780f572e73e0f5ce8146af655512a3a5eaab7bc2dda5f2ec274257614abc0c`.
+Exact same-ID submit and later read preserved it; an unbound caller was denied
+403. A broad question refused for insufficient evidence, as designed.
+
+After all five identities reported rc.4 compatibility, Monolith enabled the
+complete addressed-schema-1 fleet and restarted only the gateway. A first
+agent submit exposed the missing `UPDATE` privilege above, and its question
+then published to the signed PDS but expired because the newly activated
+Workshop collection lacked an exact grant to its existing responder service
+identity. The grant was added through the collection API without changing the
+reviewed source or requester/output consent. A fresh scoped Codex/Homelab
+request `7dea674a-7416-46a8-89a4-6f0c6061c002` and scoped
+Claude/General request `8ec5c439-bcb2-4a9c-a262-3798f6ff03a1` each reached
+`published` for both question and answer with signed-repository commit CIDs.
+Each returned exactly one citation to the reviewed Workshop canonical
+`44e45bda-d0e3-4b92-b699-0835fc297d2d` version 1/content digest
+`b41c611916a0e18412fc91cdd042e464a043c96f556068b5836566cc5405433e`.
+Exact same-ID resubmission reused each record digest. A changed payload under
+the Codex request ID was denied 403; the Homelab identity could not read the
+General/Claude result (404). The returned answer was marked untrusted, with
+zero evidence files and no `/home/` path in its text. These checks used the
+registered scoped MCP wrappers, not a paid Codex/Claude model turn or Memory
+synthesis call. Already-open desktop clients may need MCP reconnection.
+
+The CA report predates fleet activation and records only `SELECT, INSERT` on
+its new agent-intents table. The Trust runtime role still needs the narrow
+`UPDATE` correction if a Trust-local watched agent is later authorized to
+submit; no Trust agent caller or extra collection consent was activated here.

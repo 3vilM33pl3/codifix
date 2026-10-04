@@ -1,8 +1,9 @@
 # Watched-agent ATProto expertise exchange
 
-Status: `2.1.0-rc.4` software implemented on `codex/federation-v1`; fleet
-activation, operator grants and deployment remain pending. This document grants no
-question or onward-disclosure permission by itself.
+Status: `2.1.0-rc.4` installed on Monolith and CA Trust; the complete
+addressed fleet is active. Two narrowly bound Monolith agent MCP identities
+have received live deterministic, cited answers. This document grants no
+additional question or onward-disclosure permission by itself.
 
 The watcher monitors Codex and Claude repositories. A bundled skill will let those
 agents discover reviewed capabilities and ask task-relevant questions when local
@@ -41,7 +42,7 @@ already delivered. No public repository access or native Spaces alpha is used.
 - [x] Rehearse four disposable areas, including Workshop and Trust, with both
   Codex and Claude bindings; test isolation, replay, outage, signed read-back,
   citation integrity, expiry and watcher bootstrap.
-- [ ] Build and upgrade Monolith, package one CA handoff through the existing
+- [x] Build and upgrade Monolith, package one CA handoff through the existing
   coordination channel, and demonstrate cited answers from each agent type.
 
 Pi supervisors, delegated tasks, paid synthesis and automatic remote requests
@@ -80,4 +81,9 @@ timeouts when the entire workspace was exercised concurrently. Lean build/test,
 Web tests/build, scoped JavaScript proxy tests, formatting, workspace Clippy
 (with the pre-existing `double_must_use` macro warning exempted) and boundary
 checks pass. Release artifacts and deployment evidence are recorded separately
-before the remaining boxes can be checked.
+in [the rc.4 deployment record](watched-agent-rc4-release.md). The live
+Codex/Homelab and Claude/General checks used their registered scoped MCP
+wrappers; neither model was invoked, so this demonstrates bound transport and
+cited results, not autonomous task behavior. A Trust-local watched-agent
+submission was not configured. The CA app role needs one additional grant on
+the new agent-intents table before that future path can run.
