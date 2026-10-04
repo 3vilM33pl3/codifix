@@ -153,6 +153,20 @@ a CLI token, and a client cannot choose an output destination flag.
 
 ## Explicit expertise workflow
 
+Watched Codex/Claude agents can use the separate `memory_expertise_agent_ask`
+MCP tool only when an operator has bound their exact service-token identity to
+a non-local output destination and an allowlist of reviewed collections. This
+is standing, task-driven consent, not the human per-question confirmation
+below. The question is deterministic-only, capped by the configured daily
+limit (at most 20), and its result is read with
+`memory_expertise_agent_result`. Exact retries retain the request UUID and
+bytes. Neither tool is a fallback for an unavailable addressed transport.
+
+`memory federation --project PROJECT agent-exchanges` shows the latest twenty
+agent exchanges as request IDs, recipients, times and observed states only.
+The federation TUI has the same metadata-only view. `unknown` means the
+gateway could not verify current status; it is not a successful answer.
+
 F1 is default-off internal-use software. Follow the
 [installation and operations checklist](../f1-internal-expertise.md) for a
 separately approved activation; the disposable rehearsal changes no deployment.

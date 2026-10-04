@@ -321,6 +321,7 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         .route(
             "/v1/projects/{slug}/federation/{space}/agent-questions",
             post(crate::federation::workflow::expertise_agent_ask)
+                .get(crate::federation::workflow::expertise_agent_exchanges)
                 .layer(axum::extract::DefaultBodyLimit::max(8192)),
         )
         .route(

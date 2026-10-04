@@ -91,6 +91,17 @@ async fn watched_agent_question_is_policy_bound_budgeted_and_retryable() {
         .await;
     assert_eq!(status, StatusCode::OK, "{queued}");
     assert_eq!(queued["status"], "queued");
+    let (status, list) = f
+        .request(
+            &f.writer,
+            reqwest::Method::GET,
+            "/agent-questions",
+            Value::Null,
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{list}");
+    assert_eq!(list[0]["request_id"], request_id.to_string());
+    assert!(!list.to_string().contains("What changed?"));
     let (status, retried) = f
         .request(
             &f.writer,

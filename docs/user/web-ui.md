@@ -27,6 +27,13 @@ explicit federation grants and CSRF protection still apply.
 
 ### Private expertise questions (disposable F1 rehearsal)
 
+The **Watched agent exchanges** panel lists the latest twenty project-scoped
+Codex/Claude questions by request ID, destination, time and observed transport
+state. It deliberately omits question and answer bodies. Refresh it to see
+queued/published progress; `unknown` means status could not be verified. The
+existing **Ask another instance** panel remains the separate, human-reviewed
+question workflow.
+
 Authority administrators can select **Ask expertise** or **Answer expertise** in
 **Local grants and authority enrollment → Remote capability**, then review and
 confirm enrollment or capability revocation. These actions require schema-v3

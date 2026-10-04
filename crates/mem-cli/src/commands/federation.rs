@@ -108,6 +108,9 @@ enum FederationCommand {
         #[arg(long)]
         request_id: Uuid,
     },
+    /// Show metadata-only watched-agent exchanges for this project.
+    #[command(after_help = HELP)]
+    AgentExchanges,
     /// Discover configured identity and current local actor (does not grant Pull).
     #[command(after_help = HELP)]
     Discover,
@@ -342,6 +345,7 @@ pub(super) async fn handle(args: FederationArgs, client: Client, config: AppConf
         FederationCommand::Capabilities{after_publisher,after_record,limit}=>api.call(Method::GET,&expertise::capability_path(after_publisher,after_record,limit),None).await?,
         FederationCommand::Ask{command}=>expertise::ask(&api,command).await?,
         FederationCommand::Answer{request_id}=>api.call(Method::GET,&format!("/questions/{request_id}"),None).await?,
+        FederationCommand::AgentExchanges=>api.call(Method::GET,"/agent-questions",None).await?,
         FederationCommand::Discover=>unreachable!(),
         FederationCommand::Status=>api.call(Method::GET,"",None).await?,
         FederationCommand::Catalog{offset}=>api.call(Method::GET,&format!("/catalog?offset={offset}"),None).await?,

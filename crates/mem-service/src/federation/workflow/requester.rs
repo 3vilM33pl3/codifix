@@ -370,6 +370,64 @@ pub struct AgentQuestionStatus {
     pub answer_receipt: Option<mem_federation_store::AddressedReceipt>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct AgentExchangeSummary {
+    pub request_id: Uuid,
+    pub recipient: InstanceId,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    /// None means gateway status is unavailable or denied; never healthy.
+    pub question_status: Option<mem_federation_store::AddressedStatus>,
+    pub answer_status: Option<mem_federation_store::AddressedStatus>,
+}
+
+pub(crate) async fn expertise_agent_exchanges(
+    State(state): State<AppState>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Path(path): Path<SpacePath>,
+) -> Result<Json<Vec<AgentExchangeSummary>>, ApiError> {
+    let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    current_access(&state, &mut tx, &principal, &access).await?;
+    let rows = sqlx::query("SELECT request_id,created_at,record FROM federation_agent_expertise_intents WHERE project_id=$1 AND space=$2 ORDER BY created_at DESC,request_id DESC LIMIT 20")
+        .bind(runtime.project).bind(runtime.space.as_uuid()).fetch_all(&mut *tx).await.map_err(|_| unavailable())?;
+    let mut items = Vec::with_capacity(rows.len());
+    for row in rows {
+        let request_id: Uuid = row.try_get("request_id").map_err(|_| unavailable())?;
+        let record = row
+            .try_get::<SqlJson<AddressedExpertiseRecord>, _>("record")
+            .map_err(|_| unavailable())?
+            .0;
+        items.push(AgentExchangeSummary {
+            request_id,
+            recipient: record.recipient,
+            created_at: row.try_get("created_at").map_err(|_| unavailable())?,
+            question_status: None,
+            answer_status: None,
+        });
+    }
+    tx.rollback().await.map_err(|_| unavailable())?;
+    for item in &mut items {
+        item.question_status = runtime
+            .sync
+            .addressed_expertise_result(item.request_id, "question")
+            .await
+            .ok()
+            .flatten()
+            .map(|delivery| delivery.receipt.status);
+        item.answer_status = runtime
+            .sync
+            .addressed_expertise_result(item.request_id, "answer")
+            .await
+            .ok()
+            .flatten()
+            .map(|delivery| delivery.receipt.status);
+    }
+    let mut tx = state.pool()?.begin().await.map_err(|_| unavailable())?;
+    current_access(&state, &mut tx, &principal, &access).await?;
+    tx.rollback().await.map_err(|_| unavailable())?;
+    Ok(Json(items))
+}
+
 pub(crate) async fn expertise_agent_result(
     State(state): State<AppState>,
     Extension(principal): Extension<AuthenticatedPrincipal>,

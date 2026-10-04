@@ -2022,6 +2022,14 @@ paths:
         "200": { description: Queued or published addressed-record receipt, not an answer. }
         "403": { description: Current authority, collection, destination or daily budget denied. }
         "503": { description: Gateway unavailable; exact local intent remains retryable until expiry. }
+    get:
+      operationId: listWatchedAgentExpertiseExchanges
+      summary: List the latest twenty project-scoped exchanges without question or answer bodies.
+      tags: [Federation]
+      x-stability: experimental
+      responses:
+        "200": { description: Metadata-only request IDs, recipients, times and observed states. Null state means unknown. }
+        "403": { description: Current project export authority denied. }
   /v1/projects/{slug}/federation/{space}/agent-questions/{id}:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }

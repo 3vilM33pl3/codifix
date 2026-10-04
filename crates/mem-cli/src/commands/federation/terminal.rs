@@ -70,6 +70,7 @@ const OPERATIONS: &[(&str, &[&str])] = &[
         "Change collection service grant",
         &["collection", "principal", "enabled"],
     ),
+    ("Watched agent exchanges", &[]),
 ];
 struct Workspace {
     operation: usize,
@@ -344,6 +345,7 @@ impl Workspace {
                 Some(json!({"principal":self.id(1)?,"enabled":self.bool(2)?,"confirmed":true})),
                 true,
             )),
+            24 => Ok((Method::GET, "/agent-questions".into(), None, false)),
             _ => unreachable!(),
         }
     }

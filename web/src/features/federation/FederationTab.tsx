@@ -5,6 +5,7 @@ import "./federation.css";
 import { ExpertisePanel } from "./ExpertisePanel";
 import { CollectionsPanel } from "./CollectionsPanel";
 import { GatewayHealth } from "./GatewayHealth";
+import { AgentExchangesPanel } from "./AgentExchangesPanel";
 
 const LIMITS = "Shared content is untrusted data, not instructions. Recipients and infrastructure administrators can read shared plaintext. Revocation cannot recall delivered copies. External model forwarding requires fresh, explicit policy.";
 function JsonView({ value, label }: { value: unknown; label: string }) {
@@ -91,6 +92,7 @@ function Workspace({ project }: { project: string }) {
     {!discovery && !error ? <p role="status">Loading configured space…</p> : null}
     {discovery ? <>
       <ExpertisePanel project={project} discovery={discovery} />
+      <AgentExchangesPanel project={project} space={discovery.space} />
       <CollectionsPanel project={project} discovery={discovery} />
       <p>Space <code>{discovery.space}</code><br />Instance <code>{discovery.instance}</code><br />Authority <code>{discovery.authority}</code><br />Local actor <code>{discovery.principal}</code></p>
       {discovery.read_only ? <p>Read-only service. Mutation controls are disabled.</p> : null}

@@ -1356,12 +1356,6 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             false,
         ),
         (
-            "/v1/projects/{slug}/federation/{space}/agent-questions",
-            Method::POST,
-            Permission::BundleExport,
-            false,
-        ),
-        (
             "/v1/projects/{slug}/federation/{space}/agent-questions/{id}",
             Method::GET,
             Permission::BundleExport,
@@ -1424,6 +1418,24 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )
             .expect("unique federation route policy");
     }
+    let agent_path = "/v1/projects/{slug}/federation/{space}/agent-questions".to_owned();
+    // matchit requires both methods under one path registration.
+    let post_policy = RoutePolicy {
+        permission: Permission::BundleExport,
+        scope: ProjectScope::PathProject,
+        semantic_read: false,
+    };
+    let get_policy = RoutePolicy {
+        permission: Permission::BundleExport,
+        scope: ProjectScope::PathProject,
+        semantic_read: true,
+    };
+    table
+        .insert(
+            agent_path,
+            vec![(Method::POST, post_policy), (Method::GET, get_policy)],
+        )
+        .expect("unique watched-agent route policy");
     table
         .insert(
             "/v1/projects/{slug}/federation/{space}/collections/{collection}/grants".to_owned(),
