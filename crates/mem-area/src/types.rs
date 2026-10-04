@@ -22,6 +22,7 @@ pub const AREA_RECONCILIATION_MIGRATION: u32 = 61;
 pub const ADDRESSED_EXPERTISE_MIGRATION: u32 = 62;
 pub const AGENT_EXPERTISE_MIGRATION: u32 = 63;
 pub const ADDRESSED_DELETION_MIGRATION: u32 = 64;
+pub const AREA_IMPORT_HEAD_MIGRATION: u32 = 65;
 
 /// Stable wire identities. Display names must not become routing identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

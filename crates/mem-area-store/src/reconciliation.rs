@@ -126,7 +126,10 @@ async fn setup(conn: &mut PgConnection, target: Uuid, area: AreaId) -> Result<()
             .persistent(false)
             .fetch_one(&mut *conn)
             .await?;
-    if head != Some(RECONCILIATION_TARGET_MIGRATION) {
+    if !matches!(
+        head,
+        Some(RECONCILIATION_TARGET_MIGRATION..=CURRENT_TARGET_MIGRATION)
+    ) {
         return Err(ImportError::Schema);
     }
     // Require an established installation binding, not just a caller supplied UUID.

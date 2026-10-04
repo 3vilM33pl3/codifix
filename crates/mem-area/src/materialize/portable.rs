@@ -176,7 +176,8 @@ pub fn import(
         || w.partition.source_instance == target
         || w.partition.source_instance.is_nil()
         || w.partition.snapshot_id.is_nil()
-        || !(52..=61).contains(&w.partition.source_migration_version)
+        || !(SUPPORTED_MIGRATION..=AREA_IMPORT_HEAD_MIGRATION)
+            .contains(&w.partition.source_migration_version)
         || w.rows != w.partition.rows.len()
         || w.projections != w.partition.projected_sources.len()
         || w.rows + w.projections > 1_000_000

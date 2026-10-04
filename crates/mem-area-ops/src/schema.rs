@@ -9,7 +9,7 @@ use sqlx::{
 };
 use std::{borrow::Cow, path::PathBuf, time::Duration};
 
-const HEAD: i64 = 61;
+const HEAD: i64 = 65;
 // Same compatibility rule as mem-service::runtime and mem-test-support. Preserve
 // the applied checksum; migration 16 removes the obsolete dimensionless index.
 const VECTOR_COMPAT: &str = r#"

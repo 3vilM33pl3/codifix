@@ -159,9 +159,10 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
             | ADDRESSED_EXPERTISE_MIGRATION
             | AGENT_EXPERTISE_MIGRATION
             | ADDRESSED_DELETION_MIGRATION
+            | AREA_IMPORT_HEAD_MIGRATION
     ) {
         errors.push(format!(
-            "unsupported migration version {}; supported explicit heads are 52 through 64",
+            "unsupported migration version {}; supported explicit heads are 52 through 65",
             inventory.migration_version
         ));
     }
@@ -409,7 +410,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         }
     }
     for (table, _) in SUPERVISOR_TABLES_0053 {
-        if (SUPERVISOR_MIGRATION..=ADDRESSED_DELETION_MIGRATION)
+        if (SUPERVISOR_MIGRATION..=AREA_IMPORT_HEAD_MIGRATION)
             .contains(&inventory.migration_version)
             && !tables.contains_key(table)
         {
@@ -421,7 +422,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         }
     }
     for (table, _) in SUPERVISOR_TABLES_0054 {
-        if (SUPERVISOR_PROPOSAL_MIGRATION..=ADDRESSED_DELETION_MIGRATION)
+        if (SUPERVISOR_PROPOSAL_MIGRATION..=AREA_IMPORT_HEAD_MIGRATION)
             .contains(&inventory.migration_version)
             && !tables.contains_key(table)
         {
@@ -453,7 +454,7 @@ pub fn inspect_inventory(inventory: &Inventory) -> InventoryValidation {
         (AGENT_EXPERTISE_MIGRATION, AGENT_EXPERTISE_TABLES_0063),
     ] {
         for (table, _) in catalog {
-            if (head..=ADDRESSED_DELETION_MIGRATION).contains(&inventory.migration_version)
+            if (head..=AREA_IMPORT_HEAD_MIGRATION).contains(&inventory.migration_version)
                 && !tables.contains_key(table)
             {
                 errors.push(format!(

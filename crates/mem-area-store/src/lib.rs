@@ -22,6 +22,10 @@ pub const USAGE_TARGET_MIGRATION: i64 = 58;
 pub const REVIEW_TARGET_MIGRATION: i64 = 59;
 pub const QUESTION_TARGET_MIGRATION: i64 = 60;
 pub const RECONCILIATION_TARGET_MIGRATION: i64 = 61;
+pub const ADDRESSED_TARGET_MIGRATION: i64 = 62;
+pub const AGENT_TARGET_MIGRATION: i64 = 63;
+pub const DELETION_TARGET_MIGRATION: i64 = 64;
+pub const CURRENT_TARGET_MIGRATION: i64 = 65;
 const TABLES: &[&str] = &[
     "public.projects",
     "public.sessions",
@@ -171,6 +175,10 @@ pub async fn import_partition(
                 | REVIEW_TARGET_MIGRATION
                 | QUESTION_TARGET_MIGRATION
                 | RECONCILIATION_TARGET_MIGRATION
+                | ADDRESSED_TARGET_MIGRATION
+                | AGENT_TARGET_MIGRATION
+                | DELETION_TARGET_MIGRATION
+                | CURRENT_TARGET_MIGRATION
         )
     ) {
         return Err(ImportError::Schema);
@@ -205,6 +213,16 @@ pub async fn import_partition(
         })
         .chain(if target_head >= RECONCILIATION_TARGET_MIGRATION {
             mem_area::AREA_RECONCILIATION_TABLES_0061
+        } else {
+            &[]
+        })
+        .chain(if target_head >= ADDRESSED_TARGET_MIGRATION {
+            mem_area::ADDRESSED_EXPERTISE_TABLES_0062
+        } else {
+            &[]
+        })
+        .chain(if target_head >= AGENT_TARGET_MIGRATION {
+            mem_area::AGENT_EXPERTISE_TABLES_0063
         } else {
             &[]
         })
