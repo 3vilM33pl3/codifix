@@ -48,13 +48,14 @@ the four PDS SQLite copies passed `quick_check`. These are **live-writer
 snapshots, not a coordinated cutover point**. A stopped-writer backup and a
 restore check are still needed at installation. No CA-local backup is included.
 
-One encrypted gateway dump was restored into a disposable PostgreSQL 17
-database, entirely separate from production. Pinned `sqlx-cli 0.8.6` saw
-pending migrations 61–65, applied them successfully and then reported all 65
-installed with matching history. The clone retained 22 accepted publications
-and had zero new addressed intents. This verifies that one gateway snapshot
-migrates; it does not verify a stopped-writer cutover, runtime grants, or an
-upgraded live gateway.
+All four encrypted Monolith PostgreSQL dumps were restored into separate
+disposable PostgreSQL 17 databases, entirely separate from production. Pinned
+`sqlx-cli 0.8.6` applied pending migrations to each: gateway 61–65 and each
+participant 62–65. Every clone then reported migration head 65 with 65
+successful history rows. The gateway clone retained 22 accepted publications
+and had zero new addressed intents. This verifies those four snapshot upgrade
+paths; it does not verify a stopped-writer cutover, runtime grants, CA's own
+database, or upgraded live services.
 
 The full Rust workspace, Lean build/test, Web tests/build, scoped JavaScript
 tests, formatting, Clippy and boundary checks passed before packaging. A
