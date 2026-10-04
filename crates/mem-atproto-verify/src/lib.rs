@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bounded verification for the private gateway profile, not DID discovery or
 //! native Spaces. Never feed untrusted CAR/MST bytes to Atrium's trusted loaders.
-use atrium_api::types::string::{Did, Nsid, RecordKey, Tid};
+use atrium_api::types::{
+    Unknown,
+    string::{Did, Nsid, RecordKey, Tid},
+};
 use atrium_crypto::{did, verify::verify_signature};
 use atrium_repo::{Cid, blockstore::MemoryBlockStore, mst::Tree};
-use mem_atproto::publication::PublicationWire;
+use mem_atproto::{
+    EncodedAtRecord, addressed_expertise::AddressedExpertiseWire, publication::PublicationWire,
+};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -111,6 +116,33 @@ impl PinnedRepository {
         wire: &PublicationWire,
         now_micros: u64,
     ) -> Result<VerifiedRepository> {
+        let expected = wire.record().map_err(|_| VerifyError::Record)?;
+        let cid = wire.cid().map_err(|_| VerifyError::Record)?;
+        self.verify_full_car_record(bytes, &expected, &cid, wire.raw(), now_micros)
+    }
+
+    /// The addressed collection uses the same pinned signature, canonical MST
+    /// and exact record-byte checks as ordinary publication. This does not
+    /// authorize a recipient; the gateway must do that before returning bytes.
+    pub fn verify_full_car_addressed(
+        &self,
+        bytes: &[u8],
+        wire: &AddressedExpertiseWire,
+        now_micros: u64,
+    ) -> Result<VerifiedRepository> {
+        let expected = wire.record().map_err(|_| VerifyError::Record)?;
+        let cid = wire.cid().map_err(|_| VerifyError::Record)?;
+        self.verify_full_car_record(bytes, &expected, &cid, wire.raw(), now_micros)
+    }
+
+    fn verify_full_car_record(
+        &self,
+        bytes: &[u8],
+        expected: &EncodedAtRecord,
+        expected_cid: &str,
+        raw: &Unknown,
+        now_micros: u64,
+    ) -> Result<VerifiedRepository> {
         let (root, blocks) = parse_car(bytes)?;
         let commit_bytes = block(&blocks, &root)?;
         if commit_bytes.len() > MAX_METADATA_BYTES {
@@ -157,15 +189,13 @@ impl PinnedRepository {
         if rebuilt != commit.data {
             return Err(VerifyError::Tree);
         }
-        let expected = wire.record().map_err(|_| VerifyError::Record)?;
         let key = format!(
             "{}/{}",
             expected.collection.as_ref(),
             expected.rkey.as_ref()
         );
-        let cid = wire.cid().map_err(|_| VerifyError::Record)?;
-        let cid: Cid = cid.parse().map_err(|_| VerifyError::Record)?;
-        let value = serde_ipld_dagcbor::to_vec(wire.raw()).map_err(|_| VerifyError::Record)?;
+        let cid: Cid = expected_cid.parse().map_err(|_| VerifyError::Record)?;
+        let value = serde_ipld_dagcbor::to_vec(raw).map_err(|_| VerifyError::Record)?;
         if entries.get(&key) != Some(&cid) || block(&blocks, &cid)? != value {
             return Err(VerifyError::Record);
         }

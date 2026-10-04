@@ -115,6 +115,44 @@ fn both_curves_verify_full_inclusion_and_preserve_unknown_fields() {
 }
 
 #[test]
+fn addressed_question_uses_the_same_signed_repository_proof() {
+    use mem_atproto::addressed_expertise::AddressedExpertiseWire;
+    use mem_federation::{
+        CanonicalJsonCodec,
+        expertise::{AddressedExpertiseRecord, ExpertiseQuestion},
+    };
+    let question: ExpertiseQuestion = serde_json::from_value(json!({
+        "request_id":Uuid::from_u128(70),"space":Uuid::from_u128(71),
+        "requester":Uuid::from_u128(72),"principal":Uuid::from_u128(73),
+        "capability":{"publisher":Uuid::from_u128(74),"id":Uuid::from_u128(75)},
+        "revision":1,"collection_digest":CanonicalJsonCodec::digest(&"reviewed").unwrap(),
+        "question":"What changed?","mode":"deterministic","model_destination":null,
+        "output_destination":"codex_openai",
+        "created_at":"2026-10-04T10:00:00Z","expires_at":"2026-10-04T10:02:00Z"
+    }))
+    .unwrap();
+    let record = AddressedExpertiseRecord::question(
+        question,
+        1,
+        CanonicalJsonCodec::digest(&"policy").unwrap(),
+    )
+    .unwrap();
+    let wire = AddressedExpertiseWire::encode(record).unwrap();
+    let encoded = wire.record().unwrap();
+    let key = format!("{}/{}", encoded.collection.as_ref(), encoded.rkey.as_ref());
+    let car = signed_repo(
+        REPO,
+        &BTreeMap::from([(key, wire.raw().clone())]),
+        FixtureKey::K256,
+    );
+    let verifier = PinnedRepository::new(REPO.into(), FixtureKey::K256.did_key()).unwrap();
+    let receipt = verifier
+        .verify_full_car_addressed(&car, &wire, u64::MAX)
+        .unwrap();
+    assert_eq!(receipt.record_cid, wire.cid().unwrap());
+}
+
+#[test]
 fn reject_wrong_key_did_version_future_revision_and_bad_signatures() {
     let car = signed_repo(REPO, &records(&wire()), FixtureKey::K256);
     assert_eq!(verify(&car, FixtureKey::P256), Err(VerifyError::Signature));

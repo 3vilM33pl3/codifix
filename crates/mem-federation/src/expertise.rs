@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Private expertise contracts. These types establish neither authentication
-//! nor human review. Only advertisements may enter the publication log.
+//! nor human review. Only advertisements enter the shared publication log;
+//! addressed question/answer records have their own recipient-filtered channel.
 use crate::{AuthorIdentity, CanonicalJsonCodec, ContentDigest, SpaceCapability, publication::*};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,10 @@ pub const MAX_ANSWER_BYTES: usize = 64 * 1024;
 pub const MAX_CITATIONS: usize = 8;
 pub const MAX_COLLECTION_ENTRIES: usize = 256;
 pub const MAX_COLLECTION_BYTES: usize = 1024 * 1024;
+pub const ADDRESSED_EXPERTISE_SCHEMA_VERSION: u32 = 1;
+/// Leave room for envelope, citations and AT record metadata under the private
+/// profile's 64 KiB record ceiling.
+pub const MAX_ADDRESSED_ANSWER_BYTES: usize = 32 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -98,6 +103,136 @@ pub enum ExpertiseReject {
     DestinationDenied,
     #[error("answer citation not in selected reviewed evidence")]
     InvalidCitation,
+}
+
+/// This is an addressed payload, not a publication-log variant. The gateway
+/// authenticates the sender and permits reads only to sender and recipient.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "payload",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
+pub enum AddressedExpertisePayload {
+    Question(ExpertiseQuestion),
+    Answer(ExpertiseAnswer),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AddressedExpertiseRecord {
+    pub schema_version: u32,
+    pub space: SpaceId,
+    pub sender: InstanceId,
+    pub recipient: InstanceId,
+    pub request_id: Uuid,
+    pub policy_revision: u32,
+    pub policy_digest: ContentDigest,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub payload_digest: ContentDigest,
+    pub payload: AddressedExpertisePayload,
+}
+
+impl AddressedExpertiseRecord {
+    pub fn question(
+        question: ExpertiseQuestion,
+        policy_revision: u32,
+        policy_digest: ContentDigest,
+    ) -> Result<Self, ExpertiseReject> {
+        question.validate()?;
+        let payload = AddressedExpertisePayload::Question(question.clone());
+        let record = Self {
+            schema_version: ADDRESSED_EXPERTISE_SCHEMA_VERSION,
+            space: question.space,
+            sender: question.requester,
+            recipient: question.capability.publisher,
+            request_id: question.request_id,
+            policy_revision,
+            policy_digest,
+            created_at: question.created_at,
+            expires_at: question.expires_at,
+            payload_digest: CanonicalJsonCodec::digest(&payload)
+                .map_err(|_| ExpertiseReject::Binding)?,
+            payload,
+        };
+        record.validate()?;
+        Ok(record)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn answer(
+        question: &ExpertiseQuestion,
+        answer: ExpertiseAnswer,
+        policy_revision: u32,
+        policy_digest: ContentDigest,
+        authored_at: DateTime<Utc>,
+    ) -> Result<Self, ExpertiseReject> {
+        question.validate()?;
+        if answer.request_digest != question.digest()? {
+            return Err(ExpertiseReject::Binding);
+        }
+        let payload = AddressedExpertisePayload::Answer(answer);
+        let record = Self {
+            schema_version: ADDRESSED_EXPERTISE_SCHEMA_VERSION,
+            space: question.space,
+            sender: question.capability.publisher,
+            recipient: question.requester,
+            request_id: question.request_id,
+            policy_revision,
+            policy_digest,
+            created_at: authored_at,
+            expires_at: question.expires_at,
+            payload_digest: CanonicalJsonCodec::digest(&payload)
+                .map_err(|_| ExpertiseReject::Binding)?,
+            payload,
+        };
+        record.validate()?;
+        Ok(record)
+    }
+
+    pub fn validate(&self) -> Result<(), ExpertiseReject> {
+        if self.schema_version != ADDRESSED_EXPERTISE_SCHEMA_VERSION
+            || self.sender == self.recipient
+            || self.request_id.is_nil()
+            || self.policy_revision == 0
+            || self.created_at > self.expires_at
+            || self.payload_digest
+                != CanonicalJsonCodec::digest(&self.payload)
+                    .map_err(|_| ExpertiseReject::Binding)?
+        {
+            return Err(ExpertiseReject::Binding);
+        }
+        match &self.payload {
+            AddressedExpertisePayload::Question(q) => {
+                q.validate()?;
+                if q.space != self.space
+                    || q.requester != self.sender
+                    || q.capability.publisher != self.recipient
+                    || q.request_id != self.request_id
+                    || q.created_at != self.created_at
+                    || q.expires_at != self.expires_at
+                {
+                    return Err(ExpertiseReject::Binding);
+                }
+            }
+            AddressedExpertisePayload::Answer(answer) => {
+                if !answer.status.terminal()
+                    || !answer.untrusted
+                    || answer.citations.len() > MAX_CITATIONS
+                    || answer.citations.iter().any(|c| c.responder != self.sender)
+                    || CanonicalJsonCodec::encode(answer)
+                        .map_err(|_| ExpertiseReject::Binding)?
+                        .len()
+                        > MAX_ADDRESSED_ANSWER_BYTES
+                {
+                    return Err(ExpertiseReject::Binding);
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 pub fn valid_destination(value: &str) -> bool {

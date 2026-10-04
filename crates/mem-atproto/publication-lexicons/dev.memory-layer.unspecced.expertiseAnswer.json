@@ -1,0 +1,18 @@
+{
+  "lexicon": 1,
+  "id": "dev.memory-layer.unspecced.expertiseAnswer",
+  "description": "UNPUBLISHED private Memory profile: gateway-addressed answer, not a space-wide publication or native Spaces record.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": ["addressed"],
+        "properties": {
+          "addressed": { "type": "unknown", "description": "Versioned, bounded AddressedExpertiseRecord validated by Memory; gateway recipient filtering is mandatory." }
+        }
+      }
+    }
+  }
+}

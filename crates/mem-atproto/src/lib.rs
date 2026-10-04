@@ -3,6 +3,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 mod adapter;
+pub mod addressed_expertise;
 mod aturi;
 mod error;
 mod fixtures;
