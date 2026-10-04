@@ -1,6 +1,6 @@
 ---
 name: memory-remember
-version: 2.1.0-rc.3
+version: 2.1.0-rc.4
 description: Remember meaningful completed work by capturing task context and curating it into durable project memory with provenance
 ---
 

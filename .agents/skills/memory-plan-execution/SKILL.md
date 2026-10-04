@@ -1,6 +1,6 @@
 ---
 name: memory-plan-execution
-version: 2.1.0-rc.3
+version: 2.1.0-rc.4
 description: Save the approved plan and checkpoint when execution starts, and verify all plan checkbox items are complete before claiming the task is finished
 ---
 

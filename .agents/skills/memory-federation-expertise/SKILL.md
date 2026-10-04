@@ -1,6 +1,6 @@
 ---
 name: memory-federation-expertise
-version: 2.1.0-rc.3
+version: 2.1.0-rc.4
 description: Discover approved expertise in other Memory Layer areas and ask a bounded, cited question when local evidence is insufficient
 ---
 

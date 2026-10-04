@@ -1,6 +1,6 @@
 ---
 name: memory-direct-task-start
-version: 2.1.0-rc.3
+version: 2.1.0-rc.4
 description: Record a task memory before starting direct no-plan implementation work when the user asks to implement, fix, change, add, update, release, install, or otherwise mutate the repository without first approving a plan
 ---
 
