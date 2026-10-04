@@ -19,7 +19,7 @@ async fn migration_0056_import_receipt_survives_upgrade_but_cannot_authorize_rep
     let (partition, _) = capture(&source.pool).await.partition();
     execute(
         &target.pool,
-        "DROP TABLE area_reconciliation_receipts; DELETE FROM _sqlx_migrations WHERE version=61;",
+        "DROP TABLE federation_agent_expertise_daily,federation_agent_expertise_intents,federation_expertise_addressed; DELETE FROM _sqlx_migrations WHERE version>=62; DROP TABLE area_reconciliation_receipts; DELETE FROM _sqlx_migrations WHERE version=61;",
     )
     .await;
     // This newly created disposable database alone simulates a pre-0057
