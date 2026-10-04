@@ -2808,6 +2808,7 @@ dependencies = [
  "clap",
  "mem-area",
  "mem-area-store",
+ "mem-platform-files",
  "mem-test-support",
  "percent-encoding",
  "rustix 1.1.4",
@@ -2994,6 +2995,7 @@ dependencies = [
  "mem-curate",
  "mem-federation",
  "mem-federation-store",
+ "mem-platform-files",
  "mem-record",
  "mem-test-support",
  "reqwest",
@@ -3080,11 +3082,20 @@ name = "mem-platform"
 version = "2.1.0-rc.4"
 dependencies = [
  "anyhow",
+ "mem-platform-files",
  "serde",
  "serde_json",
  "sha2",
  "sysinfo",
  "uuid",
+]
+
+[[package]]
+name = "mem-platform-files"
+version = "2.1.0-rc.4"
+dependencies = [
+ "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -37,6 +37,15 @@ for dep in tokio sqlx axum duckdb; do
   fi
 done
 
+# Narrow filesystem primitives must not pull the broad platform/service layer
+# into protected import, federation or supervisor operators.
+files_tree=$(cargo tree -p mem-platform-files -e normal --prefix none | awk '{print $1}' | sort -u)
+for dep in tokio sqlx axum sysinfo mem-platform mem-config reqwest; do
+  if echo "$files_tree" | grep -qx "$dep"; then
+    err "mem-platform-files depends on $dep"
+  fi
+done
+
 # 3a. mem-federation purity: protocol-neutral domain and state only. Runtime,
 # persistence, and concrete AT Protocol dependencies belong in adapters.
 federation_tree=$(cargo tree -p mem-federation -e normal --prefix none | awk '{print $1}' | sort -u)

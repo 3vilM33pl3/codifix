@@ -8,6 +8,7 @@ members = [
   "crates/mem-atproto",
   "crates/mem-atproto-verify",
   "crates/mem-platform",
+  "crates/mem-platform-files",
   "crates/mem-federation",
   "crates/mem-federation-store",
   "crates/mem-federation-runtime",

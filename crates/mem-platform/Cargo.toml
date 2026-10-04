@@ -12,6 +12,7 @@ serde_json.workspace = true
 sha2.workspace = true
 uuid.workspace = true
 sysinfo.workspace = true
+mem-platform-files = { path = "../mem-platform-files" }
 
 [lints]
 workspace = true

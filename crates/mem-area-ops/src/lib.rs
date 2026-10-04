@@ -4,6 +4,11 @@
 //! initialization is a separate explicitly confirmed fresh-database operation.
 pub mod portable;
 pub mod preview;
+#[cfg(unix)]
+#[path = "private_unix.rs"]
+mod private;
+#[cfg(windows)]
+#[path = "private_windows.rs"]
 mod private;
 pub mod reconciliation;
 pub mod schema;
@@ -34,7 +39,7 @@ pub enum Failure {
     )]
     Preview,
     #[error(
-        "private file boundary failed; use owned 0700 directories and exclusive 0600 regular files"
+        "private file boundary failed; use exclusive protected directories and regular files (Unix 0700/0600 or Windows private ACLs)"
     )]
     PrivateFiles,
     #[error("private input exceeds its bounded size")]

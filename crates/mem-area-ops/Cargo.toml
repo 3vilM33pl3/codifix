@@ -24,6 +24,11 @@ sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 uuid.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+mem-platform-files = { path = "../mem-platform-files" }
+
+[target.'cfg(unix)'.dependencies]
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 
 [dev-dependencies]

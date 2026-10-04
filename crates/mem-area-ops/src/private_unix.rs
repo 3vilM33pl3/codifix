@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Pinned directory descriptors. No symlinks, shared writable ancestors, special
+//! Pinned Unix directory descriptors. No symlinks, shared writable ancestors, special
 //! files or hard-linked input. Root/same-UID mutation is a trusted operator risk.
 use crate::{Failure, Result};
 use rustix::fs::{AtFlags, Mode, OFlags, linkat, open, openat, statat, unlinkat};

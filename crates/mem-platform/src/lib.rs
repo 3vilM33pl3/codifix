@@ -4,6 +4,8 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 pub mod journal;
+#[cfg(windows)]
+pub use mem_platform_files::windows as private_windows;
 
 use std::{
     env, fs,

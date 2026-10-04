@@ -4,8 +4,10 @@
 //! A dropped owner is uncertainty, never permission to repeat a command.
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+#[cfg(not(windows))]
+use std::fs::OpenOptions;
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{self, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
 };
@@ -28,14 +30,32 @@ pub struct Operation {
 }
 
 fn private_file(path: &Path) -> io::Result<File> {
-    let mut options = OpenOptions::new();
-    options.write(true).read(true).create_new(true);
-    #[cfg(unix)]
+    #[cfg(windows)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
+        crate::private_windows::create_private_file(&std::path::absolute(path)?)
     }
-    options.open(path)
+    #[cfg(not(windows))]
+    {
+        let mut options = OpenOptions::new();
+        options.write(true).read(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        options.open(path)
+    }
+}
+
+fn replace_file(source: &Path, target: &Path) -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        crate::private_windows::replace_file(source, target)
+    }
+    #[cfg(not(windows))]
+    {
+        fs::rename(source, target)
+    }
 }
 
 fn sync_directory(path: &Path) -> io::Result<()> {
@@ -65,6 +85,18 @@ fn create_root(root: &Path) -> io::Result<()> {
         }
         parent = next;
     }
+    #[cfg(windows)]
+    {
+        for path in missing.iter().rev() {
+            match crate::private_windows::create_private_directory(&std::path::absolute(path)?) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+                Err(error) => return Err(error),
+            }
+        }
+        crate::private_windows::Directory::open(&std::path::absolute(root)?)?;
+    }
+    #[cfg(not(windows))]
     fs::create_dir_all(root)?;
     for path in missing.into_iter().rev() {
         sync_directory(path)?;
@@ -82,7 +114,7 @@ fn receipt(directory: &Path, name: &str, bytes: &[u8]) -> io::Result<()> {
     let mut file = private_file(&temporary)?;
     file.write_all(bytes)?;
     file.sync_all()?;
-    fs::rename(temporary, directory.join(name))?;
+    replace_file(&temporary, &directory.join(name))?;
     sync_directory(directory)
 }
 
@@ -99,14 +131,19 @@ where
     create_root(parent)?;
     reconcile(&parent.join("operation-journal"), 100)?;
     let lock_path = path.with_extension("json.lock");
-    let mut options = OpenOptions::new();
-    options.read(true).write(true).create(true).truncate(false);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let lock = options.open(lock_path)?;
+    #[cfg(windows)]
+    let lock = crate::private_windows::open_private_lock(&std::path::absolute(&lock_path)?)?;
+    #[cfg(not(windows))]
+    let lock = {
+        let mut options = OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        options.open(lock_path)?
+    };
     lock.lock()?;
     let mut state = match File::open(path) {
         Ok(file) => {
@@ -141,7 +178,7 @@ where
     let mut file = private_file(&temporary)?;
     file.write_all(&bytes)?;
     file.sync_all()?;
-    fs::rename(temporary, path)?;
+    replace_file(&temporary, path)?;
     sync_directory(parent)?;
     operation.observed(true)?;
     Ok(result)
@@ -176,14 +213,24 @@ impl Operation {
                 .as_millis(),
         };
         let directory = root.join(intent.id.to_string());
-        let mut builder = fs::DirBuilder::new();
-        #[cfg(unix)]
+        #[cfg(windows)]
+        crate::private_windows::create_private_directory(&std::path::absolute(&directory)?)?;
+        #[cfg(not(windows))]
         {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
+            let mut builder = fs::DirBuilder::new();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                builder.mode(0o700);
+            }
+            builder.create(&directory)?;
         }
-        builder.create(&directory)?;
         sync_directory(root)?;
+        #[cfg(windows)]
+        let owner = crate::private_windows::open_private_lock(&std::path::absolute(
+            directory.join("owner.lock"),
+        )?)?;
+        #[cfg(not(windows))]
         let owner = private_file(&directory.join("owner.lock"))?;
         owner.lock()?;
         receipt(
@@ -246,6 +293,11 @@ pub fn reconcile(root: &Path, limit: usize) -> io::Result<Vec<Intent>> {
         {
             continue;
         }
+        #[cfg(windows)]
+        let owner = crate::private_windows::open_existing_private_lock(&std::path::absolute(
+            directory.join("owner.lock"),
+        )?)?;
+        #[cfg(not(windows))]
         let owner = OpenOptions::new()
             .read(true)
             .write(true)

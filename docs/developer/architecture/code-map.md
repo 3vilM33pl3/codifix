@@ -4,6 +4,11 @@ Use this map to find the right PR boundary before opening the large files.
 
 ## Crates
 
+- `crates/mem-platform-files`: narrow protected filesystem primitives shared by
+  platform journals and offline/federation operators. Native Windows ACL,
+  handle/identity and atomic-replacement checks; no configuration, SQL, network,
+  process discovery or service-management dependency. Re-exported by `mem-platform`.
+
 - `crates/mem-record`: shared request/response and domain record types (pure serde, no I/O).
 - `crates/mem-area`: offline, hash-bound four-area inventory, review planner and strict payload materializer. No database access or implicit project-name classification; unknown tables and unresolved ownership block migration.
 - `crates/mem-area-store`: trusted fresh-target PostgreSQL import of opaque reviewed partitions; atomic source rows and immutable reconciliation/provenance receipts. No database discovery, migrations, credentials, live cutover or operator CLI.

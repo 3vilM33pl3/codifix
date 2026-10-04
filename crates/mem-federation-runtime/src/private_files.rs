@@ -10,7 +10,14 @@ pub(crate) fn read(path: &Path, limit: u64) -> Result<Vec<u8>> {
     unix::Input::open(path, limit)?.read(limit)
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+pub(crate) fn read(path: &Path, limit: u64) -> Result<Vec<u8>> {
+    mem_platform_files::windows::Input::open(path, limit)
+        .and_then(|input| input.read(limit))
+        .map_err(|_| RuntimeError::Configuration)
+}
+
+#[cfg(not(any(unix, windows)))]
 pub(crate) fn read(_path: &Path, _limit: u64) -> Result<Vec<u8>> {
     // Do not silently discard ownership/no-follow guarantees on other platforms.
     Err(RuntimeError::Configuration)
