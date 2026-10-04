@@ -59,6 +59,8 @@ when repeated instructions or project knowledge should survive future sessions.
 - Use the smallest validation loop that proves the change.
 - For common Rust, web, database, and eval commands, follow the validation
   sections in [CONTRIBUTING.md](CONTRIBUTING.md).
+- Follow [regular build-cache maintenance](CONTRIBUTING.md#build-disk-usage):
+  check weekly during active development and after large build/test batches.
 - If behavior changes touch user workflows, update the matching page under
   `docs/user/` or `docs-site/content/docs/`.
 

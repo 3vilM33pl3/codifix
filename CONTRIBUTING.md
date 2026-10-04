@@ -73,11 +73,20 @@ For full workspace debugger information, temporarily set
 `CARGO_PROFILE_DEV_DEBUG=2` or `CARGO_PROFILE_TEST_DEBUG=2` for the relevant
 command. External dependency debug settings remain disabled.
 
+During active development, check repository and build-cache disk usage at least
+weekly and after large build, test or release batches. Regularly prune obsolete
+rebuildable caches rather than allowing them to accumulate; keep useful current
+build outputs when possible to avoid unnecessary recompilation.
+
 Before pruning old build outputs, stop builds and preserve any release packages,
 evaluation evidence and binaries used by services or scripts. Do not blindly
 delete `target/`: it also holds non-cache artifacts. Moving the build directory
 with `CARGO_TARGET_DIR` can relieve a full filesystem, but does not reduce total
 storage usage.
+
+After cleanup, set `MEMCTL_BIN` to a preserved Memory executable when invoking
+the repository's Memory helpers; otherwise they default to `cargo run` and may
+trigger a full rebuild just to record the cleanup.
 
 ## Database Tests
 
