@@ -8,8 +8,8 @@ use crate::{
 use axum::http::StatusCode;
 use mem_federation::publication::InstanceId;
 use mem_federation_store::{
-    AddressedDelivery, AddressedReceipt, AnswerDeliveryAuthorization, AnswerDeliveryLease,
-    DELIVERY_WAIT_SECONDS, QuestionResult,
+    AddressedDelivery, AddressedQuestionLease, AddressedReceipt, AnswerDeliveryAuthorization,
+    AnswerDeliveryLease, DELIVERY_WAIT_SECONDS, QuestionResult,
 };
 use std::{
     collections::BTreeMap,
@@ -193,7 +193,45 @@ impl crate::InstanceSync {
             .client
             .expertise(
                 self.instance,
-                ExpertiseOperation::AddressedSubmit { record },
+                ExpertiseOperation::AddressedSubmit {
+                    record,
+                    answer_claim: None,
+                },
+            )
+            .await?
+        {
+            ExpertiseReply::AddressedReceipt(receipt) => Ok(receipt),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+
+    pub async fn claim_addressed_expertise(&self) -> crate::Result<Option<AddressedQuestionLease>> {
+        match self
+            .client
+            .expertise(self.instance, ExpertiseOperation::AddressedClaim)
+            .await?
+        {
+            ExpertiseReply::AddressedLease(lease) => Ok(lease.map(|lease| *lease)),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+
+    pub async fn answer_addressed_expertise(
+        &self,
+        lease: &AddressedQuestionLease,
+        record: mem_federation::expertise::AddressedExpertiseRecord,
+    ) -> crate::Result<AddressedReceipt> {
+        if record.sender != self.instance || record.request_id != lease.record.request_id {
+            return Err(RuntimeError::Unauthorized);
+        }
+        match self
+            .client
+            .expertise(
+                self.instance,
+                ExpertiseOperation::AddressedSubmit {
+                    record,
+                    answer_claim: Some(lease.lease_token),
+                },
             )
             .await?
         {
@@ -206,7 +244,7 @@ impl crate::InstanceSync {
         &self,
         request_id: Uuid,
         kind: &str,
-    ) -> crate::Result<AddressedDelivery> {
+    ) -> crate::Result<Option<AddressedDelivery>> {
         match self
             .client
             .expertise(
@@ -218,7 +256,7 @@ impl crate::InstanceSync {
             )
             .await?
         {
-            ExpertiseReply::AddressedDelivery(delivery) => Ok(*delivery),
+            ExpertiseReply::AddressedDelivery(delivery) => Ok(delivery.map(|delivery| *delivery)),
             _ => Err(RuntimeError::InvalidResponse),
         }
     }

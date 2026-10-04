@@ -30,6 +30,7 @@ pub struct GatewayServer {
     // New semantics stay unreachable through the existing deployment profile.
     // F1 activation must establish fleet compatibility before enabling them.
     expertise_enabled: bool,
+    addressed_enabled: bool,
     space: SpaceId,
     authority: InstanceId,
     publication_status: Option<PdsPublisher>,
@@ -39,6 +40,8 @@ impl GatewayServer {
     pub async fn maintain_expertise(&self) -> Result<()> {
         if self.expertise_enabled {
             self.store.cleanup_questions(self.fence).await?;
+        }
+        if self.addressed_enabled {
             self.store.cleanup_addressed(self.fence).await?;
         }
         Ok(())
@@ -76,6 +79,7 @@ impl GatewayServer {
             credentials,
             security,
             expertise_enabled: false,
+            addressed_enabled: false,
             delivery_waiters: Default::default(),
             space,
             authority,
@@ -125,6 +129,29 @@ impl GatewayServer {
             return Err(RuntimeError::Configuration);
         }
         self.enable_expertise(participants).await
+    }
+    pub async fn enable_addressed_expertise(
+        mut self,
+        participants: &[(InstanceId, u32)],
+    ) -> Result<Self> {
+        if !self.expertise_enabled {
+            return Err(RuntimeError::Configuration);
+        }
+        let configured: BTreeSet<_> = self.credentials.iter().map(|(_, id)| *id).collect();
+        let compatible: BTreeSet<_> = participants.iter().map(|(id, _)| *id).collect();
+        if compatible.len() != participants.len()
+            || configured != compatible
+            || participants.iter().any(|(_, schema)| {
+                *schema != mem_federation::expertise::ADDRESSED_EXPERTISE_SCHEMA_VERSION
+            })
+        {
+            return Err(RuntimeError::Configuration);
+        }
+        self.store
+            .require_expertise_fleet(self.fence, &compatible)
+            .await?;
+        self.addressed_enabled = true;
+        Ok(self)
     }
     pub async fn publish_one(&self, pds: &PdsPublisher) -> Result<WorkerOutcome> {
         if self
@@ -178,7 +205,7 @@ impl GatewayServer {
     /// a shared publication sequence. Success requires exact PDS read-back and
     /// signed repository inclusion before the durable receipt becomes visible.
     pub async fn publish_addressed_one(&self, pds: &PdsPublisher) -> Result<bool> {
-        if !self.expertise_enabled {
+        if !self.addressed_enabled {
             return Ok(false);
         }
         let pds = match pds.credential_snapshot() {
@@ -368,6 +395,16 @@ async fn expertise(
 ) -> std::result::Result<Json<SignedExpertiseReply>, StatusCode> {
     let actor = server.authenticate(&headers)?;
     request.digest().map_err(|_| StatusCode::BAD_REQUEST)?;
+    if matches!(
+        &request.operation,
+        ExpertiseOperation::AddressedSubmit { .. }
+            | ExpertiseOperation::AddressedClaim
+            | ExpertiseOperation::AddressedRead { .. }
+            | ExpertiseOperation::AddressedInbox { .. }
+    ) && !server.addressed_enabled
+    {
+        return Err(StatusCode::NOT_FOUND);
+    }
     let store = &server.store;
     let fence = server.fence;
     let reply = match &request.operation {
@@ -383,19 +420,30 @@ async fn expertise(
                 .await
                 .map_err(expertise_error)?,
         )),
-        ExpertiseOperation::AddressedSubmit { record } => ExpertiseReply::AddressedReceipt(
+        ExpertiseOperation::AddressedSubmit {
+            record,
+            answer_claim,
+        } => ExpertiseReply::AddressedReceipt(
             store
-                .enqueue_addressed(fence, actor, record)
+                .enqueue_addressed(fence, actor, record, *answer_claim)
                 .await
                 .map_err(expertise_error)?,
         ),
+        ExpertiseOperation::AddressedClaim => ExpertiseReply::AddressedLease(
+            store
+                .claim_addressed_question(fence, actor)
+                .await
+                .map_err(expertise_error)?
+                .map(Box::new),
+        ),
         ExpertiseOperation::AddressedRead { request_id, kind } => {
-            ExpertiseReply::AddressedDelivery(Box::new(
+            ExpertiseReply::AddressedDelivery(
                 store
                     .read_addressed(fence, actor, *request_id, kind)
                     .await
-                    .map_err(expertise_error)?,
-            ))
+                    .map_err(expertise_error)?
+                    .map(Box::new),
+            )
         }
         ExpertiseOperation::AddressedInbox { limit } => ExpertiseReply::AddressedInbox(
             store

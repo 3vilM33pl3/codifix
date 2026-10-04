@@ -46,6 +46,13 @@ pub struct AddressedLease {
     pub lease_token: Uuid,
     pub attempts: u16,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AddressedQuestionLease {
+    pub record: AddressedExpertiseRecord,
+    pub lease_token: Uuid,
+    pub lease_until: DateTime<Utc>,
+}
 
 fn kind(payload: &AddressedExpertisePayload) -> &'static str {
     match payload {
@@ -77,6 +84,7 @@ impl GatewayStore {
         fence: WriterFence,
         authenticated: InstanceId,
         record: &AddressedExpertiseRecord,
+        answer_claim: Option<Uuid>,
     ) -> Result<AddressedReceipt> {
         record.validate()?;
         if record.space != fence.space || authenticated != record.sender {
@@ -105,19 +113,33 @@ impl GatewayStore {
         }
         match &record.payload {
             AddressedExpertisePayload::Question(question) => {
+                if answer_claim.is_some() {
+                    return Err(StoreError::Binding);
+                }
                 state.authorize_expertise(authenticated, question, at)?;
                 self.question_policy(&mut tx, fence, question, at).await?;
+                let outstanding: i64 = sqlx::query_scalar("SELECT count(*) FROM federation_expertise_addressed q WHERE q.space=$1 AND q.sender=$2 AND q.kind='question' AND q.expires_at>clock_timestamp() AND NOT EXISTS (SELECT 1 FROM federation_expertise_addressed a WHERE a.space=q.space AND a.request_id=q.request_id AND a.kind='answer')")
+                    .bind(fence.space.as_uuid()).bind(authenticated.as_uuid()).fetch_one(&mut *tx).await?;
+                if outstanding >= 32 {
+                    return Err(StoreError::Limits);
+                }
             }
             AddressedExpertisePayload::Answer(answer) => {
+                let claim = answer_claim.ok_or(StoreError::Binding)?;
                 if !state.has_capability(authenticated, SpaceCapability::AnswerExpertise)
                     || !state.has_capability(record.recipient, SpaceCapability::AskExpertise)
                 {
                     return Err(StoreError::Binding);
                 }
-                let question_row = sqlx::query("SELECT record,status FROM federation_expertise_addressed WHERE space=$1 AND request_id=$2 AND kind='question' FOR UPDATE")
+                let question_row = sqlx::query("SELECT record,status,answer_lease_token,answer_lease_until FROM federation_expertise_addressed WHERE space=$1 AND request_id=$2 AND kind='question' FOR UPDATE")
                     .bind(record.space.as_uuid()).bind(record.request_id)
                     .fetch_optional(&mut *tx).await?.ok_or(StoreError::Binding)?;
-                if question_row.try_get::<String, _>("status")? != "published" {
+                if question_row.try_get::<String, _>("status")? != "published"
+                    || question_row.try_get::<Option<Uuid>, _>("answer_lease_token")? != Some(claim)
+                    || question_row
+                        .try_get::<Option<DateTime<Utc>>, _>("answer_lease_until")?
+                        .is_none_or(|until| until <= at)
+                {
                     return Err(StoreError::Binding);
                 }
                 let question_record = question_row
@@ -150,10 +172,62 @@ impl GatewayStore {
         Ok(result)
     }
 
+    /// One responder at a time may prepare the deterministic answer. A crashed
+    /// responder relinquishes the lease on expiry; accepted answers are never
+    /// overwritten and disappear from claim eligibility immediately.
+    pub async fn claim_addressed_question(
+        &self,
+        fence: WriterFence,
+        authenticated: InstanceId,
+    ) -> Result<Option<AddressedQuestionLease>> {
+        let mut tx = self.pool.begin().await?;
+        let authority = self.lock(&mut tx, fence).await?;
+        let state = self.load(&mut tx, fence.space, authority).await?;
+        if !state.has_capability(authenticated, SpaceCapability::AnswerExpertise) {
+            return Err(StoreError::Binding);
+        }
+        let rows = sqlx::query("SELECT q.* FROM federation_expertise_addressed q WHERE q.space=$1 AND q.recipient=$2 AND q.kind='question' AND q.status='published' AND q.expires_at>clock_timestamp() AND q.payload_until>clock_timestamp() AND (q.answer_lease_until IS NULL OR q.answer_lease_until<=clock_timestamp()) AND NOT EXISTS (SELECT 1 FROM federation_expertise_addressed a WHERE a.space=q.space AND a.request_id=q.request_id AND a.kind='answer') ORDER BY q.created_at,q.request_id LIMIT 32 FOR UPDATE OF q SKIP LOCKED")
+            .bind(fence.space.as_uuid()).bind(authenticated.as_uuid()).fetch_all(&mut *tx).await?;
+        for row in rows {
+            let Some(record) = row
+                .try_get::<Option<Json<AddressedExpertiseRecord>>, _>("record")?
+                .map(|r| r.0)
+            else {
+                continue;
+            };
+            let AddressedExpertisePayload::Question(q) = &record.payload else {
+                return Err(StoreError::Corrupt);
+            };
+            match self.question_policy(&mut tx, fence, q, q.created_at).await {
+                Ok(_) => {}
+                Err(StoreError::Binding | StoreError::Expertise(_) | StoreError::Outcome(_)) => {
+                    continue;
+                }
+                Err(other) => return Err(other),
+            }
+            let token = Uuid::new_v4();
+            let until = Utc::now() + chrono::Duration::seconds(30);
+            sqlx::query("UPDATE federation_expertise_addressed SET answer_lease_token=$3,answer_lease_until=$4 WHERE space=$1 AND request_id=$2 AND kind='question'")
+                .bind(fence.space.as_uuid()).bind(record.request_id).bind(token).bind(until)
+                .execute(&mut *tx).await?;
+            tx.commit().await?;
+            return Ok(Some(AddressedQuestionLease {
+                record,
+                lease_token: token,
+                lease_until: until,
+            }));
+        }
+        tx.commit().await?;
+        Ok(None)
+    }
+
     pub async fn claim_addressed(&self, fence: WriterFence) -> Result<Option<AddressedLease>> {
         let mut tx = self.pool.begin().await?;
-        self.lock(&mut tx, fence).await?;
+        let authority = self.lock(&mut tx, fence).await?;
+        let state = self.load(&mut tx, fence.space, authority).await?;
         sqlx::query("UPDATE federation_expertise_addressed SET lease_token=NULL,lease_until=NULL,status=CASE WHEN attempts>=5 THEN 'failed' ELSE status END WHERE space=$1 AND status='queued' AND lease_until<=clock_timestamp()")
+            .bind(fence.space.as_uuid()).execute(&mut *tx).await?;
+        sqlx::query("UPDATE federation_expertise_addressed SET status='failed',last_error='expired' WHERE space=$1 AND status IN ('queued','auth_blocked') AND expires_at<=clock_timestamp()")
             .bind(fence.space.as_uuid()).execute(&mut *tx).await?;
         let row = sqlx::query("SELECT * FROM federation_expertise_addressed WHERE space=$1 AND status='queued' AND lease_token IS NULL AND next_attempt_at<=clock_timestamp() AND expires_at>clock_timestamp() ORDER BY created_at,request_id,kind LIMIT 1 FOR UPDATE")
             .bind(fence.space.as_uuid()).fetch_optional(&mut *tx).await?;
@@ -167,6 +241,54 @@ impl GatewayStore {
             .try_get::<Option<Json<AddressedExpertiseRecord>>, _>("record")?
             .ok_or(StoreError::Corrupt)?
             .0;
+        let question = match &record.payload {
+            AddressedExpertisePayload::Question(q) => q.clone(),
+            AddressedExpertisePayload::Answer(_) => {
+                let q: Option<Json<AddressedExpertiseRecord>> = sqlx::query_scalar("SELECT record FROM federation_expertise_addressed WHERE space=$1 AND request_id=$2 AND kind='question'")
+                    .bind(fence.space.as_uuid()).bind(record.request_id).fetch_optional(&mut *tx).await?.flatten();
+                let q = q.ok_or(StoreError::Corrupt)?.0;
+                let AddressedExpertisePayload::Question(q) = q.payload else {
+                    return Err(StoreError::Corrupt);
+                };
+                q
+            }
+        };
+        let membership = state.has_capability(
+            record.sender,
+            if kind(&record.payload) == "question" {
+                SpaceCapability::AskExpertise
+            } else {
+                SpaceCapability::AnswerExpertise
+            },
+        ) && state.has_capability(
+            record.recipient,
+            if kind(&record.payload) == "question" {
+                SpaceCapability::AnswerExpertise
+            } else {
+                SpaceCapability::AskExpertise
+            },
+        );
+        let authorized = if membership {
+            match self
+                .question_policy(&mut tx, fence, &question, question.created_at)
+                .await
+            {
+                Ok(_) => true,
+                Err(StoreError::Binding | StoreError::Expertise(_) | StoreError::Outcome(_)) => {
+                    false
+                }
+                Err(other) => return Err(other),
+            }
+        } else {
+            false
+        };
+        if !authorized {
+            sqlx::query("UPDATE federation_expertise_addressed SET status='failed',last_error='policy_denied' WHERE space=$1 AND request_id=$2 AND kind=$3")
+                .bind(fence.space.as_uuid()).bind(record.request_id).bind(kind(&record.payload))
+                .execute(&mut *tx).await?;
+            tx.commit().await?;
+            return Ok(None);
+        }
         sqlx::query("UPDATE federation_expertise_addressed SET lease_token=$4,lease_until=clock_timestamp()+interval '120 seconds',attempts=attempts+1 WHERE space=$1 AND request_id=$2 AND kind=$3")
             .bind(fence.space.as_uuid()).bind(record.request_id).bind(kind(&record.payload))
             .bind(token).execute(&mut *tx).await?;
@@ -187,7 +309,7 @@ impl GatewayStore {
         authenticated: InstanceId,
         request_id: Uuid,
         kind: &str,
-    ) -> Result<AddressedDelivery> {
+    ) -> Result<Option<AddressedDelivery>> {
         if !matches!(kind, "question" | "answer") || request_id.is_nil() {
             return Err(StoreError::Binding);
         }
@@ -196,7 +318,11 @@ impl GatewayStore {
         let state = self.load(&mut tx, fence.space, authority).await?;
         let row = sqlx::query("SELECT * FROM federation_expertise_addressed WHERE space=$1 AND request_id=$2 AND kind=$3 AND metadata_until>clock_timestamp() FOR SHARE")
             .bind(fence.space.as_uuid()).bind(request_id).bind(kind)
-            .fetch_optional(&mut *tx).await?.ok_or(StoreError::Binding)?;
+            .fetch_optional(&mut *tx).await?;
+        let Some(row) = row else {
+            tx.commit().await?;
+            return Ok(None);
+        };
         let sender = InstanceId::new(row.try_get("sender")?)?;
         let recipient = InstanceId::new(row.try_get("recipient")?)?;
         if authenticated != sender && authenticated != recipient {
@@ -246,7 +372,7 @@ impl GatewayStore {
                 .await?;
         }
         tx.commit().await?;
-        Ok(AddressedDelivery { receipt, record })
+        Ok(Some(AddressedDelivery { receipt, record }))
     }
 
     pub async fn addressed_inbox(

@@ -40,6 +40,10 @@ pub struct GatewayConfig {
     /// None keeps all expertise routes disabled.
     #[serde(default)]
     pub expertise_fleet: Option<Vec<(InstanceId, u32)>>,
+    /// Separate fleet gate for the addressed-record profile. Existing schema-v3
+    /// Q&A remains compatible when this is absent.
+    #[serde(default)]
+    pub addressed_expertise_fleet: Option<Vec<(InstanceId, u32)>>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -185,6 +189,11 @@ impl GatewayConfig {
         .await?;
         let server = if let Some(fleet) = self.expertise_fleet {
             server.enable_expertise(&fleet).await?
+        } else {
+            server
+        };
+        let server = if let Some(fleet) = self.addressed_expertise_fleet {
+            server.enable_addressed_expertise(&fleet).await?
         } else {
             server
         };

@@ -10,12 +10,14 @@ GRANT SELECT, INSERT, UPDATE ON
     federation_security, federation_audit, federation_retention_decisions
 TO gateway_runtime;
 GRANT SELECT, INSERT, UPDATE ON federation_expertise_mailbox,
-    federation_expertise_daily_budget, federation_expertise_deliveries TO gateway_runtime;
+    federation_expertise_daily_budget, federation_expertise_deliveries,
+    federation_expertise_addressed TO gateway_runtime;
 GRANT SELECT, INSERT ON federation_expertise_attempts TO gateway_runtime;
 -- Only the private, expiring mailbox and its metadata journal may be purged.
 -- Publication history and independent audit receipts remain append-only.
 GRANT DELETE ON federation_expertise_mailbox, federation_expertise_attempts
 TO gateway_runtime;
-GRANT DELETE ON federation_expertise_deliveries TO gateway_runtime;
+GRANT DELETE ON federation_expertise_deliveries,
+    federation_expertise_addressed TO gateway_runtime;
 -- No TRUNCATE, schema modification, app tables, source captures, local
 -- principals, collection snapshots/grants, inboxes or other privileges.

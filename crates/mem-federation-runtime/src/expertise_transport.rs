@@ -5,8 +5,8 @@ use crate::{GatewayClient, Result, RuntimeError};
 use chrono::{DateTime, Utc};
 use mem_federation::{CanonicalJsonCodec, ContentDigest, expertise::*, publication::*};
 use mem_federation_store::{
-    AddressedDelivery, AddressedReceipt, AddressedStatus, AnswerDeliveryAuthorization,
-    AnswerDeliveryLease, QuestionLease, QuestionResult,
+    AddressedDelivery, AddressedQuestionLease, AddressedReceipt, AddressedStatus,
+    AnswerDeliveryAuthorization, AnswerDeliveryLease, QuestionLease, QuestionResult,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -23,7 +23,9 @@ pub enum ExpertiseOperation {
     },
     AddressedSubmit {
         record: AddressedExpertiseRecord,
+        answer_claim: Option<Uuid>,
     },
+    AddressedClaim,
     AddressedRead {
         request_id: Uuid,
         kind: String,
@@ -59,6 +61,7 @@ impl ExpertiseOperation {
             Self::Discover { .. } => "memory-expertise-discover-v1",
             Self::Submit { .. } => "memory-expertise-submit-v1",
             Self::AddressedSubmit { .. } => "memory-addressed-submit-v1",
+            Self::AddressedClaim => "memory-addressed-claim-v1",
             Self::AddressedRead { .. } => "memory-addressed-read-v1",
             Self::AddressedInbox { .. } => "memory-addressed-inbox-v1",
             Self::Result { .. } => "memory-expertise-result-v1",
@@ -96,7 +99,8 @@ pub enum ExpertiseReply {
     Capabilities(Vec<CapabilityAdvertisement>),
     Question(Box<QuestionResult>),
     AddressedReceipt(AddressedReceipt),
-    AddressedDelivery(Box<AddressedDelivery>),
+    AddressedLease(Option<Box<AddressedQuestionLease>>),
+    AddressedDelivery(Option<Box<AddressedDelivery>>),
     AddressedInbox(Vec<AddressedDelivery>),
     Lease(Option<Box<QuestionLease>>),
     DeliveryLease(Option<Box<AnswerDeliveryLease>>),
@@ -182,7 +186,7 @@ impl GatewayClient {
                 validate_result(result, instance, self.space)?;
             }
             (
-                ExpertiseOperation::AddressedSubmit { record },
+                ExpertiseOperation::AddressedSubmit { record, .. },
                 ExpertiseReply::AddressedReceipt(receipt),
             ) => {
                 if record.space != self.space
@@ -196,16 +200,30 @@ impl GatewayClient {
                     return Err(RuntimeError::InvalidResponse);
                 }
             }
+            (ExpertiseOperation::AddressedClaim, ExpertiseReply::AddressedLease(lease)) => {
+                if lease.as_ref().is_some_and(|lease| {
+                    lease.lease_token.is_nil()
+                        || lease.lease_until <= Utc::now()
+                        || lease.record.recipient != instance
+                        || lease.record.space != self.space
+                        || !matches!(lease.record.payload, AddressedExpertisePayload::Question(_))
+                        || lease.record.validate().is_err()
+                }) {
+                    return Err(RuntimeError::InvalidResponse);
+                }
+            }
             (
                 ExpertiseOperation::AddressedRead { request_id, kind },
                 ExpertiseReply::AddressedDelivery(delivery),
             ) => {
-                if delivery.receipt.request_id != *request_id
-                    || delivery.receipt.kind != *kind
-                    || delivery.receipt.space != self.space
-                    || !valid_addressed_delivery(delivery, instance)?
-                {
-                    return Err(RuntimeError::InvalidResponse);
+                if let Some(delivery) = delivery {
+                    if delivery.receipt.request_id != *request_id
+                        || delivery.receipt.kind != *kind
+                        || delivery.receipt.space != self.space
+                        || !valid_addressed_delivery(delivery, instance)?
+                    {
+                        return Err(RuntimeError::InvalidResponse);
+                    }
                 }
             }
             (

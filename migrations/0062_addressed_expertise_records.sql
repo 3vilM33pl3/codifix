@@ -16,6 +16,8 @@ CREATE TABLE federation_expertise_addressed (
     metadata_until TIMESTAMPTZ NOT NULL,
     lease_token UUID,
     lease_until TIMESTAMPTZ,
+    answer_lease_token UUID,
+    answer_lease_until TIMESTAMPTZ,
     attempts SMALLINT NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
     next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     last_error TEXT,
@@ -24,6 +26,7 @@ CREATE TABLE federation_expertise_addressed (
     CHECK (sender <> recipient AND request_id <> '00000000-0000-0000-0000-000000000000'::uuid),
     CHECK (expires_at > created_at AND payload_until > expires_at AND metadata_until > payload_until),
     CHECK ((lease_token IS NULL) = (lease_until IS NULL)),
+    CHECK ((answer_lease_token IS NULL) = (answer_lease_until IS NULL)),
     CHECK (record IS NULL OR octet_length(record::text) <= 65536),
     CHECK (status <> 'published' OR proof IS NOT NULL)
 );
