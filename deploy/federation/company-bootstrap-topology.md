@@ -51,7 +51,7 @@ The inspected pinned `@atproto/pds` **0.5.27** derives its public service URL as
 `https://${PDS_HOSTNAME}` outside localhost. There is no `PDS_PUBLIC_URL` override
 in that configuration path. Consequently this optional overlay changes the
 publisher TLS listener from 8443 to **443** and returns the publisher origin
-`https://pds.<company-domain>`. It retains the same three publisher routes,
+`https://pds.<company-domain>`. It retains the same four publisher routes,
 networks, image and credential scope. The base generator still returns 8443.
 
 Source evidence: the official [0.5.27 package metadata](https://registry.npmjs.org/@atproto/pds/0.5.27)

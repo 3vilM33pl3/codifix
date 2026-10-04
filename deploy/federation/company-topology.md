@@ -31,8 +31,10 @@ The member apps cannot directly reach raw PDS, the gateway process, its database
 or another member's database. The TLS gateway edge allows only `/v1/accept`,
 `/v1/pull`, `/v1/retention` and `/v1/status`; `/v1/expertise` needs an explicit option. Status is authenticated, current-membership checked and signed, not a public health endpoint. It never
 forwards arbitrary URLs, raw repository requests, CAR downloads or event streams.
-The PDS proxy allows only the three XRPC operations currently used by the
-publisher: `createRecord`, `getRecord` and `getRepo`.
+The PDS proxy allows only the four XRPC operations used by the publisher:
+`createRecord`, `getRecord`, `deleteRecord` and `getRepo`. The delete route is
+for expired, exact-CID addressed expertise records; shared publication records
+remain append-only and are never deleted by this worker.
 
 The host, Docker administrators and the scoped proxy/gateway processes remain
 trusted. A network diagram is not a firewall or confidentiality proof. Negative

@@ -145,7 +145,7 @@ export function companyTopology(input) {
     volumes: gatewayMounts, networks: ['gateway_api', 'gateway_database', 'pds_client'] };
   database('gateway_db', 'gateway_database', 'gateway/database', 'memory_gateway');
   proxy('gateway_edge', 'gateway/tls', `gateway.${input.domain}`, 'gateway:4055', ['/v1/accept', '/v1/pull', '/v1/retention', '/v1/status', ...(expertiseRoutes ? ['/v1/expertise'] : [])], edgeNetworks);
-  proxy('pds_tls', 'pds/tls', `pds.${input.domain}`, 'pds:2583', ['/xrpc/com.atproto.repo.createRecord', '/xrpc/com.atproto.repo.getRecord', '/xrpc/com.atproto.sync.getRepo'],
+  proxy('pds_tls', 'pds/tls', `pds.${input.domain}`, 'pds:2583', ['/xrpc/com.atproto.repo.createRecord', '/xrpc/com.atproto.repo.getRecord', '/xrpc/com.atproto.repo.deleteRecord', '/xrpc/com.atproto.sync.getRepo'],
     { pds_client: { aliases: [`pds.${input.domain}`] }, pds_repository: {} });
   compose.volumes.pds_data = {};
   const pdsEnv = `${root}/pds/pds.env`;
