@@ -15,8 +15,12 @@ The approved [execution contract](execution.md) is the completion checklist.
 - PDS/Atrium baselines remain in `fixtures/federation/upstream-lock.json`.
 - Pi remains v0.5.1 at `7c018475d54d4e09c907691e47a520f1f09e3288`
   with the existing no-tools correction. Windows patches must be recorded separately.
-- Host has QEMU/libvirt/OVMF/swtpm. `kvm_amd` is available but not loaded;
-  `/dev/kvm` is absent. Temporary sudo must be restored for the VM host operation.
+- Host has QEMU/libvirt/OVMF/swtpm. Initial sudo expiry was resolved. Loading
+  `kvm_amd` then failed twice with `Operation not supported`; kernel messages
+  report `SVM not supported by CPU 4` and `CPU 8`. All 32 CPU flag lists omit
+  `svm`. Board: ASUS TUF GAMING X570-PLUS, CPU: AMD Ryzen 9 5950X.
+  Firmware SVM/AMD-V must be enabled and verified after an operator-managed
+  reboot. Existing services have not been stopped; no fallback emulation used.
 - Existing Microsoft consumer ISO SHA-256 matches Microsoft's download table:
   `66b7b4b71763ed6f9b2ce29326ed9284544da6f5283d00329921540c01aaaeea`.
   A consumer licence has not been established, so use Enterprise evaluation media.
@@ -68,3 +72,41 @@ Keep `execution.md` unchecked until its entire requirement has observed evidence
 Separate host-script unit tests, cross-target compilation, native VM tests and
 clean-install release acceptance. Never label a blocked or unexecuted feature as
 working. Signing/public publication and real-data activation remain separate.
+
+## Foundation slice evidence — 2026-10-04
+
+- VM assets created at `/data/VMs/memory-windows-native/lab`: private SSH/seed,
+  200 GiB thin qcow2, UEFI variables and TPM state, configured 8 CPUs/16 GiB.
+  **The VM has not booted.** Guest bootstrap and native dependencies remain pending.
+- Enterprise evaluation media fetched from Microsoft's evaluation download link
+  over verified HTTPS, SHA-256
+  `bc3f24086ebadc94489066b5ad78089e2cf5c3491e90e790bb81a2b199c10e38`.
+  Actual guest edition/build and licence expiry must be recorded after install.
+- VirtIO media fetched from Fedora's stable official distribution, SHA-256
+  `303f7ae40dad495d6ae474fdc571df58958a4dbc5c37a522d80f9a203867949d`.
+  Guest bootstrap uses signed Windows 11 network/serial drivers and QEMU guest agent.
+- `python3 -m unittest discover -s scripts/windows -p 'test_*.py'`: three
+  host-only tests passed, including synthetic interrupted cold-restore recovery
+  retaining the prior disk/TPM state. This is **not** database recovery evidence.
+- New `mem-platform-files` is a narrow filesystem-only crate, re-exported by
+  `mem-platform`; import/gateway operators share it without depending on broad
+  platform service management. Unix protected reads remain unchanged.
+- Windows implementation checks ACLs/current identity, pins ancestors and exact
+  input handles, rejects public access/reparse points/hard links/ADS/reserved names,
+  and supplies private creation plus write-through same-directory replacement.
+  Wired into area-operator reads, enrollment reads and platform journals.
+- Windows tests cover publication, limits, hard links, junctions, public ACLs and
+  denied replacement/writes during reads. **Cross-compiled, not yet executed.**
+- `cargo clippy -p mem-platform-files -p mem-platform --all-targets
+  --target x86_64-pc-windows-gnu --locked -- -D warnings`: passed. This proves
+  Windows code type-checking only, not MSVC/native execution.
+- Linux `cargo test -p mem-platform-files -p mem-platform --locked`: seven
+  platform tests passed (Windows-only tests are absent on Linux).
+- Linux `cargo test -p mem-area-ops -p mem-federation-runtime --lib --locked`:
+  test binaries reported five and 25 passes. No required-database environment was
+  supplied, so conditional SQL tests do not constitute database acceptance.
+- Added hosted Windows platform smoke workflow and shared PowerShell runner.
+  No remote workflow has been dispatched; it is not evidence of a passing job.
+
+No Windows candidate, full application port, AppContainer sandbox, native PDS
+pipe, PostgreSQL/Pi proof or clean-install acceptance is claimed by this slice.

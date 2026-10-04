@@ -1,0 +1,31 @@
+name: Native Windows platform smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/mem-platform/**'
+      - 'crates/mem-platform-files/**'
+      - 'packaging/windows/check-platform.ps1'
+      - '.github/workflows/windows-native.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  platform:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Native protected files, journals and platform smoke
+        shell: pwsh
+        run: ./packaging/windows/check-platform.ps1
+
+# Complete required-database, PDS, Pi/AppContainer and installer acceptance runs
+# remain on the disposable VM. This job is not a native-release certification.
