@@ -287,6 +287,36 @@ The dedicated gateway JSON accepts an optional `expertise_fleet` array of
 `["INSTANCE-UUID", 3]` pairs for every enrolled credential, including authority.
 It validates fleet/history compatibility before enabling expertise; absence
 keeps expertise disabled. It does not grant membership or collection access.
+
+### Watched-agent addressed questions
+
+Addressed ATProto questions are a separate opt-in from the human F1 mailbox.
+The gateway requires both the complete `expertise_fleet` above and a complete
+`addressed_expertise_fleet` containing `["INSTANCE-UUID", 1]` for **every**
+configured credential, including the authority. The `1` is the addressed-record
+schema, not the publication schema. Enable this only after all participants and
+the private PDS proxy have been upgraded; an omitted or partial fleet fails
+closed. The proxy must allow the gateway's fenced `deleteRecord` request so
+expired addressed records can be removed after verified signed-key absence.
+Participants still receive no PDS credentials or raw repository access.
+
+For each watched Codex or Claude installation, create a separate project-scoped
+service token and bind its exact principal and token **IDs** in the owning
+instance's `expertise_callers`. Set a fixed non-local
+`output_destination` (for example `codex_openai` or `claude_anthropic`) and an
+`agent_ask` object containing a positive `revision`, `daily_limit` of 1–20 and
+an `allowed_capabilities` list of exact publisher/collection record keys. A
+binding is not collection consent: the reviewed collection must separately
+allow that requester instance and output destination, and current memberships
+must include the expertise capabilities. Use distinct tokens/destinations for
+Codex and Claude; never bind an assistant to `local_human`.
+
+The bundled `memory-federation-expertise` skill teaches watched agents to
+discover, submit one bounded question and read its cited result. Installing the
+skill does not enable the service, expand collection consent or permit a paid
+model call. Agent answers are deterministic only. The gateway stores private
+addressed bodies for at most 24 hours of participant access; a hold may retain
+bytes for audit, and backups or previously delivered copies cannot be recalled.
 For an approved TLS installation, expose only the exact `/v1/expertise` path
 through the fixed-upstream gateway edge in addition to the existing routes;
 never expose the PDS, raw repository or database interfaces. Customer release
