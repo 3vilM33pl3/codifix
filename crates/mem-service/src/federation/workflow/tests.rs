@@ -383,7 +383,11 @@ impl Fixture {
         let security = GatewaySecurity::initial(
             &[3; 32],
             mem_federation_store::SpacePolicy {
-                external_models: ["synthetic_cloud".into()].into_iter().collect(),
+                external_models: if expertise_browser {
+                    ["synthetic_cloud".into()].into_iter().collect()
+                } else {
+                    Default::default()
+                },
             },
         )
         .unwrap();
