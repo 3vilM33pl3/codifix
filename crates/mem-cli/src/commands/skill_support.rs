@@ -29,6 +29,7 @@ pub(crate) const MEMORY_SKILL_NAMES: &[&str] = &[
     "memory-plan-execution",
     "memory-direct-task-start",
     "memory-remember",
+    "memory-federation-expertise",
 ];
 
 const GITHUB_SKILL_TEMPLATE_ARCHIVE_URL: &str =

@@ -13,6 +13,7 @@ The focused skills that sit beside it are:
 - `.agents/skills/memory-plan-execution/SKILL.md`
 - `.agents/skills/memory-direct-task-start/SKILL.md`
 - `.agents/skills/memory-remember/SKILL.md`
+- `.agents/skills/memory-federation-expertise/SKILL.md`
 
 Use this page to understand how the bundle is intended to behave without reading every raw skill file line by line.
 

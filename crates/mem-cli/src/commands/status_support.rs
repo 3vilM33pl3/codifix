@@ -2022,9 +2022,8 @@ pub(crate) fn repair_repo_bootstrap(repo_root: &Path, project: &str) -> Result<(
         .context("write .agents/memory-layer.toml")?;
     }
     if missing_memory_skill_dirs(&skill_root).next().is_some() {
-        let skill_template_dir = download_github_skill_template()
-            .ok()
-            .or_else(discover_skill_template_dir)
+        let skill_template_dir = discover_skill_template_dir()
+            .or_else(|| download_github_skill_template().ok())
             .ok_or_else(|| {
                 anyhow::anyhow!("could not locate packaged memory-layer skill template")
             })?;

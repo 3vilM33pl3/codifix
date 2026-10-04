@@ -41,6 +41,9 @@ Prefer the focused skills when the task is clearly one of these:
 - `memory-remember`
   - remember meaningful completed work after the task is done
   - remember distilled code or codebase explanations after answering explanation requests
+- `memory-federation-expertise`
+  - discover other areas' reviewed capabilities and ask bounded, cited questions
+  - use only the operator-bound agent path, never impersonate human confirmation
 
 Use this umbrella skill when the turn is mixed, ambiguous, or about the Memory Layer workflow itself.
 
