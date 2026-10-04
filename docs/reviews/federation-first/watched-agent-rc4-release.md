@@ -94,6 +94,14 @@ the new watched-agent skill appeared with the packaged hash in the Homelab,
 sctp and dish2-tools repositories. Already-running desktop MCP processes may
 still map the old rc.3 inode until their client reconnects.
 
+Claude Code does not use the watcher's `.agents/skills` directory as its
+personal skill directory. The Monolith operator's
+`~/.claude/skills/memory-federation-expertise` now links to the immutable
+rc.4 package copy, whose `SKILL.md` hash matches the repository template
+(`977f21a68ca085c024ad25c6f5b2cb89cedf45f0bb326577d58ead5fe9a818bc`).
+The link resolves and Claude Code 2.1.258 recognizes its `skills` facility;
+actual skill invocation in a fresh Claude session has not been observed.
+
 The private PDS TLS proxy now permits the gateway's exact
 `com.atproto.repo.deleteRecord` path alongside its previous create/get/repo
 paths. Its Caddy configuration validated and the scoped proxy restarted. A
