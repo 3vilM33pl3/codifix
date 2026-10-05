@@ -11,11 +11,13 @@ Memory Layer now supports a native macOS service model:
 - Shared config: `~/Library/Application Support/memory-layer/memory-layer.toml`
 - Shared env: `~/Library/Application Support/memory-layer/memory-layer.env`
 - LaunchAgents: `~/Library/LaunchAgents/`
-- Logs: `~/Library/Application Support/memory-layer/logs/`
+- Logs: `~/Library/Application Support/memory-layer/log/`
 
 ## Native .pkg installer
 
-Build a standalone macOS `.pkg` from the repo root:
+Build a standalone macOS `.pkg` from the repo root on Darwin. Install Cargo,
+Node/npm and Apple's `pkgbuild` tools first; this script does not install build
+dependencies. The selected Rust target must match the package architecture:
 
 ```bash
 ./packaging/build-pkg.sh                          # unsigned, native architecture
@@ -30,7 +32,28 @@ Build a standalone macOS `.pkg` from the repo root:
   --notarize --notary-profile "memory-notary"
 ```
 
-The `.pkg` installs to `/usr/local/` and seeds `~/Library/Application Support/memory-layer/` on first run.
+The build uses `cargo --locked` and a private temporary staging directory,
+cleaned on exit. It never clears `target/macos-pkg`. Completions execute the
+selected binary during staging, so the build host must be able to run that
+architecture (a target installed in Rust alone is insufficient).
+
+The `.pkg` installs to `/usr/local/`. Post-installation starts or restarts **no
+services**. When a non-root console user and their existing Application Support
+directory can be verified, defaults are seeded as that user: only a missing
+Memory directory, `log/`, `run/`, config and env file are created. Existing
+configuration, secrets, assets, settings, ownership and permissions are retained,
+including read-only files and symlinked/relocated paths. If no suitable user or
+writable directory exists, per-user seeding is skipped; there is no root-home
+fallback or recursive ownership change.
+
+Exact project-scoped Codex templates are installed read-only at:
+
+- `/usr/local/share/memory-layer/onboarding/.codex/config.toml`
+- `/usr/local/share/memory-layer/onboarding/.codex/agents/astra_adviser.toml`
+
+They are packaged references, not activated global user settings. Installation
+does not overwrite `~/.codex/`, deploy project templates, clone repositories or
+grant company access.
 
 Outputs:
 
@@ -94,7 +117,7 @@ Release tags publish `memory-<version>.tar.gz` as the Homebrew source archive.
 Refresh `Formula/memory-layer.rb` only after that archive exists on the GitHub
 release and its SHA256 has been verified.
 
-After install:
+For optional legacy local setup after installation, run these explicitly:
 
 ```bash
 memory wizard
@@ -103,6 +126,28 @@ memory watcher enable --project <slug>
 ```
 
 `memory service enable` provisions the shared service API token automatically if it is missing or still set to the development placeholder.
+
+This legacy wizard is not the company onboarding installer journey. Company
+device login (`memory auth login --company https://<company-origin>`) and browser
+approval are separate foundations; native macOS Keychain/installer acceptance
+remains unverified. Reviewed project inventory does not clone repositories,
+activate named services, deliver offline data or perform selective sync. No
+complete Mac/company onboarding or public release is implied by these scripts.
+
+## Offline packaging contract checks
+
+These tests use synthetic users, build tools and payloads, without building a
+native package, signing, notarizing, installing dependencies or changing services:
+
+```bash
+for script in packaging/build-pkg.sh packaging/macos/postinstall.sh packaging/macos/seed-user.sh; do
+  bash -n "$script" || exit 1
+done
+python3 packaging/macos/tests/test_package_contract.py
+```
+
+Actual `.pkg` installation/upgrade, signing, launchd behavior and native Keychain
+operation still require a separate macOS acceptance run.
 
 ## Service labels
 

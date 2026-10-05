@@ -40,6 +40,14 @@ PKG_ARCH=""
 RUST_TARGET=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --arch|--target|--sign|--sign-app|--sign-pkg|--notary-profile|--apple-id|--team-id|--apple-password)
+      if [[ $# -lt 2 || -z "$2" || "$2" == --* ]]; then
+        echo "Option $1 requires a value." >&2
+        exit 1
+      fi
+      ;;
+  esac
+  case "$1" in
     --arch)
       PKG_ARCH="$2"
       shift 2
@@ -101,11 +109,11 @@ fi
 
 case "$PKG_ARCH" in
   x86_64)
-    RUST_TARGET="${RUST_TARGET:-x86_64-apple-darwin}"
+    EXPECTED_TARGET="x86_64-apple-darwin"
     ;;
   arm64|aarch64)
     PKG_ARCH="aarch64"
-    RUST_TARGET="${RUST_TARGET:-aarch64-apple-darwin}"
+    EXPECTED_TARGET="aarch64-apple-darwin"
     ;;
   *)
     echo "Unsupported macOS package architecture: $PKG_ARCH" >&2
@@ -113,6 +121,11 @@ case "$PKG_ARCH" in
     exit 1
     ;;
 esac
+RUST_TARGET="${RUST_TARGET:-$EXPECTED_TARGET}"
+if [[ "$RUST_TARGET" != "$EXPECTED_TARGET" ]]; then
+  echo "Package architecture $PKG_ARCH requires --target $EXPECTED_TARGET; got $RUST_TARGET." >&2
+  exit 1
+fi
 
 if [[ "$NOTARIZE" -eq 1 && -z "$PKG_SIGN_IDENTITY" ]]; then
   echo "Notarization requires a signed installer. Pass --sign-pkg." >&2
@@ -126,17 +139,62 @@ if [[ "$NOTARIZE" -eq 1 && -z "$NOTARY_PROFILE" ]]; then
   fi
 fi
 
-STAGE_DIR="$ROOT_DIR/target/macos-pkg"
+# Fail before staging or builds. This script is not a Linux package cross-builder.
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "Building a macOS .pkg requires Darwin and Apple's packaging tools." >&2
+  exit 1
+fi
+REQUIRED_TOOLS=(cargo npm pkgbuild mktemp install cp ln find chmod mkdir rm awk du cut)
+if [[ -n "$APP_SIGN_IDENTITY" ]]; then REQUIRED_TOOLS+=(codesign); fi
+if [[ "$NOTARIZE" -eq 1 ]]; then REQUIRED_TOOLS+=(xcrun); fi
+for tool in "${REQUIRED_TOOLS[@]}"; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "Required macOS package build tool unavailable: $tool" >&2
+    exit 1
+  fi
+done
+if [[ "$NOTARIZE" -eq 1 ]]; then
+  for apple_tool in notarytool stapler; do
+    if ! xcrun --find "$apple_tool" >/dev/null 2>&1; then
+      echo "Required Apple package tool unavailable: $apple_tool" >&2
+      exit 1
+    fi
+  done
+fi
+for source in "$ROOT_DIR/.codex/config.toml" "$ROOT_DIR/.codex/agents/astra_adviser.toml" \
+  "$ROOT_DIR/packaging/macos/postinstall.sh" "$ROOT_DIR/packaging/macos/seed-user.sh"; do
+  if [[ ! -f "$source" ]]; then
+    echo "Required package input unavailable: $source" >&2
+    exit 1
+  fi
+done
+
+STAGE_PARENT="${TMPDIR:-/tmp}"
+if [[ "$STAGE_PARENT" != /* || ! -d "$STAGE_PARENT" ]]; then
+  echo "Temporary staging parent must be an existing absolute directory." >&2
+  exit 1
+fi
+STAGE_DIR="$(mktemp -d "${STAGE_PARENT%/}/memory-layer-macos-pkg.XXXXXXXX")"
+# Only clean the private directory returned by mktemp, never a workspace stage.
+case "$STAGE_DIR" in
+  /*/memory-layer-macos-pkg.????????) ;;
+  *) echo "Unexpected temporary staging path; refusing cleanup." >&2; exit 1 ;;
+esac
+cleanup() {
+  if [[ -d "$STAGE_DIR" && ! -L "$STAGE_DIR" ]]; then rm -rf -- "$STAGE_DIR"; fi
+}
+trap cleanup EXIT
 PAYLOAD="$STAGE_DIR/payload"
 SCRIPTS="$STAGE_DIR/scripts"
 PKG_PATH="$ROOT_DIR/target/memory-layer-${VERSION}-macos-${PKG_ARCH}.pkg"
 BINARY_PATH="$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory"
 
-rm -rf "$STAGE_DIR"
 mkdir -p \
+  "$ROOT_DIR/target" \
   "$PAYLOAD/usr/local/bin" \
   "$PAYLOAD/usr/local/share/memory-layer/skill-template" \
   "$PAYLOAD/usr/local/share/memory-layer/web" \
+  "$PAYLOAD/usr/local/share/memory-layer/onboarding/.codex/agents" \
   "$PAYLOAD/usr/local/share/bash-completion/completions" \
   "$PAYLOAD/usr/local/share/zsh/site-functions" \
   "$PAYLOAD/usr/local/share/fish/vendor_completions.d" \
@@ -144,7 +202,7 @@ mkdir -p \
 
 # --- Build -----------------------------------------------------------------
 echo "Building release binary for $PKG_ARCH ($RUST_TARGET)..."
-cargo build --release --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory --target "$RUST_TARGET"
+cargo build --locked --release --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory --target "$RUST_TARGET"
 
 echo "Building web UI..."
 npm --prefix "$ROOT_DIR/web" ci
@@ -171,64 +229,12 @@ find "$PAYLOAD/usr/local/share/memory-layer/skill-template" -type f -name '*.sh'
 install -m 0644 "$ROOT_DIR/memory-layer.toml.example" "$PAYLOAD/usr/local/share/memory-layer/memory-layer.toml.example"
 install -m 0644 "$ROOT_DIR/README.md" "$PAYLOAD/usr/local/share/memory-layer/README.md"
 cp -R "$ROOT_DIR/web/dist/." "$PAYLOAD/usr/local/share/memory-layer/web/"
+install -m 0444 "$ROOT_DIR/.codex/config.toml" "$PAYLOAD/usr/local/share/memory-layer/onboarding/.codex/config.toml"
+install -m 0444 "$ROOT_DIR/.codex/agents/astra_adviser.toml" "$PAYLOAD/usr/local/share/memory-layer/onboarding/.codex/agents/astra_adviser.toml"
 
 # --- Post-install script ----------------------------------------------------
-cat > "$SCRIPTS/postinstall" << 'POSTINSTALL'
-#!/usr/bin/env bash
-# Ensure the shared Application Support directory exists for the logged-in user,
-# not root, because Installer postinstall runs as root.
-CONSOLE_USER="$(stat -f %Su /dev/console 2>/dev/null || true)"
-if [[ -z "$CONSOLE_USER" || "$CONSOLE_USER" == "root" ]]; then
-  CONSOLE_USER="${SUDO_USER:-}"
-fi
-if [[ -n "$CONSOLE_USER" ]]; then
-  CONSOLE_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
-fi
-if [[ -z "${CONSOLE_HOME:-}" ]]; then
-  CONSOLE_HOME="/var/root"
-fi
-
-APP_SUPPORT="$CONSOLE_HOME/Library/Application Support/memory-layer"
-mkdir -p "$APP_SUPPORT/log" "$APP_SUPPORT/run"
-
-SHARE="/usr/local/share/memory-layer"
-if [[ ! -f "$APP_SUPPORT/memory-layer.toml" && -f "$SHARE/memory-layer.toml.example" ]]; then
-  cp "$SHARE/memory-layer.toml.example" "$APP_SUPPORT/memory-layer.toml"
-  echo "Installed example config to $APP_SUPPORT/memory-layer.toml"
-fi
-
-if [[ ! -f "$APP_SUPPORT/memory-layer.env" ]]; then
-  cat > "$APP_SUPPORT/memory-layer.env" <<'EOF'
-# Shared secrets and overrides for Memory Layer CLI and background services.
-# The service API token is provisioned automatically during setup.
-# Example:
-# OPENAI_API_KEY=replace-me
-EOF
-  chmod 600 "$APP_SUPPORT/memory-layer.env"
-  echo "Installed shared environment file at $APP_SUPPORT/memory-layer.env"
-fi
-
-if [[ -n "$CONSOLE_USER" && "$CONSOLE_USER" != "root" ]]; then
-  chown -R "$CONSOLE_USER":staff "$APP_SUPPORT" || true
-fi
-
-if command -v /usr/local/bin/memory >/dev/null 2>&1; then
-  if [[ -n "$CONSOLE_USER" && "$CONSOLE_USER" != "root" ]]; then
-    CONSOLE_UID="$(id -u "$CONSOLE_USER" 2>/dev/null || true)"
-    if [[ -n "$CONSOLE_UID" ]]; then
-      launchctl asuser "$CONSOLE_UID" sudo -u "$CONSOLE_USER" /usr/local/bin/memory service restart-all --mark-tui-restart --json || true
-    fi
-  else
-    /usr/local/bin/memory service restart-all --mark-tui-restart --json || true
-  fi
-fi
-
-echo ""
-echo "Memory Layer $PACKAGE_VERSION installed. Get started:"
-echo "  memory wizard --global"
-echo "  memory service enable"
-POSTINSTALL
-chmod 0755 "$SCRIPTS/postinstall"
+install -m 0755 "$ROOT_DIR/packaging/macos/postinstall.sh" "$SCRIPTS/postinstall"
+install -m 0755 "$ROOT_DIR/packaging/macos/seed-user.sh" "$SCRIPTS/seed-user.sh"
 
 # --- Build .pkg -------------------------------------------------------------
 echo "Assembling .pkg..."
