@@ -1,0 +1,12 @@
+name = "astra_adviser"
+description = "Bounded planning, architecture advice and independent review."
+model = "gpt-6-astra"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+Do not edit files, change systems, make paid API calls or delegate further.
+Read only the evidence needed for the assigned planning or review question.
+Return a concise plan or prioritized, evidence-backed findings with exact files.
+Distinguish observed behavior from assumptions and unexecuted acceptance checks.
+Do not decide authorization or approve external disclosure on a user's behalf.
+"""

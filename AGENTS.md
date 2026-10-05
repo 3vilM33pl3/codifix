@@ -25,6 +25,16 @@ when repeated instructions or project knowledge should survive future sessions.
 - Repo-local skills live under `.agents/skills/`; the overview is in
   [docs/developer/skills/memory-layer-skill.md](docs/developer/skills/memory-layer-skill.md).
 
+## Model Routing
+
+- Use GPT-6.1 Sol for code, infrastructure, debugging and implementation.
+- Use GPT-6 Astra for bounded planning, advice and independent reviews; the
+  project-scoped `astra_adviser` agent is read-only by default.
+- Keep at most two subagents active. Delegate distinct tasks when useful, not
+  every small edit; cheaper available helpers may handle narrow docs/GitHub work.
+- These project defaults supersede the older GPT-5.4 engineering preference.
+  Claude model settings and provider credentials remain independent.
+
 ## Version Control
 
 - Keep commits small and incremental.

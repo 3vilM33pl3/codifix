@@ -1,0 +1,8 @@
+# Project defaults. Do not change global credentials or Claude model settings.
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+
+[agents]
+max_concurrent_threads_per_session = 2
+default_subagent_model = "gpt-6.1-sol"
+default_subagent_reasoning_effort = "medium"
