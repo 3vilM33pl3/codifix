@@ -214,6 +214,7 @@ impl AppConfig {
         config.resolved_config_path = resolved_config_path;
         config.resolved_dev_overlay_path = resolved_dev_overlay_path;
         config.apply_runtime_defaults();
+        config.auth.validate_company_delegations()?;
         if let Some(area) = &config.area {
             area.validate()?;
             config.automation.area = Some(area.clone());

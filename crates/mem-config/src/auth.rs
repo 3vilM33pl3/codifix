@@ -164,6 +164,57 @@ impl Default for AuthConfig {
     }
 }
 
+impl AuthConfig {
+    /// Fail closed before operator provisioning; these are exact stable
+    /// identities, never role presets, email aliases or automatic enrollment.
+    pub fn validate_company_delegations(&self) -> Result<(), ConfigError> {
+        let fail = || {
+            ConfigError::Message("company delegates require unique exact identities, shared HTTPS OIDC namespace and bounded non-Trust project ceilings".into())
+        };
+        if self.company_delegations.len() > 64 {
+            return Err(fail());
+        }
+        let mut companies = std::collections::BTreeSet::new();
+        let mut principals = std::collections::BTreeSet::new();
+        let mut tokens = std::collections::BTreeSet::new();
+        for cfg in &self.company_delegations {
+            if cfg.company_id.is_nil()
+                || cfg.principal_id.is_nil()
+                || cfg.token_id.is_nil()
+                || cfg.principal_id == cfg.token_id
+                || cfg.policy_revision < 1
+                || cfg.issuer != self.oidc.issuer_url
+                || cfg.issuer.ends_with('/')
+                || !cfg.issuer.starts_with("https://")
+                || cfg.issuer.len() <= 8
+                || cfg.issuer.len() > 2048
+                || cfg.issuer.chars().any(|c| {
+                    c.is_control() || c.is_whitespace() || matches!(c, '@' | '?' | '#' | '\\')
+                })
+                || !companies.insert(cfg.company_id)
+                || !principals.insert(cfg.principal_id)
+                || !tokens.insert(cfg.token_id)
+                || cfg.projects.is_empty()
+                || cfg.projects.len() > 256
+            {
+                return Err(fail());
+            }
+            let mut projects = std::collections::BTreeSet::new();
+            if cfg.projects.iter().any(|p| {
+                p.project_id.is_nil()
+                    || !projects.insert(p.project_id)
+                    || !matches!(
+                        p.role_ceiling,
+                        AuthRole::Reader | AuthRole::Writer | AuthRole::Operator
+                    )
+            }) {
+                return Err(fail());
+            }
+        }
+        Ok(())
+    }
+}
+
 pub fn default_auth_session_ttl() -> Duration {
     Duration::from_secs(12 * 60 * 60)
 }
@@ -182,4 +233,75 @@ pub fn default_oidc_scopes() -> Vec<String> {
 
 pub fn default_oidc_groups_claim() -> String {
     "groups".to_string()
+}
+
+#[cfg(test)]
+mod company_delegations_tests {
+    use super::*;
+
+    fn configured() -> AuthConfig {
+        let mut auth = AuthConfig::default();
+        auth.oidc.issuer_url = "https://identity.example/application/o/memory".into();
+        auth.company_delegations.push(CompanyDelegationConfig {
+            company_id: Uuid::new_v4(),
+            issuer: auth.oidc.issuer_url.clone(),
+            principal_id: Uuid::new_v4(),
+            token_id: Uuid::new_v4(),
+            policy_revision: 1,
+            projects: vec![CompanyProjectDelegation {
+                project_id: Uuid::new_v4(),
+                role_ceiling: AuthRole::Operator,
+            }],
+        });
+        auth
+    }
+
+    #[test]
+    fn company_delegations_are_opt_in_and_exact() {
+        assert!(AuthConfig::default().validate_company_delegations().is_ok());
+        let auth = configured();
+        assert!(auth.validate_company_delegations().is_ok());
+        for issuer in [
+            "http://identity.example/application/o/memory",
+            "https://identity.example/application/o/memory/",
+            "https://secret@identity.example/application/o/memory",
+            "https://identity.example/application/o/memory?alias=yes",
+            "https://identity.example/application/o/memory#alias",
+            "https://identity.example/application/o/other",
+        ] {
+            let mut changed = auth.clone();
+            changed.company_delegations[0].issuer = issuer.into();
+            assert!(changed.validate_company_delegations().is_err());
+        }
+    }
+
+    #[test]
+    fn company_delegations_reject_duplicate_or_unbounded_authority() {
+        let auth = configured();
+        for change in [
+            (|a: &mut AuthConfig| a.company_delegations[0].company_id = Uuid::nil())
+                as fn(&mut AuthConfig),
+            |a| a.company_delegations[0].token_id = a.company_delegations[0].principal_id,
+            |a| a.company_delegations[0].policy_revision = 0,
+            |a| a.company_delegations[0].projects[0].role_ceiling = AuthRole::Admin,
+            |a| a.company_delegations[0].projects.clear(),
+            |a| {
+                let p = a.company_delegations[0].projects[0].clone();
+                a.company_delegations[0].projects.push(p);
+            },
+            |a| a.company_delegations.push(a.company_delegations[0].clone()),
+        ] {
+            let mut changed = auth.clone();
+            change(&mut changed);
+            assert!(changed.validate_company_delegations().is_err());
+        }
+        let mut excessive = auth;
+        excessive.company_delegations[0].projects = (0..257)
+            .map(|_| CompanyProjectDelegation {
+                project_id: Uuid::new_v4(),
+                role_ceiling: AuthRole::Reader,
+            })
+            .collect();
+        assert!(excessive.validate_company_delegations().is_err());
+    }
 }
