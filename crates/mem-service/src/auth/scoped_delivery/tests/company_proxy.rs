@@ -11,6 +11,7 @@ struct ObservedOwner {
     expected: String,
     seen: Arc<Mutex<Vec<String>>>,
     revoke: Arc<Mutex<Option<(sqlx::PgPool, Uuid)>>>,
+    corrupt: Arc<Mutex<bool>>,
 }
 async fn observe(
     State(observed): State<ObservedOwner>,
@@ -24,7 +25,7 @@ async fn observe(
     );
     assert!(!request.headers().contains_key(header::COOKIE));
     observed.seen.lock().unwrap().push(path.clone());
-    let response = next.run(request).await;
+    let mut response = next.run(request).await;
     if path.ends_with("/snapshot") {
         let hook = observed.revoke.lock().unwrap().take();
         if let Some((pool, human)) = hook {
@@ -33,6 +34,18 @@ async fn observe(
                 .execute(&pool)
                 .await
                 .unwrap();
+        }
+        let corrupt = std::mem::take(&mut *observed.corrupt.lock().unwrap());
+        if corrupt && response.status().is_success() {
+            let (parts, body) = response.into_parts();
+            let mut signed: SignedProjectPage =
+                serde_json::from_slice(&axum::body::to_bytes(body, 4 * 1024 * 1024).await.unwrap())
+                    .unwrap();
+            signed.signature[0] ^= 1;
+            response = Response::from_parts(
+                parts,
+                axum::body::Body::from(serde_json::to_vec(&signed).unwrap()),
+            );
         }
     }
     response
@@ -76,6 +89,7 @@ impl CompanyFixture {
             expected: secret.clone(),
             seen: Default::default(),
             revoke: Default::default(),
+            corrupt: Default::default(),
         };
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
@@ -341,13 +355,22 @@ async fn company_device_rechecks_human_after_owner_bytes_and_rejects_bad_signatu
     let Some(f) = CompanyFixture::new(121).await else {
         return;
     };
-    *f.owner.fake.hook.lock().unwrap() = Some(Hook::ExpirePage);
     let req = || OnboardingProjectSnapshotRequest {
         nonce: Uuid::new_v4(),
         after: 0,
         through: None,
         limit: 32,
     };
+    // Owner verification succeeded; a forged response on the owner→company hop
+    // must still be rejected against the immutable enrolled gateway trust.
+    *f.observed.corrupt.lock().unwrap() = true;
+    assert_eq!(
+        f.http("POST", &f.path("snapshot"), Some(json!(req())))
+            .await
+            .status(),
+        StatusCode::CONFLICT
+    );
+    *f.owner.fake.hook.lock().unwrap() = Some(Hook::ExpirePage);
     assert_ne!(
         f.http("POST", &f.path("snapshot"), Some(json!(req())))
             .await
