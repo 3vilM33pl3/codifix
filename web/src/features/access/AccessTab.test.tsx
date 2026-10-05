@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccessTab } from "./AccessTab";
 import {
@@ -30,6 +30,7 @@ const principal = {
 };
 
 describe("AccessTab", () => {
+  afterEach(cleanup);
   beforeEach(() => {
     vi.mocked(listAuthPrincipals).mockResolvedValue([principal]);
     vi.mocked(listAuthTokens).mockResolvedValue([]);
@@ -61,5 +62,13 @@ describe("AccessTab", () => {
     }));
     expect(await screen.findByText("mlt_one_time_secret")).toBeInTheDocument();
     expect(screen.getByText(/shown once/i)).toBeInTheDocument();
+  });
+
+  it("disables legacy token and membership mutations on a read-only service", async () => {
+    render(<AccessTab project="memory" readOnly />);
+    await screen.findAllByText("Memory Admin");
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "worker" } });
+    expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Grant" })).toBeDisabled();
   });
 });

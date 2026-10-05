@@ -21,9 +21,10 @@ const SERVICE_ROLES: AuthRole[] = ["reader", "writer", "operator"];
 
 interface AccessTabProps {
   project: string;
+  readOnly?: boolean;
 }
 
-export function AccessTab({ project }: AccessTabProps) {
+export function AccessTab({ project, readOnly = false }: AccessTabProps) {
   const [principals, setPrincipals] = useState<AuthPrincipalResponse[]>([]);
   const [tokens, setTokens] = useState<AuthServiceTokenResponse[]>([]);
   const [memberships, setMemberships] = useState<AuthMembershipResponse[]>([]);
@@ -77,7 +78,7 @@ export function AccessTab({ project }: AccessTabProps) {
   }, [membershipRole, selectedMembershipPrincipal?.kind]);
 
   async function createToken() {
-    if (!tokenName.trim() || !tokenProject.trim()) return;
+    if (readOnly || !tokenName.trim() || !tokenProject.trim()) return;
     setBusy(true);
     setError(null);
     try {
@@ -97,7 +98,7 @@ export function AccessTab({ project }: AccessTabProps) {
   }
 
   async function grantMembership() {
-    if (!membershipPrincipal || !membershipProject.trim()) return;
+    if (readOnly || !membershipPrincipal || !membershipProject.trim()) return;
     setBusy(true);
     setError(null);
     try {
@@ -115,6 +116,7 @@ export function AccessTab({ project }: AccessTabProps) {
   }
 
   async function revokeToken(selector: string) {
+    if (readOnly) return;
     setBusy(true);
     try {
       await revokeAuthToken(selector);
@@ -127,6 +129,7 @@ export function AccessTab({ project }: AccessTabProps) {
   }
 
   async function revokeMembership(id: string) {
+    if (readOnly) return;
     setBusy(true);
     try {
       await revokeAuthMembership(id);
@@ -170,7 +173,7 @@ export function AccessTab({ project }: AccessTabProps) {
         <label>Name<input value={tokenName} onChange={(event) => setTokenName(event.target.value)} /></label>
         <label>Project<input value={tokenProject} onChange={(event) => setTokenProject(event.target.value)} /></label>
         <RoleSelect value={tokenRole} roles={SERVICE_ROLES} onChange={setTokenRole} />
-        <button type="button" disabled={busy || !tokenName.trim() || !tokenProject.trim()} onClick={() => void createToken()}>
+        <button type="button" disabled={readOnly || busy || !tokenName.trim() || !tokenProject.trim()} onClick={() => void createToken()}>
           Create
         </button>
       </section>
@@ -192,7 +195,7 @@ export function AccessTab({ project }: AccessTabProps) {
           roles={selectedMembershipPrincipal?.kind === "service_token" ? SERVICE_ROLES : ROLES}
           onChange={setMembershipRole}
         />
-        <button type="button" disabled={busy || !membershipPrincipal || !membershipProject.trim()} onClick={() => void grantMembership()}>
+        <button type="button" disabled={readOnly || busy || !membershipPrincipal || !membershipProject.trim()} onClick={() => void grantMembership()}>
           Grant
         </button>
       </section>
@@ -226,7 +229,7 @@ export function AccessTab({ project }: AccessTabProps) {
                   <td>{token.name}</td><td><code>{token.token_prefix}</code></td>
                   <td>{token.projects.map((entry) => `${entry.project}:${entry.role}`).join(", ")}</td>
                   <td>{formatDate(token.last_used_at)}</td><td>{token.revoked_at ? "revoked" : "active"}</td>
-                  <td><button type="button" disabled={busy || Boolean(token.revoked_at)} onClick={() => void revokeToken(token.id)}>Revoke</button></td>
+                  <td><button type="button" disabled={readOnly || busy || Boolean(token.revoked_at)} onClick={() => void revokeToken(token.id)}>Revoke</button></td>
                 </tr>
               ))}
             </tbody>
@@ -244,7 +247,7 @@ export function AccessTab({ project }: AccessTabProps) {
                 <tr key={membership.id}>
                   <td>{principalNames.get(membership.principal_id) ?? membership.principal_id}</td>
                   <td>{membership.project}</td><td>{membership.role}</td><td>{membership.source}</td>
-                  <td><button type="button" disabled={busy} onClick={() => void revokeMembership(membership.id)}>Revoke</button></td>
+                  <td><button type="button" disabled={readOnly || busy} onClick={() => void revokeMembership(membership.id)}>Revoke</button></td>
                 </tr>
               ))}
             </tbody>

@@ -556,7 +556,7 @@ export default function App() {
         />
       ) : null}
       {tab === "access" && authMe?.principal.global_role === "admin" ? (
-        <AccessTab project={project} />
+        <AccessTab project={project} readOnly={serviceReadOnly} />
       ) : null}
       {tab === "federation" ? <FederationTab project={project} /> : null}
       {tab === "jobs" ? <JobsTab project={project} readOnly={serviceReadOnly} /> : null}
