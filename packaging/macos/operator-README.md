@@ -164,16 +164,75 @@ duplicate. A partial cluster without a valid version/control file is retained
 for manual inspection, never cleared or automatically recreated.
 
 Existing shared Memory services, clusters, config/env files, repositories,
-custom Codex/Claude settings and user installations remain untouched. This step
-does not clone repositories or provision separate Codex/OpenAI and
-Claude/Anthropic agent identities; those identities remain blocked. It does not
-grant company membership or mark the full onboarding plan complete.
+custom Codex/Claude settings and user installations remain untouched. This native
+provisioning step alone does not clone repositories or provision agent identities.
+The joined journey and explicit agent stage below reuse it; neither grants company
+membership or marks the full onboarding plan complete.
+
+## Joined login and workspace journey
+
+`onboard.py journey --input /ABS/PRIVATE/journey-input.json --journal
+/ABS/PRIVATE/journey.json` joins login, project selection, cloning/approved Memory
+skills, public subscription metadata and the native operator. Its schema-v1 input
+contains `company`, `name`, `no_browser`, `allow_loopback_development`, the native
+prerequisites above (without `subscriptions`) and one to eight output slots:
+`projects: [{workspace, journal, subscription_output}]`. Each path is absolute;
+private journals remain outside repository and installation roots. Each selected
+area must be represented by a selected project. This is an operator input, not
+an automatically generated end-user form.
+
+Review each displayed plan, then type `yes` to confirm its exact recorded digest.
+The full digest is still accepted for compatibility; you do not need to retype
+64 characters. The operator retains stable request IDs, subscription IDs and
+effect receipts. Re-run that same command after interruption; it rechecks current
+authority and existing repositories rather than recloning or resetting them.
+Git uses the user's own credentials. No arbitrary repository setup hook executes.
+
+## Separate agent setup
+
+After the native journey finishes:
+
+```bash
+/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+  journey-agents --journal /ABS/PRIVATE/journey.json
+/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+  journey-status --journal /ABS/PRIVATE/journey.json
+```
+
+Prepare opens the company browser with a public approval request. The actual
+owning OIDC human must confirm separate Codex/OpenAI and Claude/Anthropic project
+disclosure grants. If signed out, sign in and import the displayed public JSON
+into Access → Devices → Agent access. Tokens remain in Keychain; the Python
+operator and public approval URL never receive them. The project manifest must
+permit each destination. Only then confirm the generated Memory MCP settings
+changes, which preserve custom agent settings and Claude's independent model.
+
+The bridge provides only exact-project read-only cache status/search. It enables
+no model call, ordinary query, mutation or Trust remote expertise. Reload each
+agent and accept its normal project/MCP trust prompt before use.
+
+Optional `--allow-offline` permits explicitly consented, previously activated,
+unexpired cache disclosure during network disconnection. Known denials stay
+fenced; server errors do not silently enable offline disclosure. Grants expire
+within 24 hours. To replace an expired or denied grant, repeat `journey-agents`
+with `--renew-grant OLD_AGENT_UUID` (and the original offline flag, if selected).
+This retains old history, creates independent new credentials, and requests fresh
+browser consent; no automatic consent extension occurs. Remove expired Memory
+MCP entries manually if desired; they cannot be revived by renewal.
+
+The separate `.agents.json` journal contains public metadata/digests only.
+`journey-status` reports its recorded progress, not current authority. Exact
+replay recovers a lost settings acknowledgement without repeating clones,
+credentials or completed confirmations. Settings changed since review are
+preserved and require a new explicit configuration review.
 
 ## Offline validation only
 
 ```bash
 python3 packaging/macos/tests/test_onboarding_operator.py
 python3 packaging/macos/tests/test_package_contract.py
+python3 packaging/macos/tests/test_onboarding_journey.py
+python3 packaging/macos/tests/test_onboarding_agents.py
 bash -n packaging/build-pkg.sh
 ```
 

@@ -1,15 +1,19 @@
 # Mac project onboarding
 
-This feature is under implementation. Existing macOS packages still use the
-setup wizard; they do not yet provide sign-in/select/clone/offline-sync onboarding.
+This feature is under implementation. The development package now includes a
+resumable sign-in/select/clone/offline-sync operator and a separate Codex/Claude
+setup stage. It still needs reviewed native prerequisites and real-Mac acceptance;
+it is not yet a verified self-contained first-run installer.
 See the [execution contract](../reviews/mac-onboarding/README.md) for completion
 checks. No Mac installation or existing area has been changed by this work.
 
 ## Administration in the development build
 
 The Access page now includes Users, Projects, Devices and Company alongside the existing
-memberships and service tokens. These new controls require global `system_admin`;
-a project administrator is not automatically a company administrator. Browser
+memberships and service tokens. Company administration requires global
+`system_admin`; a project administrator is not automatically a company
+administrator. An enrolled OIDC human can see their own Devices/Agent access
+without gaining the administration inventory. Browser
 mutations also require CSRF protection and a writable service.
 
 - Users can be registered using the configured OIDC issuer and a verified stable
@@ -100,8 +104,8 @@ This is not yet the full Mac onboarding journey. The gateway/owner selective fee
 read-only projector and prerequisite-based native provisioning operator now exist
 in the development build. Cross-area device approval and selective delivery are
 implemented, as are read-only Web/TUI cache views and terminal selection of
-already-approved projects. Separate agent identities, a unified installer journey
-and native Mac acceptance remain unfinished.
+already-approved projects. A prerequisite-based installer journey and separate
+agent identities now exist. Native Mac acceptance remains unfinished.
 
 ## Journaled workspace preparation in the development build
 
@@ -189,13 +193,14 @@ directory component, receipt aliases and file/directory prefix conflicts fail
 before installation. Journal containment is checked through physical filesystem
 identities and existing canonical ancestors, not path spelling alone. Linux
 alias fixtures are covered; native case-insensitive APFS validation is pending.
-Custom skills are retained, scripts are not executed
-or made executable, and no generic executable plugin is installed. Unknown tool
+Missing reviewed Memory skills are installed in both `.agents/skills/` for Codex
+and `.claude/skills/` for Claude. Custom skills are retained, scripts are not
+executed or made executable, and no generic executable plugin is installed. Unknown tool
 formats or failed hashes/versions stop with the completed journal stages retained.
 
-Agent registration remains explicitly blocked pending separate scoped
-Codex/OpenAI and Claude/Anthropic credentials; the broad device-login credential
-is not reused for MCP. These commands do not provision PostgreSQL, start services,
+Agent registration is a separate explicitly approved stage described below;
+the broad device-login credential is not reused for MCP. Workspace commands
+alone do not provision PostgreSQL, start services,
 build source, enable paid model calls, clone Trust sources or perform selective
 sync. Local repository/template stages are not a completed company onboarding
 installation.
@@ -299,6 +304,81 @@ launchers/services, and resumes the same journal. Its local area services are
 read-only at this stage; local capture/proposal onboarding is not yet connected.
 Linux fake-command verification is not proof that Keychain, LaunchAgents or
 case-insensitive APFS work on a real Mac.
+
+### Separate Codex and Claude project access
+
+The candidate's `journey` command joins browser login, project selection, reviewed
+repository/skill preparation and native provisioning. Once those stages are
+recorded, run the separate agent setup using the same private journey journal:
+
+```bash
+/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+  journey-agents --journal /ABS/PRIVATE/journey.json
+/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+  journey-status --journal /ABS/PRIVATE/journey.json
+```
+
+Each selected project gets independent Codex/OpenAI and Claude/Anthropic
+credentials, held only in Keychain. The owning human reviews each public request
+in Access → Devices → Agent access. The operator opens that exact company page;
+if already signed out, sign in and import the displayed public JSON. It contains
+no credential. Project membership/offline permission is not this separate model
+disclosure consent. The reviewed project manifest must also permit the exact
+caller/provider destination. No API call or model invocation is made by setup.
+
+After browser approval, review the generated settings plan and confirm it. Only
+Memory-owned MCP entries are added to project `.codex/config.toml` and `.mcp.json`;
+custom entries, Codex model settings and Claude's own model configuration survive.
+Restart/reload the respective agent to use its new project tools, and accept its
+normal project/MCP trust prompt. Those entries contain public IDs and local
+profile paths, never bearer tokens or database URLs.
+
+The MCP bridge exposes only `memory_project_cache_status` and
+`memory_project_cache_search`: read-only, cited lexical search of that exact
+project's approved cache. It cannot select another project, invoke ordinary query
+tools, perform mutations, call a model or make a Trust expertise request. Results
+are untrusted source data, not agent instructions. Remote F1 integration with
+these new credentials remains work; existing approved remote expertise is not
+automatically inherited. This scopes Memory MCP calls; it is not an operating-
+system sandbox against an assistant with unrestricted same-user filesystem or
+database access. Keep private installation/profile directories outside agent
+workspaces, and review the agent's own filesystem/tool permissions separately.
+
+By default every disclosure checks current child and parent/device authority
+online. Opting into `journey-agents --allow-offline` permits previously activated,
+unexpired, explicitly approved access during a connectivity outage. It does not
+override a known revocation or a server denial. Offline copies cannot be recalled
+after transmission. The current grant has a maximum 24-hour lifetime, and
+renewal is never automatic:
+
+```bash
+/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+  journey-agents --journal /ABS/PRIVATE/journey.json --renew-grant OLD_AGENT_UUID
+```
+
+Replacement retains old history and denial fences, generates a new credential
+and requires fresh browser consent. The new MCP key is independent; expired old
+Memory entries remain fenced and can be removed manually from agent settings.
+Repeat the same command after an interruption; do not delete journals or create
+another login to recover it. Local status reports recorded progress, not current
+remote authorization or successful native Mac acceptance.
+
+Manual preparation/inspection uses the same implementation:
+
+```bash
+memory projects agents prepare --company https://<company-origin> \
+  --caller codex --workspace-journal /ABS/PRIVATE/project-onboarding.json --open-browser
+memory projects agents status --company https://<company-origin> --agent-id AGENT_UUID
+memory projects agents configure --company https://<company-origin> \
+  --agent-id AGENT_UUID --profile /ABS/PRIVATE/installation/profiles/SUBSCRIPTION_UUID.json \
+  --workspace-journal /ABS/PRIVATE/project-onboarding.json
+```
+
+`configure` previews without changing settings. Confirm the exact returned plan
+with the same arguments plus `--plan-sha256 SHA256 --confirm`. Changed settings,
+permissions or profile pins stop rather than overwriting your configuration.
+Prepare accepts `--new-request` only to explicitly replace an expired or
+definitively denied request; it cannot renew a still-active grant silently.
 
 ## Identity and project access
 

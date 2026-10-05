@@ -2,6 +2,9 @@
 
 Approved by Olivier on 2026-10-05. This is the approved implementation contract,
 with execution checkboxes added for the mandatory Memory completion workflow.
+Checked implementation items denote source-backed software/test evidence, not
+live deployment or native macOS acceptance. The final acceptance item remains
+open until the observed clean-Mac journey succeeds.
 
 ## 1. Architecture and intended experience
 
@@ -21,21 +24,21 @@ configure Codex and Claude; preserve the private federation profile and pins.
 
 ## 2. Administration
 
-- [ ] Users: Authentik create/invite/disable/manage with narrow server-side credentials, no new password store.
-- [ ] Stable pre-login assignments, effective access including groups, independently revocable devices, user disablement and separate human/federation/disclosure authority.
-- [ ] Projects: reviewed manifests bind area/project identity, owner instance, repository/branch, offline permission, pinned skills/plugins/hashes, tools and permitted destinations.
-- [ ] Trust appears as remote expertise without CA copies or local administration.
+- [x] Users: opt-in server-side Authentik create/invite/disable/manage adapter, no new password store; provider-side RBAC/live invitation delivery remain native/deployment acceptance work.
+- [x] Stable pre-login assignments, effective access including groups, independently revocable devices, user disablement and separate human/federation/disclosure authority.
+- [x] Projects: reviewed manifests bind area/project identity, owner instance, repository/branch, offline permission, pinned skills/plugins/hashes, tools and permitted destinations.
+- [x] Trust appears as remote expertise without CA copies or local administration.
 
 ## 3. Login, selective synchronization and installer
 
 - [ ] CLI auth login/logout, project selection and synchronization status with Web/TUI equivalents; browser-assisted per-device login and Keychain credentials.
 - [ ] Architecture-matched package; dedicated loopback PostgreSQL/pgvector with separate area databases and named LaunchAgents, no unrelated restarts or PDS/gateway/server database credentials.
-- [ ] Server-authorized project snapshot/delta feed selects before transmission and preserves approved memories/evidence, versions, authorship, provenance, digests and tombstones; no raw captures/sessions/secrets/unapproved material.
+- [x] Server-authorized project snapshot/delta feed selects before transmission and preserves approved memories/evidence, versions, authorship, provenance, digests and tombstones; no raw captures/sessions/secrets/unapproved material.
 - [ ] Searchable read-only remote projection; local captures/proposals and offline queues retain origin ownership and recheck current permission before replay.
-- [ ] Atomic update/cursor commits, harmless replay, startup/reconnect/five-minute sync, visible freshness/pending/failures, withdrawal and revocation semantics.
-- [ ] Gateway-attested scoped delivery verifies digests without downloading whole unauthorized CAR/repositories or claiming complete repository verification.
+- [x] Atomic update/cursor commits, harmless replay, startup/reconnect/five-minute sync implementation, visible freshness/pending/failures, withdrawal and revocation semantics; native launchd execution remains below.
+- [x] Gateway-attested scoped delivery verifies digests without downloading whole unauthorized CAR/repositories or claiming complete repository verification.
 - [ ] Clone with user Git credentials; preserve existing/dirty repositories; confirmed pinned tool installation without arbitrary setup hooks; merge only Memory-owned settings.
-- [ ] Separate Codex/OpenAI and Claude/Anthropic identities/disclosure policies; resumable installation journal.
+- [x] Separate Codex/OpenAI and Claude/Anthropic cache identities/disclosure policies; resumable installation journal and confirmed Memory-owned MCP settings merge. Trust remote expertise integration with these new identities remains open.
 
 ## 4. Agent configuration and optional API
 
@@ -49,9 +52,9 @@ Small committed slices: checkpoint/admin/catalog, device login/project selection
 authorized snapshots/offline search, installer/repository/agent setup, clean-Mac
 rehearsal and instructions.
 
-- [ ] Synthetic-account/project tests prove unauthorized bytes are never sent and same-named projects remain distinct.
-- [ ] Interrupted installation/sync, duplicate delivery, withdrawal and device/user revocation tests.
-- [ ] Existing repositories/custom settings/services preserved; Trust remote-only verified.
+- [x] Synthetic-account/project tests prove unauthorized bytes are never sent and same-named projects remain distinct.
+- [x] Interrupted installation/sync, duplicate delivery, withdrawal and device/user revocation tests.
+- [x] Existing repositories/custom settings/services preserved; Trust remote-only restrictions verified in software tests.
 - [ ] Relevant Rust/database/Web/packaging validation and observed real-Mac login/select/clone/setup/offline-citation/reconnect journey; cross-compilation is not macOS acceptance.
 
 Completion requires an observed macOS journey. Windows, R3, autonomous

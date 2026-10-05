@@ -30,13 +30,15 @@ and embedding work are disabled.
 | Contract checkpoint | Complete | Memory IDs above; contract committed. |
 | Sol/Astra project defaults | Complete | Two TOML files parse successfully; bounded read-only adviser and updated repo guidance. |
 | Local company administration backend | Implemented and focused tests passed | Commits `5140b5d1`, `2fb2a3f2`; 36 auth tests on a separate disposable PostgreSQL database, including six onboarding tests; OpenAPI inventory test, formatting and diff checks. Live provider RBAC and company-wide authority remain unverified. |
-| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices/Company alongside existing memberships/tokens; latest full run: 221 Web tests and production build passed, including explicit company device review. This is a development UI, not a deployed company console. |
+| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices/Company alongside existing memberships/tokens; latest full run: 260 Web tests and production build passed, including separate owning-human agent disclosure review. This is a development UI, not a deployed company console. |
 | Unified cross-area administration | Owner delegation, credential provisioner, coordinator and console grant workflow implemented | `16051bb8`, `9f60b457`, `60d27978`, `cc1fe53a`, `af387f94`; explicit owner/token/namespace/role ceiling, ownership guards and durable uncertain outcomes. Separate delivery delegates and company devices are now implemented below; live owner provisioning remains pending. |
-| Device login and selection | Backend, CLI/browser approval and terminal project picker implemented | `9f439c27`, `6ac5b994`, `121fab3b`, `f57c25e0`, `4abe06b1`; latest CLI enrollment/workspace/picker suite: 56 tests passed. Native Keychain execution and unified installer remain unfinished. |
-| Selective snapshots/offline search | Gateway, company/local enrolled-device delivery, bootstrap, private metadata producer and explicit CLI projector/runner implemented | `e741af31`, `d8c5f8db`, `8f578566`, `00d7f2fa`, `09df86da`, `d2d8508f`, `15b649d1`, `46fce2d1`, `99cea0c4`; latest required-database federation store/runtime all-target regression: 85 tests. Latest auth regression: 82 tests with bounded concurrency, including company delivery. Ordinary retrieval does not merge cached records; native execution remains pending. |
+| Device login and selection | Backend, CLI/browser approval and terminal project picker implemented | `9f439c27`, `6ac5b994`, `121fab3b`, `f57c25e0`, `4abe06b1`; latest CLI enrollment/workspace/picker/agent suite: 75 tests passed. Native Keychain execution remains unobserved; prerequisite-based journey is now implemented. |
+| Selective snapshots/offline search | Gateway, company/local enrolled-device delivery, bootstrap, private metadata producer and explicit CLI projector/runner implemented | `e741af31`, `d8c5f8db`, `8f578566`, `00d7f2fa`, `09df86da`, `d2d8508f`, `15b649d1`, `46fce2d1`, `99cea0c4`; latest required-database federation store/runtime all-target regression: 85 tests. Latest auth regression: 85 tests with bounded concurrency, including company delivery and independent agents. Ordinary retrieval does not merge cached records; native execution remains pending. |
 | Company device and composite selection | Implemented; database/HTTP and Web tests passed | `a8f90068`, `02c576b9`, `8118fe1c`, `99cea0c4`, `90c0cabc`, `cdf8580b`; immutable owner approvals, pinned trust, zero ordinary project/global device authority, current-owner refresh and no legacy fallback. Complete identity survives equal project names/UUIDs. Details below; native login remains unobserved. |
 | Installer and tool/repository setup | Journaled workspace preparation and prerequisite-based native operator implemented and reviewed | `9dabaca8`, `e305955a`, `178560cc`, `894323cb`, `901f6805`, `56b87363`, `730d48c1`, `f087b735`; 21 operator and 13 packaging tests passed. Latest prior enrollment/workspace/client suite: 44 tests. Exact immutable package helpers, independent cluster/roles/databases/LaunchAgents and recovery are modeled with synthetic commands. Native APFS/Keychain/launchd and self-contained dependency distribution remain pending. |
 | Read-only local cache interfaces | Web/TUI implemented and reviewed; backend/configuration tests passed | `cb755bb5`, `1f0a12fb`, `f4814db4`; three PostgreSQL/HTTP cache tests, two cache configuration tests and nine focused CLI/TUI tests passed. Exact subscription allowlist; same-snapshot freshness and citations; no normal-query merge, model forwarding or write controls. This is not a native Mac acceptance result. |
+| Joined prerequisite-based journey | Implemented with synthetic recovery evidence | `d234521d`, `9f0bc203`, `53ba8812`; login/select/workspace/subscription/native provisioning and explicit agent setup share stable journals. Exact replays preserve clones, credentials, completed stages and consent. The latest complete operator/package suite passed 63 tests; two subsequently added short-confirmation/EOF cases also passed. Native dependency distribution remains open. |
+| Independent agent identities and settings | Implemented; real PostgreSQL/HTTP, CLI and MCP transport tests passed | `8fb6b39f`, `9705b8bb`, `d0d18d34`, `d91d4f10`, `e94bbb45`, `b95aafa7`, `4b57e512`, `86f83d58`, `27dd79c7`; browser changes `bacae72d`, `bca625a3`. Separate one-project Codex/OpenAI and Claude/Anthropic grants, monotonic denial, read-only cache tools and protected settings merges. No automatic model calls or inherited F1 authority. |
 | Real macOS acceptance | Pending | Requires native execution; Linux builds/tests are not evidence of this. |
 
 ## Invariants under review
@@ -281,14 +283,10 @@ operator are development candidates, not a self-contained installer.
 
 Remaining implementation work:
 
-- A unified native installer journey combining browser/Keychain login, approved
-  device/project selection, repository/tool setup and native provisioning. The
-  standalone terminal picker and CLI/Web selection now exist; the local read-only
-  cache views still do not merge records into ordinary retrieval or model inputs.
-- Separately scoped Codex/OpenAI and Claude/Anthropic MCP credentials and
-  disclosure policies, not reuse of the device credential.
 - Local capture/proposal/offline replay onboarding, supported project plugin
   formats and reviewed native dependency installation.
+- Online Trust/F1 expertise integration using the new scoped laptop identities;
+  a cache disclosure grant does not authorize it automatically.
 - Native package/Keychain/LaunchAgent/pgvector/APFS and full clean-Mac acceptance.
 
 R3 remains paused. No existing company area was upgraded and no autonomous
@@ -315,3 +313,63 @@ exact-owner apply and offline permission withdrawal before repository/tool
 effects. Ratatui TestBackend checks cover small-terminal selection; this is not a
 native PTY or Keychain rehearsal. Astra identified and the implementation fixed
 lost offline eligibility on apply and invisible selections after wrapping.
+
+### Independent project agents and settings recovery
+
+The owning human browser approves a hash-only request for each Codex/OpenAI and
+Claude/Anthropic project grant; administrators cannot substitute another human.
+The client stores independently generated secrets only in Keychain. Parent
+disablement, device logout/revocation, changed owner policy and expiry remain
+effective. Expiry binds PostgreSQL's exact microsecond precision, without a
+tolerance window or authority extension. Three focused company-agent tests and
+the complete 85-test `mem-service auth::` regression passed against the required
+disposable PostgreSQL database.
+
+The native CLI independently fetches only its own receipt. Known denial persists
+in a separate monotonic Keychain fence, including during initial activation;
+stale concurrent success cannot clear it. Authority is checked again after
+network waits and before releasing cache results. Explicit offline consent is
+bounded by prior activation/expiry and network failures, not server denials.
+The complete CLI enrollment/workspace/picker/agent filter passed 75 tests.
+
+The MCP server exposes exactly cache status and cited lexical search. A real
+Tokio duplex JSON-RPC connection test initializes, lists and invokes those tools,
+and rejects ordinary `memory_query` and caller-selected project overrides. All
+three focused MCP tests passed. This is actual protocol execution on Linux, not
+native Keychain/macOS evidence.
+
+Settings previews bind the exact completed workspace, native profile, manifest,
+receipt and generated command. Changes append only owned Codex MCP TOML or merge
+the matching Claude JSON object; they preserve existing model/custom settings.
+Keychain journals contain public generated metadata/digests, never raw settings
+backups, bearer tokens or local database URLs. A physical workspace lock
+coordinates Memory writers independently of journal directory or provider.
+Target-volume staging recovers exact retained partial prefixes while preserving
+conflicting files. Same-user, non-cooperating modification in the final rename
+window is not a POSIX compare-and-swap guarantee. Native directory locking and
+APFS behavior remain acceptance work.
+
+Astra identified the partial-write and per-journal-lock gaps; both were fixed and
+the source closure review found no remaining blocker in those fixes. Focused CLI
+agent tests passed 18 cases, including interrupted publication and cross-journal
+serialization. The full Python operator/package/journey suite passed 63 tests;
+the subsequent agent-helper run passed all 13 tests, including two new short
+confirmation/EOF cases. All providers/native commands in Python tests are fake.
+
+Explicit `journey-agents --renew-grant OLD_UUID` retains old history/fences and
+requires fresh browser approval. It recovers already-prepared replacement IDs,
+never automatically renews consent, and leaves expired MCP entries fenced.
+`journey-status` reports recorded progress only. Installer confirmation now
+accepts `yes` for the displayed immutable plan instead of requiring hand-typed
+SHA-256; the exact digest still binds the native CLI effect.
+
+Strict Clippy passed for the embedded-PostgreSQL/TUI CLI and, separately, the
+service/MCP/record crates with all targets and no default features. Formatting,
+boundary checks, OpenAPI/router inventory and diff checks passed. The CI workflow
+now runs the project-sync CLI filter explicitly and a clearly named synthetic
+Linux macOS-onboarding contract job. Its YAML parsed locally; no remote CI run is
+claimed.
+
+No clean-Mac journey, live Authentik provisioning, customer deployment, paid
+provider execution or R3 continuation is claimed. The last cache check was
+27 GiB with 369 GiB free; no cache or user data was deleted.

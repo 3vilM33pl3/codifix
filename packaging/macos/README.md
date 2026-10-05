@@ -64,6 +64,12 @@ installed PostgreSQL/pgvector and the full architecture-matched Memory binary
 are required. No prerequisites are silently downloaded or source-built, and a
 self-contained dependency distribution/native Mac acceptance is not complete.
 
+The bundled `journey` connector joins login, project selection, reviewed workspace
+setup and native provisioning. `journey-agents` adds separately approved
+Codex/OpenAI and Claude/Anthropic Keychain identities and project MCP entries,
+without changing custom settings or enabling paid calls. `journey-status` reports
+recorded progress; none of these commands is native Mac acceptance evidence.
+
 Outputs:
 
 - `target/memory-layer-<version>-macos-x86_64.pkg`
@@ -139,8 +145,9 @@ memory watcher enable --project <slug>
 This legacy wizard is not the company onboarding installer journey. Company
 device login (`memory auth login --company https://<company-origin>`) and browser
 approval are separate foundations; native macOS Keychain/installer acceptance
-remains unverified. Reviewed project inventory does not clone repositories,
-activate named services, deliver offline data or perform selective sync. No
+remains unverified. Reviewed project inventory alone does not clone repositories,
+activate named services, deliver offline data or perform selective sync; the
+explicit journey operator orchestrates those separately confirmed stages. No
 complete Mac/company onboarding or public release is implied by these scripts.
 
 ## Offline packaging contract checks
@@ -154,6 +161,8 @@ for script in packaging/build-pkg.sh packaging/macos/postinstall.sh packaging/ma
 done
 python3 packaging/macos/tests/test_package_contract.py
 python3 packaging/macos/tests/test_onboarding_operator.py
+python3 packaging/macos/tests/test_onboarding_journey.py
+python3 packaging/macos/tests/test_onboarding_agents.py
 ```
 
 Actual `.pkg` installation/upgrade, signing, launchd behavior and native Keychain

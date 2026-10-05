@@ -1,8 +1,9 @@
 # Project-selective synchronization implementation boundary
 
 This is the source-backed boundary for selective synchronization. The gateway
-feed, signed-page verification and separate read-only projection are implemented;
-enrolled-device delivery and automatic laptop execution are still in progress.
+feed, signed-page verification, enrolled-device delivery and separate read-only
+projection are implemented. Automatic execution has a prerequisite-based native
+operator; native laptop acceptance is still pending.
 It is not a declaration of a working Mac journey. The approved [contract](README.md)
 remains authoritative.
 
@@ -76,6 +77,30 @@ Search and citations label the remote owner, exact source/shared version, author
 reviewed evidence and digest. Local mutation routes cannot edit the projection.
 External model forwarding still needs the existing explicit destination policy;
 offline-copy permission is not model consent.
+
+## Independent agent cache disclosure
+
+Separate Codex/OpenAI and Claude/Anthropic Keychain credentials bind one exact
+company/device/area/owner/project/manifest and reviewed provider destination.
+The owning OIDC human approves the public credential fingerprint; company/project
+administrators cannot approve it as a substitute human. These service identities
+have no ordinary project memberships, global roles, broad exports, mutations or
+whole-space pull authority. Receipt reads expose only the authenticating child's
+own binding.
+
+Current parent/user/project authority, owner policy and immutable grant expiry
+are rechecked before disclosure and after network waits. Definitive denials
+persist a separate monotonic Keychain fence, including before initial activation;
+late successful responses cannot clear it. Explicit offline access requires prior
+online activation and an unexpired approved receipt, and is allowed only on
+connectivity failures, not server denials or malformed responses. It cannot
+recall downloaded bytes or detect a new revocation while disconnected.
+
+The native stdio MCP bridge exposes only scoped cache status/search, not ordinary
+Memory MCP tools or remote F1. Agent settings carry public IDs/profile paths, not
+bearer or database secrets. Configuration journals contain digests and generated
+public metadata, not backups of arbitrary existing settings. Separate explicit
+replacement creates fresh identities/consent and retains old fences/history.
 
 ## Focused acceptance evidence required
 
