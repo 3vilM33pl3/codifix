@@ -31,10 +31,10 @@ and embedding work are disabled.
 | Sol/Astra project defaults | Complete | Two TOML files parse successfully; bounded read-only adviser and updated repo guidance. |
 | Local company administration backend | Implemented and focused tests passed | Commits `5140b5d1`, `2fb2a3f2`; 36 auth tests on a separate disposable PostgreSQL database, including six onboarding tests; OpenAPI inventory test, formatting and diff checks. Live provider RBAC and company-wide authority remain unverified. |
 | Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices alongside existing memberships/tokens; latest full run: 183 Web tests and production build passed. This is a development UI, not a deployed company console. |
-| Unified cross-area administration | Pending | Explicit remote authority and partial-failure handling; a local catalog cannot grant access in another database. |
+| Unified cross-area administration | Owner delegation and coordinator implemented | `16051bb8`, `9f60b457`; five required-database company tests and 49 auth regression tests passed. Explicit owner/token/namespace/role ceiling, ownership guards and durable uncertain outcomes. Fleet enrollment and company UI integration remain pending. |
 | Device login and selection | Backend, CLI and browser approval implemented | `9f439c27`, `6ac5b994`, `121fab3b`; 44 required-database auth tests and 15 CLI tests passed. Native Keychain execution and TUI selection remain unfinished. |
-| Selective snapshots/offline search | Pending | Project-scoped authorization before bytes leave the server; verified publication data only. |
-| Installer and tool/repository setup | In progress | `9dabaca8` fixes package architecture validation and missing-only user seeding; 13 offline packaging tests passed. Journaled repository/tools preparation and native area provisioning remain unfinished. |
+| Selective snapshots/offline search | Gateway and read-only projector implemented | `e741af31`, `d8c5f8db`; six required-database store tests, two signed-page runtime tests and 41 neutral-core tests passed. Denied-project sentinel absence, withdrawn-byte exclusion, independent origins, replay/rollback/cursors, revoked authority, archived/tombstoned exclusion and empty projects are covered. Enrolled-device origin adapter and automatic laptop synchronization are still being implemented. |
+| Installer and tool/repository setup | Journaled workspace preparation implemented | `9dabaca8`, `e305955a`, `178560cc`; 13 offline packaging tests and 34 focused enrollment/workspace tests passed. Native area provisioning is unfinished. Astra's follow-up findings on checkout filters, resumed repositories and physical journal containment are being corrected; native APFS acceptance remains pending. |
 | Real macOS acceptance | Pending | Requires native execution; Linux builds/tests are not evidence of this. |
 
 ## Invariants under review
@@ -51,8 +51,10 @@ and embedding work are disabled.
   durable intents/outcomes; timeout or interrupted confirmation is uncertain.
 - Device revocation is independent; disabling a human also fences their linked
   sessions and machine credentials.
-- No broad federation pull is used for laptop project selection. Scoped snapshots
-  are a remaining feature, not an existing property of the instance/space stream.
+- No broad federation pull is used for laptop project selection. The scoped
+  gateway feed is opt-in and origin-authenticated; devices cannot access it
+  directly or obtain gateway credentials. The device delivery adapter must
+  enforce current human/device authority before selecting and transmitting.
 
 ## Focused validation and review evidence
 
@@ -106,10 +108,32 @@ and bundles exact read-only Codex templates. Postinstall has no service restart
 or recursive ownership change; existing configurations, read-only files and
 symlinks are preserved. No `.pkg` was built or installed on a Mac here.
 
-Strict focused Clippy currently encounters the existing Rust 1.99
-`async_trait`-generated `double_must_use` lint in `mem-search` and `mem-reinforce`.
-This is not recorded as a passed strict Clippy run. New scoped-delivery and
-company-delegation code still requires its own focused validation.
+The initial strict Clippy run encountered Rust 1.99's `async_trait`-generated
+`double_must_use` lint in `mem-search` and `mem-reinforce`. Commit `4de07b4b`
+adds narrowly scoped, explained compatibility annotations on those two traits;
+a full strict rerun remains required. This is not recorded as a passed run.
+
+### Selective feed and projection
+
+The gateway binds reviewed publication keys to company/area/owner/project/space,
+keeps project cursors under transaction locks, masks withdrawn historical events,
+and signs nonce/device/revision-bound pages with a distinct purpose. Tests use a
+disposable database and actual detached signatures for runtime verification.
+Filtered pages verify individual publication receipts, not a complete repository
+or contiguous space history. No device downloads an unrestricted CAR.
+
+The separate laptop projector commits the page receipt, read-only projection and
+cursor atomically. Lexical search requires an active current source version,
+matching canonical state and eligible reviewed evidence. Original authors,
+source/shared versions, locators and digests remain available for citations.
+It does not write local authoritative memories, embeddings or reinforcement.
+
+Astra's review found that archived memories were searchable and empty approved
+projects could not initialize. Both are corrected and included in the six store
+tests. Registration is a patch: the owner adapter must explicitly disable a
+previously registered stream when it ceases to be eligible, never assume omission
+withdraws it. Full source/authority fingerprints and delivery rechecks are part
+of the next adapter slice.
 
 ## Completion status
 

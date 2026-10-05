@@ -1,8 +1,10 @@
 # Project-selective synchronization implementation boundary
 
-This is the source-backed design constraint for the next implementation slice,
-not a declaration that laptop synchronization is implemented. The approved
-[contract](README.md) remains authoritative.
+This is the source-backed boundary for selective synchronization. The gateway
+feed, signed-page verification and separate read-only projection are implemented;
+enrolled-device delivery and automatic laptop execution are still in progress.
+It is not a declaration of a working Mac journey. The approved [contract](README.md)
+remains authoritative.
 
 ## Existing mechanisms to reuse
 
@@ -40,6 +42,11 @@ necessary dependency outside the selected scope blocks the page or requires a
 bounded authenticated representation; it is not permission to disclose it.
 
 ## Attested pages and local projection
+
+The implemented gateway registration API is a **patch**, not a replacement.
+Owner adapters retain the prior registered set and explicitly disable removed or
+ineligible streams. A current review covers only its exact published keys; neither
+catalog membership nor an old review permits a union of historical content.
 
 Scoped pages need a distinct signature purpose and bind the device audience,
 subscription, exact manifest/policy revision, request nonce, cursor interval,
