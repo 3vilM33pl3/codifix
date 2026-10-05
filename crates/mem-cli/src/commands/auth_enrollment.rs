@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Company device enrollment is isolated from local-owner configuration.
 mod credentials;
+mod project_picker;
 mod replica;
 #[cfg(test)]
 mod tests;
@@ -58,6 +59,8 @@ pub(super) struct ProjectsArgs {
 pub(super) enum ProjectsCommand {
     /// List reviewed projects currently available to this enrolled device.
     Available(CompanyArgs),
+    /// Interactively review one approved project and prepare metadata only.
+    Select(project_picker::SelectArgs),
     /// Preview an exact reviewed project and persist a resumable local plan.
     Prepare(workspace::PrepareArgs),
     /// Apply the confirmed immutable plan without replacing existing settings.
@@ -139,6 +142,7 @@ pub(super) async fn handle_command(command: &Command) -> Result<bool> {
             ProjectsCommand::Available(args) => {
                 available(args, &store).await?;
             }
+            ProjectsCommand::Select(args) => project_picker::run(args, &store).await?,
             ProjectsCommand::Prepare(args) => workspace::prepare(args, &store).await?,
             ProjectsCommand::Apply(args) => workspace::apply(args, &store).await?,
             ProjectsCommand::Status(args) => workspace::status(args)?,
