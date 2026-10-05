@@ -118,6 +118,18 @@ paths:
               schema: { $ref: '#/components/schemas/CompanyGrantResult' }
         '403': { description: Current owner delegate or project authority denied. }
         '404': { description: No committed owner operation. }
+  /v1/admin/onboarding/company/configuration:
+    get:
+      operationId: inspectCompanyOnboardingConfiguration
+      x-stability: internal
+      summary: Inspect enrolled company owners without server transport or secrets
+      responses:
+        '200':
+          description: Global administrator only; no-store. Trust is remote expertise, never delegated local access.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyOnboardingView' }
+        '403': { description: Required global administration or valid bounded configuration missing. }
   /v1/admin/onboarding/company/operations:
     get:
       operationId: listCompanyOnboardingOperations
@@ -3279,6 +3291,26 @@ components:
                             properties:
                               kind: { type: string, const: withheld }
                               stream: { type: object, required: [origin, canonical], properties: { origin: { type: string, format: uuid }, canonical: { type: string, format: uuid } } }
+    CompanyOnboardingView:
+      type: object
+      additionalProperties: false
+      required: [company_id, writes_enabled, owners]
+      properties:
+        company_id: { type: [string, 'null'], format: uuid }
+        writes_enabled: { type: boolean }
+        owners:
+          type: array
+          maxItems: 16
+          items:
+            type: object
+            additionalProperties: false
+            required: [owner_instance_id, area, issuer, delegation_policy_revision, grant_management]
+            properties:
+              owner_instance_id: { type: string, format: uuid }
+              area: { type: string, enum: [workshop, homelab, general, trust] }
+              issuer: { type: string, format: uri }
+              delegation_policy_revision: { type: integer, minimum: 1 }
+              grant_management: { type: boolean }
     CompanyGrantRequest:
       type: object
       additionalProperties: false

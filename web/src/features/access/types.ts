@@ -63,3 +63,53 @@ export interface ManagedDevice {
   last_seen_at: string | null;
   revoked_at: string | null;
 }
+
+export interface CompanyOwner {
+  owner_instance_id: string;
+  area: MemoryArea;
+  issuer: string;
+  delegation_policy_revision: number;
+  grant_management: boolean;
+}
+export interface CompanyConfiguration {
+  company_id: string | null;
+  writes_enabled: boolean;
+  owners: CompanyOwner[];
+}
+export interface CompanyGrantRequest {
+  company_id: string;
+  operation_id: string;
+  owner_instance_id: string;
+  area: MemoryArea;
+  project_id: string;
+  issuer: string;
+  subject: string;
+  operation: "grant" | "revoke";
+  role: "reader" | "writer" | "operator";
+  expected_grant_revision: number;
+  delegation_policy_revision: number;
+}
+export interface CompanyOperation {
+  request: CompanyGrantRequest;
+  request_sha256: string;
+  outcome: "pending" | "uncertain" | "confirmed" | "rejected";
+  receipt: null | {
+    request: CompanyGrantRequest;
+    request_sha256: string;
+    principal_id: string;
+    grant_revision: number;
+    direct_grant_active: boolean;
+    committed_at: string;
+  };
+  current_access: null | {
+    observed_at: string;
+    principal_id: string;
+    disabled: boolean;
+    project: string;
+    direct_role: AuthRole | null;
+    grant_company_id: string | null;
+    owner_grant_revision: number | null;
+    group_roles: AuthRole[];
+    permissions: string[];
+  };
+}

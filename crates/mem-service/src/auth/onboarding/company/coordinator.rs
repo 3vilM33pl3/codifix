@@ -4,6 +4,47 @@ use super::*;
 use reqwest::{Client, Url};
 use std::time::Duration;
 
+pub(crate) async fn company_configuration(
+    State(state): State<AppState>,
+) -> Result<Json<CompanyOnboardingView>, ApiError> {
+    let Some(registry) = state.config.auth.company_onboarding.as_ref() else {
+        return Ok(Json(CompanyOnboardingView {
+            company_id: None,
+            writes_enabled: false,
+            owners: Vec::new(),
+        }));
+    };
+    if registry.company_id.is_nil() || registry.owners.len() > 16 {
+        return Err(ApiError::forbidden("invalid company owner registry"));
+    }
+    let mut owners = Vec::new();
+    let mut identities = std::collections::BTreeSet::new();
+    for cfg in &registry.owners {
+        if cfg.owner_instance_id.is_nil()
+            || !identities.insert(cfg.owner_instance_id)
+            || cfg.issuer != state.config.auth.oidc.issuer_url
+            || cfg.issuer.ends_with('/')
+            || !super::super::safe_https(&cfg.issuer)
+            || cfg.delegation_policy_revision < 1
+        {
+            return Err(ApiError::forbidden("invalid company owner registry"));
+        }
+        endpoint(&cfg.base_url)?;
+        owners.push(CompanyOwnerView {
+            owner_instance_id: cfg.owner_instance_id,
+            area: cfg.area,
+            issuer: cfg.issuer.clone(),
+            delegation_policy_revision: cfg.delegation_policy_revision,
+            grant_management: cfg.area != OnboardingArea::Trust,
+        });
+    }
+    Ok(Json(CompanyOnboardingView {
+        company_id: Some(registry.company_id),
+        writes_enabled: writable(&state).is_ok(),
+        owners,
+    }))
+}
+
 fn owner<'a>(
     state: &'a AppState,
     request: &CompanyGrantRequest,

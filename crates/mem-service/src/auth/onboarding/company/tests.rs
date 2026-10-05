@@ -78,6 +78,69 @@ async fn fixture() -> Option<Fixture> {
         secret,
     })
 }
+
+#[tokio::test]
+async fn company_configuration_never_serializes_transport_or_credentials() {
+    let Some(mut f) = fixture().await else {
+        return;
+    };
+    let Json(absent) = company_configuration(State(f.state.clone())).await.unwrap();
+    assert!(absent.company_id.is_none());
+    assert!(!absent.writes_enabled);
+    f.state.config.auth.company_onboarding = Some(mem_config::CompanyOnboardingConfig {
+        company_id: f.request.company_id,
+        owners: vec![
+            mem_config::CompanyOwnerConfig {
+                owner_instance_id: f.request.owner_instance_id,
+                area: OnboardingArea::Workshop,
+                base_url: "https://private-owner.example.test".into(),
+                token_env: "PRIVATE_OWNER_CREDENTIAL".into(),
+                issuer: f.request.issuer.clone(),
+                delegation_policy_revision: 1,
+            },
+            mem_config::CompanyOwnerConfig {
+                owner_instance_id: Uuid::new_v4(),
+                area: OnboardingArea::Trust,
+                base_url: "https://private-ca.example.test".into(),
+                token_env: "PRIVATE_CA_CREDENTIAL".into(),
+                issuer: f.request.issuer.clone(),
+                delegation_policy_revision: 1,
+            },
+        ],
+    });
+    let Json(view) = company_configuration(State(f.state.clone())).await.unwrap();
+    assert!(view.writes_enabled);
+    assert!(view.owners[0].grant_management);
+    assert!(!view.owners[1].grant_management);
+    let text = serde_json::to_string(&view).unwrap();
+    for secret in [
+        "base_url",
+        "token_env",
+        "PRIVATE_",
+        "private-owner",
+        "private-ca",
+    ] {
+        assert!(!text.contains(secret));
+    }
+    f.state.config.service.read_only = true;
+    assert!(
+        !company_configuration(State(f.state.clone()))
+            .await
+            .unwrap()
+            .0
+            .writes_enabled
+    );
+    f.state
+        .config
+        .auth
+        .company_onboarding
+        .as_mut()
+        .unwrap()
+        .owners[1]
+        .owner_instance_id = f.request.owner_instance_id;
+    assert!(company_configuration(State(f.state)).await.is_err());
+    f.db.cleanup().await.unwrap();
+}
 async fn apply(
     f: &Fixture,
     request: CompanyGrantRequest,

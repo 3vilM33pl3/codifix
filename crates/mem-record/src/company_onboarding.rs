@@ -70,3 +70,22 @@ pub struct CompanyOperationStatus {
     /// Present only when a fresh owner status was verified, not from the journal.
     pub current_access: Option<CompanyCurrentAccess>,
 }
+
+/// Administration discovery, never a transport or credential configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompanyOnboardingView {
+    pub company_id: Option<Uuid>,
+    pub writes_enabled: bool,
+    pub owners: Vec<CompanyOwnerView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompanyOwnerView {
+    pub owner_instance_id: Uuid,
+    pub area: OnboardingArea,
+    pub issuer: String,
+    pub delegation_policy_revision: i64,
+    pub grant_management: bool,
+}

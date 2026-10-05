@@ -18,6 +18,7 @@ import type {
 import { DevicesPanel } from "./DevicesPanel";
 import { ProjectsPanel } from "./ProjectsPanel";
 import { UsersPanel } from "./UsersPanel";
+import { CompanyPanel } from "./CompanyPanel";
 
 const ROLES: AuthRole[] = ["reader", "writer", "operator", "admin"];
 const SERVICE_ROLES: AuthRole[] = ["reader", "writer", "operator"];
@@ -28,17 +29,17 @@ interface AccessTabProps {
 }
 
 export function AccessTab({ project, readOnly = false }: AccessTabProps) {
-  const [view, setView] = useState<"users" | "projects" | "devices">("users");
+  const [view, setView] = useState<"users" | "projects" | "devices" | "company">("users");
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [accessVersion, setAccessVersion] = useState(0);
   const refreshLegacy = useCallback(() => setRefreshVersion((value) => value + 1), []);
   const refreshUserAccess = useCallback(() => setAccessVersion((value) => value + 1), []);
   return <main className="panel-stack access-tab">
     <section className="panel"><h2>Company administration</h2>
-      <p>Users, onboarding projects and device credentials on this service. Fleet-wide administration and remote-instance authority require later integration.</p>
+      <p>Users, onboarding projects and device credentials. Company grants use explicitly enrolled owner delegates; device approval is still owner-local.</p>
       {readOnly ? <p role="status">This service is read-only. Administration changes are disabled.</p> : null}
       <nav className="actions-row" aria-label="Company administration views">
-        {(["users", "projects", "devices"] as const).map((name) => <button type="button" key={name} aria-pressed={view === name} onClick={() => setView(name)}>
+        {(["users", "projects", "devices", "company"] as const).map((name) => <button type="button" key={name} aria-pressed={view === name} onClick={() => setView(name)}>
           {name[0].toUpperCase() + name.slice(1)}
         </button>)}
       </nav>
@@ -49,6 +50,7 @@ export function AccessTab({ project, readOnly = false }: AccessTabProps) {
     </div>
     {view === "projects" ? <ProjectsPanel readOnly={readOnly} /> : null}
     {view === "devices" ? <DevicesPanel readOnly={readOnly} /> : null}
+    {view === "company" ? <CompanyPanel readOnly={readOnly} /> : null}
   </main>;
 }
 
