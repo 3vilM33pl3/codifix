@@ -33,6 +33,12 @@ pub struct ProjectSearchHit {
     pub evidence: Vec<ReviewedEvidence>,
     pub read_only: bool,
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectProjectionStatus {
+    pub cursor: u64,
+    /// Last committed verified page, not a claim of current network authority.
+    pub observed_at: Option<DateTime<Utc>>,
+}
 #[derive(Clone)]
 pub struct ProjectProjectionStore {
     pool: PgPool,
@@ -41,6 +47,25 @@ pub struct ProjectProjectionStore {
     scope: ProjectScope,
 }
 impl ProjectProjectionStore {
+    /// Inspection/search never creates a subscription or changes its cursor.
+    pub async fn open(
+        pool: PgPool,
+        subscription: Uuid,
+        device: Uuid,
+        scope: ProjectScope,
+    ) -> Result<Self> {
+        if subscription.is_nil() || device.is_nil() || !scope.valid() {
+            return Err(StoreError::Binding);
+        }
+        let projection = Self {
+            pool,
+            subscription,
+            device,
+            scope,
+        };
+        projection.status().await?;
+        Ok(projection)
+    }
     /// The trusted onboarding operator supplies these identities, not an
     /// untrusted page. This cannot merge with local authoritative memories.
     pub async fn initialize(
@@ -77,6 +102,20 @@ impl ProjectProjectionStore {
         .fetch_one(&self.pool)
         .await?;
         u64::try_from(n).map_err(|_| StoreError::Corrupt)
+    }
+    pub async fn status(&self) -> Result<ProjectProjectionStatus> {
+        let row = sqlx::query("SELECT device,scope,cursor,observed_at FROM onboarding_project_projections WHERE subscription=$1")
+            .bind(self.subscription).fetch_one(&self.pool).await?;
+        if row.try_get::<Uuid, _>("device")? != self.device
+            || row.try_get::<Json<ProjectScope>, _>("scope")?.0 != self.scope
+        {
+            return Err(StoreError::Binding);
+        }
+        Ok(ProjectProjectionStatus {
+            cursor: u64::try_from(row.try_get::<i64, _>("cursor")?)
+                .map_err(|_| StoreError::Corrupt)?,
+            observed_at: row.try_get("observed_at")?,
+        })
     }
     /// Exact replay is harmless, including lost acknowledgements after commit.
     /// Altered bytes under one nonce fail before any projection/cursor effect.
