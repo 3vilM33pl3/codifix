@@ -10,6 +10,7 @@ mod effects;
 mod error;
 pub mod federation;
 mod handlers;
+mod laptop_cache;
 mod llm;
 mod mcp_http;
 #[cfg(feature = "offline")]

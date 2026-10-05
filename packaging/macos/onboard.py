@@ -257,9 +257,26 @@ def area_config(value, area, secret):
     root = state_root(value)
     name = area["name"]
     url = database_url(value, name, secret["password"])
+    cache = ""
+    for selected in value["plan"]["selections"]:
+        metadata = selected["metadata"]
+        scope = metadata["bootstrap"]["scope"]
+        if scope["area"] != name:
+            continue
+        cache += "\n[[laptop_cache.subscriptions]]\n"
+        for key, identifier in {
+            "subscription_id": metadata["subscription"],
+            "device_id": metadata["bootstrap"]["device"],
+            "company_id": scope["company"],
+            "owner_instance_id": scope["owner"],
+            "project_id": scope["project"],
+            "space_id": scope["space"],
+        }.items():
+            cache += key + " = " + json.dumps(identifier) + "\n"
     # Full embedded service applies its existing migration inventory. These new
     # configs never overlay/discover legacy config and enable no paid automation.
-    return f'''[area]
+    return f'''{cache}
+[area]
 name = "{name}"
 instance_id = "{area['instance_id']}"
 [service]
@@ -275,6 +292,10 @@ internal_automation = false
 enabled = false
 validation_enabled = false
 [consolidation]
+enabled = false
+[provenance]
+reverify_enabled = false
+[procedural]
 enabled = false
 [llm]
 provider = "openai_compatible"

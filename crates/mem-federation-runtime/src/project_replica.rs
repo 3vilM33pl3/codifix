@@ -177,12 +177,11 @@ impl ProjectReplica {
             .connect(&profile.local_database_url)
             .await
             .map_err(|_| RuntimeError::Unavailable)?;
-        let exists: bool = sqlx::query_scalar(
-            "SELECT to_regclass('onboarding_project_projections') IS NOT NULL",
-        )
-        .fetch_one(&pool)
-        .await
-        .map_err(|_| RuntimeError::Unavailable)?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT to_regclass('onboarding_project_projections') IS NOT NULL")
+                .fetch_one(&pool)
+                .await
+                .map_err(|_| RuntimeError::Unavailable)?;
         if !exists {
             return Err(RuntimeError::Configuration);
         }

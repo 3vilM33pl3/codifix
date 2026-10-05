@@ -385,6 +385,7 @@ pub(crate) async fn build_state(
     config: AppConfig,
     shutdown: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 ) -> Result<AppState> {
+    config.validate_laptop_cache()?;
     if config.evaluation.active() {
         anyhow::ensure!(
             config.service.read_only,

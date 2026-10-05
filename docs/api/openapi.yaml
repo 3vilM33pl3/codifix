@@ -27,6 +27,67 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/onboarding/cache:
+    get:
+      operationId: listSelectedLaptopCache
+      x-stability: internal
+      summary: Inspect explicitly configured local read-only project subscriptions
+      description: Opt-in isolated laptop service only. Requires a loopback local-owner credential, exact area and bindings, read-only mode, and disabled model/MCP/background work. Never contacts an owner or gateway. Freshness is last committed verified-page time, not a claim of current permission. Missing subscriptions are shown as uninitialized; arbitrary database rows are never listed. No-store.
+      responses:
+        '200':
+          description: Selected subscriptions and local freshness only.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schema_version, area, instance_id, projects]
+                properties:
+                  schema_version: { type: integer, const: 1 }
+                  area: { type: string, enum: [workshop, homelab, general] }
+                  instance_id: { type: string, format: uuid }
+                  projects: { type: array, maxItems: 32, items: { $ref: '#/components/schemas/LaptopCacheProject' } }
+        '403': { description: Authenticated loopback local owner required. }
+        '404': { description: No laptop cache configured; not a successful empty cache. }
+        '503': { description: Bound local projection unavailable or changed; no fallback. }
+  /v1/onboarding/cache/{subscription_id}/search:
+    parameters:
+      - in: path
+        name: subscription_id
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: searchSelectedLaptopCache
+      x-stability: internal
+      summary: Search one explicitly selected local approved knowledge projection
+      description: Semantic read, permitted in the required read-only mode. Ordinary cookie Origin/CSRF protections still apply. No model, embeddings, learning, broader project search, network lookup or timeline write. Plain reviewed text and exact provenance only; results and freshness read from one committed projection snapshot. Responses over 256 KiB fail without partial disclosure. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [question]
+              properties:
+                question: { type: string, minLength: 1, maxLength: 4096, description: At most 4096 UTF-8 bytes. }
+                limit: { type: integer, minimum: 1, maximum: 50, default: 8 }
+      responses:
+        '200':
+          description: Cached cited read-only matches; not model answers or current remote authority.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schema_version, project, hits]
+                properties:
+                  schema_version: { type: integer, const: 1 }
+                  project: { $ref: '#/components/schemas/LaptopCacheProject' }
+                  hits: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/LaptopCacheHit' } }
+        '400': { description: Invalid bounded question or result limit. }
+        '403': { description: Authenticated loopback local owner or cookie protections failed. }
+        '404': { description: Subscription was not selected for this laptop area. }
+        '413': { description: Request or complete response exceeds bounded size. }
+        '503': { description: Projection missing, changed or unavailable; no fallback. }
   /v1/admin/onboarding/company/delegates:
     get:
       operationId: inspectConfiguredCompanyDelegates
@@ -3203,6 +3264,46 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    LaptopCacheProject:
+      type: object
+      required: [subscription_id, device_id, company_id, area, owner_instance_id, project_id, space_id, cursor, observed_at, initialized, read_only]
+      properties:
+        subscription_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        company_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        owner_instance_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        space_id: { type: string, format: uuid }
+        cursor: { type: integer, minimum: 0 }
+        observed_at: { type: [string, 'null'], format: date-time }
+        initialized: { type: boolean }
+        read_only: { type: boolean, const: true }
+    LaptopCacheEvidence:
+      type: object
+      required: [label, text, digest, reviewer, reviewed_at]
+      properties:
+        label: { type: string }
+        text: { type: string, description: Explicitly reviewed evidence excerpt; never raw captures or sessions. }
+        digest: { type: string, pattern: '^[0-9a-f]{64}$', description: SHA-256 of exact reviewed evidence snapshot. }
+        reviewer: { type: string }
+        reviewed_at: { type: string, format: date-time }
+    LaptopCacheHit:
+      type: object
+      required: [stream_id, author, authored_at, locator, digest, shared_version, source_record_id, source_version, text, summary, evidence, read_only]
+      properties:
+        stream_id: { type: string, format: uuid }
+        author: { type: string }
+        authored_at: { type: string, format: date-time }
+        locator: { type: string, description: Original accepted record locator; no invented evidence AT-URI. }
+        digest: { type: string, pattern: '^[0-9a-f]{64}$', description: SHA-256 of accepted publication envelope. }
+        shared_version: { type: integer, minimum: 1 }
+        source_record_id: { type: string, format: uuid }
+        source_version: { type: integer, minimum: 1 }
+        text: { type: string }
+        summary: { type: string }
+        evidence: { type: array, items: { $ref: '#/components/schemas/LaptopCacheEvidence' } }
+        read_only: { type: boolean, const: true }
     CompanyDelegateProject:
       type: object
       additionalProperties: false

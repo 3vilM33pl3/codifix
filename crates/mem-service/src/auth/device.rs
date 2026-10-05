@@ -19,7 +19,7 @@ use std::{
 };
 use uuid::Uuid;
 #[cfg(test)]
-pub(super) mod tests;
+pub(crate) mod tests;
 
 fn bad(message: &str) -> ApiError {
     ApiError::status_message(StatusCode::BAD_REQUEST, message)

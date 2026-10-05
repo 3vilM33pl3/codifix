@@ -200,6 +200,8 @@ class OperatorContract(unittest.TestCase):
                              ("reinforcement", "enabled"),
                              ("reinforcement", "validation_enabled"),
                              ("consolidation", "enabled"),
+                             ("provenance", "reverify_enabled"),
+                             ("procedural", "enabled"),
                              ("automation", "enabled"), ("embeddings", "enabled"),
                              ("embeddings", "create_enabled"),
                              ("features", "llm_curation")]:
@@ -210,6 +212,11 @@ class OperatorContract(unittest.TestCase):
             "provider": "openai_compatible", "model": "", "api_key_env": "",
             "base_url": "http://127.0.0.1:1",
         })
+        selected = config["laptop_cache"]["subscriptions"]
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(selected[0]["subscription_id"], self.metadata["subscription"])
+        self.assertEqual(selected[0]["owner_instance_id"], self.metadata["bootstrap"]["scope"]["owner"])
+        self.assertEqual(selected[0]["project_id"], self.metadata["bootstrap"]["scope"]["project"])
 
     def test_three_areas_isolated_profiles_named_jobs_and_no_legacy_effects(self):
         legacy = self.home / "custom-config"

@@ -1,0 +1,372 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+use super::*;
+use mem_config::{LaptopCacheConfig, LaptopCacheSubscription};
+use mem_federation::{
+    AuthorIdentity, CanonicalJsonCodec, RecordLocator, publication::*,
+    subscription::ProjectStreamReview,
+};
+use serde_json::{Value, json};
+
+async fn fixture() -> Option<(
+    crate::auth::device::tests::Fixture,
+    LaptopCacheSubscription,
+    AuthenticatedPrincipal,
+)> {
+    let mut f = crate::auth::device::tests::fixture().await?;
+    let binding = LaptopCacheSubscription {
+        subscription_id: Uuid::new_v4(),
+        device_id: Uuid::new_v4(),
+        company_id: Uuid::new_v4(),
+        owner_instance_id: Uuid::new_v4(),
+        project_id: f.project,
+        space_id: Uuid::new_v4(),
+    };
+    f.state.config.auth.mode = AuthMode::SingleUser;
+    f.state.config.service.read_only = true;
+    f.state.config.service.bind_addr = "127.0.0.1:55440".into();
+    f.state.config.llm.model.clear();
+    f.state.config.background_work.internal_automation = false;
+    f.state.config.provenance.reverify_enabled = false;
+    f.state.config.procedural.enabled = false;
+    f.state.config.reinforcement.validation_enabled = false;
+    f.state.config.mcp.enabled = false;
+    f.state.config.mcp.http_enabled = false;
+    // The disposable fixture owns the actual pool. This configuration-only URL
+    // exercises the guarded native target shape without provisioning a cluster.
+    f.state.config.database.url =
+        "postgresql://synthetic@127.0.0.1:55432/memory_laptop_workshop".into();
+    f.state.config.laptop_cache = Some(LaptopCacheConfig {
+        subscriptions: vec![binding.clone()],
+    });
+    f.state.config.validate_laptop_cache().unwrap();
+    let actor = crate::auth::resolve_principal(
+        &f.state,
+        crate::auth::Credential::ApiToken("synthetic-owner".into()),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    Some((f, binding, actor))
+}
+fn peer() -> ConnectInfo<SocketAddr> {
+    ConnectInfo("127.0.0.1:40000".parse().unwrap())
+}
+async fn body(response: Response) -> Value {
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+    serde_json::from_slice(
+        &axum::body::to_bytes(response.into_body(), 256 * 1024)
+            .await
+            .unwrap(),
+    )
+    .unwrap()
+}
+async fn seed(
+    state: &AppState,
+    binding: &LaptopCacheSubscription,
+    text: &str,
+) -> (Uuid, Vec<PublicationDelivery>) {
+    let scope = scope("workshop", binding).unwrap();
+    let store = ProjectProjectionStore::initialize(
+        state.pool().unwrap(),
+        binding.subscription_id,
+        binding.device_id,
+        scope.clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(store.cursor().await.unwrap(), 0);
+    let stream = StreamId {
+        origin: scope.owner,
+        canonical: RecordId::new(Uuid::new_v4()).unwrap(),
+    };
+    let snapshot = EvidenceSnapshot {
+        space: scope.space,
+        stream,
+        public_source_label: "Reviewed runbook excerpt".into(),
+        selected_text: "approved evidence bytes".into(),
+        observed_at: chrono::Utc::now(),
+    };
+    let evidence = ReviewedEvidence::new(
+        snapshot.clone(),
+        ReviewReceipt {
+            snapshot_digest: CanonicalJsonCodec::digest(&snapshot).unwrap(),
+            reviewer: AuthorIdentity::new("reviewed-expert").unwrap(),
+            reviewed_at: chrono::Utc::now(),
+        },
+    )
+    .unwrap();
+    let mut records: Vec<PublicationDelivery> = Vec::new();
+    let confidence = ConfidencePpm::try_from(800_000).unwrap();
+    for (index, record) in [
+        PublicationRecord::Evidence(evidence),
+        PublicationRecord::MemoryVersion {
+            stream,
+            publication: MemoryPublication {
+                version: SharedVersion::new(2).unwrap(),
+                source: SourceVersionRef {
+                    record_id: RecordId::new(Uuid::new_v4()).unwrap(),
+                    version: SourceVersion::new(7).unwrap(),
+                },
+                content: MemoryContent {
+                    text: text.into(),
+                    summary: "approved offline summary".into(),
+                    memory_type: MemoryType::DomainFact,
+                    confidence,
+                    importance: 1,
+                    tags: vec![],
+                },
+                evidence: vec![],
+            },
+        },
+        PublicationRecord::CanonicalState {
+            stream,
+            state: StatePublication {
+                revision: StateRevision::new(3).unwrap(),
+                content_version: SharedVersion::new(2).unwrap(),
+                status: MemoryStatus::Active,
+                confidence,
+                tombstone: false,
+            },
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut record = record;
+        if let PublicationRecord::MemoryVersion { publication, .. } = &mut record {
+            publication.evidence = vec![records[0].envelope.key()];
+        }
+        records.push(
+            PublicationDelivery::new(
+                AuthoritySequence::new(index as u32 + 1).unwrap(),
+                RecordLocator::new(format!("offline-record:{index}")).unwrap(),
+                PublicationEnvelope {
+                    schema_version: 2,
+                    space: scope.space,
+                    publisher: scope.owner,
+                    record_id: RecordId::new(Uuid::new_v4()).unwrap(),
+                    author: AuthorIdentity::new("original-author").unwrap(),
+                    authored_at: chrono::Utc::now(),
+                    causation: None,
+                    record,
+                },
+            )
+            .unwrap(),
+        );
+    }
+    // Tests seed the already verified local projection, not an untrusted
+    // network ingestion path. Existing signature/apply tests exercise that path.
+    let projection = json!({"records":records,"reviews":[ProjectStreamReview {stream,review_id:Uuid::new_v4(),records:records.iter().map(|r|r.envelope.key()).collect(),enabled:true}]});
+    sqlx::query("UPDATE onboarding_project_projections SET projection=$2,cursor=3,observed_at=clock_timestamp() WHERE subscription=$1").bind(binding.subscription_id).bind(projection).execute(&state.pool().unwrap()).await.unwrap();
+    (stream.canonical.as_uuid(), records)
+}
+#[tokio::test]
+async fn selected_local_cache_is_read_only_cited_and_current_snapshot_bounded() {
+    let Some((f, binding, actor)) = fixture().await else {
+        return;
+    };
+    let missing = body(
+        list(State(f.state.clone()), Extension(actor.clone()), peer())
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(missing["projects"][0]["initialized"], false);
+    let (stream, records) = seed(&f.state, &binding, "diagnosis selected approved text").await;
+    let mut other = binding.clone();
+    other.subscription_id = Uuid::new_v4();
+    other.owner_instance_id = Uuid::new_v4();
+    seed(&f.state, &other, "diagnosis OTHER-AREA-SECRET").await;
+    let cache = body(
+        list(State(f.state.clone()), Extension(actor.clone()), peer())
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(cache["projects"].as_array().unwrap().len(), 1);
+    let result = body(
+        search(
+            State(f.state.clone()),
+            Extension(actor.clone()),
+            peer(),
+            Path(binding.subscription_id),
+            Json(LaptopCacheSearchRequest {
+                question: "diagnosis".into(),
+                limit: 8,
+            }),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(result["project"]["cursor"], 3);
+    assert_eq!(
+        result["project"]["observed_at"],
+        cache["projects"][0]["observed_at"]
+    );
+    assert_eq!(result["hits"][0]["stream_id"], json!(stream));
+    assert_eq!(result["hits"][0]["author"], "original-author");
+    assert_eq!(result["hits"][0]["source_version"], 7);
+    assert_eq!(result["hits"][0]["shared_version"], 2);
+    assert_eq!(result["hits"][0]["digest"], records[1].digest.as_hex());
+    assert_eq!(
+        result["hits"][0]["evidence"][0]["text"],
+        "approved evidence bytes"
+    );
+    assert!(result["hits"][0]["read_only"].as_bool().unwrap());
+    assert!(!result.to_string().contains("OTHER-AREA-SECRET"));
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM onboarding_project_projections")
+            .fetch_one(&f.db.pool)
+            .await
+            .unwrap(),
+        2
+    );
+    sqlx::query("UPDATE onboarding_project_projections SET projection=jsonb_set(projection,'{reviews,0,enabled}','false'::jsonb) WHERE subscription=$1").bind(binding.subscription_id).execute(&f.db.pool).await.unwrap();
+    let withdrawn = body(
+        search(
+            State(f.state.clone()),
+            Extension(actor),
+            peer(),
+            Path(binding.subscription_id),
+            Json(LaptopCacheSearchRequest {
+                question: "diagnosis".into(),
+                limit: 8,
+            }),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(withdrawn["hits"], json!([]));
+    f.db.cleanup().await.unwrap();
+}
+#[tokio::test]
+async fn unbound_changed_and_remote_cache_reads_fail_without_fallback_or_initialization() {
+    let Some((mut f, binding, actor)) = fixture().await else {
+        return;
+    };
+    assert_eq!(
+        search(
+            State(f.state.clone()),
+            Extension(actor.clone()),
+            peer(),
+            Path(Uuid::new_v4()),
+            Json(LaptopCacheSearchRequest {
+                question: "anything".into(),
+                limit: 8
+            })
+        )
+        .await
+        .unwrap_err()
+        .status,
+        StatusCode::NOT_FOUND
+    );
+    let remote = ConnectInfo("192.0.2.30:40000".parse().unwrap());
+    assert_eq!(
+        list(State(f.state.clone()), Extension(actor.clone()), remote)
+            .await
+            .unwrap_err()
+            .status,
+        StatusCode::FORBIDDEN
+    );
+    let mut unbound = actor.clone();
+    unbound.credential_source = CredentialSource::ServiceToken;
+    assert_eq!(
+        list(State(f.state.clone()), Extension(unbound), peer())
+            .await
+            .unwrap_err()
+            .status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM onboarding_project_projections")
+            .fetch_one(&f.db.pool)
+            .await
+            .unwrap(),
+        0
+    );
+    seed(&f.state, &binding, "selected").await;
+    sqlx::query("UPDATE onboarding_project_projections SET device=$2 WHERE subscription=$1")
+        .bind(binding.subscription_id)
+        .bind(Uuid::new_v4())
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        list(State(f.state.clone()), Extension(actor.clone()), peer())
+            .await
+            .unwrap_err()
+            .status,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    f.state.config.database.url =
+        "postgresql://synthetic@server.example.invalid:5432/memory_laptop_workshop".into();
+    assert_eq!(
+        list(State(f.state.clone()), Extension(actor), peer())
+            .await
+            .unwrap_err()
+            .status,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    f.db.cleanup().await.unwrap();
+}
+#[tokio::test]
+async fn cache_http_requires_session_csrf_and_accepts_only_semantic_read_in_read_only_mode() {
+    let Some((f, binding, actor)) = fixture().await else {
+        return;
+    };
+    seed(&f.state, &binding, "cited http diagnosis").await;
+    let app = crate::routes::build_http_app(f.state.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+    let client = reqwest::Client::new();
+    let denied = client
+        .get(format!("{base}/v1/onboarding/cache"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    let ok = client
+        .get(format!("{base}/v1/onboarding/cache"))
+        .header("x-api-token", "synthetic-owner")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(ok.status(), StatusCode::OK);
+    assert_eq!(ok.headers()[header::CACHE_CONTROL], "no-store");
+    let path = format!(
+        "{base}/v1/onboarding/cache/{}/search",
+        binding.subscription_id
+    );
+    let ok = client
+        .post(&path)
+        .header("x-api-token", "synthetic-owner")
+        .json(&json!({"question":"diagnosis","limit":8}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(ok.status(), StatusCode::OK);
+    let (cookie, _) = crate::auth::mint_web_session(&f.state, &f.db.pool, actor.id)
+        .await
+        .unwrap();
+    let browser = client
+        .post(&path)
+        .header("cookie", format!("memory_session={cookie}"))
+        .json(&json!({"question":"diagnosis"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(browser.status(), StatusCode::FORBIDDEN);
+    server.abort();
+    let _ = server.await;
+    f.db.cleanup().await.unwrap();
+}

@@ -50,6 +50,11 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
     let web_assets = state.web_root.clone();
     let mcp_config = state.config.mcp.clone();
     let mut app = Router::new()
+        .route("/v1/onboarding/cache", get(crate::laptop_cache::list))
+        .route(
+            "/v1/onboarding/cache/{subscription_id}/search",
+            post(crate::laptop_cache::search).layer(axum::extract::DefaultBodyLimit::max(8192)),
+        )
         .route(
             "/v1/onboarding/device/cancel",
             post(crate::auth::device::cancel).layer(axum::extract::DefaultBodyLimit::max(4096)),

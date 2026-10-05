@@ -243,15 +243,35 @@ impl ProjectProjectionStore {
     /// Bounded lexical search, no embeddings/learning/model writeback. All
     /// identities and citations remain exact reviewed publication metadata.
     pub async fn search(&self, query: &str, limit: u32) -> Result<Vec<ProjectSearchHit>> {
+        Ok(self.search_with_status(query, limit).await?.1)
+    }
+    /// The displayed freshness/cursor belongs to the same committed projection
+    /// as these results, even if synchronization commits during inspection.
+    pub async fn search_with_status(
+        &self,
+        query: &str,
+        limit: u32,
+    ) -> Result<(ProjectProjectionStatus, Vec<ProjectSearchHit>)> {
         if query.is_empty() || query.len() > 4096 || !(1..=50).contains(&limit) {
             return Err(StoreError::Limits);
         }
-        let projection: Json<ReadOnlyProjection> = sqlx::query_scalar(
-            "SELECT projection FROM onboarding_project_projections WHERE subscription=$1",
+        let row = sqlx::query(
+            "SELECT device,scope,cursor,observed_at,projection FROM onboarding_project_projections WHERE subscription=$1",
         )
         .bind(self.subscription)
         .fetch_one(&self.pool)
         .await?;
+        if row.try_get::<Uuid, _>("device")? != self.device
+            || row.try_get::<Json<ProjectScope>, _>("scope")?.0 != self.scope
+        {
+            return Err(StoreError::Binding);
+        }
+        let status = ProjectProjectionStatus {
+            cursor: u64::try_from(row.try_get::<i64, _>("cursor")?)
+                .map_err(|_| StoreError::Corrupt)?,
+            observed_at: row.try_get("observed_at")?,
+        };
+        let projection = row.try_get::<Json<ReadOnlyProjection>, _>("projection")?.0;
         let tokens: Vec<_> = query
             .split_whitespace()
             .take(32)
@@ -350,11 +370,13 @@ impl ProjectProjectionStore {
             ));
         }
         hits.sort_by(|(a, ha), (b, hb)| b.cmp(a).then_with(|| ha.stream.cmp(&hb.stream)));
-        Ok(hits
-            .into_iter()
-            .take(limit as usize)
-            .map(|(_, h)| h)
-            .collect())
+        Ok((
+            status,
+            hits.into_iter()
+                .take(limit as usize)
+                .map(|(_, h)| h)
+                .collect(),
+        ))
     }
 }
 fn same_revision(a: &PublicationDelivery, b: &PublicationDelivery) -> bool {
