@@ -6,6 +6,7 @@
 pub mod admin;
 pub mod bundle;
 pub mod capture;
+pub mod company_onboarding;
 pub mod compose;
 pub mod device_onboarding;
 pub mod error;
@@ -26,6 +27,7 @@ pub mod watcher;
 pub use admin::*;
 pub use bundle::*;
 pub use capture::*;
+pub use company_onboarding::*;
 pub use compose::*;
 pub use device_onboarding::*;
 pub use error::*;

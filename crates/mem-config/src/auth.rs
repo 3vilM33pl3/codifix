@@ -86,6 +86,45 @@ pub struct AuthentikManagementConfig {
     pub user_path: String,
 }
 
+/// Owner-enrolled authority. A company credential is not a global administrator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompanyProjectDelegation {
+    pub project_id: Uuid,
+    pub role_ceiling: AuthRole,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompanyDelegationConfig {
+    pub company_id: Uuid,
+    /// Exact shared OIDC namespace, also equal to this owner's configured issuer.
+    pub issuer: String,
+    pub principal_id: Uuid,
+    pub token_id: Uuid,
+    pub policy_revision: i64,
+    pub projects: Vec<CompanyProjectDelegation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompanyOwnerConfig {
+    pub owner_instance_id: Uuid,
+    pub area: OnboardingArea,
+    pub base_url: String,
+    /// Server-only environment reference; never a browser/device credential.
+    pub token_env: String,
+    pub issuer: String,
+    pub delegation_policy_revision: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompanyOnboardingConfig {
+    pub company_id: Uuid,
+    pub owners: Vec<CompanyOwnerConfig>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthConfig {
     #[serde(default)]
@@ -103,6 +142,10 @@ pub struct AuthConfig {
     pub group_mappings: AuthGroupMappingsConfig,
     #[serde(default)]
     pub authentik_management: AuthentikManagementConfig,
+    #[serde(default)]
+    pub company_delegations: Vec<CompanyDelegationConfig>,
+    #[serde(default)]
+    pub company_onboarding: Option<CompanyOnboardingConfig>,
 }
 
 impl Default for AuthConfig {
@@ -115,6 +158,8 @@ impl Default for AuthConfig {
             oidc: OidcAuthConfig::default(),
             group_mappings: AuthGroupMappingsConfig::default(),
             authentik_management: AuthentikManagementConfig::default(),
+            company_delegations: vec![],
+            company_onboarding: None,
         }
     }
 }
