@@ -69,7 +69,7 @@ fn failure(output: Output, message: &str) {
 }
 fn request(fixture: &Fixture, dir: &std::path::Path) -> Command {
     let plan = success(command().arg("schema-plan").output().unwrap());
-    assert_eq!(plan["migration_head"], 70);
+    assert_eq!(plan["migration_head"], 71);
     let descriptor = json!({"format_version":1,"instance_id":Uuid::new_v4(),"area":"trust",
         "connection":{"kind":"loopback","port":fixture.options.get_port()},
         "database":fixture.name,"username":fixture.options.get_username(),
