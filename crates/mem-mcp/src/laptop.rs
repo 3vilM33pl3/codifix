@@ -123,6 +123,68 @@ mod tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
+    #[tokio::test]
+    async fn actual_mcp_transport_lists_and_calls_only_the_project_bound_tools() {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let (server_io, client_io) = tokio::io::duplex(32768);
+        let backend = Fake::default();
+        let server_backend = backend.clone();
+        let task = tokio::spawn(async move {
+            LaptopMcpServer::new(server_backend)
+                .serve(server_io)
+                .await
+                .unwrap()
+                .waiting()
+                .await
+                .unwrap();
+        });
+        let (read, mut write) = tokio::io::split(client_io);
+        let mut read = BufReader::new(read);
+        async fn exchange(
+            read: &mut BufReader<tokio::io::ReadHalf<tokio::io::DuplexStream>>,
+            write: &mut tokio::io::WriteHalf<tokio::io::DuplexStream>,
+            request: Value,
+        ) -> Value {
+            let mut bytes = serde_json::to_vec(&request).unwrap();
+            bytes.push(b'\n');
+            write.write_all(&bytes).await.unwrap();
+            let mut line = String::new();
+            tokio::time::timeout(std::time::Duration::from_secs(5), read.read_line(&mut line))
+                .await
+                .unwrap()
+                .unwrap();
+            serde_json::from_str(&line).unwrap()
+        }
+        let initialized=exchange(&mut read,&mut write,json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"synthetic-native-agent","version":"1"}}})).await;
+        assert!(initialized.get("result").is_some());
+        write
+            .write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n")
+            .await
+            .unwrap();
+        let listed = exchange(
+            &mut read,
+            &mut write,
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+        )
+        .await;
+        let tools = listed["result"]["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), 2);
+        assert_eq!(tools[0]["name"], "memory_project_cache_status");
+        assert_eq!(tools[1]["name"], "memory_project_cache_search");
+        let searched=exchange(&mut read,&mut write,json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"memory_project_cache_search","arguments":{"question":"synthetic fact","limit":2}}})).await;
+        assert_eq!(searched["result"]["structuredContent"]["read_only"], true);
+        let denied=exchange(&mut read,&mut write,json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"memory_query","arguments":{"project":"unauthorized"}}})).await;
+        assert!(denied.get("error").is_some());
+        let overridden=exchange(&mut read,&mut write,json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"memory_project_cache_search","arguments":{"question":"synthetic","project":"other"}}})).await;
+        assert!(overridden.get("error").is_some());
+        assert_eq!(backend.0.load(Ordering::SeqCst), 1);
+        drop(write);
+        drop(read);
+        tokio::time::timeout(std::time::Duration::from_secs(5), task)
+            .await
+            .unwrap()
+            .unwrap();
+    }
     #[derive(Clone, Default)]
     struct Fake(Arc<AtomicUsize>);
     impl LaptopCacheBackend for Fake {
