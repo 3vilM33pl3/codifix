@@ -15,6 +15,37 @@ pub(in crate::commands) struct SyncArgs {
     watch: bool,
 }
 #[derive(Debug, Args)]
+pub(in crate::commands) struct SubscriptionArgs {
+    #[command(flatten)]
+    company: super::CompanyArgs,
+    #[arg(long)]
+    project: uuid::Uuid,
+    #[arg(long)]
+    area: String,
+    #[arg(long)]
+    owner_instance: uuid::Uuid,
+    #[arg(long)]
+    revision: i64,
+    /// Create-only metadata in an existing owner-only directory, never a repo.
+    #[arg(long)]
+    output: PathBuf,
+    #[arg(long, requires = "confirm")]
+    bootstrap_sha256: Option<String>,
+    #[arg(long, requires = "bootstrap_sha256")]
+    confirm: bool,
+}
+pub(super) async fn subscription(args: &SubscriptionArgs) -> Result<()> {
+    #[cfg(feature = "project-sync")]
+    {
+        native::subscription(args, &super::credentials::NativeKeychain).await
+    }
+    #[cfg(not(feature = "project-sync"))]
+    {
+        let _ = args;
+        anyhow::bail!("this build has no project-sync support")
+    }
+}
+#[derive(Debug, Args)]
 pub(in crate::commands) struct SyncStatusArgs {
     #[arg(long)]
     profile: PathBuf,
@@ -74,9 +105,111 @@ mod native {
     };
     use anyhow::bail;
     use mem_federation_runtime::{
-        Endpoint, LocalProjectReplicaProfile, ProjectReplica, ProjectSyncHealth, ScopedDeviceClient,
+        Endpoint, LocalProjectReplicaProfile, PreparedProjectSubscription, ProjectReplica,
+        ProjectSyncHealth, ScopedDeviceClient,
     };
     use mem_record::OnboardingDeviceReviewProject;
+
+    pub(super) async fn subscription(
+        args: &SubscriptionArgs,
+        store: &impl CredentialStore,
+    ) -> Result<()> {
+        if args.project.is_nil()
+            || args.owner_instance.is_nil()
+            || args.revision <= 0
+            || !matches!(args.area.as_str(), "workshop" | "homelab" | "general")
+            || !args.output.is_absolute()
+            || args.output.file_name().is_none()
+        {
+            bail!(
+                "exact offline area/project/owner/revision and absolute private metadata output required"
+            );
+        }
+        let origin = CompanyOrigin::parse(&args.company.company, args.company.allow_loopback)?;
+        let enrollment = credentials::load(store, &origin)?
+            .ok_or_else(|| anyhow::anyhow!("sign in to this company first"))?;
+        if !enrollment.approved || enrollment.pending_logout {
+            bail!("approved device without pending logout required");
+        }
+        let client = CompanyClient::new(origin.clone())?;
+        let catalog = client.projects(&enrollment).await?;
+        let matching: Vec<_> = catalog
+            .projects
+            .iter()
+            .filter(|p| {
+                p.manifest.project_id == args.project
+                    && p.manifest.entry.area.as_str() == args.area
+                    && p.manifest.entry.owner_instance_id == args.owner_instance
+            })
+            .collect();
+        if matching.len() != 1
+            || matching[0].manifest.revision != args.revision
+            || !matching[0].offline_available
+            || !matching[0].manifest.entry.offline_allowed
+        {
+            bail!("exact currently approved offline manifest required");
+        }
+        let bootstrap = client.subscription(&enrollment, args.project).await?;
+        bootstrap.validate()?;
+        if bootstrap.device != enrollment.device_id
+            || bootstrap.scope.project != args.project
+            || bootstrap.scope.area != args.area
+            || bootstrap.scope.owner.as_uuid() != args.owner_instance
+            || u64::try_from(args.revision).ok() != Some(bootstrap.catalog_revision)
+        {
+            bail!("control-plane subscription does not match the selected device/manifest");
+        }
+        use sha2::{Digest, Sha256};
+        let digest = format!(
+            "{:x}",
+            Sha256::digest(serde_json::to_vec(&(&origin.0, &bootstrap))?)
+        );
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({"company":origin.0,
+            "bootstrap":bootstrap,"bootstrap_sha256":digest,"output":args.output,
+            "contains_database_credentials":false,"creates_services":false,"downloads_knowledge":false}))?
+        );
+        if !args.confirm {
+            return Ok(());
+        }
+        if args.bootstrap_sha256.as_deref() != Some(digest.as_str()) {
+            bail!("bootstrap confirmation differs; no metadata written");
+        }
+        let existing = match std::fs::symlink_metadata(&args.output) {
+            Ok(_) => Some(PreparedProjectSubscription::read(&args.output)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(_) => bail!("subscription metadata unavailable; existing files preserved"),
+        };
+        if let Some(existing) = existing {
+            if existing.company != origin.0
+                || existing.bootstrap != bootstrap
+                || existing.allow_loopback_development != args.company.allow_loopback
+            {
+                bail!(
+                    "existing subscription metadata differs; review a new output rather than replacing it"
+                );
+            }
+            println!(
+                "Subscription {} already prepared; unchanged.",
+                existing.subscription
+            );
+        } else {
+            let prepared = PreparedProjectSubscription {
+                schema_version: 1,
+                company: origin.0,
+                subscription: uuid::Uuid::new_v4(),
+                bootstrap,
+                allow_loopback_development: args.company.allow_loopback,
+            };
+            prepared.create(&args.output)?;
+            println!(
+                "Prepared subscription {}. No services or database credentials created.",
+                prepared.subscription
+            );
+        }
+        Ok(())
+    }
 
     async fn replica(
         profile: &LocalProjectReplicaProfile,
@@ -298,6 +431,45 @@ mod native {
                 offline_available: true,
             };
             (profile, enrollment, entry)
+        }
+        #[test]
+        fn subscription_preview_and_confirmation_require_exact_selection() {
+            use crate::commands::runtime::Cli;
+            use clap::Parser;
+            let project = Uuid::new_v4().to_string();
+            let owner = Uuid::new_v4().to_string();
+            let mut args = vec![
+                "memory",
+                "projects",
+                "subscription",
+                "--company",
+                "https://company.example.invalid",
+                "--project",
+                &project,
+                "--area",
+                "workshop",
+                "--owner-instance",
+                &owner,
+                "--revision",
+                "1",
+                "--output",
+                "/private/subscription.json",
+            ];
+            assert!(Cli::try_parse_from(args.clone()).is_ok());
+            args.push("--confirm");
+            assert!(Cli::try_parse_from(args.clone()).is_err());
+            args.extend(["--bootstrap-sha256", "0123456789"]);
+            assert!(Cli::try_parse_from(args).is_ok());
+            assert!(
+                Cli::try_parse_from([
+                    "memory",
+                    "projects",
+                    "subscription",
+                    "--company",
+                    "https://company.example.invalid"
+                ])
+                .is_err()
+            );
         }
         #[test]
         fn offline_scope_device_catalog_and_consent_are_checked_before_initialization() {

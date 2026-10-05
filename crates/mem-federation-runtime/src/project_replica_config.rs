@@ -7,6 +7,48 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use uuid::Uuid;
 
+/// Confirmed control-plane metadata passed to the native provisioner; no local
+/// or server database credentials. The provisioner adds its own loopback URL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreparedProjectSubscription {
+    pub schema_version: u32,
+    pub company: String,
+    pub subscription: Uuid,
+    pub bootstrap: DeviceProjectSubscription,
+    #[serde(default)]
+    pub allow_loopback_development: bool,
+}
+impl PreparedProjectSubscription {
+    pub fn validate(&self) -> Result<()> {
+        // Reuse profile/control-plane validation without inventing a server URL.
+        LocalProjectReplicaProfile {
+            schema_version: self.schema_version,
+            company: self.company.clone(),
+            subscription: self.subscription,
+            local_database_url: format!(
+                "postgresql://validation@127.0.0.1:55432/memory_laptop_{}",
+                self.bootstrap.scope.area
+            ),
+            bootstrap: self.bootstrap.clone(),
+            allow_loopback_development: self.allow_loopback_development,
+        }
+        .validate()
+    }
+    pub fn read(path: &Path) -> Result<Self> {
+        let bytes = crate::private_files::read(path, 64 * 1024)?;
+        let prepared: Self =
+            serde_json::from_slice(&bytes).map_err(|_| RuntimeError::Configuration)?;
+        prepared.validate()?;
+        Ok(prepared)
+    }
+    pub fn create(&self, path: &Path) -> Result<()> {
+        self.validate()?;
+        let bytes = serde_json::to_vec_pretty(self).map_err(|_| RuntimeError::Configuration)?;
+        crate::private_files::create(path, &bytes)
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LocalProjectReplicaProfile {
@@ -93,6 +135,48 @@ mod tests {
                 },
             },
         }
+    }
+    #[cfg(unix)]
+    #[test]
+    fn prepared_metadata_publication_is_atomic_create_only_and_private() {
+        use std::{
+            fs,
+            os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
+        };
+        let path =
+            std::env::temp_dir().join(format!("memory-subscription-test-{}", Uuid::new_v4()));
+        fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+        let fixture = profile();
+        let prepared = PreparedProjectSubscription {
+            schema_version: 1,
+            company: fixture.company,
+            subscription: fixture.subscription,
+            bootstrap: fixture.bootstrap,
+            allow_loopback_development: false,
+        };
+        let target = path.join("subscription.json");
+        prepared.create(&target).unwrap();
+        assert_eq!(
+            PreparedProjectSubscription::read(&target).unwrap(),
+            prepared
+        );
+        assert_eq!(
+            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        let original = fs::read(&target).unwrap();
+        let mut changed = prepared.clone();
+        changed.subscription = Uuid::new_v4();
+        assert!(changed.create(&target).is_err());
+        assert_eq!(fs::read(&target).unwrap(), original);
+        let alias = path.join("alias.json");
+        symlink(&target, &alias).unwrap();
+        assert!(PreparedProjectSubscription::read(&alias).is_err());
+        assert!(changed.create(&alias).is_err());
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(PreparedProjectSubscription::read(&target).is_err());
+        assert_eq!(fs::read_dir(&path).unwrap().count(), 2);
+        fs::remove_dir_all(&path).unwrap();
     }
     #[test]
     fn profile_does_not_allow_server_database_or_origin_fallback() {

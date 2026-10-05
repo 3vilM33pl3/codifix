@@ -5,6 +5,18 @@
 use crate::{Result, RuntimeError};
 use std::path::Path;
 
+/// Atomic, create-only publication for native onboarding metadata. Never
+/// replace an existing profile; an interrupted final fsync is reconciled by
+/// reading the already published exact profile on the next invocation.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub(crate) fn create(path: &Path, bytes: &[u8]) -> Result<()> {
+    unix::create(path, bytes)
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+pub(crate) fn create(_path: &Path, _bytes: &[u8]) -> Result<()> {
+    Err(RuntimeError::Configuration)
+}
+
 #[cfg(unix)]
 pub(crate) fn read(path: &Path, limit: u64) -> Result<Vec<u8>> {
     unix::Input::open(path, limit)?.read(limit)
@@ -78,6 +90,36 @@ mod unix {
             return Err(RuntimeError::Configuration);
         }
         Ok(dir)
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    pub(super) fn create(path: &Path, bytes: &[u8]) -> Result<()> {
+        use rustix::fs::{AtFlags, RenameFlags, renameat_with, unlinkat};
+        use std::io::Write;
+        if bytes.len() > 64 * 1024 {
+            return Err(RuntimeError::Configuration);
+        }
+        let dir = directory(path.parent().ok_or(RuntimeError::Configuration)?)?;
+        let target = path.file_name().ok_or(RuntimeError::Configuration)?;
+        let temporary = format!(".memory-subscription-{}.tmp", uuid::Uuid::new_v4());
+        let mut file: File = openat(
+            &dir,
+            &temporary,
+            OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::RUSR | Mode::WUSR,
+        )
+        .map_err(failure)?
+        .into();
+        secure(&file.metadata().map_err(failure)?)?;
+        file.write_all(bytes).map_err(failure)?;
+        file.sync_all().map_err(failure)?;
+        if let Err(error) = renameat_with(&dir, &temporary, &dir, target, RenameFlags::NOREPLACE) {
+            // Only this invocation's generated private staging file is removed.
+            let _ = unlinkat(&dir, &temporary, AtFlags::empty());
+            return Err(failure(error));
+        }
+        dir.sync_all().map_err(failure)?;
+        Ok(())
     }
 
     pub(super) struct Input {

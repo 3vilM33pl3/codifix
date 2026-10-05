@@ -66,6 +66,8 @@ pub(super) enum ProjectsCommand {
     Status(workspace::StatusArgs),
     /// Apply approved, attested pages to a separate local read-only projection.
     Sync(replica::SyncArgs),
+    /// Review and prepare credential-free metadata for the native provisioner.
+    Subscription(replica::SubscriptionArgs),
     /// Show committed cursor/freshness without claiming current remote authority.
     SyncStatus(replica::SyncStatusArgs),
     /// Search only the selected project's cached, cited read-only projection.
@@ -141,6 +143,7 @@ pub(super) async fn handle_command(command: &Command) -> Result<bool> {
             ProjectsCommand::Apply(args) => workspace::apply(args, &store).await?,
             ProjectsCommand::Status(args) => workspace::status(args)?,
             ProjectsCommand::Sync(args) => replica::sync(args).await?,
+            ProjectsCommand::Subscription(args) => replica::subscription(args).await?,
             ProjectsCommand::SyncStatus(args) => replica::status(args).await?,
             ProjectsCommand::OfflineSearch(args) => replica::search(args).await?,
         },
