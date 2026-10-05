@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 use sqlx::{Row, postgres::PgRow};
 use uuid::Uuid;
 
+pub(crate) mod company;
 mod provider;
 #[cfg(test)]
 mod tests;

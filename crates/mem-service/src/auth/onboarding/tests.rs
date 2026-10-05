@@ -323,10 +323,16 @@ async fn fake_authentik_effects_are_bounded_sanitized_and_journaled() {
         .route("/api/v3/core/users/{id}/",get(|Path(id):Path<i64>|async move{Json(if id==2 {json!({"pk":id,"path":"memory-onboarding"})}else if id==3{json!({"pk":id,"path":"memory-onboarding","is_superuser":"false"})}else{json!({"pk":id,"path":if id==42 {"memory-onboarding"} else {"unrelated-admins"},"is_superuser":id!=42})})}).patch(|Json(body):Json<Value>|async move{assert_eq!(body,json!({"is_active":false}));Json(json!({"pk":42}))}))
         .route("/api/v3/stages/invitation/invitations/",post(|Json(body):Json<Value>|async move{assert_eq!(body["single_use"],true);let name=body["name"].as_str().unwrap();assert!(name.len()<=50);assert!(name.bytes().all(|c|c.is_ascii_alphanumeric() || matches!(c,b'-'|b'_')));Json(json!({"pk":Uuid::new_v4()}))}));
     let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let token_env = format!(
+        "MEMORY_ONBOARDING_FAKE_AUTHENTIK_{}",
+        Uuid::new_v4().simple()
+    );
+    // This fake provider test is self-contained and never reads a live token.
+    unsafe { std::env::set_var(&token_env, "synthetic-management-token") };
     state.config.auth.authentik_management = mem_config::AuthentikManagementConfig {
         enabled: true,
         base_url: format!("http://{addr}"),
-        token_env: "MEMORY_ONBOARDING_FAKE_AUTHENTIK_TOKEN".into(),
+        token_env: token_env.clone(),
         invitation_flow: Some(Uuid::new_v4()),
         user_path: "memory-onboarding".into(),
     };
@@ -444,6 +450,7 @@ async fn fake_authentik_effects_are_bounded_sanitized_and_journaled() {
             .is_err()
     );
     server.abort();
+    unsafe { std::env::remove_var(token_env) };
 }
 
 #[tokio::test]

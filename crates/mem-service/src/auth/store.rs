@@ -1045,6 +1045,7 @@ pub(crate) async fn grant_membership(
         .ok_or_else(|| ApiError::not_found("project not found"))?
         .try_get("id")
         .map_err(ApiError::sql)?;
+    guard_local_membership(&mut tx, project_id, request.principal_id).await?;
     let id = Uuid::new_v4();
     let actor_id = persisted_actor_id(actor);
     let row = sqlx::query(
@@ -1123,6 +1124,19 @@ pub(crate) async fn revoke_membership(
     membership_id: Uuid,
 ) -> Result<AuthMembershipResponse, ApiError> {
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
+    let binding =
+        sqlx::query("SELECT principal_id,project_id FROM auth_project_memberships WHERE id=$1")
+            .bind(membership_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(ApiError::sql)?
+            .ok_or_else(|| ApiError::not_found("membership not found"))?;
+    guard_local_membership(
+        &mut tx,
+        binding.try_get("project_id").map_err(ApiError::sql)?,
+        binding.try_get("principal_id").map_err(ApiError::sql)?,
+    )
+    .await?;
     let row = sqlx::query(
         r#"
         DELETE FROM auth_project_memberships m
@@ -1160,6 +1174,25 @@ pub(crate) async fn revoke_membership(
         source: row.try_get("source").map_err(ApiError::sql)?,
         created_at: row.try_get("created_at").map_err(ApiError::sql)?,
     })
+}
+
+/// Serializes absent-row creation with delegated grants too. Company ownership
+/// is not silently transferred by legacy upsert/delete administration helpers.
+async fn guard_local_membership(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    project: Uuid,
+    principal: Uuid,
+) -> Result<(), ApiError> {
+    super::onboarding::company::lock_grant_key(tx, project, principal).await?;
+    let owned: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM onboarding_company_grants WHERE project_id=$1 AND principal_id=$2)")
+        .bind(project).bind(principal).fetch_one(&mut **tx).await.map_err(ApiError::sql)?;
+    if owned {
+        return Err(ApiError::status_message(
+            axum::http::StatusCode::CONFLICT,
+            "direct grant is company-owned; use its revisioned delegated operation",
+        ));
+    }
+    Ok(())
 }
 
 async fn project_access_for_principal(

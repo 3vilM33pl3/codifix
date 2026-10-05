@@ -58,6 +58,71 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
     let mut table = matchit::Router::new();
     let entries: &[(&str, &[(Method, RoutePolicy)])] = &[
         (
+            "/v1/onboarding/delegated-grants",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::AuthManage,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/delegated-grants/operations/{operation_id}",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::AuthManage,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/company/operations",
+            &[
+                (
+                    Method::GET,
+                    RoutePolicy {
+                        permission: Permission::SystemAdmin,
+                        scope: ProjectScope::Global,
+                        semantic_read: false,
+                    },
+                ),
+                (
+                    Method::POST,
+                    RoutePolicy {
+                        permission: Permission::SystemAdmin,
+                        scope: ProjectScope::Global,
+                        semantic_read: false,
+                    },
+                ),
+            ],
+        ),
+        (
+            "/v1/admin/onboarding/company/operations/{operation_id}",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/company/operations/{operation_id}/reconcile",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
             "/v1/onboarding/device/cancel",
             &[(
                 Method::POST,

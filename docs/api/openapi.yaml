@@ -27,6 +27,105 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/onboarding/delegated-grants:
+    post:
+      operationId: applyCompanyDelegatedGrant
+      x-stability: internal
+      summary: Apply an owner-enrolled company direct grant or revoke
+      description: Exact current ServiceToken principal and token UUID, explicit project AuthManage and configured role ceiling required. Exact shared no-trailing-slash OIDC namespace may create an absent pre-login identity but never reactivate disabled humans; other issuer configurations fail closed rather than silently aliasing. Only absent direct rows may be claimed; locally-owned grants conflict. Company ownership survives revoke. Effect, audit and immutable receipt commit together. Exact replay returns a historical receipt plus freshly inspected current direct/group rights, never revives authority. Trust administration denied; catalog revision is unrelated. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyGrantRequest' }
+      responses:
+        '200':
+          description: Historical transaction receipt and separately timestamped current rights.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyGrantResult' }
+        '400': { description: Invalid bounded role or identity; Trust rejected. }
+        '401': { description: Credential expired or revoked. }
+        '403': { description: Exact delegate, namespace, project permission or ceiling denied. }
+        '409': { description: Changed request, ownership or revision. }
+  /v1/onboarding/delegated-grants/operations/{operation_id}:
+    get:
+      operationId: inspectCompanyDelegatedGrant
+      x-stability: internal
+      summary: Inspect a historical owner receipt with fresh effective rights
+      parameters:
+        - { name: operation_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: company_id, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Exact enrolled delegate only; current project authority required. No-store.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyGrantResult' }
+        '403': { description: Current owner delegate or project authority denied. }
+        '404': { description: No committed owner operation. }
+  /v1/admin/onboarding/company/operations:
+    get:
+      operationId: listCompanyOnboardingOperations
+      x-stability: internal
+      summary: List up to one hundred durable company operation journals
+      responses:
+        '200':
+          description: Global administrator only; historical metadata, no current rights. No-store.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [operations]
+                properties:
+                  operations: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/CompanyOperationStatus' } }
+    post:
+      operationId: startCompanyOnboardingOperation
+      x-stability: internal
+      summary: Journal an exact request before one configured owner call
+      description: Writable company global administrator with ordinary CSRF rules. Explicit HTTPS owner registry and restricted server-only credential; no imported URLs or inherited human cookies. No database locks span HTTP. Lost confirmation is uncertain. Exact repeat reads journal without another effect; use explicit reconcile. This is grant/revoke only, not fleet disable or remote-device approval. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyGrantRequest' }
+      responses:
+        '200':
+          description: Durable pending/confirmed/rejected/uncertain state; current rights only from verified fresh owner reply.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyOperationStatus' }
+        '409': { description: Changed bytes or owner origin under the same operation identity. }
+        '503': { description: External effect may have occurred; sanitized operation UUID identifies durable intent. }
+  /v1/admin/onboarding/company/operations/{operation_id}:
+    get:
+      operationId: inspectCompanyOnboardingOperation
+      x-stability: internal
+      summary: Read historical company journal without asserting current remote rights
+      parameters:
+        - { name: operation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Global administrator only; current_access is null. No-store.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyOperationStatus' }
+        '404': { description: Company intent not found. }
+  /v1/admin/onboarding/company/operations/{operation_id}/reconcile:
+    post:
+      operationId: reconcileCompanyOnboardingOperation
+      x-stability: internal
+      summary: Inspect the owner, then replay the exact request only if absent
+      parameters:
+        - { name: operation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Fresh verified rights are separate from historical receipt; unavailable owner remains uncertain, never a successful fleet revoke. No-store.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyOperationStatus' }
+        '409': { description: Owner origin or currently enrolled policy changed. }
+        '503': { description: External effect may have occurred; inspect durable operation UUID. }
   /v1/onboarding/device/start:
     post:
       operationId: startDeviceEnrollment
@@ -2989,6 +3088,63 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    CompanyGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [company_id, operation_id, owner_instance_id, area, project_id, issuer, subject, operation, role, expected_grant_revision, delegation_policy_revision]
+      properties:
+        company_id: { type: string, format: uuid }
+        operation_id: { type: string, format: uuid }
+        owner_instance_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        project_id: { type: string, format: uuid }
+        issuer: { type: string, format: uri }
+        subject: { type: string, minLength: 1, maxLength: 512 }
+        operation: { type: string, enum: [grant, revoke] }
+        role: { type: string, enum: [reader, writer, operator] }
+        expected_grant_revision: { type: integer, minimum: 0 }
+        delegation_policy_revision: { type: integer, minimum: 1 }
+    CompanyGrantReceipt:
+      type: object
+      additionalProperties: false
+      required: [request, request_sha256, principal_id, grant_revision, direct_grant_active, committed_at]
+      properties:
+        request: { $ref: '#/components/schemas/CompanyGrantRequest' }
+        request_sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        principal_id: { type: string, format: uuid }
+        grant_revision: { type: integer, minimum: 1 }
+        direct_grant_active: { type: boolean }
+        committed_at: { type: string, format: date-time }
+    CompanyCurrentAccess:
+      type: object
+      additionalProperties: false
+      required: [observed_at, principal_id, disabled, project, direct_role, grant_company_id, owner_grant_revision, group_roles, permissions]
+      properties:
+        observed_at: { type: string, format: date-time }
+        principal_id: { type: string, format: uuid }
+        disabled: { type: boolean }
+        project: { type: string, maxLength: 128 }
+        direct_role: { type: [string, 'null'], enum: [reader, writer, operator, admin, null] }
+        grant_company_id: { type: [string, 'null'], format: uuid }
+        owner_grant_revision: { type: [integer, 'null'], minimum: 1 }
+        group_roles: { type: array, maxItems: 16, items: { type: string, enum: [reader, writer, operator, admin] } }
+        permissions: { type: array, items: { type: string } }
+    CompanyGrantResult:
+      type: object
+      additionalProperties: false
+      required: [receipt, current_access]
+      properties:
+        receipt: { $ref: '#/components/schemas/CompanyGrantReceipt' }
+        current_access: { $ref: '#/components/schemas/CompanyCurrentAccess' }
+    CompanyOperationStatus:
+      type: object
+      required: [request, request_sha256, outcome, receipt, current_access]
+      properties:
+        request: { $ref: '#/components/schemas/CompanyGrantRequest' }
+        request_sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        outcome: { type: string, enum: [pending, confirmed, rejected, uncertain] }
+        receipt: { anyOf: [{ $ref: '#/components/schemas/CompanyGrantReceipt' }, { type: 'null' }] }
+        current_access: { anyOf: [{ $ref: '#/components/schemas/CompanyCurrentAccess' }, { type: 'null' }] }
     OnboardingDeviceStartRequest:
       type: object
       additionalProperties: false

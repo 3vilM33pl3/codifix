@@ -76,6 +76,29 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         )
         .route("/v1/onboarding/projects", get(crate::auth::device::catalog))
         .route(
+            "/v1/onboarding/delegated-grants",
+            post(crate::auth::onboarding::company::delegated_grant)
+                .layer(axum::extract::DefaultBodyLimit::max(8192)),
+        )
+        .route(
+            "/v1/onboarding/delegated-grants/operations/{operation_id}",
+            get(crate::auth::onboarding::company::delegated_status),
+        )
+        .route(
+            "/v1/admin/onboarding/company/operations",
+            get(crate::auth::onboarding::company::company_operations)
+                .post(crate::auth::onboarding::company::company_operation)
+                .layer(axum::extract::DefaultBodyLimit::max(8192)),
+        )
+        .route(
+            "/v1/admin/onboarding/company/operations/{operation_id}",
+            get(crate::auth::onboarding::company::company_status),
+        )
+        .route(
+            "/v1/admin/onboarding/company/operations/{operation_id}/reconcile",
+            post(crate::auth::onboarding::company::company_reconcile),
+        )
+        .route(
             "/v1/admin/onboarding/capabilities",
             get(crate::auth::onboarding::capabilities),
         )
