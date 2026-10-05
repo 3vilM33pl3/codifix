@@ -37,6 +37,21 @@ pub struct ReceiptTrust {
     verifiers: Vec<DetachedVerifier>,
 }
 impl ReceiptTrust {
+    pub(crate) fn verify_current_signature(
+        &self,
+        generation: u32,
+        bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<()> {
+        if generation != self.keys.len() as u32 {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        self.verifiers
+            .last()
+            .ok_or(RuntimeError::Configuration)?
+            .verify(bytes, signature)
+            .map_err(|_| RuntimeError::InvalidResponse)
+    }
     pub(crate) fn verify_status(
         &self,
         signed: crate::SignedGatewayStatus,
@@ -205,6 +220,11 @@ pub struct GatewaySecurity {
     policy: SpacePolicy,
 }
 impl GatewaySecurity {
+    pub(crate) fn sign_current(&self, bytes: &[u8]) -> Result<Vec<u8>> {
+        self.signer
+            .sign(bytes)
+            .map_err(|_| RuntimeError::InvalidResponse)
+    }
     pub(crate) fn sign_status(
         &self,
         status: crate::GatewayStatus,

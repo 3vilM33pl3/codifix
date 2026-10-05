@@ -26,11 +26,12 @@ pub struct GatewayServer {
     pub(crate) fence: WriterFence,
     pub(crate) delivery_waiters: crate::expertise_delivery::DeliveryWaiters,
     credentials: Vec<([u8; 32], InstanceId)>,
-    security: GatewaySecurity,
+    pub(crate) security: GatewaySecurity,
     // New semantics stay unreachable through the existing deployment profile.
     // F1 activation must establish fleet compatibility before enabling them.
     expertise_enabled: bool,
     addressed_enabled: bool,
+    scoped_enabled: bool,
     space: SpaceId,
     authority: InstanceId,
     publication_status: Option<PdsPublisher>,
@@ -80,6 +81,7 @@ impl GatewayServer {
             security,
             expertise_enabled: false,
             addressed_enabled: false,
+            scoped_enabled: false,
             delivery_waiters: Default::default(),
             space,
             authority,
@@ -95,9 +97,20 @@ impl GatewayServer {
         if self.expertise_enabled {
             router = router.route("/v1/expertise", post(expertise));
         }
+        if self.scoped_enabled {
+            router = router
+                .route("/v1/projects/register", post(crate::scoped::register))
+                .route("/v1/projects/page", post(crate::scoped::page));
+        }
         router
             .layer(DefaultBodyLimit::max(96 * 1024))
             .with_state(Arc::new(self.clone()))
+    }
+    /// Explicit deployment opt-in. This grants no new participant, human,
+    /// device or project authority and never changes schema-v2/v3 history.
+    pub fn enable_scoped_delivery(mut self) -> Self {
+        self.scoped_enabled = true;
+        self
     }
     /// Explicit private expertise opt-in. Customer release remains a separate
     /// operational gate; this never enrolls a member or grants collection access.
@@ -316,7 +329,10 @@ impl GatewayServer {
         self.publication_status = Some(pds);
         self
     }
-    fn authenticate(&self, headers: &HeaderMap) -> std::result::Result<InstanceId, StatusCode> {
+    pub(crate) fn authenticate(
+        &self,
+        headers: &HeaderMap,
+    ) -> std::result::Result<InstanceId, StatusCode> {
         if headers.get_all("authorization").iter().count() != 1 {
             return Err(StatusCode::UNAUTHORIZED);
         }

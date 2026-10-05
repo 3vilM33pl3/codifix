@@ -18,6 +18,8 @@ mod pds;
 mod private_files;
 pub use credentials::{CredentialMode, CredentialState, GatewayCredentialStatus, MaintenanceState};
 mod security;
+mod scoped;
+pub use scoped::*;
 mod status;
 pub use status::*;
 mod sync;
