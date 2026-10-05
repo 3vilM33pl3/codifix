@@ -252,9 +252,9 @@ mod terminal {
             return "No projects are currently approved for this device. No fallback to a broader catalog. Esc/q: cancel.".into();
         }
         let count = usize::from(height.saturating_sub(2) / 4).max(1);
-        // Context above the selection must fit the visible capacity, including
-        // short terminals that can display only one or two identity rows.
-        let start = picker.selected.saturating_sub(2.min(count - 1));
+        // Put the selection first: narrow terminals wrap identity lines, so a
+        // fixed count of preceding items can otherwise hide the active choice.
+        let start = picker.selected;
         picker
             .projects
             .iter()
@@ -341,7 +341,7 @@ mod terminal {
     #[test]
     fn picker_short_terminal_render_keeps_selected_identity_visible_after_down() {
         use ratatui::backend::TestBackend;
-        for height in [16, 20] {
+        for (width, height) in [(90, 16), (90, 20), (40, 24), (40, 16)] {
             let mut projects = vec![];
             for index in 0..8 {
                 let mut project = super::tests::project();
@@ -352,7 +352,7 @@ mod terminal {
             for _ in 0..6 {
                 picker.input(Input::Down);
             }
-            let mut terminal = Terminal::new(TestBackend::new(90, height)).unwrap();
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
             terminal
                 .draw(|frame| {
                     let areas = Layout::vertical([
@@ -378,7 +378,7 @@ mod terminal {
                 .collect();
             assert!(
                 rendered.contains("> workshop / project-6"),
-                "selected project hidden in {height}-row terminal"
+                "selected project hidden in {width}x{height} terminal"
             );
         }
     }

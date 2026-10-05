@@ -12,6 +12,8 @@ use clap::Args;
 use credentials::{CredentialStore, Enrollment};
 use mem_record::{OnboardingDeviceReviewProject, OnboardingProject};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "tui")]
+use std::path::Path;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -115,7 +117,7 @@ pub(super) fn active(store: &impl CredentialStore, origin: &CompanyOrigin) -> Re
 
 /// Read-only path validation shared by the picker before entering its UI.
 #[cfg(feature = "tui")]
-pub(super) fn validate_selection_paths(workspace: &PathBuf, journal: &PathBuf) -> Result<()> {
+pub(super) fn validate_selection_paths(workspace: &Path, journal: &Path) -> Result<()> {
     filesystem::separate(journal, workspace)?;
     filesystem::absolute_leaf(workspace)?;
     filesystem::absolute_leaf(journal)?;
