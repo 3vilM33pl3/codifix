@@ -101,6 +101,13 @@ never the Memory device token. Redirects, repository hooks, submodule recursion
 and automatic maintenance are disabled. Existing repositories must have the
 reviewed origin URL; their branch and uncommitted changes are left alone. No
 existing repository is reset, checked out, cleared or automatically recloned.
+Every apply/resume rechecks the repository and reviewed origin, including completed
+stages; newly prepared repositories also require their immutable request/plan
+receipt. Checkout of new private clones ignores global/system Git configuration
+and external attributes. Repository filters (including required filters), local
+filter definitions/config includes and external local attributes are explicitly
+unsupported rather than executed or silently materialized incorrectly. Normal
+user Git credentials remain available for the `--no-checkout` clone.
 Interrupted work reuses the recorded request and private staging. An unusable
 partial clone or publication conflict requires inspection rather than automatic
 destructive cleanup. Trust is remote-only and rejects local workspace preparation.
@@ -115,7 +122,12 @@ layout, reviewed under tool name `memory-skills`: credential-free HTTPS, an exac
 SHA-256 pin and a matching version in every bundled known Memory `SKILL.md`.
 Archives must contain `.agents/skills/<known-memory-skill>/...`; paths, file types,
 download/expansion sizes and duplicate entries are checked. Only missing skill
-directories are installed. Custom skills are retained, scripts are not executed
+directories are installed. Selected names use minimal ASCII; case aliases at any
+directory component, receipt aliases and file/directory prefix conflicts fail
+before installation. Journal containment is checked through physical filesystem
+identities and existing canonical ancestors, not path spelling alone. Linux
+alias fixtures are covered; native case-insensitive APFS validation is pending.
+Custom skills are retained, scripts are not executed
 or made executable, and no generic executable plugin is installed. Unknown tool
 formats or failed hashes/versions stop with the completed journal stages retained.
 

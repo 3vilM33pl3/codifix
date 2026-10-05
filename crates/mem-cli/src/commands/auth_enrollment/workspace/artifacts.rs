@@ -56,6 +56,29 @@ impl Downloads for HttpsArtifacts {
 }
 
 type Bundle = BTreeMap<String, BTreeMap<String, Vec<u8>>>;
+// Track the materialized tree, not just complete ZIP names: case-insensitive
+// filesystems also alias intermediate directories and file/directory prefixes.
+fn register(
+    tree: &mut BTreeMap<String, (String, bool)>,
+    parts: &[&str],
+    directory: bool,
+) -> Result<()> {
+    for index in 1..=parts.len() {
+        let spelling = parts[..index].join("/");
+        let key = spelling.to_ascii_lowercase();
+        let is_directory = index < parts.len() || directory;
+        if let Some((original, prior_directory)) = tree.get(&key) {
+            if original != &spelling || !is_directory || !prior_directory {
+                bail!(
+                    "archive has case aliases, duplicate files or file/directory prefix conflicts"
+                );
+            }
+        } else {
+            tree.insert(key, (spelling, is_directory));
+        }
+    }
+    Ok(())
+}
 pub(super) fn bundle(bytes: &[u8]) -> Result<Bundle> {
     if bytes.len() > MAX_DOWNLOAD {
         bail!("pinned archive exceeds download limit");
@@ -67,6 +90,7 @@ pub(super) fn bundle(bytes: &[u8]) -> Result<Bundle> {
         bail!("pinned archive has too many entries");
     }
     let mut files: Bundle = BTreeMap::new();
+    let mut tree = BTreeMap::new();
     let mut total = 0usize;
     for index in 0..archive.len() {
         let file = archive.by_index(index)?;
@@ -98,23 +122,54 @@ pub(super) fn bundle(bytes: &[u8]) -> Result<Bundle> {
         if file.size() > MAX_FILE as u64 || total > 64 * 1024 * 1024 {
             bail!("pinned archive expansion exceeds safe bounds");
         }
-        if file.is_dir() {
-            continue;
-        }
-        let Some(offset) = parts
-            .windows(2)
-            .position(|parts| parts == [".agents", "skills"])
-        else {
+        let Some(offset) = parts.windows(2).position(|parts| {
+            parts[0].eq_ignore_ascii_case(".agents") && parts[1].eq_ignore_ascii_case("skills")
+        }) else {
             continue;
         };
         let selected = &parts[offset + 2..];
-        if selected.len() < 2 || !mem_skills::MEMORY_SKILL_NAMES.contains(&selected[0]) {
+        if selected.is_empty()
+            || !mem_skills::MEMORY_SKILL_NAMES
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case(selected[0]))
+        {
             continue;
         }
-        let relative = selected[1..].join("/");
-        if relative == ".memory-onboarding-pin.json" {
+        if parts[offset..offset + 2] != [".agents", "skills"]
+            || !mem_skills::MEMORY_SKILL_NAMES.contains(&selected[0])
+        {
+            bail!("archive skill root has a case alias");
+        }
+        if file
+            .name()
+            .trim_end_matches('/')
+            .split('/')
+            .any(|part| part.is_empty() || matches!(part, "." | ".."))
+        {
+            bail!("selected archive path has an ambiguous prefix");
+        }
+        if selected.iter().any(|part| {
+            part.is_empty()
+                || !part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+        }) {
+            bail!("selected archive names require bounded minimal ASCII components");
+        }
+        if selected
+            .iter()
+            .any(|part| part.eq_ignore_ascii_case(".memory-onboarding-pin.json"))
+        {
             bail!("archive collides with Memory install receipt");
         }
+        register(&mut tree, selected, file.is_dir())?;
+        if file.is_dir() {
+            continue;
+        }
+        if selected.len() < 2 {
+            bail!("archive skill root must be a directory");
+        }
+        let relative = selected[1..].join("/");
         let mut content = Vec::new();
         file.take(MAX_FILE as u64 + 1).read_to_end(&mut content)?;
         if content.len() > MAX_FILE {

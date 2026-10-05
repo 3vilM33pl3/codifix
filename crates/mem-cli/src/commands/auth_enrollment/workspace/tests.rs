@@ -62,7 +62,7 @@ fn identity() -> (CompanyOrigin, Enrollment) {
     };
     (origin, record)
 }
-fn project() -> OnboardingDeviceReviewProject {
+pub(super) fn project() -> OnboardingDeviceReviewProject {
     OnboardingDeviceReviewProject {
         manifest: OnboardingProject {
             project_id: Uuid::new_v4(),
@@ -82,6 +82,167 @@ fn project() -> OnboardingDeviceReviewProject {
         },
         allowed_roles: vec![mem_record::AuthRole::Reader],
         offline_available: true,
+    }
+}
+#[tokio::test]
+async fn every_ready_resume_requires_current_origin_and_immutable_receipt() {
+    let fixture = Fixture::new();
+    let project = project();
+    let args = fixture.prepare(&project.manifest);
+    let catalog = FakeCatalog::new(project);
+    let (origin, record) = identity();
+    let journal = prepare_with(&args, &origin, &record, &catalog)
+        .await
+        .unwrap();
+    let apply = fixture.apply(&journal);
+    let git = FakeGit::default();
+    let downloads = FakeDownloads::default();
+    apply_with(&apply, &origin, &record, &catalog, &git, &downloads)
+        .await
+        .unwrap();
+    git.reject_existing.set(true);
+    assert!(
+        apply_with(&apply, &origin, &record, &catalog, &git, &downloads)
+            .await
+            .is_err()
+    );
+    git.reject_existing.set(false);
+    fs::remove_file(args.workspace.join(".git/memory-onboarding-receipt.json")).unwrap();
+    assert!(
+        apply_with(&apply, &origin, &record, &catalog, &git, &downloads)
+            .await
+            .is_err()
+    );
+    // Replace only the test-owned synthetic repository, never a user workspace.
+    fs::remove_dir_all(&args.workspace).unwrap();
+    fs::create_dir_all(args.workspace.join(".git")).unwrap();
+    fs::write(args.workspace.join("custom.txt"), "replacement").unwrap();
+    assert!(
+        apply_with(&apply, &origin, &record, &catalog, &git, &downloads)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        fs::read_to_string(args.workspace.join("custom.txt")).unwrap(),
+        "replacement"
+    );
+    assert_eq!(git.clones.get(), 1);
+}
+#[tokio::test]
+async fn existing_preserved_resume_rechecks_origin() {
+    let fixture = Fixture::new();
+    let project = project();
+    let args = fixture.prepare(&project.manifest);
+    fs::create_dir_all(args.workspace.join(".git")).unwrap();
+    fs::write(args.workspace.join("dirty.txt"), "keep").unwrap();
+    let catalog = FakeCatalog::new(project);
+    let (origin, record) = identity();
+    let journal = prepare_with(&args, &origin, &record, &catalog)
+        .await
+        .unwrap();
+    let git = FakeGit::default();
+    let apply = fixture.apply(&journal);
+    apply_with(
+        &apply,
+        &origin,
+        &record,
+        &catalog,
+        &git,
+        &FakeDownloads::default(),
+    )
+    .await
+    .unwrap();
+    git.reject_existing.set(true);
+    assert!(
+        apply_with(
+            &apply,
+            &origin,
+            &record,
+            &catalog,
+            &git,
+            &FakeDownloads::default()
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(git.existing.get(), 2);
+    assert_eq!(
+        fs::read_to_string(args.workspace.join("dirty.txt")).unwrap(),
+        "keep"
+    );
+    assert_eq!(git.clones.get(), 0);
+}
+#[cfg(unix)]
+#[tokio::test]
+async fn physical_containment_rejects_aliases_before_journal_or_locks() {
+    use std::os::unix::fs::symlink;
+    let fixture = Fixture::new();
+    let project = project();
+    let mut args = fixture.prepare(&project.manifest);
+    fs::create_dir(&args.workspace).unwrap();
+    symlink(&args.workspace, fixture.0.join("alias")).unwrap();
+    args.journal = fixture.0.join("alias/plan.json");
+    let catalog = FakeCatalog::new(project);
+    let (origin, record) = identity();
+    assert!(
+        prepare_with(&args, &origin, &record, &catalog)
+            .await
+            .is_err()
+    );
+    assert!(fs::read_dir(&args.workspace).unwrap().next().is_none());
+    assert_eq!(catalog.calls.get(), 0);
+    assert!(filesystem::separate(&fixture.0.join("REPO2"), &fixture.0.join("repo2")).is_err());
+    assert!(
+        filesystem::separate(
+            &fixture.0.join("missing"),
+            &fixture.0.join("missing.memory-lock")
+        )
+        .is_err()
+    );
+    assert!(
+        filesystem::separate(
+            &fixture.0.join("missing.memory-lock"),
+            &fixture.0.join("missing")
+        )
+        .is_err()
+    );
+    fs::write(fixture.0.join("a"), "metadata").unwrap();
+    fs::hard_link(fixture.0.join("a"), fixture.0.join("b")).unwrap();
+    assert!(filesystem::separate(&fixture.0.join("a"), &fixture.0.join("b")).is_err());
+    assert!(filesystem::separate(&fixture.0.join("outside.json"), &args.workspace).is_ok());
+}
+#[test]
+fn archive_aliases_and_prefix_conflicts_are_rejected_before_installation() {
+    let name = mem_skills::MEMORY_SKILL_NAMES[0];
+    let cases = vec![
+        vec!["skill.md".to_string()],
+        vec!["Scripts/other.sh".to_string()],
+        vec!["file".to_string(), "file/child".to_string()],
+        vec!["dir/child".to_string(), "dir".to_string()],
+        vec![".MEMORY-ONBOARDING-PIN.JSON".to_string()],
+        vec!["café.md".to_string()],
+        vec!["scripts/./ambiguous".to_string()],
+    ];
+    for extras in cases {
+        let mut zip = ZipWriter::new_append(Cursor::new(bundle("1.0"))).unwrap();
+        for extra in extras {
+            zip.start_file(
+                format!("fixture/.agents/skills/{name}/{extra}"),
+                SimpleFileOptions::default(),
+            )
+            .unwrap();
+            zip.write_all(b"untrusted").unwrap();
+        }
+        assert!(artifacts::bundle(&zip.finish().unwrap().into_inner()).is_err());
+    }
+    for path in [
+        format!("fixture/.AGENTS/skills/{name}/other"),
+        format!("fixture/.agents/skills/{}/other", name.to_ascii_uppercase()),
+    ] {
+        let mut zip = ZipWriter::new_append(Cursor::new(bundle("1.0"))).unwrap();
+        zip.start_file(path, SimpleFileOptions::default()).unwrap();
+        zip.write_all(b"untrusted").unwrap();
+        assert!(artifacts::bundle(&zip.finish().unwrap().into_inner()).is_err());
     }
 }
 struct FakeCatalog {

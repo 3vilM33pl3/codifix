@@ -77,6 +77,93 @@ pub(super) fn absolute_leaf(path: &Path) -> Result<PathBuf> {
     }
     Ok(path.to_owned())
 }
+
+#[cfg(unix)]
+fn identity(path: &Path) -> Result<(u64, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = fs::metadata(path)?;
+    Ok((metadata.dev(), metadata.ino()))
+}
+
+/// Physical ancestor checks catch APFS case aliases, symlinks and mount aliases
+/// without assuming that canonical path spelling or ASCII case is authority.
+#[cfg(unix)]
+pub(super) fn separate(journal: &Path, workspace: &Path) -> Result<()> {
+    for path in [journal, workspace] {
+        if !path.is_absolute()
+            || path
+                .components()
+                .any(|part| !matches!(part, Component::RootDir | Component::Normal(_)))
+        {
+            bail!("physical containment requires absolute paths without traversal");
+        }
+    }
+    fn inside(child: &Path, root: &Path) -> Result<bool> {
+        if !exists(root)? {
+            return Ok(false);
+        }
+        let root = identity(root)?;
+        let mut existing = child;
+        while !exists(existing)? {
+            existing = existing
+                .parent()
+                .ok_or_else(|| anyhow::anyhow!("physical ancestor unavailable"))?;
+        }
+        let existing = fs::canonicalize(existing)?;
+        for ancestor in existing.ancestors() {
+            if identity(ancestor)? == root {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+    let journal_lock = lock_path(journal)?;
+    let workspace_lock = lock_path(workspace)?;
+    // Missing leaves have no inode yet. With the same physical parent, refuse
+    // ambiguous ASCII case aliases conservatively, and unsupported Unicode
+    // names until they exist and can be checked by physical identity.
+    for (journal, workspace) in [
+        (journal, workspace),
+        (journal_lock.as_path(), workspace),
+        (journal, workspace_lock.as_path()),
+    ] {
+        if inside(journal, workspace)? || inside(workspace, journal)? {
+            bail!(
+                "the metadata journal and lock sidecars must be physically outside the project workspace"
+            );
+        }
+        if !exists(journal)? && !exists(workspace)? {
+            let jp = journal
+                .parent()
+                .ok_or_else(|| anyhow::anyhow!("journal parent unavailable"))?;
+            let wp = workspace
+                .parent()
+                .ok_or_else(|| anyhow::anyhow!("workspace parent unavailable"))?;
+            if identity(jp)? == identity(wp)? {
+                let j = journal
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| anyhow::anyhow!("new journal name must be ASCII"))?;
+                let w = workspace
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| anyhow::anyhow!("new workspace name must be ASCII"))?;
+                if !j.is_ascii() || !w.is_ascii() || j.eq_ignore_ascii_case(w) {
+                    bail!(
+                        "new journal/workspace names have ambiguous filesystem aliases; use distinct ASCII names"
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+#[cfg(not(unix))]
+pub(super) fn separate(_: &Path, _: &Path) -> Result<()> {
+    bail!(
+        "physical workspace containment validation is unsupported on this platform; no local writes performed"
+    )
+}
 pub(super) fn is_repository(path: &Path) -> Result<bool> {
     no_symlinks(path)?;
     if !path.is_dir() {
@@ -95,14 +182,17 @@ pub(super) fn is_repository(path: &Path) -> Result<bool> {
 pub(super) struct Lock {
     _file: fs::File,
 }
+fn lock_path(path: &Path) -> Result<PathBuf> {
+    Ok(path.with_file_name(format!(
+        "{}.memory-lock",
+        path.file_name()
+            .ok_or_else(|| anyhow::anyhow!("journal name unavailable"))?
+            .to_string_lossy()
+    )))
+}
 impl Lock {
     pub(super) fn take(path: &Path) -> Result<Self> {
-        let lock = path.with_file_name(format!(
-            "{}.memory-lock",
-            path.file_name()
-                .ok_or_else(|| anyhow::anyhow!("journal name unavailable"))?
-                .to_string_lossy()
-        ));
+        let lock = lock_path(path)?;
         no_symlinks(&lock)?;
         let mut options = fs::OpenOptions::new();
         options.write(true).create(true).truncate(false);
@@ -153,6 +243,7 @@ pub(super) fn read(path: &Path) -> Result<Journal> {
         bail!("journal immutable inputs or template version conflict; no effects performed");
     }
     absolute_leaf(&journal.plan.workspace)?;
+    separate(path, &journal.plan.workspace)?;
     if super::CompanyOrigin::parse(&journal.plan.company, true)?.0 != journal.plan.company {
         bail!("journal company origin is not canonical");
     }
@@ -161,12 +252,14 @@ pub(super) fn read(path: &Path) -> Result<Journal> {
     Ok(journal)
 }
 pub(super) fn create_journal(path: &Path, journal: &Journal) -> Result<()> {
+    separate(path, &journal.plan.workspace)?;
     let mut file = exclusive(path)?;
     file.write_all(&serde_json::to_vec_pretty(journal)?)?;
     file.sync_all()?;
     Ok(())
 }
 pub(super) fn save(path: &Path, journal: &Journal) -> Result<()> {
+    separate(path, &journal.plan.workspace)?;
     no_symlinks(path)?;
     let temporary = path.with_file_name(format!(".memory-journal-{}.tmp", Uuid::new_v4()));
     create_journal(&temporary, journal)?;

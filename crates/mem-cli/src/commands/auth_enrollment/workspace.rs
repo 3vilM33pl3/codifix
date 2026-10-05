@@ -129,11 +129,9 @@ async fn prepare_with(
     enrollment: &Enrollment,
     remote: &impl Catalog,
 ) -> Result<Journal> {
+    filesystem::separate(&args.journal, &args.workspace)?;
     let journal_path = filesystem::absolute_leaf(&args.journal)?;
     let workspace = filesystem::absolute_leaf(&args.workspace)?;
-    if journal_path.starts_with(&workspace) || workspace.starts_with(&journal_path) {
-        bail!("the metadata journal must be outside the project workspace");
-    }
     let _lock = filesystem::Lock::take(&journal_path)?;
     let scope = remote.projects(enrollment).await?;
     let project = scope
@@ -200,7 +198,7 @@ pub(super) async fn apply(args: &ApplyArgs, store: &impl CredentialStore) -> Res
         &origin,
         &enrollment,
         &remote,
-        &repository::NativeGit,
+        &repository::NativeGit::default(),
         &artifacts::HttpsArtifacts::new()?,
     )
     .await?;
@@ -224,8 +222,12 @@ async fn apply_with(
         bail!("apply requires --confirm; no effects performed");
     }
     let path = filesystem::absolute_leaf(&args.journal)?;
+    // Read-only physical validation comes before even creating lock sidecars.
+    let preview = filesystem::read(&path)?;
+    filesystem::separate(&path, &preview.plan.workspace)?;
     let _lock = filesystem::Lock::take(&path)?;
     let mut journal = filesystem::read(&path)?;
+    filesystem::separate(&path, &journal.plan.workspace)?;
     if journal.plan.company != origin.0
         || journal.plan.device_id != enrollment.device_id
         || journal.plan_sha256 != args.plan_sha256
@@ -235,12 +237,9 @@ async fn apply_with(
     let _workspace_lock = filesystem::Lock::take(&journal.plan.workspace)?;
     // Recheck authority even when resuming completed local stages.
     current(&journal, enrollment, remote).await?;
-    if !matches!(
-        journal.repository,
-        RepositoryStage::Ready | RepositoryStage::ExistingPreserved
-    ) {
-        repository::apply(&path, &mut journal, git).await?;
-    }
+    // Completed stages are not authority: reverify repository and origin on
+    // every invocation before templates/downloads or successful status.
+    repository::apply(&path, &mut journal, git).await?;
     current(&journal, enrollment, remote).await?;
     if !journal.templates_done {
         for template in &journal.plan.templates {
