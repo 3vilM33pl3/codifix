@@ -29,10 +29,10 @@ and embedding work are disabled.
 | --- | --- | --- |
 | Contract checkpoint | Complete | Memory IDs above; contract committed. |
 | Sol/Astra project defaults | Complete | Two TOML files parse successfully; bounded read-only adviser and updated repo guidance. |
-| Company administration backend | In progress | Reviewed catalog, stable identities, local disablement, device revocation and opt-in Authentik adapter; validation pending. |
-| Administration Web UI | In progress | Users/Projects/Devices alongside existing memberships and tokens; validation pending. |
+| Local company administration backend | Implemented and focused tests passed | Commits `5140b5d1`, `2fb2a3f2`; 36 auth tests on a separate disposable PostgreSQL database, including six onboarding tests; OpenAPI inventory test, formatting and diff checks. Live provider RBAC and company-wide authority remain unverified. |
+| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices alongside existing memberships/tokens; 170 Web tests and production build passed. This is a development UI, not a deployed company console. |
 | Unified cross-area administration | Pending | Explicit remote authority and partial-failure handling; a local catalog cannot grant access in another database. |
-| Device login and selection | Pending | Browser-authorized, revocable enrollment; CLI/Web/TUI and Keychain. |
+| Device login and selection | In progress | Exact browser review, bounded per-device approval and current-human authority checks; CLI/Web/TUI and native Keychain acceptance remain unfinished. |
 | Selective snapshots/offline search | Pending | Project-scoped authorization before bytes leave the server; verified publication data only. |
 | Installer and tool/repository setup | Pending | Journaled, pinned, non-destructive native Mac workflow. |
 | Real macOS acceptance | Pending | Requires native execution; Linux builds/tests are not evidence of this. |
@@ -53,6 +53,35 @@ and embedding work are disabled.
   sessions and machine credentials.
 - No broad federation pull is used for laptop project selection. Scoped snapshots
   are a remaining feature, not an existing property of the instance/space stream.
+
+## Focused validation and review evidence
+
+The Rust administration tests exercised reviewed catalog compare-and-swap and
+immutable history; Trust/offline rejection and unpinned tool rejection; direct
+grant removal while group access survives; disabled-user OIDC/session/token
+fencing; device revocation; shared HTTP authorization/CSRF/read-only policy; and
+rollback when the protected audit append fails. Fake Authentik tests covered
+bounded provider responses, managed-path restrictions, durable intents and
+uncertain outcomes. No live Authentik mutation occurred.
+
+Astra's independent review found two recovery defects: provider operations lacked
+a durable target/correlation, and Web refresh could lose an uncertain operation's
+reference. The backend now persists bounded correlation metadata and the browser
+restores metadata-only operation history without resubmitting effects. Provider
+response bodies and credentials are not displayed. The Web recovery tests include
+lost HTTP confirmations, strict operation-ID parsing and reloaded invitation
+metadata (`5c27e0d2`).
+
+Migration `0066` had already been applied by the development test helper. It was
+restored byte-for-byte to its applied checksum; correlation fields are additive
+in `0067`. No migration checksum bypass, source reset or production migration was
+used. Device enrollment starts at `0068`.
+
+Device approval binds the reviewed catalog revision as well as the exact
+area/project/owner identity. A changed manifest requires renewed review. The
+server never releases a new bearer secret through polling: the client prepares
+its random credential locally and enrollment approves its hash. This is an
+implementation contract, not evidence that native Keychain login already works.
 
 ## Completion status
 

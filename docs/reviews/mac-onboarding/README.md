@@ -39,9 +39,9 @@ configure Codex and Claude; preserve the private federation profile and pins.
 
 ## 4. Agent configuration and optional API
 
-- [ ] Sol primary coding/high effort; Astra read-only adviser/reviewer/high effort; maximum two concurrent subagents, default Sol/medium; bounded installer/verifier/security/docs roles as needed.
-- [ ] Update older engineering model guidance and provide exact custom-agent/default configuration; preserve Claude's independent models and credentials.
-- [ ] No dependency on an unverified Decision API. Optional Agents SDK explicit per-agent models or separate Responses calls; authorization remains deterministic; no new paid API execution.
+- [x] Sol primary coding/high effort; Astra read-only adviser/reviewer/high effort; maximum two concurrent subagents, default Sol/medium; bounded installer/verifier/security/docs roles as needed.
+- [x] Update older engineering model guidance and provide exact custom-agent/default configuration; preserve Claude's independent models and credentials.
+- [x] No dependency on an unverified Decision API. Optional Agents SDK explicit per-agent models or separate Responses calls; authorization remains deterministic; no new paid API execution.
 
 ## 5. Delivery and acceptance
 
@@ -57,4 +57,3 @@ rehearsal and instructions.
 Completion requires an observed macOS journey. Windows, R3, autonomous
 supervisors and public release remain separate. No existing installations are
 changed by this development work.
-
