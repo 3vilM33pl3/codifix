@@ -83,6 +83,8 @@ jobs:
               - "deploy/areas/**"
               - ".github/workflows/ci.yml"
               - ".agents/skills/**"
+              - ".codex/config.toml"
+              - ".codex/agents/astra_adviser.toml"
               - "README.md"
               - "memory-layer.toml.example"
             plugin:
@@ -210,6 +212,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --workspace --all-targets --locked
+      - name: Test project onboarding CLI and independent cache agents
+        run: |
+          cargo test -p mem-cli --no-default-features --features project-sync,tui --locked commands::auth_enrollment:: -- --test-threads=2
 
   rust-clippy:
     name: Rust Clippy
@@ -435,6 +440,21 @@ jobs:
           bash packaging/tests/test-debian-lifecycle.sh
           python3 packaging/tests/test-instance-launcher.py
           python3 packaging/tests/test-ca-preflight.py
+
+  macos-onboarding-contract:
+    name: macOS Onboarding Contract (Synthetic Linux Tests)
+    runs-on: [self-hosted, memory, Linux, X64]
+    needs: changes
+    if: needs.changes.outputs.package == 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test package and recovery contracts (no Mac or provider access)
+        run: |
+          python3 -c 'import sys; assert sys.version_info >= (3, 11)'
+          bash -n packaging/build-pkg.sh
+          bash -n packaging/macos/postinstall.sh
+          bash -n packaging/macos/seed-user.sh
+          python3 -m unittest discover -s packaging/macos/tests -v
 
   package-smoke:
     name: Debian Package Smoke (amd64)

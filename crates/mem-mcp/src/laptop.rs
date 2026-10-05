@@ -268,8 +268,7 @@ mod tests {
         let error = LaptopMcpServer::new(Failed)
             .call("memory_project_cache_status", Map::new())
             .await
-            .err()
-            .expect("expected denial");
+            .expect_err("expected denial");
         assert!(!error.message.contains("secret"));
         assert!(!error.message.contains("raw error"));
     }
