@@ -48,6 +48,10 @@ impl ValidationTrigger {
 /// Produces a verdict for a gathered context. Implementations must not
 /// mutate any state; the pipeline owns all persistence.
 #[async_trait]
+#[allow(
+    clippy::double_must_use,
+    reason = "async_trait generates must_use on its boxed futures"
+)]
 pub trait VerdictProvider: Send + Sync {
     async fn assess(&self, context: &ValidationContext) -> Result<RawVerdict>;
 

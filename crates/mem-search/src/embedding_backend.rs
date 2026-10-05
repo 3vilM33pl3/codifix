@@ -60,6 +60,10 @@ impl EmbeddingSpace {
 }
 
 #[async_trait]
+#[allow(
+    clippy::double_must_use,
+    reason = "async_trait generates must_use on its boxed futures"
+)]
 pub trait EmbeddingBackend: Send + Sync {
     fn space(&self) -> &EmbeddingSpace;
     async fn embed(&self, input: &[String], purpose: EmbeddingPurpose) -> Result<Vec<Vector>>;
