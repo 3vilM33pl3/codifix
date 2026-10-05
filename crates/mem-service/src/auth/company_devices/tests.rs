@@ -149,7 +149,7 @@ async fn fake_subscription(
     }
     Ok(Json(bootstrap))
 }
-struct Owner {
+pub(crate) struct Owner {
     fake: Fake,
     config: mem_config::CompanyOwnerConfig,
     secret: String,
@@ -158,11 +158,18 @@ struct Owner {
 }
 impl Owner {
     async fn new(f: &Fixture) -> Self {
+        Self::new_with_destinations(f, Vec::new()).await
+    }
+    pub(crate) async fn new_with_destinations(
+        f: &Fixture,
+        destinations: Vec<OnboardingDestination>,
+    ) -> Self {
         let row=sqlx::query("SELECT v.*,p.slug FROM onboarding_project_versions v JOIN projects p ON p.id=v.project_id WHERE v.project_id=$1 ORDER BY v.revision DESC LIMIT 1").bind(f.project).fetch_one(&f.db.pool).await.unwrap();
         let mut manifest = crate::auth::onboarding::project_row(&row).unwrap();
         manifest.project_id = Uuid::new_v4();
         manifest.entry.area = OnboardingArea::Homelab;
         manifest.entry.owner_instance_id = Uuid::new_v4();
+        manifest.entry.destinations = destinations;
         let security = GatewaySecurity::initial(&[61; 32], SpacePolicy::default()).unwrap();
         let fake = Fake {
             manifest: manifest.clone(),
@@ -214,19 +221,22 @@ impl Owner {
             server,
         }
     }
-    async fn close(self) {
+    pub(crate) fn mode(&self, value: u8) {
+        self.fake.mode.store(value, Ordering::SeqCst);
+    }
+    pub(crate) async fn close(self) {
         self.server.abort();
         let _ = self.server.await;
         unsafe { std::env::remove_var(&self.env) };
     }
 }
-fn configure(f: &mut Fixture, owner: &Owner) {
+pub(crate) fn configure(f: &mut Fixture, owner: &Owner) {
     f.state.config.auth.company_onboarding = Some(mem_config::CompanyOnboardingConfig {
         company_id: Uuid::new_v4(),
         owners: vec![owner.config.clone()],
     });
 }
-async fn start(f: &Fixture) -> (OnboardingDeviceStartResponse, String, String) {
+pub(crate) async fn start(f: &Fixture) -> (OnboardingDeviceStartResponse, String, String) {
     static PEER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
     let peer = PEER.fetch_add(1, Ordering::Relaxed);
     let credential = format!(
@@ -263,7 +273,7 @@ async fn start(f: &Fixture) -> (OnboardingDeviceStartResponse, String, String) {
     );
     (response, credential, poll)
 }
-async fn request(
+pub(crate) async fn request(
     f: &Fixture,
     start: &OnboardingDeviceStartResponse,
 ) -> CompanyDeviceApproveRequest {
@@ -293,7 +303,7 @@ async fn request(
         }],
     }
 }
-async fn call(
+pub(crate) async fn call(
     f: &Fixture,
     r: &CompanyDeviceApproveRequest,
 ) -> Result<OnboardingDevicePollResponse, ApiError> {

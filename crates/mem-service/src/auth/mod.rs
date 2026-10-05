@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 pub(crate) mod answerer;
+pub(crate) mod company_agents;
 pub(crate) mod company_catalog;
 pub(crate) mod company_delegate;
 pub(crate) mod company_delivery_delegate;

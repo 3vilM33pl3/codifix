@@ -222,6 +222,49 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )],
         ),
         (
+            "/v1/onboarding/devices/{device_id}/agents",
+            &[
+                (
+                    Method::GET,
+                    RoutePolicy {
+                        permission: Permission::MemoryRead,
+                        scope: ProjectScope::HumanSession,
+                        semantic_read: false,
+                    },
+                ),
+                (
+                    Method::POST,
+                    RoutePolicy {
+                        permission: Permission::MemoryRead,
+                        scope: ProjectScope::HumanSession,
+                        semantic_read: false,
+                    },
+                ),
+            ],
+        ),
+        (
+            "/v1/onboarding/devices/{device_id}/agents/{agent_id}/revoke",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanSession,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/agents/{agent_id}/receipt",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
             "/v1/onboarding/company/device/approve",
             &[(
                 Method::POST,

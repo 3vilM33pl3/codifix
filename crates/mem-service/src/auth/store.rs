@@ -307,6 +307,7 @@ async fn load_service_token_principal(
     principal.credential_source = CredentialSource::ServiceToken;
     principal.token_id = Some(token_id);
     super::device::cap_authenticated_device(state, pool, token_id, &mut principal).await?;
+    super::company_agents::cap_authenticated_agent(state, pool, token_id, &mut principal).await?;
     if should_touch_last_used(token_id) {
         if state.config.evaluation.active() {
             // Frozen credential rows are part of the benchmark snapshot. Keep

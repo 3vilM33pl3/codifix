@@ -64,6 +64,92 @@ paths:
         '403': { description: Current authority or exact scope denied. }
         '409': { description: Changed source, approval, cursor or nonce. }
         '503': { description: Registration or delivery unavailable; retry exact request. }
+  /v1/onboarding/devices/{device_id}/agents:
+    parameters:
+      - { name: device_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: inspectCompanyDeviceAgents
+      x-stability: internal
+      summary: Inspect retained independent agent receipts for the owning browser human
+      description: Exact fresh parent HumanOidc browser only, not a company admin override. At most 64 retained child identities. Includes expiry/revocation metadata, not a claim of current remote authority; child receipt checks are required for activation. No secrets or endpoints. No-store.
+      responses:
+        '200':
+          description: Bounded retained receipts including revocation tombstones.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyAgentList' }
+        '401': { description: Session expired or revoked. }
+        '403': { description: Exact owning browser human required. }
+    post:
+      operationId: approveIndependentCompanyAgent
+      x-stability: internal
+      summary: Bind a client-generated independent agent credential to exact approved scopes
+      description: |
+        Exact parent HumanOidc browser session, Origin/CSRF, writable primary only. Client
+        supplies stable request/agent/principal/token UUIDs and SHA256 of its own random
+        credential; no raw credential is accepted or returned. Codex requires fixed reviewed
+        destination codex/openai/openai; Claude requires claude/anthropic/anthropic. All selected
+        non-Trust offline scopes must already belong to the exact company device, with matching
+        manifest revision/SHA and explicit offline consent. At most 32 unique composite scopes,
+        expiry greater than now and at most 24 hours, no extension or renewal. Validate current
+        owning human/device/token/registry and authenticated owner subscription outside local
+        locks, then recheck before transactionally inserting immutable child binding, independent
+        zero-permission service identity/hash and protected audit. No globals, memberships,
+        device impersonation, generic MCP or snapshot/export authority. Exact replay returns
+        the original active receipt; changed bytes or revoked/expired parents/children cannot
+        restore authority. Provider/destination policy comes only from operator-reviewed
+        manifest descriptors, not caller URLs/configuration. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyAgentApproveRequest' }
+      responses:
+        '200':
+          description: Sanitized exact independent child receipt; never a secret.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyAgentReceipt' }
+        '401': { description: Parent session expired or revoked. }
+        '403': { description: Current parent, destination, offline consent or bounded expiry denied. }
+        '409': { description: Stable identity or immutable request/scope/policy changed. }
+        '429': { description: Maximum retained child identities reached. }
+        '503': { description: Current selected owner authority unavailable; no activation. }
+  /v1/onboarding/devices/{device_id}/agents/{agent_id}/revoke:
+    post:
+      operationId: revokeIndependentCompanyAgent
+      x-stability: internal
+      summary: Independently revoke the owning human's exact child credential
+      description: Fresh exact parent browser identity and CSRF required, including after parent device revocation. Independent retained tombstone, token fence and protected audit commit atomically. Exact replay acknowledges original timestamp; no siblings are revoked and no authority restored. No-store.
+      parameters:
+        - { name: device_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: agent_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Exact retained receipt including original revoked_at.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyAgentReceipt' }
+        '401': { description: Parent browser session expired or revoked. }
+        '403': { description: Exact owning human, device and agent relation required. }
+  /v1/onboarding/agents/{agent_id}/receipt:
+    get:
+      operationId: inspectCurrentIndependentAgentReceipt
+      x-stability: internal
+      summary: Check only the current exact child's own receipt using its independent credential
+      description: Exact current child ServiceToken only, not a parent device/browser/sibling credential. Generic authentication has no permissions and is fenced by current parent human/device/token/registry and immutable child state. Reconfirm each owner subscription with server-only delivery credentials outside local locks, require unchanged pinned bootstrap and reviewed destination, then recheck child/parents and serialize bounded metadata before commit. Historical approval alone never proves current remote authority. No content, snapshot, generic MCP, other-agent metadata or secret returned. No-store.
+      parameters:
+        - { name: agent_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Current exact child's sanitized receipt.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyAgentReceipt' }
+        '401': { description: Child or parent expired, disabled or revoked. }
+        '403': { description: Not the exact independently enrolled child. }
+        '409': { description: Current reviewed scope, destination, registry or pinned trust changed. }
+        '503': { description: Current selected owner authority unavailable; no receipt returned. }
   /v1/onboarding/company/device/review:
     get:
       operationId: reviewCompanyDeviceEnrollment
@@ -3508,6 +3594,60 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    CompanyAgentCaller:
+      type: string
+      enum: [codex, claude]
+    CompanyAgentApproveRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, agent_id, principal_id, token_id, caller, provider_id, credential_sha256, expires_at, projects, confirmed]
+      properties:
+        request_id: { type: string, format: uuid }
+        agent_id: { type: string, format: uuid }
+        principal_id: { type: string, format: uuid }
+        token_id: { type: string, format: uuid }
+        caller: { $ref: '#/components/schemas/CompanyAgentCaller' }
+        provider_id: { type: string, enum: [openai, anthropic] }
+        credential_sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        expires_at: { type: string, format: date-time, description: Fixed future expiry at most 24 hours; never extended. }
+        projects: { type: array, minItems: 1, maxItems: 32, items: { $ref: '#/components/schemas/CompanyDeviceSelection' } }
+        confirmed: { type: boolean, const: true }
+    CompanyAgentScope:
+      type: object
+      additionalProperties: false
+      required: [selection, destination]
+      properties:
+        selection: { $ref: '#/components/schemas/CompanyDeviceSelection' }
+        destination: { $ref: '#/components/schemas/OnboardingDestination' }
+    CompanyAgentReceipt:
+      type: object
+      additionalProperties: false
+      required: [schema_version, request_id, agent_id, device_id, human_id, issuer, subject, company_id, principal_id, token_id, caller, provider_id, credential_sha256, expires_at, projects, approved_at, revoked_at]
+      properties:
+        schema_version: { type: integer, const: 1 }
+        request_id: { type: string, format: uuid }
+        agent_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        human_id: { type: string, format: uuid }
+        issuer: { type: string, format: uri }
+        subject: { type: string, minLength: 1, maxLength: 512 }
+        company_id: { type: string, format: uuid }
+        principal_id: { type: string, format: uuid }
+        token_id: { type: string, format: uuid }
+        caller: { $ref: '#/components/schemas/CompanyAgentCaller' }
+        provider_id: { type: string, enum: [openai, anthropic] }
+        credential_sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        expires_at: { type: string, format: date-time }
+        projects: { type: array, minItems: 1, maxItems: 32, items: { $ref: '#/components/schemas/CompanyAgentScope' } }
+        approved_at: { type: string, format: date-time }
+        revoked_at: { type: [string, 'null'], format: date-time }
+    CompanyAgentList:
+      type: object
+      additionalProperties: false
+      required: [schema_version, agents]
+      properties:
+        schema_version: { type: integer, const: 1 }
+        agents: { type: array, maxItems: 64, items: { $ref: '#/components/schemas/CompanyAgentReceipt' } }
     CompanyDeviceReview:
       type: object
       additionalProperties: false

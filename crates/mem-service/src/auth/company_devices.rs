@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 mod enrollment;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 mod transport;
 pub(crate) use enrollment::approve;
 
@@ -248,6 +248,11 @@ pub(super) struct CompanyDeviceBinding {
     pub bootstrap: DeviceProjectSubscription,
     pub registry_sha256: String,
     pub owner: mem_config::CompanyOwnerConfig,
+    pub machine_principal_id: Uuid,
+    pub service_token_id: Uuid,
+}
+pub(super) async fn current_owner(binding: &CompanyDeviceBinding) -> Result<(), ApiError> {
+    transport::current_bootstrap(&binding.owner, &binding.approval, &binding.bootstrap).await
 }
 pub(super) async fn company_binding(
     state: &AppState,
@@ -273,9 +278,46 @@ pub(super) async fn company_binding(
     else {
         return Ok(None);
     };
+    let binding = parent_binding(
+        state,
+        tx,
+        probe.try_get("id").map_err(ApiError::sql)?,
+        human_id,
+        area,
+        owner,
+        project,
+    )
+    .await?;
+    if binding.machine_principal_id != actor.id || Some(binding.service_token_id) != actor.token_id
+    {
+        return Err(denied());
+    }
+    Ok(Some(binding))
+}
+
+/// Current persisted parent relation, independent of possession of its bearer.
+/// Only internal child/browser paths may supply these IDs after verifying the
+/// immutable child relation or the fresh owning human. Never synthesize an actor.
+pub(super) async fn parent_binding(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    device_id: Uuid,
+    human_id: Uuid,
+    area: &str,
+    owner: Uuid,
+    project: Uuid,
+) -> Result<CompanyDeviceBinding, ApiError> {
     let human=sqlx::query("SELECT issuer,subject FROM auth_principals WHERE id=$1 AND kind='human_oidc' AND disabled_at IS NULL FOR SHARE").bind(human_id).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?.ok_or_else(denied)?;
     let row=sqlx::query("SELECT d.*,r.request_id,r.status,r.approved_by,r.machine_principal_id AS decided_machine,r.selection_json,r.credential_hash FROM onboarding_devices d JOIN onboarding_device_requests r ON r.device_id=d.id WHERE d.id=$1 FOR SHARE OF d,r")
-        .bind(probe.try_get::<Uuid,_>("id").map_err(ApiError::sql)?).fetch_one(&mut **tx).await.map_err(ApiError::sql)?;
+        .bind(device_id).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?.ok_or_else(denied)?;
+    let machine_principal_id = row
+        .try_get::<Option<Uuid>, _>("machine_principal_id")
+        .map_err(ApiError::sql)?
+        .ok_or_else(denied)?;
+    let service_token_id = row
+        .try_get::<Option<Uuid>, _>("service_token_id")
+        .map_err(ApiError::sql)?
+        .ok_or_else(denied)?;
     let device_id: Uuid = row.try_get("id").map_err(ApiError::sql)?;
     let request_id: Uuid = row.try_get("request_id").map_err(ApiError::sql)?;
     let intent = load_intent(tx, request_id).await?.ok_or_else(denied)?;
@@ -303,17 +345,9 @@ pub(super) async fn company_binding(
             .map_err(ApiError::sql)?
             != Some(human_id)
         || row
-            .try_get::<Option<Uuid>, _>("machine_principal_id")
-            .map_err(ApiError::sql)?
-            != Some(actor.id)
-        || row
             .try_get::<Option<Uuid>, _>("decided_machine")
             .map_err(ApiError::sql)?
-            != Some(actor.id)
-        || row
-            .try_get::<Option<Uuid>, _>("service_token_id")
-            .map_err(ApiError::sql)?
-            != actor.token_id
+            != Some(machine_principal_id)
         || row
             .try_get::<Option<DateTime<Utc>>, _>("revoked_at")
             .map_err(ApiError::sql)?
@@ -327,7 +361,7 @@ pub(super) async fn company_binding(
         return Err(denied());
     }
     let live=sqlx::query("SELECT t.token_hash,t.expires_at,p.global_role,p.global_permissions_json,p.groups_json FROM auth_principals p JOIN auth_service_tokens t ON t.principal_id=p.id WHERE p.id=$1 AND p.kind='service_token' AND p.disabled_at IS NULL AND t.id=$2 AND t.revoked_at IS NULL AND t.expires_at>clock_timestamp() FOR SHARE OF p,t")
-        .bind(actor.id).bind(actor.token_id).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?.ok_or_else(denied)?;
+        .bind(machine_principal_id).bind(service_token_id).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?.ok_or_else(denied)?;
     if live
         .try_get::<Vec<u8>, _>("token_hash")
         .map_err(ApiError::sql)?
@@ -356,7 +390,7 @@ pub(super) async fn company_binding(
     let ordinary: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM auth_project_memberships WHERE principal_id=$1)",
     )
-    .bind(actor.id)
+    .bind(machine_principal_id)
     .fetch_one(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
@@ -413,7 +447,7 @@ pub(super) async fn company_binding(
     if !still_live {
         return Err(denied());
     }
-    Ok(Some(CompanyDeviceBinding {
+    Ok(CompanyDeviceBinding {
         device_id,
         human_id,
         issuer,
@@ -424,7 +458,9 @@ pub(super) async fn company_binding(
         bootstrap,
         registry_sha256,
         owner: cfg,
-    }))
+        machine_principal_id,
+        service_token_id,
+    })
 }
 
 /// None is the legacy local-device path only. An enrolled company device never

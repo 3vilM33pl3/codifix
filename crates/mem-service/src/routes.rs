@@ -90,6 +90,20 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         )
         .route("/v1/onboarding/projects", get(crate::auth::device::catalog))
         .route(
+            "/v1/onboarding/devices/{device_id}/agents",
+            get(crate::auth::company_agents::inspect)
+                .post(crate::auth::company_agents::approve)
+                .layer(axum::extract::DefaultBodyLimit::max(16384)),
+        )
+        .route(
+            "/v1/onboarding/devices/{device_id}/agents/{agent_id}/revoke",
+            post(crate::auth::company_agents::revoke),
+        )
+        .route(
+            "/v1/onboarding/agents/{agent_id}/receipt",
+            get(crate::auth::company_agents::child_receipt),
+        )
+        .route(
             "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/snapshot",
             post(crate::auth::scoped_delivery::scoped_snapshot)
                 .layer(axum::extract::DefaultBodyLimit::max(4096)),
