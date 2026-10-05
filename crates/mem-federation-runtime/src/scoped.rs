@@ -104,7 +104,7 @@ impl ReceiptTrust {
                         delivery.envelope.clone(),
                     )
                     .map_err(|_| RuntimeError::InvalidResponse)?
-                        != *delivery
+                        != **delivery
                 {
                     return Err(RuntimeError::InvalidResponse);
                 }
@@ -419,7 +419,7 @@ mod tests {
             .unwrap();
         page.entries[0].event = ProjectEvent::Record {
             stream,
-            delivery,
+            delivery: Box::new(delivery),
             receipt,
         };
         let signed = security.sign_project_page(page.clone()).unwrap();

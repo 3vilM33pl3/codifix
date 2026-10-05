@@ -120,64 +120,65 @@ pub async fn current_project_sources(
         let shared_state = known.current_state(stream);
         let mut eligible = false;
         let mut keys = Vec::new();
-        if consent && live {
-            if let (Some(version), Some(shared_state)) = (selected, shared_state) {
-                let expected = crate::sharing::selection(tx, project, stream.canonical).await?;
-                eligible = version.publication.source == expected.source
-                    && version.publication.content == expected.content
-                    && version.publication.evidence == evidence
-                    && shared_state.status == MemoryStatus::Active
-                    && !shared_state.tombstone
-                    && shared_state.confidence
-                        == ConfidencePpm::from_confidence(state.try_get("confidence")?)?
-                    && shared_state.content_version == version.publication.version
-                    && evidence.len() == reviewed.len();
-                if eligible {
-                    keys.extend(evidence.iter().copied());
-                    keys.push(version.key);
-                    let state_key = known
-                        .state_history(stream)
-                        .last()
-                        .ok_or(StoreError::Binding)?
-                        .0;
-                    keys.push(state_key);
-                    for (key, item) in evidence.iter().zip(&reviewed) {
-                        if key.publisher != owner
-                            || known.evidence(*key) != Some(item)
-                            || item.snapshot().space != space
-                            || item.snapshot().stream != stream
-                            || item.review().reviewer.as_str() != principal.to_string()
-                        {
-                            return Err(StoreError::Binding);
-                        }
+        if consent
+            && live
+            && let (Some(version), Some(shared_state)) = (selected, shared_state)
+        {
+            let expected = crate::sharing::selection(tx, project, stream.canonical).await?;
+            eligible = version.publication.source == expected.source
+                && version.publication.content == expected.content
+                && version.publication.evidence == evidence
+                && shared_state.status == MemoryStatus::Active
+                && !shared_state.tombstone
+                && shared_state.confidence
+                    == ConfidencePpm::from_confidence(state.try_get("confidence")?)?
+                && shared_state.content_version == version.publication.version
+                && evidence.len() == reviewed.len();
+            if eligible {
+                keys.extend(evidence.iter().copied());
+                keys.push(version.key);
+                let state_key = known
+                    .state_history(stream)
+                    .last()
+                    .ok_or(StoreError::Binding)?
+                    .0;
+                keys.push(state_key);
+                for (key, item) in evidence.iter().zip(&reviewed) {
+                    if key.publisher != owner
+                        || known.evidence(*key) != Some(item)
+                        || item.snapshot().space != space
+                        || item.snapshot().stream != stream
+                        || item.review().reviewer.as_str() != principal.to_string()
+                    {
+                        return Err(StoreError::Binding);
                     }
-                    keys.sort();
-                    keys.dedup();
-                    if keys.len() > 256 {
-                        return Err(StoreError::Limits);
+                }
+                keys.sort();
+                keys.dedup();
+                if keys.len() > 256 {
+                    return Err(StoreError::Limits);
+                }
+                for key in &keys {
+                    let delivery = known.accepted_record(*key).ok_or(StoreError::Binding)?;
+                    if crate::delivery_stream(delivery)? != stream {
+                        return Err(StoreError::Binding);
                     }
-                    for key in &keys {
-                        let delivery = known.accepted_record(*key).ok_or(StoreError::Binding)?;
-                        if crate::delivery_stream(delivery)? != stream {
-                            return Err(StoreError::Binding);
-                        }
-                        // Exact accepted source intent, not an arbitrary record
-                        // sharing a locator or historical canonical UUID.
-                        let outbox=sqlx::query("SELECT envelope,acceptance FROM federation_source_outbox WHERE space=$1 AND publisher=$2 AND record_id=$3 AND project_id=$4 AND principal_id=$5 FOR SHARE")
+                    // Exact accepted source intent, not an arbitrary record
+                    // sharing a locator or historical canonical UUID.
+                    let outbox=sqlx::query("SELECT envelope,acceptance FROM federation_source_outbox WHERE space=$1 AND publisher=$2 AND record_id=$3 AND project_id=$4 AND principal_id=$5 FOR SHARE")
                             .bind(space.as_uuid()).bind(owner.as_uuid()).bind(key.id.as_uuid()).bind(project).bind(principal)
                             .fetch_optional(&mut **tx).await?.ok_or(StoreError::Binding)?;
-                        let envelope: PublicationEnvelope = outbox
-                            .try_get::<Json<PublicationEnvelope>, _>("envelope")?
-                            .0;
-                        let acceptance: Option<Json<PublicationDelivery>> =
-                            outbox.try_get("acceptance")?;
-                        if envelope != delivery.envelope
-                            || acceptance.map(|a| a.0) != Some(delivery.clone())
-                        {
-                            return Err(StoreError::Binding);
-                        }
-                        records.insert(*key, delivery.clone());
+                    let envelope: PublicationEnvelope = outbox
+                        .try_get::<Json<PublicationEnvelope>, _>("envelope")?
+                        .0;
+                    let acceptance: Option<Json<PublicationDelivery>> =
+                        outbox.try_get("acceptance")?;
+                    if envelope != delivery.envelope
+                        || acceptance.map(|a| a.0) != Some(delivery.clone())
+                    {
+                        return Err(StoreError::Binding);
                     }
+                    records.insert(*key, delivery.clone());
                 }
             }
         }

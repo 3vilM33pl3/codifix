@@ -21,7 +21,7 @@ pub struct ProjectBindingReceipt {
 pub enum ProjectEvent {
     Record {
         stream: StreamId,
-        delivery: PublicationDelivery,
+        delivery: Box<PublicationDelivery>,
         receipt: AuditReceipt,
     },
     Review {
@@ -173,10 +173,9 @@ impl GatewayStore {
                             }
                         }
                     }
-                    PublicationRecord::CanonicalState {state,..} => {
-                        if !records.iter().any(|(m,_)| matches!(&m.envelope.record, PublicationRecord::MemoryVersion{publication,..} if publication.version == state.content_version)) {
-                            return Err(StoreError::Binding);
-                        }
+                    PublicationRecord::CanonicalState {state,..}
+                        if !records.iter().any(|(m,_)| matches!(&m.envelope.record, PublicationRecord::MemoryVersion{publication,..} if publication.version == state.content_version)) => {
+                        return Err(StoreError::Binding);
                     }
                     _ => {}
                 }
@@ -192,7 +191,7 @@ impl GatewayStore {
                     &mut head,
                     ProjectEvent::Record {
                         stream: review.stream,
-                        delivery,
+                        delivery: Box::new(delivery),
                         receipt,
                     },
                 )

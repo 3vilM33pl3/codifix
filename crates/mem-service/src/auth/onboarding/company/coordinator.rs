@@ -90,7 +90,7 @@ fn credential(cfg: &mem_config::CompanyOwnerConfig) -> Result<String, ApiError> 
     Ok(secret)
 }
 enum RemoteResult {
-    Verified(CompanyGrantResult),
+    Verified(Box<CompanyGrantResult>),
     Rejected,
     Absent,
     Uncertain,
@@ -175,7 +175,7 @@ async fn remote(
     {
         return Ok(RemoteResult::Uncertain);
     }
-    Ok(RemoteResult::Verified(result))
+    Ok(RemoteResult::Verified(Box::new(result)))
 }
 
 async fn status_row(state: &AppState, id: Uuid) -> Result<CompanyOperationStatus, ApiError> {

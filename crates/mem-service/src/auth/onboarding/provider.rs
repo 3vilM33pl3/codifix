@@ -61,18 +61,17 @@ pub(super) async fn operate(
     if !text(&token, 4096) {
         return Err(unavailable());
     }
-    if let Some(input) = &input {
-        if !text(&input.username, 150)
+    if let Some(input) = &input
+        && (!text(&input.username, 150)
             || !input
                 .username
                 .bytes()
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-' | b'.' | b'@'))
             || !text(&input.display_name, 256)
             || !text(&input.email, 320)
-            || !input.email.contains('@')
-        {
-            return Err(bad("bounded username, display name and email are required"));
-        }
+            || !input.email.contains('@'))
+    {
+        return Err(bad("bounded username, display name and email are required"));
     }
     let id = Uuid::new_v4();
     let provider_origin = base.origin().ascii_serialization();

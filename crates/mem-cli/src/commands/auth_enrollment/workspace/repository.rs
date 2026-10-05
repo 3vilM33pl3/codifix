@@ -131,7 +131,7 @@ impl Git for NativeGit {
         let mut child = command
             .spawn()
             .map_err(|_| anyhow::anyhow!("git repository metadata unavailable"))?;
-        let result = tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::time::timeout(Duration::from_secs(10), async {
             let mut bytes = Vec::new();
             child
                 .stdout
@@ -153,8 +153,7 @@ impl Git for NativeGit {
             Ok(())
         })
         .await
-        .map_err(|_| anyhow::anyhow!("existing repository metadata timed out"))?;
-        result
+        .map_err(|_| anyhow::anyhow!("existing repository metadata timed out"))?
     }
     async fn clone_to(&self, manifest: &OnboardingProject, path: &Path) -> Result<()> {
         let mut command = self.command();
@@ -294,7 +293,12 @@ impl NativeGit {
         if fields.len() % 3 != 0 {
             bail!("isolated Git attribute inspection unsupported or unreadable");
         }
-        if fields.chunks_exact(3).any(|entry| entry[1] == b"filter") {
+        if fields
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .any(|entry| entry[1] == b"filter")
+        {
             // Conservative first-slice policy: required/custom filters cannot be
             // silently replaced by raw files, and optional filters are not run.
             bail!(

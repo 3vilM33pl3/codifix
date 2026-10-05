@@ -50,12 +50,10 @@ fn no_symlinks(path: &Path) -> Result<()> {
             Component::RootDir | Component::Normal(_) => current.push(component.as_os_str()),
             _ => bail!("paths must be absolute without traversal"),
         }
-        if let Ok(metadata) = fs::symlink_metadata(&current) {
-            if metadata.file_type().is_symlink() {
-                bail!(
-                    "symlinked workspace/journal paths are not supported; existing paths preserved"
-                );
-            }
+        if let Ok(metadata) = fs::symlink_metadata(&current)
+            && metadata.file_type().is_symlink()
+        {
+            bail!("symlinked workspace/journal paths are not supported; existing paths preserved");
         }
     }
     Ok(())
@@ -207,6 +205,14 @@ impl Lock {
         })?;
         // OS lock releases on interruption; leave the same inode for all retries.
         Ok(Self { _file: file })
+    }
+}
+impl Drop for Lock {
+    fn drop(&mut self) {
+        // A concurrent fork can briefly inherit the open file description even
+        // with CLOEXEC. Release explicitly instead of waiting for its last close.
+        // No child command is allowed to own the workspace mutation lock.
+        let _ = self._file.unlock();
     }
 }
 
@@ -403,14 +409,13 @@ fn move_tree(source: &Path, target: &Path) -> Result<()> {
                 {
                     use std::os::unix::fs::MetadataExt;
                     // Recover an interruption between link and source unlink.
-                    if let Ok(existing) = fs::symlink_metadata(&dst) {
-                        if existing.is_file()
-                            && metadata.dev() == existing.dev()
-                            && metadata.ino() == existing.ino()
-                        {
-                            fs::remove_file(&src)?;
-                            continue;
-                        }
+                    if let Ok(existing) = fs::symlink_metadata(&dst)
+                        && existing.is_file()
+                        && metadata.dev() == existing.dev()
+                        && metadata.ino() == existing.ino()
+                    {
+                        fs::remove_file(&src)?;
+                        continue;
                     }
                 }
                 if let Ok(existing) = fs::symlink_metadata(&dst) {

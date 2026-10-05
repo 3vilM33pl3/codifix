@@ -396,8 +396,8 @@ pub(crate) async fn delegated_grant(
         {
             return Err(conflict());
         }
-        if let Some(member) = &member {
-            if member.try_get::<String, _>("role").map_err(ApiError::sql)?
+        if let Some(member) = &member
+            && (member.try_get::<String, _>("role").map_err(ApiError::sql)?
                 != owned.try_get::<String, _>("role").map_err(ApiError::sql)?
                 || member
                     .try_get::<String, _>("source")
@@ -406,10 +406,9 @@ pub(crate) async fn delegated_grant(
                 || member
                     .try_get::<Option<Value>, _>("permissions_json")
                     .map_err(ApiError::sql)?
-                    .is_some()
-            {
-                return Err(conflict());
-            }
+                    .is_some())
+        {
+            return Err(conflict());
         }
     } else if member.is_some() || request.operation == CompanyGrantOperation::Revoke {
         return Err(conflict());

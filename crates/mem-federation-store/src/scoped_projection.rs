@@ -190,7 +190,7 @@ impl ProjectProjectionStore {
                         .iter()
                         .find(|old| old.envelope.key() == delivery.envelope.key())
                     {
-                        if old != delivery {
+                        if old != delivery.as_ref() {
                             return Err(StoreError::Binding);
                         }
                     } else {
@@ -203,7 +203,7 @@ impl ProjectProjectionStore {
                         {
                             return Err(StoreError::Binding);
                         }
-                        projection.records.push(delivery.clone());
+                        projection.records.push(delivery.as_ref().clone());
                     }
                 }
                 ProjectEvent::Review { review } => {
