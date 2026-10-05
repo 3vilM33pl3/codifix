@@ -238,6 +238,18 @@ async fn locked_relation(
     if !live {
         return Err(denied());
     }
+    // SQLx encodes TIMESTAMPTZ as whole microseconds. Preserve the immutable
+    // original JSON/request digest, but require BOTH database expiry columns
+    // to equal that exact representation (no tolerance and no TTL extension).
+    let database_expiry =
+        DateTime::from_timestamp_micros(saved.expires_at.timestamp_micros()).ok_or_else(denied)?;
+    if row
+        .try_get::<DateTime<Utc>, _>("expires_at")
+        .map_err(ApiError::sql)?
+        != database_expiry
+    {
+        return Err(denied());
+    }
     let token=sqlx::query("SELECT t.token_hash,t.expires_at,p.global_role,p.global_permissions_json,p.groups_json FROM auth_principals p JOIN auth_service_tokens t ON t.principal_id=p.id WHERE p.id=$1 AND p.kind='service_token' AND p.disabled_at IS NULL AND t.id=$2 AND t.revoked_at IS NULL AND t.expires_at>clock_timestamp() FOR SHARE OF p,t").bind(saved.principal_id).bind(saved.token_id).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?.ok_or_else(denied)?;
     if token
         .try_get::<Vec<u8>, _>("token_hash")
@@ -252,7 +264,7 @@ async fn locked_relation(
         || token
             .try_get::<Option<DateTime<Utc>>, _>("expires_at")
             .map_err(ApiError::sql)?
-            != Some(saved.expires_at)
+            != Some(database_expiry)
         || token
             .try_get::<Option<String>, _>("global_role")
             .map_err(ApiError::sql)?

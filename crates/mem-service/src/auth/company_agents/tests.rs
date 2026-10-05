@@ -2,6 +2,7 @@
 use super::*;
 use crate::auth::company_devices::tests as enrollment;
 use crate::auth::device::tests::{Fixture, fixture};
+use chrono::Timelike;
 
 struct Setup {
     f: Fixture,
@@ -61,7 +62,9 @@ fn request(s: &Setup, caller: CompanyAgentCaller) -> (CompanyAgentApproveRequest
             caller,
             provider_id: caller.provider_id().into(),
             credential_sha256: hash,
-            expires_at: Utc::now() + chrono::Duration::hours(1),
+            expires_at: (Utc::now() + chrono::Duration::hours(1))
+                .with_nanosecond(123456789)
+                .unwrap(),
             projects: vec![s.scope.clone()],
             confirmed: true,
         },
@@ -94,6 +97,14 @@ async fn independent_siblings_have_no_generic_authority_and_only_exact_child_rec
     let s = setup(destinations()).await;
     let (codex, secret) = request(&s, CompanyAgentCaller::Codex);
     let first = call(&s, &codex).await.unwrap();
+    assert_eq!(first.expires_at.timestamp_subsec_nanos(), 123456789);
+    let database_expiry: DateTime<Utc> =
+        sqlx::query_scalar("SELECT expires_at FROM auth_service_tokens WHERE id=$1")
+            .bind(first.token_id)
+            .fetch_one(&s.f.db.pool)
+            .await
+            .unwrap();
+    assert_eq!(database_expiry.timestamp_subsec_nanos(), 123456000);
     let (claude, other_secret) = request(&s, CompanyAgentCaller::Claude);
     let other = call(&s, &claude).await.unwrap();
     assert_eq!(json!(first), json!(call(&s, &codex).await.unwrap()));
@@ -435,6 +446,18 @@ async fn protected_audit_failure_rolls_back_provisioning_and_revocation() {
         )
         .await
         .is_ok()
+    );
+    sqlx::query(
+        "UPDATE auth_service_tokens SET expires_at=expires_at+interval '1 microsecond' WHERE id=$1",
+    )
+    .bind(receipt.token_id)
+    .execute(&s.f.db.pool)
+    .await
+    .unwrap();
+    assert!(
+        crate::auth::resolve_principal(&s.f.state, crate::auth::Credential::ApiToken(secret))
+            .await
+            .is_err()
     );
     close(s).await;
 }
