@@ -113,6 +113,10 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )],
         ),
         (
+            "/v1/onboarding/company/projects",
+            &[(Method::GET,RoutePolicy {permission:Permission::MemoryRead,scope:ProjectScope::HumanSession,semantic_read:true})],
+        ),
+        (
             "/v1/admin/onboarding/company/operations",
             &[
                 (
@@ -227,6 +231,50 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
                 Method::GET,
                 RoutePolicy {
                     permission: Permission::MemoryRead,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/company-delivery/catalog",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::ScopedProjectDelivery,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/company-delivery/approve",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::ScopedProjectDelivery,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/company-delivery/subscription",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::ScopedProjectDelivery,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/company-delivery/snapshot",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::ScopedProjectDelivery,
                     scope: ProjectScope::Authenticated,
                     semantic_read: false,
                 },

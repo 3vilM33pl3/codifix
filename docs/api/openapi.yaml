@@ -27,6 +27,77 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/onboarding/company-delivery/catalog:
+    post:
+      operationId: inspectOwnerAuthorizedDeviceCatalog
+      x-stability: internal
+      summary: Inspect reviewed owner metadata for an exact company human identity
+      description: Server-to-server only. Exact configured delivery principal/token and explicit project_scoped_delivery custom permission. Resolve an existing active human by shared issuer/subject, authorize before selecting manifests, and omit ungranted projects. No email lookup, identity creation, Trust offline access, device bearer or owner endpoints. Bounded 512 KiB response; no-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OwnerDeviceCatalogRequest' }
+      responses:
+        '200':
+          description: Authorized metadata with exact request and manifest digests, not a delivery grant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerDeviceCatalogResponse' }
+        '403': { description: Exact delegate, policy or current human access denied. }
+  /v1/onboarding/company-delivery/approve:
+    post:
+      operationId: bindCompanyApprovedDeviceToOwnerProject
+      x-stability: internal
+      summary: Journal an immutable external-device audience without creating local credentials
+      description: Company-attested enrollment bound to device/request/credential digest, stable human issuer/subject, exact reviewed non-Trust offline manifest and delivery policy. Owner independently checks current human read/export permission and exact configured delivery token. Maximum 30-day expiry. Exact replay reauthorizes; altered bindings conflict. Approval plus protected audit commit atomically. No local user/device/token/membership creation. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OwnerDeviceApprovalRequest' }
+      responses:
+        '200':
+          description: Historical immutable owner approval receipt, not a statement of future access.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerDeviceApprovalReceipt' }
+        '403': { description: Current delegate/human/export authority or expiry denied. }
+        '409': { description: Changed enrollment or owner manifest; no implicit renewal. }
+  /v1/onboarding/company-delivery/subscription:
+    post:
+      operationId: bootstrapCompanyDeviceOwnerSubscription
+      x-stability: internal
+      summary: Obtain authenticated selective receipt trust for an approved external device
+      description: Exact delivery delegate; freshly reauthorize the retained approval and current owner-local human/catalog before returning scope, audience and receipt keys. No content-page trust adoption or gateway credentials. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OwnerDeviceSubscriptionRequest' }
+      responses:
+        '200':
+          description: Authenticated control-plane bootstrap.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceProjectSubscription' }
+        '403': { description: Current exact device approval/delegate/human authority denied. }
+  /v1/onboarding/company-delivery/snapshot:
+    post:
+      operationId: deliverCompanyDeviceOwnerProjectPage
+      x-stability: internal
+      summary: Deliver a signed, audience-bound, project-only snapshot or delta
+      description: Reuses verified source selection, reviewer checks, registration reconciliation and gateway attestations. Checks current delegate/human/approval/catalog before gateway HTTP and before serialized delivery commit. Separate immutable external-device nonce journal; altered requests fail. No SQL locks across HTTP, broad repository download, local-device impersonation or laptop bearer forwarding. At most 32 entries/4 MiB; no-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OwnerDeviceSnapshotRequest' }
+      responses:
+        '200': { description: Existing signed project-page wire format, not a complete-repository proof. }
+        '403': { description: Current delivery authority revoked, expired or denied. }
+        '409': { description: Changed binding, nonce replay, catalog or source. }
+        '503': { description: Gateway/registration unavailable; retry exact request. }
   /v1/admin/onboarding/company/delivery-delegates:
     get:
       operationId: inspectConfiguredCompanyDeliveryDelegates
@@ -3314,6 +3385,73 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    OwnerDeviceCatalogRequest:
+      type: object
+      additionalProperties: false
+      required: [company_id, owner_instance_id, area, issuer, subject, delivery_policy_revision]
+      properties:
+        company_id: { type: string, format: uuid }
+        owner_instance_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        issuer: { type: string, format: uri, maxLength: 2048 }
+        subject: { type: string, minLength: 1, maxLength: 512 }
+        delivery_policy_revision: { type: integer, minimum: 1 }
+    OwnerDeviceCatalogProject:
+      type: object
+      additionalProperties: false
+      required: [project, manifest_sha256]
+      properties:
+        project: { $ref: '#/components/schemas/OnboardingDeviceReviewProject' }
+        manifest_sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+    OwnerDeviceCatalogResponse:
+      type: object
+      additionalProperties: false
+      required: [request_sha256, projects, observed_at]
+      properties:
+        request_sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        projects: { type: array, maxItems: 256, items: { $ref: '#/components/schemas/OwnerDeviceCatalogProject' } }
+        observed_at: { type: string, format: date-time }
+    OwnerDeviceApprovalRequest:
+      type: object
+      additionalProperties: false
+      required: [operation_id, company_id, device_request_id, device_id, credential_sha256, owner_instance_id, area, project_id, issuer, subject, manifest_revision, manifest_sha256, delivery_policy_revision, expires_at]
+      properties:
+        operation_id: { type: string, format: uuid }
+        company_id: { type: string, format: uuid }
+        device_request_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        credential_sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        owner_instance_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        project_id: { type: string, format: uuid }
+        issuer: { type: string, format: uri, maxLength: 2048 }
+        subject: { type: string, minLength: 1, maxLength: 512 }
+        manifest_revision: { type: integer, minimum: 1 }
+        manifest_sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        delivery_policy_revision: { type: integer, minimum: 1 }
+        expires_at: { type: string, format: date-time }
+    OwnerDeviceApprovalReceipt:
+      type: object
+      additionalProperties: false
+      required: [request, request_sha256, human_principal_id, committed_at]
+      properties:
+        request: { $ref: '#/components/schemas/OwnerDeviceApprovalRequest' }
+        request_sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        human_principal_id: { type: string, format: uuid }
+        committed_at: { type: string, format: date-time }
+    OwnerDeviceSubscriptionRequest:
+      type: object
+      additionalProperties: false
+      required: [approval_id]
+      properties:
+        approval_id: { type: string, format: uuid }
+    OwnerDeviceSnapshotRequest:
+      type: object
+      additionalProperties: false
+      required: [approval_id, snapshot]
+      properties:
+        approval_id: { type: string, format: uuid }
+        snapshot: { $ref: '#/components/schemas/OnboardingProjectSnapshotRequest' }
     CompanyDeliveryDelegateProvisionRequest:
       type: object
       additionalProperties: false

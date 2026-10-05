@@ -46,7 +46,7 @@ fn hash<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, ApiError> {
         .map(|v| Sha256::digest(v).to_vec())
         .map_err(|_| ApiError::internal("invalid project delivery binding"))
 }
-struct Eligibility {
+pub(super) struct Eligibility {
     device: Uuid,
     scope: ProjectScope,
     catalog: u64,
@@ -153,6 +153,22 @@ async fn eligibility(
             "unsupported local project delivery scope",
         ));
     }
+    sources(state, tx, device, scope, manifest, known).await
+}
+
+/// Reused only after an audience has been independently authorized. Source
+/// review, version and publication checks remain identical for both paths.
+pub(super) async fn sources(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    device: Uuid,
+    scope: ProjectScope,
+    manifest: OnboardingProject,
+    known: &PublicationState,
+) -> Result<Eligibility, ApiError> {
+    let project = scope.project;
+    let space = scope.space;
+    let owner = scope.owner;
     let mut reviewers = BTreeMap::new();
     for id in mem_federation_store::project_source_reviewers(tx, project, space, owner)
         .await
@@ -191,6 +207,45 @@ async fn eligibility(
         sources,
         fingerprint,
     })
+}
+
+async fn audience_eligibility(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    actor: &AuthenticatedPrincipal,
+    project: Uuid,
+    binding: (InstanceId, SpaceId),
+    known: &PublicationState,
+    approval: Option<Uuid>,
+) -> Result<Eligibility, ApiError> {
+    let (owner, space) = binding;
+    match approval {
+        None => eligibility(state, tx, actor, project, owner, space, known).await,
+        Some(id) => {
+            let (receipt, manifest) =
+                super::company_device_delivery::approved(state, tx, actor, id).await?;
+            if receipt.request.project_id != project
+                || receipt.request.owner_instance_id != owner.as_uuid()
+            {
+                return Err(changed());
+            }
+            sources(
+                state,
+                tx,
+                receipt.request.device_id,
+                ProjectScope {
+                    company: receipt.request.company_id,
+                    area: receipt.request.area.as_str().into(),
+                    owner,
+                    project,
+                    space,
+                },
+                manifest,
+                known,
+            )
+            .await
+        }
+    }
 }
 
 struct Registration {
@@ -363,6 +418,16 @@ pub(crate) async fn snapshot(
     Path(project): Path<Uuid>,
     Json(request): Json<OnboardingProjectSnapshotRequest>,
 ) -> Result<Response, ApiError> {
+    snapshot_for(state, actor, project, request, None).await
+}
+
+pub(super) async fn snapshot_for(
+    state: AppState,
+    actor: AuthenticatedPrincipal,
+    project: Uuid,
+    request: OnboardingProjectSnapshotRequest,
+    approval: Option<Uuid>,
+) -> Result<Response, ApiError> {
     if request.nonce.is_nil()
         || project.is_nil()
         || !(1..=32).contains(&request.limit)
@@ -391,21 +456,44 @@ pub(crate) async fn snapshot(
     })?;
     let pool = state.pool()?;
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
-    let current = eligibility(&state, &mut tx, &actor, project, owner, space, &known).await?;
-    sqlx::query("INSERT INTO onboarding_owner_snapshot_requests(device_id,nonce,project_id,request) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING")
+    let current = audience_eligibility(
+        &state,
+        &mut tx,
+        &actor,
+        project,
+        (owner, space),
+        &known,
+        approval,
+    )
+    .await?;
+    if let Some(id) = approval {
+        let bound = OwnerDeviceSnapshotRequest {
+            approval_id: id,
+            snapshot: request.clone(),
+        };
+        sqlx::query("INSERT INTO onboarding_delegated_snapshot_requests(company_id,device_id,nonce,approval_id,request_json) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING")
+            .bind(current.scope.company).bind(current.device).bind(request.nonce).bind(id).bind(json!(bound)).execute(&mut *tx).await.map_err(ApiError::sql)?;
+        let saved: Value = sqlx::query_scalar("SELECT request_json FROM onboarding_delegated_snapshot_requests WHERE company_id=$1 AND device_id=$2 AND nonce=$3")
+            .bind(current.scope.company).bind(current.device).bind(request.nonce).fetch_one(&mut *tx).await.map_err(ApiError::sql)?;
+        if saved != json!(bound) {
+            return Err(changed());
+        }
+    } else {
+        sqlx::query("INSERT INTO onboarding_owner_snapshot_requests(device_id,nonce,project_id,request) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING")
         .bind(current.device).bind(request.nonce).bind(project).bind(json!(request)).execute(&mut *tx).await.map_err(ApiError::sql)?;
-    let saved=sqlx::query("SELECT project_id,request FROM onboarding_owner_snapshot_requests WHERE device_id=$1 AND nonce=$2")
+        let saved=sqlx::query("SELECT project_id,request FROM onboarding_owner_snapshot_requests WHERE device_id=$1 AND nonce=$2")
         .bind(current.device).bind(request.nonce).fetch_one(&mut *tx).await.map_err(ApiError::sql)?;
-    if saved
-        .try_get::<Uuid, _>("project_id")
-        .map_err(ApiError::sql)?
-        != project
-        || saved
-            .try_get::<Value, _>("request")
+        if saved
+            .try_get::<Uuid, _>("project_id")
             .map_err(ApiError::sql)?
-            != json!(request)
-    {
-        return Err(changed());
+            != project
+            || saved
+                .try_get::<Value, _>("request")
+                .map_err(ApiError::sql)?
+                != json!(request)
+        {
+            return Err(changed());
+        }
     }
     let registration = prepare(&mut tx, &current, actor.id).await?;
     tx.commit().await.map_err(ApiError::sql)?;
@@ -445,7 +533,16 @@ pub(crate) async fn snapshot(
         ApiError::service_unavailable("verified local source publications unavailable")
     })?;
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
-    let final_state = eligibility(&state, &mut tx, &actor, project, owner, space, &latest).await?;
+    let final_state = audience_eligibility(
+        &state,
+        &mut tx,
+        &actor,
+        project,
+        (owner, space),
+        &latest,
+        approval,
+    )
+    .await?;
     if final_state.fingerprint != registration.fingerprint || final_state.device != current.device {
         return Err(changed());
     }
@@ -491,6 +588,11 @@ pub(crate) async fn snapshot(
             "device credential expired before delivery commit",
         ));
     }
+    if let Some(id) = approval {
+        // Clock expiry is not protected by row locks. Recheck immediately before
+        // this owner's delivery linearization point, including delegate expiry.
+        super::company_device_delivery::approved(&state, &mut tx, &actor, id).await?;
+    }
     tx.commit().await.map_err(ApiError::sql)?;
     Ok((
         [
@@ -509,6 +611,15 @@ pub(crate) async fn subscription(
     Extension(actor): Extension<AuthenticatedPrincipal>,
     Path(project): Path<Uuid>,
 ) -> Result<Json<mem_federation_runtime::DeviceProjectSubscription>, ApiError> {
+    subscription_for(state, actor, project, None).await
+}
+
+pub(super) async fn subscription_for(
+    state: AppState,
+    actor: AuthenticatedPrincipal,
+    project: Uuid,
+    approval: Option<Uuid>,
+) -> Result<Json<mem_federation_runtime::DeviceProjectSubscription>, ApiError> {
     let configured = state
         .federation
         .read()
@@ -522,7 +633,16 @@ pub(crate) async fn subscription(
         ApiError::service_unavailable("verified local source publications unavailable")
     })?;
     let mut tx = state.pool()?.begin().await.map_err(ApiError::sql)?;
-    let current = eligibility(&state, &mut tx, &actor, project, owner, space, &known).await?;
+    let current = audience_eligibility(
+        &state,
+        &mut tx,
+        &actor,
+        project,
+        (owner, space),
+        &known,
+        approval,
+    )
+    .await?;
     let (authority, receipt_keys) = sync.project_delivery_trust();
     let response = mem_federation_runtime::DeviceProjectSubscription {
         schema_version: 1,

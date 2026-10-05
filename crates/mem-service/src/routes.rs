@@ -81,6 +81,26 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         )
         .route("/v1/onboarding/projects", get(crate::auth::device::catalog))
         .route(
+            "/v1/onboarding/company-delivery/catalog",
+            post(crate::auth::company_device_delivery::catalog)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/v1/onboarding/company-delivery/approve",
+            post(crate::auth::company_device_delivery::approve)
+                .layer(axum::extract::DefaultBodyLimit::max(8192)),
+        )
+        .route(
+            "/v1/onboarding/company-delivery/subscription",
+            post(crate::auth::company_device_delivery::subscription)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/v1/onboarding/company-delivery/snapshot",
+            post(crate::auth::company_device_delivery::snapshot)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
             "/v1/onboarding/projects/{project_id}/snapshot",
             post(crate::auth::scoped_delivery::snapshot)
                 .layer(axum::extract::DefaultBodyLimit::max(4096)),
@@ -102,6 +122,7 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
             "/v1/admin/onboarding/company/configuration",
             get(crate::auth::onboarding::company::company_configuration),
         )
+        .route("/v1/onboarding/company/projects",get(crate::auth::company_catalog::catalog))
         .route(
             "/v1/admin/onboarding/company/delegates",
             get(crate::auth::company_delegate::list)

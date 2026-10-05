@@ -9,6 +9,138 @@ use mem_federation_store::{
 };
 use std::sync::{Arc, Mutex};
 
+#[tokio::test]
+async fn company_device_uses_signed_scoped_feed_without_owner_device_or_bearer() {
+    let Some(mut f) = DeliveryFixture::new(119).await else {
+        return;
+    };
+    let (delegate, approval) =
+        super::super::company_device_delivery::tests::setup(&mut f.base).await;
+    // Existing per-project registration belongs to the approved company scope.
+    f.base
+        .state
+        .config
+        .auth
+        .company_onboarding
+        .as_mut()
+        .unwrap()
+        .company_id = approval.company_id;
+    f.share().await;
+    let Json(receipt) = super::super::company_device_delivery::approve(
+        State(f.base.state.clone()),
+        Extension(delegate.clone()),
+        Json(approval.clone()),
+    )
+    .await
+    .unwrap();
+    let Json(subscription) = super::super::company_device_delivery::subscription(
+        State(f.base.state.clone()),
+        Extension(delegate.clone()),
+        Json(OwnerDeviceSubscriptionRequest {
+            approval_id: receipt.request.operation_id,
+        }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(subscription.device, approval.device_id);
+    assert_eq!(subscription.scope.company, approval.company_id);
+    let request = OwnerDeviceSnapshotRequest {
+        approval_id: approval.operation_id,
+        snapshot: OnboardingProjectSnapshotRequest {
+            nonce: Uuid::new_v4(),
+            after: 0,
+            through: None,
+            limit: 32,
+        },
+    };
+    let response = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        super::super::company_device_delivery::snapshot(
+            State(f.base.state.clone()),
+            Extension(delegate.clone()),
+            Json(request.clone()),
+        ),
+    )
+    .await
+    .expect("no SQL locks across gateway HTTP")
+    .unwrap();
+    let bytes = axum::body::to_bytes(response.into_body(), 4 * 1024 * 1024)
+        .await
+        .unwrap();
+    let page: SignedProjectPage = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(page.claims.page.request.device, approval.device_id);
+    assert_eq!(page.claims.page.request.scope, subscription.scope);
+    assert!(String::from_utf8_lossy(&bytes).contains("approved scoped knowledge"));
+    assert_eq!(
+        0,
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM onboarding_devices WHERE id=$1")
+            .bind(approval.device_id)
+            .fetch_one(&f.base.db.pool)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        0,
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM onboarding_owner_snapshot_requests WHERE device_id=$1"
+        )
+        .bind(approval.device_id)
+        .fetch_one(&f.base.db.pool)
+        .await
+        .unwrap()
+    );
+    let repeated = super::super::company_device_delivery::snapshot(
+        State(f.base.state.clone()),
+        Extension(delegate.clone()),
+        Json(request.clone()),
+    )
+    .await
+    .unwrap();
+    let replay: SignedProjectPage = serde_json::from_slice(
+        &axum::body::to_bytes(repeated.into_body(), 4 * 1024 * 1024)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(replay.claims.page.entries, page.claims.page.entries);
+    let mut changed = request.clone();
+    changed.snapshot.limit = 1;
+    assert!(
+        super::super::company_device_delivery::snapshot(
+            State(f.base.state.clone()),
+            Extension(delegate.clone()),
+            Json(changed)
+        )
+        .await
+        .is_err()
+    );
+    // A local device token is not company delivery authority.
+    assert!(
+        super::super::company_device_delivery::snapshot(
+            State(f.base.state.clone()),
+            Extension(f.device.clone()),
+            Json(request.clone())
+        )
+        .await
+        .is_err()
+    );
+    // Owner-side access removed while the signed gateway response is in flight
+    // prevents those bytes being returned to the company.
+    *f.fake.hook.lock().unwrap() = Some(Hook::Revoke(f.base.membership));
+    let mut next = request.clone();
+    next.snapshot.nonce = Uuid::new_v4();
+    assert!(
+        super::super::company_device_delivery::snapshot(
+            State(f.base.state.clone()),
+            Extension(delegate),
+            Json(next)
+        )
+        .await
+        .is_err()
+    );
+    f.close().await;
+}
+
 #[derive(Clone)]
 struct FakeGateway {
     store: GatewayStore,
