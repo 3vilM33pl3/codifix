@@ -211,6 +211,28 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )],
         ),
         (
+            "/v1/onboarding/company/device/review",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanSession,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/company/device/approve",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanSession,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
             "/v1/onboarding/device/approve",
             &[(
                 Method::POST,

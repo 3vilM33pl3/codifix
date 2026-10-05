@@ -45,7 +45,7 @@ fn changed() -> ApiError {
         "company catalog human identity or owner registry changed; refresh before retrying",
     )
 }
-fn digest<T: Serialize>(value: &T) -> Result<String, ApiError> {
+pub(super) fn digest<T: Serialize>(value: &T) -> Result<String, ApiError> {
     use sha2::{Digest, Sha256};
     CanonicalJsonCodec::encode(value)
         .map(|v| {
@@ -71,7 +71,7 @@ fn issuer(value: &str) -> bool {
                 && u.fragment().is_none()
         })
 }
-fn origin(value: &str) -> Result<Url, ApiError> {
+pub(super) fn origin(value: &str) -> Result<Url, ApiError> {
     let url = Url::parse(value).map_err(|_| denied())?;
     if !(url.scheme() == "https"
         || (cfg!(test)
@@ -163,6 +163,35 @@ fn registry(state: &AppState) -> Result<Registry, ApiError> {
         owners,
         fingerprint,
     })
+}
+pub(super) fn registry_sha256(state: &AppState) -> Result<String, ApiError> {
+    Ok(registry(state)?.fingerprint)
+}
+pub(super) fn delivery_owner(
+    state: &AppState,
+    area: &str,
+    owner: Uuid,
+) -> Result<mem_config::CompanyOwnerConfig, ApiError> {
+    let registry = registry(state)?;
+    if !registry
+        .owners
+        .iter()
+        .any(|o| o.instance == owner && o.area.as_str() == area)
+    {
+        return Err(denied());
+    }
+    state
+        .config
+        .auth
+        .company_onboarding
+        .as_ref()
+        .and_then(|c| {
+            c.owners
+                .iter()
+                .find(|o| o.owner_instance_id == owner && o.area.as_str() == area)
+        })
+        .cloned()
+        .ok_or_else(denied)
 }
 
 #[derive(PartialEq, Eq)]

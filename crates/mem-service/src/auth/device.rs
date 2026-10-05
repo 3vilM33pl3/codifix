@@ -30,7 +30,7 @@ fn conflict() -> ApiError {
         "device request, decision or reviewed project revision changed",
     )
 }
-fn configuration(state: &AppState) -> Result<&mem_config::AreaIdentityConfig, ApiError> {
+pub(super) fn configuration(state: &AppState) -> Result<&mem_config::AreaIdentityConfig, ApiError> {
     let url = state
         .config
         .auth
@@ -230,6 +230,21 @@ pub(crate) async fn start(
     .map_err(|_| ApiError::forbidden("invalid company browser origin"))?;
     uri.set_path("/");
     uri.set_query(Some(&format!("device_code={user_code}")));
+    if state
+        .config
+        .auth
+        .company_onboarding
+        .as_ref()
+        .is_some_and(|c| {
+            c.owners.iter().any(|o| {
+                o.area != OnboardingArea::Trust
+                    && o.delivery_token_env.is_some()
+                    && o.delivery_policy_revision.is_some()
+            })
+        })
+    {
+        uri.query_pairs_mut().append_pair("company_device", "1");
+    }
     let response = OnboardingDeviceStartResponse {
         request_id: request.request_id,
         user_code,
@@ -248,7 +263,7 @@ fn empty_status(status: &str) -> OnboardingDevicePollResponse {
         projects: None,
     }
 }
-async fn status(
+pub(super) async fn status(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     row: &PgRow,
 ) -> Result<OnboardingDevicePollResponse, ApiError> {
@@ -371,7 +386,7 @@ pub(crate) async fn cancel(
         json!({"status":"denied","request_id":request.request_id,"device_id":device}),
     ))
 }
-async fn lock_human(
+pub(super) async fn lock_human(
     state: &AppState,
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     actor: &AuthenticatedPrincipal,
@@ -398,7 +413,7 @@ async fn lock_human(
     }
     Ok(())
 }
-fn code(value: &str) -> Result<(), ApiError> {
+pub(super) fn code(value: &str) -> Result<(), ApiError> {
     if value.len() != 9
         || value.as_bytes()[4] != b'-'
         || !value
@@ -515,6 +530,22 @@ pub(crate) async fn approve(
     lock_human(&state, &mut tx, &actor).await?;
     let row=sqlx::query("SELECT *,expires_at>clock_timestamp() AS active FROM onboarding_device_requests WHERE user_code=$1 FOR UPDATE")
         .bind(&request.user_code).fetch_optional(&mut *tx).await.map_err(ApiError::sql)?.ok_or_else(||ApiError::not_found("device confirmation code not found"))?;
+    let company: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM onboarding_company_device_intents WHERE request_id=$1)",
+    )
+    .bind(
+        row.try_get::<Uuid, _>("request_id")
+            .map_err(ApiError::sql)?,
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(ApiError::sql)?;
+    if company {
+        return Err(ApiError::status_message(
+            StatusCode::CONFLICT,
+            "company enrollment must use its exact company approval path",
+        ));
+    }
     let device: Uuid = row.try_get("device_id").map_err(ApiError::sql)?;
     if row.try_get::<String, _>("status").map_err(ApiError::sql)? != "pending" {
         if row
@@ -615,6 +646,9 @@ pub(crate) async fn catalog(
         && actor.credential_source == CredentialSource::BrowserSession
     {
     } else if actor.credential_source == CredentialSource::ServiceToken {
+        if let Some(projects) = super::company_devices::catalog_for_device(&state, &actor).await? {
+            return Ok(Json(json!({"schema_version":1,"projects":projects})));
+        }
         let exists:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM onboarding_devices WHERE service_token_id=$1 AND machine_principal_id=$2 AND revoked_at IS NULL)")
             .bind(actor.token_id).bind(actor.id).fetch_one(&state.pool()?).await.map_err(ApiError::sql)?;
         if !exists {

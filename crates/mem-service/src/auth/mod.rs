@@ -5,6 +5,7 @@ pub(crate) mod company_catalog;
 pub(crate) mod company_delegate;
 pub(crate) mod company_delivery_delegate;
 pub(crate) mod company_device_delivery;
+pub(crate) mod company_devices;
 pub(crate) mod device;
 mod model;
 mod oidc;

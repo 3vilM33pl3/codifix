@@ -72,6 +72,15 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
             get(crate::auth::device::review),
         )
         .route(
+            "/v1/onboarding/company/device/review",
+            get(crate::auth::company_devices::review),
+        )
+        .route(
+            "/v1/onboarding/company/device/approve",
+            post(crate::auth::company_devices::approve)
+                .layer(axum::extract::DefaultBodyLimit::max(16384)),
+        )
+        .route(
             "/v1/onboarding/device/approve",
             post(crate::auth::device::approve).layer(axum::extract::DefaultBodyLimit::max(16384)),
         )
