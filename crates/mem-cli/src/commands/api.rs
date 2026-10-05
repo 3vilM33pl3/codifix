@@ -27,8 +27,10 @@ use uuid::Uuid;
 
 use crate::commands::output::{service_url, write_headers};
 
+mod laptop_cache;
 mod local_session;
 mod supervisor_questions;
+pub(crate) use laptop_cache::cache_scope_matches;
 pub(super) use local_session::local_human_client;
 
 fn jobs_path(project: &str, id: Option<Uuid>, retry: bool) -> Result<String> {

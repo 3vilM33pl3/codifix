@@ -1338,7 +1338,7 @@ fn tab_order_restores_activity_after_query() {
     assert_eq!(TabKind::Jobs.index(), 12);
     assert_eq!(TabKind::Supervisor.index(), 13);
     assert_eq!(TabKind::Jobs.next(), TabKind::Supervisor);
-    assert_eq!(TabKind::Memories.prev(), TabKind::Supervisor);
+    assert_eq!(TabKind::Memories.prev(), TabKind::Offline);
     assert_eq!(TabKind::Memories.next(), TabKind::Agents);
     assert_eq!(TabKind::Query.next(), TabKind::Activity);
     assert_eq!(TabKind::Activity.prev(), TabKind::Query);
@@ -1359,7 +1359,10 @@ fn tab_order_restores_activity_after_query() {
     assert_eq!(TabKind::Embeddings.next(), TabKind::Resume);
     assert_eq!(TabKind::Resume.prev(), TabKind::Embeddings);
     assert_eq!(TabKind::Resume.next(), TabKind::Jobs);
-    assert_eq!(TabKind::Supervisor.next(), TabKind::Memories);
+    assert_eq!(TabKind::Supervisor.next(), TabKind::Offline);
+    assert_eq!(TabKind::Offline.index(), 14);
+    assert_eq!(TabKind::Offline.next(), TabKind::Memories);
+    assert_eq!(TabKind::Offline.prev(), TabKind::Supervisor);
     assert_eq!(TabKind::Jobs.prev(), TabKind::Resume);
 }
 

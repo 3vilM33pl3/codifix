@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn supervisor_is_in_both_tab_navigation_directions() {
         use crate::tui::state::{TabKind, VISIBLE_TABS};
-        assert_eq!(TabKind::Supervisor.next(), TabKind::Memories);
+        assert_eq!(TabKind::Supervisor.next(), TabKind::Offline);
         assert_eq!(TabKind::Supervisor.prev(), TabKind::Jobs);
         for (index, tab) in VISIBLE_TABS.iter().enumerate() {
             assert_eq!(tab.index(), index);

@@ -24,6 +24,7 @@ pub(super) fn should_quit(key: KeyEvent, app: &App) -> bool {
         && matches!(key.code, KeyCode::Char('q'))
         && !(app.active_tab == TabKind::Supervisor
             && app.supervisor.private.consumes_quit(&app.project))
+        && !(app.active_tab == TabKind::Offline && app.offline.editing)
 }
 
 pub(super) fn should_attempt_stream_reconnect(

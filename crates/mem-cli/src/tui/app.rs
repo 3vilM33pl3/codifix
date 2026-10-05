@@ -562,6 +562,7 @@ impl App {
             },
             jobs: super::tabs::jobs::JobsState::default(),
             supervisor: super::tabs::supervisor::SupervisorState::default(),
+            offline: super::tabs::offline::OfflineState::default(),
             embeddings: EmbeddingsTabState {
                 embedding_backends_snapshot: None,
                 embedding_backends_error: None,
@@ -616,6 +617,10 @@ impl App {
     }
 
     fn set_active_tab(&mut self, tab: TabKind) {
+        if self.active_tab == TabKind::Offline && tab != TabKind::Offline {
+            self.offline.invalidate();
+            self.offline.editing = false;
+        }
         let became_agents = tab == TabKind::Agents && self.active_tab != TabKind::Agents;
         let became_embeddings =
             tab == TabKind::Embeddings && self.active_tab != TabKind::Embeddings;
@@ -1050,6 +1055,9 @@ impl App {
     fn apply_background_event(&mut self, event: BackgroundEvent) {
         self.chrome.needs_redraw = true;
         match event {
+            BackgroundEvent::Offline { generation, result } => {
+                self.offline.receive(generation, result)
+            }
             BackgroundEvent::SupervisorPrivate { project, result } => {
                 if project == self.project {
                     self.supervisor.private.receive(result);
@@ -1578,6 +1586,15 @@ impl App {
             return Ok(false);
         }
 
+        if self.active_tab == TabKind::Offline {
+            if key.code == KeyCode::Char('r') && !self.offline.editing && !self.service.health_ok {
+                self.request_refresh(api, RefreshMode::Full);
+            }
+            if self.offline_key(key, api) {
+                self.chrome.needs_redraw = true;
+                return Ok(false);
+            }
+        }
         if self.active_tab == TabKind::Jobs
             && key.code == KeyCode::Char('r')
             && !self.service.health_ok

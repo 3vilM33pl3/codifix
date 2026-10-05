@@ -7,6 +7,7 @@ pub(super) mod embeddings;
 pub(super) mod errors;
 pub(in crate::tui) mod jobs;
 pub(super) mod memories;
+pub(in crate::tui) mod offline;
 pub(super) mod project;
 pub(super) mod query;
 pub(super) mod resume;
@@ -75,5 +76,6 @@ pub(in crate::tui) fn dispatch_update(
         TabKind::Resume => resume::update(event, &mut app.resume, &mut ctx),
         TabKind::Jobs => TabAction::None,
         TabKind::Supervisor => TabAction::None,
+        TabKind::Offline => TabAction::None,
     }
 }

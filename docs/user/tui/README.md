@@ -1,5 +1,21 @@
 # TUI Guide
 
+The **Offline** tab shows read-only synchronized knowledge from explicitly
+configured laptop subscriptions. `r` loads/refreshes inventory; `j/k` or arrows
+select the exact subscription UUID; `/` enters a question and `Enter` performs
+a bounded eight-hit local deterministic search. Questions are limited to 4096
+UTF-8 bytes. `Esc` ends entry; `d/u` or PageDown/PageUp scroll provenance and
+reviewed evidence. While editing, letters including `q` are question text, not
+quit/navigation shortcuts; Ctrl+C still exits.
+
+Area, owner instance, project, company, device and space UUIDs identify the copy.
+Last observed sync/cursor is not guaranteed freshness or current remote access.
+Shared text/locators are untrusted plain text, never executed or forwarded to a
+model. There are no write, approval or synchronization controls. Selection,
+refresh and query edits invalidate old excerpts; leaving the tab cancels reads.
+The configured local loopback owner must authenticate. A disabled/unsupported
+server or failed read is reported as unavailable, not an empty healthy cache.
+
 The **Jobs** tab inspects durable background stages and provides confirmed retry
 with stable request IDs. See [Background jobs](../cli/jobs.md) for keys and policy.
 

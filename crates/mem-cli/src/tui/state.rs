@@ -48,6 +48,7 @@ pub(super) struct App {
     pub(in crate::tui) embeddings: EmbeddingsTabState,
     pub(in crate::tui) jobs: super::tabs::jobs::JobsState,
     pub(in crate::tui) supervisor: super::tabs::supervisor::SupervisorState,
+    pub(in crate::tui) offline: super::tabs::offline::OfflineState,
     pub(in crate::tui) filters: Filters,
     pub(in crate::tui) background_tx: mpsc::UnboundedSender<BackgroundEvent>,
 }
@@ -406,6 +407,10 @@ pub(super) struct ProjectRefreshResult {
 }
 
 pub(super) enum BackgroundEvent {
+    Offline {
+        generation: u64,
+        result: Result<super::tabs::offline::OfflineResult, String>,
+    },
     SupervisorPrivate {
         project: String,
         result: Result<super::tabs::supervisor::private::PrivateResult, String>,
@@ -527,9 +532,10 @@ pub(super) enum TabKind {
     Resume,
     Jobs,
     Supervisor,
+    Offline,
 }
 
-pub(super) const VISIBLE_TABS: [TabKind; 14] = [
+pub(super) const VISIBLE_TABS: [TabKind; 15] = [
     TabKind::Memories,
     TabKind::Agents,
     TabKind::Query,
@@ -544,6 +550,7 @@ pub(super) const VISIBLE_TABS: [TabKind; 14] = [
     TabKind::Resume,
     TabKind::Jobs,
     TabKind::Supervisor,
+    TabKind::Offline,
 ];
 
 impl TabKind {
@@ -563,6 +570,7 @@ impl TabKind {
             Self::Resume => "Resume",
             Self::Jobs => "Jobs",
             Self::Supervisor => "Supervisor",
+            Self::Offline => "Offline",
         }
     }
 
@@ -581,13 +589,14 @@ impl TabKind {
             Self::Embeddings => Self::Resume,
             Self::Resume => Self::Jobs,
             Self::Jobs => Self::Supervisor,
-            Self::Supervisor => Self::Memories,
+            Self::Supervisor => Self::Offline,
+            Self::Offline => Self::Memories,
         }
     }
 
     pub(in crate::tui) fn prev(self) -> Self {
         match self {
-            Self::Memories => Self::Supervisor,
+            Self::Memories => Self::Offline,
             Self::Agents => Self::Memories,
             Self::Query => Self::Agents,
             Self::Activity => Self::Query,
@@ -601,6 +610,7 @@ impl TabKind {
             Self::Resume => Self::Embeddings,
             Self::Jobs => Self::Resume,
             Self::Supervisor => Self::Jobs,
+            Self::Offline => Self::Supervisor,
         }
     }
 
@@ -620,6 +630,7 @@ impl TabKind {
             Self::Resume => 11,
             Self::Jobs => 12,
             Self::Supervisor => 13,
+            Self::Offline => 14,
         }
     }
 }

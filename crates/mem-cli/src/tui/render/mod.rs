@@ -101,6 +101,9 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         ])
     } else {
         let mut spans = match app.active_tab {
+            TabKind::Offline => vec![Span::raw(
+                "r refresh  j/k subscription  / question  Enter search  d/u scroll",
+            )],
             TabKind::Supervisor => vec![Span::raw(
                 "r refresh  PgDn next history  Home first page  j/k scroll",
             )],
@@ -316,6 +319,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         match app.active_tab {
             TabKind::Jobs => super::tabs::jobs::draw(frame, app, chunks[2]),
             TabKind::Supervisor => super::tabs::supervisor::draw(frame, app, chunks[2]),
+            TabKind::Offline => super::tabs::offline::draw(frame, app, chunks[2]),
             TabKind::Resume => draw_resume_tab(frame, &tab_ctx, chunks[2]),
             TabKind::Memories => draw_memories_tab(frame, &tab_ctx, chunks[2]),
             TabKind::Agents => draw_agents_tab(frame, &tab_ctx, chunks[2]),
