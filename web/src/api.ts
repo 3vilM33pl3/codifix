@@ -424,6 +424,47 @@ export async function approveCompanyDevice(request: import("./features/onboardin
   return companyDeviceRequest("/v1/onboarding/company/device/approve", signal, request);
 }
 
+export class CompanyAgentRequestError extends Error {
+  constructor(message: string, readonly retryable: boolean) { super(message); }
+}
+async function companyAgentRequest<T>(device: string, suffix: string, signal?: AbortSignal, mutate = false, body?: import("./features/access/companyAgentTypes").CompanyAgentRequest): Promise<T> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(device)) throw new CompanyAgentRequestError("Invalid device identity; no request sent.", false);
+  let response: Response;
+  try {
+    const auth = await getAuthMe();
+    if (!auth.authenticated || auth.mode !== "multi_user" || auth.principal.kind !== "human_oidc" || (mutate && auth.read_only))
+      throw new CompanyAgentRequestError("Agent access requires the exact parent OIDC human browser session; writable service required for changes. Administration is not an override.", false);
+    if (signal?.aborted) throw new CompanyAgentRequestError("Cancelled agent request; no request sent.", false);
+    response = await apiFetch(`/v1/onboarding/devices/${device}/agents${suffix}`, { signal, cache: "no-store", redirect: "error",
+      ...(mutate ? { method: "POST", ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) } : {}),
+    });
+  } catch (error) {
+    if (error instanceof CompanyAgentRequestError) throw error;
+    throw new CompanyAgentRequestError("Agent outcome unconfirmed. Inspect its stable request/agent IDs and retry only the unchanged request; response details suppressed.", true);
+  }
+  if (!response.ok) throw new CompanyAgentRequestError(response.status === 401 || response.status === 403
+    ? "Agent access denied. The exact current parent human/device and owner permissions are required; no administrator override."
+    : response.status === 409 ? "Agent request conflicts with reviewed scope/trust or prior IDs. Keep the frozen request; never silently regenerate identities or change disclosure."
+    : response.status === 404 ? "Own device agent or capability unavailable. No legacy fallback was attempted."
+    : response.status === 410 ? "Agent approval expired; no new activation is confirmed."
+    : "Agent outcome unconfirmed. Retry only the exact same request/IDs; response details suppressed.", response.status >= 500);
+  try {
+    const raw = await response.text();
+    if (new TextEncoder().encode(raw).length > 2 * 1024 * 1024) throw new Error();
+    return JSON.parse(raw) as T;
+  } catch { throw new CompanyAgentRequestError("Agent receipt unreadable. Inspect the original IDs; retry only the unchanged request.", true); }
+}
+export async function listCompanyAgents(device: string, signal?: AbortSignal): Promise<import("./features/access/companyAgentTypes").CompanyAgentList> {
+  return companyAgentRequest(device, "", signal);
+}
+export async function approveCompanyAgent(device: string, request: import("./features/access/companyAgentTypes").CompanyAgentRequest & { confirmed: true }, signal?: AbortSignal): Promise<import("./features/access/companyAgentTypes").CompanyAgentReceipt> {
+  return companyAgentRequest(device, "", signal, true, request);
+}
+export async function revokeCompanyAgent(device: string, agent: string, signal?: AbortSignal): Promise<import("./features/access/companyAgentTypes").CompanyAgentReceipt> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(agent)) throw new CompanyAgentRequestError("Invalid agent identity; no request sent.", false);
+  return companyAgentRequest(device, `/${agent}/revoke`, signal, true);
+}
+
 export async function approveDevice(request: {
   user_code: string;
   projects: import("./features/onboarding/types").DeviceApprovalSelection[];
