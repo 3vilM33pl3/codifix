@@ -9,6 +9,8 @@ use mem_federation_store::{
 };
 use std::sync::{Arc, Mutex};
 
+mod company_proxy;
+
 #[tokio::test]
 async fn company_device_uses_signed_scoped_feed_without_owner_device_or_bearer() {
     let Some(mut f) = DeliveryFixture::new(119).await else {
@@ -166,12 +168,18 @@ async fn composite_local_route_rejects_other_owner_area_without_fallback() {
         return;
     };
     let local_owner = f.fake.owner.as_uuid();
-    let Json(bootstrap) = scoped_subscription(
+    let response = scoped_subscription(
         State(f.base.state.clone()),
         Extension(f.device.clone()),
         Path(("workshop".into(), local_owner, f.base.project)),
     )
     .await
+    .unwrap();
+    let bootstrap: mem_federation_runtime::DeviceProjectSubscription = serde_json::from_slice(
+        &axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .unwrap(),
+    )
     .unwrap();
     assert_eq!(bootstrap.scope.owner.as_uuid(), local_owner);
     for (area, owner) in [

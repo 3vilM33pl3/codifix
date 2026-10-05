@@ -439,6 +439,18 @@ pub(crate) async fn scoped_snapshot(
     Path((area, owner, project)): Path<(String, Uuid, Uuid)>,
     Json(request): Json<OnboardingProjectSnapshotRequest>,
 ) -> Result<Response, ApiError> {
+    if let Some(response) = super::company_device_proxy::snapshot(
+        &state,
+        &actor,
+        &area,
+        owner,
+        project,
+        request.clone(),
+    )
+    .await?
+    {
+        return Ok(response);
+    }
     require_local_route(&state, &area, owner)?;
     snapshot_for(state, actor, project, request, None).await
 }
@@ -447,9 +459,16 @@ pub(crate) async fn scoped_subscription(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthenticatedPrincipal>,
     Path((area, owner, project)): Path<(String, Uuid, Uuid)>,
-) -> Result<Json<mem_federation_runtime::DeviceProjectSubscription>, ApiError> {
+) -> Result<Response, ApiError> {
+    if let Some(response) =
+        super::company_device_proxy::subscription(&state, &actor, &area, owner, project).await?
+    {
+        return Ok(response);
+    }
     require_local_route(&state, &area, owner)?;
-    subscription_for(state, actor, project, None).await
+    subscription_for(state, actor, project, None)
+        .await
+        .map(IntoResponse::into_response)
 }
 
 pub(super) async fn snapshot_for(
