@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-use super::{Mcp, Prepare, Status};
+use super::{Configure, Mcp, Prepare, Status};
 use crate::commands::auth_enrollment::{
     CompanyOrigin,
     credentials::{self, CredentialStore, NativeKeychain},
@@ -274,15 +274,36 @@ pub(super) async fn prepare(args: &Prepare) -> Result<()> {
         !r.observed_revoked && r.request.expires_at > Utc::now(),
         "saved agent request expired or was revoked; no automatic renewal"
     );
+    let envelope = public_envelope(&r);
+    println!("{}", serde_json::to_string_pretty(&envelope)?);
+    if args.open_browser {
+        let url = approval_url(&origin, &envelope)?;
+        crate::commands::auth_enrollment::transport::open_browser(url.as_str()).map_err(|_| {
+            anyhow::anyhow!(
+                "browser could not open; import the printed public approval JSON manually"
+            )
+        })?;
+    }
+    Ok(())
+}
+fn public_envelope(r: &Record) -> Value {
     let mut request = r.request.clone();
     request.confirmed = false;
-    println!(
-        "{}",
-        serde_json::to_string_pretty(
-            &json!({"device_id":r.device_id,"approval_endpoint":format!("/v1/onboarding/devices/{}/agents",r.device_id),"request":request,"agent_id":r.request.agent_id,"contains_secret":false,"automatic_approval":false})
-        )?
+    json!({"device_id":r.device_id,"approval_endpoint":format!("/v1/onboarding/devices/{}/agents",r.device_id),"request":request,"agent_id":r.request.agent_id,"contains_secret":false,"automatic_approval":false})
+}
+fn approval_url(origin: &CompanyOrigin, envelope: &Value) -> Result<reqwest::Url> {
+    let body = serde_json::to_string(envelope)?;
+    ensure!(
+        body.len() <= 8192,
+        "public approval envelope exceeds browser limit; import JSON manually"
     );
-    Ok(())
+    let mut url = reqwest::Url::parse(&origin.endpoint("/"))?;
+    url.query_pairs_mut().append_pair("agent_request", &body);
+    ensure!(
+        url.as_str().len() <= 8192 && url.origin().ascii_serialization() == origin.0,
+        "public approval URL exceeds bound or origin changed; import JSON manually"
+    );
+    Ok(url)
 }
 enum Observation {
     Current(CompanyAgentReceipt),
@@ -413,6 +434,139 @@ pub(super) async fn status(args: &Status) -> Result<()> {
     Ok(())
 }
 
+fn configuration_inputs(
+    args: &Configure,
+    origin: &CompanyOrigin,
+    r: &Record,
+    profile: &LocalProjectReplicaProfile,
+) -> Result<super::settings::Inputs> {
+    let (company, device, workspace, manifest, journal_sha) =
+        workspace::agent_settings_workspace(&args.workspace_journal, &args.profile)?;
+    let parent = workspace::active(&NativeKeychain, origin)?;
+    let latest = load(&NativeKeychain, origin, args.agent_id)?;
+    ensure!(
+        company == origin.0
+            && device == r.device_id
+            && parent.device_id == device
+            && !latest.observed_revoked
+            && latest.request == r.request
+            && latest.bootstrap == r.bootstrap,
+        "reviewed workspace or parent agent binding changed"
+    );
+    let receipt = latest
+        .receipt
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("online approved agent receipt required"))?;
+    eligible(&latest, receipt)?;
+    let current_profile = LocalProjectReplicaProfile::read(&args.profile)?;
+    ensure!(
+        serde_json::to_value(&current_profile)? == serde_json::to_value(profile)?
+            && profile.company == company
+            && profile.bootstrap == r.bootstrap,
+        "native profile changed before settings configuration"
+    );
+    let selected = &r.request.projects[0];
+    ensure!(
+        manifest.entry.offline_allowed
+            && manifest.entry.area != OnboardingArea::Trust
+            && manifest.entry.area == selected.area
+            && manifest.entry.owner_instance_id == selected.owner_instance_id
+            && manifest.project_id == selected.project_id
+            && manifest.revision == selected.manifest_revision
+            && mem_federation_runtime::onboarding_manifest_digest(&manifest)?
+                == selected.manifest_sha256,
+        "completed workspace manifest is not the exact approved disclosure scope"
+    );
+    ensure!(
+        manifest
+            .entry
+            .destinations
+            .iter()
+            .any(|d| d.name == r.request.caller.as_str()
+                && d.provider_id == r.request.provider_id
+                && d.destination_id == r.request.provider_id),
+        "reviewed manifest does not permit exact agent destination"
+    );
+    let command =
+        std::env::current_exe().map_err(|_| anyhow::anyhow!("installed executable unavailable"))?;
+    let command = command
+        .to_str()
+        .filter(|v| command.is_absolute() && !v.chars().any(char::is_control))
+        .ok_or_else(|| anyhow::anyhow!("absolute installed executable required"))?
+        .to_owned();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let m = std::fs::symlink_metadata(&command)
+            .map_err(|_| anyhow::anyhow!("installed executable unavailable"))?;
+        ensure!(
+            m.is_file()
+                && (m.uid() == 0 || m.uid() == rustix::process::getuid().as_raw())
+                && m.mode() & 0o022 == 0
+                && m.mode() & 0o111 != 0,
+            "installed executable must be trusted and non-shared-writable"
+        );
+    }
+    let hash =
+        |v: &Value| -> Result<String> { Ok(credentials::sha256(&serde_json::to_string(v)?)) };
+    Ok(super::settings::Inputs {
+        company,
+        agent_id: args.agent_id,
+        caller: r.request.caller,
+        provider_id: r.request.provider_id.clone(),
+        device_id: device,
+        scope: serde_json::to_value(&r.bootstrap.scope)?,
+        workspace,
+        profile: args.profile.clone(),
+        workspace_journal_sha256: journal_sha,
+        profile_sha256: hash(&serde_json::to_value(profile)?)?,
+        bootstrap_sha256: hash(&serde_json::to_value(&r.bootstrap)?)?,
+        manifest_sha256: selected.manifest_sha256.clone(),
+        receipt_sha256: hash(&serde_json::to_value(receipt)?)?,
+        command,
+        allow_loopback: args.company.allow_loopback,
+        allow_offline: args.allow_offline,
+    })
+}
+pub(super) async fn configure(args: &Configure) -> Result<()> {
+    let origin = CompanyOrigin::parse(&args.company.company, args.company.allow_loopback)?;
+    let broker = CacheBroker {
+        company: origin.0.clone(),
+        allow_loopback: args.company.allow_loopback,
+        agent_id: args.agent_id,
+        profile: args.profile.clone(),
+        allow_offline: false,
+    };
+    let (r, profile, online) = broker.authorize().await?;
+    ensure!(
+        online,
+        "settings configuration requires current online approval"
+    );
+    let inputs = configuration_inputs(args, &origin, &r, &profile)?;
+    let prepared = super::settings::prepare(
+        &NativeKeychain,
+        &origin,
+        inputs,
+        &args.workspace_journal,
+        args.plan_sha256.as_deref(),
+    )?;
+    let output = if args.confirm {
+        ensure!(
+            broker.recheck(&r, &profile).await?,
+            "settings apply requires current online approval"
+        );
+        ensure!(
+            configuration_inputs(args, &origin, &r, &profile)? == *prepared.inputs(),
+            "reviewed inputs changed before settings apply"
+        );
+        prepared.apply(&NativeKeychain, &origin)?
+    } else {
+        prepared.preview(false, false)
+    };
+    println!("{}", serde_json::to_string_pretty(&output)?);
+    Ok(())
+}
+
 #[derive(Clone)]
 struct CacheBroker {
     company: String,
@@ -501,6 +655,26 @@ mod tests {
     use super::*;
     use mem_record::{CompanyAgentCaller, CompanyAgentScope, OnboardingDestination};
     use std::{collections::BTreeMap, sync::Mutex};
+    #[test]
+    fn browser_approval_contains_only_public_request_and_exact_origin() {
+        let (origin, r, _) = fixture();
+        let envelope = public_envelope(&r);
+        let raw = serde_json::to_string(&envelope).unwrap();
+        assert!(!raw.contains(&r.credential));
+        assert_eq!(envelope["request"]["confirmed"], false);
+        assert_eq!(envelope["contains_secret"], false);
+        let url = approval_url(&origin, &envelope).unwrap();
+        assert_eq!(url.origin().ascii_serialization(), origin.0);
+        assert_eq!(url.path(), "/");
+        let pairs: Vec<_> = url.query_pairs().collect();
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].0, "agent_request");
+        assert_eq!(
+            serde_json::from_str::<Value>(&pairs[0].1).unwrap(),
+            envelope
+        );
+        assert!(approval_url(&origin, &json!({"oversized":"x".repeat(8192)})).is_err());
+    }
     #[derive(Default)]
     struct Store(Mutex<BTreeMap<(String, String), Vec<u8>>>);
     impl CredentialStore for Store {

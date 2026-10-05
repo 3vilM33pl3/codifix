@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use uuid::Uuid;
 #[cfg(feature = "project-sync")]
 mod native;
+#[cfg(feature = "project-sync")]
+mod settings;
 
 #[derive(Debug, Args)]
 pub(in crate::commands) struct AgentArgs {
@@ -20,6 +22,8 @@ enum AgentCommand {
     Status(Status),
     /// Serve only this project's cache under the approved caller disclosure.
     Mcp(Mcp),
+    /// Preview or explicitly apply only this project's secret-free MCP entry.
+    Configure(Configure),
 }
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum Caller {
@@ -48,6 +52,9 @@ struct Prepare {
     /// expired. Never clears its revocation or inherits its approval.
     #[arg(long)]
     new_request: bool,
+    /// Open only the public approval JSON on the pinned company browser origin.
+    #[arg(long)]
+    open_browser: bool,
 }
 #[derive(Debug, Args)]
 struct Status {
@@ -70,6 +77,25 @@ struct Mcp {
     #[arg(long)]
     allow_offline: bool,
 }
+#[derive(Debug, Args)]
+struct Configure {
+    #[command(flatten)]
+    company: CompanyArgs,
+    #[arg(long)]
+    agent_id: Uuid,
+    #[arg(long)]
+    profile: PathBuf,
+    #[arg(long)]
+    workspace_journal: PathBuf,
+    /// Permit future cached disclosure only under the explicit bounded receipt.
+    #[arg(long)]
+    allow_offline: bool,
+    /// Exact digest printed by the preview; required together with --confirm.
+    #[arg(long, requires = "confirm")]
+    plan_sha256: Option<String>,
+    #[arg(long, requires = "plan_sha256")]
+    confirm: bool,
+}
 pub(super) async fn handle(args: &AgentArgs) -> Result<()> {
     #[cfg(feature = "project-sync")]
     {
@@ -77,6 +103,7 @@ pub(super) async fn handle(args: &AgentArgs) -> Result<()> {
             AgentCommand::Prepare(args) => native::prepare(args).await,
             AgentCommand::Status(args) => native::status(args).await,
             AgentCommand::Mcp(args) => native::mcp(args).await,
+            AgentCommand::Configure(args) => native::configure(args).await,
         }
     }
     #[cfg(not(feature = "project-sync"))]

@@ -388,6 +388,17 @@ fn has_receipt(path: &Path, journal: &Journal) -> Result<bool> {
     }
     Ok(true)
 }
+#[cfg(feature = "project-sync")]
+pub(super) fn ready_for_agent_settings(journal: &Journal) -> Result<bool> {
+    if !filesystem::is_repository(&journal.plan.workspace)? {
+        return Ok(false);
+    }
+    match journal.repository {
+        RepositoryStage::Ready => has_receipt(&journal.plan.workspace, journal),
+        RepositoryStage::ExistingPreserved => Ok(true),
+        _ => Ok(false),
+    }
+}
 fn staging(journal: &Journal) -> Result<PathBuf> {
     let parent = journal
         .plan

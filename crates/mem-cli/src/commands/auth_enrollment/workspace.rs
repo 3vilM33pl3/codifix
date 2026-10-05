@@ -443,6 +443,32 @@ pub(super) fn agent_manifest(path: &std::path::Path) -> Result<(String, Uuid, On
         journal.plan.manifest,
     ))
 }
+#[cfg(feature = "project-sync")]
+pub(super) fn agent_settings_workspace(
+    path: &std::path::Path,
+    profile: &std::path::Path,
+) -> Result<(String, Uuid, PathBuf, OnboardingProject, String)> {
+    let journal = filesystem::read(&filesystem::absolute_leaf(path)?)?;
+    if !matches!(
+        journal.repository,
+        RepositoryStage::Ready | RepositoryStage::ExistingPreserved
+    ) || !journal.templates_done
+        || !journal.tools_done
+        || !repository::ready_for_agent_settings(&journal)?
+    {
+        bail!("agent settings require a completed reviewed clone/templates/tools journal");
+    }
+    filesystem::absolute_leaf(profile)?;
+    filesystem::separate(profile, &journal.plan.workspace)?;
+    let digest = filesystem::digest(&journal)?;
+    Ok((
+        journal.plan.company,
+        journal.plan.device_id,
+        journal.plan.workspace,
+        journal.plan.manifest,
+        digest,
+    ))
+}
 fn print_preview(journal: &Journal) -> Result<()> {
     println!("{}", serde_json::to_string_pretty(journal)?);
     println!(

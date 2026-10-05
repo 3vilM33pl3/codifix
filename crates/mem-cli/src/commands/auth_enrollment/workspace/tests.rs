@@ -62,6 +62,43 @@ fn identity() -> (CompanyOrigin, Enrollment) {
     };
     (origin, record)
 }
+#[cfg(feature = "project-sync")]
+#[tokio::test]
+async fn agent_settings_require_completed_tools_templates_and_exact_clone_receipt() {
+    let fixture = Fixture::new();
+    let project = project();
+    let args = fixture.prepare(&project.manifest);
+    let catalog = FakeCatalog::new(project);
+    let (origin, record) = identity();
+    let journal = prepare_with(&args, &origin, &record, &catalog)
+        .await
+        .unwrap();
+    let profile = fixture.0.join("private-native-profile.json");
+    assert!(agent_settings_workspace(&args.journal, &profile).is_err());
+    apply_with(
+        &fixture.apply(&journal),
+        &origin,
+        &record,
+        &catalog,
+        &FakeGit::default(),
+        &FakeDownloads::default(),
+    )
+    .await
+    .unwrap();
+    let mut ready = filesystem::read(&args.journal).unwrap();
+    assert!(agent_settings_workspace(&args.journal, &profile).is_ok());
+    ready.tools_done = false;
+    filesystem::save(&args.journal, &ready).unwrap();
+    assert!(agent_settings_workspace(&args.journal, &profile).is_err());
+    ready.tools_done = true;
+    ready.templates_done = false;
+    filesystem::save(&args.journal, &ready).unwrap();
+    assert!(agent_settings_workspace(&args.journal, &profile).is_err());
+    ready.templates_done = true;
+    filesystem::save(&args.journal, &ready).unwrap();
+    fs::remove_file(args.workspace.join(".git/memory-onboarding-receipt.json")).unwrap();
+    assert!(agent_settings_workspace(&args.journal, &profile).is_err());
+}
 pub(super) fn project() -> OnboardingDeviceReviewProject {
     OnboardingDeviceReviewProject {
         manifest: OnboardingProject {
