@@ -11,6 +11,8 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 use uuid::Uuid;
+type FileIdentity = (u64, u64);
+type Snapshot = (Vec<u8>, FileIdentity);
 fn error() -> anyhow::Error {
     anyhow::anyhow!(
         "protected settings filesystem operation failed; existing settings were not deliberately overwritten"
@@ -49,7 +51,7 @@ fn directory(path: &Path) -> Result<File> {
     Ok(dir)
 }
 #[allow(clippy::unnecessary_cast)] // Stat field width differs on supported Unix targets.
-fn identity(file: &File) -> Result<(u64, u64)> {
+fn identity(file: &File) -> Result<FileIdentity> {
     let s = fs::fstat(file).map_err(|_| error())?;
     Ok((s.st_dev as u64, s.st_ino as u64))
 }
@@ -64,7 +66,7 @@ fn regular(file: &File) -> Result<()> {
     );
     Ok(())
 }
-fn read_at(dir: &File, name: &str) -> Result<Option<(Vec<u8>, (u64, u64))>> {
+fn read_at(dir: &File, name: &str) -> Result<Option<Snapshot>> {
     let fd = match fs::openat(
         dir,
         name,
@@ -92,7 +94,7 @@ pub(super) struct Settings {
     target: Option<File>,
     stage: File,
     caller: CompanyAgentCaller,
-    initial: Option<(u64, u64)>,
+    initial: Option<FileIdentity>,
 }
 impl Settings {
     pub(super) fn open(
@@ -156,7 +158,7 @@ impl Settings {
             CompanyAgentCaller::Claude => ".mcp.json",
         }
     }
-    fn snapshot(&self) -> Result<Option<(Vec<u8>, (u64, u64))>> {
+    fn snapshot(&self) -> Result<Option<Snapshot>> {
         self.target
             .as_ref()
             .map(|dir| read_at(dir, self.leaf()))

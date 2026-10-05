@@ -306,7 +306,7 @@ fn approval_url(origin: &CompanyOrigin, envelope: &Value) -> Result<reqwest::Url
     Ok(url)
 }
 enum Observation {
-    Current(CompanyAgentReceipt),
+    Current(Box<CompanyAgentReceipt>),
     Unreachable,
     Denied,
 }
@@ -353,7 +353,7 @@ fn accept(r: &mut Record, observation: Observation, allow_offline: bool) -> Resu
     match observation {
         Observation::Current(receipt) => {
             eligible(r, &receipt)?;
-            r.receipt = Some(receipt);
+            r.receipt = Some(*receipt);
             Ok(true)
         }
         Observation::Denied => {
@@ -423,7 +423,7 @@ async fn observe(origin: &CompanyOrigin, r: &Record) -> Result<Observation> {
     if eligible(r, &receipt).is_err() {
         return Ok(Observation::Denied);
     }
-    Ok(Observation::Current(receipt))
+    Ok(Observation::Current(Box::new(receipt)))
 }
 pub(super) async fn status(args: &Status) -> Result<()> {
     let origin = CompanyOrigin::parse(&args.company.company, args.company.allow_loopback)?;
@@ -832,7 +832,14 @@ mod tests {
     fn offline_authorization_requires_explicit_consent_activation_and_unexpired_grant() {
         let (_, mut r, receipt) = fixture();
         assert!(accept(&mut r, Observation::Unreachable, true).is_err());
-        assert!(accept(&mut r, Observation::Current(receipt.clone()), false).unwrap());
+        assert!(
+            accept(
+                &mut r,
+                Observation::Current(Box::new(receipt.clone())),
+                false
+            )
+            .unwrap()
+        );
         assert!(accept(&mut r, Observation::Unreachable, false).is_err());
         assert!(!accept(&mut r, Observation::Unreachable, true).unwrap());
         let mut expired = r.clone();
@@ -842,7 +849,7 @@ mod tests {
         assert!(accept(&mut r, Observation::Denied, true).is_err());
         assert!(r.observed_revoked);
         assert!(accept(&mut r, Observation::Unreachable, true).is_err());
-        assert!(accept(&mut r, Observation::Current(receipt), false).is_err());
+        assert!(accept(&mut r, Observation::Current(Box::new(receipt)), false).is_err());
     }
     #[test]
     fn stale_success_cannot_erase_another_process_denial_or_reenable_offline_disclosure() {
@@ -858,7 +865,14 @@ mod tests {
         assert!(final_record.observed_revoked);
         assert!(accept(&mut final_record, Observation::Unreachable, true).is_err());
         assert!(
-            persist_observation(&store, &origin, id, Observation::Current(receipt), false).is_err()
+            persist_observation(
+                &store,
+                &origin,
+                id,
+                Observation::Current(Box::new(receipt)),
+                false
+            )
+            .is_err()
         );
     }
     #[test]
@@ -869,7 +883,14 @@ mod tests {
         save(&store, &origin, &r).unwrap();
         // A denial request starts while pending. A sibling activates the same
         // immutable grant before the denial arrives; it must now fence it.
-        persist_observation(&store, &origin, id, Observation::Current(receipt), false).unwrap();
+        persist_observation(
+            &store,
+            &origin,
+            id,
+            Observation::Current(Box::new(receipt)),
+            false,
+        )
+        .unwrap();
         assert!(persist_observation(&store, &origin, id, Observation::Denied, true).is_err());
         assert!(load(&store, &origin, id).unwrap().observed_revoked);
         assert!(persist_observation(&store, &origin, id, Observation::Unreachable, true).is_err());
@@ -883,7 +904,14 @@ mod tests {
         assert!(persist_observation(&store, &origin, id, Observation::Denied, false).is_err());
         save(&store, &origin, &r).unwrap(); // delayed preapproval writer
         assert!(
-            persist_observation(&store, &origin, id, Observation::Current(receipt), false).is_err()
+            persist_observation(
+                &store,
+                &origin,
+                id,
+                Observation::Current(Box::new(receipt)),
+                false
+            )
+            .is_err()
         );
         assert!(persist_observation(&store, &origin, id, Observation::Unreachable, true).is_err());
         let (_, mut fresh, receipt) = fixture();
@@ -893,7 +921,7 @@ mod tests {
             &store,
             &origin,
             fresh.request.agent_id,
-            Observation::Current(receipt),
+            Observation::Current(Box::new(receipt)),
             false,
         )
         .unwrap();
@@ -932,7 +960,11 @@ mod tests {
         let task = tokio::spawn(async move {
             let (mut socket, _) = listener.accept().await.unwrap();
             let mut buf = [0; 8192];
-            socket.read(&mut buf).await.unwrap();
+            let received = socket.read(&mut buf).await.unwrap();
+            assert!(
+                received > 0,
+                "authorization request must arrive before logout"
+            );
             parent.pending_logout = true;
             credentials::save(task_store.as_ref(), &task_origin, &parent).unwrap();
             let body = serde_json::to_vec(&receipt).unwrap();
