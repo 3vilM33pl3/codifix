@@ -68,6 +68,24 @@ pub struct AuthGroupMappingsConfig {
     pub rules: Vec<AuthGroupMappingRule>,
 }
 
+/// Opt-in server-only Authentik API access. The token must have only the
+/// configured user/invitation permissions; it is never returned by the API.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthentikManagementConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub base_url: String,
+    #[serde(default)]
+    pub token_env: String,
+    #[serde(default)]
+    pub invitation_flow: Option<Uuid>,
+    /// Newly created users go only under this provider-owned restricted path.
+    #[serde(default)]
+    pub user_path: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthConfig {
     #[serde(default)]
@@ -83,6 +101,8 @@ pub struct AuthConfig {
     pub oidc: OidcAuthConfig,
     #[serde(default)]
     pub group_mappings: AuthGroupMappingsConfig,
+    #[serde(default)]
+    pub authentik_management: AuthentikManagementConfig,
 }
 
 impl Default for AuthConfig {
@@ -94,6 +114,7 @@ impl Default for AuthConfig {
             multi_user_legacy_token_enabled: false,
             oidc: OidcAuthConfig::default(),
             group_mappings: AuthGroupMappingsConfig::default(),
+            authentik_management: AuthentikManagementConfig::default(),
         }
     }
 }
