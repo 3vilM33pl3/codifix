@@ -1,10 +1,12 @@
 """Private create-only native onboarding files; never manage legacy settings."""
 import fcntl
+import ctypes
 import hashlib
 import json
 import os
 from pathlib import Path
 import stat
+import sys
 import uuid
 
 
@@ -152,7 +154,10 @@ def missing(file, data):
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
-        os.link(temporary, file.name, src_dir_fd=parent, dst_dir_fd=parent, follow_symlinks=False)
+        # Linking then unlinking has a crash window leaving nlink=2. Protected
+        # readers correctly reject that file, which made exact recovery fail.
+        # Publish once with the platform's atomic no-replace rename instead.
+        rename_missing(parent, temporary, file.name)
         os.fsync(parent)
     finally:
         try:
@@ -160,6 +165,25 @@ def missing(file, data):
         except FileNotFoundError:
             pass
         os.close(parent)
+
+
+def rename_missing(parent, source, target):
+    if sys.platform == "darwin":
+        symbol, flags = "renameatx_np", 0x00000004  # RENAME_EXCL
+    elif sys.platform == "linux":
+        symbol, flags = "renameat2", 1  # RENAME_NOREPLACE; offline fixture host
+    else:
+        raise Refused("atomic create-only publication requires Darwin or Linux")
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        rename = getattr(libc, symbol)
+    except AttributeError:
+        raise Refused("atomic create-only rename unavailable; no unsafe fallback") from None
+    rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+    rename.restype = ctypes.c_int
+    if rename(parent, os.fsencode(source), parent, os.fsencode(target), flags) != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), target)
 
 
 def save(file, journal):

@@ -280,6 +280,36 @@ class OperatorContract(unittest.TestCase):
         os.link(self.metadata_file, alias)
         with self.assertRaises(files.Refused):
             files.read(self.metadata_file)
+    def test_lost_create_directory_fsync_recovers_exact_single_link_file(self):
+        target = self.root / "interrupted-create.json"
+        data = files.encoded({"request_id": "synthetic", "secret": "fake-only"})
+        original = os.fsync
+        def lose_directory_confirmation(fd):
+            if stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise OSError("synthetic directory fsync interruption after publish")
+            original(fd)
+        with patch.object(os, "fsync", side_effect=lose_directory_confirmation):
+            with self.assertRaises(OSError):
+                files.missing(target, data)
+        self.assertEqual(target.stat().st_nlink, 1)
+        files.missing(target, data)
+        self.assertEqual(files.bytes_at(target), data)
+        self.assertEqual(list(self.root.glob(".memory-new-*")), [])
+        with self.assertRaises(files.Refused):
+            files.missing(target, b"changed inputs")
+    def test_atomic_publish_cannot_replace_a_concurrently_created_file(self):
+        target = self.root / "concurrent-create.json"
+        original = files.rename_missing
+        def competing_publish(parent, source, name):
+            fd = os.open(name, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600, dir_fd=parent)
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(b"other operator file")
+            original(parent, source, name)
+        with patch.object(files, "rename_missing", side_effect=competing_publish):
+            with self.assertRaises(FileExistsError):
+                files.missing(target, b"first intent")
+        self.assertEqual(files.bytes_at(target), b"other operator file")
+        self.assertEqual(target.stat().st_nlink, 1)
     def test_native_has_no_linux_root_or_fake_environment_bypass(self):
         value = self.prepare()
         with patch.object(native_module.sys, "platform", "linux"):
