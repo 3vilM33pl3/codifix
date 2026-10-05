@@ -320,7 +320,7 @@ async fn fake_authentik_effects_are_bounded_sanitized_and_journaled() {
     let seen = observed.clone();
     let app=axum::Router::new()
         .route("/api/v3/core/users/",post(move|headers:axum::http::HeaderMap,Json(body):Json<Value>|{let seen=seen.clone();async move{assert_eq!(headers["authorization"],"Bearer synthetic-management-token");seen.lock().unwrap().push(body.clone());if body["username"]=="failure"{(StatusCode::BAD_REQUEST,Json(json!({"secret":"synthetic-do-not-leak"})))}else if body["username"]=="response-lost"{(StatusCode::CREATED,Json(json!({"effect_accepted_but_identifier_lost":true})))}else{(StatusCode::CREATED,Json(json!({"pk":42,"uid":"must-not-bind-oidc","token":"synthetic-do-not-leak"})))}}}))
-        .route("/api/v3/core/users/{id}/",get(|Path(id):Path<i64>|async move{Json(json!({"pk":id,"path":if id==42 {"memory-onboarding"} else {"unrelated-admins"},"is_superuser":id!=42}))}).patch(|Json(body):Json<Value>|async move{assert_eq!(body,json!({"is_active":false}));Json(json!({"pk":42}))}))
+        .route("/api/v3/core/users/{id}/",get(|Path(id):Path<i64>|async move{Json(if id==2 {json!({"pk":id,"path":"memory-onboarding"})}else if id==3{json!({"pk":id,"path":"memory-onboarding","is_superuser":"false"})}else{json!({"pk":id,"path":if id==42 {"memory-onboarding"} else {"unrelated-admins"},"is_superuser":id!=42})})}).patch(|Json(body):Json<Value>|async move{assert_eq!(body,json!({"is_active":false}));Json(json!({"pk":42}))}))
         .route("/api/v3/stages/invitation/invitations/",post(|Json(body):Json<Value>|async move{assert_eq!(body["single_use"],true);let name=body["name"].as_str().unwrap();assert!(name.len()<=50);assert!(name.bytes().all(|c|c.is_ascii_alphanumeric() || matches!(c,b'-'|b'_')));Json(json!({"pk":Uuid::new_v4()}))}));
     let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
     state.config.auth.authentik_management = mem_config::AuthentikManagementConfig {
@@ -367,6 +367,15 @@ async fn fake_authentik_effects_are_bounded_sanitized_and_journaled() {
         .await
         .unwrap_err();
     assert_eq!(denied.status, StatusCode::FORBIDDEN);
+    for invalid in [2, 3] {
+        assert_eq!(
+            provider::operate(&state, &actor, "disable", None, Some(invalid))
+                .await
+                .unwrap_err()
+                .status,
+            StatusCode::FORBIDDEN
+        );
+    }
     let mut fail = request();
     fail.username = "failure".into();
     let failed = provider::operate(&state, &actor, "create", Some(fail), None)

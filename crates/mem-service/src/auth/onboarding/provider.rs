@@ -139,7 +139,7 @@ pub(super) async fn operate(
         let target = bounded_json(response).await.ok_or_else(unavailable)?;
         if target.get("pk").and_then(Value::as_i64) != provider_id
             || target.get("path").and_then(Value::as_str) != Some(cfg.user_path.as_str())
-            || target.get("is_superuser").and_then(Value::as_bool) == Some(true)
+            || target.get("is_superuser").and_then(Value::as_bool) != Some(false)
         {
             return Err(ApiError::forbidden(
                 "provider user is outside the managed onboarding path",
