@@ -82,7 +82,7 @@ def metadata(value):
         raise Refused("bounded owner receipt keys required (Memory validates cryptographic contents)")
 
 
-def make_plan(source):
+def make_plan(source, *, prerequisites_only=False):
     exact(source, {"schema_version", "root", "memory", "postgres", "pg_port", "areas", "subscriptions"})
     if source["schema_version"] != 1:
         raise Refused("unsupported operator schema")
@@ -139,7 +139,9 @@ def make_plan(source):
     if not isinstance(source["subscriptions"], list) or not 1 <= len(source["subscriptions"]) <= 8:
         raise Refused("one to eight reviewed subscriptions required")
     selections, ids, scopes = [], set(), set()
-    for file in source["subscriptions"]:
+    # Journey preflight checks installed pins only. Ordinary preparation and
+    # every native apply still require actual reviewed subscription receipts.
+    for file in ([] if prerequisites_only else source["subscriptions"]):
         file = files.private(file)
         value = files.read(file, 64 * 1024)
         metadata(value)
@@ -150,7 +152,7 @@ def make_plan(source):
         ids.add(value["subscription"])
         scopes.add(key)
         selections.append({"path": str(file), "metadata": value, "sha256": files.sha(file)})
-    if seen != {s["metadata"]["bootstrap"]["scope"]["area"] for s in selections}:
+    if not prerequisites_only and seen != {s["metadata"]["bootstrap"]["scope"]["area"] for s in selections}:
         raise Refused("each selected local area requires reviewed project subscription metadata")
     if instances & {s["metadata"]["bootstrap"][key] for s in selections for key in ["device", "authority"]} or instances & {s["metadata"]["bootstrap"]["scope"]["owner"] for s in selections}:
         raise Refused("local area identities must not impersonate enrolled devices or remote owners/authorities")
@@ -467,6 +469,10 @@ def main():
     apply_parser.add_argument("--plan-sha256", required=True)
     apply_parser.add_argument("--confirm", action="store_true")
     commands.add_parser("status").add_argument("--journal", required=True, type=Path)
+    journey = commands.add_parser("journey")
+    journey.add_argument("--input", required=True, type=Path)
+    journey.add_argument("--journal", required=True, type=Path)
+    commands.add_parser("journey-status").add_argument("--journal", required=True, type=Path)
     for name, option in [("run-postgres", None), ("run-service", "--area"), ("run-sync", "--subscription")]:
         child = commands.add_parser(name)
         child.add_argument("--journal", required=True, type=Path)
@@ -474,6 +480,13 @@ def main():
             child.add_argument(option, required=True)
     args = parser.parse_args()
     try:
+        if args.command in {"journey", "journey-status"}:
+            import onboarding_journey
+            if args.command == "journey":
+                onboarding_journey.run(args.input, args.journal, Native())
+            else:
+                print(json.dumps(onboarding_journey.status(args.journal), indent=2, sort_keys=True))
+            return
         if args.command == "prepare":
             value = prepare(args.input, args.journal, Native())
         elif args.command == "apply":
@@ -485,6 +498,9 @@ def main():
             return
         print(json.dumps(value, indent=2, sort_keys=True))
         print("Metadata/stages only: native Mac acceptance, signed prerequisites and self-contained distribution remain unverified. Agent identity provisioning is not performed.")
+    except KeyboardInterrupt:
+        print("operator interrupted; retain journals and resume exact inputs (output suppressed)", file=sys.stderr)
+        raise SystemExit(130) from None
     except (Refused, OSError, ValueError, KeyError, TypeError) as error:
         # Never include raw file/provider/process bodies or local passwords.
         print(str(error) if isinstance(error, Refused) else "operator input/filesystem invalid; inspect retained journal (details suppressed)", file=sys.stderr)
