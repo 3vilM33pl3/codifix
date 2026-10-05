@@ -22,6 +22,7 @@ import { AccessTab } from "./features/access/AccessTab";
 import { FederationTab } from "./features/federation/FederationTab";
 import { JobsTab } from "./features/jobs/JobsTab";
 import { SupervisorTab } from "./features/supervisor/SupervisorTab";
+import { DeviceApprovalPage } from "./features/onboarding/DeviceApprovalPage";
 import { useAppShell } from "./hooks/useAppShell";
 import { MORE_TABS, PRIMARY_TABS, type Tab } from "./tabs";
 import type { AuthMeResponse } from "./types";
@@ -29,6 +30,11 @@ import type { AuthMeResponse } from "./types";
 const GraphTab = lazy(() => import("./features/graph/GraphTab").then((module) => ({ default: module.GraphTab })));
 
 export default function App() {
+  const deviceCode = new URLSearchParams(window.location.search).get("device_code");
+  return deviceCode === null ? <MemoryApp /> : <DeviceApprovalPage initialCode={deviceCode} />;
+}
+
+function MemoryApp() {
   const {
     tab,
     setTab,

@@ -31,9 +31,9 @@ export interface IdpOperation {
   outcome: "success" | "error" | "pending" | "uncertain";
   provider_user_id?: number | null;
   invitation_id?: string | null;
-  provider_correlation?: string;
-  request_sha256?: string;
-  provider_origin?: string;
+  provider_correlation?: string | null;
+  request_sha256?: string | null;
+  provider_origin?: string | null;
 }
 
 export type MemoryArea = "general" | "workshop" | "homelab" | "trust";

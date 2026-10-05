@@ -235,6 +235,15 @@ label.access-checkbox {
   overflow-wrap: anywhere;
 }
 
+.device-approval-page {
+  max-width: 90rem;
+  margin: 1rem auto;
+}
+
+.device-fingerprint {
+  overflow-wrap: anywhere;
+}
+
 .project-form {
   display: grid;
   grid-auto-flow: column;

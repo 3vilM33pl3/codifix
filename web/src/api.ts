@@ -339,6 +339,33 @@ export async function onboardingRequest<T>(suffix: string, body?: unknown, signa
   return response.json() as Promise<T>;
 }
 
+export async function deviceReview(userCode: string, signal?: AbortSignal): Promise<import("./features/onboarding/types").DeviceReview> {
+  const response = await apiFetch(`/v1/onboarding/device/review?${new URLSearchParams({ code: userCode })}`, { signal, cache: "no-store" });
+  return parseDeviceApprovalResponse(response);
+}
+
+export async function approveDevice(request: {
+  user_code: string;
+  projects: import("./features/onboarding/types").DeviceApprovalSelection[];
+  confirmed: true;
+}): Promise<import("./features/onboarding/types").DeviceApprovalReceipt> {
+  const response = await apiFetch("/v1/onboarding/device/approve", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request), cache: "no-store",
+  });
+  return parseDeviceApprovalResponse(response);
+}
+
+async function parseDeviceApprovalResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) throw new Error(response.status === 401 || response.status === 403
+    ? "Device approval denied. Sign in with a current OIDC human browser session; project membership may have changed."
+    : response.status === 404 ? "Device request unavailable. Check the user code on the requesting device."
+    : response.status === 410 ? "Device request expired. Start a new request on the device."
+    : response.status === 409 ? "Device request, project membership or reviewed manifest revision changed. Review the current request again."
+    : "Device approval outcome unconfirmed. Review the current request before submitting again.");
+  try { return await response.json() as T; }
+  catch { throw new Error("Device approval receipt unreadable. Review the current request before submitting again."); }
+}
+
 export async function getHealth(): Promise<Record<string, unknown>> {
   return parseJson(await fetch("/healthz"));
 }

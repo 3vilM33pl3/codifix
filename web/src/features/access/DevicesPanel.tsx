@@ -29,7 +29,8 @@ export function DevicesPanel({ readOnly }: { readOnly: boolean }) {
     finally { setBusy(false); }
   }
   return <div className="panel-stack">
-    <section className="panel access-heading"><div><h3>Devices</h3><p>Inspect enrolled device credentials and revoke a device independently. Last seen is an observation; device health is unknown. Device login and Mac enrolment are not available in this first slice.</p></div>
+    <section className="panel access-heading"><div><h3>Devices</h3><p>Inspect enrolled device credentials and revoke a device independently. Last seen is an observation; device health is unknown. Browser approval requires a current human session; Mac client login, local credential storage and selective sync require separate client implementation.</p>
+      <a className="button-link" href="/?device_code=">Review a device request</a></div>
       <button type="button" disabled={busy || loading} onClick={() => { setSelected(null); void refresh(); }}>Refresh devices</button></section>
     {error ? <div className="panel error-banner" role="alert">Devices error: {error}</div> : null}
     {status ? <div className="panel" role="status">{status}</div> : null}
