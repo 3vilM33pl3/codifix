@@ -30,6 +30,56 @@ pub trait ProjectDeviceTransport: Send + Sync {
 pub struct ScopedDeviceClient {
     endpoint: Endpoint,
     credential: String,
+    scope: Option<ProjectScope>,
+}
+
+#[cfg(test)]
+mod scoped_client_tests {
+    use super::*;
+    #[test]
+    fn scoped_address_is_exact_and_never_falls_back_to_uuid_only() {
+        use mem_federation::publication::SpaceId;
+        let scope = ProjectScope {
+            company: Uuid::new_v4(),
+            area: "workshop".into(),
+            owner: InstanceId::new(Uuid::new_v4()).unwrap(),
+            project: Uuid::new_v4(),
+            space: SpaceId::new(Uuid::new_v4()).unwrap(),
+        };
+        let token = format!("mlt_{}", "a".repeat(64));
+        let client = ScopedDeviceClient::for_scope(
+            Endpoint::new("http://127.0.0.1:4250", true).unwrap(),
+            token.clone(),
+            scope.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            client.snapshot_path(scope.project).unwrap(),
+            format!(
+                "/v1/onboarding/areas/workshop/owners/{}/projects/{}/snapshot",
+                scope.owner.as_uuid(),
+                scope.project
+            )
+        );
+        assert!(client.snapshot_path(Uuid::new_v4()).is_err());
+        let mut invalid = scope.clone();
+        invalid.area = "trust".into();
+        assert!(
+            ScopedDeviceClient::for_scope(
+                Endpoint::new("http://127.0.0.1:4250", true).unwrap(),
+                token.clone(),
+                invalid
+            )
+            .is_err()
+        );
+        let legacy =
+            ScopedDeviceClient::new(Endpoint::new("http://127.0.0.1:4250", true).unwrap(), token)
+                .unwrap();
+        assert_eq!(
+            legacy.snapshot_path(scope.project).unwrap(),
+            format!("/v1/onboarding/projects/{}/snapshot", scope.project)
+        );
+    }
 }
 impl ScopedDeviceClient {
     pub fn new(endpoint: Endpoint, credential: String) -> Result<Self> {
@@ -42,7 +92,30 @@ impl ScopedDeviceClient {
         Ok(Self {
             endpoint,
             credential,
+            scope: None,
         })
+    }
+    /// New clients address the complete reviewed identity. Preserve the old
+    /// single-owner transport for existing profiles/callers, never infer an
+    /// owner from a project name or silently fall back after a scoped failure.
+    pub fn for_scope(endpoint: Endpoint, credential: String, scope: ProjectScope) -> Result<Self> {
+        if !scope.valid() {
+            return Err(RuntimeError::Configuration);
+        }
+        let mut client = Self::new(endpoint, credential)?;
+        client.scope = Some(scope);
+        Ok(client)
+    }
+    fn snapshot_path(&self, project: Uuid) -> Result<String> {
+        match &self.scope {
+            Some(scope) if scope.project == project => Ok(format!(
+                "/v1/onboarding/areas/{}/owners/{}/projects/{project}/snapshot",
+                scope.area,
+                scope.owner.as_uuid()
+            )),
+            Some(_) => Err(RuntimeError::Configuration),
+            None => Ok(format!("/v1/onboarding/projects/{project}/snapshot")),
+        }
     }
 }
 impl ProjectDeviceTransport for ScopedDeviceClient {
@@ -65,10 +138,7 @@ impl ProjectDeviceTransport for ScopedDeviceClient {
             let response = self
                 .endpoint
                 .client
-                .post(
-                    self.endpoint
-                        .url(&format!("/v1/onboarding/projects/{project}/snapshot"))?,
-                )
+                .post(self.endpoint.url(&self.snapshot_path(project)?)?)
                 .bearer_auth(&self.credential)
                 .json(request)
                 .send()

@@ -159,6 +159,39 @@ enum Hook {
     Withdraw(Uuid),
     ExpirePage,
 }
+
+#[tokio::test]
+async fn composite_local_route_rejects_other_owner_area_without_fallback() {
+    let Some(f) = DeliveryFixture::new(118).await else {
+        return;
+    };
+    let local_owner = f.fake.owner.as_uuid();
+    let Json(bootstrap) = scoped_subscription(
+        State(f.base.state.clone()),
+        Extension(f.device.clone()),
+        Path(("workshop".into(), local_owner, f.base.project)),
+    )
+    .await
+    .unwrap();
+    assert_eq!(bootstrap.scope.owner.as_uuid(), local_owner);
+    for (area, owner) in [
+        ("homelab", local_owner),
+        ("trust", local_owner),
+        ("workshop", Uuid::new_v4()),
+    ] {
+        assert!(
+            scoped_subscription(
+                State(f.base.state.clone()),
+                Extension(f.device.clone()),
+                Path((area.into(), owner, f.base.project))
+            )
+            .await
+            .is_err()
+        );
+    }
+    assert!(f.fake.seen.lock().unwrap().is_empty());
+    f.close().await;
+}
 async fn register(
     State(fake): State<FakeGateway>,
     headers: axum::http::HeaderMap,

@@ -27,6 +27,43 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/subscription:
+    get:
+      operationId: bootstrapExplicitAreaOwnerProject
+      x-stability: internal
+      summary: Bootstrap the exact selected area/owner/project without fallback
+      description: Complete stable identity; current enrolled device and linked human read/export authority required. Reject another owner or Trust rather than using a coincidentally matching local project. Existing UUID-only single-owner route remains compatible. No-store.
+      parameters:
+        - { name: area, in: path, required: true, schema: { type: string, enum: [workshop, homelab, general] } }
+        - { name: owner, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: project_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Authenticated control-plane scope and receipt keys.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceProjectSubscription' }
+        '403': { description: Current device/human or exact selected scope denied; no fallback. }
+  /v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/snapshot:
+    post:
+      operationId: synchronizeExplicitAreaOwnerProject
+      x-stability: internal
+      summary: Read a bounded selective page for the complete stable project identity
+      description: Exact area/owner identity, current approved device and human export authority. Same signed, verified, idempotent local-owner delivery contract as the UUID-only route; no cross-owner fallback, whole-space pull or credential forwarding. No-store.
+      parameters:
+        - { name: area, in: path, required: true, schema: { type: string, enum: [workshop, homelab, general] } }
+        - { name: owner, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: project_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingProjectSnapshotRequest' }
+      responses:
+        '200': { description: Existing signed project-page wire format. }
+        '403': { description: Current authority or exact scope denied. }
+        '409': { description: Changed source, approval, cursor or nonce. }
+        '503': { description: Registration or delivery unavailable; retry exact request. }
   /v1/onboarding/company/projects:
     get:
       operationId: inspectAuthorizedCompanyProjectCatalog

@@ -28,16 +28,18 @@ impl CompanyClient {
         &self,
         enrollment: &Enrollment,
         project: uuid::Uuid,
+        area: &str,
+        owner: uuid::Uuid,
     ) -> Result<mem_federation_runtime::DeviceProjectSubscription> {
-        if project.is_nil() {
+        if project.is_nil() || owner.is_nil() || !matches!(area, "workshop" | "homelab" | "general")
+        {
             bail!("exact project identity required");
         }
         let response = self
             .client
-            .get(
-                self.origin
-                    .endpoint(&format!("/v1/onboarding/projects/{project}/subscription")),
-            )
+            .get(self.origin.endpoint(&format!(
+                "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project}/subscription"
+            )))
             .bearer_auth(&enrollment.credential)
             .send()
             .await
@@ -196,6 +198,22 @@ pub(super) fn approval_url(origin: &CompanyOrigin, code: &str) -> Result<String>
         bail!("company returned an invalid public user code; saved request retained");
     }
     Ok(origin.endpoint(&format!("/?device_code={code}")))
+}
+
+pub(super) fn validated_approval_url(
+    origin: &CompanyOrigin,
+    code: &str,
+    received: &str,
+) -> Result<String> {
+    let local = approval_url(origin, code)?;
+    if received == local {
+        return Ok(local);
+    }
+    let company = format!("{local}&company_device=1");
+    if received == company {
+        return Ok(company);
+    }
+    bail!("enrollment approval URL mismatch; the saved request is retained")
 }
 pub(super) fn open_browser(url: &str) -> Result<()> {
     #[cfg(target_os = "macos")]

@@ -149,7 +149,9 @@ mod native {
         {
             bail!("exact currently approved offline manifest required");
         }
-        let bootstrap = client.subscription(&enrollment, args.project).await?;
+        let bootstrap = client
+            .subscription(&enrollment, args.project, &args.area, args.owner_instance)
+            .await?;
         bootstrap.validate()?;
         if bootstrap.device != enrollment.device_id
             || bootstrap.scope.project != args.project
@@ -278,13 +280,19 @@ mod native {
         let projects = company.projects(&enrollment).await?;
         current_project(&profile, &enrollment, &projects.projects)?;
         let current = company
-            .subscription(&enrollment, profile.bootstrap.scope.project)
+            .subscription(
+                &enrollment,
+                profile.bootstrap.scope.project,
+                &profile.bootstrap.scope.area,
+                profile.bootstrap.scope.owner.as_uuid(),
+            )
             .await?;
         current_bootstrap(&profile, &current)?;
         let replica = replica(&profile, true).await?;
-        let client = ScopedDeviceClient::new(
+        let client = ScopedDeviceClient::for_scope(
             Endpoint::new(&origin.0, profile.allow_loopback_development)?,
             enrollment.credential,
+            profile.bootstrap.scope.clone(),
         )?;
         if !args.watch {
             let progress = replica.synchronize(&client, 128).await?;

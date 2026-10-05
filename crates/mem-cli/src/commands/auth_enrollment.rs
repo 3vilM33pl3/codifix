@@ -178,10 +178,11 @@ async fn login(args: &LoginArgs, store: &impl CredentialStore) -> Result<()> {
             "enrollment start receipt mismatch; rerun the same login to inspect this saved request"
         );
     }
-    let approval_url = transport::approval_url(&origin, &started.user_code)?;
-    if started.verification_uri_complete != approval_url {
-        bail!("enrollment approval URL mismatch; the saved request is retained");
-    }
+    let approval_url = transport::validated_approval_url(
+        &origin,
+        &started.user_code,
+        &started.verification_uri_complete,
+    )?;
     println!("Device: {} ({})", enrollment.name, enrollment.device_id);
     println!(
         "Credential SHA-256: {}",

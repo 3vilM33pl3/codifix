@@ -468,6 +468,24 @@ fn public_approval_url_never_accepts_secrets_or_another_origin() {
         "https://company.example.test/?device_code=ABCD-1234"
     );
     assert!(transport::approval_url(&origin, "ABCD-1234&poll_secret=private").is_err());
+    let local = transport::approval_url(&origin, "ABCD-1234").unwrap();
+    let company = format!("{local}&company_device=1");
+    assert_eq!(
+        transport::validated_approval_url(&origin, "ABCD-1234", &company).unwrap(),
+        company
+    );
+    assert_eq!(
+        transport::validated_approval_url(&origin, "ABCD-1234", &local).unwrap(),
+        local
+    );
+    for bad in [
+        format!("{local}&company_device=0"),
+        format!("{company}&poll_secret=secret"),
+        company.replace("company.example.test", "other.example.test"),
+        format!("{local}&company_device=1&company_device=1"),
+    ] {
+        assert!(transport::validated_approval_url(&origin, "ABCD-1234", &bad).is_err());
+    }
 }
 
 #[cfg(not(target_os = "macos"))]

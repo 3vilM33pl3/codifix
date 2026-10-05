@@ -114,7 +114,14 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
         ),
         (
             "/v1/onboarding/company/projects",
-            &[(Method::GET,RoutePolicy {permission:Permission::MemoryRead,scope:ProjectScope::HumanSession,semantic_read:true})],
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanSession,
+                    semantic_read: true,
+                },
+            )],
         ),
         (
             "/v1/admin/onboarding/company/operations",
@@ -231,6 +238,28 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
                 Method::GET,
                 RoutePolicy {
                     permission: Permission::MemoryRead,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/snapshot",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::BundleExport,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/subscription",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::BundleExport,
                     scope: ProjectScope::Authenticated,
                     semantic_read: false,
                 },

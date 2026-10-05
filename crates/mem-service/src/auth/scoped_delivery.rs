@@ -421,6 +421,37 @@ pub(crate) async fn snapshot(
     snapshot_for(state, actor, project, request, None).await
 }
 
+fn require_local_route(state: &AppState, area: &str, owner: Uuid) -> Result<(), ApiError> {
+    let local = state.config.area.as_ref().ok_or_else(changed)?;
+    if local.name != area || local.instance_id != owner || area == "trust" || owner.is_nil() {
+        return Err(ApiError::forbidden(
+            "exact selected area and owner required; no fallback",
+        ));
+    }
+    Ok(())
+}
+
+/// Complete identity for new clients. A remote owner never falls through to a
+/// coincidentally same-named/same-UUID local project. Fleet bridging is explicit.
+pub(crate) async fn scoped_snapshot(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthenticatedPrincipal>,
+    Path((area, owner, project)): Path<(String, Uuid, Uuid)>,
+    Json(request): Json<OnboardingProjectSnapshotRequest>,
+) -> Result<Response, ApiError> {
+    require_local_route(&state, &area, owner)?;
+    snapshot_for(state, actor, project, request, None).await
+}
+
+pub(crate) async fn scoped_subscription(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthenticatedPrincipal>,
+    Path((area, owner, project)): Path<(String, Uuid, Uuid)>,
+) -> Result<Json<mem_federation_runtime::DeviceProjectSubscription>, ApiError> {
+    require_local_route(&state, &area, owner)?;
+    subscription_for(state, actor, project, None).await
+}
+
 pub(super) async fn snapshot_for(
     state: AppState,
     actor: AuthenticatedPrincipal,
