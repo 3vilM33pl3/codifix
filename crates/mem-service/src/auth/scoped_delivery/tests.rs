@@ -22,14 +22,20 @@ struct FakeGateway {
 }
 enum Hook {
     LoseRegistration,
+    FailConfirmation,
     Revoke(Uuid),
     Withdraw(Uuid),
     ExpirePage,
 }
 async fn register(
     State(fake): State<FakeGateway>,
+    headers: axum::http::HeaderMap,
     Json(request): Json<ProjectFeedRegistration>,
 ) -> Response {
+    assert_eq!(
+        headers.get(header::AUTHORIZATION).unwrap(),
+        "Bearer synthetic-owner-token-that-is-not-a-device-token"
+    );
     fake.seen.lock().unwrap().push(request.clone());
     let receipt = fake
         .store
@@ -44,6 +50,15 @@ async fn register(
         fake.hook.lock().unwrap().take();
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     }
+    let fail = matches!(
+        fake.hook.lock().unwrap().as_ref(),
+        Some(Hook::FailConfirmation)
+    );
+    if fail {
+        fake.hook.lock().unwrap().take();
+        sqlx::query("CREATE FUNCTION synthetic_owner_confirmation_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic confirmation unavailable'; END $$").execute(&fake.pool).await.unwrap();
+        sqlx::query("CREATE TRIGGER synthetic_owner_confirmation_fail BEFORE UPDATE ON onboarding_owner_project_operations FOR EACH ROW EXECUTE FUNCTION synthetic_owner_confirmation_fail()").execute(&fake.pool).await.unwrap();
+    }
     Json(
         fake.security
             .sign_owner_project_binding(request, receipt)
@@ -53,8 +68,13 @@ async fn register(
 }
 async fn page(
     State(fake): State<FakeGateway>,
+    headers: axum::http::HeaderMap,
     Json(request): Json<ProjectPageRequest>,
 ) -> Response {
+    assert_eq!(
+        headers.get(header::AUTHORIZATION).unwrap(),
+        "Bearer synthetic-owner-token-that-is-not-a-device-token"
+    );
     let page = match fake
         .store
         .project_page(fake.fence, fake.owner, &request)
@@ -386,6 +406,44 @@ async fn approved_source_cursor_and_withdrawal_disable_prior_stream() {
         return;
     };
     let canonical = f.share().await;
+    let denied_canonical = RecordId::new(Uuid::new_v4()).unwrap();
+    let denied = publish(
+        &f.fake,
+        f.fake.owner,
+        PublicationRecord::MemoryVersion {
+            stream: StreamId {
+                origin: f.fake.owner,
+                canonical: denied_canonical,
+            },
+            publication: MemoryPublication {
+                version: SharedVersion::new(1).unwrap(),
+                source: SourceVersionRef {
+                    record_id: RecordId::new(Uuid::new_v4()).unwrap(),
+                    version: SourceVersion::new(1).unwrap(),
+                },
+                content: MemoryContent {
+                    text: "DENIED_SENTINEL_OTHER_PUBLISHED_PROJECT".into(),
+                    summary: "denied".into(),
+                    memory_type: MemoryType::Decision,
+                    confidence: ConfidencePpm::from_confidence(0.8).unwrap(),
+                    importance: 3,
+                    tags: vec![],
+                },
+                evidence: vec![],
+            },
+        },
+    )
+    .await;
+    let (records, receipts) = f.fake.store.audited_history(f.fake.fence).await.unwrap();
+    f.sync
+        .replica()
+        .receive_with_receipts(
+            f.sync.verified_snapshot().await.unwrap().authority(),
+            &records,
+            &receipts,
+        )
+        .await
+        .unwrap();
     let request = cursor();
     let response = f.request(request).await.unwrap();
     let bytes = axum::body::to_bytes(response.into_body(), 4 * 1024 * 1024)
@@ -393,6 +451,10 @@ async fn approved_source_cursor_and_withdrawal_disable_prior_stream() {
         .unwrap();
     let page: SignedProjectPage = serde_json::from_slice(&bytes).unwrap();
     assert!(String::from_utf8_lossy(&bytes).contains("approved scoped knowledge"));
+    assert!(!String::from_utf8_lossy(&bytes).contains("DENIED_SENTINEL"));
+    let transmitted = serde_json::to_string(&*f.fake.seen.lock().unwrap()).unwrap();
+    assert!(!transmitted.contains(&denied.envelope.record_id.as_uuid().to_string()));
+    assert!(!transmitted.contains(&denied_canonical.as_uuid().to_string()));
     assert!(page.claims.page.next > 0);
     let mut next = cursor();
     next.after = page.claims.page.next;
@@ -473,6 +535,103 @@ async fn expired_gateway_page_and_saved_catalog_revision_fail_closed() {
         StatusCode::CONFLICT
     );
     assert_eq!(f.fake.seen.lock().unwrap().len(), count);
+    f.close().await;
+}
+
+#[tokio::test]
+async fn subscription_bootstrap_is_public_trust_but_exact_device_authority() {
+    let Some(f) = DeliveryFixture::new(85).await else {
+        return;
+    };
+    let Json(value) = subscription(
+        State(f.base.state.clone()),
+        Extension(f.device.clone()),
+        Path(f.base.project),
+    )
+    .await
+    .unwrap();
+    value.validate().unwrap();
+    assert_eq!(value.schema_version, 1);
+    assert_eq!(value.scope.project, f.base.project);
+    assert_eq!(value.scope.owner, f.fake.owner);
+    assert_eq!(value.receipt_keys, f.fake.security.trust().keys());
+    assert_eq!(value.catalog_revision, 1);
+    let encoded = serde_json::to_string(&value).unwrap();
+    assert!(!encoded.contains("synthetic-owner-token"));
+    assert!(!encoded.contains("endpoint"));
+    assert!(!encoded.contains("database"));
+    assert!(f.fake.seen.lock().unwrap().is_empty());
+    assert_eq!(
+        subscription(
+            State(f.base.state.clone()),
+            Extension(f.base.human.clone()),
+            Path(f.base.project)
+        )
+        .await
+        .unwrap_err()
+        .status,
+        StatusCode::FORBIDDEN
+    );
+    let mut wrong = f.device.clone();
+    wrong.token_id = Some(Uuid::new_v4());
+    assert_eq!(
+        subscription(
+            State(f.base.state.clone()),
+            Extension(wrong),
+            Path(f.base.project)
+        )
+        .await
+        .unwrap_err()
+        .status,
+        StatusCode::FORBIDDEN
+    );
+    let mut wrong = f.device.clone();
+    wrong.id = Uuid::new_v4();
+    assert_eq!(
+        subscription(
+            State(f.base.state.clone()),
+            Extension(wrong),
+            Path(f.base.project)
+        )
+        .await
+        .unwrap_err()
+        .status,
+        StatusCode::FORBIDDEN
+    );
+    f.close().await;
+}
+
+#[tokio::test]
+async fn post_gateway_confirmation_failure_retains_exact_durable_intent() {
+    let Some(f) = DeliveryFixture::new(86).await else {
+        return;
+    };
+    *f.fake.hook.lock().unwrap() = Some(Hook::FailConfirmation);
+    let request = cursor();
+    let error = f.request(request.clone()).await.unwrap_err();
+    assert_eq!(error.status, StatusCode::SERVICE_UNAVAILABLE);
+    let first = f.fake.seen.lock().unwrap()[0].clone();
+    assert!(error.message.contains(&first.operation_id.to_string()));
+    let pending: Uuid = sqlx::query_scalar(
+        "SELECT pending_operation FROM onboarding_owner_project_heads WHERE project_id=$1",
+    )
+    .bind(f.base.project)
+    .fetch_one(&f.base.db.pool)
+    .await
+    .unwrap();
+    assert_eq!(pending, first.operation_id);
+    sqlx::query(
+        "DROP TRIGGER synthetic_owner_confirmation_fail ON onboarding_owner_project_operations",
+    )
+    .execute(&f.base.db.pool)
+    .await
+    .unwrap();
+    let response = f.request(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        f.fake.seen.lock().unwrap().as_slice(),
+        &[first.clone(), first]
+    );
     f.close().await;
 }
 

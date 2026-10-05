@@ -25,8 +25,15 @@ fn changed() -> ApiError {
         "project delivery authority, source selection or cursor changed; refresh before retrying",
     )
 }
-fn store_error(_: mem_federation_store::StoreError) -> ApiError {
-    changed()
+fn store_error(error: mem_federation_store::StoreError) -> ApiError {
+    if matches!(error, mem_federation_store::StoreError::Limits) {
+        ApiError::status_message(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "project source selection exceeds bounded stream/record limits",
+        )
+    } else {
+        changed()
+    }
 }
 fn unavailable(id: Uuid) -> ApiError {
     ApiError::service_unavailable(&format!(
@@ -493,6 +500,43 @@ pub(crate) async fn snapshot(
         bytes,
     )
         .into_response())
+}
+
+/// Authenticated control-plane bootstrap. Trust is never learned from a scoped
+/// content page, and no gateway credential/endpoint is returned to the laptop.
+pub(crate) async fn subscription(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthenticatedPrincipal>,
+    Path(project): Path<Uuid>,
+) -> Result<Json<mem_federation_runtime::DeviceProjectSubscription>, ApiError> {
+    let configured = state
+        .federation
+        .read()
+        .map_err(|_| ApiError::service_unavailable("owner delivery unavailable"))?
+        .clone()
+        .ok_or_else(|| ApiError::forbidden("local owner federation instance is not enrolled"))?;
+    let (sync, owner, space) = configured
+        .project_delivery(project)
+        .ok_or_else(|| ApiError::forbidden("project is not enrolled on this local owner"))?;
+    let (known, _) = sync.verified_project_sources().await.map_err(|_| {
+        ApiError::service_unavailable("verified local source publications unavailable")
+    })?;
+    let mut tx = state.pool()?.begin().await.map_err(ApiError::sql)?;
+    let current = eligibility(&state, &mut tx, &actor, project, owner, space, &known).await?;
+    let (authority, receipt_keys) = sync.project_delivery_trust();
+    let response = mem_federation_runtime::DeviceProjectSubscription {
+        schema_version: 1,
+        device: current.device,
+        scope: current.scope,
+        catalog_revision: current.catalog,
+        authority,
+        receipt_keys,
+    };
+    response.validate().map_err(|_| {
+        ApiError::service_unavailable("owner receipt trust configuration unavailable")
+    })?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(Json(response))
 }
 fn validate_entries(
     sources: &CurrentProjectSources,

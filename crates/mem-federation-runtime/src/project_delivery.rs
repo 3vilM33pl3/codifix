@@ -17,6 +17,15 @@ impl crate::GatewaySecurity {
 }
 
 impl InstanceSync {
+    /// Public administrator-pinned trust, not a gateway endpoint or credential.
+    pub fn project_delivery_trust(
+        &self,
+    ) -> (
+        mem_federation::publication::InstanceId,
+        Vec<mem_federation_store::ReceiptKey>,
+    ) {
+        (self.client.authority, self.client.trust.keys().to_vec())
+    }
     /// Only retained, cryptographically verified local publications; no network
     /// whole-space pull is performed on behalf of a device.
     pub async fn verified_project_sources(&self) -> Result<(PublicationState, Vec<AuditReceipt>)> {
