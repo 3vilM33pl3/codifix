@@ -397,6 +397,33 @@ export async function deviceReview(userCode: string, signal?: AbortSignal): Prom
   return parseDeviceApprovalResponse(response);
 }
 
+async function companyDeviceRequest<T>(path: string, signal?: AbortSignal, body?: import("./features/onboarding/types").CompanyDeviceApprovalRequest): Promise<T> {
+  let response: Response;
+  try {
+    response = await apiFetch(path, { signal, cache: "no-store", redirect: "error",
+      ...(body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}),
+    });
+  } catch { throw new Error("Company device outcome unconfirmed. Keep the reviewed request and retry only its exact confirmed selection; no legacy fallback was attempted."); }
+  if (!response.ok) throw new Error(response.status === 401 || response.status === 403
+    ? "Company device access denied. A current writable OIDC human session and owner authorization are required."
+    : response.status === 404 ? "Company device request or opt-in capability unavailable. No legacy fallback was attempted."
+    : response.status === 410 ? "Company device request expired. It cannot activate new access."
+    : response.status === 409 ? "Company device review, owner authority, revision or digest changed. The frozen selection was not replaced; inspect the requesting device before a new review."
+    : "Company device outcome unconfirmed. Keep the reviewed request and retry only its exact confirmed selection; response details suppressed.");
+  try {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).length > 256 * 1024) throw new Error("oversized");
+    return JSON.parse(text) as T;
+  } catch { throw new Error("Company device receipt unreadable. Keep the exact request/selection; do not assume approval or automatically submit a different selection."); }
+}
+export async function companyDeviceReview(code: string, signal?: AbortSignal): Promise<import("./features/onboarding/types").CompanyDeviceReview> {
+  if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw new Error("Invalid public device user code.");
+  return companyDeviceRequest(`/v1/onboarding/company/device/review?${new URLSearchParams({ code })}`, signal);
+}
+export async function approveCompanyDevice(request: import("./features/onboarding/types").CompanyDeviceApprovalRequest, signal?: AbortSignal): Promise<import("./features/onboarding/types").DeviceApprovalReceipt> {
+  return companyDeviceRequest("/v1/onboarding/company/device/approve", signal, request);
+}
+
 export async function approveDevice(request: {
   user_code: string;
   projects: import("./features/onboarding/types").DeviceApprovalSelection[];

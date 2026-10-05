@@ -22,3 +22,22 @@ export interface DeviceApprovalReceipt {
   principal_id?: string | null;
   projects?: { manifest: OnboardingManifest; role: DeviceProjectRole }[];
 }
+
+export interface CompanyDeviceReview extends Omit<DeviceReview, "projects"> {
+  company_id: string;
+  observed_at: string;
+  projects: { project: DeviceReview["projects"][number]; manifest_sha256: string }[];
+}
+export interface CompanyDeviceSelection {
+  area: "workshop" | "homelab" | "general";
+  owner_instance_id: string;
+  project_id: string;
+  manifest_revision: number;
+  manifest_sha256: string;
+  offline_confirmed: true;
+}
+export interface CompanyDeviceApprovalRequest {
+  user_code: string;
+  confirmed: true;
+  projects: CompanyDeviceSelection[];
+}
