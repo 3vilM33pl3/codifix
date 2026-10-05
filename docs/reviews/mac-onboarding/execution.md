@@ -33,8 +33,8 @@ and embedding work are disabled.
 | Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices alongside existing memberships/tokens; latest full run: 183 Web tests and production build passed. This is a development UI, not a deployed company console. |
 | Unified cross-area administration | Owner delegation and coordinator implemented | `16051bb8`, `9f60b457`; five required-database company tests and 49 auth regression tests passed. Explicit owner/token/namespace/role ceiling, ownership guards and durable uncertain outcomes. Fleet enrollment and company UI integration remain pending. |
 | Device login and selection | Backend, CLI and browser approval implemented | `9f439c27`, `6ac5b994`, `121fab3b`; 44 required-database auth tests and 15 CLI tests passed. Native Keychain execution and TUI selection remain unfinished. |
-| Selective snapshots/offline search | Gateway and read-only projector implemented | `e741af31`, `d8c5f8db`; six required-database store tests, two signed-page runtime tests and 41 neutral-core tests passed. Denied-project sentinel absence, withdrawn-byte exclusion, independent origins, replay/rollback/cursors, revoked authority, archived/tombstoned exclusion and empty projects are covered. Enrolled-device origin adapter and automatic laptop synchronization are still being implemented. |
-| Installer and tool/repository setup | Journaled workspace preparation implemented | `9dabaca8`, `e305955a`, `178560cc`; 13 offline packaging tests and 34 focused enrollment/workspace tests passed. Native area provisioning is unfinished. Astra's follow-up findings on checkout filters, resumed repositories and physical journal containment are being corrected; native APFS acceptance remains pending. |
+| Selective snapshots/offline search | Gateway, enrolled-owner delivery and read-only projector implemented | `e741af31`, `d8c5f8db`, `8f578566`, `00d7f2fa`; six store tests, six owner adapter tests, two signed-page runtime tests and 41 neutral-core tests passed. Latest auth regression: 55 tests and OpenAPI inventory passed. Public subscription bootstrap and laptop runner are next; native integration remains pending. |
+| Installer and tool/repository setup | Journaled workspace preparation implemented and reviewed | `9dabaca8`, `e305955a`, `178560cc`; 13 offline packaging tests and latest 41 focused enrollment/workspace tests passed (26 workspace tests in final rerun). Native area provisioning is unfinished. Astra's checkout filter, resumed repository and physical journal containment findings are corrected; native APFS acceptance remains pending. |
 | Real macOS acceptance | Pending | Requires native execution; Linux builds/tests are not evidence of this. |
 
 ## Invariants under review
@@ -134,6 +134,22 @@ tests. Registration is a patch: the owner adapter must explicitly disable a
 previously registered stream when it ceases to be eligible, never assume omission
 withdraws it. Full source/authority fingerprints and delivery rechecks are part
 of the next adapter slice.
+
+The owner adapter now uses append-only migration `0071` for a durable registration
+intent/confirmation journal. It checks the exact enrolled device credential,
+current linked human permissions, approved manifest and current reviewer/sharing
+authority before selecting content and again after HTTP. Lost gateway confirmation
+replays the same operation, not a fresh registration. Revocation or source changes
+during HTTP deny delivery. Serialization and expiry checking occur under the final
+protected transaction; its commit is the delivery authorization linearization
+point. These tests passed with actual PostgreSQL and signed fake-gateway replies.
+Remote-owner device enrollment is deliberately still closed.
+
+The laptop runner is being implemented separately. It pins audience, subscription,
+company/area/owner/project/space, catalog revision and gateway key schedule; it
+does not accept identity or trust from content pages. A private profile permits
+only a dedicated loopback laptop database. Starting/reconnecting/polling software
+is not evidence that a native Mac service or database has been installed.
 
 ## Completion status
 
