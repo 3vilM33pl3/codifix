@@ -211,6 +211,10 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )],
         ),
         (
+            "/v1/onboarding/projects/{project_id}/snapshot",
+            &[(Method::POST, RoutePolicy {permission: Permission::BundleExport, scope: ProjectScope::Authenticated, semantic_read: false})],
+        ),
+        (
             "/v1/admin/onboarding/idp/operations",
             &[(
                 Method::GET,

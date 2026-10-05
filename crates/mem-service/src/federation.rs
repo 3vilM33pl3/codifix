@@ -3,6 +3,7 @@
 //! Local workflow handlers share only the administrator-enrolled instance.
 mod expertise;
 mod projects;
+mod project_delivery;
 pub mod workflow;
 use crate::AppState;
 use mem_federation::publication::{InstanceId, RecordKey, SpaceId};

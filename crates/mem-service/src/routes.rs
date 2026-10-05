@@ -75,6 +75,7 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
             post(crate::auth::device::logout),
         )
         .route("/v1/onboarding/projects", get(crate::auth::device::catalog))
+        .route("/v1/onboarding/projects/{project_id}/snapshot", post(crate::auth::scoped_delivery::snapshot).layer(axum::extract::DefaultBodyLimit::max(4096)))
         .route(
             "/v1/onboarding/delegated-grants",
             post(crate::auth::onboarding::company::delegated_grant)

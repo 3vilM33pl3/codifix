@@ -4,18 +4,18 @@ use mem_test_support::IsolatedDatabase;
 use sqlx::ConnectOptions;
 use std::sync::Arc;
 
-struct Fixture {
-    db: IsolatedDatabase,
-    state: AppState,
-    human: AuthenticatedPrincipal,
+pub(crate) struct Fixture {
+    pub(crate) db: IsolatedDatabase,
+    pub(crate) state: AppState,
+    pub(crate) human: AuthenticatedPrincipal,
     admin: AuthenticatedPrincipal,
-    project: Uuid,
+    pub(crate) project: Uuid,
     other: Uuid,
-    membership: Uuid,
+    pub(crate) membership: Uuid,
     session: String,
     csrf: String,
 }
-async fn fixture() -> Option<Fixture> {
+pub(crate) async fn fixture() -> Option<Fixture> {
     let db = IsolatedDatabase::new().await?;
     let instance = Uuid::new_v4();
     let config=serde_json::from_value(json!({"database":{"url":db.pool.connect_options().to_url_lossy().as_str()},"area":{"name":"workshop","instance_id":instance},
@@ -161,7 +161,7 @@ fn approval(code: &str, id: Uuid, role: AuthRole) -> OnboardingDeviceApproveRequ
         confirmed: true,
     }
 }
-async fn enroll(
+pub(crate) async fn enroll(
     f: &Fixture,
     n: u8,
     role: AuthRole,

@@ -169,10 +169,10 @@ pub async fn current_project_sources(
                         let envelope: PublicationEnvelope = outbox
                             .try_get::<Json<PublicationEnvelope>, _>("envelope")?
                             .0;
-                        let acceptance: Option<Json<crate::Acceptance>> =
+                        let acceptance: Option<Json<PublicationDelivery>> =
                             outbox.try_get("acceptance")?;
                         if envelope != delivery.envelope
-                            || acceptance.and_then(|a| a.0.delivery) != Some(delivery.clone())
+                            || acceptance.map(|a| a.0) != Some(delivery.clone())
                         {
                             return Err(StoreError::Binding);
                         }
@@ -192,6 +192,9 @@ pub async fn current_project_sources(
                 enabled: true,
             });
         }
+    }
+    if records.len() > 256 {
+        return Err(StoreError::Limits);
     }
     let fingerprint = CanonicalJsonCodec::digest(
         &json!({"observed":observed,"reviews":reviews,"records":records.values().collect::<Vec<_>>()}),

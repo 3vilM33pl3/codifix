@@ -34,7 +34,7 @@ fn safe_https(value: &str) -> bool {
     })
 }
 
-async fn audit(
+pub(super) async fn audit(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     actor: Uuid,
     target: Option<Uuid>,

@@ -27,6 +27,43 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/onboarding/projects/{project_id}/snapshot:
+    post:
+      operationId: snapshotApprovedLocalDeviceProject
+      x-stability: internal
+      summary: Deliver one signed selective page to an enrolled local device
+      description: |
+        Exact current ServiceToken, token UUID and registered machine/device binding required.
+        Browser sessions, installation owners and ordinary machine tokens are denied. Current
+        linked human MemoryRead and BundleExport, exact saved reviewed catalog revision and
+        offline_allowed are rechecked before and after gateway HTTP. Only the configured local
+        owner/area is supported; Trust and remote-owner approvals remain closed. Current sharing
+        consent, reviewer authority, active non-tombstoned source version, reviewed evidence and
+        individually verified publication receipts select exact keys, never whole-space pull/CAR.
+        Registration intent retains every prior stream and explicitly disables withdrawals.
+        Lost registration replies replay the same durable operation, not a replacement UUID.
+        No SQL locks span HTTP. Signed entries and attestation expiry are verified again under
+        authorization/source locks; bounded JSON bytes are serialized before the protected audit
+        and delivery commit. No-store. Empty approved projects return an empty signed page.
+      parameters:
+        - { name: project_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingProjectSnapshotRequest' }
+      responses:
+        '200':
+          description: Device, nonce, exact project scope, revisions and cursor-bound signed gateway page; no raw captures or arbitrary reference traversal.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignedProjectPage' }
+        '400': { description: Invalid or unbounded cursor; unknown body fields rejected. }
+        '401': { description: Revoked, expired or missing credential. }
+        '403': { description: Not an approved local device or current offline authority denied. }
+        '409': { description: Nonce reuse changed bytes, catalog, source eligibility, registration or cursor changed. }
+        '413': { description: Body, retained stream set or selective response exceeds bounded size. }
+        '503': { description: Verified gateway unavailable or registration confirmation uncertain; sanitized durable operation UUID may be returned. Retry exact request, never assume delivery or revocation. }
   /v1/onboarding/delegated-grants:
     post:
       operationId: applyCompanyDelegatedGrant
@@ -3088,6 +3125,121 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    OnboardingProjectSnapshotRequest:
+      type: object
+      additionalProperties: false
+      required: [nonce, after, limit]
+      properties:
+        nonce: { type: string, format: uuid, description: Stable request identity; changed bytes under the same device/nonce conflict. }
+        after: { type: integer, minimum: 0, maximum: 9223372036854775807 }
+        through: { type: [integer, 'null'], minimum: 0, maximum: 9223372036854775807, description: Omit on first page; pin returned through for subsequent pages. }
+        limit: { type: integer, minimum: 1, maximum: 32 }
+    ProjectScopeBinding:
+      type: object
+      additionalProperties: false
+      required: [company, area, owner, project, space]
+      properties:
+        company: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        owner: { type: string, format: uuid }
+        project: { type: string, format: uuid }
+        space: { type: string, format: uuid }
+    ProjectPublicationKey:
+      type: object
+      additionalProperties: false
+      required: [publisher, id]
+      properties:
+        publisher: { type: string, format: uuid }
+        id: { type: string, format: uuid }
+    ProjectStreamReview:
+      type: object
+      additionalProperties: false
+      required: [stream, review_id, records, enabled]
+      properties:
+        stream:
+          type: object
+          additionalProperties: false
+          required: [origin, canonical]
+          properties:
+            origin: { type: string, format: uuid }
+            canonical: { type: string, format: uuid }
+        review_id: { type: string, format: uuid }
+        records: { type: array, maxItems: 256, items: { $ref: '#/components/schemas/ProjectPublicationKey' } }
+        enabled: { type: boolean }
+    ProjectContentDigest:
+      type: object
+      additionalProperties: false
+      required: [algorithm, hex]
+      properties:
+        algorithm: { type: string, const: sha256 }
+        hex: { type: string, pattern: '^[0-9a-f]{64}$' }
+    SignedProjectPage:
+      type: object
+      additionalProperties: false
+      required: [claims, signature]
+      properties:
+        signature: { type: array, minItems: 64, maxItems: 64, items: { type: integer, minimum: 0, maximum: 255 } }
+        claims:
+          type: object
+          additionalProperties: false
+          required: [purpose, key_generation, issued_at, expires_at, request_digest, payload_digest, page]
+          properties:
+            purpose: { type: string, const: memory-scoped-page-v1 }
+            key_generation: { type: integer, minimum: 1 }
+            issued_at: { type: string, format: date-time }
+            expires_at: { type: string, format: date-time, description: Fresh gateway attestation valid for at most thirty seconds. }
+            request_digest: { $ref: '#/components/schemas/ProjectContentDigest' }
+            payload_digest: { $ref: '#/components/schemas/ProjectContentDigest' }
+            page:
+              type: object
+              additionalProperties: false
+              required: [request, authority, through, next, entries]
+              properties:
+                request:
+                  type: object
+                  additionalProperties: false
+                  required: [nonce, device, scope, catalog_revision, policy_revision, binding_revision, after, through, limit]
+                  properties:
+                    nonce: { type: string, format: uuid }
+                    device: { type: string, format: uuid }
+                    scope: { $ref: '#/components/schemas/ProjectScopeBinding' }
+                    catalog_revision: { type: integer, minimum: 1 }
+                    policy_revision: { type: integer, minimum: 1 }
+                    binding_revision: { type: integer, minimum: 1 }
+                    after: { type: integer, minimum: 0 }
+                    through: { type: [integer, 'null'], minimum: 0 }
+                    limit: { type: integer, minimum: 1, maximum: 32 }
+                authority: { type: string, format: uuid }
+                through: { type: integer, minimum: 0 }
+                next: { type: integer, minimum: 0 }
+                entries:
+                  type: array
+                  maxItems: 32
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [sequence, event]
+                    properties:
+                      sequence: { type: integer, minimum: 1 }
+                      event:
+                        oneOf:
+                          - type: object
+                            required: [kind, stream, delivery, receipt]
+                            properties:
+                              kind: { type: string, const: record }
+                              stream: { type: object, required: [origin, canonical], properties: { origin: { type: string, format: uuid }, canonical: { type: string, format: uuid } } }
+                              delivery: { type: object, description: Exact neutral v2/v3 PublicationDelivery, limited to reviewed MemoryVersion/CanonicalState/Evidence; never raw local captures. }
+                              receipt: { type: object, description: Individually verified publication AuditReceipt under administrator-pinned gateway keys. }
+                          - type: object
+                            required: [kind, review]
+                            properties:
+                              kind: { type: string, const: review }
+                              review: { $ref: '#/components/schemas/ProjectStreamReview' }
+                          - type: object
+                            required: [kind, stream]
+                            properties:
+                              kind: { type: string, const: withheld }
+                              stream: { type: object, required: [origin, canonical], properties: { origin: { type: string, format: uuid }, canonical: { type: string, format: uuid } } }
     CompanyGrantRequest:
       type: object
       additionalProperties: false

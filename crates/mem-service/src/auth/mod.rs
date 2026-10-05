@@ -5,6 +5,7 @@ pub(crate) mod device;
 mod model;
 mod oidc;
 pub(crate) mod onboarding;
+pub(crate) mod scoped_delivery;
 mod policy;
 #[cfg(test)]
 mod scoped_token_tests;

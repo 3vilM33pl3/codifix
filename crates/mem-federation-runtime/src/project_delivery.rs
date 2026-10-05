@@ -5,6 +5,17 @@ use mem_federation::publication::PublicationState;
 use mem_federation::subscription::{ProjectFeedRegistration, ProjectPageRequest};
 use mem_federation_store::{AuditReceipt, ProjectBindingReceipt, ProjectPage};
 
+impl crate::GatewaySecurity {
+    /// Gateway integration edges may sign only the typed registration receipt.
+    pub fn sign_owner_project_binding(
+        &self,
+        request: ProjectFeedRegistration,
+        receipt: ProjectBindingReceipt,
+    ) -> Result<crate::SignedProjectBinding> {
+        self.sign_project_binding(request, receipt)
+    }
+}
+
 impl InstanceSync {
     /// Only retained, cryptographically verified local publications; no network
     /// whole-space pull is performed on behalf of a device.
