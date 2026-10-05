@@ -23,6 +23,10 @@ const MAX_AUTH_INSPECTION_BODY: usize = 64 * 1024 * 1024;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectScope {
     Public,
+    /// Valid credential only; the route narrows identity kind (e.g. device logout).
+    Authenticated,
+    /// Human OIDC browser session, with ordinary mutation Origin/CSRF checks.
+    HumanSession,
     Unscoped,
     Global,
     PathProject,
@@ -53,6 +57,83 @@ pub(crate) struct RoutePolicy {
 pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>> {
     let mut table = matchit::Router::new();
     let entries: &[(&str, &[(Method, RoutePolicy)])] = &[
+        (
+            "/v1/onboarding/device/cancel",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Public,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/device/start",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Public,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/device/poll",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Public,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/device/review",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanSession,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/device/approve",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanSession,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/device/logout",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/projects",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
         (
             "/v1/admin/onboarding/capabilities",
             &[(
@@ -1656,7 +1737,15 @@ pub(crate) async fn authorization_guard(
             .into_response();
     };
     if policy.scope == ProjectScope::Public {
-        return next.run(request).await;
+        let onboarding = request.uri().path().starts_with("/v1/onboarding/");
+        let mut response = next.run(request).await;
+        if onboarding {
+            response.headers_mut().insert(
+                header::CACHE_CONTROL,
+                axum::http::HeaderValue::from_static("no-store"),
+            );
+        }
+        return response;
     }
 
     let request_id = request
@@ -1664,46 +1753,54 @@ pub(crate) async fn authorization_guard(
         .get("x-request-id")
         .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
-    let principal =
-        match resolve_request_principal(&state, request.headers(), CookiePolicy::Allow).await {
-            Ok(Some(principal)) => principal,
-            Ok(None) => {
-                crate::auth::record_denied_audit(
-                    &state,
-                    None,
-                    "denied",
-                    request.method().as_str(),
-                    request.uri().path(),
-                    "authentication required",
-                    request_id,
-                );
-                return ApiError::unauthorized("authentication required").into_response();
-            }
-            Err(error) => {
-                let error = if matches!(
-                    request.uri().path(),
-                    "/v1/supervisor" | "/v1/supervisor/policy"
-                ) {
-                    if error.status.is_server_error() {
-                        ApiError::service_unavailable("supervisor authentication unavailable")
-                    } else {
-                        ApiError::unauthorized("valid supervisor authentication is required")
-                    }
+    let resolved = resolve_request_principal(&state, request.headers(), CookiePolicy::Allow).await;
+    let resolved = if resolved.is_err()
+        && request.method() == Method::POST
+        && request.uri().path() == "/v1/onboarding/device/logout"
+    {
+        super::device::logout_proof(&state, request.headers()).await
+    } else {
+        resolved
+    };
+    let principal = match resolved {
+        Ok(Some(principal)) => principal,
+        Ok(None) => {
+            crate::auth::record_denied_audit(
+                &state,
+                None,
+                "denied",
+                request.method().as_str(),
+                request.uri().path(),
+                "authentication required",
+                request_id,
+            );
+            return ApiError::unauthorized("authentication required").into_response();
+        }
+        Err(error) => {
+            let error = if matches!(
+                request.uri().path(),
+                "/v1/supervisor" | "/v1/supervisor/policy"
+            ) {
+                if error.status.is_server_error() {
+                    ApiError::service_unavailable("supervisor authentication unavailable")
                 } else {
-                    error
-                };
-                crate::auth::record_denied_audit(
-                    &state,
-                    None,
-                    "error",
-                    request.method().as_str(),
-                    request.uri().path(),
-                    &error.message,
-                    request_id,
-                );
-                return error.into_response();
-            }
-        };
+                    ApiError::unauthorized("valid supervisor authentication is required")
+                }
+            } else {
+                error
+            };
+            crate::auth::record_denied_audit(
+                &state,
+                None,
+                "error",
+                request.method().as_str(),
+                request.uri().path(),
+                &error.message,
+                request_id,
+            );
+            return error.into_response();
+        }
+    };
 
     if principal.credential_source == CredentialSource::BrowserSession
         && is_mutating(request.method())
@@ -1734,7 +1831,8 @@ pub(crate) async fn authorization_guard(
     }
 
     request.extensions_mut().insert(principal);
-    let onboarding = request.uri().path().starts_with("/v1/admin/onboarding/");
+    let onboarding = request.uri().path().starts_with("/v1/admin/onboarding/")
+        || request.uri().path().starts_with("/v1/onboarding/");
     let mut response = next.run(request).await;
     if onboarding {
         response.headers_mut().insert(
@@ -1756,6 +1854,13 @@ fn is_authorized(
 ) -> bool {
     match policy.scope {
         ProjectScope::Public => true,
+        ProjectScope::Authenticated => {
+            principal.credential_source != CredentialSource::AnonymousSingleUser
+        }
+        ProjectScope::HumanSession => {
+            principal.kind == mem_record::AuthPrincipalKind::HumanOidc
+                && principal.credential_source == CredentialSource::BrowserSession
+        }
         ProjectScope::Global => principal.has_global(policy.permission),
         ProjectScope::Unscoped => principal.has_anywhere(policy.permission),
         _ => match project {
@@ -1870,7 +1975,11 @@ async fn resolve_request_project(
     scope: ProjectScope,
 ) -> Result<Option<String>, ApiError> {
     match scope {
-        ProjectScope::Public | ProjectScope::Unscoped | ProjectScope::Global => Ok(None),
+        ProjectScope::Public
+        | ProjectScope::Authenticated
+        | ProjectScope::HumanSession
+        | ProjectScope::Unscoped
+        | ProjectScope::Global => Ok(None),
         ProjectScope::PathProject => Ok(request
             .uri()
             .path()

@@ -308,7 +308,7 @@ fn validate_entry(entry: &OnboardingProjectEntry) -> Result<(), ApiError> {
     }
     Ok(())
 }
-fn project_row(row: &PgRow) -> Result<OnboardingProject, ApiError> {
+pub(super) fn project_row(row: &PgRow) -> Result<OnboardingProject, ApiError> {
     Ok(OnboardingProject {
         project_id: row.try_get("project_id").map_err(ApiError::sql)?,
         project: row.try_get("slug").map_err(ApiError::sql)?,

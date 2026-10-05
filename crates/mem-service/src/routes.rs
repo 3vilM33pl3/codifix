@@ -51,6 +51,31 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
     let mcp_config = state.config.mcp.clone();
     let mut app = Router::new()
         .route(
+            "/v1/onboarding/device/cancel",
+            post(crate::auth::device::cancel).layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/v1/onboarding/device/start",
+            post(crate::auth::device::start).layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/v1/onboarding/device/poll",
+            post(crate::auth::device::poll).layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/v1/onboarding/device/review",
+            get(crate::auth::device::review),
+        )
+        .route(
+            "/v1/onboarding/device/approve",
+            post(crate::auth::device::approve).layer(axum::extract::DefaultBodyLimit::max(16384)),
+        )
+        .route(
+            "/v1/onboarding/device/logout",
+            post(crate::auth::device::logout),
+        )
+        .route("/v1/onboarding/projects", get(crate::auth::device::catalog))
+        .route(
             "/v1/admin/onboarding/capabilities",
             get(crate::auth::onboarding::capabilities),
         )

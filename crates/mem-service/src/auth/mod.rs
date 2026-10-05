@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 pub(crate) mod answerer;
+pub(crate) mod device;
 mod model;
 mod oidc;
 pub(crate) mod onboarding;

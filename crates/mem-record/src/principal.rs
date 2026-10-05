@@ -243,6 +243,10 @@ impl PermissionSet {
         PermissionSet(self.0 | other.0)
     }
 
+    pub const fn intersection(self, other: PermissionSet) -> PermissionSet {
+        PermissionSet(self.0 & other.0)
+    }
+
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }

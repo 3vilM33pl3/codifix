@@ -27,6 +27,151 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/onboarding/device/start:
+    post:
+      operationId: startDeviceEnrollment
+      x-stability: internal
+      summary: startDeviceEnrollment
+      description: >-
+        Public bounded start: multi_user, explicit local area identity and HTTPS company origin required. Socket-peer IP limit ten per minute; at most 1000 unexpired pending requests. Exact request replay preserves original code/expiry. Client creates and stores both secrets before submitting only digests. Responses are no-store. No scoped offline delivery or fleet authority is implemented by this metadata surface.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingDeviceStartRequest' }
+      responses:
+        '200':
+          description: Exact bounded enrollment metadata or bound revocation receipt.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingDeviceStartResponse' }
+        '401': { description: Invalid proof or disabled/expired general credential. }
+        '403': { description: Required identity, current role, configuration or browser CSRF missing. }
+        '409': { description: Changed request/decision, already approved cancellation, or stale manifest revision. }
+        '410': { description: Pending challenge expired or request already decided. }
+        '429': { description: Peer start capacity or authenticated poll timing limit reached. }
+  /v1/onboarding/device/poll:
+    post:
+      operationId: pollDeviceEnrollment
+      x-stability: internal
+      summary: pollDeviceEnrollment
+      description: Public poll proves separate poll secret before timing updates. Two-second polling interval. Ten-minute challenge lifetime. Never returns any raw credential. Responses are no-store. No scoped offline delivery or fleet authority is implemented by this metadata surface.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingDevicePollRequest' }
+      responses:
+        '200':
+          description: Exact bounded enrollment metadata or bound revocation receipt.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingDevicePollResponse' }
+        '401': { description: Invalid proof or disabled/expired general credential. }
+        '403': { description: Required identity, current role, configuration or browser CSRF missing. }
+        '409': { description: Changed request/decision, already approved cancellation, or stale manifest revision. }
+        '410': { description: Pending challenge expired or request already decided. }
+        '429': { description: Peer start capacity or authenticated poll timing limit reached. }
+  /v1/onboarding/device/cancel:
+    post:
+      operationId: cancelDeviceEnrollment
+      x-stability: internal
+      summary: cancelDeviceEnrollment
+      description: Separate poll proof cancels pending enrollment, including expired pending requests. Exact denied replay is harmless. Approved enrollment returns409 regardless challenge expiry; use exact device credential logout. Responses are no-store. No scoped offline delivery or fleet authority is implemented by this metadata surface.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingDevicePollRequest' }
+      responses:
+        '200':
+          description: Exact bounded enrollment metadata or bound revocation receipt.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingDeviceCancelResponse' }
+        '401': { description: Invalid proof or disabled/expired general credential. }
+        '403': { description: Required identity, current role, configuration or browser CSRF missing. }
+        '409': { description: Changed request/decision, already approved cancellation, or stale manifest revision. }
+        '410': { description: Pending challenge expired or request already decided. }
+        '429': { description: Peer start capacity or authenticated poll timing limit reached. }
+  /v1/onboarding/device/review:
+    get:
+      operationId: reviewDeviceEnrollment
+      x-stability: internal
+      summary: reviewDeviceEnrollment
+      description: Current human OIDC browser session only. Shows exact device fingerprint and current local reviewed manifests matching configured area/owner. Device, legacy owner and service-token identities cannot approve. Responses are no-store. No scoped offline delivery or fleet authority is implemented by this metadata surface.
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string, pattern: '^[A-Z0-9]{4}-[A-Z0-9]{4}$' } }
+      responses:
+        '200':
+          description: Exact bounded enrollment metadata or bound revocation receipt.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingDeviceReview' }
+        '401': { description: Invalid proof or disabled/expired general credential. }
+        '403': { description: Required identity, current role, configuration or browser CSRF missing. }
+        '409': { description: Changed request/decision, already approved cancellation, or stale manifest revision. }
+        '410': { description: Pending challenge expired or request already decided. }
+        '429': { description: Peer start capacity or authenticated poll timing limit reached. }
+  /v1/onboarding/device/approve:
+    post:
+      operationId: approveDeviceEnrollment
+      x-stability: internal
+      summary: approveDeviceEnrollment
+      description: Human browser session with Origin/CSRF. Locks human, request, current project/caps and reviewed revision. Stale manifest409. Reader/writer cap only, no global admin/federation authority. Empty selection denies. Client credential digest is admitted transactionally; token expires30days. Exact replay cannot revive revoked/expired enrollment. Responses are no-store. No scoped offline delivery or fleet authority is implemented by this metadata surface.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingDeviceApproveRequest' }
+      responses:
+        '200':
+          description: Exact bounded enrollment metadata or bound revocation receipt.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingDevicePollResponse' }
+        '401': { description: Invalid proof or disabled/expired general credential. }
+        '403': { description: Required identity, current role, configuration or browser CSRF missing. }
+        '409': { description: Changed request/decision, already approved cancellation, or stale manifest revision. }
+        '410': { description: Pending challenge expired or request already decided. }
+        '429': { description: Peer start capacity or authenticated poll timing limit reached. }
+  /v1/onboarding/device/logout:
+    post:
+      operationId: logoutDeviceEnrollment
+      x-stability: internal
+      summary: logoutDeviceEnrollment
+      description: Exact enrolled device token proof revokes only its bound device. Revoked/expired proof may only acknowledge the same device tombstone on this exact POST route, carrying empty permissions; it is rejected on every general/project route. Writable company instance required. Responses are no-store. No scoped offline delivery or fleet authority is implemented by this metadata surface.
+      responses:
+        '200':
+          description: Exact bounded enrollment metadata or bound revocation receipt.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingDeviceLogoutResponse' }
+        '401': { description: Invalid proof or disabled/expired general credential. }
+        '403': { description: Required identity, current role, configuration or browser CSRF missing. }
+        '409': { description: Changed request/decision, already approved cancellation, or stale manifest revision. }
+        '410': { description: Pending challenge expired or request already decided. }
+        '429': { description: Peer start capacity or authenticated poll timing limit reached. }
+  /v1/onboarding/projects:
+    get:
+      operationId: listCurrentOnboardingProjects
+      x-stability: internal
+      summary: listCurrentOnboardingProjects
+      description: Current human browser or enrolled device only. Server filters local reviewed metadata by configured area/owner identity and current human/device project permissions before responding. Trust never allows offline selection. Responses are no-store. No scoped offline delivery or fleet authority is implemented by this metadata surface.
+      responses:
+        '200':
+          description: Exact bounded enrollment metadata or bound revocation receipt.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingCurrentProjects' }
+        '401': { description: Invalid proof or disabled/expired general credential. }
+        '403': { description: Required identity, current role, configuration or browser CSRF missing. }
+        '409': { description: Changed request/decision, already approved cancellation, or stale manifest revision. }
+        '410': { description: Pending challenge expired or request already decided. }
+        '429': { description: Peer start capacity or authenticated poll timing limit reached. }
   /v1/admin/onboarding/capabilities:
     get:
       operationId: inspectOnboardingCapabilities
@@ -2844,6 +2989,103 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    OnboardingDeviceStartRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, device_id, name, platform, credential_sha256, poll_sha256]
+      properties:
+        request_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 128 }
+        platform: { type: string, enum: [macos, linux, windows] }
+        credential_sha256: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+        poll_sha256: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+    OnboardingDeviceStartResponse:
+      type: object
+      required: [request_id, user_code, expires_at, poll_interval_seconds, verification_uri_complete]
+      properties:
+        request_id: { type: string, format: uuid }
+        user_code: { type: string, pattern: '^[A-Z0-9]{4}-[A-Z0-9]{4}$' }
+        expires_at: { type: string, format: date-time }
+        poll_interval_seconds: { const: 2 }
+        verification_uri_complete: { type: string, format: uri }
+    OnboardingDevicePollRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, poll_secret]
+      properties:
+        request_id: { type: string, format: uuid }
+        poll_secret: { type: string, minLength: 32, maxLength: 256, writeOnly: true }
+    OnboardingDeviceGrant:
+      type: object
+      required: [manifest, role]
+      properties:
+        manifest: { $ref: '#/components/schemas/OnboardingProject' }
+        role: { type: string, enum: [reader, writer] }
+    OnboardingDevicePollResponse:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [pending, approved, denied, expired] }
+        device_id: { type: string, format: uuid }
+        principal_id: { type: string, format: uuid }
+        projects: { type: array, maxItems: 32, items: { $ref: '#/components/schemas/OnboardingDeviceGrant' } }
+    OnboardingDeviceCancelResponse:
+      type: object
+      required: [status, request_id, device_id]
+      properties:
+        status: { const: denied }
+        request_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+    OnboardingDeviceLogoutResponse:
+      type: object
+      required: [logged_out, device_id]
+      properties:
+        logged_out: { const: true }
+        device_id: { type: string, format: uuid }
+    OnboardingDeviceReviewProject:
+      type: object
+      required: [manifest, allowed_roles, offline_available]
+      properties:
+        manifest: { $ref: '#/components/schemas/OnboardingProject' }
+        allowed_roles: { type: array, maxItems: 2, items: { type: string, enum: [reader, writer] } }
+        offline_available: { type: boolean, description: False for Trust or absent current export/offline permission. Metadata only. }
+    OnboardingCurrentProjects:
+      type: object
+      required: [schema_version, projects]
+      properties:
+        schema_version: { const: 1 }
+        projects: { type: array, maxItems: 1000, items: { $ref: '#/components/schemas/OnboardingDeviceReviewProject' } }
+    OnboardingDeviceReview:
+      type: object
+      required: [request_id, device_id, user_code, name, platform, credential_sha256, expires_at, projects]
+      properties:
+        request_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        user_code: { type: string, pattern: '^[A-Z0-9]{4}-[A-Z0-9]{4}$' }
+        name: { type: string }
+        platform: { type: string, enum: [macos, linux, windows] }
+        credential_sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        expires_at: { type: string, format: date-time }
+        projects: { type: array, maxItems: 1000, items: { $ref: '#/components/schemas/OnboardingDeviceReviewProject' } }
+    OnboardingDeviceApproveRequest:
+      type: object
+      additionalProperties: false
+      required: [user_code, projects, confirmed]
+      properties:
+        user_code: { type: string, pattern: '^[A-Z0-9]{4}-[A-Z0-9]{4}$' }
+        confirmed: { const: true }
+        projects:
+          type: array
+          maxItems: 32
+          items:
+            type: object
+            additionalProperties: false
+            required: [project_id, role, revision]
+            properties:
+              project_id: { type: string, format: uuid }
+              role: { type: string, enum: [reader, writer] }
+              revision: { type: integer, minimum: 1 }
     OnboardingCapabilities:
       type: object
       required: [schema_version, idp_management_enabled, invitation_enabled, idp_provider]

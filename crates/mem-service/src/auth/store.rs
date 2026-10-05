@@ -306,6 +306,7 @@ async fn load_service_token_principal(
     let mut principal = principal_from_row(pool, state, &row).await?;
     principal.credential_source = CredentialSource::ServiceToken;
     principal.token_id = Some(token_id);
+    super::device::cap_authenticated_device(state, pool, token_id, &mut principal).await?;
     if should_touch_last_used(token_id) {
         if state.config.evaluation.active() {
             // Frozen credential rows are part of the benchmark snapshot. Keep
@@ -597,6 +598,10 @@ pub(crate) async fn locked_project_permissions(
             session,
         } => (*principal, *token, *session),
     };
+    // Device ownership is locked before machine/token rows, matching human
+    // disable -> device -> token ordering. Recorded scope and current human
+    // authority remain locked through the caller's eventual effect commit.
+    let device_cap = super::device::locked_device_cap(state, tx, principal, token, project).await?;
     let row =
         sqlx::query("SELECT * FROM auth_principals WHERE id=$1 AND disabled_at IS NULL FOR SHARE")
             .bind(principal)
@@ -670,7 +675,7 @@ pub(crate) async fn locked_project_permissions(
             permissions = permissions.union(rule.role.permissions());
         }
     }
-    Ok(permissions)
+    Ok(device_cap.map_or(permissions, |cap| permissions.intersection(cap)))
 }
 
 async fn load_memberships(
