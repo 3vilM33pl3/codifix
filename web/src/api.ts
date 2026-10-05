@@ -303,6 +303,25 @@ export async function revokeAuthMembership(id: string): Promise<AuthMembershipRe
   );
 }
 
+/** Company administration shares the current service session and CSRF boundary. */
+export async function onboardingRequest<T>(suffix: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await apiFetch(`/v1/admin/onboarding${suffix}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: body === undefined ? undefined : { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(response.status === 401 || response.status === 403
+      ? "Access denied. Current global administration and a writable service are required for changes."
+      : response.status === 409 ? "Conflict. Refresh and review the current record before saving."
+      : response.status === 404 ? "Administration record or capability unavailable."
+      : `Administration request failed (${response.status}). Refresh to inspect the outcome before retrying.`);
+  }
+  return response.json() as Promise<T>;
+}
+
 export async function getHealth(): Promise<Record<string, unknown>> {
   return parseJson(await fetch("/healthz"));
 }

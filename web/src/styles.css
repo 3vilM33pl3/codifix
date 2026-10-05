@@ -199,6 +199,42 @@ select {
   font-size: 0.78rem;
 }
 
+.access-admin-form,
+.access-admin-form fieldset {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.access-admin-form label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.access-admin-form fieldset {
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.access-admin-form textarea {
+  width: 100%;
+  font-family: monospace;
+}
+
+label.access-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.access-checkbox input {
+  width: auto;
+}
+
+.access-manifest-review pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .project-form {
   display: grid;
   grid-auto-flow: column;

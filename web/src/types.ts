@@ -118,6 +118,7 @@ export type AuthPrincipalKind =
 export interface AuthProjectAccess {
   project: string;
   role: AuthRole;
+  permissions?: string[];
   source: string;
 }
 
@@ -126,8 +127,11 @@ export interface AuthPrincipalResponse {
   kind: AuthPrincipalKind;
   display_name: string;
   email?: string | null;
+  issuer?: string | null;
+  subject?: string | null;
   groups: string[];
   global_role?: AuthRole | null;
+  global_permissions?: string[];
   projects: AuthProjectAccess[];
 }
 

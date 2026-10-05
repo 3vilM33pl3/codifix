@@ -221,8 +221,11 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+  const canAdminister = authMe?.principal.global_permissions !== undefined
+    ? authMe.principal.global_permissions.includes("system_admin")
+    : authMe?.principal.global_role === "admin";
   const visibleMoreTabs: readonly (typeof MORE_TABS)[number][] =
-    authMe?.principal.global_role === "admin"
+    canAdminister
       ? MORE_TABS
       : MORE_TABS.filter((name) => name !== "access");
 
@@ -555,7 +558,7 @@ export default function App() {
           onApplyImport={() => void handleApplyImport()}
         />
       ) : null}
-      {tab === "access" && authMe?.principal.global_role === "admin" ? (
+      {tab === "access" && canAdminister ? (
         <AccessTab project={project} readOnly={serviceReadOnly} />
       ) : null}
       {tab === "federation" ? <FederationTab project={project} /> : null}

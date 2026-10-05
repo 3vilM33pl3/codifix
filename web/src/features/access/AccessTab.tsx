@@ -15,6 +15,9 @@ import type {
   AuthRole,
   AuthServiceTokenResponse,
 } from "../../types";
+import { DevicesPanel } from "./DevicesPanel";
+import { ProjectsPanel } from "./ProjectsPanel";
+import { UsersPanel } from "./UsersPanel";
 
 const ROLES: AuthRole[] = ["reader", "writer", "operator", "admin"];
 const SERVICE_ROLES: AuthRole[] = ["reader", "writer", "operator"];
@@ -25,6 +28,31 @@ interface AccessTabProps {
 }
 
 export function AccessTab({ project, readOnly = false }: AccessTabProps) {
+  const [view, setView] = useState<"users" | "projects" | "devices">("users");
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [accessVersion, setAccessVersion] = useState(0);
+  const refreshLegacy = useCallback(() => setRefreshVersion((value) => value + 1), []);
+  const refreshUserAccess = useCallback(() => setAccessVersion((value) => value + 1), []);
+  return <main className="panel-stack access-tab">
+    <section className="panel"><h2>Company administration</h2>
+      <p>Users, onboarding projects and device credentials on this service. Fleet-wide administration and remote-instance authority require later integration.</p>
+      {readOnly ? <p role="status">This service is read-only. Administration changes are disabled.</p> : null}
+      <nav className="actions-row" aria-label="Company administration views">
+        {(["users", "projects", "devices"] as const).map((name) => <button type="button" key={name} aria-pressed={view === name} onClick={() => setView(name)}>
+          {name[0].toUpperCase() + name.slice(1)}
+        </button>)}
+      </nav>
+    </section>
+    {view === "users" ? <UsersPanel readOnly={readOnly} onChanged={refreshLegacy} accessVersion={accessVersion} /> : null}
+    <div hidden={view !== "users"}>
+      <LegacyAccessControls project={project} readOnly={readOnly} refreshVersion={refreshVersion} onMembershipChanged={refreshUserAccess} />
+    </div>
+    {view === "projects" ? <ProjectsPanel readOnly={readOnly} /> : null}
+    {view === "devices" ? <DevicesPanel readOnly={readOnly} /> : null}
+  </main>;
+}
+
+function LegacyAccessControls({ project, readOnly, refreshVersion, onMembershipChanged }: AccessTabProps & { refreshVersion: number; onMembershipChanged: () => void }) {
   const [principals, setPrincipals] = useState<AuthPrincipalResponse[]>([]);
   const [tokens, setTokens] = useState<AuthServiceTokenResponse[]>([]);
   const [memberships, setMemberships] = useState<AuthMembershipResponse[]>([]);
@@ -69,7 +97,7 @@ export function AccessTab({ project, readOnly = false }: AccessTabProps) {
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, refreshVersion]);
 
   useEffect(() => {
     if (selectedMembershipPrincipal?.kind === "service_token" && membershipRole === "admin") {
@@ -108,6 +136,7 @@ export function AccessTab({ project, readOnly = false }: AccessTabProps) {
         role: membershipRole,
       });
       await refresh();
+      onMembershipChanged();
     } catch (nextError) {
       setError((nextError as Error).message);
     } finally {
@@ -134,6 +163,7 @@ export function AccessTab({ project, readOnly = false }: AccessTabProps) {
     try {
       await revokeAuthMembership(id);
       await refresh();
+      onMembershipChanged();
     } catch (nextError) {
       setError((nextError as Error).message);
     } finally {
@@ -142,10 +172,10 @@ export function AccessTab({ project, readOnly = false }: AccessTabProps) {
   }
 
   return (
-    <main className="panel-stack access-tab">
+    <div className="panel-stack">
       <section className="panel panel-toolbar access-heading">
         <div>
-          <h2>Access</h2>
+          <h3>Memberships and service tokens</h3>
           <p>Authentik users, service credentials, and project-scoped roles.</p>
         </div>
         <button type="button" onClick={() => void refresh()} disabled={loading || busy}>
@@ -254,7 +284,7 @@ export function AccessTab({ project, readOnly = false }: AccessTabProps) {
           </table>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 
