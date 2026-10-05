@@ -17,7 +17,6 @@ mem-analyze = { path = "../mem-analyze" }
 mem-config = { path = "../mem-config" }
 mem-record = { path = "../mem-record" }
 mem-federation-runtime = { path = "../mem-federation-runtime", optional = true }
-sqlx = { workspace = true, optional = true }
 mem-eval = { path = "../mem-eval" }
 mem-graph = { path = "../mem-graph" }
 mem-mcp = { path = "../mem-mcp" }
@@ -47,7 +46,7 @@ security-framework = "=3.7.0"
 [features]
 default = ["full"]
 tui = ["dep:ratatui", "dep:crossterm"]
-project-sync = ["dep:mem-federation-runtime", "dep:sqlx"]
+project-sync = ["dep:mem-federation-runtime"]
 embedded-service-postgres = ["dep:mem-service", "project-sync"]
 embedded-service = ["embedded-service-postgres", "mem-service/offline"]
 full = ["tui", "embedded-service"]

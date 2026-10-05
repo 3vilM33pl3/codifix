@@ -2,8 +2,8 @@
 //! Explicit publication/review repository APIs and opt-in worker lifecycle.
 //! Local workflow handlers share only the administrator-enrolled instance.
 mod expertise;
-mod projects;
 mod project_delivery;
+mod projects;
 pub mod workflow;
 use crate::AppState;
 use mem_federation::publication::{InstanceId, RecordKey, SpaceId};

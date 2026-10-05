@@ -215,28 +215,7 @@ mod native {
         profile: &LocalProjectReplicaProfile,
         initialize: bool,
     ) -> Result<ProjectReplica> {
-        profile.validate()?;
-        let pool=sqlx::postgres::PgPoolOptions::new().max_connections(3)
-            .acquire_timeout(std::time::Duration::from_secs(5))
-            .connect(&profile.local_database_url).await
-            .map_err(|_|anyhow::anyhow!("dedicated loopback laptop database unavailable; no area fallback or migration performed"))?;
-        let exists: bool =
-            sqlx::query_scalar("SELECT to_regclass('onboarding_project_projections') IS NOT NULL")
-                .fetch_one(&pool)
-                .await
-                .map_err(|_| anyhow::anyhow!("local projection schema could not be verified"))?;
-        if !exists {
-            bail!(
-                "the laptop database is not provisioned for selective sync; run the native installer first"
-            );
-        }
-        let binding = profile.bootstrap.binding(profile.subscription);
-        let trust = profile.bootstrap.validate()?;
-        if initialize {
-            Ok(ProjectReplica::initialize(pool, binding, trust).await?)
-        } else {
-            ProjectReplica::open(pool, binding, trust).await.map_err(|_|anyhow::anyhow!("local subscription not initialized or binding changed; inspect the profile and run the first explicit sync"))
-        }
+        ProjectReplica::connect(profile, initialize).await.map_err(|_|anyhow::anyhow!("dedicated local subscription unavailable or binding changed; provision the laptop schema and inspect the profile. No fallback or migration performed"))
     }
     fn current_project(
         profile: &LocalProjectReplicaProfile,

@@ -164,6 +164,37 @@ pub struct ProjectReplica {
     trust: ReceiptTrust,
 }
 impl ProjectReplica {
+    /// Native client connection stays in the runtime, not the CLI boundary.
+    /// This opens only a validated loopback replica and never migrates it.
+    pub async fn connect(
+        profile: &crate::LocalProjectReplicaProfile,
+        initialize: bool,
+    ) -> Result<Self> {
+        profile.validate()?;
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(3)
+            .acquire_timeout(Duration::from_secs(5))
+            .connect(&profile.local_database_url)
+            .await
+            .map_err(|_| RuntimeError::Unavailable)?;
+        let exists: bool = sqlx::query_scalar(
+            "SELECT to_regclass('onboarding_project_projections') IS NOT NULL",
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| RuntimeError::Unavailable)?;
+        if !exists {
+            return Err(RuntimeError::Configuration);
+        }
+        let binding = profile.bootstrap.binding(profile.subscription);
+        let trust = profile.bootstrap.validate()?;
+        if initialize {
+            Self::initialize(pool, binding, trust).await
+        } else {
+            Self::open(pool, binding, trust).await
+        }
+    }
+
     pub async fn open(
         pool: PgPool,
         binding: ProjectReplicaBinding,
