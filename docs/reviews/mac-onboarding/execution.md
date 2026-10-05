@@ -30,10 +30,11 @@ and embedding work are disabled.
 | Contract checkpoint | Complete | Memory IDs above; contract committed. |
 | Sol/Astra project defaults | Complete | Two TOML files parse successfully; bounded read-only adviser and updated repo guidance. |
 | Local company administration backend | Implemented and focused tests passed | Commits `5140b5d1`, `2fb2a3f2`; 36 auth tests on a separate disposable PostgreSQL database, including six onboarding tests; OpenAPI inventory test, formatting and diff checks. Live provider RBAC and company-wide authority remain unverified. |
-| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices/Company alongside existing memberships/tokens; latest full run: 203 Web tests and production build passed. This is a development UI, not a deployed company console. |
-| Unified cross-area administration | Owner delegation, credential provisioner, coordinator and console grant workflow implemented | `16051bb8`, `9f60b457`, `60d27978`, `cc1fe53a`, `af387f94`; six company tests plus five delegate database/HTTP tests and two delegate configuration tests passed. Explicit owner/token/namespace/role ceiling, ownership guards and durable uncertain outcomes; sanitized registry discovery, exact confirmation, retained operation IDs and distinct current/group rights. Fleet enrollment and live owner provisioning remain pending. |
-| Device login and selection | Backend, CLI and browser approval implemented | `9f439c27`, `6ac5b994`, `121fab3b`; 44 required-database auth tests and 15 CLI tests passed. Native Keychain execution and TUI selection remain unfinished. |
-| Selective snapshots/offline search | Gateway, local enrolled-owner delivery, bootstrap, private metadata producer and explicit CLI projector/runner implemented | `e741af31`, `d8c5f8db`, `8f578566`, `00d7f2fa`, `09df86da`, `d2d8508f`, `15b649d1`, `46fce2d1`; latest required-database federation store/runtime regression: 84 tests; auth regression: 57 tests with bounded concurrency, plus new configuration test. Two private profile/metadata tests and 41 neutral-core tests passed. Cross-owner device approval, ordinary retrieval/Web/TUI integration and native execution remain pending. |
+| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices/Company alongside existing memberships/tokens; latest full run: 221 Web tests and production build passed, including explicit company device review. This is a development UI, not a deployed company console. |
+| Unified cross-area administration | Owner delegation, credential provisioner, coordinator and console grant workflow implemented | `16051bb8`, `9f60b457`, `60d27978`, `cc1fe53a`, `af387f94`; explicit owner/token/namespace/role ceiling, ownership guards and durable uncertain outcomes. Separate delivery delegates and company devices are now implemented below; live owner provisioning remains pending. |
+| Device login and selection | Backend, CLI/browser approval and terminal project picker implemented | `9f439c27`, `6ac5b994`, `121fab3b`, `f57c25e0`, `4abe06b1`; latest CLI enrollment/workspace/picker suite: 56 tests passed. Native Keychain execution and unified installer remain unfinished. |
+| Selective snapshots/offline search | Gateway, company/local enrolled-device delivery, bootstrap, private metadata producer and explicit CLI projector/runner implemented | `e741af31`, `d8c5f8db`, `8f578566`, `00d7f2fa`, `09df86da`, `d2d8508f`, `15b649d1`, `46fce2d1`, `99cea0c4`; latest required-database federation store/runtime all-target regression: 85 tests. Latest auth regression: 82 tests with bounded concurrency, including company delivery. Ordinary retrieval does not merge cached records; native execution remains pending. |
+| Company device and composite selection | Implemented; database/HTTP and Web tests passed | `a8f90068`, `02c576b9`, `8118fe1c`, `99cea0c4`, `90c0cabc`, `cdf8580b`; immutable owner approvals, pinned trust, zero ordinary project/global device authority, current-owner refresh and no legacy fallback. Complete identity survives equal project names/UUIDs. Details below; native login remains unobserved. |
 | Installer and tool/repository setup | Journaled workspace preparation and prerequisite-based native operator implemented and reviewed | `9dabaca8`, `e305955a`, `178560cc`, `894323cb`, `901f6805`, `56b87363`, `730d48c1`, `f087b735`; 21 operator and 13 packaging tests passed. Latest prior enrollment/workspace/client suite: 44 tests. Exact immutable package helpers, independent cluster/roles/databases/LaunchAgents and recovery are modeled with synthetic commands. Native APFS/Keychain/launchd and self-contained dependency distribution remain pending. |
 | Read-only local cache interfaces | Web/TUI implemented and reviewed; backend/configuration tests passed | `cb755bb5`, `1f0a12fb`, `f4814db4`; three PostgreSQL/HTTP cache tests, two cache configuration tests and nine focused CLI/TUI tests passed. Exact subscription allowlist; same-snapshot freshness and citations; no normal-query merge, model forwarding or write controls. This is not a native Mac acceptance result. |
 | Real macOS acceptance | Pending | Requires native execution; Linux builds/tests are not evidence of this. |
@@ -225,8 +226,53 @@ not laptop-delivery authority. Fleet delivery must add separate explicit authori
 and must never forward a laptop bearer credential to another owner.
 
 The development instance remains isolated and earlier operational installations
-remain unchanged. The last build-cache check was 24 GiB, with 373 GiB free on the
-workspace filesystem; no broad cache deletion was performed.
+remain unchanged. The last build-cache check was 25 GiB; no broad cache deletion
+was performed and the working executable was retained.
+
+### Company device enrollment and owner bridge
+
+Company metadata comes only from configured non-Trust owners using newly scoped
+delivery delegates, not membership-management credentials. An actual human
+browser session supplies the current issuer/subject from locked database rows;
+neither client-reported identity nor email becomes authority. The Web company
+marker is explicit and errors never downgrade into local enrollment.
+
+The approval persists exact area/owner/project/revision/digest selections and
+stable remote operation IDs before contacting owners. Every owner independently
+checks current human read/export permission and the reviewed manifest. Confirmed
+receipts and public gateway trust are immutable. Lost confirmations are uncertain;
+only the exact request resumes. Local activation is a separate transaction, not
+a claim of distributed atomicity. Company devices receive no global permissions
+or ordinary local project memberships.
+
+The company proxies selected pages without forwarding the laptop bearer or
+cookies. Both owner and company recheck authority after remote calls. Scoped
+nonces bind the full identity, including when owners preserve identical source
+project UUIDs. Signature, audience, nonce, expiry, manifest and digest checks
+use the enrolled bootstrap; a later response cannot silently replace its keys.
+
+The required PostgreSQL auth suite passed all 82 tests with two threads. Two
+independent disposable databases and actual company/owner HTTP routers exchanged
+real detached-signature gateway pages, replayed exact requests and rejected
+unselected projects, Trust, altered retries, generic access and human revocation
+after owner bytes were prepared. Four enrollment tests additionally cover lost
+owner replies, malformed receipts/bootstrap, cancellation and challenge/session
+expiry during unlocked HTTP. These are synthetic services, not live IdP or Mac
+acceptance.
+
+The company-hop forgery test then altered a successfully verified owner's gateway
+signature in transit. The company returned conflict without knowledge bytes;
+the two real-HTTP company delivery tests passed again after this injection was
+added. Independent federation/PDS/ATProto checks passed: 85 store/runtime tests,
+24 adapter tests, 11 repository/signature verification tests and 41 neutral tests.
+The nested Lean build/tests passed with existing linter warnings; these are
+modeled protocol regressions, not proofs of deployed onboarding authentication.
+
+Astra identified that a saved device catalog could falsely report current access
+after owner revocation. The catalog now checks each current owner subscription
+outside database locks, requires the saved bootstrap unchanged, and rechecks the
+company binding before returning. Astra's focused rereview found this resolved.
+The broader deployed authentication and native Mac environment remain unverified.
 
 The overall plan is not complete. Native package installation, a clean-Mac
 journey, live Authentik integration and new live project synchronization have
@@ -235,11 +281,10 @@ operator are development candidates, not a self-contained installer.
 
 Remaining implementation work:
 
-- A single company-approved device across configured owners, without exposing
-  owner credentials or expanding project authority.
-- Company project-selection parity across CLI/Web/TUI. The dedicated local
-  read-only cache search/status views are implemented; ordinary retrieval still
-  does not merge these records or forward them to a model.
+- A unified native installer journey combining browser/Keychain login, approved
+  device/project selection, repository/tool setup and native provisioning. The
+  standalone terminal picker and CLI/Web selection now exist; the local read-only
+  cache views still do not merge records into ordinary retrieval or model inputs.
 - Separately scoped Codex/OpenAI and Claude/Anthropic MCP credentials and
   disclosure policies, not reuse of the device credential.
 - Local capture/proposal/offline replay onboarding, supported project plugin
@@ -248,3 +293,25 @@ Remaining implementation work:
 
 R3 remains paused. No existing company area was upgraded and no autonomous
 supervisor, paid execution or public release authority was added.
+
+### Terminal project preparation
+
+`memory projects select` renders exact composite identities, the complete
+manifest/tool/output policy, templates and local output paths. Explicit
+reader/offline consent and confirmation prepare only a metadata journal. Current
+device identity, owner catalog and full manifest are checked again after the
+terminal closes. Apply/resume uses exact area/owner/project identity and retains
+the reader/offline requirement instead of relying on historical approval.
+
+The full CLI suite passed 56 tests with:
+
+```bash
+cargo test -p mem-cli --no-default-features --features project-sync,tui --locked commands::auth_enrollment::
+```
+
+Twelve new cases cover review/confirmation/cancellation, Trust and unavailable
+offline scope, equal names/UUIDs at different owners, changed manifests/devices,
+exact-owner apply and offline permission withdrawal before repository/tool
+effects. Ratatui TestBackend checks cover small-terminal selection; this is not a
+native PTY or Keychain rehearsal. Astra identified and the implementation fixed
+lost offline eligibility on apply and invisible selections after wrapping.
