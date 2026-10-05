@@ -1,12 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { onboardingRequest } from "../../api";
+import { onboardingRequest, OnboardingRequestError } from "../../api";
 import { UsersPanel } from "./UsersPanel";
 import { ProjectsPanel } from "./ProjectsPanel";
 import { DevicesPanel } from "./DevicesPanel";
+import { ProviderOperationsPanel } from "./ProviderOperationsPanel";
 import type { EffectiveUserAccess, ManagedDevice, ManagedUser, OnboardingManifest } from "./types";
 
-vi.mock("../../api", () => ({ onboardingRequest: vi.fn() }));
+vi.mock("../../api", async (importOriginal) => ({ onboardingRequest: vi.fn(), OnboardingRequestError: (await importOriginal<typeof import("../../api")>()).OnboardingRequestError }));
 afterEach(cleanup);
 beforeEach(() => { vi.mocked(onboardingRequest).mockReset(); });
 const user: ManagedUser = {
@@ -31,6 +32,8 @@ function usersApi(enabled = false) {
   vi.mocked(onboardingRequest).mockImplementation(async (suffix) => {
     if (suffix === "/users") return { users: [user] };
     if (suffix === "/capabilities") return { schema_version: 1, idp_management_enabled: enabled, invitation_enabled: enabled, idp_provider: enabled ? "authentik" : null };
+    if (suffix === "/idp/operations") return { operations: [] };
+    if (suffix.startsWith("/idp/operations/")) return { id: suffix.split("/").at(-1), operation: "invite", outcome: "pending", provider_user_id: null, invitation_id: null };
     if (suffix.endsWith("/access")) return access;
     return user;
   });
@@ -89,6 +92,53 @@ describe("company users", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create provider invitation" }));
     expect(await screen.findByText(/Provider invitation creation: pending. Operation op-1/)).toBeInTheDocument();
     expect(vi.mocked(onboardingRequest).mock.calls.filter((call) => call[1] !== undefined).map((call) => call[0])).toEqual(["/users/invite"]);
+  });
+
+  it("shows an uncertain successful HTTP response and never automatically resubmits", async () => {
+    usersApi(true);
+    const original = vi.mocked(onboardingRequest).getMockImplementation()!;
+    vi.mocked(onboardingRequest).mockImplementation(async (...args) => args[0] === "/users/invite"
+      ? { id: "op-uncertain", operation: "invite", outcome: "uncertain", provider_user_id: null, invitation_id: null }
+      : original(...args));
+    render(<UsersPanel readOnly={false} onChanged={vi.fn()} />);
+    await screen.findByText(/verified-subject/);
+    fireEvent.change(screen.getByLabelText("Provider username"), { target: { value: "ada" } });
+    fireEvent.change(screen.getByLabelText("Provider display name"), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByLabelText("Provider email"), { target: { value: "ada@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create provider invitation" }));
+    expect(await screen.findByText(/Provider invitation creation: uncertain. Operation op-uncertain/)).toHaveTextContent("duplicate an external effect");
+    fireEvent.click(screen.getByRole("button", { name: "Refresh users" }));
+    await waitFor(() => expect(vi.mocked(onboardingRequest).mock.calls.filter((call) => call[0] === "/idp/operations").length).toBeGreaterThan(1));
+    expect(vi.mocked(onboardingRequest).mock.calls.filter((call) => call[1] !== undefined)).toHaveLength(1);
+  });
+
+  it("preserves a safe operation reference after lost 503 confirmation and restores durable metadata after reload", async () => {
+    const operationId = "11111111-1111-4111-8111-111111111111";
+    const operation = { id: operationId, operation: "invite", outcome: "pending", invitation_id: "22222222-2222-4222-8222-222222222222", provider_user_id: null };
+    let sent = false;
+    usersApi(true);
+    const original = vi.mocked(onboardingRequest).getMockImplementation()!;
+    vi.mocked(onboardingRequest).mockImplementation(async (...args) => {
+      if (args[0] === "/users/invite") { sent = true; throw new OnboardingRequestError(`Provider action unconfirmed. Operation ${operationId}. Inspect Authentik before resubmitting.`, operationId); }
+      if (args[0] === "/idp/operations") return { operations: sent ? [operation] : [] };
+      if (args[0] === `/idp/operations/${operationId}`) return operation;
+      return original(...args);
+    });
+    const view = render(<UsersPanel readOnly={false} onChanged={vi.fn()} />);
+    await screen.findByText(/verified-subject/);
+    fireEvent.change(screen.getByLabelText("Provider username"), { target: { value: "ada" } });
+    fireEvent.change(screen.getByLabelText("Provider display name"), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByLabelText("Provider email"), { target: { value: "ada@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create provider invitation" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(operationId);
+    expect(await screen.findByRole("heading", { name: `Operation ${operationId}` })).toBeInTheDocument();
+    expect(await screen.findByText(operation.invitation_id)).toBeInTheDocument();
+    view.unmount();
+    render(<UsersPanel readOnly={false} onChanged={vi.fn()} />);
+    expect(await screen.findByText(operationId)).toBeInTheDocument();
+    expect(await screen.findByText(operation.invitation_id)).toBeInTheDocument();
+    expect(screen.getByText("pending — inspect before resubmitting")).toBeInTheDocument();
+    expect(vi.mocked(onboardingRequest).mock.calls.filter((call) => call[1] !== undefined)).toHaveLength(1);
   });
 });
 
@@ -166,4 +216,15 @@ describe("device administration", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Current session denied");
     expect(screen.getByLabelText("Device revocation review")).toHaveTextContent("device-id");
   });
+});
+
+it("bounds provider operation inventory to 100 metadata records", async () => {
+  vi.mocked(onboardingRequest).mockResolvedValue({ operations: Array.from({ length: 101 }, (_, index) => ({
+    id: `operation-${index}`, operation: "invite", outcome: "uncertain", provider_user_id: null, invitation_id: null,
+  })) });
+  render(<ProviderOperationsPanel refreshVersion={0} operationId={null} />);
+  await screen.findByText("operation-0");
+  expect(screen.getAllByRole("button", { name: /^Inspect operation/ })).toHaveLength(100);
+  expect(screen.queryByText("operation-100")).toBeNull();
+  expect(vi.mocked(onboardingRequest).mock.calls.every((call) => call[1] === undefined)).toBe(true);
 });

@@ -304,6 +304,10 @@ export async function revokeAuthMembership(id: string): Promise<AuthMembershipRe
 }
 
 /** Company administration shares the current service session and CSRF boundary. */
+export class OnboardingRequestError extends Error {
+  constructor(message: string, readonly operationId: string | null = null) { super(message); }
+}
+
 export async function onboardingRequest<T>(suffix: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await apiFetch(`/v1/admin/onboarding${suffix}`, {
     method: body === undefined ? "GET" : "POST",
@@ -313,6 +317,19 @@ export async function onboardingRequest<T>(suffix: string, body?: unknown, signa
     cache: "no-store",
   });
   if (!response.ok) {
+    if (response.status === 503 && body !== undefined
+      && (suffix === "/users/invite" || suffix === "/idp/users" || /^\/idp\/users\/\d+\/disable$/.test(suffix))) {
+      let operationId: string | null = null;
+      try {
+        const payload: unknown = await response.json();
+        if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") {
+          // The service supplies this exact sanitized message. Extract only a canonical
+          // v4 operation UUID; never show or retain provider/database response text.
+          operationId = /^external effect may have occurred; inspect provider operation ([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}); outcome could not be recorded$/i.exec(payload.error)?.[1] ?? null;
+        }
+      } catch { /* An unreadable response still leaves the external effect unconfirmed. */ }
+      throw new OnboardingRequestError(`Provider action unconfirmed.${operationId ? ` Operation ${operationId}.` : ""} Refresh provider operations and inspect Authentik before resubmitting; another submission may duplicate an external effect.`, operationId);
+    }
     throw new Error(response.status === 401 || response.status === 403
       ? "Access denied. Current global administration and a writable service are required for changes."
       : response.status === 409 ? "Conflict. Refresh and review the current record before saving."

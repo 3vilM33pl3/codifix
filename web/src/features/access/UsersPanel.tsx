@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { onboardingRequest } from "../../api";
+import { onboardingRequest, OnboardingRequestError } from "../../api";
 import type { EffectiveUserAccess, IdpOperation, ManagedUser, OnboardingCapabilities } from "./types";
+import { ProviderOperationsPanel } from "./ProviderOperationsPanel";
 
 export function UsersPanel({ readOnly, onChanged, accessVersion = 0 }: { readOnly: boolean; onChanged: () => void; accessVersion?: number }) {
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -23,6 +24,8 @@ export function UsersPanel({ readOnly, onChanged, accessVersion = 0 }: { readOnl
   const [confirmDisable, setConfirmDisable] = useState(false);
   const [confirmProviderDisable, setConfirmProviderDisable] = useState(false);
   const [accessRevision, setAccessRevision] = useState(0);
+  const [operationsRevision, setOperationsRevision] = useState(0);
+  const [operationId, setOperationId] = useState<string | null>(null);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -67,13 +70,17 @@ export function UsersPanel({ readOnly, onChanged, accessVersion = 0 }: { readOnl
     try {
       const result = await onboardingRequest<IdpOperation | ManagedUser>(suffix, body);
       if (provider && "outcome" in result) {
+        setOperationId(result.id);
         setStatus(`${message}: ${result.outcome}. Operation ${result.id}${result.provider_user_id != null
-          ? `; provider user ${result.provider_user_id}` : ""}${result.invitation_id ? `; invitation ${result.invitation_id}` : ""}.${result.outcome === "pending" ? " Inspect this operation in provider administration before retrying." : ""}`);
+          ? `; provider user ${result.provider_user_id}` : ""}${result.invitation_id ? `; invitation ${result.invitation_id}` : ""}.${result.outcome === "pending" || result.outcome === "uncertain" ? " Inspect this operation in provider administration before resubmitting; another submission may duplicate an external effect." : ""}`);
       } else { setStatus(message); }
       await refresh();
       onChanged();
-    } catch (nextError) { setError((nextError as Error).message); }
-    finally { setBusy(false); setConfirmDisable(false); setConfirmProviderDisable(false); }
+    } catch (nextError) {
+      if (nextError instanceof OnboardingRequestError && nextError.operationId) setOperationId(nextError.operationId);
+      setError((nextError as Error).message);
+    }
+    finally { if (provider) setOperationsRevision((value) => value + 1); setBusy(false); setConfirmDisable(false); setConfirmProviderDisable(false); }
   }
 
   const selectedUser = users.find((user) => user.principal.id === selected);
@@ -85,7 +92,7 @@ export function UsersPanel({ readOnly, onChanged, accessVersion = 0 }: { readOnl
   return <div className="panel-stack">
     <section className="panel access-heading"><div><h3>Users</h3>
       <p>Register a verified issuer and subject before first login, then grant access using the membership controls below. Email is a contact field.</p></div>
-      <button type="button" disabled={loading || busy} onClick={() => void refresh()}>Refresh users</button>
+      <button type="button" disabled={loading || busy} onClick={() => { setOperationsRevision((value) => value + 1); void refresh(); }}>Refresh users</button>
     </section>
     {error ? <div className="panel error-banner" role="alert">Users error: {error}</div> : null}
     {status ? <div className="panel" role="status">{status}</div> : null}
@@ -132,5 +139,6 @@ export function UsersPanel({ readOnly, onChanged, accessVersion = 0 }: { readOnl
       <label className="access-checkbox"><input type="checkbox" checked={confirmProviderDisable} disabled={providerDisabled} onChange={(event) => setConfirmProviderDisable(event.target.checked)} />Confirm disabling this provider user</label>
       <button type="button" disabled={providerDisabled || !/^\d+$/.test(providerId) || !confirmProviderDisable} onClick={() => void mutate(`/idp/users/${encodeURIComponent(providerId)}/disable`, {}, "Provider user disable", true)}>Disable provider user</button>
     </section>
+    <ProviderOperationsPanel refreshVersion={operationsRevision} operationId={operationId} />
   </div>;
 }

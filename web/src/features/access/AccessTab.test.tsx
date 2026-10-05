@@ -10,7 +10,8 @@ import {
   onboardingRequest,
 } from "../../api";
 
-vi.mock("../../api", () => ({
+vi.mock("../../api", async (importOriginal) => ({
+  OnboardingRequestError: (await importOriginal<typeof import("../../api")>()).OnboardingRequestError,
   createAuthToken: vi.fn(),
   grantAuthMembership: vi.fn(),
   listAuthMemberships: vi.fn(),
@@ -40,7 +41,7 @@ describe("AccessTab", () => {
     vi.mocked(listAuthMemberships).mockResolvedValue([]);
     vi.mocked(onboardingRequest).mockImplementation(async (suffix) => suffix === "/capabilities"
       ? { schema_version: 1, idp_management_enabled: false, invitation_enabled: false, idp_provider: null }
-      : { users: [] });
+      : suffix === "/idp/operations" ? { operations: [] } : { users: [] });
   });
 
   it("loads access inventory and shows a newly issued token only in the result panel", async () => {
@@ -68,7 +69,9 @@ describe("AccessTab", () => {
     }));
     expect(await screen.findByText("mlt_one_time_secret")).toBeInTheDocument();
     expect(screen.getByText(/shown once/i)).toBeInTheDocument();
-    vi.mocked(onboardingRequest).mockResolvedValue({ schema_version: 1, projects: [] });
+    vi.mocked(onboardingRequest).mockImplementation(async (suffix) => suffix === "/idp/operations" ? { operations: [] }
+      : suffix === "/capabilities" ? { schema_version: 1, idp_management_enabled: false, invitation_enabled: false, idp_provider: null }
+      : suffix === "/projects" ? { schema_version: 1, projects: [] } : { users: [] });
     fireEvent.click(screen.getByRole("button", { name: "Projects" }));
     expect(screen.getByText("mlt_one_time_secret")).not.toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Users" }));
@@ -95,7 +98,7 @@ describe("AccessTab", () => {
   it("retains legacy controls when onboarding inventory is unavailable", async () => {
     vi.mocked(onboardingRequest).mockRejectedValue(new Error("Administration unavailable"));
     render(<AccessTab project="memory" />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("Administration unavailable");
+    expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent("Administration unavailable");
     expect(screen.getByRole("heading", { name: "Create service token" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Grant project access" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Projects" })).toBeInTheDocument();

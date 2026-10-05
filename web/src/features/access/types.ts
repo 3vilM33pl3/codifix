@@ -28,9 +28,12 @@ export interface EffectiveUserAccess {
 export interface IdpOperation {
   id: string;
   operation: string;
-  outcome: "success" | "error" | "pending";
+  outcome: "success" | "error" | "pending" | "uncertain";
   provider_user_id?: number | null;
   invitation_id?: string | null;
+  provider_correlation?: string;
+  request_sha256?: string;
+  provider_origin?: string;
 }
 
 export type MemoryArea = "general" | "workshop" | "homelab" | "trust";

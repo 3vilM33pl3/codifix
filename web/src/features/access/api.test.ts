@@ -29,3 +29,20 @@ it("reports denial and conflict without rendering provider response details", as
   code = 502;
   await expect(onboardingRequest("/users/invite", {})).rejects.toThrow("Administration request failed (502)");
 });
+
+it("extracts only a strict sanitized provider operation UUID on lost 503 confirmation", async () => {
+  const operationId = "11111111-1111-4111-8111-111111111111";
+  let message = `external effect may have occurred; inspect provider operation ${operationId}; outcome could not be recorded`;
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => url === "/v1/auth/me"
+    ? new Response(JSON.stringify({ mode: "multi_user", read_only: false, principal: { id: "admin" } }), { status: 200 })
+    : new Response(JSON.stringify({ error: message, diagnostic: { raw_error: "private provider detail" } }), { status: 503 })));
+  const { onboardingRequest } = await import("../../api");
+  await expect(onboardingRequest("/users/invite", {})).rejects.toMatchObject({ operationId, message: expect.stringContaining(operationId) });
+  message = "external effect may have occurred; inspect provider operation invalid-id; outcome could not be recorded private provider detail";
+  await expect(onboardingRequest("/users/invite", {})).rejects.toMatchObject({ operationId: null });
+  try { await onboardingRequest("/users/invite", {}); } catch (error) {
+    expect((error as Error).message).toContain("duplicate an external effect");
+    expect((error as Error).message).not.toContain("invalid-id");
+    expect((error as Error).message).not.toContain("private provider detail");
+  }
+});
