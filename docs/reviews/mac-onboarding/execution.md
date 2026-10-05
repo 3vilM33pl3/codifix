@@ -30,11 +30,11 @@ and embedding work are disabled.
 | Contract checkpoint | Complete | Memory IDs above; contract committed. |
 | Sol/Astra project defaults | Complete | Two TOML files parse successfully; bounded read-only adviser and updated repo guidance. |
 | Local company administration backend | Implemented and focused tests passed | Commits `5140b5d1`, `2fb2a3f2`; 36 auth tests on a separate disposable PostgreSQL database, including six onboarding tests; OpenAPI inventory test, formatting and diff checks. Live provider RBAC and company-wide authority remain unverified. |
-| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices alongside existing memberships/tokens; 170 Web tests and production build passed. This is a development UI, not a deployed company console. |
+| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices alongside existing memberships/tokens; latest full run: 183 Web tests and production build passed. This is a development UI, not a deployed company console. |
 | Unified cross-area administration | Pending | Explicit remote authority and partial-failure handling; a local catalog cannot grant access in another database. |
-| Device login and selection | In progress | Exact browser review, bounded per-device approval and current-human authority checks; CLI/Web/TUI and native Keychain acceptance remain unfinished. |
+| Device login and selection | Backend, CLI and browser approval implemented | `9f439c27`, `6ac5b994`, `121fab3b`; 44 required-database auth tests and 15 CLI tests passed. Native Keychain execution and TUI selection remain unfinished. |
 | Selective snapshots/offline search | Pending | Project-scoped authorization before bytes leave the server; verified publication data only. |
-| Installer and tool/repository setup | Pending | Journaled, pinned, non-destructive native Mac workflow. |
+| Installer and tool/repository setup | In progress | `9dabaca8` fixes package architecture validation and missing-only user seeding; 13 offline packaging tests passed. Journaled repository/tools preparation and native area provisioning remain unfinished. |
 | Real macOS acceptance | Pending | Requires native execution; Linux builds/tests are not evidence of this. |
 
 ## Invariants under review
@@ -82,6 +82,34 @@ area/project/owner identity. A changed manifest requires renewed review. The
 server never releases a new bearer secret through polling: the client prepares
 its random credential locally and enrollment approves its hash. This is an
 implementation contract, not evidence that native Keychain login already works.
+
+### Combined service/client smoke test
+
+The source-built CLI with embedded PostgreSQL service and TUI features passed a
+real HTTP smoke test against the isolated dev database. Anonymous administration
+was denied; authenticated metadata had `Cache-Control: no-store`; stable-subject
+registration, effective reader access and catalog revision 1 worked; disabling
+the synthetic human removed effective permissions. Single-user/local-owner
+credentials could neither start production device enrollment nor approve a
+device. The fake OIDC issuer and repository URLs are `.example.invalid`; no live
+identity-provider call, clone, paid call or existing-service change occurred.
+
+Browser checks of the real built UI confirmed that a non-OIDC local owner sees
+an explicit sign-in requirement and a disabled device-review action. The public
+return path contains only the user code, not a polling or credential secret.
+No browser console errors were observed. This verifies denial behavior, not a
+positive Authentik login or Mac Keychain execution.
+
+The package build script now requires Darwin/tooling and an exact native
+architecture/target match, uses locked dependency resolution and private staging,
+and bundles exact read-only Codex templates. Postinstall has no service restart
+or recursive ownership change; existing configurations, read-only files and
+symlinks are preserved. No `.pkg` was built or installed on a Mac here.
+
+Strict focused Clippy currently encounters the existing Rust 1.99
+`async_trait`-generated `double_must_use` lint in `mem-search` and `mem-reinforce`.
+This is not recorded as a passed strict Clippy run. New scoped-delivery and
+company-delegation code still requires its own focused validation.
 
 ## Completion status
 
