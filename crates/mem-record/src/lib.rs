@@ -6,6 +6,7 @@
 pub mod admin;
 pub mod bundle;
 pub mod capture;
+pub mod company_catalog;
 pub mod company_delegate;
 pub mod company_delivery_delegate;
 pub mod company_device_delivery;
@@ -32,6 +33,7 @@ pub mod watcher;
 pub use admin::*;
 pub use bundle::*;
 pub use capture::*;
+pub use company_catalog::*;
 pub use company_delegate::*;
 pub use company_delivery_delegate::*;
 pub use company_device_delivery::*;
