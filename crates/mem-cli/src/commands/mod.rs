@@ -6,6 +6,7 @@ pub(crate) mod api;
 mod archive;
 mod area;
 mod auth;
+mod auth_enrollment;
 mod bundle;
 mod capture;
 mod checkpoint;

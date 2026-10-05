@@ -214,11 +214,16 @@ See also:
 
 const AUTH_GROUP_AFTER_HELP: &str = "\
 Agent notes:
+  Company Mac onboarding uses auth login/logout and projects available with an explicit --company origin.
+  Device credentials and pending-request secrets stay in macOS Keychain; company commands bypass local-owner config.
   Browser users sign in through Authentik. CLI, TUI, watcher, and MCP clients use service tokens.
   Set MEMORY_LAYER_CLIENT_TOKEN to the issued token; it takes precedence over service.api_token.
   Newly created token secrets are printed once and are never stored in Memory Layer config.
 
 Examples:
+  memory auth login --company https://memory.example.com --name Work-Mac --no-browser
+  memory projects available --company https://memory.example.com
+  memory auth logout --company https://memory.example.com
   memory auth whoami --json
   memory auth token create --name hermes --project memory --role writer --ttl 30d
   memory auth token list
@@ -1405,6 +1410,8 @@ pub(in crate::commands) enum Command {
     Service(ServiceArgs),
     #[command(about = "Inspect identity and administer scoped service access.", after_help = AUTH_GROUP_AFTER_HELP)]
     Auth(AuthArgs),
+    /// Inspect currently approved company projects using a Keychain device credential.
+    Projects(crate::commands::auth_enrollment::ProjectsArgs),
     #[command(
         about = "Review and exchange selected knowledge through a private federation space.",
         after_help = "Examples:\n  memory federation --project example discover\n  memory federation --project example status\n  memory federation --project example tui\n\nAgent notes:\nDocs: docs/user/cli/federation.md\nPublication is explicit. Queued is not accepted. Delivered copies cannot be recalled."
@@ -1467,6 +1474,10 @@ pub(in crate::commands) struct AuthArgs {
 
 #[derive(Debug, Subcommand)]
 pub(in crate::commands) enum AuthCommand {
+    /// Enroll a device through human browser approval; secrets stay in macOS Keychain.
+    Login(crate::commands::auth_enrollment::LoginArgs),
+    /// Revoke the enrolled device, then remove its Keychain credential.
+    Logout(crate::commands::auth_enrollment::LogoutArgs),
     /// Preview a restricted internal expertise answerer; --confirm provisions it.
     #[command(
         after_help = "Agent notes:\nPreview is offline. Inspect project, name and stable request/principal IDs before --confirm. Requires global system_admin. Creates only local read/export access, never login credentials, federation membership, collection consent or model authority. Exact retries cannot restore revoked access."
@@ -3619,6 +3630,11 @@ pub(super) async fn run() -> Result<()> {
         writer_id: cli_writer_id,
         command,
     } = Cli::from_arg_matches(&matches)?;
+    // Company enrollment never loads local configuration, area routing or the
+    // default API client: those may carry unrelated owner/service credentials.
+    if crate::commands::auth_enrollment::handle_command(&command).await? {
+        return Ok(());
+    }
     let cwd = env::current_dir().context("read routing working directory")?;
     let repository = if let Some(path) = repository_arg {
         Some(
@@ -3717,6 +3733,7 @@ pub(super) async fn run() -> Result<()> {
         }) => unreachable!("service run is handled before config loading"),
         Command::Service(_) => unreachable!("service management is handled before config loading"),
         Command::Auth(args) => crate::commands::auth::handle(args, client, config).await?,
+        Command::Projects(_) => unreachable!("company projects are handled before config loading"),
         Command::Federation(args) => {
             crate::commands::federation::handle(args, client, config).await?
         }

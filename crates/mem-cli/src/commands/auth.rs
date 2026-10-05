@@ -17,6 +17,9 @@ use crate::commands::{
 
 pub(super) async fn handle(args: AuthArgs, client: Client, config: AppConfig) -> Result<()> {
     match args.command {
+        AuthCommand::Login(_) | AuthCommand::Logout(_) => {
+            anyhow::bail!("company enrollment must use its isolated client before config loading");
+        }
         AuthCommand::ExpertiseAnswerer(args) => {
             let request = ExpertiseAnswererRequest {
                 request_id: args.request_id,
