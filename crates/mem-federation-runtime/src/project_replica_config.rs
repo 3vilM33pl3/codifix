@@ -7,6 +7,14 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use uuid::Uuid;
 
+/// The company/owner review contract uses RFC 8785, not struct field order.
+/// Native clients must bind that same digest without leaking wire types into CLI.
+pub fn onboarding_manifest_digest(manifest: &mem_record::OnboardingProject) -> Result<String> {
+    mem_federation::CanonicalJsonCodec::digest(manifest)
+        .map(|digest| digest.as_hex().to_owned())
+        .map_err(|_| RuntimeError::Configuration)
+}
+
 /// Confirmed control-plane metadata passed to the native provisioner; no local
 /// or server database credentials. The provisioner adds its own loopback URL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

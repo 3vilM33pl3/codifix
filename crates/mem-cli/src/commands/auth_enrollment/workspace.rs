@@ -434,6 +434,15 @@ pub(super) fn status(args: &StatusArgs) -> Result<()> {
     println!("Local metadata only; current company authorization was not checked.");
     Ok(())
 }
+#[cfg(feature = "project-sync")]
+pub(super) fn agent_manifest(path: &std::path::Path) -> Result<(String, Uuid, OnboardingProject)> {
+    let journal = filesystem::read(&filesystem::absolute_leaf(path)?)?;
+    Ok((
+        journal.plan.company,
+        journal.plan.device_id,
+        journal.plan.manifest,
+    ))
+}
 fn print_preview(journal: &Journal) -> Result<()> {
     println!("{}", serde_json::to_string_pretty(journal)?);
     println!(

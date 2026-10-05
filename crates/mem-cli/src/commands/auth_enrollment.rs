@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Company device enrollment is isolated from local-owner configuration.
+mod agents;
 mod credentials;
 mod project_picker;
 mod replica;
@@ -57,6 +58,8 @@ pub(super) struct ProjectsArgs {
 }
 #[derive(Debug, Subcommand)]
 pub(super) enum ProjectsCommand {
+    /// Prepare independent, browser-approved Codex/Claude disclosure identities.
+    Agents(agents::AgentArgs),
     /// List reviewed projects currently available to this enrolled device.
     Available(CompanyArgs),
     /// Interactively review one approved project and prepare metadata only.
@@ -139,6 +142,7 @@ pub(super) async fn handle_command(command: &Command) -> Result<bool> {
             _ => return Ok(false),
         },
         Command::Projects(args) => match &args.command {
+            ProjectsCommand::Agents(args) => agents::handle(args).await?,
             ProjectsCommand::Available(args) => {
                 available(args, &store).await?;
             }

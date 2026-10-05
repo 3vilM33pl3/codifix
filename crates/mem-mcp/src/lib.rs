@@ -35,6 +35,7 @@ use rmcp::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 mod expertise;
+pub mod laptop;
 
 pub const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 
