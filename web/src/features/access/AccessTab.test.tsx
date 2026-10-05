@@ -11,6 +11,8 @@ import {
 } from "../../api";
 
 vi.mock("../../api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api")>()),
+  getAuthMe: vi.fn().mockRejectedValue(new Error("No human session")),
   OnboardingRequestError: (await importOriginal<typeof import("../../api")>()).OnboardingRequestError,
   createAuthToken: vi.fn(),
   grantAuthMembership: vi.fn(),

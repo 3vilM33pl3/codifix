@@ -26,10 +26,17 @@ const SERVICE_ROLES: AuthRole[] = ["reader", "writer", "operator"];
 interface AccessTabProps {
   project: string;
   readOnly?: boolean;
+  administrationAllowed?: boolean;
+  initialAgentRequest?: string;
 }
 
-export function AccessTab({ project, readOnly = false }: AccessTabProps) {
-  const [view, setView] = useState<"users" | "projects" | "devices" | "company">("users");
+export function AccessTab({ project, readOnly = false, administrationAllowed = true, initialAgentRequest }: AccessTabProps) {
+  if (!administrationAllowed) return <main className="panel-stack access-tab"><section className="panel"><h2>Own device access</h2><p>Exact parent human agent approval and historical receipts only. No global administration access is granted.</p></section><DevicesPanel readOnly={readOnly} administrationAllowed={false} initialAgentRequest={initialAgentRequest} /></main>;
+  return <AdminAccessTab project={project} readOnly={readOnly} initialAgentRequest={initialAgentRequest} />;
+}
+
+function AdminAccessTab({ project, readOnly = false, initialAgentRequest }: AccessTabProps) {
+  const [view, setView] = useState<"users" | "projects" | "devices" | "company">(initialAgentRequest ? "devices" : "users");
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [accessVersion, setAccessVersion] = useState(0);
   const refreshLegacy = useCallback(() => setRefreshVersion((value) => value + 1), []);
@@ -49,7 +56,7 @@ export function AccessTab({ project, readOnly = false }: AccessTabProps) {
       <LegacyAccessControls project={project} readOnly={readOnly} refreshVersion={refreshVersion} onMembershipChanged={refreshUserAccess} />
     </div>
     {view === "projects" ? <ProjectsPanel readOnly={readOnly} /> : null}
-    {view === "devices" ? <DevicesPanel readOnly={readOnly} /> : null}
+    {view === "devices" ? <DevicesPanel readOnly={readOnly} initialAgentRequest={initialAgentRequest} /> : null}
     {view === "company" ? <CompanyPanel readOnly={readOnly} /> : null}
   </main>;
 }

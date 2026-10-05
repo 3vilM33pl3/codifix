@@ -19,6 +19,7 @@ import { ResumeTab } from "./features/resume/ResumeTab";
 import { WatchersTab } from "./features/watchers/WatchersTab";
 import { SkillsTab } from "./features/skills/SkillsTab";
 import { AccessTab } from "./features/access/AccessTab";
+import { consumeAgentRequestLink } from "./features/access/agentRequestLink";
 import { FederationTab } from "./features/federation/FederationTab";
 import { JobsTab } from "./features/jobs/JobsTab";
 import { SupervisorTab } from "./features/supervisor/SupervisorTab";
@@ -31,13 +32,14 @@ import type { AuthMeResponse } from "./types";
 const GraphTab = lazy(() => import("./features/graph/GraphTab").then((module) => ({ default: module.GraphTab })));
 
 export default function App() {
+  const [agentLink] = useState(() => consumeAgentRequestLink(window.location, window.history));
   const query = new URLSearchParams(window.location.search);
   const deviceCode = query.get("device_code");
   const mode = query.has("company_device") ? query.get("company_device") === "1" ? "company" : "invalid" : "local";
-  return deviceCode === null ? <MemoryApp /> : <DeviceApprovalPage initialCode={deviceCode} initialMode={mode} />;
+  return deviceCode === null ? <MemoryApp agentLink={agentLink} /> : <DeviceApprovalPage initialCode={deviceCode} initialMode={mode} />;
 }
 
-function MemoryApp() {
+function MemoryApp({ agentLink }: { agentLink: { request?: string; notice?: string } }) {
   const {
     tab,
     setTab,
@@ -211,6 +213,9 @@ function MemoryApp() {
   const [serviceReadOnly, setServiceReadOnly] = useState(false);
   const [authMe, setAuthMe] = useState<AuthMeResponse | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
+  useEffect(() => {
+    if (agentLink.request && authMe?.authenticated && authMe.principal.kind === "human_oidc") setTab("access");
+  }, [agentLink.request, authMe?.authenticated, authMe?.principal.id, authMe?.principal.kind, setTab]);
   const runtimeServiceVersion = runtimeStatus?.service.version ?? serviceVersion;
   const isDevelopmentMode = runtimeServiceVersion.endsWith("-dev");
   useEffect(() => {
@@ -234,12 +239,13 @@ function MemoryApp() {
     ? authMe.principal.global_permissions.includes("system_admin")
     : authMe?.principal.global_role === "admin";
   const visibleMoreTabs: readonly (typeof MORE_TABS)[number][] =
-    canAdminister
+    canAdminister || authMe?.authenticated && authMe.principal.kind === "human_oidc"
       ? MORE_TABS
       : MORE_TABS.filter((name) => name !== "access");
 
   return (
     <div className="app-shell">
+      {agentLink.notice ? <div className="panel" role="status">{agentLink.notice}</div> : null}
       {serviceReadOnly && (
         <div className="read-only-banner" role="status">
           Student mode — this Memory Layer is read-only. Explore and query freely; nothing you do
@@ -567,8 +573,8 @@ function MemoryApp() {
           onApplyImport={() => void handleApplyImport()}
         />
       ) : null}
-      {tab === "access" && canAdminister ? (
-        <AccessTab project={project} readOnly={serviceReadOnly} />
+      {tab === "access" && (canAdminister || authMe?.authenticated && authMe.principal.kind === "human_oidc") ? (
+        <AccessTab key={authMe?.principal.id ?? "signed-out"} project={project} readOnly={serviceReadOnly} administrationAllowed={canAdminister} initialAgentRequest={agentLink.request} />
       ) : null}
       {tab === "federation" ? <FederationTab project={project} /> : null}
       {tab === "jobs" ? <JobsTab project={project} readOnly={serviceReadOnly} /> : null}

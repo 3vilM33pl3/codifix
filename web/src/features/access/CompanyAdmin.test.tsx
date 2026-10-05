@@ -7,7 +7,7 @@ import { DevicesPanel } from "./DevicesPanel";
 import { ProviderOperationsPanel } from "./ProviderOperationsPanel";
 import type { EffectiveUserAccess, ManagedDevice, ManagedUser, OnboardingManifest } from "./types";
 
-vi.mock("../../api", async (importOriginal) => ({ onboardingRequest: vi.fn(), OnboardingRequestError: (await importOriginal<typeof import("../../api")>()).OnboardingRequestError }));
+vi.mock("../../api", async (importOriginal) => ({ ...(await importOriginal<typeof import("../../api")>()), getAuthMe: vi.fn().mockResolvedValue({ authenticated: true, mode: "multi_user", read_only: false, principal: { id: "human", kind: "human_oidc", display_name: "Parent" } }), onboardingRequest: vi.fn() }));
 afterEach(cleanup);
 beforeEach(() => { vi.mocked(onboardingRequest).mockReset(); });
 const user: ManagedUser = {

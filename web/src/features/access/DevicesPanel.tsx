@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { onboardingRequest } from "../../api";
 import type { ManagedDevice } from "./types";
+import { CompanyAgentsPanel } from "./CompanyAgentsPanel";
 
-export function DevicesPanel({ readOnly }: { readOnly: boolean }) {
+export function DevicesPanel({ readOnly, administrationAllowed = true, initialAgentRequest }: { readOnly: boolean; administrationAllowed?: boolean; initialAgentRequest?: string }) {
+  return <div className="panel-stack"><CompanyAgentsPanel readOnly={readOnly} initialRequest={initialAgentRequest} />
+    {administrationAllowed ? <AdminDevicesPanel readOnly={readOnly} /> : <section className="panel"><h3>Own device access</h3><p>Import the public native envelope to inspect only its exact owned device. Global administration inventories and unrelated device controls are unavailable here.</p></section>}
+  </div>;
+}
+
+function AdminDevicesPanel({ readOnly }: { readOnly: boolean }) {
   const [devices, setDevices] = useState<ManagedDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
