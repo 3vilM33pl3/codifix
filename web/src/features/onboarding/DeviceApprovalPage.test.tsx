@@ -119,6 +119,18 @@ describe("human device approval", () => {
     expect(approveDevice).not.toHaveBeenCalled();
   });
 
+  it("requires a new review when another valid human replaces the reviewing identity", async () => {
+    await inspect(); await confirmSelection();
+    vi.mocked(getAuthMe).mockResolvedValue({ ...human, principal: { ...human.principal, id: "another-human", display_name: "Grace" } });
+    fireEvent.click(screen.getByRole("button", { name: "Approve selected device access" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Human identity changed after review");
+    expect(approveDevice).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Exact device approval")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Device identity" })).toBeNull();
+    expect(screen.getByText("Approving as Grace.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review device request" })).toBeEnabled();
+  });
+
   it("rejects a receipt bound to another owner instance", async () => {
     vi.mocked(approveDevice).mockResolvedValue({ status: "approved", device_id: review.device_id, principal_id: "machine-id",
       projects: [{ role: "reader", manifest: { ...review.projects[0].manifest, owner_instance_id: "different-owner" } }] });

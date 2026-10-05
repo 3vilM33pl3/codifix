@@ -17,6 +17,7 @@ export function DeviceApprovalPage({ initialCode }: { initialCode: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState<DeviceReview | null>(null);
+  const [reviewIdentityId, setReviewIdentityId] = useState<string | null>(null);
   const [roles, setRoles] = useState<Record<string, DeviceProjectRole>>({});
   const [confirmation, setConfirmation] = useState<DeviceApprovalSelection[] | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -41,7 +42,7 @@ export function DeviceApprovalPage({ initialCode }: { initialCode: string }) {
 
   async function loadReview() {
     if (!canReview || !validCode || busy || readOnly) return;
-    setLoading(true); setError(null); setReview(null); setRoles({}); setConfirmation(null); setConfirmed(false); setReceipt(null);
+    setLoading(true); setError(null); setReview(null); setReviewIdentityId(null); setRoles({}); setConfirmation(null); setConfirmed(false); setReceipt(null);
     try {
       const currentAuth = await getAuthMe(true);
       setAuth(currentAuth);
@@ -49,7 +50,7 @@ export function DeviceApprovalPage({ initialCode }: { initialCode: string }) {
       const next = await deviceReview(code);
       if (next.user_code !== code || !/^[0-9a-f]{64}$/i.test(next.credential_sha256)) throw new Error("Device review identity or fingerprint mismatch. Check the requesting device and start again.");
       if (next.projects.some(({ allowed_roles }) => allowed_roles.some((role) => role !== "reader" && role !== "writer"))) throw new Error("Device review contains an unsupported project role. Review current project access before proceeding.");
-      setReview(next); setNow(Date.now());
+      setReview(next); setReviewIdentityId(currentAuth.principal.id); setNow(Date.now());
     } catch (nextError) { setError((nextError as Error).message); }
     finally { setLoading(false); }
   }
@@ -71,6 +72,10 @@ export function DeviceApprovalPage({ initialCode }: { initialCode: string }) {
       const currentAuth = await getAuthMe(true);
       setAuth(currentAuth);
       if (!humanSession(currentAuth) || currentAuth.read_only) throw new Error("A writable OIDC human browser session is required. Review this request after signing in.");
+      if (currentAuth.principal.id !== reviewIdentityId) {
+        setReview(null); setReviewIdentityId(null); setRoles({}); setConfirmation(null);
+        throw new Error("Human identity changed after review. Review the device and select access again as the current human before approval.");
+      }
       const result = await approveDevice({ user_code: review.user_code, projects: confirmation, confirmed: true });
       if (result.status === "expired") throw new Error("Device request expired. Start a new request on the device.");
       if (result.status === "denied") throw new Error("Device request denied. Review your current human session and project membership.");
@@ -95,7 +100,7 @@ export function DeviceApprovalPage({ initialCode }: { initialCode: string }) {
           : <><p>Approval requires an OIDC human browser session. Local-owner sessions and service credentials cannot approve devices.</p><a className="button-link" href={authLoginUrl(returnTo)}>Sign in to review this device</a></>}
         {canReview && readOnly ? <p role="status">This service is read-only. Device approvals are disabled.</p> : null}
         <label>User code<input autoComplete="off" maxLength={9} value={code} disabled={busy || loading || Boolean(confirmation)} onChange={(event) => {
-          setCode(event.target.value.toUpperCase()); setReview(null); setRoles({}); setReceipt(null); setError(null);
+          setCode(event.target.value.toUpperCase()); setReview(null); setReviewIdentityId(null); setRoles({}); setReceipt(null); setError(null);
         }} /></label>
         <button type="button" disabled={!canReview || readOnly || !validCode || busy || loading} onClick={() => void loadReview()}>Review device request</button>
       </section>
