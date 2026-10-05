@@ -1,10 +1,12 @@
 """Explicit native command boundary. Tests inject a fake; CLI has no bypass."""
 import os
+import json
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
-from onboarding_files import Refused, sha
+from onboarding_files import Refused, read, sha
 
 
 def clean_env():
@@ -27,7 +29,7 @@ class Native:
         return result.returncode, result.stdout.decode("utf-8", errors="strict").strip()
 
     def preflight(self, plan):
-        if sys.platform != "darwin" or os.getuid() == 0:
+        if sys.platform != "darwin" or os.getuid() == 0 or os.geteuid() != os.getuid():
             raise Refused("native provisioning requires Darwin, a non-root logged-in user and Python 3.11+; no native effects")
         if sys.version_info < (3, 11):
             raise Refused("explicit Python 3.11+ prerequisite unavailable; installer is not self-contained")
@@ -60,14 +62,58 @@ class Native:
                     "--company", value["company"], "--project", scope["project"],
                     "--area", scope["area"], "--owner-instance", scope["owner"],
                     "--revision", str(value["bootstrap"]["catalog_revision"]),
-                    "--output", selected["path"], "--confirm"]
+                    "--output", selected["path"]]
             if value.get("allow_loopback_development"):
                 args.append("--allow-loopback")
-            self.command(args)
+            _, output = self.command(args)
+            try:
+                preview = json.loads(output)
+            except (ValueError, TypeError):
+                raise Refused("subscription preview unreadable; output suppressed, no confirmation") from None
+            expected = {"company", "bootstrap", "bootstrap_sha256", "output",
+                        "contains_database_credentials", "creates_services", "downloads_knowledge"}
+            if not isinstance(preview, dict) or set(preview) != expected or preview["company"] != value["company"] or preview["bootstrap"] != value["bootstrap"] or preview["output"] != selected["path"] or any(preview[key] is not False for key in ["contains_database_credentials", "creates_services", "downloads_knowledge"]) or not isinstance(preview["bootstrap_sha256"], str) or not re.fullmatch("[a-f0-9]{64}", preview["bootstrap_sha256"]):
+                raise Refused("current subscription preview differs from exact prepared metadata; no confirmation")
+            # Use only the CLI's current preview digest. Do not reconstruct a
+            # different serialization/hash contract inside the installer.
+            self.command([*args, "--bootstrap-sha256", preview["bootstrap_sha256"], "--confirm"])
+            if read(selected["path"], 64 * 1024) != value:
+                raise Refused("subscription replay identity changed; no local provisioning")
 
     def loaded(self, label):
         code, _ = self.command(["/bin/launchctl", "print", f"gui/{os.getuid()}/{label}"], allowed=(0, 113))
         return code == 0
+
+    def available(self, port):
+        import socket
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.bind(("127.0.0.1", port))
+        except OSError:
+            raise Refused("selected loopback port is occupied; no unrelated process is stopped") from None
+
+    def health(self, area):
+        import http.client
+        import json
+        import time
+        for _ in range(20):
+            connection = http.client.HTTPConnection("127.0.0.1", area["api_port"], timeout=1)
+            try:
+                connection.request("GET", "/healthz")
+                response = connection.getresponse()
+                body = response.read(65537)
+                if response.status == 200 and len(body) <= 65536:
+                    value = json.loads(body)
+                    # instance_id is a random boot ID in the existing service;
+                    # service_id is the explicitly configured durable local tag.
+                    if isinstance(value, dict) and value.get("status") == "ok" and value.get("database") == "up" and value.get("role") == "primary" and value.get("service_id") == "memory-onboarding-" + area["instance_id"]:
+                        return
+            except (OSError, ValueError, http.client.HTTPException):
+                pass
+            finally:
+                connection.close()
+            time.sleep(1)
+        raise Refused("exact named local area identity/health not verified; no fallback")
 
     def bootstrap(self, plist):
         self.command(["/bin/launchctl", "bootstrap", f"gui/{os.getuid()}", plist])
