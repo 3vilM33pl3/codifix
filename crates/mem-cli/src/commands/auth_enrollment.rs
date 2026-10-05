@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Company device enrollment is isolated from local-owner configuration.
 mod credentials;
+mod replica;
 #[cfg(test)]
 mod tests;
 mod transport;
@@ -63,6 +64,12 @@ pub(super) enum ProjectsCommand {
     Apply(workspace::ApplyArgs),
     /// Inspect local preparation stages (does not assert current remote access).
     Status(workspace::StatusArgs),
+    /// Apply approved, attested pages to a separate local read-only projection.
+    Sync(replica::SyncArgs),
+    /// Show committed cursor/freshness without claiming current remote authority.
+    SyncStatus(replica::SyncStatusArgs),
+    /// Search only the selected project's cached, cited read-only projection.
+    OfflineSearch(replica::OfflineSearchArgs),
 }
 
 #[derive(Clone)]
@@ -133,6 +140,9 @@ pub(super) async fn handle_command(command: &Command) -> Result<bool> {
             ProjectsCommand::Prepare(args) => workspace::prepare(args, &store).await?,
             ProjectsCommand::Apply(args) => workspace::apply(args, &store).await?,
             ProjectsCommand::Status(args) => workspace::status(args)?,
+            ProjectsCommand::Sync(args) => replica::sync(args).await?,
+            ProjectsCommand::SyncStatus(args) => replica::status(args).await?,
+            ProjectsCommand::OfflineSearch(args) => replica::search(args).await?,
         },
         _ => return Ok(false),
     }

@@ -1,0 +1,356 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Explicit local subscriptions. Lean clients report a missing capability, not
+//! a successful sync. Production credentials remain in macOS Keychain.
+use anyhow::Result;
+use clap::Args;
+use std::path::PathBuf;
+
+#[derive(Debug, Args)]
+pub(in crate::commands) struct SyncArgs {
+    /// Private JSON profile prepared by the native laptop onboarding operator.
+    #[arg(long)]
+    profile: PathBuf,
+    /// Stay online: sync at startup and every five minutes; Ctrl-C stops work.
+    #[arg(long)]
+    watch: bool,
+}
+#[derive(Debug, Args)]
+pub(in crate::commands) struct SyncStatusArgs {
+    #[arg(long)]
+    profile: PathBuf,
+}
+#[derive(Debug, Args)]
+pub(in crate::commands) struct OfflineSearchArgs {
+    #[arg(long)]
+    profile: PathBuf,
+    #[arg(long)]
+    question: String,
+    #[arg(long, default_value_t = 8)]
+    limit: u32,
+}
+pub(super) async fn sync(args: &SyncArgs) -> Result<()> {
+    #[cfg(feature = "project-sync")]
+    {
+        native::sync(args, &super::credentials::NativeKeychain).await
+    }
+    #[cfg(not(feature = "project-sync"))]
+    {
+        let _ = args;
+        anyhow::bail!(
+            "this build has no project-sync support; install the native full Memory package"
+        )
+    }
+}
+pub(super) async fn status(args: &SyncStatusArgs) -> Result<()> {
+    #[cfg(feature = "project-sync")]
+    {
+        native::status(args).await
+    }
+    #[cfg(not(feature = "project-sync"))]
+    {
+        let _ = args;
+        anyhow::bail!("this build has no project-sync support")
+    }
+}
+pub(super) async fn search(args: &OfflineSearchArgs) -> Result<()> {
+    #[cfg(feature = "project-sync")]
+    {
+        native::search(args).await
+    }
+    #[cfg(not(feature = "project-sync"))]
+    {
+        let _ = args;
+        anyhow::bail!("this build has no project-sync support")
+    }
+}
+
+#[cfg(feature = "project-sync")]
+mod native {
+    use super::*;
+    use crate::commands::auth_enrollment::{
+        CompanyOrigin,
+        credentials::{self, CredentialStore, Enrollment},
+        transport::CompanyClient,
+    };
+    use anyhow::bail;
+    use mem_federation_runtime::{
+        Endpoint, LocalProjectReplicaProfile, ProjectReplica, ProjectSyncHealth, ScopedDeviceClient,
+    };
+    use mem_record::OnboardingDeviceReviewProject;
+
+    async fn replica(
+        profile: &LocalProjectReplicaProfile,
+        initialize: bool,
+    ) -> Result<ProjectReplica> {
+        profile.validate()?;
+        let pool=sqlx::postgres::PgPoolOptions::new().max_connections(3)
+            .acquire_timeout(std::time::Duration::from_secs(5))
+            .connect(&profile.local_database_url).await
+            .map_err(|_|anyhow::anyhow!("dedicated loopback laptop database unavailable; no area fallback or migration performed"))?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT to_regclass('onboarding_project_projections') IS NOT NULL")
+                .fetch_one(&pool)
+                .await
+                .map_err(|_| anyhow::anyhow!("local projection schema could not be verified"))?;
+        if !exists {
+            bail!(
+                "the laptop database is not provisioned for selective sync; run the native installer first"
+            );
+        }
+        let binding = profile.bootstrap.binding(profile.subscription);
+        let trust = profile.bootstrap.validate()?;
+        if initialize {
+            Ok(ProjectReplica::initialize(pool, binding, trust).await?)
+        } else {
+            ProjectReplica::open(pool, binding, trust).await.map_err(|_|anyhow::anyhow!("local subscription not initialized or binding changed; inspect the profile and run the first explicit sync"))
+        }
+    }
+    fn current_project(
+        profile: &LocalProjectReplicaProfile,
+        enrollment: &Enrollment,
+        projects: &[OnboardingDeviceReviewProject],
+    ) -> Result<()> {
+        if !enrollment.approved
+            || enrollment.pending_logout
+            || enrollment.device_id != profile.bootstrap.device
+        {
+            bail!(
+                "approved Keychain device does not match this subscription; no network transfer permitted"
+            );
+        }
+        let matching: Vec<_> = projects
+            .iter()
+            .filter(|p| {
+                p.manifest.project_id == profile.bootstrap.scope.project
+                    && p.manifest.entry.area.as_str() == profile.bootstrap.scope.area
+                    && p.manifest.entry.owner_instance_id == profile.bootstrap.scope.owner.as_uuid()
+            })
+            .collect();
+        if matching.len() != 1
+            || !matching[0].offline_available
+            || !matching[0].manifest.entry.offline_allowed
+            || u64::try_from(matching[0].manifest.revision).ok()
+                != Some(profile.bootstrap.catalog_revision)
+        {
+            bail!(
+                "project's current approved offline scope differs; refresh the reviewed subscription before retrying"
+            );
+        }
+        Ok(())
+    }
+    fn current_bootstrap(
+        profile: &LocalProjectReplicaProfile,
+        current: &mem_federation_runtime::DeviceProjectSubscription,
+    ) -> Result<()> {
+        current.validate()?;
+        if current != &profile.bootstrap {
+            bail!(
+                "subscription authority, review or receipt keys changed; explicit profile renewal required"
+            );
+        }
+        Ok(())
+    }
+    pub(super) async fn sync(args: &SyncArgs, store: &impl CredentialStore) -> Result<()> {
+        let profile = LocalProjectReplicaProfile::read(&args.profile)?;
+        let origin = CompanyOrigin::parse(&profile.company, profile.allow_loopback_development)?;
+        let enrollment = credentials::load(store, &origin)?
+            .ok_or_else(|| anyhow::anyhow!("run memory auth login for this company first"))?;
+        // Reject a wrong/unapproved local device before even inventory/bootstrap.
+        if enrollment.device_id != profile.bootstrap.device
+            || !enrollment.approved
+            || enrollment.pending_logout
+        {
+            bail!("Keychain device does not match this approved subscription");
+        }
+        let company = CompanyClient::new(origin.clone())?;
+        let projects = company.projects(&enrollment).await?;
+        current_project(&profile, &enrollment, &projects.projects)?;
+        let current = company
+            .subscription(&enrollment, profile.bootstrap.scope.project)
+            .await?;
+        current_bootstrap(&profile, &current)?;
+        let replica = replica(&profile, true).await?;
+        let client = ScopedDeviceClient::new(
+            Endpoint::new(&origin.0, profile.allow_loopback_development)?,
+            enrollment.credential,
+        )?;
+        if !args.watch {
+            let progress = replica.synchronize(&client, 128).await?;
+            println!("{}", serde_json::to_string_pretty(&progress)?);
+            return Ok(());
+        }
+        let (stop, stopping) = tokio::sync::watch::channel(false);
+        let (health, mut observed) = tokio::sync::watch::channel(ProjectSyncHealth::Unknown);
+        let wake = tokio::sync::Notify::new();
+        let worker = replica.watch(&client, stopping, &wake, health);
+        tokio::pin!(worker);
+        loop {
+            tokio::select! {
+                _=&mut worker=>return Ok(()),
+                changed=observed.changed()=>{
+                    if changed.is_ok() {
+                        let health=observed.borrow_and_update().clone();
+                        println!("{}",serde_json::to_string(&health)?);
+                    }
+                },
+                signal=tokio::signal::ctrl_c()=>{
+                    signal.map_err(|_|anyhow::anyhow!("could not receive shutdown signal"))?;
+                    stop.send_replace(true);
+                    worker.await;
+                    return Ok(());
+                }
+            }
+        }
+    }
+    pub(super) async fn status(args: &SyncStatusArgs) -> Result<()> {
+        let profile = LocalProjectReplicaProfile::read(&args.profile)?;
+        let status = replica(&profile, false).await?.status().await?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "area":profile.bootstrap.scope.area,"project":profile.bootstrap.scope.project,
+                "owner":profile.bootstrap.scope.owner,"subscription":profile.subscription,
+                "cursor":status.cursor,"last_committed_page":status.observed_at,
+                "current_remote_access":"unknown_offline_observation_only",
+                "stale":status.observed_at.is_none_or(|t|chrono::Utc::now()-t>chrono::Duration::minutes(5))
+            }))?
+        );
+        Ok(())
+    }
+    pub(super) async fn search(args: &OfflineSearchArgs) -> Result<()> {
+        if args.question.trim().is_empty()
+            || args.question.len() > 4096
+            || !(1..=32).contains(&args.limit)
+        {
+            bail!("offline search requires a nonempty question up to4096 bytes and limit1..32");
+        }
+        let profile = LocalProjectReplicaProfile::read(&args.profile)?;
+        let results = replica(&profile, false)
+            .await?
+            .search(&args.question, args.limit)
+            .await?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "read_only":true,"remote_authority_currently_verified":false,
+                "area":profile.bootstrap.scope.area,"project":profile.bootstrap.scope.project,"results":results
+            }))?
+        );
+        Ok(())
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use mem_record::{AuthRole, OnboardingArea, OnboardingProject, OnboardingProjectEntry};
+        use uuid::Uuid;
+        fn fixture() -> (
+            LocalProjectReplicaProfile,
+            Enrollment,
+            OnboardingDeviceReviewProject,
+        ) {
+            let security =
+                mem_federation_runtime::GatewaySecurity::initial(&[21; 32], Default::default())
+                    .unwrap();
+            let device = Uuid::new_v4();
+            let project = Uuid::new_v4();
+            let owner = Uuid::new_v4();
+            let bootstrap=serde_json::from_value(serde_json::json!({"schema_version":1,"device":device,"catalog_revision":1,
+                "authority":Uuid::new_v4(),"receipt_keys":security.trust().keys(),
+                "scope":{"company":Uuid::new_v4(),"area":"workshop","owner":owner,"project":project,"space":Uuid::new_v4()}})).unwrap();
+            let profile = LocalProjectReplicaProfile {
+                schema_version: 1,
+                company: "https://company.example.invalid".into(),
+                subscription: Uuid::new_v4(),
+                local_database_url: "postgresql://laptop@127.0.0.1:55432/memory_laptop_workshop"
+                    .into(),
+                bootstrap,
+                allow_loopback_development: false,
+            };
+            let enrollment = Enrollment {
+                company: profile.company.clone(),
+                device_id: device,
+                request_id: Uuid::new_v4(),
+                name: "Synthetic Mac".into(),
+                platform: "macos".into(),
+                credential: format!("mlt_{}", "a".repeat(64)),
+                poll_secret: "b".repeat(64),
+                approved: true,
+                pending_logout: false,
+            };
+            let entry = OnboardingDeviceReviewProject {
+                manifest: OnboardingProject {
+                    project_id: project,
+                    project: "same-name".into(),
+                    revision: 1,
+                    reviewed_by: Uuid::new_v4(),
+                    reviewed_at: chrono::Utc::now(),
+                    entry: OnboardingProjectEntry {
+                        area: OnboardingArea::Workshop,
+                        owner_instance_id: owner,
+                        repository_url: "https://git.example.invalid/project.git".into(),
+                        default_branch: "main".into(),
+                        offline_allowed: true,
+                        tools: vec![],
+                        destinations: vec![],
+                    },
+                },
+                allowed_roles: vec![AuthRole::Reader],
+                offline_available: true,
+            };
+            (profile, enrollment, entry)
+        }
+        #[test]
+        fn offline_scope_device_catalog_and_consent_are_checked_before_initialization() {
+            let (profile, enrollment, entry) = fixture();
+            assert!(current_project(&profile, &enrollment, std::slice::from_ref(&entry)).is_ok());
+            for change in [
+                (|p: &mut OnboardingDeviceReviewProject| {
+                    p.manifest.entry.area = OnboardingArea::General
+                }) as fn(&mut OnboardingDeviceReviewProject),
+                |p| p.manifest.entry.owner_instance_id = Uuid::new_v4(),
+                |p| p.manifest.project_id = Uuid::new_v4(),
+                |p| p.manifest.revision += 1,
+                |p| p.offline_available = false,
+                |p| p.manifest.entry.offline_allowed = false,
+            ] {
+                let mut changed = entry.clone();
+                change(&mut changed);
+                assert!(current_project(&profile, &enrollment, &[changed]).is_err());
+            }
+            assert!(
+                current_project(&profile, &enrollment, &[entry.clone(), entry.clone()]).is_err()
+            );
+            let mut device = enrollment;
+            device.device_id = Uuid::new_v4();
+            assert!(current_project(&profile, &device, &[entry]).is_err());
+        }
+        #[test]
+        fn bootstrap_is_control_plane_pinned_and_not_silently_updated() {
+            let (profile, _, _) = fixture();
+            assert!(current_bootstrap(&profile, &profile.bootstrap).is_ok());
+            for change in [
+                (|p: &mut mem_federation_runtime::DeviceProjectSubscription| {
+                    p.device = Uuid::new_v4()
+                }) as fn(&mut mem_federation_runtime::DeviceProjectSubscription),
+                |p| p.catalog_revision += 1,
+                |p| p.scope.company = Uuid::new_v4(),
+                |p| p.scope.project = Uuid::new_v4(),
+                |p| p.scope.area = "general".into(),
+                |p| {
+                    p.receipt_keys = mem_federation_runtime::GatewaySecurity::initial(
+                        &[22; 32],
+                        Default::default(),
+                    )
+                    .unwrap()
+                    .trust()
+                    .keys()
+                    .to_vec()
+                },
+            ] {
+                let mut changed = profile.bootstrap.clone();
+                change(&mut changed);
+                assert!(current_bootstrap(&profile, &changed).is_err());
+            }
+        }
+    }
+}

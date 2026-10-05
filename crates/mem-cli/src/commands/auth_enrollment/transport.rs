@@ -23,6 +23,27 @@ pub(super) struct AvailableProjects {
 }
 
 impl CompanyClient {
+    #[cfg(feature = "project-sync")]
+    pub(super) async fn subscription(
+        &self,
+        enrollment: &Enrollment,
+        project: uuid::Uuid,
+    ) -> Result<mem_federation_runtime::DeviceProjectSubscription> {
+        if project.is_nil() {
+            bail!("exact project identity required");
+        }
+        let response = self
+            .client
+            .get(
+                self.origin
+                    .endpoint(&format!("/v1/onboarding/projects/{project}/subscription")),
+            )
+            .bearer_auth(&enrollment.credential)
+            .send()
+            .await
+            .map_err(|_| anyhow::anyhow!("authorized subscription bootstrap unavailable"))?;
+        read_metadata(response).await
+    }
     pub(super) fn new(origin: CompanyOrigin) -> Result<Self> {
         let client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
