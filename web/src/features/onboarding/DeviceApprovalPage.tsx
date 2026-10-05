@@ -2,13 +2,28 @@ import { useEffect, useState } from "react";
 import { approveDevice, authLoginUrl, deviceReview, getAuthMe } from "../../api";
 import type { AuthMeResponse } from "../../types";
 import type { DeviceApprovalReceipt, DeviceApprovalSelection, DeviceProjectRole, DeviceReview } from "./types";
+import { CompanyDeviceApproval } from "./CompanyDeviceApproval";
 
 const USER_CODE = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 function humanSession(auth: AuthMeResponse): boolean {
   return auth.authenticated && auth.mode === "multi_user" && auth.principal.kind === "human_oidc";
 }
 
-export function DeviceApprovalPage({ initialCode }: { initialCode: string }) {
+export function DeviceApprovalPage({ initialCode, initialMode = "local" }: { initialCode: string; initialMode?: "local" | "company" | "invalid" }) {
+  const [mode, setMode] = useState(initialMode);
+  const [locked, setLocked] = useState(false);
+  return <><section className="panel" aria-label="Device enrollment scope">
+    <label>Enrollment scope<select value={mode} disabled={locked} onChange={e => setMode(e.target.value as "local" | "company")}>
+      {mode === "invalid" ? <option value="invalid">Choose enrollment scope explicitly</option> : null}
+      <option value="local">Legacy local owner instance</option><option value="company">Company-reviewed owner projects (read-only offline copy)</option>
+    </select></label>
+    <p>Company and legacy local enrollment are separate. A denied/unavailable company request never falls back to local approval.</p>
+  </section>{mode === "invalid" ? <p role="alert">Invalid company enrollment marker. Choose the intended scope before reviewing.</p>
+    : mode === "company" ? <CompanyDeviceApproval initialCode={initialCode} onLock={setLocked} />
+      : <LocalDeviceApprovalPage initialCode={initialCode} onLock={setLocked} />}</>;
+}
+
+function LocalDeviceApprovalPage({ initialCode, onLock }: { initialCode: string; onLock: (locked: boolean) => void }) {
   const initial = initialCode.toUpperCase();
   const [code, setCode] = useState(USER_CODE.test(initial) ? initial : "");
   const [auth, setAuth] = useState<AuthMeResponse | null>(null);
@@ -23,6 +38,7 @@ export function DeviceApprovalPage({ initialCode }: { initialCode: string }) {
   const [confirmed, setConfirmed] = useState(false);
   const [receipt, setReceipt] = useState<DeviceApprovalReceipt | null>(null);
   const [now, setNow] = useState(Date.now());
+  useEffect(() => { onLock(busy || Boolean(confirmation)); return () => onLock(false); }, [busy, confirmation, onLock]);
 
   useEffect(() => {
     let cancelled = false;

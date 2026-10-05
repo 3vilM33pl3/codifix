@@ -31,8 +31,10 @@ import type { AuthMeResponse } from "./types";
 const GraphTab = lazy(() => import("./features/graph/GraphTab").then((module) => ({ default: module.GraphTab })));
 
 export default function App() {
-  const deviceCode = new URLSearchParams(window.location.search).get("device_code");
-  return deviceCode === null ? <MemoryApp /> : <DeviceApprovalPage initialCode={deviceCode} />;
+  const query = new URLSearchParams(window.location.search);
+  const deviceCode = query.get("device_code");
+  const mode = query.has("company_device") ? query.get("company_device") === "1" ? "company" : "invalid" : "local";
+  return deviceCode === null ? <MemoryApp /> : <DeviceApprovalPage initialCode={deviceCode} initialMode={mode} />;
 }
 
 function MemoryApp() {
