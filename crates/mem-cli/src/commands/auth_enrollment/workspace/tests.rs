@@ -1053,3 +1053,213 @@ fn cli_workspace_commands_require_selection_and_confirmation_digest() {
         .is_ok()
     );
 }
+
+#[tokio::test]
+async fn picker_review_revalidates_changed_manifest_revoked_and_offline_scope_before_publication() {
+    for change in 0..4 {
+        let fixture = Fixture::new();
+        let selected = project();
+        let args = fixture.prepare(&selected.manifest);
+        let mut current = selected.clone();
+        match change {
+            0 => current.manifest.entry.default_branch = "changed-with-same-revision".into(),
+            1 => current.manifest.revision += 1,
+            2 => current.offline_available = false,
+            _ => current.allowed_roles = vec![mem_record::AuthRole::Writer],
+        }
+        let catalog = FakeCatalog::new(current);
+        let reviewed = ReviewedCatalog {
+            remote: &catalog,
+            expected: &selected.manifest,
+        };
+        let (origin, record) = identity();
+        assert!(
+            prepare_with(&args, &origin, &record, &reviewed)
+                .await
+                .is_err()
+        );
+        assert!(!args.journal.exists());
+        assert!(!args.workspace.exists());
+    }
+    let fixture = Fixture::new();
+    let selected = project();
+    let args = fixture.prepare(&selected.manifest);
+    let catalog = FakeCatalog::new(selected.clone());
+    catalog.queued.borrow_mut().push_back(vec![]);
+    let reviewed = ReviewedCatalog {
+        remote: &catalog,
+        expected: &selected.manifest,
+    };
+    let (origin, record) = identity();
+    assert!(
+        prepare_with(&args, &origin, &record, &reviewed)
+            .await
+            .is_err()
+    );
+    assert!(!args.journal.exists());
+}
+
+#[tokio::test]
+async fn picker_review_binds_same_uuid_to_owner_and_prepares_metadata_without_settings_changes() {
+    let fixture = Fixture::new();
+    let first = project();
+    let mut selected = first.clone();
+    selected.manifest.entry.owner_instance_id = Uuid::new_v4();
+    let args = fixture.prepare(&selected.manifest);
+    fs::create_dir_all(args.workspace.join(".git")).unwrap();
+    fs::create_dir_all(args.workspace.join(".codex")).unwrap();
+    fs::write(args.workspace.join("dirty.txt"), "preserve my work").unwrap();
+    fs::write(args.workspace.join(".codex/config.toml"), "custom = true").unwrap();
+    let catalog = FakeCatalog::new(first.clone());
+    catalog
+        .queued
+        .borrow_mut()
+        .push_back(vec![first, selected.clone()]);
+    let reviewed = ReviewedCatalog {
+        remote: &catalog,
+        expected: &selected.manifest,
+    };
+    let (origin, record) = identity();
+    let journal = prepare_with(&args, &origin, &record, &reviewed)
+        .await
+        .unwrap();
+    assert_eq!(
+        journal.plan.manifest.entry.owner_instance_id,
+        selected.manifest.entry.owner_instance_id
+    );
+    assert_eq!(
+        journal.plan.manifest_sha256,
+        filesystem::digest(&selected.manifest).unwrap()
+    );
+    assert_eq!(
+        journal.plan_sha256,
+        filesystem::digest(&journal.plan).unwrap()
+    );
+    assert!(matches!(journal.repository, RepositoryStage::Pending));
+    assert!(!journal.tools_done && !journal.templates_done);
+    assert_eq!(
+        fs::read_to_string(args.workspace.join("dirty.txt")).unwrap(),
+        "preserve my work"
+    );
+    assert_eq!(
+        fs::read_to_string(args.workspace.join(".codex/config.toml")).unwrap(),
+        "custom = true"
+    );
+    assert!(!args.workspace.join(".codex/agents").exists());
+}
+
+#[tokio::test]
+async fn picker_apply_selects_exact_composite_identity_not_the_first_same_uuid_owner() {
+    let fixture = Fixture::new();
+    let wrong = project();
+    let mut selected = wrong.clone();
+    selected.manifest.entry.owner_instance_id = Uuid::new_v4();
+    selected.manifest.entry.default_branch = "intended-owner-branch".into();
+    let args = fixture.prepare(&selected.manifest);
+    let catalog = FakeCatalog::new(selected.clone());
+    for _ in 0..3 {
+        catalog
+            .queued
+            .borrow_mut()
+            .push_back(vec![wrong.clone(), selected.clone()]);
+    }
+    let reviewed = ReviewedCatalog {
+        remote: &catalog,
+        expected: &selected.manifest,
+    };
+    let (origin, record) = identity();
+    let journal = prepare_with(&args, &origin, &record, &reviewed)
+        .await
+        .unwrap();
+    let git = FakeGit::default();
+    let applied = apply_with(
+        &fixture.apply(&journal),
+        &origin,
+        &record,
+        &catalog,
+        &git,
+        &FakeDownloads::default(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        applied.plan.manifest.entry.owner_instance_id,
+        selected.manifest.entry.owner_instance_id
+    );
+    assert_eq!(
+        applied.plan.manifest.entry.default_branch,
+        "intended-owner-branch"
+    );
+    assert_eq!(git.clones.get(), 1);
+    // The remaining same-UUID entry does not inherit the selected owner's grant.
+    catalog.queued.borrow_mut().push_back(vec![wrong]);
+    assert!(
+        apply_with(
+            &fixture.apply(&journal),
+            &origin,
+            &record,
+            &catalog,
+            &git,
+            &FakeDownloads::default()
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(git.clones.get(), 1);
+}
+
+#[tokio::test]
+async fn picker_apply_rejects_withdrawn_reader_or_offline_scope_before_clone_or_tools() {
+    for reader_withdrawn in [false, true] {
+        let fixture = Fixture::new();
+        let mut selected = project();
+        selected
+            .manifest
+            .entry
+            .tools
+            .push(mem_record::OnboardingPinnedTool {
+                name: "memory-skills".into(),
+                version: "1.0.0".into(),
+                url: "https://tools.example.test/skills.zip".into(),
+                sha256: "a".repeat(64),
+            });
+        let args = fixture.prepare(&selected.manifest);
+        let catalog = FakeCatalog::new(selected.clone());
+        let (origin, record) = identity();
+        let journal = prepare_with(&args, &origin, &record, &catalog)
+            .await
+            .unwrap();
+        let mut withdrawn = selected;
+        if reader_withdrawn {
+            withdrawn.allowed_roles = vec![mem_record::AuthRole::Writer];
+        } else {
+            withdrawn.offline_available = false; // BundleExport/offline grant withdrawn.
+        }
+        // The manifest digest stays identical: effective authorization is separate.
+        assert_eq!(
+            filesystem::digest(&withdrawn.manifest).unwrap(),
+            journal.plan.manifest_sha256
+        );
+        catalog.queued.borrow_mut().push_back(vec![withdrawn]);
+        let git = FakeGit::default();
+        let downloads = FakeDownloads::default();
+        assert!(
+            apply_with(
+                &fixture.apply(&journal),
+                &origin,
+                &record,
+                &catalog,
+                &git,
+                &downloads
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(git.clones.get(), 0);
+        assert_eq!(downloads.calls.get(), 0);
+        assert!(!args.workspace.exists());
+        let retained = filesystem::read(&args.journal).unwrap();
+        assert!(matches!(retained.repository, RepositoryStage::Pending));
+        assert!(!retained.tools_done && !retained.templates_done);
+    }
+}

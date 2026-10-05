@@ -18,22 +18,22 @@ use uuid::Uuid;
 #[derive(Debug, Args)]
 pub(in crate::commands) struct PrepareArgs {
     #[command(flatten)]
-    company: CompanyArgs,
+    pub(super) company: CompanyArgs,
     #[arg(long)]
-    project: Uuid,
+    pub(super) project: Uuid,
     /// Stable reviewed area: workshop, homelab, trust or general.
     #[arg(long)]
-    area: String,
+    pub(super) area: String,
     #[arg(long)]
-    owner_instance: Uuid,
+    pub(super) owner_instance: Uuid,
     #[arg(long)]
-    revision: i64,
+    pub(super) revision: i64,
     /// Absolute target with an existing parent; existing repositories are preserved.
     #[arg(long)]
-    workspace: PathBuf,
+    pub(super) workspace: PathBuf,
     /// Absolute local metadata journal outside the target repository.
     #[arg(long)]
-    journal: PathBuf,
+    pub(super) journal: PathBuf,
 }
 #[derive(Debug, Args)]
 pub(in crate::commands) struct ApplyArgs {
@@ -104,13 +104,83 @@ impl Catalog for transport::CompanyClient {
     }
 }
 
-fn active(store: &impl CredentialStore, origin: &CompanyOrigin) -> Result<Enrollment> {
+pub(super) fn active(store: &impl CredentialStore, origin: &CompanyOrigin) -> Result<Enrollment> {
     let record = credentials::load(store, origin)?
         .ok_or_else(|| anyhow::anyhow!("sign in with memory auth login for this company first"))?;
     if !record.approved || record.pending_logout {
         bail!("workspace preparation requires an approved device without pending logout");
     }
     Ok(record)
+}
+
+/// Read-only path validation shared by the picker before entering its UI.
+#[cfg(feature = "tui")]
+pub(super) fn validate_selection_paths(workspace: &PathBuf, journal: &PathBuf) -> Result<()> {
+    filesystem::separate(journal, workspace)?;
+    filesystem::absolute_leaf(workspace)?;
+    filesystem::absolute_leaf(journal)?;
+    Ok(())
+}
+
+/// A picker confirmation binds the complete manifest, not just its display name
+/// or revision. Current authorization/offline availability is checked again.
+#[cfg(any(feature = "tui", test))]
+struct ReviewedCatalog<'a, C> {
+    remote: &'a C,
+    expected: &'a OnboardingProject,
+}
+#[cfg(any(feature = "tui", test))]
+impl<C: Catalog> Catalog for ReviewedCatalog<'_, C> {
+    async fn projects(&self, enrollment: &Enrollment) -> Result<transport::AvailableProjects> {
+        let scope = self.remote.projects(enrollment).await?;
+        let expected = self.expected;
+        let project = scope.projects.iter().find(|project| {
+            project.manifest.project_id == expected.project_id
+                && project.manifest.entry.area == expected.entry.area
+                && project.manifest.entry.owner_instance_id == expected.entry.owner_instance_id
+                && project.manifest.revision == expected.revision
+        }).ok_or_else(|| anyhow::anyhow!("reviewed project is no longer in the current approved device scope; select again"))?;
+        validate_project(project)?;
+        if filesystem::digest(&project.manifest)? != filesystem::digest(expected)? {
+            bail!("reviewed manifest changed; select and confirm the current manifest again");
+        }
+        Ok(scope)
+    }
+}
+
+#[cfg(feature = "tui")]
+pub(super) async fn prepare_reviewed(
+    args: &PrepareArgs,
+    expected: &OnboardingProject,
+    device_id: Uuid,
+    store: &impl CredentialStore,
+) -> Result<String> {
+    if args.project != expected.project_id
+        || args.area != expected.entry.area.as_str()
+        || args.owner_instance != expected.entry.owner_instance_id
+        || args.revision != expected.revision
+    {
+        bail!("prepared selection does not match the confirmed area/owner/project/revision");
+    }
+    let origin = CompanyOrigin::parse(&args.company.company, args.company.allow_loopback)?;
+    let enrollment = active(store, &origin)?;
+    if enrollment.device_id != device_id {
+        bail!("enrolled device changed during review; select again before preparing metadata");
+    }
+    let remote = transport::CompanyClient::new(origin.clone())?;
+    let reviewed = ReviewedCatalog {
+        remote: &remote,
+        expected,
+    };
+    let journal = prepare_with(args, &origin, &enrollment, &reviewed).await?;
+    print_preview(&journal)?;
+    println!("Journal: {}", args.journal.display());
+    Ok(journal.plan_sha256)
+}
+
+#[cfg(feature = "tui")]
+pub(super) fn reviewed_template_preview() -> Result<String> {
+    Ok(serde_json::to_string_pretty(&templates())?)
 }
 
 pub(super) async fn prepare(args: &PrepareArgs, store: &impl CredentialStore) -> Result<()> {
@@ -276,7 +346,12 @@ async fn current(journal: &Journal, enrollment: &Enrollment, remote: &impl Catal
     let project = scope
         .projects
         .iter()
-        .find(|project| project.manifest.project_id == journal.plan.manifest.project_id)
+        .find(|project| {
+            project.manifest.project_id == journal.plan.manifest.project_id
+                && project.manifest.entry.area == journal.plan.manifest.entry.area
+                && project.manifest.entry.owner_instance_id
+                    == journal.plan.manifest.entry.owner_instance_id
+        })
         .ok_or_else(|| {
             anyhow::anyhow!(
                 "project no longer approved; local effects stopped and journal retained"
@@ -289,7 +364,7 @@ async fn current(journal: &Journal, enrollment: &Enrollment, remote: &impl Catal
     Ok(())
 }
 
-fn validate_project(project: &OnboardingDeviceReviewProject) -> Result<()> {
+pub(super) fn validate_project(project: &OnboardingDeviceReviewProject) -> Result<()> {
     let manifest = &project.manifest;
     if manifest.project_id.is_nil()
         || manifest.entry.owner_instance_id.is_nil()
@@ -308,6 +383,16 @@ fn validate_project(project: &OnboardingDeviceReviewProject) -> Result<()> {
     repository::branch(&manifest.entry.default_branch)?;
     if manifest.entry.area == mem_record::OnboardingArea::Trust {
         bail!("Trust is remote-only; local repository/tool preparation is not allowed");
+    }
+    // Workspace journals retain offline repository/settings/tool copies. This
+    // condition must hold at prepare AND every apply/resume, not just in the UI.
+    if !project
+        .allowed_roles
+        .contains(&mem_record::AuthRole::Reader)
+        || !project.offline_available
+        || !manifest.entry.offline_allowed
+    {
+        bail!("workspace preparation requires current Reader and reviewed offline scope");
     }
     if manifest.entry.tools.len() > 32 {
         bail!("too many pinned tools");
