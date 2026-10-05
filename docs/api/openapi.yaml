@@ -27,6 +27,37 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/onboarding/company/projects:
+    get:
+      operationId: inspectAuthorizedCompanyProjectCatalog
+      x-stability: internal
+      summary: Aggregate fresh owner-authorized metadata for the current browser human
+      description: |
+        Current multi-user HumanOidc browser session on a writable primary only. Issuer/subject
+        come from the freshly locked local human row, never client input or cached actor claims.
+        Queries only explicitly configured non-Trust delivery owners with separate server-side
+        delivery credentials. Old management-only registries yield no remote projects. At most
+        three eligible owners, 256 projects and 512 KiB per owner; requests use bounded HTTPS
+        pinned origins, no redirects and no browser/device/management credential forwarding.
+        Every response must match canonical request digest, exact area/owner/project identity,
+        reviewed manifest digest/revision and reader-only role/offline metadata. Any unavailable
+        or unverifiable eligible owner rejects the entire result, never silent partial fallback.
+        Local human/session/registry are rechecked after unlocked HTTP; bounded serialization
+        and protected audit commit precede delivery. Same project slug or UUID in different
+        owner scopes remains distinct. Catalog metadata creates no local grant, device approval
+        or content-delivery authority. No endpoint/environment reference or credential exposed.
+        Owner observation timestamps tolerate at most five minutes clock skew. No-store.
+      responses:
+        '200':
+          description: Fresh bounded company metadata; empty when no delivery owner opted in.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyDeviceCatalogResponse' }
+        '401': { description: Browser human/session missing, revoked, disabled or expired. }
+        '403': { description: Human browser identity, multi-user writable primary or exact delivery registry denied. }
+        '409': { description: Local human identity or registry changed while querying owners. }
+        '413': { description: Verified aggregate exceeds the bounded response size. }
+        '503': { description: Owner unavailable or response could not be verified; sanitized error and no partial catalog. }
   /v1/onboarding/company-delivery/catalog:
     post:
       operationId: inspectOwnerAuthorizedDeviceCatalog
@@ -3385,6 +3416,14 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    CompanyDeviceCatalogResponse:
+      type: object
+      additionalProperties: false
+      required: [company_id, projects, observed_at]
+      properties:
+        company_id: { type: string, format: uuid }
+        projects: { type: array, maxItems: 768, items: { $ref: '#/components/schemas/OwnerDeviceCatalogProject' } }
+        observed_at: { type: string, format: date-time }
     OwnerDeviceCatalogRequest:
       type: object
       additionalProperties: false

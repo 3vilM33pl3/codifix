@@ -258,7 +258,7 @@ pub(crate) async fn access(
     }))
 }
 
-fn validate_entry(entry: &OnboardingProjectEntry) -> Result<(), ApiError> {
+pub(super) fn validate_entry(entry: &OnboardingProjectEntry) -> Result<(), ApiError> {
     if entry.owner_instance_id.is_nil()
         || (entry.area == OnboardingArea::Trust && entry.offline_allowed)
         || !safe_https(&entry.repository_url)
