@@ -265,6 +265,27 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             ],
         ),
         (
+            "/v1/admin/onboarding/company/delivery-delegates",
+            &[
+                (
+                    Method::GET,
+                    RoutePolicy {
+                        permission: Permission::SystemAdmin,
+                        scope: ProjectScope::Global,
+                        semantic_read: false,
+                    },
+                ),
+                (
+                    Method::POST,
+                    RoutePolicy {
+                        permission: Permission::SystemAdmin,
+                        scope: ProjectScope::Global,
+                        semantic_read: false,
+                    },
+                ),
+            ],
+        ),
+        (
             "/v1/onboarding/projects/{project_id}/snapshot",
             &[(
                 Method::POST,

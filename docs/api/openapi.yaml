@@ -27,6 +27,56 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/admin/onboarding/company/delivery-delegates:
+    get:
+      operationId: inspectConfiguredCompanyDeliveryDelegates
+      x-stability: internal
+      summary: Inspect public delivery-only configured credentials and current state
+      description: Multi-user current global administrator on writable primary only. Exact local owner, non-Trust project UUIDs, shared issuer and configured separate credential identities. Current complete credential and custom membership state is checked; never inferred from history. No token value/hash/commitment, endpoint or environment reference. No-store.
+      responses:
+        '200':
+          description: Bounded public configuration and fresh provisioning state.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [delegates]
+                properties:
+                  delegates: { type: array, maxItems: 64, items: { $ref: '#/components/schemas/CompanyDeliveryDelegatePlan' } }
+        '403': { description: Multi-user current global administration, writable local owner or exact configuration denied. }
+    post:
+      operationId: provisionConfiguredCompanyDeliveryDelegate
+      x-stability: internal
+      summary: Provision a separate delivery-only service credential once
+      description: |
+        Explicit confirmed multi-user operator workflow on the exact configured non-Trust local
+        owner. Configured principal/token identities must be separate from every management
+        delegate, absent in storage, with exact issuer/company/owner/area/project/policy binding.
+        Creates only explicit project_scoped_delivery custom project permissions, excluded from
+        every standard role (including Admin), and no global/read/export/AuthManage rights.
+        Existing identities/grants are never adopted or restored. Protected audit and local
+        effect commit atomically. First success returns the one-time credential after commit;
+        exact replay rechecks active identity/token/original expiry/exact full direct membership
+        envelope, returns token:null, and cannot restore expired/revoked/disabled/changed authority.
+        Lost first response cannot recover a credential; explicitly revoke and configure fresh
+        identities. Ordinary Origin/CSRF/read-only/evaluation controls apply. No owner HTTP,
+        device enrollment, fleet activation or generic export grant. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyDeliveryDelegateProvisionRequest' }
+      responses:
+        '200':
+          description: Exact delivery credential binding and one-time secret only on first success.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyDeliveryDelegateProvisionResponse' }
+        '400': { description: Missing confirmation or invalid bounded identity/name/lifetime. }
+        '403': { description: Current administrator, multi-user owner, shared issuer or separate delivery scope denied. }
+        '409': { description: Changed request/configuration or existing/inactive/altered credential; no rights restored. }
+        '503': { description: Outcome uncertain; retry exact request, never assume one-time secret is recoverable. }
   /v1/onboarding/cache:
     get:
       operationId: listSelectedLaptopCache
@@ -3264,6 +3314,58 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    CompanyDeliveryDelegateProvisionRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, company_id, owner_instance_id, area, issuer, principal_id, token_id, delivery_policy_revision, name, projects, expires_in_days, confirmed]
+      properties:
+        request_id: { type: string, format: uuid }
+        company_id: { type: string, format: uuid }
+        owner_instance_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        issuer: { type: string, format: uri }
+        principal_id: { type: string, format: uuid }
+        token_id: { type: string, format: uuid }
+        delivery_policy_revision: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        projects: { type: array, minItems: 1, maxItems: 256, uniqueItems: true, items: { type: string, format: uuid } }
+        expires_in_days: { type: integer, minimum: 1, maximum: 90 }
+        confirmed: { type: boolean, const: true }
+    CompanyDeliveryDelegateProvisionResponse:
+      type: object
+      additionalProperties: false
+      required: [request_id, company_id, owner_instance_id, area, issuer, principal_id, token_id, delivery_policy_revision, expires_at, projects, permissions, replayed, credential_issued, token]
+      properties:
+        request_id: { type: string, format: uuid }
+        company_id: { type: string, format: uuid }
+        owner_instance_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        issuer: { type: string, format: uri }
+        principal_id: { type: string, format: uuid }
+        token_id: { type: string, format: uuid }
+        delivery_policy_revision: { type: integer, minimum: 1 }
+        expires_at: { type: string, format: date-time }
+        projects: { type: array, minItems: 1, maxItems: 256, uniqueItems: true, items: { type: string, format: uuid } }
+        permissions: { type: array, minItems: 1, maxItems: 1, items: { type: string, const: project_scoped_delivery } }
+        replayed: { type: boolean }
+        credential_issued: { type: boolean }
+        token: { type: [string, 'null'], description: First-success one-time secret only, null for every replay and absent from all listings/history. }
+    CompanyDeliveryDelegatePlan:
+      type: object
+      additionalProperties: false
+      required: [company_id, owner_instance_id, area, issuer, principal_id, token_id, delivery_policy_revision, projects, permissions, status, expires_at]
+      properties:
+        company_id: { type: string, format: uuid }
+        owner_instance_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        issuer: { type: string, format: uri }
+        principal_id: { type: string, format: uuid }
+        token_id: { type: string, format: uuid }
+        delivery_policy_revision: { type: integer, minimum: 1 }
+        projects: { type: array, minItems: 1, maxItems: 256, uniqueItems: true, items: { type: string, format: uuid } }
+        permissions: { type: array, minItems: 1, maxItems: 1, items: { type: string, const: project_scoped_delivery } }
+        status: { type: string, enum: [unprovisioned, active, inactive, conflict] }
+        expires_at: { type: [string, 'null'], format: date-time }
     LaptopCacheProject:
       type: object
       required: [subscription_id, device_id, company_id, area, owner_instance_id, project_id, space_id, cursor, observed_at, initialized, read_only]

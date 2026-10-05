@@ -2,6 +2,7 @@
 
 pub(crate) mod answerer;
 pub(crate) mod company_delegate;
+pub(crate) mod company_delivery_delegate;
 pub(crate) mod device;
 mod model;
 mod oidc;

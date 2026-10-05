@@ -109,6 +109,12 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
                 .layer(axum::extract::DefaultBodyLimit::max(32768)),
         )
         .route(
+            "/v1/admin/onboarding/company/delivery-delegates",
+            get(crate::auth::company_delivery_delegate::list)
+                .post(crate::auth::company_delivery_delegate::create)
+                .layer(axum::extract::DefaultBodyLimit::max(32768)),
+        )
+        .route(
             "/v1/admin/onboarding/company/operations",
             get(crate::auth::onboarding::company::company_operations)
                 .post(crate::auth::onboarding::company::company_operation)

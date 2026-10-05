@@ -97,6 +97,8 @@ async fn company_configuration_never_serializes_transport_or_credentials() {
                 token_env: "PRIVATE_OWNER_CREDENTIAL".into(),
                 issuer: f.request.issuer.clone(),
                 delegation_policy_revision: 1,
+                delivery_token_env: None,
+                delivery_policy_revision: None,
             },
             mem_config::CompanyOwnerConfig {
                 owner_instance_id: Uuid::new_v4(),
@@ -105,6 +107,8 @@ async fn company_configuration_never_serializes_transport_or_credentials() {
                 token_env: "PRIVATE_CA_CREDENTIAL".into(),
                 issuer: f.request.issuer.clone(),
                 delegation_policy_revision: 1,
+                delivery_token_env: None,
+                delivery_policy_revision: None,
             },
         ],
     });
@@ -389,6 +393,8 @@ async fn coordinator_intent_survives_lost_reply_and_reconciles_current_rights() 
             token_env: env.clone(),
             issuer: f.request.issuer.clone(),
             delegation_policy_revision: 1,
+            delivery_token_env: None,
+            delivery_policy_revision: None,
         }],
     });
     let Json(uncertain) = company_operation(

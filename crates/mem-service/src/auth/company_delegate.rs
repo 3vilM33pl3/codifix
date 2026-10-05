@@ -19,6 +19,25 @@ mod tests;
 
 const PERMISSIONS: [Permission; 2] = [Permission::MemoryRead, Permission::AuthManage];
 const EVENT: &str = "onboarding.company.delegate.provision";
+#[derive(Clone, Copy)]
+pub(super) enum DelegateKind {
+    Management,
+    Delivery,
+}
+impl DelegateKind {
+    fn event(self) -> &'static str {
+        match self {
+            Self::Management => EVENT,
+            Self::Delivery => "onboarding.company.delivery_delegate.provision",
+        }
+    }
+    fn permissions(self) -> &'static [Permission] {
+        match self {
+            Self::Management => &PERMISSIONS,
+            Self::Delivery => &[Permission::ScopedProjectDelivery],
+        }
+    }
+}
 fn conflict() -> ApiError {
     ApiError::status_message(
         StatusCode::CONFLICT,
@@ -46,6 +65,10 @@ fn area(state: &AppState) -> Result<(OnboardingArea, Uuid), ApiError> {
         .auth
         .validate_company_delegations()
         .map_err(|_| ApiError::forbidden("invalid exact company delegate configuration"))?;
+    state
+        .config
+        .validate_company_delivery_owner()
+        .map_err(|_| ApiError::forbidden("invalid exact company delivery configuration"))?;
     let area = state
         .config
         .area
@@ -108,6 +131,45 @@ fn plan(
         expires_at: None,
     })
 }
+fn delivery_plan(
+    state: &AppState,
+    cfg: &mem_config::CompanyDeliveryDelegationConfig,
+) -> Result<CompanyDelegatePlan, ApiError> {
+    let (area, owner) = area(state)?;
+    if state.config.auth.mode != AuthMode::MultiUser
+        || cfg.owner_instance_id != owner
+        || cfg.area != area
+        || cfg.principal_id == super::local_owner_id()
+    {
+        return Err(ApiError::forbidden(
+            "multi-user exact configured local delivery owner required",
+        ));
+    }
+    let mut projects: Vec<_> = cfg
+        .projects
+        .iter()
+        .map(|id| CompanyDelegateProject {
+            project_id: *id,
+            role_ceiling: AuthRole::Reader,
+        })
+        .collect();
+    projects.sort_by_key(|p| p.project_id);
+    // This private common-kernel representation preserves management receipt
+    // compatibility. Its reader label is not a delivery grant or role ceiling:
+    // every delivery membership has ONLY the explicit custom override.
+    Ok(CompanyDelegatePlan {
+        company_id: cfg.company_id,
+        owner_instance_id: owner,
+        area,
+        issuer: cfg.issuer.clone(),
+        principal_id: cfg.principal_id,
+        token_id: cfg.token_id,
+        delegation_policy_revision: cfg.policy_revision,
+        projects,
+        status: "unprovisioned".into(),
+        expires_at: None,
+    })
+}
 fn same_configuration(
     request: &CompanyDelegateProvisionRequest,
     plan: &CompanyDelegatePlan,
@@ -146,6 +208,7 @@ async fn current(
     plan: &CompanyDelegatePlan,
     receipt: Option<&Receipt>,
     creator: Option<Uuid>,
+    kind: DelegateKind,
 ) -> Result<(String, Option<DateTime<Utc>>), ApiError> {
     let principal = sqlx::query("SELECT * FROM auth_principals WHERE id=$1 FOR SHARE")
         .bind(plan.principal_id)
@@ -174,7 +237,7 @@ async fn current(
     }
     let token = &tokens[0];
     let expiry: Option<DateTime<Utc>> = token.try_get("expires_at").map_err(storage)?;
-    let expected = json!(PERMISSIONS);
+    let expected = json!(kind.permissions());
     let identity = principal.try_get::<String, _>("kind").map_err(storage)? == "service_token"
         && principal
             .try_get::<String, _>("display_name")
@@ -250,6 +313,26 @@ pub(crate) async fn list(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthenticatedPrincipal>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let plans = list_plans(&state, &actor, DelegateKind::Management).await?;
+    Ok((
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(json!({"delegates":plans})),
+    ))
+}
+pub(super) async fn list_plans(
+    state: &AppState,
+    actor: &AuthenticatedPrincipal,
+    kind: DelegateKind,
+) -> Result<Vec<CompanyDelegatePlan>, ApiError> {
+    state
+        .config
+        .validate_company_delivery_owner()
+        .map_err(|_| ApiError::forbidden("invalid exact company delivery configuration"))?;
+    if matches!(kind, DelegateKind::Delivery) && state.config.auth.mode != AuthMode::MultiUser {
+        return Err(ApiError::forbidden(
+            "multi-user company delivery provisioning required",
+        ));
+    }
     state
         .config
         .auth
@@ -260,14 +343,28 @@ pub(crate) async fn list(
         .execute(&mut *tx)
         .await
         .map_err(storage)?;
-    super::lock_global_administrator(&state, &mut tx, &actor)
+    super::lock_global_administrator(state, &mut tx, actor)
         .await
         .map_err(authority)?;
-    let mut plans = Vec::new();
-    for cfg in &state.config.auth.company_delegations {
-        let mut view = plan(&state, cfg)?;
+    let mut plans = match kind {
+        DelegateKind::Management => state
+            .config
+            .auth
+            .company_delegations
+            .iter()
+            .map(|cfg| plan(state, cfg))
+            .collect::<Result<Vec<_>, _>>()?,
+        DelegateKind::Delivery => state
+            .config
+            .auth
+            .company_delivery_delegations
+            .iter()
+            .map(|cfg| delivery_plan(state, cfg))
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+    for view in &mut plans {
         let row=sqlx::query("SELECT actor_principal_id,metadata_json FROM auth_audit_events WHERE event_type=$1 AND outcome='success' AND target_principal_id=$2 AND target_token_id=$3 ORDER BY recorded_at DESC,id LIMIT 1")
-            .bind(EVENT).bind(cfg.principal_id).bind(cfg.token_id).fetch_optional(&mut *tx).await.map_err(storage)?;
+            .bind(kind.event()).bind(view.principal_id).bind(view.token_id).fetch_optional(&mut *tx).await.map_err(storage)?;
         let receipt = row
             .as_ref()
             .map(|r| {
@@ -284,16 +381,12 @@ pub(crate) async fn list(
             })
             .transpose()?
             .flatten();
-        let (status, expiry) = current(&mut tx, &view, receipt.as_ref(), creator).await?;
+        let (status, expiry) = current(&mut tx, view, receipt.as_ref(), creator, kind).await?;
         view.status = status;
         view.expires_at = expiry;
-        plans.push(view);
     }
     tx.commit().await.map_err(storage)?;
-    Ok((
-        [(header::CACHE_CONTROL, "no-store")],
-        Json(json!({"delegates":plans})),
-    ))
+    Ok(plans)
 }
 pub(crate) async fn create(
     State(state): State<AppState>,
@@ -307,6 +400,14 @@ pub(crate) async fn provision(
     state: &AppState,
     actor: &AuthenticatedPrincipal,
     request: &CompanyDelegateProvisionRequest,
+) -> Result<CompanyDelegateProvisionResponse, ApiError> {
+    provision_with(state, actor, request, DelegateKind::Management).await
+}
+pub(super) async fn provision_with(
+    state: &AppState,
+    actor: &AuthenticatedPrincipal,
+    request: &CompanyDelegateProvisionRequest,
+    kind: DelegateKind,
 ) -> Result<CompanyDelegateProvisionResponse, ApiError> {
     if !request.confirmed
         || request.request_id.is_nil()
@@ -323,14 +424,32 @@ pub(crate) async fn provision(
             "explicit confirmation, stable identity and bounded delegate credential lifetime required",
         ));
     }
-    let cfg = state
-        .config
-        .auth
-        .company_delegations
-        .iter()
-        .find(|c| c.company_id == request.company_id)
-        .ok_or_else(|| ApiError::forbidden("company is not configured on this owner"))?;
-    let view = plan(state, cfg)?;
+    let view = match kind {
+        DelegateKind::Management => plan(
+            state,
+            state
+                .config
+                .auth
+                .company_delegations
+                .iter()
+                .find(|c| c.company_id == request.company_id)
+                .ok_or_else(|| {
+                    ApiError::forbidden("company management is not configured on this owner")
+                })?,
+        )?,
+        DelegateKind::Delivery => delivery_plan(
+            state,
+            state
+                .config
+                .auth
+                .company_delivery_delegations
+                .iter()
+                .find(|c| c.company_id == request.company_id)
+                .ok_or_else(|| {
+                    ApiError::forbidden("company delivery is not configured on this owner")
+                })?,
+        )?,
+    };
     if !same_configuration(request, &view) {
         return Err(conflict());
     }
@@ -364,7 +483,7 @@ pub(crate) async fn provision(
                 .try_get::<Option<Uuid>, _>("target_token_id")
                 .map_err(storage)?
                 != Some(request.token_id)
-            || row.try_get::<String, _>("event_type").map_err(storage)? != EVENT
+            || row.try_get::<String, _>("event_type").map_err(storage)? != kind.event()
             || row.try_get::<String, _>("outcome").map_err(storage)? != "success"
         {
             return Err(conflict());
@@ -374,7 +493,7 @@ pub(crate) async fn provision(
             .map_err(storage)?
             .0;
         if receipt.request != *request
-            || current(&mut tx, &view, Some(&receipt), Some(actor.id))
+            || current(&mut tx, &view, Some(&receipt), Some(actor.id), kind)
                 .await?
                 .0
                 != "active"
@@ -412,10 +531,10 @@ pub(crate) async fn provision(
             return Err(conflict());
         }
         for project in &view.projects {
-            // The display preset is reader, but the explicit override is ONLY
-            // read+AuthManage. Human grant ceilings stay in owner configuration.
+            // The display preset is reader, but the explicit override alone is
+            // authoritative. Delivery receives no reader/management capability.
             sqlx::query("INSERT INTO auth_project_memberships(id,principal_id,project_id,role,source,permissions_json,created_by) VALUES($1,$2,$3,'reader','direct',$4,$5)")
-                .bind(membership(request.request_id,project.project_id)).bind(request.principal_id).bind(project.project_id).bind(json!(PERMISSIONS)).bind(actor.id).execute(&mut *tx).await.map_err(storage)?;
+                .bind(membership(request.request_id,project.project_id)).bind(request.principal_id).bind(project.project_id).bind(json!(kind.permissions())).bind(actor.id).execute(&mut *tx).await.map_err(storage)?;
         }
         let receipt = Receipt {
             request: request.clone(),
@@ -423,7 +542,7 @@ pub(crate) async fn provision(
             credential_commitment: commitment(&hashed),
         };
         sqlx::query("INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,target_token_id,event_type,outcome,metadata_json,recorded_at) VALUES($1,$2,$3,$4,$5,'success',$6,clock_timestamp())")
-            .bind(request.request_id).bind(actor.id).bind(request.principal_id).bind(request.token_id).bind(EVENT).bind(SqlJson(receipt)).execute(&mut *tx).await.map_err(storage)?;
+            .bind(request.request_id).bind(actor.id).bind(request.principal_id).bind(request.token_id).bind(kind.event()).bind(SqlJson(receipt)).execute(&mut *tx).await.map_err(storage)?;
         (expiry, Some(raw))
     };
     super::lock_global_administrator(state, &mut tx, actor)
@@ -446,7 +565,11 @@ pub(crate) async fn provision(
             .map(|p| CompanyDelegateProjectGrant {
                 project_id: p.project_id,
                 role_ceiling: p.role_ceiling,
-                permissions: PERMISSIONS.iter().map(|p| p.as_str().into()).collect(),
+                permissions: kind
+                    .permissions()
+                    .iter()
+                    .map(|p| p.as_str().into())
+                    .collect(),
             })
             .collect(),
         replayed,
