@@ -42,11 +42,13 @@ zip.workspace = true
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "=3.7.0"
 
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "=1.1.4", features = ["fs", "process"], optional = true }
 
 [features]
 default = ["full"]
 tui = ["dep:ratatui", "dep:crossterm"]
-project-sync = ["dep:mem-federation-runtime"]
+project-sync = ["dep:mem-federation-runtime", "dep:rustix"]
 embedded-service-postgres = ["dep:mem-service", "project-sync"]
 embedded-service = ["embedded-service-postgres", "mem-service/offline"]
 full = ["tui", "embedded-service"]

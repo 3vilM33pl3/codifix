@@ -2903,6 +2903,7 @@ dependencies = [
  "mem-watch",
  "ratatui",
  "reqwest",
+ "rustix 1.1.4",
  "security-framework",
  "semver",
  "serde",
