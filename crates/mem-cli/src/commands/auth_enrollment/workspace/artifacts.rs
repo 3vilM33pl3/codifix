@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Only the existing Memory skill-bundle ZIP layout is supported. No executable
-//! plugin install, script invocation, generic archive extraction or auth reuse.
+//! The reviewed Memory skill-bundle ZIP supplies Codex and Claude project skills.
+//! No executable plugin install, hook, generic extraction or auth reuse.
 use super::{Journal, filesystem};
 use anyhow::{Result, bail};
 use mem_record::OnboardingPinnedTool;
@@ -246,40 +246,74 @@ pub(super) async fn apply(
             bail!("skill version differs from its reviewed pin; nothing installed");
         }
     }
-    for (name, _) in files {
-        let relative = format!(".agents/skills/{name}");
-        let target = journal.plan.workspace.join(&relative);
-        let receipt = serde_json::to_vec(
-            &serde_json::json!({"request_id":journal.request_id,"sha256":pin,"version":tool.version}),
-        )?;
-        if filesystem::exists(&target)? {
-            if filesystem::receipt_matches(&target, ".memory-onboarding-pin.json", &receipt)? {
-                let stage = cache.join(format!("{pin}-{name}"));
-                filesystem::publish_directory(
-                    &stage,
-                    &target,
-                    ".memory-onboarding-pin.json",
-                    &receipt,
-                )?;
-                continue;
-            }
-            if !journal.preserved_paths.contains(&relative) {
-                journal.preserved_paths.push(relative);
-            }
-            continue;
+    for (name, contents) in &files {
+        for root in [".agents", ".claude"] {
+            publish_skill(path, journal, &cache, &pin, name, contents, tool, root)?;
         }
-        // Publish a fully validated private directory. An interruption before
-        // publication keeps staging; after publication keeps complete skills.
-        // No file is executable and no script/plugin is invoked.
-        let stage = cache.join(format!("{pin}-{name}"));
-        filesystem::install_missing(&stage, ".memory-onboarding-pin.json", &receipt)?;
-        filesystem::owned_directory(&journal.plan.workspace.join(".agents"))?;
-        filesystem::owned_directory(&journal.plan.workspace.join(".agents/skills"))?;
-        if filesystem::exists(&target)? {
-            bail!("skill destination appeared during apply; staging retained");
-        }
-        filesystem::publish_directory(&stage, &target, ".memory-onboarding-pin.json", &receipt)?;
     }
+    filesystem::save(path, journal)?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn publish_skill(
+    path: &Path,
+    journal: &mut Journal,
+    cache: &Path,
+    pin: &str,
+    name: &str,
+    contents: &BTreeMap<String, Vec<u8>>,
+    tool: &OnboardingPinnedTool,
+    root: &str,
+) -> Result<()> {
+    let relative = format!("{root}/skills/{name}");
+    let target = journal.plan.workspace.join(&relative);
+    let receipt = serde_json::to_vec(
+        &serde_json::json!({"request_id":journal.request_id,"sha256":pin,"version":tool.version}),
+    )?;
+    // A distinct staged tree for each destination allows interruption after
+    // the first publication without moving/copying an existing user tree.
+    let stage = cache.join(format!("{pin}-{name}-{root}"));
+    filesystem::owned_directory(&stage)?;
+    for (relative, bytes) in contents {
+        if !filesystem::install_missing(&stage, relative, bytes)? {
+            let existing = stage.join(relative);
+            filesystem::absolute_leaf(&existing)?;
+            let mut content = Vec::new();
+            fs::File::open(existing)?
+                .take(MAX_FILE as u64 + 1)
+                .read_to_end(&mut content)?;
+            if content != *bytes {
+                bail!("agent-specific skill staging inputs changed; no replacement performed");
+            }
+        }
+    }
+    filesystem::install_missing(&stage, ".memory-onboarding-pin.json", &receipt)?;
+    if filesystem::exists(&target)? {
+        if filesystem::receipt_matches(&target, ".memory-onboarding-pin.json", &receipt)? {
+            filesystem::publish_directory(
+                &stage,
+                &target,
+                ".memory-onboarding-pin.json",
+                &receipt,
+            )?;
+            return Ok(());
+        }
+        if !journal.preserved_paths.contains(&relative) {
+            journal.preserved_paths.push(relative);
+        }
+        filesystem::save(path, journal)?;
+        return Ok(());
+    }
+    // Publish a fully validated private directory. An interruption before
+    // publication keeps staging; after publication keeps complete skills.
+    // No file is executable and no script/plugin is invoked.
+    filesystem::owned_directory(&journal.plan.workspace.join(root))?;
+    filesystem::owned_directory(&journal.plan.workspace.join(format!("{root}/skills")))?;
+    if filesystem::exists(&target)? {
+        bail!("skill destination appeared during apply; staging retained");
+    }
+    filesystem::publish_directory(&stage, &target, ".memory-onboarding-pin.json", &receipt)?;
     filesystem::save(path, journal)?;
     Ok(())
 }

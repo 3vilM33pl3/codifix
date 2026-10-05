@@ -720,6 +720,13 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
         "custom skill",
     )
     .unwrap();
+    fs::create_dir_all(args.workspace.join(".claude/skills/memory-remember")).unwrap();
+    fs::write(
+        args.workspace
+            .join(".claude/skills/memory-remember/SKILL.md"),
+        "custom Claude skill",
+    )
+    .unwrap();
     let journal = prepare_with(&args, &origin, &record, &catalog)
         .await
         .unwrap();
@@ -748,6 +755,23 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
         args.workspace
             .join(".agents/skills/memory-remember/SKILL.md")
             .is_file()
+    );
+    assert!(
+        args.workspace
+            .join(".claude/skills/memory-layer/SKILL.md")
+            .is_file()
+    );
+    assert_eq!(
+        fs::read_to_string(
+            args.workspace
+                .join(".claude/skills/memory-remember/SKILL.md")
+        )
+        .unwrap(),
+        "custom Claude skill"
+    );
+    assert!(
+        done.preserved_paths
+            .contains(&".claude/skills/memory-remember".into())
     );
     #[cfg(unix)]
     {
