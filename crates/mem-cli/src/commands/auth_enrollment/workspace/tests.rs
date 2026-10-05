@@ -670,7 +670,7 @@ fn unsafe_archive_paths_and_expansion_are_rejected() {
     assert!(artifacts::bundle(&vec![0; 16 * 1024 * 1024 + 1]).is_err());
 }
 #[test]
-fn journal_tampering_and_concurrent_apply_locks_fail_closed() {
+fn concurrent_apply_locks_fail_closed() {
     let fixture = Fixture::new();
     let path = fixture.0.join("plan.json");
     let first = filesystem::Lock::take(&path).unwrap();
@@ -678,6 +678,168 @@ fn journal_tampering_and_concurrent_apply_locks_fail_closed() {
     drop(first);
     assert!(filesystem::Lock::take(&path).is_ok());
 }
+
+#[tokio::test]
+async fn modified_journal_inputs_are_rejected_without_rewriting_user_files() {
+    let fixture = Fixture::new();
+    let catalog = FakeCatalog::new(project());
+    let (origin, record) = identity();
+    let args = fixture.prepare(&catalog.project.manifest);
+    let journal = prepare_with(&args, &origin, &record, &catalog)
+        .await
+        .unwrap();
+    let mut raw: serde_json::Value =
+        serde_json::from_slice(&fs::read(&args.journal).unwrap()).unwrap();
+    raw["plan"]["manifest"]["repository_url"] = "https://attacker.example.test/other.git".into();
+    fs::write(&args.journal, serde_json::to_vec(&raw).unwrap()).unwrap();
+    let git = FakeGit::default();
+    assert!(
+        apply_with(
+            &fixture.apply(&journal),
+            &origin,
+            &record,
+            &catalog,
+            &git,
+            &FakeDownloads::default()
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(git.clones.get(), 0);
+    assert!(!args.workspace.exists());
+}
+
+#[tokio::test]
+async fn current_scope_revoked_after_clone_stops_templates_and_downloads() {
+    let fixture = Fixture::new();
+    let mut reviewed = project();
+    let bytes = bundle("2.1.0");
+    reviewed.manifest.entry.tools.push(pin(&bytes, "2.1.0"));
+    let catalog = FakeCatalog::new(reviewed);
+    let (origin, record) = identity();
+    let args = fixture.prepare(&catalog.project.manifest);
+    let journal = prepare_with(&args, &origin, &record, &catalog)
+        .await
+        .unwrap();
+    catalog
+        .queued
+        .borrow_mut()
+        .extend([vec![catalog.project.clone()], vec![]]);
+    let git = FakeGit::default();
+    let downloads = FakeDownloads {
+        bytes,
+        calls: Cell::new(0),
+    };
+    assert!(
+        apply_with(
+            &fixture.apply(&journal),
+            &origin,
+            &record,
+            &catalog,
+            &git,
+            &downloads
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(git.clones.get(), 1);
+    assert!(args.workspace.join(".git").is_dir());
+    assert!(!args.workspace.join(".codex").exists());
+    assert_eq!(downloads.calls.get(), 0);
+}
+
+#[tokio::test]
+async fn lost_skill_completion_reuses_pinned_cache_without_overwrite_or_download() {
+    let fixture = Fixture::new();
+    let bytes = bundle("2.1.0");
+    let mut reviewed = project();
+    reviewed.manifest.entry.tools.push(pin(&bytes, "2.1.0"));
+    let catalog = FakeCatalog::new(reviewed);
+    let (origin, record) = identity();
+    let args = fixture.prepare(&catalog.project.manifest);
+    let journal = prepare_with(&args, &origin, &record, &catalog)
+        .await
+        .unwrap();
+    let downloads = FakeDownloads {
+        bytes,
+        calls: Cell::new(0),
+    };
+    let git = FakeGit::default();
+    let mut done = apply_with(
+        &fixture.apply(&journal),
+        &origin,
+        &record,
+        &catalog,
+        &git,
+        &downloads,
+    )
+    .await
+    .unwrap();
+    done.tools_done = false; // Simulate completed effects but lost stage acknowledgement.
+    filesystem::save(&args.journal, &done).unwrap();
+    let recovered = apply_with(
+        &fixture.apply(&journal),
+        &origin,
+        &record,
+        &catalog,
+        &git,
+        &downloads,
+    )
+    .await
+    .unwrap();
+    assert!(recovered.tools_done);
+    assert_eq!(downloads.calls.get(), 1);
+    assert_eq!(git.clones.get(), 1);
+    let skill = args.workspace.join(".agents/skills/memory-layer/SKILL.md");
+    fs::write(&skill, "custom change after installation").unwrap();
+    let mut pending = recovered;
+    pending.tools_done = false;
+    filesystem::save(&args.journal, &pending).unwrap();
+    assert!(
+        apply_with(
+            &fixture.apply(&journal),
+            &origin,
+            &record,
+            &catalog,
+            &git,
+            &downloads
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        fs::read_to_string(skill).unwrap(),
+        "custom change after installation"
+    );
+    assert_eq!(downloads.calls.get(), 1);
+}
+
+#[test]
+fn directory_publication_never_replaces_even_empty_existing_target() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("private");
+    let target = fixture.0.join("user-directory");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("payload"), "private contents").unwrap();
+    fs::create_dir(&target).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let inode = fs::metadata(&target).unwrap().ino();
+        assert!(
+            filesystem::publish_directory(&source, &target, "receipt.json", b"receipt").is_err()
+        );
+        assert_eq!(fs::metadata(&target).unwrap().ino(), inode);
+    }
+    #[cfg(not(unix))]
+    assert!(filesystem::publish_directory(&source, &target, "receipt.json", b"receipt").is_err());
+    assert!(target.read_dir().unwrap().next().is_none());
+    assert_eq!(
+        fs::read_to_string(source.join("payload")).unwrap(),
+        "private contents"
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn symlinked_settings_are_preserved_and_traversal_paths_fail() {
