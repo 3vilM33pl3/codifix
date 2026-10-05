@@ -338,26 +338,31 @@ async fn remote_only_activation_has_zero_generic_authority_exact_scope_and_no_fa
     ] {
         assert!(!actor.permissions_for_project("local").contains(permission));
     }
-    use tower::ServiceExt;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
     let app = crate::routes::build_http_app(f.state.clone());
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
     for path in [
         "/v1/auth/tokens",
         "/v1/auth/memberships",
         "/v1/admin/onboarding/users",
     ] {
-        let response = app
-            .clone()
-            .oneshot(
-                axum::http::Request::builder()
-                    .uri(path)
-                    .header("authorization", format!("Bearer {credential}"))
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
+        let response = client
+            .get(format!("{origin}{path}"))
+            .bearer_auth(&credential)
+            .send()
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::FORBIDDEN, "{path}");
     }
+    server.abort();
     assert_eq!(
         sqlx::query_scalar::<_, i64>(
             "SELECT count(*) FROM auth_project_memberships WHERE principal_id=$1"
@@ -490,15 +495,16 @@ async fn lost_owner_reply_resumes_exact_durable_operation_and_local_path_cannot_
     );
     let result = call(&f, &request).await.unwrap();
     assert_eq!(result.status, "approved");
-    let requests = owner.fake.seen.lock().unwrap();
-    let approvals = requests
-        .iter()
-        .filter(|(kind, _, _)| kind == "approve")
-        .map(|(_, _, body)| body.clone())
-        .collect::<Vec<_>>();
-    assert_eq!(approvals.len(), 2);
-    assert_eq!(approvals[0], approvals[1]);
-    drop(requests);
+    {
+        let requests = owner.fake.seen.lock().unwrap();
+        let approvals = requests
+            .iter()
+            .filter(|(kind, _, _)| kind == "approve")
+            .map(|(_, _, body)| body.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(approvals.len(), 2);
+        assert_eq!(approvals[0], approvals[1]);
+    }
     owner.close().await;
     f.db.cleanup().await.unwrap();
 }

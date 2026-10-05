@@ -325,7 +325,7 @@ async fn company_device_end_to_end_signed_delivery_never_forwards_laptop_authori
     assert_eq!(observed, f.observed.seen.lock().unwrap().len());
     // It is a selective device, not a normal Memory/export/federation client.
     for path in [
-        format!("/v1/projects/local/memories"),
+        "/v1/projects/local/memories".to_string(),
         format!("/v1/onboarding/projects/{}/subscription", f.company.project),
     ] {
         assert_eq!(

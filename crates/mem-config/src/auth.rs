@@ -460,11 +460,13 @@ mod company_delegations_tests {
         })).unwrap();
         assert!(owner.delivery_token_env.is_none());
         assert!(owner.delivery_policy_revision.is_none());
-        let mut auth = AuthConfig::default();
-        auth.company_onboarding = Some(CompanyOnboardingConfig {
-            company_id: Uuid::new_v4(),
-            owners: vec![owner],
-        });
+        let mut auth = AuthConfig {
+            company_onboarding: Some(CompanyOnboardingConfig {
+                company_id: Uuid::new_v4(),
+                owners: vec![owner],
+            }),
+            ..AuthConfig::default()
+        };
         assert!(auth.validate_company_delivery_delegations().is_ok());
         auth.mode = AuthMode::MultiUser;
         let owner = &mut auth.company_onboarding.as_mut().unwrap().owners[0];

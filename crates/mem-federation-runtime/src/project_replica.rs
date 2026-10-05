@@ -42,19 +42,21 @@ mod scoped_client_tests {
         let scope = ProjectScope {
             company: Uuid::new_v4(),
             area: "workshop".into(),
-            owner: InstanceId::new(Uuid::new_v4()).unwrap(),
+            owner: InstanceId::new(Uuid::new_v4()).expect("non-nil fixture owner"),
             project: Uuid::new_v4(),
-            space: SpaceId::new(Uuid::new_v4()).unwrap(),
+            space: SpaceId::new(Uuid::new_v4()).expect("non-nil fixture space"),
         };
         let token = format!("mlt_{}", "a".repeat(64));
         let client = ScopedDeviceClient::for_scope(
-            Endpoint::new("http://127.0.0.1:4250", true).unwrap(),
+            Endpoint::new("http://127.0.0.1:4250", true).expect("explicit loopback fixture"),
             token.clone(),
             scope.clone(),
         )
-        .unwrap();
+        .expect("valid exact scoped client");
         assert_eq!(
-            client.snapshot_path(scope.project).unwrap(),
+            client
+                .snapshot_path(scope.project)
+                .expect("selected project"),
             format!(
                 "/v1/onboarding/areas/workshop/owners/{}/projects/{}/snapshot",
                 scope.owner.as_uuid(),
@@ -66,17 +68,19 @@ mod scoped_client_tests {
         invalid.area = "trust".into();
         assert!(
             ScopedDeviceClient::for_scope(
-                Endpoint::new("http://127.0.0.1:4250", true).unwrap(),
+                Endpoint::new("http://127.0.0.1:4250", true).expect("explicit loopback fixture"),
                 token.clone(),
                 invalid
             )
             .is_err()
         );
-        let legacy =
-            ScopedDeviceClient::new(Endpoint::new("http://127.0.0.1:4250", true).unwrap(), token)
-                .unwrap();
+        let legacy = ScopedDeviceClient::new(
+            Endpoint::new("http://127.0.0.1:4250", true).expect("explicit loopback fixture"),
+            token,
+        )
+        .expect("valid legacy client");
         assert_eq!(
-            legacy.snapshot_path(scope.project).unwrap(),
+            legacy.snapshot_path(scope.project).expect("legacy project"),
             format!("/v1/onboarding/projects/{}/snapshot", scope.project)
         );
     }
