@@ -2,6 +2,11 @@
 use super::*;
 use serde::de::DeserializeOwned;
 use std::time::Duration;
+fn unavailable() -> ApiError {
+    ApiError::service_unavailable(
+        "current owner confirmation unavailable; no current authority asserted",
+    )
+}
 
 pub(super) fn validate_receipt(
     request: &OwnerDeviceApprovalRequest,
@@ -58,19 +63,28 @@ async fn post<T: Serialize, R: DeserializeOwned>(
         .connect_timeout(Duration::from_secs(3))
         .timeout(Duration::from_secs(10))
         .build()
-        .map_err(|_| denied())?;
+        .map_err(|_| unavailable())?;
     let mut response = client
         .post(url)
         .bearer_auth(secret)
         .json(body)
         .send()
         .await
-        .map_err(|_| denied())?;
-    if !response.status().is_success() || response.content_length().is_some_and(|n| n > 65536) {
+        .map_err(|_| unavailable())?;
+    if !response.status().is_success() {
+        // Never reflect the owner body. A definitive denial must reach the
+        // native broker so it can latch revocation before another offline call.
+        return Err(match response.status().as_u16() {
+            401 | 403 | 404 | 410 => denied(),
+            409 => changed(),
+            _ => unavailable(),
+        });
+    }
+    if response.content_length().is_some_and(|n| n > 65536) {
         return Err(denied());
     }
     let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| denied())? {
+    while let Some(chunk) = response.chunk().await.map_err(|_| unavailable())? {
         if bytes.len() + chunk.len() > 65536 {
             return Err(denied());
         }

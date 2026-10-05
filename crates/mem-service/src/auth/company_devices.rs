@@ -494,7 +494,7 @@ pub(super) async fn catalog_for_device(
     }
     tx.commit().await.map_err(ApiError::sql)?;
     for binding in &bindings {
-        transport::current_bootstrap(&binding.owner,&binding.approval,&binding.bootstrap).await.map_err(|_|ApiError::service_unavailable("selected company project current owner authority unavailable; no catalog returned"))?;
+        transport::current_bootstrap(&binding.owner, &binding.approval, &binding.bootstrap).await?;
     }
     let mut tx = state.pool()?.begin().await.map_err(ApiError::sql)?;
     let mut projects = Vec::new();

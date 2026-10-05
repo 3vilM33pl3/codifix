@@ -2,7 +2,6 @@
 use super::*;
 use crate::auth::company_devices::tests as enrollment;
 use crate::auth::device::tests::{Fixture, fixture};
-use tower::ServiceExt;
 
 struct Setup {
     f: Fixture,
@@ -146,33 +145,42 @@ async fn independent_siblings_have_no_generic_authority_and_only_exact_child_rec
         .is_err()
     );
     let app = crate::routes::build_http_app(s.f.state.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap()
+    });
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap();
     for path in [
         "/v1/auth/tokens",
         "/v1/auth/memberships",
         "/v1/admin/onboarding/users",
     ] {
-        let response = app
-            .clone()
-            .oneshot(
-                axum::http::Request::builder()
-                    .uri(path)
-                    .header("authorization", format!("Bearer {secret}"))
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
+        let response = client
+            .get(format!("{base}{path}"))
+            .bearer_auth(&secret)
+            .send()
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
-    let response = app
-        .clone()
-        .oneshot(
-            axum::http::Request::builder()
-                .uri(format!("/v1/onboarding/agents/{}/receipt", first.agent_id))
-                .header("authorization", format!("Bearer {secret}"))
-                .body(axum::body::Body::empty())
-                .unwrap(),
-        )
+    let response = client
+        .get(format!(
+            "{base}/v1/onboarding/agents/{}/receipt",
+            first.agent_id
+        ))
+        .bearer_auth(&secret)
+        .send()
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
@@ -216,16 +224,39 @@ async fn independent_siblings_have_no_generic_authority_and_only_exact_child_rec
         .await
         .is_ok()
     );
-    s.owner.mode(10);
-    assert!(
-        child_receipt(
+    for (mode, expected) in [
+        (10, StatusCode::FORBIDDEN),
+        (16, StatusCode::FORBIDDEN),
+        (17, StatusCode::FORBIDDEN),
+        (18, StatusCode::FORBIDDEN),
+        (13, StatusCode::CONFLICT),
+        (14, StatusCode::CONFLICT),
+        (15, StatusCode::SERVICE_UNAVAILABLE),
+    ] {
+        s.owner.mode(mode);
+        let error = child_receipt(
             State(s.f.state.clone()),
             Extension(sibling.clone()),
-            Path(other.agent_id)
+            Path(other.agent_id),
         )
         .await
-        .is_err()
-    );
+        .unwrap_err();
+        assert_eq!(error.status, expected, "direct mode {mode}");
+        let response = client
+            .get(format!(
+                "{base}/v1/onboarding/agents/{}/receipt",
+                other.agent_id
+            ))
+            .bearer_auth(&other_secret)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), expected, "actual HTTP mode {mode}");
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        let body = response.text().await.unwrap();
+        assert!(!body.contains(&other_secret));
+        assert!(!body.contains("synthetic-delivery"));
+    }
     s.owner.mode(0);
     sqlx::query("UPDATE onboarding_devices SET revoked_at=clock_timestamp() WHERE id=$1")
         .bind(s.device)
@@ -246,6 +277,8 @@ async fn independent_siblings_have_no_generic_authority_and_only_exact_child_rec
         .await
         .is_err()
     );
+    server.abort();
+    let _ = server.await;
     close(s).await;
 }
 

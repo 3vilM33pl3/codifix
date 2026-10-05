@@ -116,8 +116,14 @@ async fn fake_subscription(
         .lock()
         .unwrap()
         .push(("subscription".into(), headers, json!(request)));
-    if fake.mode.load(Ordering::SeqCst) == 10 {
-        return Err(StatusCode::FORBIDDEN);
+    match fake.mode.load(Ordering::SeqCst) {
+        10 => return Err(StatusCode::FORBIDDEN),
+        13 => return Err(StatusCode::CONFLICT),
+        15 => return Err(StatusCode::SERVICE_UNAVAILABLE),
+        16 => return Err(StatusCode::UNAUTHORIZED),
+        17 => return Err(StatusCode::NOT_FOUND),
+        18 => return Err(StatusCode::GONE),
+        _ => {}
     }
     let receipt = fake
         .receipts
@@ -145,6 +151,13 @@ async fn fake_subscription(
         2 => bootstrap.device = Uuid::new_v4(),
         8 => bootstrap.catalog_revision += 1,
         9 => bootstrap.receipt_keys.clear(),
+        14 => {
+            bootstrap.receipt_keys = GatewaySecurity::initial(&[63; 32], SpacePolicy::default())
+                .unwrap()
+                .trust()
+                .keys()
+                .to_vec()
+        }
         _ => {}
     }
     Ok(Json(bootstrap))

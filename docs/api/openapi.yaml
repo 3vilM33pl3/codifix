@@ -147,8 +147,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CompanyAgentReceipt' }
         '401': { description: Child or parent expired, disabled or revoked. }
-        '403': { description: Not the exact independently enrolled child. }
-        '409': { description: Current reviewed scope, destination, registry or pinned trust changed. }
+        '403': { description: Not the exact independently enrolled child, or definitive owner401/403/404/410 denial. Native callers must latch this denial before later offline calls. }
+        '409': { description: Current reviewed scope, destination, registry or pinned trust changed, including owner policy409. Native callers must latch the changed binding. }
         '503': { description: Current selected owner authority unavailable; no receipt returned. }
   /v1/onboarding/company/device/review:
     get:

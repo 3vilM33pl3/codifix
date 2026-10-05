@@ -27,11 +27,6 @@ fn changed() -> ApiError {
         "agent identity, immutable request, reviewed scope or parent policy changed; no credential restored",
     )
 }
-fn unavailable() -> ApiError {
-    ApiError::service_unavailable(
-        "current selected owner authority unavailable; no agent receipt returned",
-    )
-}
 fn hash(value: &str) -> Result<Vec<u8>, ApiError> {
     if value.len() != 64
         || !value
@@ -335,9 +330,7 @@ async fn audit(
 }
 async fn current(binding: &CompanyAgentBinding) -> Result<(), ApiError> {
     for parent in &binding.parents {
-        company_devices::current_owner(parent)
-            .await
-            .map_err(|_| unavailable())?;
+        company_devices::current_owner(parent).await?;
     }
     Ok(())
 }
@@ -484,9 +477,7 @@ pub(crate) async fn approve(
     browser_parent(&state, &mut tx, &actor, device_id).await?;
     tx.commit().await.map_err(ApiError::sql)?;
     for parent in &before_parents {
-        company_devices::current_owner(parent)
-            .await
-            .map_err(|_| unavailable())?;
+        company_devices::current_owner(parent).await?;
     }
     let mut tx = begin(&state).await?;
     browser_parent(&state, &mut tx, &actor, device_id).await?;
