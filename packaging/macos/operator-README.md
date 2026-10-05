@@ -1,0 +1,184 @@
+# Explicit native onboarding operator
+
+This is a prerequisite-based provisioning candidate, not a verified self-contained
+Mac installer. The package bundles these first-party helpers read-only but does
+not run Python, install PostgreSQL, log in, start services or provision agent
+identities during postinstall. Native macOS/Keychain/launchd/APFS acceptance is
+still pending.
+
+## Prerequisites
+
+Run as a non-root logged-in Mac user. Supply an already installed Python 3.11+
+runtime, the installed full Memory binary (embedded PostgreSQL service and
+`project-sync` support), and one reviewed installed PostgreSQL 16, 17 or 18
+distribution with pgvector. These bounds are operator policy, not a claim that
+all native distribution/version combinations were tested.
+
+The PostgreSQL project's [macOS download page](https://www.postgresql.org/download/macosx/)
+lists native distributions. [Postgres.app documents bundled pgvector](https://postgresapp.com/extensions/)
+and its [command-line tool locations](https://postgresapp.com/documentation/cli-tools.html);
+its [downloads](https://postgresapp.com/downloads.html) identify universal Mac
+packages. No release version/hash is assumed by this operator. It does not run
+Homebrew, fetch an installer, mount a DMG, compile Memory or build extensions.
+A reviewed pinned redistributable dependency package remains unfinished.
+
+Use explicit real paths, not `latest`/Homebrew symlinks. Installed executables,
+extension library/control/SQL files and the operator/Python runtime are SHA-256
+pinned. They and their ancestors must not be group/world-writable (a system
+sticky temporary ancestor is permitted). Memory, PostgreSQL tools and vector
+library must contain the current Mac execution architecture, checked with
+`lipo` before executing them. Missing prerequisites, changed pins, port conflicts
+and unsupported layouts fail without changing an existing installation.
+
+The user `~/Library/LaunchAgents/` directory must already exist. Supply an
+existing current-user private `0700` parent for a new operator data root, and
+a separate private journal/input directory. No chown, permission repair,
+existing cluster adoption, default-global config fallback or destructive cleanup
+is performed.
+
+## Inputs and preview
+
+First enroll the device and produce credential-free, current reviewed selections
+with `memory projects subscription`. Its confirmed create-only metadata contains
+the stable company/area/owner/project/space, reviewed revision, authority receipt
+keys, device and subscription UUID. It contains no database URL or company
+credential. Exact replay retains its subscription UUID.
+
+Prepare a private `0600` JSON operator input with exactly these fields. Placeholder
+pins/UUIDs below must be replaced with actual reviewed installed-file values;
+this example is not an executable default installer profile:
+
+```json
+{
+  "schema_version": 1,
+  "root": "/Users/YOU/PrivateMemoryInstalls/selected-installation",
+  "memory": {
+    "path": "/usr/local/bin/memory",
+    "sha256": "ACTUAL_LOWERCASE_SHA256",
+    "version": "ACTUAL_MEMORY_VERSION_OUTPUT"
+  },
+  "postgres": {
+    "bin_dir": "/Applications/Postgres.app/Contents/Versions/16/bin",
+    "major": 16,
+    "tool_sha256": {
+      "postgres": "ACTUAL_LOWERCASE_SHA256",
+      "initdb": "ACTUAL_LOWERCASE_SHA256",
+      "pg_ctl": "ACTUAL_LOWERCASE_SHA256",
+      "psql": "ACTUAL_LOWERCASE_SHA256",
+      "pg_config": "ACTUAL_LOWERCASE_SHA256",
+      "pg_controldata": "ACTUAL_LOWERCASE_SHA256"
+    },
+    "vector_library": "ACTUAL_PG_CONFIG_PKGLIBDIR/vector.so",
+    "vector_library_sha256": "ACTUAL_LOWERCASE_SHA256",
+    "vector_control": "ACTUAL_PG_CONFIG_SHAREDIR/extension/vector.control",
+    "vector_control_sha256": "ACTUAL_LOWERCASE_SHA256",
+    "vector_version": "ACTUAL_INSTALLED_VERSION",
+    "vector_sql": {
+      "vector--ACTUAL_INSTALLED_VERSION.sql": "ACTUAL_LOWERCASE_SHA256"
+    }
+  },
+  "pg_port": 55432,
+  "areas": [
+    {"name": "workshop", "instance_id": "NEW_LOCAL_AREA_UUID", "api_port": 55440}
+  ],
+  "subscriptions": ["/Users/YOU/PrivateSelections/project-subscription.json"]
+}
+```
+
+Pin the actual SQL installation file (and any additionally reviewed vector SQL
+files), not a checksum copied from this example. `pg_config --sharedir` and
+`--pkglibdir` must match the pinned extension paths. Ports are explicit,
+unprivileged and distinct, never silently reassigned. One to three unique
+Workshop/Homelab/General areas and one to eight exact subscriptions are supported.
+Every selected area must have at least one subscription. Trust is always rejected.
+The new local area UUID is not the remote owner's UUID.
+
+Using the explicit installed Python prerequisite:
+
+```bash
+/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+  prepare --input /ABS/PRIVATE/input.json --journal /ABS/PRIVATE/native-plan.json
+/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+  apply --journal /ABS/PRIVATE/native-plan.json --plan-sha256 EXACT_PREVIEW_SHA256 --confirm
+/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+  status --journal /ABS/PRIVATE/native-plan.json
+```
+
+Prepare records only metadata and immutable installed-tool/helper pins. Apply
+freshly checks each selection through the Keychain-backed subscription producer
+before local provisioning. Changed identities/revisions/receipt keys, unavailable
+authority or revoked scope block effects rather than expanding privileges.
+Status is local journal inspection, not current device/subscription health.
+
+## Local effects and recovery
+
+Apply records durable intents/receipts for layout, initdb, named PostgreSQL
+LaunchAgent, each area's database/config/service and each subscription worker.
+It creates only the confirmed new data root and exact new plists. Every file is
+create-only or exact idempotent replay; altered settings/credentials/configs are
+preserved and block continuation. Journals/configs/secrets/profiles use `0600`,
+data/profile directories `0700`, descriptor-pinned no-follow paths, physical
+containment checks and an exclusive journal lock. Native APFS alias behavior
+remains an acceptance gate despite Linux alias fixtures.
+
+The dedicated cluster binds 127.0.0.1 only, has Unix sockets disabled, SCRAM
+passwords and reject rules for other addresses. PostgreSQL
+[documents initdb/password-file authentication](https://www.postgresql.org/docs/current/app-initdb.html)
+and [SCRAM](https://www.postgresql.org/docs/current/auth-password.html).
+The local administrator and per-area login passwords are generated here; no
+server database credentials or PDS/gateway secrets are downloaded. Passwords are
+not in process arguments, logs or the metadata journal. The private local
+profiles add their own loopback database URL for the scoped replica client.
+
+Each area gets a distinct `memory_laptop_<area>` database and non-superuser login,
+a distinct loopback API port and a new local area identity. Its installed Memory
+service applies the existing embedded migration inventory, not duplicated SQL
+migrations. Background work, reinforcement (including validation), consolidation,
+embedding automation, discovery and MCP are explicitly disabled. Model settings
+have an empty model and credential reference, so the current service rejects
+enrichment before contacting a provider; the configured destination is loopback
+port 1, not an external provider. Service read-only mode is enabled. Schema checks and a healthy primary
+service with the exact configured durable service tag are required before
+registering workers; unknown/unready responses do not count as success.
+
+Labels are namespaced by the installation journal's request UUID:
+
+- `com.memory-layer.onboarding.<request>.postgres.cluster`
+- `com.memory-layer.onboarding.<request>.area.<area>`
+- `com.memory-layer.onboarding.<request>.sync.<subscription>`
+
+Workers use launchd `RunAtLoad` and `StartInterval=300` for one guarded
+`memory projects sync --profile ...` invocation. They retry at a subsequent
+interval after connection failure; registration is not proof of successful sync.
+Inspect `memory projects sync-status --profile ...` and explicit offline search
+for committed progress/citations. [Apple documents timed per-user LaunchAgents](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html).
+Every launch runs the pinned operator wrapper, which rechecks private files and
+installed prerequisite pins; a changed installed binary blocks execution until
+an explicit reviewed upgrade path exists.
+
+No `restart-all`, `bootout`, `kickstart -k`, process killing or unrelated service
+control is used. Exact loaded jobs are retained; an absent own job can be
+bootstrapped on explicit apply. Lost initdb/bootstrap confirmation resumes the
+same journal/request, verifies existing state and does not initialize/launch a
+duplicate. A partial cluster without a valid version/control file is retained
+for manual inspection, never cleared or automatically recreated.
+
+Existing shared Memory services, clusters, config/env files, repositories,
+custom Codex/Claude settings and user installations remain untouched. This step
+does not clone repositories or provision separate Codex/OpenAI and
+Claude/Anthropic agent identities; those identities remain blocked. It does not
+grant company membership or mark the full onboarding plan complete.
+
+## Offline validation only
+
+```bash
+python3 packaging/macos/tests/test_onboarding_operator.py
+python3 packaging/macos/tests/test_package_contract.py
+bash -n packaging/build-pkg.sh
+```
+
+Tests inject fake native commands and synthetic files/metadata. Native package
+installation/signing, Python/PG/pgvector prerequisites, architecture checks,
+Keychain approval, launchd restart/login behavior, initial live sync and
+case-insensitive APFS all still need Mac acceptance. No native install or live
+provider/model call is evidenced by these tests.

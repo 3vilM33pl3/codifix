@@ -40,7 +40,8 @@ class PackageContract(unittest.TestCase):
                           "web/dist", "target/macos-pkg", "target/x86_64-apple-darwin/release"):
             (repo / directory).mkdir(parents=True, exist_ok=True)
         shutil.copy2(BUILDER, repo / "packaging/build-pkg.sh")
-        for name in ("postinstall.sh", "seed-user.sh"):
+        for name in ("postinstall.sh", "seed-user.sh", "onboard.py", "onboarding_files.py",
+                     "onboarding_native.py", "operator-README.md"):
             shutil.copy2(MACOS / name, repo / "packaging/macos" / name)
         for name in ("config.toml", "agents/astra_adviser.toml"):
             shutil.copy2(REPO / ".codex" / name, repo / ".codex" / name)
@@ -123,6 +124,11 @@ touch "$output"
             staged = capture / "payload/usr/local/share/memory-layer/onboarding/.codex" / name
             self.assertEqual(staged.read_bytes(), (REPO / ".codex" / name).read_bytes())
             self.assertEqual(stat.S_IMODE(staged.stat().st_mode), 0o444)
+        for name in ("onboard.py", "onboarding_files.py", "onboarding_native.py", "operator-README.md"):
+            staged = capture / "payload/usr/local/share/memory-layer/onboarding/operator" / name
+            self.assertEqual(staged.read_bytes(), (MACOS / name).read_bytes())
+            self.assertEqual(stat.S_IMODE(staged.stat().st_mode), 0o444)
+        self.assertNotIn("python", trace.read_text())
         self.assertFalse((capture / "payload/Users").exists())
         self.assertFalse((capture / "payload/var/root").exists())
         self.assertEqual((capture / "scripts/postinstall").read_bytes(), (MACOS / "postinstall.sh").read_bytes())

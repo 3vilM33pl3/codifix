@@ -55,6 +55,15 @@ They are packaged references, not activated global user settings. Installation
 does not overwrite `~/.codex/`, deploy project templates, clone repositories or
 grant company access.
 
+The package also includes the first-party explicit provisioning operator and
+its read-only helper modules under
+`/usr/local/share/memory-layer/onboarding/operator/`. It is not invoked by
+postinstall. [Operator inputs, private local provisioning and recovery](operator-README.md)
+describe the prerequisite-based candidate: installed Python 3.11+, reviewed
+installed PostgreSQL/pgvector and the full architecture-matched Memory binary
+are required. No prerequisites are silently downloaded or source-built, and a
+self-contained dependency distribution/native Mac acceptance is not complete.
+
 Outputs:
 
 - `target/memory-layer-<version>-macos-x86_64.pkg`
@@ -144,6 +153,7 @@ for script in packaging/build-pkg.sh packaging/macos/postinstall.sh packaging/ma
   bash -n "$script" || exit 1
 done
 python3 packaging/macos/tests/test_package_contract.py
+python3 packaging/macos/tests/test_onboarding_operator.py
 ```
 
 Actual `.pkg` installation/upgrade, signing, launchd behavior and native Keychain
