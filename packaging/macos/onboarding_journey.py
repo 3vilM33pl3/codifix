@@ -253,12 +253,12 @@ def bootstrap_preview(value, receipt, source, output):
 
 def confirm(kind, digest, preview):
     print(json.dumps(preview, indent=2, sort_keys=True))
-    print("Offline copies may persist after revocation. Separate Codex/OpenAI and Claude/Anthropic agent identities remain pending; no model calls are enabled.")
+    print("Offline copies may persist after revocation. Model disclosure requires separate explicit consent; this installer enables no paid model calls.")
     try:
-        answer = input(f"Type the exact SHA-256 {digest} to confirm {kind}, or cancel: ")
+        answer = input(f"Type yes to confirm the displayed {kind} plan ({digest}), or cancel: ")
     except EOFError:
         raise Refused("confirmation cancelled; journals retained") from None
-    if answer != digest:
+    if answer not in {"yes", digest}:
         raise Refused("confirmation cancelled; no new effects for this stage")
 
 
@@ -377,7 +377,7 @@ def run(input_file, journal, native, *, memory=None, prompt=confirm):
                         prompt, lambda: operator.apply(native_journal, native_plan["plan_sha256"], True, native))
         result = status(journal)
         print(json.dumps(result, indent=2, sort_keys=True))
-        print("Selected prerequisites/native stages recorded, not clean-Mac acceptance. Agent configuration remains pending; no self-contained prerequisite installation or paid model calls were performed.")
+        print("Selected prerequisites/native stages recorded, not clean-Mac acceptance. Run journey-agents for separate Codex/Claude setup; no self-contained prerequisite installation or paid model calls were performed.")
         return result
 
 
@@ -385,7 +385,11 @@ def status(journal):
     value = inspect(journal)
     result = {"request_id": value["request_id"], "plan_sha256": value["plan_sha256"], "stages": value["stages"],
               "projects": [{"selection": entry["selection"], "subscription_id": entry["subscription"]["subscription"] if entry["subscription"] else None} for entry in value["projects"]],
-              "agent_configuration": "pending separate identities", "native_acceptance": "unverified", "current_authority": "not asserted by local status"}
+              "agent_configuration": "not started; run journey-agents", "native_acceptance": "unverified", "current_authority": "not asserted by local status"}
+    agent_journal = Path(str(journal) + ".agents.json")
+    if agent_journal.exists():
+        import onboarding_agents
+        result["agent_configuration"] = onboarding_agents.status(journal, value)
     if value["native"] is not None:
         _, native_journal = native_paths(journal, value)
         native = operator.inspect(native_journal)

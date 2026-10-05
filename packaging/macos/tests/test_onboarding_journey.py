@@ -136,7 +136,7 @@ class JourneyContract(unittest.TestCase):
         self.assertEqual(self.prompts[0][1], "a" * 64)
         self.assertEqual(self.prompts[1][1], "c" * 64)
         self.assertEqual(self.memory.clones, 1)
-        self.assertEqual(result["agent_configuration"], "pending separate identities")
+        self.assertEqual(result["agent_configuration"], "not started; run journey-agents")
         self.assertEqual(result["native_acceptance"], "unverified")
         for text in [output, self.journal.read_text()]:
             for forbidden in ["local_database_url", "poll_secret", "mlt_", '"password"', '"api_token"']:

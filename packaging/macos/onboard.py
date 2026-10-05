@@ -473,6 +473,10 @@ def main():
     journey.add_argument("--input", required=True, type=Path)
     journey.add_argument("--journal", required=True, type=Path)
     commands.add_parser("journey-status").add_argument("--journal", required=True, type=Path)
+    agents = commands.add_parser("journey-agents")
+    agents.add_argument("--journal", required=True, type=Path)
+    agents.add_argument("--allow-offline", action="store_true", help="explicit bounded cached model-disclosure choice; observed denial always fences it")
+    agents.add_argument("--renew-grant", help="explicitly replace this denied/expired agent UUID; retains history and requires fresh browser approval")
     for name, option in [("run-postgres", None), ("run-service", "--area"), ("run-sync", "--subscription")]:
         child = commands.add_parser(name)
         child.add_argument("--journal", required=True, type=Path)
@@ -480,6 +484,10 @@ def main():
             child.add_argument(option, required=True)
     args = parser.parse_args()
     try:
+        if args.command == "journey-agents":
+            import onboarding_agents
+            onboarding_agents.run(args.journal, Native(), allow_offline=args.allow_offline, renew_grant=args.renew_grant)
+            return
         if args.command in {"journey", "journey-status"}:
             import onboarding_journey
             if args.command == "journey":
