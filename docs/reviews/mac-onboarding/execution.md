@@ -30,11 +30,12 @@ and embedding work are disabled.
 | Contract checkpoint | Complete | Memory IDs above; contract committed. |
 | Sol/Astra project defaults | Complete | Two TOML files parse successfully; bounded read-only adviser and updated repo guidance. |
 | Local company administration backend | Implemented and focused tests passed | Commits `5140b5d1`, `2fb2a3f2`; 36 auth tests on a separate disposable PostgreSQL database, including six onboarding tests; OpenAPI inventory test, formatting and diff checks. Live provider RBAC and company-wide authority remain unverified. |
-| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices/Company alongside existing memberships/tokens; latest full run: 188 Web tests and production build passed. This is a development UI, not a deployed company console. |
-| Unified cross-area administration | Owner delegation, coordinator and console grant workflow implemented | `16051bb8`, `9f60b457`, `60d27978`; six required-database company tests and five new UI tests passed. Explicit owner/token/namespace/role ceiling, ownership guards and durable uncertain outcomes; sanitized registry discovery, exact confirmation, retained operation IDs and distinct current/group rights. Fleet enrollment and native/live owner provisioning remain pending. |
+| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices/Company alongside existing memberships/tokens; latest full run: 203 Web tests and production build passed. This is a development UI, not a deployed company console. |
+| Unified cross-area administration | Owner delegation, credential provisioner, coordinator and console grant workflow implemented | `16051bb8`, `9f60b457`, `60d27978`, `cc1fe53a`, `af387f94`; six company tests plus five delegate database/HTTP tests and two delegate configuration tests passed. Explicit owner/token/namespace/role ceiling, ownership guards and durable uncertain outcomes; sanitized registry discovery, exact confirmation, retained operation IDs and distinct current/group rights. Fleet enrollment and live owner provisioning remain pending. |
 | Device login and selection | Backend, CLI and browser approval implemented | `9f439c27`, `6ac5b994`, `121fab3b`; 44 required-database auth tests and 15 CLI tests passed. Native Keychain execution and TUI selection remain unfinished. |
 | Selective snapshots/offline search | Gateway, local enrolled-owner delivery, bootstrap, private metadata producer and explicit CLI projector/runner implemented | `e741af31`, `d8c5f8db`, `8f578566`, `00d7f2fa`, `09df86da`, `d2d8508f`, `15b649d1`, `46fce2d1`; latest required-database federation store/runtime regression: 84 tests; auth regression: 57 tests with bounded concurrency, plus new configuration test. Two private profile/metadata tests and 41 neutral-core tests passed. Cross-owner device approval, ordinary retrieval/Web/TUI integration and native execution remain pending. |
-| Installer and tool/repository setup | Journaled workspace preparation implemented and reviewed; native operator candidate in progress | `9dabaca8`, `e305955a`, `178560cc`, `894323cb`, `901f6805`; 13 offline packaging tests and latest 44 focused enrollment/workspace/client tests passed. Astra's checkout filter, resumed repository and physical journal containment findings are corrected; native APFS acceptance remains pending. |
+| Installer and tool/repository setup | Journaled workspace preparation and prerequisite-based native operator implemented and reviewed | `9dabaca8`, `e305955a`, `178560cc`, `894323cb`, `901f6805`, `56b87363`, `730d48c1`, `f087b735`; 21 operator and 13 packaging tests passed. Latest prior enrollment/workspace/client suite: 44 tests. Exact immutable package helpers, independent cluster/roles/databases/LaunchAgents and recovery are modeled with synthetic commands. Native APFS/Keychain/launchd and self-contained dependency distribution remain pending. |
+| Read-only local cache interfaces | Web/TUI implemented and reviewed; backend/configuration tests passed | `cb755bb5`, `1f0a12fb`, `f4814db4`; three PostgreSQL/HTTP cache tests, two cache configuration tests and nine focused CLI/TUI tests passed. Exact subscription allowlist; same-snapshot freshness and citations; no normal-query merge, model forwarding or write controls. This is not a native Mac acceptance result. |
 | Real macOS acceptance | Pending | Requires native execution; Linux builds/tests are not evidence of this. |
 
 ## Invariants under review
@@ -175,6 +176,58 @@ area's database, URL query overrides, missing ports and Trust.
 
 ## Completion status
 
+### Native operator and local cache evidence
+
+The prerequisite-based native operator now prepares, confirms and journals its
+own per-user PostgreSQL cluster, non-superuser area roles, exact loopback databases
+and uniquely named LaunchAgents. It pins the executable, installed PostgreSQL/
+pgvector, helper runtime and subscription metadata. Each replay checks current
+Keychain-backed scope and preserves interrupted initialization without restarting
+an unrelated installation. Python 3.11+ and PostgreSQL/pgvector still require
+native installation; synthetic commands do not prove this on a Mac.
+
+Astra found a crash window that could leave a private journal with two hard links,
+blocking exact replay. Atomic no-replace rename now publishes it. Tests interrupt
+after publication and race a competing file without overwriting it; general
+hard-link rejection remains intact. The operator's 21 tests and all 13 packaging
+tests pass after this fix and the cache configuration additions.
+
+The opt-in `[laptop_cache]` view requires exact subscription/device/company/owner/
+project/space bindings, literal loopback service/database and an exact area
+database name. Models, MCP, offline replay, enrichment and autonomous work are
+disabled. The operator derives its allowlist only from reviewed metadata.
+Inspection never initializes subscriptions; search and displayed cursor/freshness
+read the same committed projection. Other stored subscriptions are not exposed.
+
+Astra found a database-URL gate bypass involving `@` inside a query. Parsed URL
+validation now occurs before connecting/migrating, using the already locked pure
+URL parser. Query and fragment attack variants are rejection tests. This adds no
+transport/runtime/database dependency to `mem-config`. A second review found no
+further actionable bug in the cache/backend/Web/TUI paths.
+
+Web `More → Offline` and TUI `Offline` display exact subscription identity, last
+verified page time, source/shared versions, author and reviewed evidence digests
+as plain text. Unknown/stale cache age is not current remote authority. Selection
+changes and cancelled requests cannot show another project's stale result.
+Ordinary prompts, model clients and MCP are not invoked. Three PostgreSQL/real
+HTTP tests and two configuration tests pass; the CLI/TUI focused filter passed
+nine tests, including seven new cache tests. The first complete TUI run exposed a
+missing help section; it was corrected, and the complete rerun passed 95 tests.
+The current OpenAPI inventory and boundary checks also passed. Strict Clippy
+identified a collapsible input-bound guard, which was corrected before rerunning.
+
+Company delegate provisioning issues a secret once after the protected audit
+commits. Exact replay cannot reissue it, restore revocation, adopt an existing
+principal or expand configured ceilings. Five PostgreSQL/HTTP tests include
+browser CSRF, audit rollback and administrator expiry during a lock wait.
+These credentials have only project-scoped `memory_read`/`auth_manage`; they are
+not laptop-delivery authority. Fleet delivery must add separate explicit authority
+and must never forward a laptop bearer credential to another owner.
+
+The development instance remains isolated and earlier operational installations
+remain unchanged. The last build-cache check was 24 GiB, with 373 GiB free on the
+workspace filesystem; no broad cache deletion was performed.
+
 The overall plan is not complete. Native package installation, a clean-Mac
 journey, live Authentik integration and new live project synchronization have
 not been observed. The explicit CLI/projector and prerequisite-based native
@@ -184,8 +237,9 @@ Remaining implementation work:
 
 - A single company-approved device across configured owners, without exposing
   owner credentials or expanding project authority.
-- Web/TUI selection and read-only projection search/status; ordinary retrieval
-  must not silently forward an imported projection to a model.
+- Company project-selection parity across CLI/Web/TUI. The dedicated local
+  read-only cache search/status views are implemented; ordinary retrieval still
+  does not merge these records or forward them to a model.
 - Separately scoped Codex/OpenAI and Claude/Anthropic MCP credentials and
   disclosure policies, not reuse of the device credential.
 - Local capture/proposal/offline replay onboarding, supported project plugin

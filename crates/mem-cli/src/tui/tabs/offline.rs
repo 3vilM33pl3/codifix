@@ -138,12 +138,11 @@ impl App {
                     if !key
                         .modifiers
                         .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
-                        && !c.is_control() =>
+                        && !c.is_control()
+                        && self.offline.question.len() + c.len_utf8() <= 4096 =>
                 {
-                    if self.offline.question.len() + c.len_utf8() <= 4096 {
-                        self.offline.invalidate();
-                        self.offline.question.push(c);
-                    }
+                    self.offline.invalidate();
+                    self.offline.question.push(c);
                 }
                 _ => {}
             }

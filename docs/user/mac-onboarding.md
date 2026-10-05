@@ -193,9 +193,14 @@ current remote authority. Search returns read-only source/shared versions,
 original authors, reviewed evidence, locators and digests. It does not mutate
 local authoritative knowledge or authorize model forwarding.
 
-This is the explicit CLI read-only projection path. Ordinary service retrieval
-and Web/TUI presentation are not yet connected to it, and no Mac-native result
-is claimed from the Linux test harness.
+This is the explicit CLI read-only projection path. The new dedicated Web
+`More → Offline` and TUI `Offline` views inspect the same isolated cache when the
+native operator has emitted `[laptop_cache]` bindings. They show subscription,
+area, owner/project identity, last verified page time and plain-text citations.
+Uninitialized/stale caches do not appear fresh. Search never contacts another
+instance or a model, and selection changes cancel stale results. Ordinary service
+retrieval still does not merge these projections or forward them to a model.
+No Mac-native result is claimed from the Linux test harness.
 
 ### Native provisioning candidate
 
