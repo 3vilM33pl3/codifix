@@ -64,6 +64,68 @@ This is not yet the full Mac onboarding journey. Project-selective feeds,
 searchable offline projections, local database/services, clone/tool setup and
 native Mac acceptance remain separate implementation checks.
 
+## Journaled workspace preparation in the development build
+
+After a reviewed device login, `memory projects available --company
+https://<company-origin>` lists the device's current project scope. The initial
+workspace commands require that approved Keychain credential; Linux tests use
+fake stores, not a production plaintext fallback. Native Mac execution is still
+unverified.
+
+Prepare a preview using the exact area, owner instance, project UUID and reviewed
+revision, not the project slug. Both paths must be absolute, their parent
+directories must already exist, and the journal must be outside the repository:
+
+```bash
+memory projects prepare --company https://<company-origin> \
+  --area workshop --owner-instance <instance-uuid> \
+  --project <project-uuid> --revision <reviewed-revision> \
+  --workspace /Users/<you>/Projects/<repository> \
+  --journal /Users/<you>/Projects/project-onboarding.json
+memory projects apply --company https://<company-origin> \
+  --journal /Users/<you>/Projects/project-onboarding.json \
+  --plan-sha256 <exact-digest-from-preview> --confirm
+memory projects status --journal /Users/<you>/Projects/project-onboarding.json
+```
+
+Prepare writes only a metadata journal containing immutable manifest/template
+inputs and a request UUID; it does not clone, download tools or store credentials
+in that journal. Review the full preview before confirming its digest. Apply
+fetches current device scope again before repository and artifact effects. A
+changed manifest, revoked grant, different device or changed plan stops the
+operation; local stages already completed are retained. Status reads local
+metadata and does not assert that remote access is still authorized.
+
+New repositories clone through the user's separately configured Git credentials,
+never the Memory device token. Redirects, repository hooks, submodule recursion
+and automatic maintenance are disabled. Existing repositories must have the
+reviewed origin URL; their branch and uncommitted changes are left alone. No
+existing repository is reset, checked out, cleared or automatically recloned.
+Interrupted work reuses the recorded request and private staging. An unusable
+partial clone or publication conflict requires inspection rather than automatic
+destructive cleanup. Trust is remote-only and rejects local workspace preparation.
+
+The exact packaged Sol/Astra project templates are applied only when
+`.codex/config.toml` or `.codex/agents/astra_adviser.toml` is missing. Existing
+Codex settings/advisers, Claude files and global settings are preserved; a skipped
+custom file is listed for manual review rather than silently replaced.
+
+The initial pinned-tool installer supports only the existing Memory skill ZIP
+layout, reviewed under tool name `memory-skills`: credential-free HTTPS, an exact
+SHA-256 pin and a matching version in every bundled known Memory `SKILL.md`.
+Archives must contain `.agents/skills/<known-memory-skill>/...`; paths, file types,
+download/expansion sizes and duplicate entries are checked. Only missing skill
+directories are installed. Custom skills are retained, scripts are not executed
+or made executable, and no generic executable plugin is installed. Unknown tool
+formats or failed hashes/versions stop with the completed journal stages retained.
+
+Agent registration remains explicitly blocked pending separate scoped
+Codex/OpenAI and Claude/Anthropic credentials; the broad device-login credential
+is not reused for MCP. These commands do not provision PostgreSQL, start services,
+build source, enable paid model calls, clone Trust sources or perform selective
+sync. Local repository/template stages are not a completed company onboarding
+installation.
+
 ## Identity and project access
 
 The company console uses Authentik for human accounts. Memory project roles,

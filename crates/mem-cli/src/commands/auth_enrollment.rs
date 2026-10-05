@@ -4,6 +4,7 @@ mod credentials;
 #[cfg(test)]
 mod tests;
 mod transport;
+mod workspace;
 
 use anyhow::{Result, bail};
 use clap::{Args, Subcommand};
@@ -56,6 +57,12 @@ pub(super) struct ProjectsArgs {
 pub(super) enum ProjectsCommand {
     /// List reviewed projects currently available to this enrolled device.
     Available(CompanyArgs),
+    /// Preview an exact reviewed project and persist a resumable local plan.
+    Prepare(workspace::PrepareArgs),
+    /// Apply the confirmed immutable plan without replacing existing settings.
+    Apply(workspace::ApplyArgs),
+    /// Inspect local preparation stages (does not assert current remote access).
+    Status(workspace::StatusArgs),
 }
 
 #[derive(Clone)]
@@ -123,6 +130,9 @@ pub(super) async fn handle_command(command: &Command) -> Result<bool> {
             ProjectsCommand::Available(args) => {
                 available(args, &store).await?;
             }
+            ProjectsCommand::Prepare(args) => workspace::prepare(args, &store).await?,
+            ProjectsCommand::Apply(args) => workspace::apply(args, &store).await?,
+            ProjectsCommand::Status(args) => workspace::status(args)?,
         },
         _ => return Ok(false),
     }
