@@ -164,7 +164,8 @@ fi
 for source in "$ROOT_DIR/.codex/config.toml" "$ROOT_DIR/.codex/agents/astra_adviser.toml" \
   "$ROOT_DIR/packaging/macos/postinstall.sh" "$ROOT_DIR/packaging/macos/seed-user.sh" \
   "$ROOT_DIR/packaging/macos/onboard.py" "$ROOT_DIR/packaging/macos/onboarding_files.py" \
-  "$ROOT_DIR/packaging/macos/onboarding_native.py" "$ROOT_DIR/packaging/macos/operator-README.md"; do
+  "$ROOT_DIR/packaging/macos/onboarding_native.py" "$ROOT_DIR/packaging/macos/onboarding_journey.py" \
+  "$ROOT_DIR/packaging/macos/operator-README.md"; do
   if [[ ! -f "$source" ]]; then
     echo "Required package input unavailable: $source" >&2
     exit 1
@@ -235,7 +236,7 @@ install -m 0644 "$ROOT_DIR/README.md" "$PAYLOAD/usr/local/share/memory-layer/REA
 cp -R "$ROOT_DIR/web/dist/." "$PAYLOAD/usr/local/share/memory-layer/web/"
 install -m 0444 "$ROOT_DIR/.codex/config.toml" "$PAYLOAD/usr/local/share/memory-layer/onboarding/.codex/config.toml"
 install -m 0444 "$ROOT_DIR/.codex/agents/astra_adviser.toml" "$PAYLOAD/usr/local/share/memory-layer/onboarding/.codex/agents/astra_adviser.toml"
-for operator_file in onboard.py onboarding_files.py onboarding_native.py operator-README.md; do
+for operator_file in onboard.py onboarding_files.py onboarding_native.py onboarding_journey.py operator-README.md; do
   install -m 0444 "$ROOT_DIR/packaging/macos/$operator_file" "$PAYLOAD/usr/local/share/memory-layer/onboarding/operator/$operator_file"
 done
 # The operator is an explicit later step. No Python, PostgreSQL installation,
