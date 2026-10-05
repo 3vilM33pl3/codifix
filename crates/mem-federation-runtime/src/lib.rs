@@ -16,6 +16,7 @@ mod credentials;
 mod http;
 mod pds;
 mod private_files;
+mod project_delivery;
 pub use credentials::{CredentialMode, CredentialState, GatewayCredentialStatus, MaintenanceState};
 mod security;
 mod scoped;

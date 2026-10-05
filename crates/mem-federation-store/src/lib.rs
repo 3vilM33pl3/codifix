@@ -5,6 +5,8 @@
 mod addressed_expertise;
 mod audit;
 mod scoped;
+mod scoped_source;
+pub use scoped_source::*;
 pub use addressed_expertise::*;
 pub use scoped::*;
 mod scoped_projection;
