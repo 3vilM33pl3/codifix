@@ -2,7 +2,7 @@
 CREATE TABLE onboarding_project_versions (
     project_id UUID NOT NULL REFERENCES projects(id),
     revision BIGINT NOT NULL CHECK (revision > 0),
-    area TEXT NOT NULL CHECK (area IN ('general','work','personal','trust')),
+    area TEXT NOT NULL CHECK (area IN ('general','workshop','homelab','trust')),
     owner_instance_id UUID NOT NULL CHECK (owner_instance_id <> '00000000-0000-0000-0000-000000000000'),
     offline_allowed BOOLEAN NOT NULL,
     entry_json JSONB NOT NULL,
@@ -35,6 +35,7 @@ CREATE TABLE onboarding_idp_outcomes (
     intent_id UUID PRIMARY KEY REFERENCES onboarding_idp_intents(id),
     outcome TEXT NOT NULL CHECK (outcome IN ('success','error','uncertain')),
     provider_user_id BIGINT,
+    invitation_id UUID,
     recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE FUNCTION onboarding_immutable() RETURNS trigger LANGUAGE plpgsql AS $$

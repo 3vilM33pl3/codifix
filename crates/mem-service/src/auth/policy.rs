@@ -54,6 +54,159 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
     let mut table = matchit::Router::new();
     let entries: &[(&str, &[(Method, RoutePolicy)])] = &[
         (
+            "/v1/admin/onboarding/capabilities",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/idp/operations",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/idp/operations/{id}",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/users",
+            &[
+                (
+                    Method::GET,
+                    RoutePolicy {
+                        permission: Permission::SystemAdmin,
+                        scope: ProjectScope::Global,
+                        semantic_read: false,
+                    },
+                ),
+                (
+                    Method::POST,
+                    RoutePolicy {
+                        permission: Permission::SystemAdmin,
+                        scope: ProjectScope::Global,
+                        semantic_read: false,
+                    },
+                ),
+            ],
+        ),
+        (
+            "/v1/admin/onboarding/users/invite",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/users/{id}/disable",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/users/{id}/access",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/projects",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/projects/{project_id}",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/devices",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/devices/{id}/revoke",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/idp/users",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/admin/onboarding/idp/users/{provider_id}/disable",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::SystemAdmin,
+                    scope: ProjectScope::Global,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
             "/v1/projects/{slug}/supervisor/questions/prepare",
             &[(
                 Method::POST,
@@ -1581,7 +1734,15 @@ pub(crate) async fn authorization_guard(
     }
 
     request.extensions_mut().insert(principal);
-    next.run(request).await
+    let onboarding = request.uri().path().starts_with("/v1/admin/onboarding/");
+    let mut response = next.run(request).await;
+    if onboarding {
+        response.headers_mut().insert(
+            header::CACHE_CONTROL,
+            axum::http::HeaderValue::from_static("no-store"),
+        );
+    }
+    response
 }
 
 /// Pure authorization decision for a resolved (policy, project) pair.

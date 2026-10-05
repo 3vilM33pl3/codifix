@@ -27,6 +27,247 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/admin/onboarding/capabilities:
+    get:
+      operationId: inspectOnboardingCapabilities
+      x-stability: internal
+      summary: inspectOnboardingCapabilities
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingCapabilities' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/users:
+    get:
+      operationId: listOnboardingUsers
+      x-stability: internal
+      summary: listOnboardingUsers
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingUsers' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+    post:
+      operationId: registerOnboardingUser
+      x-stability: internal
+      summary: registerOnboardingUser
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingUserRequest' }
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingUser' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/users/invite:
+    post:
+      operationId: createOnboardingInvitation
+      x-stability: internal
+      summary: createOnboardingInvitation
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingIdpUserRequest' }
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingIdpOperation' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/users/{id}/disable:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: disableOnboardingUser
+      x-stability: internal
+      summary: disableOnboardingUser
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingUser' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/users/{id}/access:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: inspectOnboardingAccess
+      x-stability: internal
+      summary: inspectOnboardingAccess
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingEffectiveAccess' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/projects:
+    get:
+      operationId: listOnboardingProjects
+      x-stability: internal
+      summary: listOnboardingProjects
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingProjects' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/projects/{project_id}:
+    parameters:
+      - { name: project_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: reviewOnboardingProject
+      x-stability: internal
+      summary: reviewOnboardingProject
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingProjectReviewRequest' }
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingProject' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/devices:
+    get:
+      operationId: listOnboardingDevices
+      x-stability: internal
+      summary: listOnboardingDevices
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingDevices' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/devices/{id}/revoke:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: revokeOnboardingDevice
+      x-stability: internal
+      summary: revokeOnboardingDevice
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingDevice' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/idp/users:
+    post:
+      operationId: createOnboardingIdpUser
+      x-stability: internal
+      summary: createOnboardingIdpUser
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OnboardingIdpUserRequest' }
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingIdpOperation' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/idp/users/{provider_id}/disable:
+    parameters:
+      - { name: provider_id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      operationId: disableOnboardingIdpUser
+      x-stability: internal
+      summary: disableOnboardingIdpUser
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingIdpOperation' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/idp/operations:
+    get:
+      operationId: listOnboardingIdpOperations
+      x-stability: internal
+      summary: listOnboardingIdpOperations
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingIdpOperations' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
+  /v1/admin/onboarding/idp/operations/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: inspectOnboardingIdpOperation
+      x-stability: internal
+      summary: inspectOnboardingIdpOperation
+      description: Requires global system_admin. Mutations require a writable primary, current credential locks and browser Origin/CSRF. Catalog metadata creates no access, offline or delivery grant. Provider invitations create no email delivery or local identity binding; reconcile pending/uncertain effects in the provider before any new attempt.
+      responses:
+        '200':
+          description: Bounded administration result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingIdpOperation' }
+        '403': { description: Missing global administration, disabled credential, read-only mode or CSRF failure. }
+        '409': { description: Registered stable identity or stale catalog revision. }
+        '503': { description: Provider unavailable or operation outcome uncertain; error never includes provider bodies or credentials. }
   /v1/projects/{slug}/supervisor/questions/prepare:
     parameters:
       - { $ref: '#/components/parameters/FederationProject' }
@@ -2603,6 +2844,169 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    OnboardingCapabilities:
+      type: object
+      required: [schema_version, idp_management_enabled, invitation_enabled, idp_provider]
+      properties:
+        schema_version: { const: 1 }
+        idp_management_enabled: { type: boolean }
+        invitation_enabled: { type: boolean }
+        idp_provider: { type: [string, 'null'], enum: [authentik, null] }
+    OnboardingUserRequest:
+      type: object
+      additionalProperties: false
+      required: [issuer, subject, display_name]
+      properties:
+        issuer: { type: string, format: uri, description: Exact configured verified HTTPS issuer. }
+        subject: { type: string, minLength: 1, maxLength: 512 }
+        display_name: { type: string, minLength: 1, maxLength: 256 }
+        email: { type: [string, 'null'], maxLength: 320 }
+    OnboardingUser:
+      type: object
+      required: [principal, disabled_at, created_at]
+      properties:
+        principal: { $ref: '#/components/schemas/AuthPrincipal' }
+        disabled_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+    OnboardingUsers:
+      type: object
+      required: [users]
+      properties:
+        users: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/OnboardingUser' } }
+    OnboardingAccessGrant:
+      type: object
+      required: [source, role, group]
+      properties:
+        source: { type: string, enum: [direct, bootstrap, oidc_group] }
+        role: { type: string, enum: [reader, writer, operator, admin] }
+        group: { type: [string, 'null'] }
+    OnboardingEffectiveAccess:
+      type: object
+      required: [principal_id, disabled, global_permissions, projects, group_rules]
+      properties:
+        principal_id: { type: string, format: uuid }
+        disabled: { type: boolean }
+        global_permissions: { type: array, items: { type: string } }
+        projects:
+          type: array
+          maxItems: 1000
+          items:
+            type: object
+            required: [project, permissions, grants]
+            properties:
+              project: { type: string }
+              permissions: { type: array, items: { type: string } }
+              grants: { type: array, items: { $ref: '#/components/schemas/OnboardingAccessGrant' } }
+        group_rules:
+          type: array
+          items:
+            type: object
+            required: [group, role, global, project, matched]
+            properties:
+              group: { type: string }
+              role: { type: string, enum: [reader, writer, operator, admin] }
+              global: { type: boolean }
+              project: { type: [string, 'null'] }
+              matched: { type: boolean }
+    OnboardingPinnedTool:
+      type: object
+      additionalProperties: false
+      required: [name, version, url, sha256]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 128 }
+        version: { type: string, minLength: 1, maxLength: 128 }
+        url: { type: string, format: uri }
+        sha256: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+    OnboardingDestination:
+      type: object
+      additionalProperties: false
+      required: [name, provider_id, destination_id]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 128 }
+        provider_id: { type: string, maxLength: 128, pattern: '^[a-zA-Z0-9_.-]+$' }
+        destination_id: { type: string, maxLength: 256, pattern: '^[a-zA-Z0-9_.-]+$' }
+    OnboardingProjectEntry:
+      type: object
+      additionalProperties: false
+      required: [area, owner_instance_id, repository_url, default_branch, offline_allowed, tools, destinations]
+      properties:
+        area: { type: string, enum: [workshop, homelab, trust, general] }
+        owner_instance_id: { type: string, format: uuid }
+        repository_url: { type: string, format: uri, description: Credential-free HTTPS repository identity. }
+        default_branch: { type: string, minLength: 1, maxLength: 256 }
+        offline_allowed: { type: boolean, description: Must be false for Trust. Metadata only until scoped offline delivery is implemented. }
+        tools: { type: array, maxItems: 32, items: { $ref: '#/components/schemas/OnboardingPinnedTool' } }
+        destinations: { type: array, maxItems: 32, items: { $ref: '#/components/schemas/OnboardingDestination' } }
+    OnboardingProjectReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_revision, entry]
+      properties:
+        expected_revision: { type: integer, minimum: 0, description: Zero creates the first reviewed revision; stale revisions return 409. }
+        entry: { $ref: '#/components/schemas/OnboardingProjectEntry' }
+    OnboardingProject:
+      type: object
+      required: [project_id, project, revision, reviewed_by, reviewed_at, area, owner_instance_id, repository_url, default_branch, offline_allowed, tools, destinations]
+      properties:
+        project_id: { type: string, format: uuid }
+        project: { type: string, description: Server-resolved local project slug. }
+        revision: { type: integer, minimum: 1 }
+        reviewed_by: { type: string, format: uuid }
+        reviewed_at: { type: string, format: date-time }
+        area: { type: string, enum: [workshop, homelab, trust, general] }
+        owner_instance_id: { type: string, format: uuid }
+        repository_url: { type: string, format: uri }
+        default_branch: { type: string }
+        offline_allowed: { type: boolean }
+        tools: { type: array, maxItems: 32, items: { $ref: '#/components/schemas/OnboardingPinnedTool' } }
+        destinations: { type: array, maxItems: 32, items: { $ref: '#/components/schemas/OnboardingDestination' } }
+    OnboardingProjects:
+      type: object
+      required: [schema_version, projects]
+      properties:
+        schema_version: { const: 1 }
+        projects: { type: array, maxItems: 1000, items: { $ref: '#/components/schemas/OnboardingProject' } }
+    OnboardingDevice:
+      type: object
+      required: [id, principal_id, name, platform, created_at, last_seen_at, revoked_at]
+      properties:
+        id: { type: string, format: uuid }
+        principal_id: { type: string, format: uuid }
+        name: { type: string }
+        platform: { type: string }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: [string, 'null'], format: date-time }
+        revoked_at: { type: [string, 'null'], format: date-time }
+    OnboardingDevices:
+      type: object
+      required: [devices]
+      properties:
+        devices: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/OnboardingDevice' } }
+    OnboardingIdpUserRequest:
+      type: object
+      additionalProperties: false
+      required: [username, display_name, email]
+      properties:
+        username: { type: string, minLength: 1, maxLength: 150, pattern: '^[a-zA-Z0-9_.@-]+$' }
+        display_name: { type: string, minLength: 1, maxLength: 256 }
+        email: { type: string, minLength: 1, maxLength: 320 }
+    OnboardingIdpOperation:
+      type: object
+      required: [id, operation, outcome, provider_origin, provider_correlation, request_sha256, provider_user_id, invitation_id]
+      properties:
+        id: { type: string, format: uuid }
+        operation: { type: string, enum: [create, invite, disable] }
+        outcome: { type: string, enum: [pending, success, error, uncertain] }
+        provider_origin: { type: [string, 'null'], format: uri }
+        provider_correlation: { type: [string, 'null'], maxLength: 64, description: Invitation name or user attribute used to reconcile the operation. Null for unreconstructable legacy intents. }
+        request_sha256: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$', description: Binds provider target and exact reviewed input without storing the payload. Null for unreconstructable legacy intents. }
+        provider_user_id: { type: [integer, 'null'] }
+        invitation_id: { type: [string, 'null'], format: uuid, description: Restricted provider invitation metadata. Manage delivery in Authentik. }
+    OnboardingIdpOperations:
+      type: object
+      required: [operations]
+      properties:
+        operations: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/OnboardingIdpOperation' } }
     SupervisorQuestionPreview:
       type: object
       required: [profile_digest, request_digest, question, model, destination, source_count, daily_call_limit, daily_usd_micros]

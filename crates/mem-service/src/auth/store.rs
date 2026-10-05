@@ -372,7 +372,7 @@ async fn load_session_principal(
     Ok(principal)
 }
 
-async fn principal_from_row(
+pub(super) async fn principal_from_row(
     pool: &PgPool,
     state: &AppState,
     row: &sqlx::postgres::PgRow,

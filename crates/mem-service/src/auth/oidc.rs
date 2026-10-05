@@ -414,7 +414,7 @@ fn additional_oidc_scopes(configured: &[String]) -> Vec<String> {
         .collect()
 }
 
-async fn upsert_human_principal_tx(
+pub(super) async fn upsert_human_principal_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     issuer: &str,
     subject: &str,
@@ -433,7 +433,7 @@ async fn upsert_human_principal_tx(
         DO UPDATE SET display_name = EXCLUDED.display_name, email = EXCLUDED.email,
                       groups_json = EXCLUDED.groups_json,
                       global_role = NULL, updated_at = now()
-        RETURNING id
+        RETURNING id, disabled_at
         "#,
     )
     .bind(id)
@@ -445,6 +445,15 @@ async fn upsert_human_principal_tx(
     .fetch_one(&mut **tx)
     .await
     .map_err(ApiError::sql)?;
+    // An OIDC refresh must never reactivate a locally disabled identity or
+    // mint a new session for it. The caller rolls this transaction back.
+    if row
+        .try_get::<Option<chrono::DateTime<Utc>>, _>("disabled_at")
+        .map_err(ApiError::sql)?
+        .is_some()
+    {
+        return Err(ApiError::unauthorized("human identity is disabled"));
+    }
     row.try_get("id").map_err(ApiError::sql)
 }
 

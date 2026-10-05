@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Administrative onboarding metadata; never a credential or delivery grant.
+use crate::{AuthPrincipalResponse, AuthRole};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::{AuthPrincipalResponse, AuthRole};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OnboardingCapabilities {
@@ -63,11 +63,21 @@ pub struct OnboardingEffectiveAccess {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum OnboardingArea { General, Work, Personal, Trust }
+pub enum OnboardingArea {
+    General,
+    Workshop,
+    Homelab,
+    Trust,
+}
 
 impl OnboardingArea {
     pub fn as_str(self) -> &'static str {
-        match self { Self::General => "general", Self::Work => "work", Self::Personal => "personal", Self::Trust => "trust" }
+        match self {
+            Self::General => "general",
+            Self::Workshop => "workshop",
+            Self::Homelab => "homelab",
+            Self::Trust => "trust",
+        }
     }
 }
 
@@ -84,7 +94,8 @@ pub struct OnboardingPinnedTool {
 #[serde(deny_unknown_fields)]
 pub struct OnboardingDestination {
     pub name: String,
-    pub url: String,
+    pub provider_id: String,
+    pub destination_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,7 +152,10 @@ pub struct OnboardingIdpOperation {
     pub id: Uuid,
     pub operation: String,
     pub outcome: String,
+    pub provider_origin: Option<String>,
+    pub provider_correlation: Option<String>,
+    pub request_sha256: Option<String>,
     pub provider_user_id: Option<i64>,
-    /// Metadata only: use the provider's invitation administration for delivery.
+    /// Restricted metadata: use the provider's invitation administration for delivery.
     pub invitation_id: Option<Uuid>,
 }

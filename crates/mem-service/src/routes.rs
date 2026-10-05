@@ -50,6 +50,58 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
     let web_assets = state.web_root.clone();
     let mcp_config = state.config.mcp.clone();
     let mut app = Router::new()
+        .route(
+            "/v1/admin/onboarding/capabilities",
+            get(crate::auth::onboarding::capabilities),
+        )
+        .route(
+            "/v1/admin/onboarding/users",
+            get(crate::auth::onboarding::users).post(crate::auth::onboarding::register_user),
+        )
+        .route(
+            "/v1/admin/onboarding/users/invite",
+            post(crate::auth::onboarding::invite),
+        )
+        .route(
+            "/v1/admin/onboarding/users/{id}/disable",
+            post(crate::auth::onboarding::disable_user),
+        )
+        .route(
+            "/v1/admin/onboarding/users/{id}/access",
+            get(crate::auth::onboarding::access),
+        )
+        .route(
+            "/v1/admin/onboarding/projects",
+            get(crate::auth::onboarding::projects),
+        )
+        .route(
+            "/v1/admin/onboarding/projects/{project_id}",
+            post(crate::auth::onboarding::review_project),
+        )
+        .route(
+            "/v1/admin/onboarding/devices",
+            get(crate::auth::onboarding::devices),
+        )
+        .route(
+            "/v1/admin/onboarding/devices/{id}/revoke",
+            post(crate::auth::onboarding::revoke_device),
+        )
+        .route(
+            "/v1/admin/onboarding/idp/users",
+            post(crate::auth::onboarding::create_idp_user),
+        )
+        .route(
+            "/v1/admin/onboarding/idp/operations",
+            get(crate::auth::onboarding::operations),
+        )
+        .route(
+            "/v1/admin/onboarding/idp/operations/{id}",
+            get(crate::auth::onboarding::operation),
+        )
+        .route(
+            "/v1/admin/onboarding/idp/users/{provider_id}/disable",
+            post(crate::auth::onboarding::disable_idp_user),
+        )
         .route("/v1/supervisor", get(crate::handlers::supervisor::inspect))
         .route(
             "/v1/projects/{slug}/supervisor/questions/prepare",

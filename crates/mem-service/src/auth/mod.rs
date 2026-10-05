@@ -3,6 +3,7 @@
 pub(crate) mod answerer;
 mod model;
 mod oidc;
+pub(crate) mod onboarding;
 mod policy;
 #[cfg(test)]
 mod scoped_token_tests;
