@@ -8,6 +8,7 @@ pub mod area;
 pub mod auth;
 pub mod discovery;
 pub mod embeddings;
+pub mod laptop_cache;
 #[cfg(test)]
 mod legacy_tests;
 pub mod llm;
@@ -20,6 +21,7 @@ pub use area::*;
 pub use auth::*;
 pub use discovery::*;
 pub use embeddings::*;
+pub use laptop_cache::*;
 pub use llm::*;
 pub use pipeline::*;
 pub use profile::*;

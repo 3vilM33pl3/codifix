@@ -40,6 +40,9 @@ pub struct TelemetryConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    /// Explicit native laptop read-only cache view. No server default.
+    #[serde(default)]
+    pub laptop_cache: Option<crate::laptop_cache::LaptopCacheConfig>,
     /// Named local database ownership, independent from supervisor grants.
     #[serde(default)]
     pub area: Option<crate::area::AreaIdentityConfig>,
@@ -215,6 +218,7 @@ impl AppConfig {
         config.resolved_dev_overlay_path = resolved_dev_overlay_path;
         config.apply_runtime_defaults();
         config.auth.validate_company_delegations()?;
+        config.validate_laptop_cache()?;
         if let Some(area) = &config.area {
             area.validate()?;
             config.automation.area = Some(area.clone());

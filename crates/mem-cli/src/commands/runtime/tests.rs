@@ -2820,6 +2820,7 @@ fn write_file_if_changed_skips_identical_content() {
 
 fn test_app_config() -> AppConfig {
     AppConfig {
+        laptop_cache: None,
         area: None,
         resolved_area_routing_path: None,
         supervisor: None,
