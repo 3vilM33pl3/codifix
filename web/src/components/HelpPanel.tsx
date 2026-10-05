@@ -7,6 +7,13 @@ const SHARED_CONTROLS = [
 ];
 
 const WEB_HELP: Record<Tab, { title: string; purpose: string; layout: string[]; controls: string[]; workflows: string[] }> = {
+  offline: {
+    title: "Synchronized Knowledge Help",
+    purpose: "Search retained read-only shared excerpts in one exact local subscription, without remote or model forwarding.",
+    layout: ["Subscription UUID plus area, company, owner, project, space and device identity.", "Observed sync/cursor and plain-text citation/evidence metadata."],
+    controls: ["Refresh synchronized projects clears old excerpts.", "Select a subscription, enter at most 4096 UTF-8 bytes and search up to 32 local hits."],
+    workflows: ["Requires authenticated local loopback owner and opt-in cache policy.", "Uninitialized, unsupported or denied cache is not healthy empty success.", "Offline freshness is not current remote authority; revocation cannot recall delivered bytes."],
+  },
   supervisor: {
     title: "Supervisor Help",
     purpose: "Inspect this instance's durable supervisor policy, budget and metadata-only history.",

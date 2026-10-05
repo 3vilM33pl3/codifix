@@ -240,6 +240,59 @@ export async function jobsRequest<T>(project: string, suffix = "", body?: unknow
   }));
 }
 
+/** Local cache inspection only: no remote destination, model, or browser storage. */
+async function cacheRequest(path: string, signal?: AbortSignal, body?: { question: string; limit: number }): Promise<unknown> {
+  let response: Response;
+  try {
+    const auth = await getAuthMe();
+    if (auth.mode === "single_user") await ensureSession();
+    response = await apiFetch(path, { signal, cache: "no-store", redirect: "error",
+      ...(body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+    });
+  } catch { throw new Error("Synchronized cache unavailable. No remote search was attempted."); }
+  if (!response.ok) throw new Error(response.status === 401 ? "Signed out. Local owner authentication is required."
+    : response.status === 403 ? "Forbidden. Synchronized cache requires the authenticated local loopback owner."
+    : response.status === 404 ? "Synchronized cache is not enabled or this subscription is unavailable in this build."
+    : response.status === 400 ? "Invalid local cache search. Check question and result bounds."
+    : "Synchronized cache unavailable. No remote search was attempted; response details suppressed.");
+  try {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).length > 256 * 1024) throw new Error("oversized");
+    return JSON.parse(text);
+  } catch { throw new Error("Unreadable or oversized synchronized cache response."); }
+}
+const cacheUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function validCacheProject(value: unknown): value is import("./features/offline/types").LaptopCacheProject {
+  if (!value || typeof value !== "object") return false;
+  const p = value as Record<string, unknown>;
+  return ["subscription_id", "device_id", "company_id", "owner_instance_id", "project_id", "space_id"]
+    .every(k => typeof p[k] === "string" && cacheUuid.test(p[k]))
+    && ["workshop", "homelab", "general"].includes(String(p.area)) && p.read_only === true
+    && typeof p.initialized === "boolean" && typeof p.cursor === "number" && p.cursor >= 0 && Number.isInteger(p.cursor)
+    && (p.observed_at === null || (typeof p.observed_at === "string" && Number.isFinite(Date.parse(p.observed_at))));
+}
+export async function laptopCacheList(signal?: AbortSignal): Promise<import("./features/offline/types").LaptopCacheList> {
+  const value = await cacheRequest("/v1/onboarding/cache", signal) as import("./features/offline/types").LaptopCacheList;
+  if (value?.schema_version !== 1 || !cacheUuid.test(value.instance_id) || typeof value.area !== "string"
+    || !Array.isArray(value.projects) || !value.projects.every(validCacheProject)
+    || new Set(value.projects.map(p => p.subscription_id)).size !== value.projects.length)
+    throw new Error("Invalid synchronized cache inventory; no results displayed.");
+  return value;
+}
+export async function laptopCacheSearch(subscription: string, question: string, limit = 8, signal?: AbortSignal): Promise<import("./features/offline/types").LaptopCacheSearchResponse> {
+  if (!cacheUuid.test(subscription) || !question.trim() || /[\u0000-\u0008\u000e-\u001f\u007f]/.test(question) || new TextEncoder().encode(question).length > 4096
+    || !Number.isInteger(limit) || limit < 1 || limit > 32) throw new Error("Question must contain 1–4096 UTF-8 bytes; result limit must be 1–32.");
+  const value = await cacheRequest(`/v1/onboarding/cache/${encodeURIComponent(subscription)}/search`, signal, { question, limit }) as import("./features/offline/types").LaptopCacheSearchResponse;
+  if (value?.schema_version !== 1 || !validCacheProject(value.project) || value.project.subscription_id !== subscription
+    || !Array.isArray(value.hits) || value.hits.length > limit || value.hits.some(h => h.read_only !== true
+      || !cacheUuid.test(h.stream_id) || !cacheUuid.test(h.source_record_id) || !/^[a-f0-9]{64}$/i.test(h.digest)
+      || [h.author, h.authored_at, h.locator, h.text, h.summary].some(s => typeof s !== "string")
+      || !Number.isInteger(h.shared_version) || !Number.isInteger(h.source_version) || !Array.isArray(h.evidence)
+      || h.evidence.some(e => [e.label, e.text, e.reviewer, e.reviewed_at].some(s => typeof s !== "string") || !/^[a-f0-9]{64}$/i.test(e.digest))))
+    throw new Error("Invalid synchronized cache result binding/provenance; no results displayed.");
+  return value;
+}
+
 export function authLoginUrl(returnTo = window.location.pathname + window.location.search): string {
   return `/v1/auth/login?return_to=${encodeURIComponent(returnTo)}`;
 }

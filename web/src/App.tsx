@@ -22,6 +22,7 @@ import { AccessTab } from "./features/access/AccessTab";
 import { FederationTab } from "./features/federation/FederationTab";
 import { JobsTab } from "./features/jobs/JobsTab";
 import { SupervisorTab } from "./features/supervisor/SupervisorTab";
+import { OfflineTab } from "./features/offline/OfflineTab";
 import { DeviceApprovalPage } from "./features/onboarding/DeviceApprovalPage";
 import { useAppShell } from "./hooks/useAppShell";
 import { MORE_TABS, PRIMARY_TABS, type Tab } from "./tabs";
@@ -570,6 +571,7 @@ function MemoryApp() {
       {tab === "federation" ? <FederationTab project={project} /> : null}
       {tab === "jobs" ? <JobsTab project={project} readOnly={serviceReadOnly} /> : null}
       {tab === "supervisor" ? <SupervisorTab key={authMe?.principal.id ?? "signed-out"} project={project} /> : null}
+      {tab === "offline" ? <OfflineTab key={`${authMe?.principal.id ?? "signed-out"}/${project}`} /> : null}
       <footer className="statusbar">{statusMessage}</footer>
     </div>
   );

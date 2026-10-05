@@ -1,5 +1,30 @@
 # Web UI
 
+**More → offline (Synchronized knowledge)** inspects explicitly configured
+read-only laptop subscriptions. Select by subscription UUID; the panel also
+shows company, area, owner instance, project UUID, space and device identity.
+This selection is independent of project slugs in ordinary Query.
+
+Search contains only the entered question (at most 4096 UTF-8 bytes) and a result
+limit of 8, 16 or 32. It searches the selected local copy deterministically;
+there is no remote search or model forwarding. Shared excerpts, source versions,
+publication digests, authors, locators and reviewed evidence are plain untrusted
+text, not clickable instructions or editable local canonical memories.
+
+Last observed sync and the verified local cursor are not current remote
+authorization or a freshness guarantee. Unknown sync time stays unknown;
+uninitialized subscriptions cannot be searched. Refresh, changes to selection
+or question, and leaving the panel clear old results and discard late responses.
+Nothing is persisted to browser storage. Previously delivered bytes cannot be
+recalled by revocation.
+
+The service must explicitly enable the laptop cache with exact subscription
+bindings, on a single-user loopback installation. A real local-owner browser
+session is established before inventory reads; anonymous access is not enough.
+Disabled/unsupported builds, forbidden reads and unavailable storage show an
+error, not a successful empty cache. This view works on read-only services and
+does not enable edits, credential enrollment, installation, or synchronization.
+
 **More → jobs** provides filtered, bounded background-work inspection, dependency
 and attempt history, queue statistics and explicit retry confirmation. See
 [Background jobs](cli/jobs.md). Enrichment is separate from curation success.
