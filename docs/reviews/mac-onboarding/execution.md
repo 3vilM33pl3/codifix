@@ -30,11 +30,11 @@ and embedding work are disabled.
 | Contract checkpoint | Complete | Memory IDs above; contract committed. |
 | Sol/Astra project defaults | Complete | Two TOML files parse successfully; bounded read-only adviser and updated repo guidance. |
 | Local company administration backend | Implemented and focused tests passed | Commits `5140b5d1`, `2fb2a3f2`; 36 auth tests on a separate disposable PostgreSQL database, including six onboarding tests; OpenAPI inventory test, formatting and diff checks. Live provider RBAC and company-wide authority remain unverified. |
-| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices alongside existing memberships/tokens; latest full run: 183 Web tests and production build passed. This is a development UI, not a deployed company console. |
-| Unified cross-area administration | Owner delegation and coordinator implemented | `16051bb8`, `9f60b457`; five required-database company tests and 49 auth regression tests passed. Explicit owner/token/namespace/role ceiling, ownership guards and durable uncertain outcomes. Fleet enrollment and company UI integration remain pending. |
+| Administration Web UI | Implemented and focused tests passed | Users/Projects/Devices/Company alongside existing memberships/tokens; latest full run: 188 Web tests and production build passed. This is a development UI, not a deployed company console. |
+| Unified cross-area administration | Owner delegation, coordinator and console grant workflow implemented | `16051bb8`, `9f60b457`, `60d27978`; six required-database company tests and five new UI tests passed. Explicit owner/token/namespace/role ceiling, ownership guards and durable uncertain outcomes; sanitized registry discovery, exact confirmation, retained operation IDs and distinct current/group rights. Fleet enrollment and native/live owner provisioning remain pending. |
 | Device login and selection | Backend, CLI and browser approval implemented | `9f439c27`, `6ac5b994`, `121fab3b`; 44 required-database auth tests and 15 CLI tests passed. Native Keychain execution and TUI selection remain unfinished. |
-| Selective snapshots/offline search | Gateway, enrolled-owner delivery and read-only projector implemented | `e741af31`, `d8c5f8db`, `8f578566`, `00d7f2fa`; six store tests, six owner adapter tests, two signed-page runtime tests and 41 neutral-core tests passed. Latest auth regression: 55 tests and OpenAPI inventory passed. Public subscription bootstrap and laptop runner are next; native integration remains pending. |
-| Installer and tool/repository setup | Journaled workspace preparation implemented and reviewed | `9dabaca8`, `e305955a`, `178560cc`; 13 offline packaging tests and latest 41 focused enrollment/workspace tests passed (26 workspace tests in final rerun). Native area provisioning is unfinished. Astra's checkout filter, resumed repository and physical journal containment findings are corrected; native APFS acceptance remains pending. |
+| Selective snapshots/offline search | Gateway, local enrolled-owner delivery, bootstrap, private metadata producer and explicit CLI projector/runner implemented | `e741af31`, `d8c5f8db`, `8f578566`, `00d7f2fa`, `09df86da`, `d2d8508f`, `15b649d1`, `46fce2d1`; latest required-database federation store/runtime regression: 84 tests; auth regression: 57 tests with bounded concurrency, plus new configuration test. Two private profile/metadata tests and 41 neutral-core tests passed. Cross-owner device approval, ordinary retrieval/Web/TUI integration and native execution remain pending. |
+| Installer and tool/repository setup | Journaled workspace preparation implemented and reviewed; native operator candidate in progress | `9dabaca8`, `e305955a`, `178560cc`, `894323cb`, `901f6805`; 13 offline packaging tests and latest 44 focused enrollment/workspace/client tests passed. Astra's checkout filter, resumed repository and physical journal containment findings are corrected; native APFS acceptance remains pending. |
 | Real macOS acceptance | Pending | Requires native execution; Linux builds/tests are not evidence of this. |
 
 ## Invariants under review
@@ -111,7 +111,18 @@ symlinks are preserved. No `.pkg` was built or installed on a Mac here.
 The initial strict Clippy run encountered Rust 1.99's `async_trait`-generated
 `double_must_use` lint in `mem-search` and `mem-reinforce`. Commit `4de07b4b`
 adds narrowly scoped, explained compatibility annotations on those two traits;
-a full strict rerun remains required. This is not recorded as a passed run.
+a focused strict rerun subsequently passed for federation/store/runtime/config,
+service and CLI all-targets with embedded PostgreSQL/TUI. Later slices must rerun
+it. The boundary check exposed a direct CLI SQLx dependency; `b025cf5b` moved
+connection/schema inspection behind the validated runtime API and boundaries
+passed again, without weakening the check.
+
+The first unbounded auth regression exhausted the disposable PostgreSQL fixture's
+100-client limit (29 pool timeouts). The same suite passed all 57 tests with
+`--test-threads=2`; no real database limits or services were changed. Concurrent
+Git tests also exposed a briefly fork-inherited workspace lock. `d995af4e`
+explicitly releases the OS lock on guard drop; the complete 44-test client suite
+then passed. No failing initial run is reported as passing.
 
 ### Selective feed and projection
 
@@ -145,14 +156,41 @@ protected transaction; its commit is the delivery authorization linearization
 point. These tests passed with actual PostgreSQL and signed fake-gateway replies.
 Remote-owner device enrollment is deliberately still closed.
 
-The laptop runner is being implemented separately. It pins audience, subscription,
+The explicit laptop runner pins audience, local subscription,
 company/area/owner/project/space, catalog revision and gateway key schedule; it
 does not accept identity or trust from content pages. A private profile permits
 only a dedicated loopback laptop database. Starting/reconnecting/polling software
-is not evidence that a native Mac service or database has been installed.
+is not evidence that a native Mac service or database has been installed. Five
+required-database tests cover restart/partial pagination, signed wrong audience,
+mid-pass policy changes, revocation, empty snapshots, no local-memory writes,
+HTTP failure sanitization and cancellation during network wait. Missing-subscription
+inspection leaves the projection table unchanged. CLI tests check current
+offline consent, same-name/different-identity catalog entries, changed bootstrap
+and no silent key adoption before initialization.
+
+Astra's bounded read-only replica review found no blocking disclosure/correctness
+defect. Its requested missing-subscription and network-cancellation cases are now
+tested. The private profile also rejects server database addresses, another
+area's database, URL query overrides, missing ports and Trust.
 
 ## Completion status
 
-The overall plan is not complete. No installer, clean-Mac test, live Authentik
-integration or new project synchronization has been claimed. R3 remains paused,
-and this work grants no new autonomous supervisor or paid model authority.
+The overall plan is not complete. Native package installation, a clean-Mac
+journey, live Authentik integration and new live project synchronization have
+not been observed. The explicit CLI/projector and prerequisite-based native
+operator are development candidates, not a self-contained installer.
+
+Remaining implementation work:
+
+- A single company-approved device across configured owners, without exposing
+  owner credentials or expanding project authority.
+- Web/TUI selection and read-only projection search/status; ordinary retrieval
+  must not silently forward an imported projection to a model.
+- Separately scoped Codex/OpenAI and Claude/Anthropic MCP credentials and
+  disclosure policies, not reuse of the device credential.
+- Local capture/proposal/offline replay onboarding, supported project plugin
+  formats and reviewed native dependency installation.
+- Native package/Keychain/LaunchAgent/pgvector/APFS and full clean-Mac acceptance.
+
+R3 remains paused. No existing company area was upgraded and no autonomous
+supervisor, paid execution or public release authority was added.

@@ -48,9 +48,11 @@ Owner adapters retain the prior registered set and explicitly disable removed or
 ineligible streams. A current review covers only its exact published keys; neither
 catalog membership nor an old review permits a union of historical content.
 
-Scoped pages need a distinct signature purpose and bind the device audience,
-subscription, exact manifest/policy revision, request nonce, cursor interval,
-content digest and expiry. Use the enrolled gateway receipt trust; never learn a
+Scoped pages use a distinct signature purpose and bind the device audience,
+logical company/area/owner/project/space scope, exact manifest/policy revision,
+request nonce, cursor interval, content digest and expiry. The local subscription
+UUID is a laptop storage identity, not a gateway claim. Use the enrolled gateway
+receipt trust; never learn a
 trust key from an untrusted page. Preserve existing publication bytes, receipt
 ordering and schema-v2/v3 interpretation unchanged.
 

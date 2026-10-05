@@ -7,7 +7,7 @@ checks. No Mac installation or existing area has been changed by this work.
 
 ## Administration in the development build
 
-The Access page now includes Users, Projects and Devices alongside the existing
+The Access page now includes Users, Projects, Devices and Company alongside the existing
 memberships and service tokens. These new controls require global `system_admin`;
 a project administrator is not automatically a company administrator. Browser
 mutations also require CSRF protection and a writable service.
@@ -24,9 +24,19 @@ mutations also require CSRF protection and a writable service.
 - Devices have independent revocation. New enrollment requires an actual OIDC
   human browser session, not the installation's local-owner token.
 
-This slice administers one instance's authority. The unified Homelab console's
-cross-area delegation is unfinished: catalog entries cannot create permissions
-in another area's database.
+Local controls administer this instance. The Company view coordinates grants
+through explicitly configured owner delegates: choose an enrolled owner, enter
+the exact project UUID and verified user subject, review the role/revisions and
+confirm. Owners apply their own exact-project ceilings and reject stale revisions
+or another issuer. Trust is shown as remote expertise only. Catalog entries never
+create permissions in another area's database by themselves.
+
+An interrupted grant retains its operation ID. Retry only that exact request or
+reconcile its durable operation: reconciliation checks the owner before retrying
+an absent effect. History is not current access. The separately timestamped owner
+result displays direct and group roles; revoking a direct grant does not remove
+group permissions. Server transport addresses and delegate credentials are not
+sent to the console. Fleet-wide device enrollment remains unfinished.
 
 ### Optional Authentik management
 
@@ -60,9 +70,10 @@ never returns a bearer secret. Current human permissions continue limiting the
 device after approval. A device cannot inherit a new project or higher role
 merely because its human later receives more access.
 
-This is not yet the full Mac onboarding journey. Project-selective feeds,
-searchable offline projections, local database/services, clone/tool setup and
-native Mac acceptance remain separate implementation checks.
+This is not yet the full Mac onboarding journey. The gateway/owner selective feed,
+read-only projector and prerequisite-based native provisioning operator now exist
+in the development build. Cross-area device approval, integrated Web/TUI offline
+search and native Mac acceptance remain separate implementation checks.
 
 ## Journaled workspace preparation in the development build
 
@@ -137,6 +148,92 @@ is not reused for MCP. These commands do not provision PostgreSQL, start service
 build source, enable paid model calls, clone Trust sources or perform selective
 sync. Local repository/template stages are not a completed company onboarding
 installation.
+
+## Selective synchronization commands in the development build
+
+Full/embedded PostgreSQL packages include `project-sync`; a lean binary reports
+that the capability is unavailable rather than claiming synchronization worked.
+The current owner endpoint accepts only its own enrolled devices and exact local
+project approvals. Company-wide owner membership delegation does not yet make a
+single laptop credential valid at every area.
+
+For a provisioned development laptop with a reviewed private replica profile:
+
+```bash
+memory projects sync --profile /Users/<you>/.config/memory-layer/subscriptions/<project>.json
+memory projects sync --profile /Users/<you>/.config/memory-layer/subscriptions/<project>.json --watch
+memory projects sync-status --profile /Users/<you>/.config/memory-layer/subscriptions/<project>.json
+memory projects offline-search --profile /Users/<you>/.config/memory-layer/subscriptions/<project>.json \
+  --question "What is the approved procedure?" --limit 8
+```
+
+These commands are not yet the one-click installer; do not point them at an
+existing server database. Profiles are bounded protected
+JSON, in an owner-only directory with a single-link owner-only file. Device
+credentials are loaded from Keychain and are never stored in the profile. The
+profile contains a separately generated **local** PostgreSQL connection, pinned
+company/device/project/area/owner/space/catalog identity, and the public gateway
+receipt-key schedule. Its database must be an explicit loopback address/port and
+`memory_laptop_workshop`, `memory_laptop_homelab` or `memory_laptop_general`.
+No fallback, database migration or remote-database connection occurs here.
+
+Sync checks current project consent and the authenticated control-plane bootstrap
+before initialization. Changed review, device or receipt keys require explicit
+profile renewal. Each received page is nonce/audience/scope/cursor-bound, signed,
+and individually receipt-verified before its separate projection/cursor commit.
+No whole-space stream, CAR, raw capture, session or unreviewed dependency is
+downloaded. A filtered page is not a complete repository proof.
+
+`--watch` starts immediately, polls every five minutes, retries transient outages,
+and stops on Ctrl-C without losing committed progress. Failed or revoked access
+is visible; old offline copies are not falsely described as recalled. Status and
+offline search inspect existing projections without creating subscriptions or
+contacting the company. Status reports observation age and explicitly unknown
+current remote authority. Search returns read-only source/shared versions,
+original authors, reviewed evidence, locators and digests. It does not mutate
+local authoritative knowledge or authorize model forwarding.
+
+This is the explicit CLI read-only projection path. Ordinary service retrieval
+and Web/TUI presentation are not yet connected to it, and no Mac-native result
+is claimed from the Linux test harness.
+
+### Native provisioning candidate
+
+Export public trust metadata for an exact selected project. The parent directory
+must already be private (0700); the output is create-only (0600), never a device
+credential or a server database connection:
+
+```bash
+memory projects subscription --company https://<company-origin> \
+  --area workshop --owner-instance <instance-uuid> \
+  --project <project-uuid> --revision <reviewed-revision> \
+  --output /Users/<you>/.config/memory-layer/subscription.json
+memory projects subscription --company https://<company-origin> \
+  --area workshop --owner-instance <instance-uuid> \
+  --project <project-uuid> --revision <reviewed-revision> \
+  --output /Users/<you>/.config/memory-layer/subscription.json \
+  --bootstrap-sha256 <digest-from-preview> --confirm
+```
+
+An identical confirmed replay retains the local subscription UUID. A different
+device, manifest, receipt-key schedule or existing output stops without replacing
+the file. The operator consumes this metadata and adds only its separately
+generated loopback database credential.
+
+The candidate package bundles `onboard.py` and its operator instructions under
+`/usr/local/share/memory-layer/onboarding/operator/`. Follow the
+[native operator runbook](../../packaging/macos/operator-README.md) for the exact
+reviewed input, preview and confirmed apply. It currently requires an installed,
+architecture-matched Memory binary, Python 3.11+ and a reviewed native
+PostgreSQL/pgvector toolset. It does not download these prerequisites or build
+source on the laptop. This is not yet a self-contained first-run installer.
+
+The operator creates only fresh, per-user area services and a private loopback
+cluster, schedules each selected project every five minutes, preserves unrelated
+launchers/services, and resumes the same journal. Its local area services are
+read-only at this stage; local capture/proposal onboarding is not yet connected.
+Linux fake-command verification is not proof that Keychain, LaunchAgents or
+case-insensitive APFS work on a real Mac.
 
 ## Identity and project access
 
