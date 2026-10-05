@@ -106,6 +106,20 @@ pub struct CompanyDelegationConfig {
     pub projects: Vec<CompanyProjectDelegation>,
 }
 
+/// Separate exact delivery credential, never an imported management authority.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompanyDeliveryDelegationConfig {
+    pub company_id: Uuid,
+    pub owner_instance_id: Uuid,
+    pub area: OnboardingArea,
+    pub issuer: String,
+    pub principal_id: Uuid,
+    pub token_id: Uuid,
+    pub policy_revision: i64,
+    pub projects: Vec<Uuid>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompanyOwnerConfig {
@@ -116,6 +130,11 @@ pub struct CompanyOwnerConfig {
     pub token_env: String,
     pub issuer: String,
     pub delegation_policy_revision: i64,
+    /// Separate server-only reference. Old owner registries remain valid.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_token_env: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_policy_revision: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -145,6 +164,8 @@ pub struct AuthConfig {
     #[serde(default)]
     pub company_delegations: Vec<CompanyDelegationConfig>,
     #[serde(default)]
+    pub company_delivery_delegations: Vec<CompanyDeliveryDelegationConfig>,
+    #[serde(default)]
     pub company_onboarding: Option<CompanyOnboardingConfig>,
 }
 
@@ -159,12 +180,85 @@ impl Default for AuthConfig {
             group_mappings: AuthGroupMappingsConfig::default(),
             authentik_management: AuthentikManagementConfig::default(),
             company_delegations: vec![],
+            company_delivery_delegations: vec![],
             company_onboarding: None,
         }
     }
 }
 
 impl AuthConfig {
+    /// Delivery is opt-in and exact, with no project-role preset authority.
+    pub fn validate_company_delivery_delegations(&self) -> Result<(), ConfigError> {
+        let fail = || {
+            ConfigError::Message("company delivery delegates require multi-user exact shared HTTPS namespace, separate credential identities and bounded explicit non-Trust scopes".into())
+        };
+        if let Some(registry) = &self.company_onboarding {
+            for owner in &registry.owners {
+                if owner.delivery_token_env.is_some() && self.mode != AuthMode::MultiUser {
+                    return Err(fail());
+                }
+                match (&owner.delivery_token_env, owner.delivery_policy_revision) {
+                    (None, None) => {}
+                    (Some(env), Some(revision))
+                        if revision > 0
+                            && owner.area != OnboardingArea::Trust
+                            && env != &owner.token_env
+                            && !env.is_empty()
+                            && env.len() <= 128
+                            && env.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_') => {}
+                    _ => return Err(fail()),
+                }
+            }
+        }
+        if self.company_delivery_delegations.is_empty() {
+            return Ok(());
+        }
+        self.validate_company_delegations()?;
+        if self.mode != AuthMode::MultiUser || self.company_delivery_delegations.len() > 64 {
+            return Err(fail());
+        }
+        let mut companies = std::collections::BTreeSet::new();
+        let mut principals = std::collections::BTreeSet::new();
+        let mut tokens = std::collections::BTreeSet::new();
+        for cfg in &self.company_delivery_delegations {
+            if cfg.company_id.is_nil()
+                || cfg.owner_instance_id.is_nil()
+                || cfg.principal_id.is_nil()
+                || cfg.token_id.is_nil()
+                || cfg.principal_id == cfg.token_id
+                || cfg.policy_revision < 1
+                || cfg.area == OnboardingArea::Trust
+                || cfg.issuer != self.oidc.issuer_url
+                || cfg.issuer.ends_with('/')
+                || !cfg.issuer.starts_with("https://")
+                || cfg.issuer.len() <= 8
+                || cfg.issuer.len() > 2048
+                || cfg.issuer.chars().any(|c| {
+                    c.is_control() || c.is_whitespace() || matches!(c, '@' | '?' | '#' | '\\')
+                })
+                || !companies.insert(cfg.company_id)
+                || !principals.insert(cfg.principal_id)
+                || !tokens.insert(cfg.token_id)
+                || self.company_delegations.iter().any(|m| {
+                    [m.principal_id, m.token_id].contains(&cfg.principal_id)
+                        || [m.principal_id, m.token_id].contains(&cfg.token_id)
+                })
+                || cfg.projects.is_empty()
+                || cfg.projects.len() > 256
+            {
+                return Err(fail());
+            }
+            let mut projects = std::collections::BTreeSet::new();
+            if cfg
+                .projects
+                .iter()
+                .any(|p| p.is_nil() || !projects.insert(*p))
+            {
+                return Err(fail());
+            }
+        }
+        Ok(())
+    }
     /// Fail closed before operator provisioning; these are exact stable
     /// identities, never role presets, email aliases or automatic enrollment.
     pub fn validate_company_delegations(&self) -> Result<(), ConfigError> {
@@ -303,5 +397,87 @@ mod company_delegations_tests {
             })
             .collect();
         assert!(excessive.validate_company_delegations().is_err());
+    }
+
+    fn delivery_configured() -> AuthConfig {
+        let mut auth = configured();
+        auth.mode = AuthMode::MultiUser;
+        auth.company_delivery_delegations
+            .push(CompanyDeliveryDelegationConfig {
+                company_id: auth.company_delegations[0].company_id,
+                owner_instance_id: Uuid::new_v4(),
+                area: OnboardingArea::Workshop,
+                issuer: auth.oidc.issuer_url.clone(),
+                principal_id: Uuid::new_v4(),
+                token_id: Uuid::new_v4(),
+                policy_revision: 1,
+                projects: vec![auth.company_delegations[0].projects[0].project_id],
+            });
+        auth
+    }
+
+    #[test]
+    fn company_delivery_delegations_are_separate_and_exact() {
+        assert!(
+            AuthConfig::default()
+                .validate_company_delivery_delegations()
+                .is_ok()
+        );
+        let auth = delivery_configured();
+        assert!(auth.validate_company_delivery_delegations().is_ok());
+        for change in [
+            (|a: &mut AuthConfig| a.mode = AuthMode::SingleUser) as fn(&mut AuthConfig),
+            |a| a.company_delivery_delegations[0].area = OnboardingArea::Trust,
+            |a| a.company_delivery_delegations[0].owner_instance_id = Uuid::nil(),
+            |a| a.company_delivery_delegations[0].policy_revision = 0,
+            |a| a.company_delivery_delegations[0].issuer.push('/'),
+            |a| {
+                a.company_delivery_delegations[0].principal_id =
+                    a.company_delegations[0].principal_id
+            },
+            |a| a.company_delivery_delegations[0].token_id = a.company_delegations[0].token_id,
+            |a| a.company_delivery_delegations[0].principal_id = a.company_delegations[0].token_id,
+            |a| a.company_delivery_delegations[0].projects.clear(),
+            |a| {
+                let id = a.company_delivery_delegations[0].projects[0];
+                a.company_delivery_delegations[0].projects.push(id);
+            },
+            |a| {
+                a.company_delivery_delegations
+                    .push(a.company_delivery_delegations[0].clone())
+            },
+        ] {
+            let mut changed = auth.clone();
+            change(&mut changed);
+            assert!(changed.validate_company_delivery_delegations().is_err());
+        }
+    }
+
+    #[test]
+    fn company_owner_delivery_references_are_optional_paired_and_non_secret() {
+        let owner:CompanyOwnerConfig=serde_json::from_value(serde_json::json!({
+            "owner_instance_id":Uuid::new_v4(),"area":"workshop","base_url":"https://owner.example", "token_env":"MANAGEMENT_TOKEN", "issuer":"https://identity.example/application/o/memory", "delegation_policy_revision":1,
+        })).unwrap();
+        assert!(owner.delivery_token_env.is_none());
+        assert!(owner.delivery_policy_revision.is_none());
+        let mut auth = AuthConfig::default();
+        auth.company_onboarding = Some(CompanyOnboardingConfig {
+            company_id: Uuid::new_v4(),
+            owners: vec![owner],
+        });
+        assert!(auth.validate_company_delivery_delegations().is_ok());
+        auth.mode = AuthMode::MultiUser;
+        let owner = &mut auth.company_onboarding.as_mut().unwrap().owners[0];
+        owner.delivery_token_env = Some("DELIVERY_TOKEN".into());
+        assert!(auth.validate_company_delivery_delegations().is_err());
+        auth.company_onboarding.as_mut().unwrap().owners[0].delivery_policy_revision = Some(1);
+        assert!(auth.validate_company_delivery_delegations().is_ok());
+        auth.company_onboarding.as_mut().unwrap().owners[0].delivery_token_env =
+            Some("MANAGEMENT_TOKEN".into());
+        assert!(auth.validate_company_delivery_delegations().is_err());
+        auth.company_onboarding.as_mut().unwrap().owners[0].delivery_token_env =
+            Some("DELIVERY_TOKEN".into());
+        auth.company_onboarding.as_mut().unwrap().owners[0].area = OnboardingArea::Trust;
+        assert!(auth.validate_company_delivery_delegations().is_err());
     }
 }

@@ -143,6 +143,30 @@ impl EvaluationConfig {
 }
 
 impl AppConfig {
+    pub fn validate_company_delivery_owner(&self) -> Result<(), ConfigError> {
+        self.auth.validate_company_delivery_delegations()?;
+        if !self.auth.company_delivery_delegations.is_empty() {
+            let area = self.area.as_ref().ok_or_else(|| {
+                ConfigError::Message(
+                    "company delivery requires explicit local owner area identity".into(),
+                )
+            })?;
+            area.validate()?;
+            if self
+                .auth
+                .company_delivery_delegations
+                .iter()
+                .any(|d| d.owner_instance_id != area.instance_id || d.area.as_str() != area.name)
+            {
+                return Err(ConfigError::Message(
+                    "company delivery delegation must match the exact current local owner area"
+                        .into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub fn load_from_path(path: Option<PathBuf>) -> Result<Self, ConfigError> {
         Self::load_with_profile(path, Profile::detect())
     }
@@ -218,6 +242,7 @@ impl AppConfig {
         config.resolved_dev_overlay_path = resolved_dev_overlay_path;
         config.apply_runtime_defaults();
         config.auth.validate_company_delegations()?;
+        config.validate_company_delivery_owner()?;
         config.validate_laptop_cache()?;
         if let Some(area) = &config.area {
             area.validate()?;

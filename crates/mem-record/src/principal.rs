@@ -179,10 +179,13 @@ pub enum Permission {
     EmbeddingsManage,
     AuthManage,
     SystemAdmin,
+    /// Explicit custom grant only, never a standard role/global preset.
+    #[serde(rename = "project_scoped_delivery")]
+    ScopedProjectDelivery,
 }
 
 impl Permission {
-    pub const ALL: [Permission; 11] = [
+    pub const STANDARD: [Permission; 11] = [
         Permission::MemoryRead,
         Permission::ActivityCapture,
         Permission::MemoryCurate,
@@ -194,6 +197,20 @@ impl Permission {
         Permission::EmbeddingsManage,
         Permission::AuthManage,
         Permission::SystemAdmin,
+    ];
+    pub const ALL: [Permission; 12] = [
+        Permission::MemoryRead,
+        Permission::ActivityCapture,
+        Permission::MemoryCurate,
+        Permission::MemoryDelete,
+        Permission::LoopsRun,
+        Permission::LoopsConfigure,
+        Permission::BundleExport,
+        Permission::BundleImport,
+        Permission::EmbeddingsManage,
+        Permission::AuthManage,
+        Permission::SystemAdmin,
+        Permission::ScopedProjectDelivery,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -209,6 +226,7 @@ impl Permission {
             Permission::EmbeddingsManage => "embeddings_manage",
             Permission::AuthManage => "auth_manage",
             Permission::SystemAdmin => "system_admin",
+            Permission::ScopedProjectDelivery => "project_scoped_delivery",
         }
     }
 
@@ -283,7 +301,7 @@ impl AuthRole {
             AuthRole::Reader => reader,
             AuthRole::Writer => writer,
             AuthRole::Operator => operator,
-            AuthRole::Admin => PermissionSet::from_permissions(&Permission::ALL),
+            AuthRole::Admin => PermissionSet::from_permissions(&Permission::STANDARD),
         }
     }
 }
@@ -312,9 +330,27 @@ mod permission_tests {
         assert!(!operator.contains(Permission::AuthManage));
 
         let admin = AuthRole::Admin.permissions();
-        for permission in Permission::ALL {
+        for permission in Permission::STANDARD {
             assert!(admin.contains(permission));
         }
+        for role in [
+            AuthRole::Reader,
+            AuthRole::Writer,
+            AuthRole::Operator,
+            AuthRole::Admin,
+        ] {
+            assert!(
+                !role
+                    .permissions()
+                    .contains(Permission::ScopedProjectDelivery)
+            );
+        }
+        assert_eq!(
+            PermissionSet::EMPTY
+                .with(Permission::ScopedProjectDelivery)
+                .names(),
+            vec!["project_scoped_delivery"]
+        );
     }
 
     #[test]
