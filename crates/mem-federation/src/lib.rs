@@ -11,6 +11,7 @@ mod projection;
 pub mod publication;
 mod record;
 mod replica;
+pub mod subscription;
 
 pub use codec::*;
 pub use digest::*;

@@ -4,7 +4,11 @@
 
 mod addressed_expertise;
 mod audit;
+mod scoped;
 pub use addressed_expertise::*;
+pub use scoped::*;
+mod scoped_projection;
+pub use scoped_projection::*;
 mod expertise_catalog;
 mod expertise_collections;
 pub use expertise_catalog::*;
