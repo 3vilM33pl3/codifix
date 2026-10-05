@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 pub(crate) mod answerer;
+pub(crate) mod company_delegate;
 pub(crate) mod device;
 mod model;
 mod oidc;
 pub(crate) mod onboarding;
-pub(crate) mod scoped_delivery;
 mod policy;
+pub(crate) mod scoped_delivery;
 #[cfg(test)]
 mod scoped_token_tests;
 mod store;

@@ -27,6 +27,55 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/admin/onboarding/company/delegates:
+    get:
+      operationId: inspectConfiguredCompanyDelegates
+      x-stability: internal
+      summary: Inspect public configured delegate identities and current provisioning state
+      description: Current global administrator on a writable primary only. Returns exact local owner, shared issuer, configured service principal/token UUIDs and complete project grant ceilings. State is freshly inspected, not inferred from a historical receipt. No token value, token hash, credential commitment, endpoint or environment reference is returned. Trust administration denied. No-store.
+      responses:
+        '200':
+          description: Up to sixty-four explicitly configured delegates.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [delegates]
+                properties:
+                  delegates: { type: array, maxItems: 64, items: { $ref: '#/components/schemas/CompanyDelegatePlan' } }
+        '403': { description: Global administration, writable primary or exact configured scope denied. }
+    post:
+      operationId: provisionConfiguredCompanyDelegate
+      x-stability: internal
+      summary: Explicitly provision one configuration-bound restricted service credential
+      description: |
+        Current global administrator, ordinary CSRF/read-only/evaluation controls and explicit
+        confirmation required. The full owner/area/company/issuer/principal/token/policy/project
+        ceiling binding must exactly match administrator-owned configuration. Only absent
+        identities may be created; existing humans, machines, tokens or grants are never adopted
+        or overwritten. Creates no global rights and only exact project memory_read/auth_manage
+        overrides. Configured reader/writer/operator ceilings bound delegated human grants, not
+        the credential's own permission preset. Effect and protected audit receipt commit together.
+        Stable request-ID replay checks active principal/token, bounded original expiry and exact
+        memberships, never restores disabled/revoked/changed authority, and never returns the
+        secret again. First success returns a one-time credential only after commit. Losing that
+        response does not permit secret recovery; revoke and explicitly configure fresh identities
+        for replacement. No live owner/IdP call or fleet-device enrollment. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyDelegateProvisionRequest' }
+      responses:
+        '200':
+          description: Exact identity receipt; token is present only on the first successful commit, null on replay.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyDelegateProvisionResponse' }
+        '400': { description: Missing confirmation, reserved identity or invalid bounded credential lifetime. }
+        '403': { description: Current global administrator, writable primary, exact configuration or non-Trust owner scope denied. }
+        '409': { description: Changed request/configuration or existing, expired, revoked, disabled or altered identity; no rights restored. }
+        '503': { description: Outcome unconfirmed; inspect or retry exact request, never assume the one-time secret can be recovered. }
   /v1/onboarding/projects/{project_id}/subscription:
     get:
       operationId: bootstrapApprovedLocalDeviceSubscription
@@ -3154,6 +3203,73 @@ components:
         HttpOnly OIDC session cookie instead; browser mutations additionally
         require the session CSRF value and the configured public Origin.
   schemas:
+    CompanyDelegateProject:
+      type: object
+      additionalProperties: false
+      required: [project_id, role_ceiling]
+      properties:
+        project_id: { type: string, format: uuid }
+        role_ceiling: { type: string, enum: [reader, writer, operator], description: Maximum role this configured delegate may grant to humans, not the credential's own role. }
+    CompanyDelegateProvisionRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, company_id, owner_instance_id, area, issuer, principal_id, token_id, delegation_policy_revision, name, projects, expires_in_days, confirmed]
+      properties:
+        request_id: { type: string, format: uuid }
+        company_id: { type: string, format: uuid }
+        owner_instance_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        issuer: { type: string, format: uri }
+        principal_id: { type: string, format: uuid }
+        token_id: { type: string, format: uuid }
+        delegation_policy_revision: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        projects: { type: array, minItems: 1, maxItems: 256, items: { $ref: '#/components/schemas/CompanyDelegateProject' } }
+        expires_in_days: { type: integer, minimum: 1, maximum: 90 }
+        confirmed: { type: boolean, const: true }
+    CompanyDelegateProvisionResponse:
+      type: object
+      additionalProperties: false
+      required: [request_id, company_id, owner_instance_id, area, issuer, principal_id, token_id, delegation_policy_revision, expires_at, projects, replayed, credential_issued, token]
+      properties:
+        request_id: { type: string, format: uuid }
+        company_id: { type: string, format: uuid }
+        owner_instance_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        issuer: { type: string, format: uri }
+        principal_id: { type: string, format: uuid }
+        token_id: { type: string, format: uuid }
+        delegation_policy_revision: { type: integer, minimum: 1 }
+        expires_at: { type: string, format: date-time }
+        replayed: { type: boolean }
+        credential_issued: { type: boolean }
+        token: { type: [string, 'null'], description: One-time first-success secret only. Null for every replay; never stored in audit or returned by listing. }
+        projects:
+          type: array
+          maxItems: 256
+          items:
+            type: object
+            additionalProperties: false
+            required: [project_id, role_ceiling, permissions]
+            properties:
+              project_id: { type: string, format: uuid }
+              role_ceiling: { type: string, enum: [reader, writer, operator] }
+              permissions: { type: array, items: { type: string, enum: [memory_read, auth_manage] }, minItems: 2, maxItems: 2, uniqueItems: true }
+    CompanyDelegatePlan:
+      type: object
+      additionalProperties: false
+      required: [company_id, owner_instance_id, area, issuer, principal_id, token_id, delegation_policy_revision, projects, status, expires_at]
+      properties:
+        company_id: { type: string, format: uuid }
+        owner_instance_id: { type: string, format: uuid }
+        area: { type: string, enum: [workshop, homelab, general] }
+        issuer: { type: string, format: uri }
+        principal_id: { type: string, format: uuid }
+        token_id: { type: string, format: uuid }
+        delegation_policy_revision: { type: integer, minimum: 1 }
+        projects: { type: array, maxItems: 256, items: { $ref: '#/components/schemas/CompanyDelegateProject' } }
+        status: { type: string, enum: [unprovisioned, active, inactive, conflict] }
+        expires_at: { type: [string, 'null'], format: date-time }
     DeviceProjectSubscription:
       type: object
       additionalProperties: false
