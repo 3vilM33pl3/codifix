@@ -32,7 +32,10 @@ class RuntimeBundle(unittest.TestCase):
         paths = ["python/bin/python3", *[f"postgres/bin/{n}" for n in sorted(bundle.TOOLS)],
                  "postgres/lib/vector.so", "postgres/share/extension/vector.control",
                  "postgres/share/extension/vector--0.8.1.sql", "notices/LICENSE-python",
-                 "notices/LICENSE-postgresql", "notices/LICENSE-pgvector", "python/lib/libpython.dylib"]
+                 "notices/LICENSE-postgresql", "notices/LICENSE-pgvector", "python/lib/libpython.dylib",
+                 "python/lib/python3.14/__future__.py", "python/lib/python3.14/_collections_abc.py",
+                 "python/lib/python3.14/lib-dynload/_ctypes.cpython-314-darwin.so",
+                 "python/lib/python3.14/encodings/__init__.py"]
         entries = {}
         for name in paths:
             file = self.source / name
@@ -113,11 +116,22 @@ class RuntimeBundle(unittest.TestCase):
             self.validate()
 
     def test_traversal_case_unicode_and_reserved_aliases(self):
-        for name in ["../escape", "/absolute", "python//oops", "python/thing.", "python/naïve", "PYTHON/bin/python3", bundle.DESCRIPTOR, "PYTHON"]:
+        for name in ["../escape", "/absolute", "python//oops", "python/thing.", "python/naïve", "PYTHON/bin/python3", bundle.DESCRIPTOR, "PYTHON",
+                     "python/.hidden", "python/./file", "python/../file", "python/lib/python3.14/__FUTURE__.py"]:
             value = copy.deepcopy(self.value)
             value["files"][name] = {"sha256": "a" * 64, "mode": "0444"}
             with self.subTest(name=name), self.assertRaises(Refused):
                 bundle.validate_manifest(value, "x86_64")
+
+    def test_safe_leading_underscore_stdlib_and_extension_names_are_staged(self):
+        self.validate()
+        staged = bundle.stage_bundle(self.source, self.manifest, "x86_64", self.payload).parent
+        for name in ["python/lib/python3.14/__future__.py", "python/lib/python3.14/_collections_abc.py",
+                     "python/lib/python3.14/lib-dynload/_ctypes.cpython-314-darwin.so",
+                     "python/lib/python3.14/encodings/__init__.py"]:
+            with self.subTest(name=name):
+                self.assertEqual(bundle.relative(name), name)
+                self.assertEqual((staged / name).read_bytes(), (self.source / name).read_bytes())
 
     def test_missing_executable_notice_and_vector_sql(self):
         for name in ["python/bin/python3", "postgres/bin/psql", self.value["notices"][0], self.value["postgres"]["vector_sql"][0]]:

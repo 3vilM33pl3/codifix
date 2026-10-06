@@ -34,7 +34,9 @@ def relative(value):
     if not isinstance(value, str) or len(value) > 1024 or not value:
         raise Refused("bounded ASCII relative runtime path required")
     parts = value.split("/")
-    if len(parts) > 32 or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+\-]{0,127}", p) or p.endswith(".") for p in parts):
+    # CPython stdlib and extension names commonly begin with underscores. Dot
+    # prefixes remain forbidden, including hidden paths and traversal aliases.
+    if len(parts) > 32 or any(not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._+\-]{0,127}", p) or p.endswith(".") for p in parts):
         raise Refused("runtime traversal, symlink-style or ambiguous alias path")
     return value
 
