@@ -267,6 +267,46 @@ class RuntimeBundle(unittest.TestCase):
         for mutation in ["rm ", "chmod", "chown", "launchctl", "exec "]:
             self.assertNotIn(mutation, text)
 
+    def test_runtime_launcher_uses_fixed_python_isolation_and_descriptor(self):
+        scripts = self.root / "scripts"
+        scripts.mkdir(mode=0o755)
+        bundle.stage_bundle(self.source, self.manifest, "x86_64", self.payload, scripts=scripts)
+        launcher = self.payload / "usr/local/bin/memory-onboard"
+        self.assertEqual(stat.S_IMODE(launcher.stat().st_mode), 0o755)
+        text = launcher.read_text()
+        self.assertIn(f"runtime_python='{self.value['install_prefix']}/python/bin/python3'", text)
+        self.assertIn(f"runtime_descriptor='{self.value['install_prefix']}/{bundle.DESCRIPTOR}'", text)
+        self.assertIn("operator='/usr/local/share/memory-layer/onboarding/operator/onboard.py'", text)
+        self.assertIn('if [[ ${1:-} == first-run ]]; then\n  set -- "$@" --runtime "$runtime_descriptor"\nfi', text)
+        self.assertIn('"$runtime_python" -I -S -B "$operator" "$@"', text)
+        self.assertIn('exec /usr/bin/env -i HOME="${HOME:?HOME is required}"', text)
+        checked = subprocess.run(["/bin/bash", "-n", str(launcher)], capture_output=True, timeout=5)
+        self.assertEqual(checked.returncode, 0)
+        # Syntax only: these are synthetic data files, never executed runtimes.
+        for fallback in ["/usr/bin/python", "command -v", "sudo", "launchctl", "source ", "eval "]:
+            self.assertNotIn(fallback, text)
+
+    def test_runtime_launcher_is_create_only_and_rejects_symlink_bin(self):
+        # Direct helper exercises publication without staging another bundle.
+        (self.payload / "usr/local/bin").mkdir(parents=True, mode=0o755)
+        for directory in [self.payload / "usr", self.payload / "usr/local", self.payload / "usr/local/bin"]:
+            directory.chmod(0o755)
+        existing = self.payload / "usr/local/bin/memory-onboard"
+        existing.write_text("existing launcher")
+        with self.assertRaises(FileExistsError):
+            bundle.stage_launcher(self.payload, self.value)
+        self.assertEqual(existing.read_text(), "existing launcher")
+        existing.unlink()
+        existing.parent.rmdir()
+        existing.parent.symlink_to(self.root, target_is_directory=True)
+        with self.assertRaises(OSError):
+            bundle.stage_launcher(self.payload, self.value)
+        self.assertFalse((self.root / "memory-onboard").exists())
+
+    def test_lightweight_staging_does_not_add_runtime_launcher(self):
+        bundle.stage_bundle(self.source, self.manifest, "x86_64", self.payload)
+        self.assertFalse((self.payload / "usr/local/bin/memory-onboard").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -309,6 +309,49 @@ def preinstall_guard(value):
             "  echo 'Runtime bundle ID already exists; choose a reviewed new bundle ID. Existing runtime preserved.' >&2\n  exit 1\nfi\n").encode()
 
 
+def runtime_launcher(value):
+    """Fixed reviewed paths only; no dependency picker or repository hooks."""
+    validate_manifest(value, value["arch"])
+    prefix = value["install_prefix"]
+    return ("#!/bin/bash\nset -eu\n"
+            f"runtime_python='{prefix}/{value['python']['path']}'\n"
+            "operator='/usr/local/share/memory-layer/onboarding/operator/onboard.py'\n"
+            f"runtime_descriptor='{prefix}/{DESCRIPTOR}'\n"
+            "if [[ ${1:-} == first-run ]]; then\n"
+            # Appending the fixed option prevents a caller's earlier --runtime
+            # option from silently selecting a different interpreter bundle.
+            '  set -- "$@" --runtime "$runtime_descriptor"\nfi\n'
+            'exec /usr/bin/env -i HOME="${HOME:?HOME is required}" '
+            "PATH='/usr/bin:/bin:/usr/sbin:/sbin' LANG='en_US.UTF-8' LC_ALL='C' "
+            '"$runtime_python" -I -S -B "$operator" "$@"\n').encode()
+
+
+def stage_launcher(payload, value):
+    local_fd = open_directory(payload / "usr/local")
+    bin_fd = None
+    try:
+        created = False
+        try:
+            os.mkdir("bin", 0o755, dir_fd=local_fd)
+            created = True
+        except FileExistsError:
+            pass
+        bin_fd = os.open("bin", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=local_fd)
+        trusted_directory(bin_fd)
+        if created:
+            os.fchmod(bin_fd, 0o755)
+        fd = os.open("memory-onboard", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o700, dir_fd=bin_fd)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(runtime_launcher(value))
+            stream.flush()
+            os.fchmod(stream.fileno(), 0o755)
+            os.fsync(stream.fileno())
+    finally:
+        os.close(local_fd)
+        if bin_fd is not None:
+            os.close(bin_fd)
+
+
 def stage_bundle(source, manifest, arch, payload, *, scripts=None, manifest_sha256=None):
     value, data = validate_bundle(source, manifest, arch)
     if manifest_sha256 is not None and (not isinstance(manifest_sha256, str) or not re.fullmatch(r"[a-f0-9]{64}", manifest_sha256) or hashlib.sha256(data).hexdigest() != manifest_sha256):
@@ -377,6 +420,7 @@ def stage_bundle(source, manifest, arch, payload, *, scripts=None, manifest_sha2
                     os.fsync(stream.fileno())
             finally:
                 os.close(scripts_fd)
+            stage_launcher(payload, value)
         return payload / value["install_prefix"].lstrip("/") / DESCRIPTOR
     finally:
         if source_fd is not None:
