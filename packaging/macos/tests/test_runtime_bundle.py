@@ -88,6 +88,13 @@ class RuntimeBundle(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("acceptance pending", result.stdout)
 
+    def test_manifest_change_between_preflight_and_stage_is_refused(self):
+        reviewed = hashlib.sha256(self.manifest.read_bytes()).hexdigest()
+        self.manifest.write_bytes(self.manifest.read_bytes() + b"\n")
+        with self.assertRaisesRegex(Refused, "changed since package preflight"):
+            bundle.stage_bundle(self.source, self.manifest, "x86_64", self.payload, manifest_sha256=reviewed)
+        self.assertEqual(list(self.payload.iterdir()), [])
+
     def test_strict_schema_versions_arch_and_relocation(self):
         changes = [{"schema_version": True}, {"schema_version": 2}, {"unknown": 1}, {"arch": "aarch64"},
                    {"bundle_id": "Fixture"}, {"install_prefix": "/usr/local/elsewhere"}, {"relocatable_for_prefix": False},

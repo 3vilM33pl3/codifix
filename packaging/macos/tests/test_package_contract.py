@@ -7,6 +7,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+import test_runtime_bundle
 
 REPO = Path(__file__).resolve().parents[3]
 BUILDER = REPO / "packaging/build-pkg.sh"
@@ -41,7 +42,7 @@ class PackageContract(unittest.TestCase):
             (repo / directory).mkdir(parents=True, exist_ok=True)
         shutil.copy2(BUILDER, repo / "packaging/build-pkg.sh")
         for name in ("postinstall.sh", "seed-user.sh", "onboard.py", "onboarding_files.py",
-                     "onboarding_native.py", "onboarding_journey.py", "onboarding_agents.py", "operator-README.md"):
+                     "onboarding_native.py", "onboarding_journey.py", "onboarding_agents.py", "runtime_bundle.py", "operator-README.md"):
             shutil.copy2(MACOS / name, repo / "packaging/macos" / name)
         for name in ("config.toml", "agents/astra_adviser.toml"):
             shutil.copy2(REPO / ".codex" / name, repo / ".codex" / name)
@@ -103,6 +104,37 @@ touch "$output"
         repo, trace = self.fixture()
         result = self.assert_no_build(repo, trace, "--target")
         self.assertIn("requires a value", result.stderr)
+
+    def test_optional_runtime_requires_paired_inputs_before_build(self):
+        repo, trace = self.fixture()
+        for flag in ["--runtime-bundle", "--runtime-manifest"]:
+            result = self.assert_no_build(repo, trace, flag, "/missing")
+            self.assertIn("requires both", result.stderr)
+
+    def test_optional_runtime_is_validated_before_build_or_staging(self):
+        repo, trace = self.fixture()
+        result = self.assert_no_build(repo, trace, "--runtime-bundle", "/missing", "--runtime-manifest", "/missing")
+        self.assertIn("Runtime bundle refused", result.stderr)
+
+    def test_optional_runtime_stages_exact_read_only_tree_without_running_it(self):
+        repo, trace = self.fixture()
+        runtime = test_runtime_bundle.RuntimeBundle("runTest")
+        runtime.setUp()
+        self.addCleanup(runtime.doCleanups)
+        # Protected staging refuses writable ancestors even in fixtures.
+        Path(self.env["TMPDIR"]).chmod(0o755)
+        result = self.run_script(repo / "packaging/build-pkg.sh", "--runtime-bundle", str(runtime.source),
+                                 "--runtime-manifest", str(runtime.manifest))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        staged = Path(self.env["CAPTURE"]) / "payload" / runtime.value["install_prefix"].lstrip("/")
+        for name, entry in runtime.value["files"].items():
+            self.assertEqual((staged / name).read_bytes(), (runtime.source / name).read_bytes())
+            self.assertEqual(stat.S_IMODE((staged / name).stat().st_mode), int(entry["mode"], 8))
+        self.assertTrue((staged / "runtime-prerequisites.json").is_file())
+        preinstall = Path(self.env["CAPTURE"]) / "scripts/preinstall"
+        self.assertIn("Runtime bundle ID already exists", preinstall.read_text())
+        self.assertEqual(list(Path(self.env["TMPDIR"]).iterdir()), [])
+        self.assertIn("--locked", trace.read_text())
 
     def test_failed_build_cleans_private_stage_only(self):
         repo, _ = self.fixture()

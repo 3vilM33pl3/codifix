@@ -309,8 +309,10 @@ def preinstall_guard(value):
             "  echo 'Runtime bundle ID already exists; choose a reviewed new bundle ID. Existing runtime preserved.' >&2\n  exit 1\nfi\n").encode()
 
 
-def stage_bundle(source, manifest, arch, payload, *, scripts=None):
+def stage_bundle(source, manifest, arch, payload, *, scripts=None, manifest_sha256=None):
     value, data = validate_bundle(source, manifest, arch)
+    if manifest_sha256 is not None and (not isinstance(manifest_sha256, str) or not re.fullmatch(r"[a-f0-9]{64}", manifest_sha256) or hashlib.sha256(data).hexdigest() != manifest_sha256):
+        raise Refused("runtime manifest changed since package preflight")
     payload = path(payload)
     # Only a private build staging area, never the current host's install root.
     parent_info = payload.parent.stat()
@@ -392,19 +394,24 @@ def main():
     parser.add_argument("--arch", required=True, choices=["aarch64", "x86_64"])
     parser.add_argument("--payload")
     parser.add_argument("--scripts")
+    parser.add_argument("--manifest-sha256")
+    parser.add_argument("--print-manifest-sha256", action="store_true")
     args = parser.parse_args()
     try:
         if sys.version_info < (3, 11):
             raise Refused("runtime bundle validation requires build-host Python 3.11+")
         if args.action == "stage":
-            if not args.payload:
+            if not args.payload or args.print_manifest_sha256:
                 raise Refused("stage requires explicit private --payload")
-            print(stage_bundle(args.bundle, args.manifest, args.arch, args.payload, scripts=args.scripts))
+            print(stage_bundle(args.bundle, args.manifest, args.arch, args.payload, scripts=args.scripts, manifest_sha256=args.manifest_sha256))
         else:
-            if args.payload or args.scripts:
+            if args.payload or args.scripts or args.manifest_sha256:
                 raise Refused("validate does not accept staging outputs")
-            value, _ = validate_bundle(args.bundle, args.manifest, args.arch)
-            print(f"Hash-bound runtime {value['bundle_id']} validated; native Mac acceptance pending.")
+            value, data = validate_bundle(args.bundle, args.manifest, args.arch)
+            if args.print_manifest_sha256:
+                print(hashlib.sha256(data).hexdigest())
+            else:
+                print(f"Hash-bound runtime {value['bundle_id']} validated; native Mac acceptance pending.")
     except (Refused, OSError, ValueError, TypeError, KeyError) as error:
         print(f"Runtime bundle refused: {error}", file=sys.stderr)
         return 1

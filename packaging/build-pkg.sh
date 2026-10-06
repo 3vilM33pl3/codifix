@@ -6,6 +6,8 @@ set -euo pipefail
 #   ./packaging/build-pkg.sh
 #   ./packaging/build-pkg.sh --arch x86_64
 #   ./packaging/build-pkg.sh --arch aarch64
+#   ./packaging/build-pkg.sh --runtime-bundle /ABS/REVIEWED/TREE \
+#     --runtime-manifest /ABS/REVIEWED/manifest.json
 #   ./packaging/build-pkg.sh \
 #     --sign-app "Developer ID Application: ..." \
 #     --sign-pkg "Developer ID Installer: ..."
@@ -38,9 +40,11 @@ TEAM_ID=""
 APPLE_PASSWORD=""
 PKG_ARCH=""
 RUST_TARGET=""
+RUNTIME_BUNDLE=""
+RUNTIME_MANIFEST=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --arch|--target|--sign|--sign-app|--sign-pkg|--notary-profile|--apple-id|--team-id|--apple-password)
+    --arch|--target|--sign|--sign-app|--sign-pkg|--notary-profile|--apple-id|--team-id|--apple-password|--runtime-bundle|--runtime-manifest)
       if [[ $# -lt 2 || -z "$2" || "$2" == --* ]]; then
         echo "Option $1 requires a value." >&2
         exit 1
@@ -54,6 +58,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --target)
       RUST_TARGET="$2"
+      shift 2
+      ;;
+    --runtime-bundle)
+      RUNTIME_BUNDLE="$2"
+      shift 2
+      ;;
+    --runtime-manifest)
+      RUNTIME_MANIFEST="$2"
       shift 2
       ;;
     --sign)
@@ -91,6 +103,11 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
+
+if [[ -n "$RUNTIME_BUNDLE" && -z "$RUNTIME_MANIFEST" || -z "$RUNTIME_BUNDLE" && -n "$RUNTIME_MANIFEST" ]]; then
+  echo "Optional runtime requires both --runtime-bundle and --runtime-manifest." >&2
+  exit 1
+fi
 
 if [[ -z "$PKG_ARCH" ]]; then
   case "$(uname -m)" in
@@ -145,6 +162,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 REQUIRED_TOOLS=(cargo npm pkgbuild mktemp install cp ln find chmod mkdir rm awk du cut)
+if [[ -n "$RUNTIME_BUNDLE" ]]; then REQUIRED_TOOLS+=(python3); fi
 if [[ -n "$APP_SIGN_IDENTITY" ]]; then REQUIRED_TOOLS+=(codesign); fi
 if [[ "$NOTARIZE" -eq 1 ]]; then REQUIRED_TOOLS+=(xcrun); fi
 for tool in "${REQUIRED_TOOLS[@]}"; do
@@ -153,6 +171,21 @@ for tool in "${REQUIRED_TOOLS[@]}"; do
     exit 1
   fi
 done
+
+# Offline manifest validation only: no dependency binaries or hooks execute.
+# The lightweight package remains independent of build-host Python.
+if [[ -n "$RUNTIME_BUNDLE" ]]; then
+  if [[ ! -f "$ROOT_DIR/packaging/macos/runtime_bundle.py" ]]; then
+    echo "Required runtime bundle validator unavailable." >&2
+    exit 1
+  fi
+  RUNTIME_MANIFEST_SHA256="$(python3 -I -S -B "$ROOT_DIR/packaging/macos/runtime_bundle.py" validate \
+    --bundle "$RUNTIME_BUNDLE" --manifest "$RUNTIME_MANIFEST" --arch "$PKG_ARCH" --print-manifest-sha256)"
+  if [[ ! "$RUNTIME_MANIFEST_SHA256" =~ ^[a-f0-9]{64}$ ]]; then
+    echo "Runtime validator did not produce an exact manifest SHA-256." >&2
+    exit 1
+  fi
+fi
 if [[ "$NOTARIZE" -eq 1 ]]; then
   for apple_tool in notarytool stapler; do
     if ! xcrun --find "$apple_tool" >/dev/null 2>&1; then
@@ -186,7 +219,13 @@ case "$STAGE_DIR" in
   *) echo "Unexpected temporary staging path; refusing cleanup." >&2; exit 1 ;;
 esac
 cleanup() {
-  if [[ -d "$STAGE_DIR" && ! -L "$STAGE_DIR" ]]; then rm -rf -- "$STAGE_DIR"; fi
+  if [[ -d "$STAGE_DIR" && ! -L "$STAGE_DIR" ]]; then
+    # Optional runtime directories are intentionally read-only in the payload.
+    # Make only directories inside this private mktemp stage removable; find
+    # does not follow symlinks. Never alter a reviewed runtime input tree.
+    find "$STAGE_DIR" -type d -exec chmod u+w {} +
+    rm -rf -- "$STAGE_DIR"
+  fi
 }
 trap cleanup EXIT
 PAYLOAD="$STAGE_DIR/payload"
@@ -215,6 +254,11 @@ npm --prefix "$ROOT_DIR/web" ci
 npm --prefix "$ROOT_DIR/web" run build
 
 # --- Stage payload ----------------------------------------------------------
+if [[ -n "$RUNTIME_BUNDLE" ]]; then
+  python3 -I -S -B "$ROOT_DIR/packaging/macos/runtime_bundle.py" stage \
+    --bundle "$RUNTIME_BUNDLE" --manifest "$RUNTIME_MANIFEST" --arch "$PKG_ARCH" \
+    --manifest-sha256 "$RUNTIME_MANIFEST_SHA256" --payload "$PAYLOAD" --scripts "$SCRIPTS"
+fi
 install -m 0755 "$BINARY_PATH" "$PAYLOAD/usr/local/bin/memory"
 
 if [[ -n "$APP_SIGN_IDENTITY" ]]; then
@@ -240,7 +284,7 @@ install -m 0444 "$ROOT_DIR/.codex/agents/astra_adviser.toml" "$PAYLOAD/usr/local
 for operator_file in onboard.py onboarding_files.py onboarding_native.py onboarding_journey.py onboarding_agents.py operator-README.md; do
   install -m 0444 "$ROOT_DIR/packaging/macos/$operator_file" "$PAYLOAD/usr/local/share/memory-layer/onboarding/operator/$operator_file"
 done
-# The operator is an explicit later step. No Python, PostgreSQL installation,
+# The operator is an explicit later step. No Python/PostgreSQL execution,
 # device login or service activation is executed by the package lifecycle.
 
 # --- Post-install script ----------------------------------------------------
