@@ -24,8 +24,6 @@ pub struct LaptopContributionScope {
 #[serde(deny_unknown_fields)]
 pub struct LaptopContributionBinding {
     pub scope: LaptopContributionScope,
-    /// Company service origin, distinct from the project owner's origin.
-    pub company_instance_id: Uuid,
     pub device_id: Uuid,
     pub manifest_revision: i64,
     pub manifest_sha256: String,
@@ -37,7 +35,6 @@ impl LaptopContributionBinding {
             self.scope.owner_instance_id,
             self.scope.project_id,
             self.scope.space_id,
-            self.company_instance_id,
             self.device_id,
         ]
         .iter()

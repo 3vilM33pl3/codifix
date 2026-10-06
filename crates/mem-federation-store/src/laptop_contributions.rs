@@ -327,7 +327,6 @@ mod tests {
                     project_id: Uuid::new_v4(),
                     space_id: Uuid::new_v4(),
                 },
-                company_instance_id: Uuid::new_v4(),
                 device_id: Uuid::new_v4(),
                 manifest_revision: 2,
                 manifest_sha256: "a".repeat(64),
