@@ -34,7 +34,7 @@ configure Codex and Claude; preserve the private federation profile and pins.
 - [ ] CLI auth login/logout, project selection and synchronization status with Web/TUI equivalents; browser-assisted per-device login and Keychain credentials.
 - [ ] Architecture-matched package; dedicated loopback PostgreSQL/pgvector with separate area databases and named LaunchAgents, no unrelated restarts or PDS/gateway/server database credentials.
 - [x] Server-authorized project snapshot/delta feed selects before transmission and preserves approved memories/evidence, versions, authorship, provenance, digests and tombstones; no raw captures/sessions/secrets/unapproved material.
-- [ ] Searchable read-only remote projection; local captures/proposals and offline queues retain origin ownership and recheck current permission before replay.
+- [ ] Searchable read-only remote projection; local captures/proposals and offline queues retain origin ownership and recheck current permission before replay. Separate local draft/outbox storage now exists; user interfaces, contribution consent and authenticated owner replay remain unfinished.
 - [x] Atomic update/cursor commits, harmless replay, startup/reconnect/five-minute sync implementation, visible freshness/pending/failures, withdrawal and revocation semantics; native launchd execution remains below.
 - [x] Gateway-attested scoped delivery verifies digests without downloading whole unauthorized CAR/repositories or claiming complete repository verification.
 - [ ] Clone with user Git credentials; preserve existing/dirty repositories; confirmed pinned tool installation without arbitrary setup hooks; merge only Memory-owned settings.

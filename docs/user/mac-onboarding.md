@@ -2,10 +2,57 @@
 
 This feature is under implementation. The development package now includes a
 resumable sign-in/select/clone/offline-sync operator and a separate Codex/Claude
-setup stage. It still needs reviewed native prerequisites and real-Mac acceptance;
+setup stage. Optional runtime-bundle packaging and guided first-run now exist.
+It still needs a produced reviewed native runtime and real-Mac acceptance;
 it is not yet a verified self-contained first-run installer.
 See the [execution contract](../reviews/mac-onboarding/README.md) for completion
 checks. No Mac installation or existing area has been changed by this work.
+
+## Guided first-run candidate
+
+An operator-built package containing the reviewed runtime includes
+`memory-onboard`. The existing lightweight package does not include that launcher.
+With your existing projects folder, start:
+
+```bash
+memory-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
+  --name "My Mac" --workspace-parent "$HOME/Projects" \
+  --state "$HOME/Library/Application Support/memory-layer/onboarding"
+```
+
+Sign in in the browser, select authorized offline projects by number, and press
+Enter for suggested repository paths or specify an existing repository. Then
+review and confirm the repository/tools, offline-copy and local-services plans
+with `yes`. No installer JSON, source build or provider key is needed. Git still
+uses your own Git credentials. Existing repositories, dirty work and custom
+settings are preserved. Trust is shown as remote-only, not copied to your Mac.
+
+The state parent and projects folder must exist and remain separate. First-run creates
+new private state; it does not change an existing directory's permissions. If a
+selected port is occupied, choose explicit `--pg-port`/`--api-base-port` values;
+no other installation is stopped. Confirmed native apply creates a missing user
+LaunchAgents directory and only namespaced jobs. `--prepare-only` saves selections
+without cloning or starting services.
+
+After interruption, repeat the same command and inputs. It retains the selected
+projects, identifiers and completed effects; changed manifests/executables need
+new review, not automatic substitution. After the journey completes, separately
+approve the owning-human Codex/OpenAI and Claude/Anthropic grants with:
+
+```bash
+memory-onboard journey-agents --journal "$HOME/Library/Application Support/memory-layer/onboarding/journey.json"
+memory-onboard journey-status --journal "$HOME/Library/Application Support/memory-layer/onboarding/journey.json"
+```
+
+These commands enable no paid model calls. Current implementation supports the
+reviewed Memory skills format, not arbitrary plugins. Local contribution draft
+storage exists separately from imported knowledge, but its user commands,
+submission consent and authenticated owner replay are not yet connected. Trust
+expertise integration with the new laptop identities also remains open.
+
+This candidate has synthetic and disposable-database test evidence, not an
+observed clean-Mac journey. [Runtime packaging and recovery details](../../packaging/macos/operator-README.md)
+explain prerequisites and remaining native validation.
 
 ## Administration in the development build
 

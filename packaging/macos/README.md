@@ -64,6 +64,43 @@ installed PostgreSQL/pgvector and the full architecture-matched Memory binary
 are required. No prerequisites are silently downloaded or source-built, and a
 self-contained dependency distribution/native Mac acceptance is not complete.
 
+### Optional reviewed runtime package
+
+On the native build host, an explicitly reviewed redistributable Python and
+PostgreSQL/pgvector tree can be included without downloads or laptop source builds:
+
+```bash
+./packaging/build-pkg.sh --runtime-bundle /ABS/REVIEWED/RUNTIME-TREE \
+  --runtime-manifest /ABS/REVIEWED/runtime-manifest.json
+```
+
+`runtime_bundle.py` schema v1 requires an exact architecture and versioned prefix
+`/usr/local/share/memory-layer/runtime/<bundle_id>`, explicit producer assertion
+that the tree was built for that prefix, exact Python/PG/vector versions,
+redistribution notices and an exhaustive SHA-256/mode inventory. Input files must
+be `0444` or `0555`; links, traversal, extra files and case aliases are rejected.
+Ordinary leading-underscore CPython modules are supported. Files are copied
+byte-identically, not patched or codesigned after hashing. Producers must supply
+any required signed nested binaries; the Memory binary's separate signing does
+not sign the runtime. Manifest bytes are pinned across the build interval.
+
+The optional preinstall is read-only: it rejects another target volume, symlinked
+ancestors and an already-existing exact bundle prefix. It never repairs or
+overwrites a runtime in use. A changed bundle needs a new ID; interrupted package
+extraction or same-ID repair requires operator inspection, not automatic deletion.
+Postinstall still performs no dependency execution, login or service activation.
+
+Optional packages also include `memory-onboard`, which runs their exact Python
+with isolated imports and the fixed first-party operator. `first-run` binds the
+installed descriptor, asks for company login/projects/repository locations and
+generates private resumable inputs; no hand-written JSON is needed. See the
+[guided first-run procedure](operator-README.md#guided-first-run-with-an-optional-runtime-bundle).
+
+This is packaging/verification software, not a produced or Mac-tested native
+runtime. Architecture, loader dependencies and exact-prefix relocatability still
+need observed native validation; a producer assertion or hashes cannot prove
+them. The original lightweight package remains available without these options.
+
 The bundled `journey` connector joins login, project selection, reviewed workspace
 setup and native provisioning. `journey-agents` adds separately approved
 Codex/OpenAI and Claude/Anthropic Keychain identities and project MCP entries,

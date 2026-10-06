@@ -128,8 +128,21 @@ nonce, and PKCE before creating a 12-hour session by default. The provider
 tokens are discarded. Browser writes also require a matching Origin and CSRF
 value.
 
-There is no interactive CLI OIDC login in this release. Automation should use a
-service token instead of attempting to reuse browser cookies.
+General API automation uses a scoped service token, not reused browser cookies.
+The unreleased Mac onboarding candidate adds a separate browser-approved device
+flow:
+
+```bash
+memory auth login --company https://YOUR-COMPANY-MEMORY-ORIGIN --name "My Mac"
+memory projects available --company https://YOUR-COMPANY-MEMORY-ORIGIN
+memory auth logout --company https://YOUR-COMPANY-MEMORY-ORIGIN
+```
+
+The device secret remains in macOS Keychain; it is not a general service-token
+replacement and grants only explicitly approved onboarding scope. Separate
+Codex/Claude disclosure grants remain required. Production releases without
+these commands should retain service-token automation. See [Mac onboarding](../mac-onboarding.md)
+for the guided first-run candidate and its outstanding native acceptance.
 
 ## OpenBao Pattern
 

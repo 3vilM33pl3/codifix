@@ -39,6 +39,8 @@ and embedding work are disabled.
 | Read-only local cache interfaces | Web/TUI implemented and reviewed; backend/configuration tests passed | `cb755bb5`, `1f0a12fb`, `f4814db4`; three PostgreSQL/HTTP cache tests, two cache configuration tests and nine focused CLI/TUI tests passed. Exact subscription allowlist; same-snapshot freshness and citations; no normal-query merge, model forwarding or write controls. This is not a native Mac acceptance result. |
 | Joined prerequisite-based journey | Implemented with synthetic recovery evidence | `d234521d`, `9f0bc203`, `53ba8812`; login/select/workspace/subscription/native provisioning and explicit agent setup share stable journals. Exact replays preserve clones, credentials, completed stages and consent. The latest complete operator/package suite passed 63 tests; two subsequently added short-confirmation/EOF cases also passed. Native dependency distribution remains open. |
 | Independent agent identities and settings | Implemented; real PostgreSQL/HTTP, CLI and MCP transport tests passed | `8fb6b39f`, `9705b8bb`, `d0d18d34`, `d91d4f10`, `e94bbb45`, `b95aafa7`, `4b57e512`, `86f83d58`, `27dd79c7`; browser changes `bacae72d`, `bca625a3`. Separate one-project Codex/OpenAI and Claude/Anthropic grants, monotonic denial, read-only cache tools and protected settings merges. No automatic model calls or inherited F1 authority. |
+| Guided first-run and runtime packaging | Implemented; synthetic verification passed | `9b855528`, `a63cfbad`, `205fa9e7`, `c13920a9`, `ffeef91b`, `e0b778fc`, `0140a679`; exact optional runtime tree/manifest/launcher and selected-input generation. Latest complete Python suite: 100 tests. No produced native dependency bundle, installer or clean-Mac result is claimed. |
+| Local contribution drafts/outbox | Storage foundation implemented, not a submission workflow | `3a14afc3`, `1ec1a6f5`; migration `0076`, bounded captures/pending-add drafts, canonical input binding, CAS history and separate payload storage. Required-DB record/store regression: 45 tests. CLI/UI, human consent, owner authorization and replay remain open. |
 | Real macOS acceptance | Pending | Requires native execution; Linux builds/tests are not evidence of this. |
 
 ## Invariants under review
@@ -284,7 +286,7 @@ operator are development candidates, not a self-contained installer.
 Remaining implementation work:
 
 - Local capture/proposal/offline replay onboarding, supported project plugin
-  formats and reviewed native dependency installation.
+  formats and production/validation of reviewed native dependency binaries.
 - Online Trust/F1 expertise integration using the new scoped laptop identities;
   a cache disclosure grant does not authorize it automatically.
 - Native package/Keychain/LaunchAgent/pgvector/APFS and full clean-Mac acceptance.
@@ -373,3 +375,72 @@ claimed.
 No clean-Mac journey, live Authentik provisioning, customer deployment, paid
 provider execution or R3 continuation is claimed. The last cache check was
 27 GiB with 369 GiB free; no cache or user data was deleted.
+
+### Guided first-run, optional runtime and local draft foundation — 2026-10-06
+
+The isolated dev service had stopped; only its owned `4250` process was restarted
+with the same disposable loopback `55470` database. The Memory resume workflow
+confirmed the approved plan remains in execution, not verified complete. Models,
+workers and existing area deployments remain unchanged.
+
+Optional runtime packaging accepts a reviewed architecture/prefix-bound manifest
+and exhaustive immutable Python/PostgreSQL/pgvector files and notices. It retains
+raw manifest hashes across the build and rejects aliases, links and extra files.
+Installed verification regenerates the descriptor and checks the complete tree.
+The read-only preinstall rejects an existing bundle ID rather than overwriting
+executables in use. A runtime-only `memory-onboard` launcher uses the exact pinned
+Python and descriptor, isolated imports and a sanitized native environment. It
+does not execute dependencies during packaging/postinstall. Native architecture,
+loader dependencies and exact-prefix relocation remain unverified; producer
+assertions and synthetic files do not establish runtime suitability.
+
+Guided `first-run` logs in and presents the currently authorized catalog, then
+generates private inputs rather than requiring manual JSON. It distinguishes
+full composite identities and remote-only Trust. Selected identity, revision and
+complete public manifest digest are bound by journey v2; v1 remains supported.
+Its exact selected input is journaled before publication, preserving IDs after
+lost acknowledgement. Existing repositories/custom settings are retained and
+new native services reuse the earlier guarded operator. Confirmed apply can
+create a missing user LaunchAgents directory without changing existing modes or
+jobs. No port conflict causes a legacy service to be stopped.
+
+A separate local contribution store holds raw-capture or pending-add drafts,
+bounded typed payloads, canonical hashes and metadata-only local transition
+history. Exact replay is harmless; changed source/text/time/scope conflicts;
+generation CAS prevents stale updates and completed receipts remain immutable.
+It does not initialize, write or advance a delivered replica/projection/cursor.
+Accepted metadata describes a future trusted adapter's historical owner outcome,
+not something the store independently authenticates. No submission worker or
+user interface exists yet. Offline-copy/model grants must not be inferred as
+contribution consent, and company devices must retain zero ordinary roles.
+
+Astra's bounded design review found that owner-forwarded federation correction
+submission is invalid when the executor is the target origin. The existing
+pending-add transaction helper is reusable, but a future contribution adapter
+must separately check current human/device/owner consent and commit a full-input
+receipt, capture/proposal and R1 event atomically. Legacy offline replay is not
+reused: it does not perform that current-permission check. Corrections remain
+unsubmitted until an explicit authorized path is designed.
+
+Independent source review found a runtime validator bug rejecting legitimate
+leading-underscore CPython modules; `e0b778fc` fixes it with representative
+stdlib and `_ctypes` module fixtures. No other actionable finding was reported
+in that bounded review. This is not deployed authentication or native proof.
+
+Verification on the final slice:
+
+- `python3 -m unittest discover -s packaging/macos/tests -p 'test_*.py'`: 100
+  passed, using synthetic native commands/runtime files only.
+- Required disposable PostgreSQL: `cargo test -p mem-record -p
+  mem-federation-store --all-targets --locked`: 45 passed, including the new local
+  contribution tests and existing durability, expertise and scoped-delivery
+  regressions. No customer/production database was used.
+- Strict all-target Clippy for those two crates, formatting, boundary checks,
+  package shell syntax and diff checks passed.
+- Build cache: 28 GiB, 368 GiB free; no deletion or blanket cleanup.
+
+The remaining work is authenticated contribution consent/CLI/replay, supported
+non-Memory plugin formats, new-identity Trust expertise, producing the reviewed
+native runtime and observing the complete clean-Mac journey. R3 stays paused;
+no live Authentik account, existing service, provider call or public release was
+changed or enabled.

@@ -20,7 +20,8 @@ and its [command-line tool locations](https://postgresapp.com/documentation/cli-
 its [downloads](https://postgresapp.com/downloads.html) identify universal Mac
 packages. No release version/hash is assumed by this operator. It does not run
 Homebrew, fetch an installer, mount a DMG, compile Memory or build extensions.
-A reviewed pinned redistributable dependency package remains unfinished.
+An optional reviewed runtime-bundle packaging path now exists (see below).
+Producing and verifying its real native dependency binaries remains unfinished.
 
 Use explicit real paths, not `latest`/Homebrew symlinks. Installed executables,
 extension library/control/SQL files and the operator/Python runtime are SHA-256
@@ -30,11 +31,55 @@ library must contain the current Mac execution architecture, checked with
 `lipo` before executing them. Missing prerequisites, changed pins, port conflicts
 and unsupported layouts fail without changing an existing installation.
 
-The user `~/Library/LaunchAgents/` directory must already exist. Supply an
+Confirmed apply creates `~/Library/LaunchAgents/` if absent, without changing an
+existing directory or its jobs. Supply an
 existing current-user private `0700` parent for a new operator data root, and
 a separate private journal/input directory. No chown, permission repair,
 existing cluster adoption, default-global config fallback or destructive cleanup
 is performed.
+
+## Guided first-run with an optional runtime bundle
+
+Packages built with the reviewed runtime option include `memory-onboard` bound
+to their exact bundled Python and prerequisite descriptor. They do not depend on
+an unpinned system Python or ask you to write installer JSON. After installation,
+with an existing repository parent and Memory Application Support directory:
+
+```bash
+memory-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
+  --name "Olivier Mac" --workspace-parent "$HOME/Projects" \
+  --state "$HOME/Library/Application Support/memory-layer/onboarding"
+```
+
+The state directory is created private if missing; existing public or relocated
+state is not adopted or repaired. First-run validates the exact installed runtime
+inventory, Python, architecture and Memory before login. It shows authorized
+projects, accepts up to eight explicit selections and lets you reuse an existing
+repository path. Trust is displayed as remote-only and cannot be selected for
+offline installation. Equal names at different owners remain separate.
+
+Review the repository/tools, offline-copy and native-services plans and type
+`yes`. Current owner/device checks still run before effects. Ports default to
+`55432` for PostgreSQL and `55440` upwards for the selected area services; use
+`--pg-port` and `--api-base-port` for an explicit different allocation. Occupied
+ports fail without stopping other installations. `--prepare-only` enrolls and
+saves the selected public inputs without cloning or starting services.
+
+Run the identical command to recover an interruption. Its private receipt stores
+the full selected input before publishing `journey-input.json`; lost confirmation
+does not regenerate identities or ask for another selection. Changed inputs,
+runtime, manifest or executable are rejected, not silently upgraded. It reuses
+the existing joined journey rather than introducing a different installation
+engine. Check progress and separately approve Codex/Claude disclosure with:
+
+```bash
+memory-onboard journey-status --journal "$HOME/Library/Application Support/memory-layer/onboarding/journey.json"
+memory-onboard journey-agents --journal "$HOME/Library/Application Support/memory-layer/onboarding/journey.json"
+```
+
+The builder/runtime hash tests use synthetic files. No usable native dependency
+bundle or clean-Mac acceptance result is claimed. The lightweight package still
+uses the explicit installed prerequisites below and has no runtime launcher.
 
 ## Inputs and preview
 
@@ -178,8 +223,12 @@ contains `company`, `name`, `no_browser`, `allow_loopback_development`, the nati
 prerequisites above (without `subscriptions`) and one to eight output slots:
 `projects: [{workspace, journal, subscription_output}]`. Each path is absolute;
 private journals remain outside repository and installation roots. Each selected
-area must be represented by a selected project. This is an operator input, not
-an automatically generated end-user form.
+area must be represented by a selected project. This v1 input remains compatible.
+Guided first-run generates v2 slots with a `selection` binding the exact area,
+owner, project, revision and complete public manifest digest. `projects prepare`
+then checks that selection again; changed content under the same revision also
+blocks continuation. It does not reopen a picker and accidentally select another
+project while resuming.
 
 Review each displayed plan, then type `yes` to confirm its exact recorded digest.
 The full digest is still accepted for compatibility; you do not need to retype
