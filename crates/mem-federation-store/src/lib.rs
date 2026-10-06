@@ -11,6 +11,8 @@ pub use scoped::*;
 pub use scoped_source::*;
 mod scoped_projection;
 pub use scoped_projection::*;
+mod laptop_contributions;
+pub use laptop_contributions::*;
 mod expertise_catalog;
 mod expertise_collections;
 pub use expertise_catalog::*;
