@@ -238,9 +238,13 @@ def plist(value, label, arguments, interval=None):
 
 def job(value, native, kind, identifier, arguments, interval=None):
     label = f"com.memory-layer.onboarding.{value['request_id']}.{kind}.{identifier}"
-    directory = Path.home() / "Library/LaunchAgents"
+    directory = files.path(Path.home() / "Library/LaunchAgents")
+    if not directory.exists():
+        # Called only from confirmed apply. A clean Mac may not have any user
+        # jobs yet; create that missing directory, never repair existing modes.
+        files.directory(directory)
     if not directory.is_dir():
-        raise Refused("existing user Library/LaunchAgents directory prerequisite missing")
+        raise Refused("user Library/LaunchAgents path is not a directory; existing path preserved")
     file = directory / (label + ".plist")
     files.missing(file, plist(value, label, arguments, interval))
     if not native.loaded(label):

@@ -248,6 +248,21 @@ class OperatorContract(unittest.TestCase):
             self.assertNotIn(s["password"], raw)
             self.assertNotIn(s["api_token"], raw)
         self.assertFalse(any("restart" in " ".join(args) or "stop" in args for args in self.fake.commands))
+
+    def test_clean_mac_creates_only_missing_launchagents_after_confirmation(self):
+        directory = self.home / "Library/LaunchAgents"
+        directory.rmdir()  # Test-owned empty fixture only.
+        value = self.prepare()
+        with self.assertRaises(files.Refused):
+            operator.apply(self.journal, value["plan_sha256"], False, self.fake)
+        self.assertFalse(directory.exists())
+        self.apply(value)
+        self.assertEqual(stat.S_IMODE(directory.stat().st_mode), 0o700)
+        self.assertEqual(len(list(directory.iterdir())), 3)
+        directory.chmod(0o755)  # Existing normal user directory must be retained.
+        self.apply(value)
+        self.assertEqual(stat.S_IMODE(directory.stat().st_mode), 0o755)
+        self.assertEqual(len(self.fake.bootstraps), 3)
     def test_lost_initdb_reply_resumes_same_cluster_without_reinitialization(self):
         value = self.prepare()
         self.fake.lose_init = True
