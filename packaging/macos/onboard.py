@@ -473,6 +473,18 @@ def main():
     journey.add_argument("--input", required=True, type=Path)
     journey.add_argument("--journal", required=True, type=Path)
     commands.add_parser("journey-status").add_argument("--journal", required=True, type=Path)
+    first = commands.add_parser("first-run", help="sign in and select projects using a reviewed bundled runtime; no installer JSON needed")
+    first.add_argument("--runtime", required=True, type=Path, help="exact installed runtime-prerequisites.json")
+    first.add_argument("--memory", type=Path, default=Path("/usr/local/bin/memory"))
+    first.add_argument("--company", required=True)
+    first.add_argument("--name", required=True)
+    first.add_argument("--state", required=True, type=Path, help="private new/resumable state outside repositories")
+    first.add_argument("--workspace-parent", required=True, type=Path, help="existing repository parent; existing repositories are preserved")
+    first.add_argument("--pg-port", type=int, default=55432)
+    first.add_argument("--api-base-port", type=int, default=55440)
+    first.add_argument("--no-browser", action="store_true")
+    first.add_argument("--allow-loopback-development", action="store_true")
+    first.add_argument("--prepare-only", action="store_true", help="save selected inputs without cloning or starting local services")
     agents = commands.add_parser("journey-agents")
     agents.add_argument("--journal", required=True, type=Path)
     agents.add_argument("--allow-offline", action="store_true", help="explicit bounded cached model-disclosure choice; observed denial always fences it")
@@ -484,6 +496,13 @@ def main():
             child.add_argument(option, required=True)
     args = parser.parse_args()
     try:
+        if args.command == "first-run":
+            import onboarding_first_run
+            onboarding_first_run.run(company=args.company, name=args.name, runtime=args.runtime, memory=args.memory,
+                state=args.state, workspace_parent=args.workspace_parent, native=Native(), no_browser=args.no_browser,
+                allow_loopback=args.allow_loopback_development, pg_port=args.pg_port, api_base_port=args.api_base_port,
+                prepare_only=args.prepare_only)
+            return
         if args.command == "journey-agents":
             import onboarding_agents
             onboarding_agents.run(args.journal, Native(), allow_offline=args.allow_offline, renew_grant=args.renew_grant)
