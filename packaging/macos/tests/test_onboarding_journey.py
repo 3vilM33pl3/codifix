@@ -329,6 +329,57 @@ class JourneyContract(unittest.TestCase):
         self.assertEqual(captured[1][0][-3:], ["--bootstrap-sha256", "c" * 64, "--confirm"])
         self.assertNotIn("Authorization", json.dumps(captured, default=str))
 
+    def select_v2(self):
+        manifest = self.memory.manifest
+        self.source["schema_version"] = 2
+        self.source["projects"][0]["selection"] = {
+            "area": manifest["entry"]["area"], "owner_instance_id": manifest["entry"]["owner_instance_id"],
+            "project_id": manifest["project_id"], "revision": manifest["revision"], "manifest_digest": files.digest(manifest)}
+        self.fixture.write(self.input, self.source)
+
+    def test_v2_selected_composite_project_replays_and_v1_stays_readable(self):
+        self.select_v2()
+        self.run_journey()
+        original = files.read(self.journal)
+        self.run_journey()
+        self.assertEqual(files.read(self.journal), original)
+        self.assertEqual(self.memory.clones, 1)
+        self.assertEqual(journey.status(self.journal)["native_acceptance"], "unverified")
+
+    def test_v2_selection_mismatch_blocks_all_workspace_and_native_effects(self):
+        self.select_v2()
+        for field, changed in [("project", "changed same revision"), ("owner_instance_id", str(uuid.uuid4())), ("project_id", str(uuid.uuid4())),
+                               ("revision", 2), ("area", "homelab")]:
+            target = self.memory.manifest if field in {"revision", "project_id", "project"} else self.memory.manifest["entry"]
+            original = target[field]
+            target[field] = changed
+            with self.assertRaises(files.Refused):
+                self.run_journey()
+            target[field] = original
+            workspace = Path(self.source["projects"][0]["journal"])
+            if workspace.exists():
+                workspace.unlink()  # Test-owned synthetic receipt only.
+        self.assertEqual(self.memory.clones, 0)
+        self.assertEqual(self.native.commands, [])
+
+    def test_v2_fixed_prepare_arguments_and_strict_schema(self):
+        self.select_v2()
+        memory = journey.Memory(self.source)
+        with patch.object(memory, "execute") as execute:
+            memory.select(self.source["projects"][0])
+        args = execute.call_args.args[0]
+        self.assertEqual(args[:2], ["projects", "prepare"])
+        self.assertIn(self.memory.manifest["project_id"], args)
+        self.assertIn(self.memory.manifest["entry"]["owner_instance_id"], args)
+        for version in [True, 3, 1]:
+            self.source["schema_version"] = version
+            with self.assertRaises(files.Refused):
+                journey.plan(self.source, self.journal)
+        self.source["schema_version"] = 2
+        self.source["projects"][0]["selection"]["area"] = "trust"
+        with self.assertRaises(files.Refused):
+            journey.plan(self.source, self.journal)
+
     def test_missing_private_parent_and_alias_outputs_fail_without_creating_parents(self):
         absent = self.root / "not-created"
         self.source["projects"][0]["journal"] = str(absent / "plan.json")

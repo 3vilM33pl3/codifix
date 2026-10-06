@@ -43,7 +43,7 @@ def origin(value, allow_loopback):
 
 def plan(source, journal):
     operator.exact(source, {"schema_version", "company", "name", "no_browser", "allow_loopback_development", "native", "projects"})
-    if source["schema_version"] != 1 or any(type(source[k]) is not bool for k in ["no_browser", "allow_loopback_development"]):
+    if type(source["schema_version"]) is not int or source["schema_version"] not in {1, 2} or any(type(source[k]) is not bool for k in ["no_browser", "allow_loopback_development"]):
         raise Refused("unsupported journey schema")
     origin(source["company"], source["allow_loopback_development"])
     if not isinstance(source["name"], str) or not 1 <= len(source["name"].encode()) <= 128 or source["name"].strip() != source["name"] or any(ord(c) < 32 for c in source["name"]):
@@ -55,7 +55,9 @@ def plan(source, journal):
     private_parent(journal)
     outputs, workspaces = [journal, Path(str(journal) + ".memory-lock")], []
     for slot in source["projects"]:
-        operator.exact(slot, {"workspace", "journal", "subscription_output"})
+        operator.exact(slot, {"workspace", "journal", "subscription_output"} | ({"selection"} if source["schema_version"] == 2 else set()))
+        if source["schema_version"] == 2:
+            selected_project(slot["selection"])
         workspace = files.path(slot["workspace"])
         if not workspace.parent.is_dir():
             raise Refused("workspace parents must already exist; no directory creation during review")
@@ -80,6 +82,16 @@ def plan(source, journal):
                 files.outside(a, b)
     return {"input": source, "prerequisites": prerequisite_plan,
             "connector": {"path": str(Path(__file__).absolute()), "sha256": files.sha(Path(__file__).absolute())}}
+
+
+def selected_project(value):
+    """A v2 selection binds the full composite identity, never just a slug."""
+    operator.exact(value, {"area", "owner_instance_id", "project_id", "revision", "manifest_digest"})
+    if value["area"] not in operator.AREAS or type(value["revision"]) is not int or not 1 <= value["revision"] <= 2**63 - 1:
+        raise Refused("exact offline area and catalog revision required; Trust remains remote-only")
+    operator.identifier(value["owner_instance_id"])
+    operator.identifier(value["project_id"])
+    operator.pin(value["manifest_digest"])
 
 
 def private_parent(file):
@@ -149,7 +161,13 @@ class Memory:
         self.execute(["auth", "login", *self.company(), "--name", self.source["name"], *(["--no-browser"] if self.source["no_browser"] else [])], interactive=True)
 
     def select(self, slot):
-        self.execute(["projects", "select", *self.company(), "--workspace", slot["workspace"], "--journal", slot["journal"]], interactive=True)
+        args = ["projects", "select", *self.company()]
+        if self.source["schema_version"] == 2:
+            picked = slot["selection"]
+            selected_project(picked)
+            args = ["projects", "prepare", *self.company(), "--project", picked["project_id"],
+                    "--area", picked["area"], "--owner-instance", picked["owner_instance_id"], "--revision", str(picked["revision"])]
+        self.execute([*args, "--workspace", slot["workspace"], "--journal", slot["journal"]], interactive=True)
 
     def workspace_status(self, journal):
         self.execute(["projects", "status", "--journal", journal])
@@ -190,6 +208,10 @@ def selection(value, source, slot):
     operator.identifier(entry["owner_instance_id"])
     if p["company"] != source["company"] or p["workspace"] != slot["workspace"] or entry["area"] not in {a["name"] for a in source["native"]["areas"]} or entry["offline_allowed"] is not True or type(manifest["revision"]) is not int or manifest["revision"] < 1:
         raise Refused("selected company/area/owner/project/offline scope differs from this journey")
+    if source["schema_version"] == 2 and slot["selection"] != {
+            "area": entry["area"], "owner_instance_id": entry["owner_instance_id"],
+            "project_id": manifest["project_id"], "revision": manifest["revision"], "manifest_digest": files.digest(manifest)}:
+        raise Refused("prepared project differs from the exact preselected identity/revision")
     public_manifest(manifest)
     # CLI status validates its own serialization digest/template inventory. Keep
     # that digest; don't invent a Python version of the Rust hash contract.
@@ -209,7 +231,7 @@ def public_url(value):
         raise Refused("reviewed repository/tool URLs must be credential-free HTTPS")
 
 
-def public_manifest(manifest):
+def public_manifest(manifest, *, offline=True):
     operator.exact(manifest, {"project_id", "project", "entry", "revision", "reviewed_by", "reviewed_at"})
     operator.identifier(manifest["project_id"])
     public_text(manifest["project"], 256)
@@ -218,7 +240,7 @@ def public_manifest(manifest):
     entry = manifest["entry"]
     operator.exact(entry, {"area", "owner_instance_id", "repository_url", "default_branch", "offline_allowed", "tools", "destinations"})
     operator.identifier(entry["owner_instance_id"])
-    if entry["area"] not in operator.AREAS or entry["offline_allowed"] is not True or type(manifest["revision"]) is not int or manifest["revision"] < 1:
+    if entry["area"] not in operator.AREAS | {"trust"} or type(entry["offline_allowed"]) is not bool or entry["area"] == "trust" and entry["offline_allowed"] or offline and not entry["offline_allowed"] or type(manifest["revision"]) is not int or not 1 <= manifest["revision"] <= 2**63 - 1:
         raise Refused("exact reviewed offline project scope required")
     public_url(entry["repository_url"])
     public_text(entry["default_branch"], 256)
