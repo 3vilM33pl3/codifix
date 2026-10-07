@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.1.0-rc.5 - 2026-10-07 (internal candidate)
+
+- Add `memory urls`: read-only, UI-first configuration discovery, JSON output,
+  area filtering and sanitized access/navigation descriptions.
+- Expose explicit local Web administration login.
+- Include company/project/device administration and guided Mac onboarding work;
+  real-Mac acceptance and native runtime delivery remain unfinished.
+- Include project-scoped delivery and local laptop draft journals. Draft storage
+  is not authoritative remote submission or disclosure consent.
+- Upgrade existing application databases using additive migrations 0066–0076.
+  Preserve existing identities, federation history and collection/model policies.
+- Internal checksum-verified release; no public/stable release, new paid model
+  execution, upstream PDS/Atrium/Pi upgrade or R3 campaign is included.
+
+
 ## 2.0.0 - 2026-08-25
 
 Pre-ATProto refactor: six waves of simplification, boundary work, and record
