@@ -40,8 +40,11 @@ the existing private LAN transfer server.
   failures and no queued/blocked publication intents. Existing credential
   maintenance renewed successfully after the restart.
 
-The system-wide Debian package remains rc.4 **pending refreshed sudo**.
-The user-owned deployment is not a claim that `/usr/bin/memory` changed.
+After Olivier refreshed temporary sudo, the system-wide Debian package upgraded
+successfully to `2.1.0~rc.5`. `/usr/bin/memory --version` reports rc.5 and its
+SHA-256 matches the frozen AMD64 executable above. The package installer did not
+start or restart services; both the normal area launcher and system binary now
+report rc.5.
 Already-open rc.4 TUI/MCP processes also retain their original executable until
 a normal restart/reconnection; agent chats were not forcibly terminated.
 
