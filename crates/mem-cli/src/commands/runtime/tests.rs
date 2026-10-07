@@ -269,6 +269,19 @@ fn expertise_answerer_requires_stable_ids_and_defaults_to_preview() {
     assert!(Cli::try_parse_from(["memory", "auth", "expertise-answerer", "--confirm"]).is_err());
 }
 
+#[test]
+fn urls_supports_global_area_json_and_completion_metadata() {
+    let parsed = Cli::try_parse_from(["memory", "urls", "--area", "workshop", "--json"]).unwrap();
+    assert_eq!(parsed.area.as_deref(), Some("workshop"));
+    let super::Command::Urls(args) = parsed.command else {
+        panic!("urls command");
+    };
+    assert!(args.json);
+    let mut command = Cli::command();
+    let urls = command.find_subcommand_mut("urls").unwrap();
+    assert_command_metadata(urls, "memory urls");
+}
+
 fn assert_command_metadata(cmd: &Command, path: &str) {
     if cmd.get_name() != "help" {
         let about = cmd

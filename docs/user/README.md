@@ -47,6 +47,7 @@ If you are new, start with the TUI. It shows the main product surface: cited mem
 - [Authentication And Access](cli/auth.md)
 - [Codex Desktop Plugin](codex-desktop-plugin.md)
 - [Status Command](cli/status.md)
+- [Application URLs](cli/urls.md)
 - [Doctor Diagnostics](cli/doctor.md)
 - [Health And Stats](cli/health.md)
 - [Query Command](cli/query.md)

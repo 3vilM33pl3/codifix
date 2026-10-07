@@ -28,7 +28,7 @@ the guided `memory tour`), then explore with `memory query` and `memory tui`.
 
 Command groups:
   Core          setup, init, demo, tour, remember, query, resume, tui
-  Status        status, health, stats, doctor
+  Status        status, urls, health, stats, doctor
   Memory        capture, ingest, curate, scan, proposals, review, archive
   Reinforcement scores, validate
   History       history, prune-history, verify-provenance, bundle
@@ -1352,6 +1352,8 @@ pub(in crate::commands) enum Command {
     // --- Status and health ---
     #[command(about = "Show the aggregate Memory Layer diagnostic status.", after_help = STATUS_AFTER_HELP)]
     Status(StatusArgs),
+    #[command(about = "List configured application URLs, with Web interfaces first.", after_help = crate::commands::urls::HELP)]
+    Urls(crate::commands::urls::UrlsArgs),
     #[command(about = "Check backend service health.", after_help = HEALTH_AFTER_HELP)]
     Health,
     #[command(about = "Inspect configuration and environment health.", after_help = DOCTOR_AFTER_HELP)]
@@ -3630,6 +3632,11 @@ pub(super) async fn run() -> Result<()> {
         writer_id: cli_writer_id,
         command,
     } = Cli::from_arg_matches(&matches)?;
+    // Configuration inventory must work even when area resolution, database
+    // credentials or the selected service are unavailable.
+    if let Command::Urls(args) = &command {
+        return super::urls::handle(args, cli_config, area, area_routing);
+    }
     // Company enrollment never loads local configuration, area routing or the
     // default API client: those may carry unrelated owner/service credentials.
     if crate::commands::auth_enrollment::handle_command(&command).await? {
@@ -3723,6 +3730,7 @@ pub(super) async fn run() -> Result<()> {
         .context("build http client")?;
 
     match command {
+        Command::Urls(_) => unreachable!("URL inventory is handled before configuration loading"),
         Command::Wizard(_) => unreachable!("wizard is handled before config loading"),
         Command::Init(_) => unreachable!("init is handled before config loading"),
         Command::Upgrade(_) => unreachable!("upgrade is handled before config loading"),

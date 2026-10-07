@@ -54,6 +54,7 @@ mod tour;
 mod tui;
 mod up_to_speed;
 mod upgrade;
+mod urls;
 mod verify_provenance;
 pub(crate) mod watch_support;
 mod watcher;
