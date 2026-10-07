@@ -524,6 +524,15 @@ mod tests {
     }
 
     #[test]
+    fn omitted_bind_uses_the_runtime_configuration_default() {
+        let value: toml::Value = "[service]".parse().unwrap();
+        assert_eq!(
+            config_base(&value).unwrap(),
+            safe_url(&format!("http://{}/", mem_config::default_bind_addr())).unwrap()
+        );
+    }
+
+    #[test]
     fn development_overlay_changes_only_its_candidate() {
         let mut base = config("");
         let untouched = base.clone();
