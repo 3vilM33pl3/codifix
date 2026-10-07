@@ -252,6 +252,13 @@ writes; it never downloads a service token. The Access tab appears only for a
 global admin. Newly created service-token secrets are shown once and should be
 stored in OpenBao or another secret manager before dismissal.
 
+On a writable single-user installation, click **Open administration** beside
+**local owner** in the top bar. This explicitly requests the existing loopback-only
+browser session, checks the server's administrator permissions, and opens Access
+(Users, Projects, Devices and Company). Anonymous reads do not grant administration.
+The button is unavailable for read-only services, machine identities and multi-user
+installations, which use their normal Authentik login instead.
+
 ## Automations
 
 The Automations tab is the browser control surface for loop engineering. It reads

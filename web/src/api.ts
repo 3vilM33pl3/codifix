@@ -191,6 +191,27 @@ export async function getAuthMe(refresh = false): Promise<AuthMeResponse> {
   return authMePromise;
 }
 
+/** Explicit local-owner login; never bootstrap an OIDC or machine identity. */
+export async function openLocalAdministration(): Promise<AuthMeResponse> {
+  const before = await getAuthMe();
+  if (before.mode !== "single_user" || before.principal.kind !== "internal" || before.read_only) {
+    throw new Error("Local administration is unavailable for this identity or service.");
+  }
+  const response = await fetch("/v1/auth/session/bootstrap", {
+    method: "POST", credentials: "same-origin", cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Local administration login failed. The service must be reachable over loopback.");
+  const authenticated = await getAuthMe(true);
+  const admin = authenticated.principal.global_permissions !== undefined
+    ? authenticated.principal.global_permissions.includes("system_admin")
+    : authenticated.principal.global_role === "admin";
+  if (!authenticated.authenticated || authenticated.mode !== "single_user"
+    || authenticated.principal.kind !== "internal" || authenticated.read_only || !admin) {
+    throw new Error("The server did not authorize local administration.");
+  }
+  return authenticated;
+}
+
 async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const auth = await getAuthMe();
   const headers = new Headers(init.headers);

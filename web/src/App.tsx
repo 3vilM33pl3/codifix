@@ -19,6 +19,7 @@ import { ResumeTab } from "./features/resume/ResumeTab";
 import { WatchersTab } from "./features/watchers/WatchersTab";
 import { SkillsTab } from "./features/skills/SkillsTab";
 import { AccessTab } from "./features/access/AccessTab";
+import { LocalAdministrationButton } from "./features/access/LocalAdministrationButton";
 import { consumeAgentRequestLink } from "./features/access/agentRequestLink";
 import { FederationTab } from "./features/federation/FederationTab";
 import { JobsTab } from "./features/jobs/JobsTab";
@@ -287,6 +288,11 @@ function MemoryApp({ agentLink }: { agentLink: { request?: string; notice?: stri
           ) : authMe ? (
             <>
               <span title={authMe.principal.email ?? undefined}>{authMe.principal.display_name}</span>
+              {!canAdminister ? <LocalAdministrationButton auth={authMe} onOpened={(auth) => {
+                setAuthMe(auth);
+                setServiceReadOnly(auth.read_only);
+                setTab("access");
+              }} /> : null}
               {authMe.mode === "multi_user" ? (
                 <button type="button" onClick={() => void logout().then(() => window.location.assign(authLoginUrl("/")))}>Sign out</button>
               ) : null}
