@@ -127,6 +127,12 @@ pub(in crate::tui) fn watcher_detail_lines(app: &App) -> Vec<Line<'static>> {
                 Style::default().fg(Theme::MUTED),
             ),
         ]));
+        if watcher.agent_cli.is_some() || watcher.agent_session_id.is_some() {
+            lines.push(Line::from(Span::styled(
+                monitoring_label(watcher),
+                Style::default().fg(Theme::ACCENT),
+            )));
+        }
         lines.push(Line::from(Span::styled(
             format!("  repo: {}", watcher.repo_root),
             Style::default().fg(Theme::MUTED),
@@ -136,10 +142,6 @@ pub(in crate::tui) fn watcher_detail_lines(app: &App) -> Vec<Line<'static>> {
             Style::default().fg(Theme::MUTED),
         )));
         if watcher.agent_cli.is_some() || watcher.agent_session_id.is_some() {
-            lines.push(Line::from(Span::styled(
-                monitoring_label(watcher),
-                Style::default().fg(Theme::ACCENT),
-            )));
             lines.push(Line::from(Span::styled(
                 format!(
                     "  owner: {} session={} pid={}",
