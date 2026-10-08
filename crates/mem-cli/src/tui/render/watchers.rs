@@ -127,6 +127,17 @@ pub(in crate::tui) fn watcher_detail_lines(app: &App) -> Vec<Line<'static>> {
         if watcher.agent_cli.is_some() || watcher.agent_session_id.is_some() {
             lines.push(Line::from(Span::styled(
                 format!(
+                    "  Monitoring: {} — {}",
+                    watcher.agent_cli.as_deref().unwrap_or("Agent"),
+                    watcher
+                        .agent_session_kind
+                        .map(|kind| kind.label())
+                        .unwrap_or("Session type unknown")
+                ),
+                Style::default().fg(Theme::ACCENT),
+            )));
+            lines.push(Line::from(Span::styled(
+                format!(
                     "  owner: {} session={} pid={}",
                     watcher
                         .agent_cli

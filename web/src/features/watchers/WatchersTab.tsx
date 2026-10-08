@@ -29,6 +29,9 @@ export function WatchersTab({ overview, project }: WatchersTabProps) {
           overview.watchers.watchers.map((watcher) => (
             <div key={watcher.watcher_id} className="watcher-card">
               <strong>{watcher.hostname}</strong>
+              {watcher.agent_session_id ? (
+                <p><span className="badge">{watcher.agent_session_kind === "desktop" ? "Desktop session" : watcher.agent_session_kind === "cli" ? "CLI session" : "Session type unknown"}</span> Monitoring {watcher.agent_cli ?? "agent"}</p>
+              ) : null}
               <p>{watcher.repo_root}</p>
               <div className="stats-row">
                 <span>pid {watcher.pid}</span>
@@ -42,7 +45,7 @@ export function WatchersTab({ overview, project }: WatchersTabProps) {
               </div>
               <p className="muted">Host service {watcher.host_service_id}</p>
               {watcher.agent_session_id ? (
-                <p className="muted">{watcher.agent_cli} session {watcher.agent_session_id} · agent pid {watcher.agent_pid ?? "n/a"}</p>
+                <p className="muted">Session {watcher.agent_session_id} · {watcher.agent_session_kind === "desktop" ? "desktop host" : "agent"} pid {watcher.agent_pid ?? "n/a"}</p>
               ) : null}
               {watcher.last_restart_attempt_at ? (
                 <p className="muted">Last restart attempt {formatDateTime(watcher.last_restart_attempt_at)}</p>

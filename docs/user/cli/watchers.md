@@ -35,6 +35,11 @@ projects can therefore receive separate watchers without scanning old session
 history. A watcher remains associated with an open session until it is closed
 or the Desktop host exits.
 
+Web and TUI watcher cards label detected owners as **Desktop session** or
+**CLI session**. Desktop process IDs identify the shared desktop host, while
+session IDs identify individual conversations. Older watchers without this
+metadata show **Session type unknown**, rather than being assumed to be CLI.
+
 The manager uses a lightweight process scan every 10 seconds. It reads only process IDs and command lines until it identifies live Codex or Claude processes; it does not subscribe to agent transcript directories or collect TUI metrics such as per-process CPU and memory. Every sixth scan also verifies the managed service units. A singleton lock prevents accidentally running two managers at the same time.
 
 A manager started from a Cargo build is scoped to the repository whose dev config it loaded. It does not try to launch dev watchers for every other active agent repository on the machine; the installed production manager remains responsible for those repositories.

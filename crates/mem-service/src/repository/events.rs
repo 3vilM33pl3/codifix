@@ -582,6 +582,7 @@ pub(crate) fn register_watcher_heartbeat(
             watcher.host_service_id = request.host_service_id.clone();
             watcher.managed_by_service = request.managed_by_service;
             watcher.agent_cli = request.agent_cli.clone();
+            watcher.agent_session_kind = request.agent_session_kind;
             watcher.agent_session_id = request.agent_session_id.clone();
             watcher.agent_pid = request.agent_pid;
             watcher.agent_started_at = request.agent_started_at;
@@ -628,6 +629,7 @@ pub(crate) fn register_watcher_heartbeat(
             agent_session_id: request.agent_session_id.clone(),
             agent_pid: request.agent_pid,
             agent_started_at: request.agent_started_at,
+            agent_session_kind: request.agent_session_kind,
             last_restart_attempt_at: None,
             restart_attempt_count: 0,
         });

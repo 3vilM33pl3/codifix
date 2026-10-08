@@ -224,6 +224,22 @@ pub enum WatcherHealth {
     Failed,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WatcherSessionKind {
+    Desktop,
+    Cli,
+}
+
+impl WatcherSessionKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Desktop => "Desktop session",
+            Self::Cli => "CLI session",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatcherPresence {
     pub watcher_id: String,
@@ -239,6 +255,8 @@ pub struct WatcherPresence {
     pub last_heartbeat_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_cli: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_session_kind: Option<WatcherSessionKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -264,6 +282,8 @@ pub struct WatcherHeartbeatRequest {
     pub started_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_cli: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_session_kind: Option<WatcherSessionKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -369,5 +389,36 @@ impl WatcherUnregisterRequest {
             return Err(ValidationError::new("project must be non-empty"));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod session_kind_tests {
+    use super::*;
+
+    #[test]
+    fn old_heartbeats_remain_readable_and_new_kind_round_trips() {
+        let legacy = serde_json::json!({
+            "watcher_id": "watcher-1", "project": "project", "repo_root": "/repo",
+            "hostname": "host", "host_service_id": "service", "pid": 42,
+            "mode": "suggest", "managed_by_service": true,
+            "started_at": "2026-10-08T12:00:00Z", "agent_cli": "codex"
+        });
+        let mut request: WatcherHeartbeatRequest = serde_json::from_value(legacy).unwrap();
+        assert_eq!(request.agent_session_kind, None);
+        assert!(
+            serde_json::to_value(&request)
+                .unwrap()
+                .get("agent_session_kind")
+                .is_none()
+        );
+        request.agent_session_kind = Some(WatcherSessionKind::Desktop);
+        let encoded = serde_json::to_value(&request).unwrap();
+        assert_eq!(encoded["agent_session_kind"], "desktop");
+        let decoded: WatcherHeartbeatRequest = serde_json::from_value(encoded).unwrap();
+        assert_eq!(
+            decoded.agent_session_kind,
+            Some(WatcherSessionKind::Desktop)
+        );
     }
 }

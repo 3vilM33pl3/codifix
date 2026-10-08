@@ -265,6 +265,7 @@ fn test_presence(
         managed_by_service: true,
         health: WatcherHealth::Healthy,
         agent_cli: None,
+        agent_session_kind: None,
         agent_session_id: None,
         agent_pid: None,
         agent_started_at: None,
@@ -1137,6 +1138,7 @@ fn watcher_registry_refreshes_without_double_counting() {
         host_service_id: "service-a".to_string(),
         managed_by_service: true,
         agent_cli: None,
+        agent_session_kind: Some(mem_record::WatcherSessionKind::Desktop),
         agent_session_id: None,
         agent_pid: None,
         agent_started_at: None,
@@ -1150,6 +1152,10 @@ fn watcher_registry_refreshes_without_double_counting() {
     assert_eq!(second.unhealthy_count, 0);
     assert_eq!(second.watchers.len(), 1);
     assert_eq!(second.watchers[0].watcher_id, "watcher-1");
+    assert_eq!(
+        second.watchers[0].agent_session_kind,
+        Some(mem_record::WatcherSessionKind::Desktop)
+    );
     assert!(first_changed);
     assert!(!second_changed);
     assert!(transition.is_none());

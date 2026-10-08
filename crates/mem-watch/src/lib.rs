@@ -542,6 +542,7 @@ pub fn build_watcher_heartbeat_request(
         managed_by_service,
         started_at,
         agent_cli: owner.agent_cli.clone(),
+        agent_session_kind: detected_owner_session_kind(owner),
         agent_session_id: owner.agent_session_id.clone(),
         agent_pid: owner.agent_pid,
         agent_started_at: owner.agent_started_at,
@@ -585,6 +586,29 @@ pub fn owner_session_is_alive(owner: &WatcherAgentOwner) -> bool {
             process_started_at_ms.abs_diff(started_at.timestamp_millis().max(0) as u64) <= 5_000
         })
     })
+}
+
+fn detected_owner_session_kind(
+    owner: &WatcherAgentOwner,
+) -> Option<mem_record::WatcherSessionKind> {
+    let pid = owner.agent_pid?;
+    if !owner_session_is_alive(owner) {
+        return None;
+    }
+    let process = mem_platform::process_command_snapshots()
+        .into_iter()
+        .find(|process| process.pid == pid)?;
+    session_kind_from_command(owner.agent_cli.as_deref()?, &process.command)
+}
+
+fn session_kind_from_command(agent: &str, command: &str) -> Option<mem_record::WatcherSessionKind> {
+    match agent {
+        "codex" if command.split_whitespace().any(|arg| arg == "app-server") => {
+            Some(mem_record::WatcherSessionKind::Desktop)
+        }
+        "codex" | "claude" => Some(mem_record::WatcherSessionKind::Cli),
+        _ => None,
+    }
 }
 
 pub fn build_capture_request(
@@ -883,6 +907,25 @@ async fn send_json<T: serde::de::DeserializeOwned>(response: reqwest::Response) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn session_kind_distinguishes_desktop_cli_and_unknown() {
+        use mem_record::WatcherSessionKind::{Cli, Desktop};
+        assert_eq!(
+            session_kind_from_command("codex", "/usr/bin/codex app-server --flag"),
+            Some(Desktop)
+        );
+        assert_eq!(
+            session_kind_from_command("codex", "codex exec task"),
+            Some(Cli)
+        );
+        assert_eq!(session_kind_from_command("claude", "claude"), Some(Cli));
+        assert_eq!(session_kind_from_command("other", "other app-server"), None);
+        assert_eq!(
+            session_kind_from_command("codex", "codex --file app-server.log"),
+            Some(Cli)
+        );
+    }
 
     #[test]
     fn derive_notes_from_subsystems() {

@@ -464,6 +464,7 @@ export interface WatcherPresence {
   started_at: string;
   last_heartbeat_at: string;
   agent_cli: string | null;
+  agent_session_kind?: "desktop" | "cli" | null;
   agent_session_id: string | null;
   agent_pid: number | null;
   agent_started_at: string | null;
