@@ -9,6 +9,8 @@ Use the `Watchers` tab to inspect the live watcher processes for the current pro
 - the active watcher summary for the project
 - one row per watcher when watchers are present
 - host, process, mode, repo root, owning agent session, heartbeat, and restart details
+- an explicit **Desktop session** or **CLI session** monitoring label; older
+  watchers without session-type metadata are labelled **Session type unknown**
 - watcher health states such as `healthy`, `stale`, `restarting`, and `failed`
 
 This tab is specifically for watcher liveness and watchdog status, not for the higher-level project summary.
