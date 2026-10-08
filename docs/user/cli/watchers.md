@@ -28,6 +28,13 @@ That installs a persistent user manager service:
 
 The manager detects live Codex and Claude sessions, bootstraps git repos if needed, and starts one watcher per repository. When several agent sessions use the same repository, the manager selects one stable live session as the watcher owner instead of duplicating filesystem work.
 
+On Linux, Codex Desktop sessions are discovered from the rollout files held open
+by its live `app-server` process. Each file's session metadata identifies the
+repository; the Desktop host's working directory is not used. Multiple open
+projects can therefore receive separate watchers without scanning old session
+history. A watcher remains associated with an open session until it is closed
+or the Desktop host exits.
+
 The manager uses a lightweight process scan every 10 seconds. It reads only process IDs and command lines until it identifies live Codex or Claude processes; it does not subscribe to agent transcript directories or collect TUI metrics such as per-process CPU and memory. Every sixth scan also verifies the managed service units. A singleton lock prevents accidentally running two managers at the same time.
 
 A manager started from a Cargo build is scoped to the repository whose dev config it loaded. It does not try to launch dev watchers for every other active agent repository on the machine; the installed production manager remains responsible for those repositories.

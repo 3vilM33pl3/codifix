@@ -415,13 +415,7 @@ impl CodexCollector {
     fn map_pid_to_jsonl(pids: &[u32]) -> HashMap<u32, PathBuf> {
         pids.iter()
             .filter_map(|pid| {
-                let fd_dir = PathBuf::from(format!("/proc/{pid}/fd"));
-                let rollout = fs::read_dir(fd_dir).ok()?.flatten().find_map(|entry| {
-                    let path = fs::read_link(entry.path()).ok()?;
-                    let filename = path.file_name()?.to_str()?;
-                    (filename.starts_with("rollout-") && filename.ends_with(".jsonl"))
-                        .then_some(path)
-                })?;
+                let rollout = open_linux_rollouts(*pid).into_iter().next()?;
                 Some((*pid, rollout))
             })
             .collect()
@@ -514,6 +508,27 @@ pub fn collect_lightweight_sessions(
         }
     }
 
+    // Desktop multiplexes repositories in one app-server. Its cwd is not the
+    // repository, and choosing just one fd would lose other active sessions.
+    // Only inspect files actually held open by a live host; never scan history.
+    #[cfg(target_os = "linux")]
+    for (pid, info) in process_info {
+        if !process::cmd_has_binary(&info.command, "codex") || !info.command.contains("app-server")
+        {
+            continue;
+        }
+        let Some((started_at, _)) = read_proc_started_at(*pid) else {
+            continue;
+        };
+        for path in open_linux_rollouts(*pid) {
+            if let Some(mut session) = parse_codex_jsonl_lightweight(&path) {
+                session.pid = *pid;
+                session.started_at = started_at;
+                sessions.push(session);
+            }
+        }
+    }
+
     // Codex Desktop exposes a long-lived `codex.exe app-server` process rather
     // than a per-session CLI process. Windows has no unprivileged `lsof`
     // equivalent, so correlate that host with the most recently updated rollout
@@ -535,6 +550,24 @@ pub fn collect_lightweight_sessions(
     }
 
     sessions
+}
+
+#[cfg(target_os = "linux")]
+fn open_linux_rollouts(pid: u32) -> Vec<PathBuf> {
+    let mut paths = fs::read_dir(format!("/proc/{pid}/fd"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| fs::read_link(entry.path()).ok())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("rollout-") && name.ends_with(".jsonl"))
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths.dedup();
+    paths
 }
 
 #[cfg(target_os = "windows")]
@@ -1012,6 +1045,76 @@ mod tests {
         let mapped = CodexCollector::map_pid_to_jsonl(&[pid]);
 
         assert_eq!(mapped.get(&pid), Some(&file.path().to_path_buf()));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn desktop_discovers_multiple_open_sessions_without_scanning_closed_history() {
+        let mut first = tempfile::Builder::new()
+            .prefix("rollout-")
+            .suffix(".jsonl")
+            .tempfile()
+            .unwrap();
+        let mut second = tempfile::Builder::new()
+            .prefix("rollout-")
+            .suffix(".jsonl")
+            .tempfile()
+            .unwrap();
+        write_lines(&mut first, &[SESSION_META]);
+        write_lines(
+            &mut second,
+            &[&SESSION_META
+                .replace("sess-123", "sess-456")
+                .replace("/home/user/project", "/home/user/other")],
+        );
+        // A second fd for one transcript must not create a duplicate session.
+        let _duplicate = fs::File::open(first.path()).unwrap();
+        let pid = std::process::id();
+        let processes = HashMap::from([(
+            pid,
+            ProcInfo {
+                pid,
+                ppid: 0,
+                rss_kb: 0,
+                cpu_pct: 0.0,
+                command: "/usr/bin/codex app-server".to_string(),
+            },
+        )]);
+        let sessions = collect_lightweight_sessions(&processes);
+        for id in ["sess-123", "sess-456"] {
+            let matching = sessions
+                .iter()
+                .filter(|s| s.session_id == id)
+                .collect::<Vec<_>>();
+            assert_eq!(matching.len(), 1);
+            assert_eq!(matching[0].pid, pid);
+            assert_eq!(matching[0].started_at, read_proc_started_at(pid).unwrap().0);
+        }
+        assert!(sessions.iter().any(|s| s.cwd == "/home/user/other"));
+        let path = second.into_temp_path();
+        assert!(
+            !collect_lightweight_sessions(&processes)
+                .iter()
+                .any(|s| s.session_id == "sess-456")
+        );
+        drop(path);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn desktop_does_not_attach_sessions_to_unrelated_or_missing_processes() {
+        let processes = HashMap::from([(
+            u32::MAX,
+            ProcInfo {
+                pid: u32::MAX,
+                ppid: 0,
+                rss_kb: 0,
+                cpu_pct: 0.0,
+                command: "/usr/bin/codex app-server".to_string(),
+            },
+        )]);
+        assert!(collect_lightweight_sessions(&processes).is_empty());
+        assert!(collect_lightweight_sessions(&HashMap::new()).is_empty());
     }
 
     #[test]
