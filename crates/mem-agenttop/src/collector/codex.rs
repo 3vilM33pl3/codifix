@@ -1044,7 +1044,11 @@ mod tests {
 
         let mapped = CodexCollector::map_pid_to_jsonl(&[pid]);
 
-        assert_eq!(mapped.get(&pid), Some(&file.path().to_path_buf()));
+        // Other tests may hold rollout files in this same process concurrently.
+        // The CLI mapping picks one; desktop discovery retains all of them.
+        let open = open_linux_rollouts(pid);
+        assert!(open.contains(&file.path().to_path_buf()));
+        assert!(mapped.get(&pid).is_some_and(|path| open.contains(path)));
     }
 
     #[cfg(target_os = "linux")]
