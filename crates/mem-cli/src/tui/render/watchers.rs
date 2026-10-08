@@ -12,6 +12,17 @@ use ratatui::{
 use super::*;
 use crate::tui::{app::*, theme::Theme};
 
+fn monitoring_label(watcher: &mem_record::WatcherPresence) -> String {
+    format!(
+        "  Monitoring: {} — {}",
+        watcher.agent_cli.as_deref().unwrap_or("Agent"),
+        watcher
+            .agent_session_kind
+            .map(|kind| kind.label())
+            .unwrap_or("Session type unknown")
+    )
+}
+
 pub(in crate::tui) fn watcher_summary_text(app: &App) -> String {
     let Some(summary) = &app.meta.overview.watchers else {
         return "no watcher presence reported".to_string();
@@ -126,14 +137,7 @@ pub(in crate::tui) fn watcher_detail_lines(app: &App) -> Vec<Line<'static>> {
         )));
         if watcher.agent_cli.is_some() || watcher.agent_session_id.is_some() {
             lines.push(Line::from(Span::styled(
-                format!(
-                    "  Monitoring: {} — {}",
-                    watcher.agent_cli.as_deref().unwrap_or("Agent"),
-                    watcher
-                        .agent_session_kind
-                        .map(|kind| kind.label())
-                        .unwrap_or("Session type unknown")
-                ),
+                monitoring_label(watcher),
                 Style::default().fg(Theme::ACCENT),
             )));
             lines.push(Line::from(Span::styled(
@@ -268,5 +272,26 @@ pub(in crate::tui) fn watcher_bar_status_detail(app: &App) -> Option<String> {
         Some(format!("{} active", summary.active_count))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod session_label_tests {
+    use super::*;
+
+    #[test]
+    fn watcher_monitoring_labels_are_explicit_and_legacy_is_unknown() {
+        let mut watcher: mem_record::WatcherPresence = serde_json::from_value(serde_json::json!({
+            "watcher_id": "w", "project": "p", "repo_root": "/repo", "hostname": "host",
+            "host_service_id": "service", "pid": 1, "mode": "suggest", "managed_by_service": true,
+            "health": "healthy", "started_at": "2026-10-08T12:00:00Z",
+            "last_heartbeat_at": "2026-10-08T12:00:00Z", "agent_cli": "codex"
+        }))
+        .unwrap();
+        assert!(monitoring_label(&watcher).contains("Session type unknown"));
+        watcher.agent_session_kind = Some(mem_record::WatcherSessionKind::Desktop);
+        assert!(monitoring_label(&watcher).contains("codex — Desktop session"));
+        watcher.agent_session_kind = Some(mem_record::WatcherSessionKind::Cli);
+        assert!(monitoring_label(&watcher).contains("codex — CLI session"));
     }
 }
