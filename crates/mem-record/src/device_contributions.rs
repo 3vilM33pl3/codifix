@@ -136,3 +136,25 @@ pub struct DeviceContributionStatus {
     pub receipt: DeviceContributionReceipt,
     pub resolution: Option<DeviceContributionResolution>,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LaptopCorrectionRequest {
+    pub operation_id: Uuid,
+    pub source_memory_id: Uuid,
+    /// SHA-256 of the exact downloaded DeviceReplicaRecord, without a prefix.
+    pub expected_digest: String,
+    pub content: CuratedDeviceContent,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LaptopCorrectionReceipt {
+    pub operation_id: Uuid,
+    pub subscription_id: Uuid,
+    pub local_memory_id: Uuid,
+    pub local_canonical_id: Uuid,
+    pub owner_canonical_id: Uuid,
+    pub expected_version: i32,
+    pub request_sha256: String,
+    pub staged_at: DateTime<Utc>,
+}
