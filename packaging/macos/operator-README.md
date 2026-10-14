@@ -23,6 +23,27 @@ Homebrew, fetch an installer, mount a DMG, compile Memory or build extensions.
 An optional reviewed runtime-bundle packaging path now exists (see below).
 Producing and verifying its real native dependency binaries remains unfinished.
 
+The native source producer builds a candidate without installing it or touching
+existing services. Use a new explicit directory on macOS with Xcode command-line
+tools, an existing Python interpreter and `make`:
+
+```bash
+python3 packaging/macos/build-runtime.py \
+  --work-dir /ABS/NEW-BUILD-DIRECTORY \
+  --bundle-id py3148-pg1711-vector087-aarch64-v1 --jobs 8
+```
+
+`runtime-sources.json` pins official PostgreSQL 17.11, pgvector 0.8.7 and
+CPython 3.14.8 source bytes. The producer verifies downloads, stages through
+`DESTDIR` for the exact versioned prefix, audits native loader dependencies and
+applies ad-hoc signatures before hashing. Re-run the same command with `--resume`
+after interruption; changing sources, architecture or prefix requires a fresh
+directory. The output gives the bundle and manifest arguments for `build-pkg.sh`.
+This Python runtime serves the first-party operator; pip and TLS capabilities
+are not prerequisites or promised features. Ad-hoc signing is not Apple Developer
+ID signing or notarization. Validate the produced runtime on the actual Mac,
+including `_ctypes`, loader behavior and PostgreSQL/pgvector before acceptance.
+
 Use explicit real paths, not `latest`/Homebrew symlinks. Installed executables,
 extension library/control/SQL files and the operator/Python runtime are SHA-256
 pinned. They and their ancestors must not be group/world-writable (a system
