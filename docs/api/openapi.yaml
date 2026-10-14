@@ -291,6 +291,39 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DeviceProjectSubscription' }
         '403': { description: Current exact device approval/delegate/human authority denied. }
+  /v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/replica:
+    post:
+      operationId: getCuratedDeviceReplica
+      x-stability: internal
+      summary: Download selected curated project history to an approved device
+      description: Authorizes exact company, device, owner, project and current manifest before delivery. Pages contain curated versions, canonical state and same-project relations only; no raw captures, sessions or source paths. Gateway-attested pages are not ATProto publications or complete repository proofs. Existing shared-publication snapshot remains unchanged.
+      parameters:
+        - { name: area, in: path, required: true, schema: { type: string } }
+        - { name: owner, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: project_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: DeviceReplicaRequest schema 1 }
+      responses:
+        '200': { description: SignedDeviceReplicaPage, bounded and no-store. }
+        '403': { description: Device or current project access denied. }
+        '409': { description: Binding or cursor changed. }
+  /v1/onboarding/company-delivery/replica:
+    post:
+      operationId: deliverCuratedDeviceReplica
+      x-stability: internal
+      summary: Origin-side curated project page under an exact company delivery approval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: OwnerReplicaRequest with approval ID and DeviceReplicaRequest }
+      responses:
+        '200': { description: SignedDeviceReplicaPage, bounded and no-store. }
+        '403': { description: Current delegate, device or human authority denied. }
+        '409': { description: Binding or cursor changed. }
   /v1/onboarding/company-delivery/contributions:
     post:
       operationId: submitCuratedDeviceContribution

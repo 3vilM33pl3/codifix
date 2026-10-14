@@ -16,6 +16,9 @@ pub(in crate::commands) struct SyncArgs {
 }
 #[derive(Debug, Args)]
 pub(in crate::commands) struct SubscriptionArgs {
+    /// Select the private full curated project replica or existing shared publications.
+    #[arg(long,default_value="shared_publications_v1",value_parser=["shared_publications_v1","curated_project_v1"])]
+    replication_mode: String,
     #[command(flatten)]
     company: super::CompanyArgs,
     #[arg(long)]
@@ -114,6 +117,11 @@ mod native {
         args: &SubscriptionArgs,
         store: &impl CredentialStore,
     ) -> Result<()> {
+        let mode = if args.replication_mode == "curated_project_v1" {
+            mem_federation_runtime::ProjectReplicationMode::CuratedProjectV1
+        } else {
+            mem_federation_runtime::ProjectReplicationMode::SharedPublicationsV1
+        };
         if args.project.is_nil()
             || args.owner_instance.is_nil()
             || args.revision <= 0
@@ -164,14 +172,23 @@ mod native {
         use sha2::{Digest, Sha256};
         let digest = format!(
             "{:x}",
-            Sha256::digest(serde_json::to_vec(&(&origin.0, &bootstrap))?)
+            Sha256::digest(if mode.is_shared() {
+                serde_json::to_vec(&(&origin.0, &bootstrap))?
+            } else {
+                serde_json::to_vec(&(&origin.0, &bootstrap, mode))?
+            })
         );
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&serde_json::json!({"company":origin.0,
+        let manifest_sha256 = (!mode.is_shared())
+            .then(|| mem_federation_runtime::onboarding_manifest_digest(&matching[0].manifest))
+            .transpose()?;
+        let mut preview = serde_json::json!({"company":origin.0,
             "bootstrap":bootstrap,"bootstrap_sha256":digest,"output":args.output,
-            "contains_database_credentials":false,"creates_services":false,"downloads_knowledge":false}))?
-        );
+            "contains_database_credentials":false,"creates_services":false,"downloads_knowledge":false});
+        if !mode.is_shared() {
+            preview["replication_mode"] = serde_json::to_value(mode)?;
+            preview["manifest_sha256"] = serde_json::to_value(&manifest_sha256)?;
+        }
+        println!("{}", serde_json::to_string_pretty(&preview)?);
         if !args.confirm {
             return Ok(());
         }
@@ -185,6 +202,8 @@ mod native {
         };
         if let Some(existing) = existing {
             if existing.company != origin.0
+                || existing.replication_mode != mode
+                || existing.manifest_sha256 != manifest_sha256
                 || existing.bootstrap != bootstrap
                 || existing.allow_loopback_development != args.company.allow_loopback
             {
@@ -198,6 +217,8 @@ mod native {
             );
         } else {
             let prepared = PreparedProjectSubscription {
+                manifest_sha256,
+                replication_mode: mode,
                 schema_version: 1,
                 company: origin.0,
                 subscription: uuid::Uuid::new_v4(),
@@ -288,12 +309,39 @@ mod native {
             )
             .await?;
         current_bootstrap(&profile, &current)?;
-        let replica = replica(&profile, true).await?;
         let client = ScopedDeviceClient::for_scope(
             Endpoint::new(&origin.0, profile.allow_loopback_development)?,
             enrollment.credential,
             profile.bootstrap.scope.clone(),
         )?;
+        if !profile.replication_mode.is_shared() {
+            let replica =
+                mem_federation_runtime::DeviceProjectReplica::connect(&profile, true).await?;
+            loop {
+                let result = replica.synchronize(&client, 128).await;
+                let delay = match result {
+                    Ok(progress) => {
+                        let caught_up = progress.caught_up;
+                        println!("{}", serde_json::to_string(&progress)?);
+                        if caught_up { 300 } else { 1 }
+                    }
+                    Err(error) => {
+                        if !args.watch {
+                            return Err(error.into());
+                        }
+                        eprintln!(
+                            "curated project synchronization unavailable; committed cursor retained"
+                        );
+                        30
+                    }
+                };
+                if !args.watch {
+                    return Ok(());
+                }
+                tokio::select! {result=replica.wait_for_work(std::time::Duration::from_secs(delay))=>{result?;},signal=tokio::signal::ctrl_c()=>{signal?;return Ok(());}}
+            }
+        }
+        let replica = replica(&profile, true).await?;
         if !args.watch {
             let progress = replica.synchronize(&client, 128).await?;
             println!("{}", serde_json::to_string_pretty(&progress)?);
@@ -324,13 +372,31 @@ mod native {
     }
     pub(super) async fn status(args: &SyncStatusArgs) -> Result<()> {
         let profile = LocalProjectReplicaProfile::read(&args.profile)?;
-        let status = replica(&profile, false).await?.status().await?;
+        let uploads = if profile.replication_mode.is_shared() {
+            None
+        } else {
+            Some(
+                mem_federation_runtime::DeviceProjectReplica::connect(&profile, false)
+                    .await?
+                    .uploads()
+                    .await?,
+            )
+        };
+        let status = if profile.replication_mode.is_shared() {
+            replica(&profile, false).await?.status().await?
+        } else {
+            mem_federation_runtime::DeviceProjectReplica::connect(&profile, false)
+                .await?
+                .status()
+                .await?
+        };
         println!(
             "{}",
             serde_json::to_string_pretty(&serde_json::json!({
                 "area":profile.bootstrap.scope.area,"project":profile.bootstrap.scope.project,
                 "owner":profile.bootstrap.scope.owner,"subscription":profile.subscription,
                 "cursor":status.cursor,"last_committed_page":status.observed_at,
+                "uploads":uploads,"replication_mode":profile.replication_mode,
                 "current_remote_access":"unknown_offline_observation_only",
                 "stale":status.observed_at.is_none_or(|t|chrono::Utc::now()-t>chrono::Duration::minutes(5))
             }))?
@@ -345,10 +411,21 @@ mod native {
             bail!("offline search requires a nonempty question up to4096 bytes and limit1..32");
         }
         let profile = LocalProjectReplicaProfile::read(&args.profile)?;
-        let results = replica(&profile, false)
-            .await?
-            .search(&args.question, args.limit)
-            .await?;
+        let results = if profile.replication_mode.is_shared() {
+            serde_json::to_value(
+                replica(&profile, false)
+                    .await?
+                    .search(&args.question, args.limit)
+                    .await?,
+            )?
+        } else {
+            serde_json::to_value(
+                mem_federation_runtime::DeviceProjectReplica::connect(&profile, false)
+                    .await?
+                    .search(&args.question, args.limit)
+                    .await?,
+            )?
+        };
         println!(
             "{}",
             serde_json::to_string_pretty(&serde_json::json!({
@@ -378,6 +455,10 @@ mod native {
                 "authority":Uuid::new_v4(),"receipt_keys":security.trust().keys(),
                 "scope":{"company":Uuid::new_v4(),"area":"workshop","owner":owner,"project":project,"space":Uuid::new_v4()}})).unwrap();
             let profile = LocalProjectReplicaProfile {
+                manifest_sha256: None,
+                local_project: None,
+                replication_mode:
+                    mem_federation_runtime::ProjectReplicationMode::SharedPublicationsV1,
                 schema_version: 1,
                 company: "https://company.example.invalid".into(),
                 subscription: Uuid::new_v4(),

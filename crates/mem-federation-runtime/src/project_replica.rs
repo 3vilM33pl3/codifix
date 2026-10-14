@@ -28,9 +28,9 @@ pub trait ProjectDeviceTransport: Send + Sync {
 /// The enrolled credential comes from Keychain; this type has no Debug and
 /// never prints credentials or provider/server response bodies.
 pub struct ScopedDeviceClient {
-    endpoint: Endpoint,
-    credential: String,
-    scope: Option<ProjectScope>,
+    pub(crate) endpoint: Endpoint,
+    pub(crate) credential: String,
+    pub(crate) scope: Option<ProjectScope>,
 }
 
 #[cfg(test)]
@@ -245,6 +245,7 @@ impl ProjectReplica {
         initialize: bool,
     ) -> Result<Self> {
         profile.validate()?;
+        if !profile.replication_mode.is_shared() {return Err(RuntimeError::Configuration);}
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(3)
             .acquire_timeout(Duration::from_secs(5))

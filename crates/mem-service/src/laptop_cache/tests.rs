@@ -91,6 +91,7 @@ async fn curated_replica_search_retains_source_identity_without_inventing_public
         }),
         DeviceReplicaRecord::CanonicalState(DeviceCanonicalState {
             canonical_id: canonical,
+            current_version_id: id,
             status: MemoryStatus::Active,
             confidence: ConfidencePpm::try_from(800_000).unwrap(),
             importance: 1,

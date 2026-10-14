@@ -21,6 +21,10 @@ pub use credentials::{CredentialMode, CredentialState, GatewayCredentialStatus, 
 mod scoped;
 mod security;
 pub use scoped::*;
+mod device_replica;
+pub use device_replica::*;
+mod device_project_replica;
+pub use device_project_replica::*;
 mod project_replica;
 pub use project_replica::*;
 mod project_replica_config;

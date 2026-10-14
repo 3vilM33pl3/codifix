@@ -320,6 +320,14 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )],
         ),
         (
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/replica",
+            &[(Method::POST, RoutePolicy { permission:Permission::BundleExport, scope:ProjectScope::Authenticated, semantic_read:false })],
+        ),
+        (
+            "/v1/onboarding/company-delivery/replica",
+            &[(Method::POST, RoutePolicy { permission:Permission::ScopedProjectDelivery, scope:ProjectScope::Authenticated, semantic_read:false })],
+        ),
+        (
             "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/subscription",
             &[(
                 Method::GET,
@@ -341,6 +349,30 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
                 },
             )],
         ),
+        (
+            "/v1/onboarding/company-delivery/contributions",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::ScopedProjectDelivery,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/company-delivery/contributions/status",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::ScopedProjectDelivery,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        ("/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions", &[(Method::POST,RoutePolicy {permission:Permission::BundleExport,scope:ProjectScope::Authenticated,semantic_read:false})]),
+        ("/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions/status", &[(Method::POST,RoutePolicy {permission:Permission::BundleExport,scope:ProjectScope::Authenticated,semantic_read:true})]),
         (
             "/v1/onboarding/company-delivery/approve",
             &[(

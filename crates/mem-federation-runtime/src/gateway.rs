@@ -100,7 +100,8 @@ impl GatewayServer {
         if self.scoped_enabled {
             router = router
                 .route("/v1/projects/register", post(crate::scoped::register))
-                .route("/v1/projects/page", post(crate::scoped::page));
+                .route("/v1/projects/page", post(crate::scoped::page))
+                .route("/v1/projects/device-replica/attest", post(crate::device_replica::attest).layer(DefaultBodyLimit::max(4 * 1024 * 1024)));
         }
         router
             .layer(DefaultBodyLimit::max(96 * 1024))

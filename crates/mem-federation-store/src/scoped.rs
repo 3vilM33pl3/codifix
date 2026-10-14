@@ -72,7 +72,7 @@ fn natural(value: i64) -> Result<u64> {
     u64::try_from(value).map_err(|_| StoreError::Corrupt)
 }
 impl GatewayStore {
-    async fn project_actor(
+    pub(crate) async fn project_actor(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         fence: WriterFence,

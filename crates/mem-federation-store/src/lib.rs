@@ -4,9 +4,11 @@
 
 mod addressed_expertise;
 mod audit;
+mod device_replica;
 mod scoped;
 mod scoped_source;
 pub use addressed_expertise::*;
+pub use device_replica::*;
 pub use scoped::*;
 pub use scoped_source::*;
 mod scoped_projection;

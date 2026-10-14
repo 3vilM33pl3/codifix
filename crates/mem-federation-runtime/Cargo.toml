@@ -13,6 +13,7 @@ mem-federation-store = { path = "../mem-federation-store" }
 mem-atproto = { path = "../mem-atproto" }
 mem-atproto-verify = { path = "../mem-atproto-verify" }
 mem-record = { path = "../mem-record" }
+mem-store = { path = "../mem-store" }
 axum.workspace = true
 reqwest.workspace = true
 tokio.workspace = true

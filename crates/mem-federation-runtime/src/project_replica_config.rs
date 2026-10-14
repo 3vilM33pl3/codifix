@@ -7,6 +7,19 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectReplicationMode {
+    #[default]
+    SharedPublicationsV1,
+    CuratedProjectV1,
+}
+impl ProjectReplicationMode {
+    pub fn is_shared(&self) -> bool {
+        *self == Self::SharedPublicationsV1
+    }
+}
+
 /// The company/owner review contract uses RFC 8785, not struct field order.
 /// Native clients must bind that same digest without leaking wire types into CLI.
 pub fn onboarding_manifest_digest(manifest: &mem_record::OnboardingProject) -> Result<String> {
@@ -20,6 +33,10 @@ pub fn onboarding_manifest_digest(manifest: &mem_record::OnboardingProject) -> R
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedProjectSubscription {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "ProjectReplicationMode::is_shared")]
+    pub replication_mode: ProjectReplicationMode,
     pub schema_version: u32,
     pub company: String,
     pub subscription: Uuid,
@@ -31,6 +48,9 @@ impl PreparedProjectSubscription {
     pub fn validate(&self) -> Result<()> {
         // Reuse profile/control-plane validation without inventing a server URL.
         LocalProjectReplicaProfile {
+            manifest_sha256: self.manifest_sha256.clone(),
+            local_project: None,
+            replication_mode: self.replication_mode,
             schema_version: self.schema_version,
             company: self.company.clone(),
             subscription: self.subscription,
@@ -60,6 +80,12 @@ impl PreparedProjectSubscription {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LocalProjectReplicaProfile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_project: Option<LocalReplicaProject>,
+    #[serde(default, skip_serializing_if = "ProjectReplicationMode::is_shared")]
+    pub replication_mode: ProjectReplicationMode,
     pub schema_version: u32,
     pub company: String,
     pub subscription: Uuid,
@@ -67,6 +93,12 @@ pub struct LocalProjectReplicaProfile {
     pub bootstrap: DeviceProjectSubscription,
     #[serde(default)]
     pub allow_loopback_development: bool,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LocalReplicaProject {
+    pub slug: String,
+    pub repository: std::path::PathBuf,
 }
 impl LocalProjectReplicaProfile {
     pub fn read(path: &Path) -> Result<Self> {
@@ -77,6 +109,22 @@ impl LocalProjectReplicaProfile {
         Ok(profile)
     }
     pub fn validate(&self) -> Result<()> {
+        if !self.replication_mode.is_shared()
+            && self
+                .manifest_sha256
+                .as_ref()
+                .is_none_or(|v| v.len() != 64 || !v.bytes().all(|b| b.is_ascii_hexdigit()))
+        {
+            return Err(RuntimeError::Configuration);
+        }
+        if let Some(project) = &self.local_project
+            && (self.replication_mode.is_shared()
+                || project.slug.is_empty()
+                || project.slug.len() > 128
+                || !project.repository.is_absolute())
+        {
+            return Err(RuntimeError::Configuration);
+        }
         if self.schema_version != 1 || self.subscription.is_nil() {
             return Err(RuntimeError::Configuration);
         }
@@ -123,6 +171,9 @@ mod tests {
     fn profile() -> LocalProjectReplicaProfile {
         let security = GatewaySecurity::initial(&[37; 32], Default::default()).unwrap();
         LocalProjectReplicaProfile {
+            manifest_sha256: None,
+            local_project: None,
+            replication_mode: ProjectReplicationMode::SharedPublicationsV1,
             schema_version: 1,
             company: "https://company.example.invalid".into(),
             subscription: Uuid::new_v4(),
@@ -156,6 +207,8 @@ mod tests {
         fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
         let fixture = profile();
         let prepared = PreparedProjectSubscription {
+            manifest_sha256: None,
+            replication_mode: ProjectReplicationMode::SharedPublicationsV1,
             schema_version: 1,
             company: fixture.company,
             subscription: fixture.subscription,

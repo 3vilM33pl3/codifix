@@ -9,11 +9,13 @@ pub(crate) mod company_device_delivery;
 mod company_device_proxy;
 pub(crate) mod company_devices;
 pub(crate) mod device;
+pub(crate) mod device_contributions;
 mod model;
 mod oidc;
 pub(crate) mod onboarding;
 mod policy;
 pub(crate) mod scoped_delivery;
+pub(crate) mod device_replication;
 #[cfg(test)]
 mod scoped_token_tests;
 mod store;
