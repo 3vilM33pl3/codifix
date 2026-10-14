@@ -27,6 +27,57 @@ with `yes`. No installer JSON, source build or provider key is needed. Git still
 uses your own Git credentials. Existing repositories, dirty work and custom
 settings are preserved. Trust is shown as remote-only, not copied to your Mac.
 
+### Full curated-project synchronization candidate
+
+Add `--curated-sync` to first-run for the new two-way project mode. During browser
+device approval, explicitly allow curated contributions for each selected project;
+this option is available only when your current owner-side permissions allow it.
+Existing reader devices do not acquire write permission automatically.
+
+This mode downloads curated histories, canonical state and same-project relations,
+including knowledge that has **not** been published to other federation participants.
+Raw captures, session bodies and private source paths are excluded. Unavailable
+source references remain explicitly marked. The existing publication-only mode is
+unchanged and remains read-only.
+
+The local queue records curated additions transactionally. Accepted additions
+receive an owner receipt; changes to an existing owner stream become correction
+proposals, with version conflicts visible rather than overwritten. The client
+retains operation IDs across retries. `memory projects sync-status --profile
+<private-profile>` includes queued, accepted, proposed, conflict and blocked counts.
+Downloaded records stay in a separate read-only projection and never enter the
+upload trigger. Git commit, merge and push remain your normal Git workflow.
+
+Inspect an owner's downloaded versions without following private source links:
+
+```bash
+memory --area homelab history CANONICAL_UUID --subscription SUBSCRIPTION_UUID --json
+```
+
+Use `--after-version N --limit 16` for subsequent pages. The Web query/Offline
+views provide **View owner history**; TUI Synchronized knowledge uses `h` for
+history and `n` for more versions. These are read-only owner copies.
+
+This is unreleased implementation, not Mac acceptance evidence. In particular,
+native dependencies still need a Mac build/rehearsal, and mutable-state/tombstone
+upload plus the complete review/status journey remain on the execution checklist.
+
+To propose a correction to an owner copy, inspect its downloaded version and
+digest, then use the correction form in its history view or the local CLI:
+
+```bash
+memory --area homelab projects propose-correction --subscription SUBSCRIPTION_UUID --request correction.json
+memory --area homelab projects propose-correction --subscription SUBSCRIPTION_UUID --request correction.json --confirm
+```
+
+The first command previews only. The request contains a stable `operation_id`,
+`source_memory_id`, bare SHA-256 `expected_digest`, and `content` with
+`canonical_text`, `summary`, `memory_type`, `importance` (1–5) and `confidence`
+(0–1). Reuse the exact file/operation ID after an interrupted confirmation.
+Confirmation queues local work for automatic upload and owner review; it does
+not approve or overwrite the remote version. A changed/withdrawn source requires
+a fresh review. No model is invoked.
+
 The state parent and projects folder must exist and remain separate. First-run creates
 new private state; it does not change an existing directory's permissions. If a
 selected port is occupied, choose explicit `--pg-port`/`--api-base-port` values;
@@ -45,10 +96,10 @@ memory-onboard journey-status --journal "$HOME/Library/Application Support/memor
 ```
 
 These commands enable no paid model calls. Current implementation supports the
-reviewed Memory skills format, not arbitrary plugins. Local contribution draft
-storage exists separately from imported knowledge, but its user commands,
-submission consent and authenticated owner replay are not yet connected. Trust
-expertise integration with the new laptop identities also remains open.
+reviewed Memory skills format, not arbitrary plugins. The new curated-sync mode
+connects a separate durable contribution queue to authenticated owner receipts;
+legacy raw drafts are not uploaded by that path. Trust expertise integration
+with the new laptop identities remains outside this increment.
 
 This candidate has synthetic and disposable-database test evidence, not an
 observed clean-Mac journey. [Runtime packaging and recovery details](../../packaging/macos/operator-README.md)
@@ -130,8 +181,9 @@ The requesting client presents a public code and a credential fingerprint.
 When company delivery is configured, the public browser return includes
 `company_device=1`. Sign in and review the device, expiry, exact owner/area/project
 identities, manifest hashes, offline-copy consent, tools and output destinations.
-Company offline selections are reader-only; selecting a project does not approve
-new tools or model disclosure. Trust is never an offline selection.
+Company offline selections are reader-only by default. A separate curated-write
+checkbox binds contribution consent to that device and exact project; it does not
+authorize new tools or model disclosure. Trust is never an offline selection.
 
 The older `/?device_code=ABCD-1234` local-owner flow remains explicit and permits
 reader/writer choices only within current local permissions. A company error
@@ -465,7 +517,7 @@ The approved plan was checkpointed in an isolated development service on Monolit
 at `http://127.0.0.1:4250`, backed by the disposable
 `memory-onboarding-dev-pg-20261005` database container. The development
 configuration is outside the repository, under
-`/home/olivier/.local/state/memory-mac-onboarding-dev/`. Provider calls, background
+`~/.local/state/memory-mac-onboarding-dev/`. Provider calls, background
 work, federation and watchers are not enabled there.
 
 This development service is not the company console deployment and contains no
