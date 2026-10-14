@@ -120,8 +120,9 @@ def produce(args):
             raise ValueError("new build requires empty work directory")
         journal.write_text(json.dumps(descriptor, indent=2) + "\n")
     env = dict(os.environ)
-    env.update({"LC_ALL": "C", "MACOSX_DEPLOYMENT_TARGET": "12.0", "PYTHONDONTWRITEBYTECODE": "1"})
-    for key in ("PYTHONPATH", "PYTHONHOME", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "CPATH", "LIBRARY_PATH"):
+    env.update({"LC_ALL": "C", "MACOSX_DEPLOYMENT_TARGET": "12.0", "PYTHONDONTWRITEBYTECODE": "1",
+                "PKG_CONFIG": "/usr/bin/false"})
+    for key in ("PYTHONPATH", "PYTHONHOME", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "PKG_CONFIG_LIBDIR", "CFLAGS", "CPPFLAGS", "LDFLAGS"):
         env.pop(key, None)
     src = work / "sources"
     src.mkdir(exist_ok=True)
@@ -150,7 +151,9 @@ def produce(args):
         if done.exists():
             continue
         if key == "postgres":
-            run(["./configure", f"--prefix={prefix}/postgres", "--without-readline", "--without-zlib", "--without-icu", "--without-lz4", "--without-zstd", "--without-ssl"], source, env)
+            # PostgreSQL defaults to no TLS; --without-ssl is not a valid way
+            # to select that default (its configure requires an SSL provider).
+            run(["./configure", f"--prefix={prefix}/postgres", "--without-readline", "--without-zlib", "--without-icu", "--without-lz4", "--without-zstd"], source, env)
             run(["make", f"-j{args.jobs}"], source, env)
             run(["make", "install", f"DESTDIR={stage}"], source, env)
         elif key == "vector":
