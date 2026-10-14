@@ -16,6 +16,16 @@ async function submit() {
   fireEvent.change(screen.getByLabelText("Local search question"), { target: { value: "Exact local question" } });
   fireEvent.click(screen.getByRole("button", { name: "Search local cache" }));
 }
+it("shows private curated versions without implying an ATProto publication", async () => {
+  vi.mocked(laptopCacheSearch).mockResolvedValue({ ...result, hits: [{ ...result.hits[0], origin: "curated_project", locator: undefined, shared_version: undefined, unavailable_source_ids: [uuid(20)], evidence: [] }] });
+  render(<OfflineTab />);
+  await submit();
+  const panel = await screen.findByLabelText("Cache search results");
+  expect(panel).toHaveTextContent("curated project replica");
+  expect(panel).toHaveTextContent("no publication locator");
+  expect(panel).toHaveTextContent("source content is not downloaded");
+  expect(panel).not.toHaveTextContent("shared version");
+});
 it("selects exact subscription and renders plain text with complete provenance, never links or mutation controls", async () => {
   const { container } = render(<OfflineTab />);
   await submit(); await screen.findByText("<script>untrusted excerpt</script>");

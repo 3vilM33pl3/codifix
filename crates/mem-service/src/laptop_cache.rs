@@ -7,12 +7,14 @@ use axum::{
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
-use mem_config::LaptopCacheSubscription;
+use mem_config::{LaptopCacheReplicationMode, LaptopCacheSubscription};
 use mem_federation::{
     publication::{InstanceId, SpaceId},
     subscription::ProjectScope,
 };
-use mem_federation_store::{ProjectProjectionStatus, ProjectProjectionStore};
+use mem_federation_store::{
+    DeviceProjectionStore, ProjectProjectionStatus, ProjectProjectionStore,
+};
 use mem_record::*;
 use sqlx::{Row, types::Json as SqlJson};
 use std::net::SocketAddr;
@@ -113,8 +115,19 @@ pub(crate) async fn list(
     let mut projects = Vec::new();
     for binding in &cache.subscriptions {
         let expected = scope(&area.name, binding)?;
-        let row = sqlx::query("SELECT device,scope,cursor,observed_at FROM onboarding_project_projections WHERE subscription=$1")
-            .bind(binding.subscription_id).fetch_optional(&pool).await.map_err(|_|unavailable())?;
+        let query = match binding.replication_mode {
+            LaptopCacheReplicationMode::SharedPublicationsV1 => {
+                "SELECT device,scope,cursor,observed_at FROM onboarding_project_projections WHERE subscription=$1"
+            }
+            LaptopCacheReplicationMode::CuratedProjectV1 => {
+                "SELECT device,scope,cursor,observed_at FROM device_replica_projections WHERE subscription=$1"
+            }
+        };
+        let row = sqlx::query(query)
+            .bind(binding.subscription_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|_| unavailable())?;
         let status = if let Some(row) = row {
             if row
                 .try_get::<Uuid, _>("device")
@@ -177,6 +190,43 @@ pub(crate) async fn search(
                 .find(|s| s.subscription_id == subscription)
         })
         .ok_or_else(|| ApiError::not_found("subscription was not selected for this laptop area"))?;
+    if binding.replication_mode == LaptopCacheReplicationMode::CuratedProjectV1 {
+        let store = DeviceProjectionStore::open(
+            state.pool().map_err(|_| unavailable())?,
+            binding.subscription_id,
+            binding.device_id,
+            scope(&area.name, binding)?,
+        )
+        .await
+        .map_err(|_| unavailable())?;
+        let (status, hits) = store
+            .search_with_status(&request.question, request.limit)
+            .await
+            .map_err(|_| unavailable())?;
+        return response(&LaptopCacheSearchResponse {
+            schema_version: 1,
+            project: describe(&area.name, binding, Some(status)),
+            hits: hits
+                .into_iter()
+                .map(|hit| LaptopCacheHit {
+                    stream_id: hit.version.canonical_id,
+                    author: hit.version.author,
+                    authored_at: hit.version.authored_at,
+                    locator: None,
+                    digest: hit.digest.as_hex().into(),
+                    shared_version: None,
+                    origin: LaptopCacheOrigin::CuratedProject,
+                    source_record_id: hit.version.id,
+                    source_version: hit.version.version,
+                    text: hit.version.text,
+                    summary: hit.version.summary,
+                    evidence: vec![],
+                    unavailable_source_ids: hit.version.unavailable_source_ids,
+                    read_only: true,
+                })
+                .collect(),
+        });
+    }
     let store = ProjectProjectionStore::open(
         state.pool().map_err(|_| unavailable())?,
         binding.subscription_id,
@@ -195,9 +245,10 @@ pub(crate) async fn search(
             stream_id: hit.stream.canonical.as_uuid(),
             author: hit.author.to_string(),
             authored_at: hit.authored_at,
-            locator: hit.locator.to_string(),
+            locator: Some(hit.locator.to_string()),
             digest: hit.digest.as_hex().into(),
-            shared_version: hit.shared_version.get(),
+            shared_version: Some(hit.shared_version.get()),
+            origin: LaptopCacheOrigin::SharedPublication,
             source_record_id: hit.source.record_id.as_uuid(),
             source_version: hit.source.version.get(),
             text: hit.content.text,
@@ -214,6 +265,7 @@ pub(crate) async fn search(
                 })
                 .collect(),
             read_only: true,
+            unavailable_source_ids: vec![],
         })
         .collect();
     response(&LaptopCacheSearchResponse {

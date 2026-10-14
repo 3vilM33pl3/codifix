@@ -69,8 +69,9 @@ export function OfflineTab() {
       {result.hits.map((hit, i) => <article key={hit.stream_id}>
         <h4>[{i + 1}] {hit.summary}</h4>
         <p style={{ whiteSpace: "pre-wrap" }}>{hit.text}</p>
-        <p>Author {hit.author}; authored {hit.authored_at}; stream {hit.stream_id}; shared version {hit.shared_version}; digest {hit.digest}.</p>
-        <p>Source record {hit.source_record_id}; source version {hit.source_version}; locator (text only): {hit.locator}.</p>
+        <p>Author {hit.author}; authored {hit.authored_at}; canonical {hit.stream_id}; {hit.shared_version !== undefined ? `shared version ${hit.shared_version}` : "curated project replica"}; digest {hit.digest}.</p>
+        <p>Source record {hit.source_record_id}; source version {hit.source_version}; {hit.locator ? `locator (text only): ${hit.locator}` : "private project replica; no publication locator"}.</p>
+        {!!hit.unavailable_source_ids?.length && <p>{hit.unavailable_source_ids.length} provenance references retained; source content is not downloaded.</p>}
         <h5>Reviewed evidence</h5>
         {hit.evidence.length ? hit.evidence.map((e, n) => <blockquote key={`${e.digest}/${n}`}>
           <p>{e.label}: {e.text}</p><p>Digest {e.digest}; reviewer {e.reviewer}; reviewed {e.reviewed_at}.</p>

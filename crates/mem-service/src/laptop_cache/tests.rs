@@ -14,6 +14,7 @@ async fn fixture() -> Option<(
 )> {
     let mut f = crate::auth::device::tests::fixture().await?;
     let binding = LaptopCacheSubscription {
+        replication_mode: Default::default(),
         subscription_id: Uuid::new_v4(),
         device_id: Uuid::new_v4(),
         company_id: Uuid::new_v4(),
@@ -50,6 +51,88 @@ async fn fixture() -> Option<(
 }
 fn peer() -> ConnectInfo<SocketAddr> {
     ConnectInfo("127.0.0.1:40000".parse().unwrap())
+}
+#[tokio::test]
+async fn curated_replica_search_retains_source_identity_without_inventing_publication_metadata() {
+    let Some((mut f, mut binding, actor)) = fixture().await else {
+        return;
+    };
+    binding.replication_mode = LaptopCacheReplicationMode::CuratedProjectV1;
+    f.state.config.laptop_cache.as_mut().unwrap().subscriptions[0] = binding.clone();
+    f.state.config.service.read_only = false;
+    let store = DeviceProjectionStore::initialize(
+        f.state.pool().unwrap(),
+        binding.subscription_id,
+        binding.device_id,
+        scope("workshop", &binding).unwrap(),
+    )
+    .await
+    .unwrap();
+    let now = chrono::Utc::now();
+    let id = Uuid::new_v4();
+    let canonical = Uuid::new_v4();
+    let source = Uuid::new_v4();
+    use mem_federation::device_replica::*;
+    let records = [
+        DeviceReplicaRecord::MemoryVersion(DeviceMemoryVersion {
+            id,
+            canonical_id: canonical,
+            version: 3,
+            tombstone: false,
+            text: "diagnosis curated replica text".into(),
+            summary: "curated summary".into(),
+            memory_type: MemoryType::DomainFact,
+            scope: "project".into(),
+            author: "original author".into(),
+            authored_at: now,
+            updated_at: now,
+            tags: vec![],
+            unavailable_source_ids: vec![source],
+        }),
+        DeviceReplicaRecord::CanonicalState(DeviceCanonicalState {
+            canonical_id: canonical,
+            status: MemoryStatus::Active,
+            confidence: ConfidencePpm::try_from(800_000).unwrap(),
+            importance: 1,
+            updated_at: now,
+            archived_at: None,
+        }),
+    ];
+    for record in records {
+        sqlx::query(
+            "INSERT INTO device_replica_records(subscription,record_key,record) VALUES($1,$2,$3)",
+        )
+        .bind(binding.subscription_id)
+        .bind(record.key())
+        .bind(sqlx::types::Json(record))
+        .execute(&f.state.pool().unwrap())
+        .await
+        .unwrap();
+    }
+    assert_eq!(store.status().await.unwrap().cursor, 0);
+    let result = body(
+        search(
+            State(f.state.clone()),
+            Extension(actor),
+            peer(),
+            Path(binding.subscription_id),
+            Json(LaptopCacheSearchRequest {
+                question: "diagnosis".into(),
+                limit: 8,
+            }),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    let hit = &result["hits"][0];
+    assert_eq!(hit["source_record_id"], id.to_string());
+    assert_eq!(hit["stream_id"], canonical.to_string());
+    assert_eq!(hit["source_version"], 3);
+    assert_eq!(hit["origin"], "curated_project");
+    assert_eq!(hit["unavailable_source_ids"][0], source.to_string());
+    assert!(hit.get("locator").is_none());
+    assert!(hit.get("shared_version").is_none());
 }
 async fn body(response: Response) -> Value {
     assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");

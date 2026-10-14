@@ -249,18 +249,24 @@ fn content(state: &OfflineState) -> Vec<Line<'static>> {
             lines.push(Line::from(format!("[{}] {}", i + 1, plain(&hit.summary))));
             lines.extend(plain(&hit.text).lines().map(|s| Line::from(s.to_owned())));
             lines.push(Line::from(format!(
-                "Author {} | {} | stream {} shared v{} SHA256 {}",
+                "Author {} | {} | canonical {} | {} SHA256 {}",
                 plain(&hit.author),
                 hit.authored_at,
                 hit.stream_id,
-                hit.shared_version,
+                hit.shared_version
+                    .map(|v| format!("shared v{v}"))
+                    .unwrap_or_else(|| "curated project".into()),
                 hit.digest
             )));
             lines.push(Line::from(format!(
                 "Source {} v{} | locator (text only) {}",
                 hit.source_record_id,
                 hit.source_version,
-                plain(&hit.locator)
+                plain(
+                    hit.locator
+                        .as_deref()
+                        .unwrap_or("private project replica; no publication locator")
+                )
             )));
             for e in &hit.evidence {
                 lines.push(Line::from(format!(
@@ -270,6 +276,12 @@ fn content(state: &OfflineState) -> Vec<Line<'static>> {
                     e.digest,
                     plain(&e.reviewer),
                     e.reviewed_at
+                )));
+            }
+            if !hit.unavailable_source_ids.is_empty() {
+                lines.push(Line::from(format!(
+                    "{} provenance references retained; source content is not downloaded",
+                    hit.unavailable_source_ids.len()
                 )));
             }
         }
@@ -380,14 +392,16 @@ mod tests {
                 stream_id: Uuid::new_v4(),
                 author: "shared author".into(),
                 authored_at: chrono::Utc::now(),
-                locator: "javascript:alert(1)".into(),
+                locator: Some("javascript:alert(1)".into()),
                 digest: "a".repeat(64),
-                shared_version: 2,
+                shared_version: Some(2),
+                origin: mem_record::LaptopCacheOrigin::SharedPublication,
                 source_record_id: source,
                 source_version: 7,
                 text: "<script>untrusted</script>".into(),
                 summary: "Shared summary".into(),
                 read_only: true,
+                unavailable_source_ids: vec![],
                 evidence: vec![mem_record::LaptopCacheEvidence {
                     label: "reviewed source".into(),
                     text: "Evidence".into(),

@@ -5,6 +5,14 @@ use mem_record::AuthMode;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LaptopCacheReplicationMode {
+    #[default]
+    SharedPublicationsV1,
+    CuratedProjectV1,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LaptopCacheSubscription {
@@ -14,6 +22,8 @@ pub struct LaptopCacheSubscription {
     pub owner_instance_id: Uuid,
     pub project_id: Uuid,
     pub space_id: Uuid,
+    #[serde(default)]
+    pub replication_mode: LaptopCacheReplicationMode,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -56,6 +66,11 @@ impl AppConfig {
                 })
         });
         let mut seen = std::collections::BTreeSet::new();
+        let curated = !cache.subscriptions.is_empty()
+            && cache
+                .subscriptions
+                .iter()
+                .all(|s| s.replication_mode == LaptopCacheReplicationMode::CuratedProjectV1);
         let valid_bindings = !cache.subscriptions.is_empty()
             && cache.subscriptions.len() <= 32
             && cache.subscriptions.iter().all(|s| {
@@ -75,15 +90,15 @@ impl AppConfig {
             || !loopback
             || !valid_bindings
             || !database
-            || !self.service.read_only
+            || (!curated && !self.service.read_only)
             || self.auth.mode != AuthMode::SingleUser
             || self.cluster.enabled
             || self.background_work.enabled
             || self.background_work.internal_automation
-            || self.offline.enabled
+            || (!curated && self.offline.enabled)
             || self.provenance.reverify_enabled
             || self.procedural.enabled
-            || self.automation.enabled
+            || (!curated && self.automation.enabled)
             || self.reinforcement.enabled
             || self.reinforcement.validation_enabled
             || self.consolidation.enabled
@@ -186,5 +201,18 @@ mod tests {
             c.database.url = url.into();
             assert!(c.validate_laptop_cache().is_err());
         }
+    }
+
+    #[test]
+    fn curated_cache_allows_local_work_but_does_not_enable_model_execution() {
+        let mut c = fixture();
+        c.laptop_cache.as_mut().unwrap().subscriptions[0].replication_mode =
+            LaptopCacheReplicationMode::CuratedProjectV1;
+        c.service.read_only = false;
+        c.offline.enabled = true;
+        c.automation.enabled = true;
+        c.validate_laptop_cache().unwrap();
+        c.llm.model = "not-authorized".into();
+        assert!(c.validate_laptop_cache().is_err());
     }
 }

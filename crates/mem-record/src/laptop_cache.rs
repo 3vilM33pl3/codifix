@@ -49,16 +49,29 @@ pub struct LaptopCacheHit {
     pub stream_id: Uuid,
     pub author: String,
     pub authored_at: DateTime<Utc>,
-    pub locator: String,
-    /// SHA-256 of the accepted publication envelope, not a truth score.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locator: Option<String>,
+    /// SHA-256 of the accepted publication or curated version record.
     pub digest: String,
-    pub shared_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shared_version: Option<u32>,
+    #[serde(default)]
+    pub origin: LaptopCacheOrigin,
     pub source_record_id: Uuid,
     pub source_version: u32,
     pub text: String,
     pub summary: String,
     pub evidence: Vec<LaptopCacheEvidence>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unavailable_source_ids: Vec<Uuid>,
     pub read_only: bool,
+}
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LaptopCacheOrigin {
+    #[default]
+    SharedPublication,
+    CuratedProject,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LaptopCacheSearchResponse {

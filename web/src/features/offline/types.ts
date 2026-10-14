@@ -6,9 +6,10 @@ export type LaptopCacheProject = {
 export type LaptopCacheList = { schema_version: 1; area: string; instance_id: string; projects: LaptopCacheProject[] };
 export type LaptopCacheEvidence = { label: string; text: string; digest: string; reviewer: string; reviewed_at: string };
 export type LaptopCacheHit = {
-  stream_id: string; author: string; authored_at: string; locator: string; digest: string;
-  shared_version: number; source_record_id: string; source_version: number; text: string;
+  stream_id: string; author: string; authored_at: string; locator?: string; digest: string;
+  shared_version?: number; origin?: "shared_publication" | "curated_project"; source_record_id: string; source_version: number; text: string;
   summary: string; evidence: LaptopCacheEvidence[]; read_only: true;
+  unavailable_source_ids?: string[];
 };
 export type LaptopCacheSearchResponse = { schema_version: 1; project: LaptopCacheProject; hits: LaptopCacheHit[] };
 export function sameCacheScope(a: LaptopCacheProject, b: LaptopCacheProject): boolean {
