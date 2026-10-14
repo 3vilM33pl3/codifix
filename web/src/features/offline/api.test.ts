@@ -10,6 +10,34 @@ function mock(status = 200, body: unknown = { schema_version: 1, area: "workshop
     return new Response(JSON.stringify(body), { status });
   }); vi.stubGlobal("fetch", fetcher); return fetcher;
 }
+it("accepts curated source metadata without inventing a publication locator", async () => {
+  const fetcher = mock(); const api = await import("../../api");
+  fetcher.mockImplementation(async url => url === "/v1/auth/me" ? new Response(JSON.stringify({ mode: "multi_user" })) : new Response(JSON.stringify({schema_version:1, project, hits:[{stream_id:uuid, source_record_id:uuid, source_version:3, author:"owner",authored_at:"2026-10-14T10:00:00Z",text:"text",summary:"summary",digest:"a".repeat(64),origin:"curated_project",evidence:[],read_only:true}]})));
+  expect((await api.laptopCacheSearch(uuid,"text")).hits[0].locator).toBeUndefined();
+});
+it("validates exact history scope and ordered page versions", async () => {
+  const page = {schema_version:1,project,canonical_id:uuid,read_only:true,next_after_version:null,current_state:null,versions:[{id:uuid,memory_type:"domain_fact",version:2,author:"owner",authored_at:"2026-10-14T10:00:00Z",updated_at:"2026-10-14T10:00:00Z",tombstone:true,text:"old",summary:"old",digest:"a".repeat(64),unavailable_source_ids:[]}]};
+  const fetcher = mock(); const api = await import("../../api");
+  fetcher.mockImplementation(async url => url === "/v1/auth/me" ? new Response(JSON.stringify({mode:"multi_user"})) : new Response(JSON.stringify(page)));
+  expect((await api.laptopCacheHistory(uuid,uuid)).versions[0].tombstone).toBe(true);
+  expect(fetcher.mock.calls.at(-1)?.[0]).toBe(`/v1/onboarding/cache/${uuid}/history/${uuid}?after_version=0&limit=16`);
+  page.canonical_id = "00000000-0000-4000-8000-000000000002";
+  await expect(api.laptopCacheHistory(uuid,uuid)).rejects.toThrow("history identity");
+});
+it("requires current writable authentication and sends an exact CSRF-protected correction",async()=>{
+  const request={operation_id:uuid,source_memory_id:uuid,expected_digest:"a".repeat(64),content:{canonical_text:"correction",summary:"reviewed",memory_type:"domain_fact" as const,importance:3,confidence:0.8}};
+  const fetcher=mock();const api=await import("../../api");
+  fetcher.mockImplementation(async url=>url==="/v1/auth/me"?new Response(JSON.stringify({authenticated:true,mode:"single_user",read_only:true})):new Response("{}"));
+  await expect(api.submitLaptopCorrection(uuid,request)).rejects.toThrow("write access");
+  expect(fetcher.mock.calls.some(c=>String(c[0]).includes("/corrections"))).toBe(false);
+  document.cookie="memory_csrf=synthetic-csrf";
+  fetcher.mockImplementation(async url=>url==="/v1/auth/me"?new Response(JSON.stringify({authenticated:true,mode:"single_user",read_only:false})):new Response(JSON.stringify({operation_id:uuid,subscription_id:uuid,local_memory_id:uuid,local_canonical_id:uuid,owner_canonical_id:uuid,expected_version:3,request_sha256:"b".repeat(64),staged_at:"2026-10-14T10:01:00Z"})));
+  await api.submitLaptopCorrection(uuid,request);
+  const [url,options]=fetcher.mock.calls.at(-1) as unknown as [string,RequestInit];
+  expect(url).toBe(`/v1/onboarding/cache/${uuid}/corrections`);
+  expect(new Headers(options.headers).get("x-csrf-token")).toBe("synthetic-csrf");
+  expect(JSON.parse(options.body as string)).toEqual(request);
+});
 it("bootstraps authenticated local cache reads and uses existing CSRF on read-only search", async () => {
   const fetcher = mock(); const api = await import("../../api"); await api.laptopCacheList();
   expect(fetcher.mock.calls.map(c => c[0])).toEqual(["/v1/auth/me", "/v1/auth/session/bootstrap", "/v1/onboarding/cache"]);

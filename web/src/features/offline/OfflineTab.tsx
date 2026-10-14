@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { laptopCacheList, laptopCacheSearch } from "../../api";
 import { sameCacheScope, type LaptopCacheList, type LaptopCacheSearchResponse } from "./types";
+import { ReplicaHistory } from "./ReplicaHistory";
 
 export function OfflineTab() {
   const [inventory, setInventory] = useState<LaptopCacheList | null>(null);
@@ -56,6 +57,7 @@ export function OfflineTab() {
       <p>Company {project.company_id}; area {project.area}; owner {project.owner_instance_id}; project {project.project_id}; space {project.space_id}; device {project.device_id}; subscription {project.subscription_id}.</p>
       {project.uploads && Object.keys(project.uploads).length > 0 && <p>Curated uploads: {Object.entries(project.uploads).map(([state, count]) => `${state}: ${count}`).join(" · ")}. Proposed/conflicting changes need owner review; blocked work needs access or policy repair. Refresh to update.</p>}
       <p>Last observed sync: {observed.observed_at ?? "unknown"}; verified local cursor: {Number.isSafeInteger(observed.cursor) ? observed.cursor : "large cursor (numeric precision unavailable)"}. {observed.initialized ? "Cache initialized; freshness is not guaranteed." : "Cache not initialized; no searchable data confirmed."}</p>
+      {project.sync_error && <p role="status">Synchronization needs attention: {project.sync_error}. Downloaded knowledge remains available.</p>}
       <form onSubmit={e => { e.preventDefault(); void submit(); }}>
         <label>Local search question <textarea value={question} onChange={e => { resetSearch(); setQuestion(e.target.value); }} /></label>
         <p>{bytes} / 4096 UTF-8 bytes.</p>
@@ -73,6 +75,7 @@ export function OfflineTab() {
         <p>Author {hit.author}; authored {hit.authored_at}; canonical {hit.stream_id}; {hit.shared_version !== undefined ? `shared version ${hit.shared_version}` : "curated project replica"}; digest {hit.digest}.</p>
         <p>Source record {hit.source_record_id}; source version {hit.source_version}; {hit.locator ? `locator (text only): ${hit.locator}` : "private project replica; no publication locator"}.</p>
         {!!hit.unavailable_source_ids?.length && <p>{hit.unavailable_source_ids.length} provenance references retained; source content is not downloaded.</p>}
+        {hit.origin === "curated_project" && <ReplicaHistory canonical={hit.stream_id} project={result.project} sourceMemoryId={hit.source_record_id} />}
         <h5>Reviewed evidence</h5>
         {hit.evidence.length ? hit.evidence.map((e, n) => <blockquote key={`${e.digest}/${n}`}>
           <p>{e.label}: {e.text}</p><p>Digest {e.digest}; reviewer {e.reviewer}; reviewed {e.reviewed_at}.</p>

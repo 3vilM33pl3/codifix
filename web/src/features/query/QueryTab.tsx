@@ -1,6 +1,7 @@
 import type { FormEvent, RefObject } from "react";
 
 import { RichText } from "../../components/RichText";
+import { ReplicaHistory } from "../offline/ReplicaHistory";
 import type { MemoryEntryResponse, QueryResponse, QueryResult } from "../../types";
 import { formatCitationNumbers, formatNumber, formatTokens } from "../../utils/format";
 import type { GraphOpenSeed } from "../graph/useGraphController";
@@ -163,6 +164,7 @@ export function QueryTab({
                 {!activeQueryResult.origin?.read_only && <button className="danger" onClick={() => onDelete(activeQueryResult.memory_id)} type="button">Delete</button>}
               </div>
               {activeQueryResult.origin && <p>Owner {activeQueryResult.origin.owner_instance_id}; author {activeQueryResult.origin.author}; version {activeQueryResult.version_no}; digest {activeQueryResult.origin.content_digest}. Owner-controlled history cannot be edited locally.</p>}
+              {activeQueryResult.origin?.read_only && activeQueryResult.canonical_id && <ReplicaHistory key={`${activeQueryResult.origin.owner_instance_id}/${activeQueryResult.canonical_id}`} canonical={activeQueryResult.canonical_id} sourceMemoryId={activeQueryResult.memory_id} owner={activeQueryResult.origin.owner_instance_id} projectId={activeQueryResult.origin.project_id} />}
               <section className="detail-section">
                 <h3>Snippet</h3>
                 <p>{activeQueryResult.snippet}</p>

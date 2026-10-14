@@ -21,6 +21,8 @@ pub struct LaptopCacheProject {
     /// Metadata-only local contribution counts; not remote acknowledgement of replication.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub uploads: std::collections::BTreeMap<String, i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_error: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LaptopCacheList {
@@ -81,4 +83,46 @@ pub struct LaptopCacheSearchResponse {
     pub schema_version: u32,
     pub project: LaptopCacheProject,
     pub hits: Vec<LaptopCacheHit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LaptopCacheHistoryRequest {
+    #[serde(default)]
+    pub after_version: u32,
+    #[serde(default = "default_history_limit")]
+    pub limit: u32,
+}
+fn default_history_limit() -> u32 {
+    16
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaptopCacheHistoryVersion {
+    pub memory_type: crate::MemoryType,
+    pub id: Uuid,
+    pub version: u32,
+    pub author: String,
+    pub authored_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub tombstone: bool,
+    pub text: String,
+    pub summary: String,
+    pub digest: String,
+    pub unavailable_source_ids: Vec<Uuid>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaptopCacheHistoryState {
+    pub importance: i32,
+    pub confidence: f32,
+    pub status: crate::MemoryStatus,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaptopCacheHistoryResponse {
+    pub schema_version: u32,
+    pub project: LaptopCacheProject,
+    pub canonical_id: Uuid,
+    pub versions: Vec<LaptopCacheHistoryVersion>,
+    pub next_after_version: Option<u32>,
+    pub read_only: bool,
+    pub current_state: Option<LaptopCacheHistoryState>,
 }

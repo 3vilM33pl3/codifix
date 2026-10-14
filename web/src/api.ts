@@ -307,10 +307,36 @@ export async function laptopCacheSearch(subscription: string, question: string, 
   if (value?.schema_version !== 1 || !validCacheProject(value.project) || value.project.subscription_id !== subscription
     || !Array.isArray(value.hits) || value.hits.length > limit || value.hits.some(h => h.read_only !== true
       || !cacheUuid.test(h.stream_id) || !cacheUuid.test(h.source_record_id) || !/^[a-f0-9]{64}$/i.test(h.digest)
-      || [h.author, h.authored_at, h.locator, h.text, h.summary].some(s => typeof s !== "string")
-      || !Number.isInteger(h.shared_version) || !Number.isInteger(h.source_version) || !Array.isArray(h.evidence)
+      || [h.author, h.authored_at, h.text, h.summary].some(s => typeof s !== "string")
+      || (h.origin === "curated_project" ? h.locator !== undefined || h.shared_version !== undefined : typeof h.locator !== "string" || !Number.isInteger(h.shared_version))
+      || !Number.isInteger(h.source_version) || !Array.isArray(h.evidence)
       || h.evidence.some(e => [e.label, e.text, e.reviewer, e.reviewed_at].some(s => typeof s !== "string") || !/^[a-f0-9]{64}$/i.test(e.digest))))
     throw new Error("Invalid synchronized cache result binding/provenance; no results displayed.");
+  return value;
+}
+
+export async function laptopCacheHistory(subscription: string, canonical: string, afterVersion = 0, signal?: AbortSignal): Promise<import("./features/offline/types").LaptopCacheHistoryResponse> {
+  if (!cacheUuid.test(subscription) || !cacheUuid.test(canonical) || !Number.isInteger(afterVersion) || afterVersion < 0 || afterVersion > 4294967295) throw new Error("Exact cache history identity and cursor required.");
+  const value = await cacheRequest(`/v1/onboarding/cache/${subscription}/history/${canonical}?after_version=${afterVersion}&limit=16`, signal) as import("./features/offline/types").LaptopCacheHistoryResponse;
+  if (value?.schema_version !== 1 || value.read_only !== true || value.canonical_id !== canonical || !validCacheProject(value.project) || value.project.subscription_id !== subscription || !Array.isArray(value.versions) || value.versions.length > 16
+    || (value.current_state !== null && (!value.current_state || !Number.isInteger(value.current_state.importance) || !Number.isFinite(value.current_state.confidence) || value.current_state.confidence<0 || value.current_state.confidence>1 || !["active","archived"].includes(value.current_state.status)))
+    || value.versions.some((v, i) => !cacheUuid.test(v.id) || !Number.isInteger(v.version) || v.version <= afterVersion || i > 0 && value.versions[i - 1].version >= v.version || typeof v.tombstone !== "boolean" || !/^[a-f0-9]{64}$/i.test(v.digest) || [v.memory_type,v.author,v.authored_at,v.updated_at,v.text,v.summary].some(s => typeof s !== "string") || !Array.isArray(v.unavailable_source_ids) || !v.unavailable_source_ids.every(id => cacheUuid.test(id)))
+    || value.next_after_version !== null && value.versions.at(-1)?.version !== value.next_after_version) throw new Error("Invalid cache history identity/provenance; no results displayed.");
+  return value;
+}
+
+export type LaptopCorrectionRequest = {operation_id:string;source_memory_id:string;expected_digest:string;content:{canonical_text:string;summary:string;memory_type:import("./types").MemoryType;importance:number;confidence:number}};
+export type LaptopCorrectionReceipt = {operation_id:string;subscription_id:string;local_memory_id:string;local_canonical_id:string;owner_canonical_id:string;expected_version:number;request_sha256:string;staged_at:string};
+export async function submitLaptopCorrection(subscription: string, request: LaptopCorrectionRequest, signal?: AbortSignal): Promise<LaptopCorrectionReceipt> {
+  if (!cacheUuid.test(subscription) || !cacheUuid.test(request.operation_id) || !cacheUuid.test(request.source_memory_id) || !/^[a-f0-9]{64}$/.test(request.expected_digest) || !request.content.canonical_text.trim() || new TextEncoder().encode(request.content.canonical_text).length>32768 || !request.content.summary.trim() || new TextEncoder().encode(request.content.summary).length>2048 || !Number.isInteger(request.content.importance) || request.content.importance<1 || request.content.importance>5 || !Number.isFinite(request.content.confidence) || request.content.confidence<0 || request.content.confidence>1) throw new Error("Review a bounded correction for the exact downloaded version.");
+  const auth = await getAuthMe(true);
+  if (!auth.authenticated || auth.read_only) throw new Error("Local authenticated write access is required to propose a correction.");
+  const response = await apiFetch(`/v1/onboarding/cache/${subscription}/corrections`, {method:"POST",signal,cache:"no-store",redirect:"error",headers:{"Content-Type":"application/json"},body:JSON.stringify(request)});
+  if (!response.ok) throw new Error(response.status===409?"The downloaded version changed, was withdrawn, or this operation has different inputs. Refresh owner history before creating a new correction.":response.status===403?"Current local correction permission or project contribution policy denied this operation.":"Correction staging failed; retain this operation and retry the same request. Details suppressed.");
+  const text = await response.text();
+  if (new TextEncoder().encode(text).length>65536) throw new Error("Oversized correction receipt.");
+  const value = JSON.parse(text) as LaptopCorrectionReceipt;
+  if(value.operation_id!==request.operation_id || value.subscription_id!==subscription || ![value.local_memory_id,value.local_canonical_id,value.owner_canonical_id].every(id=>cacheUuid.test(id)) || !Number.isInteger(value.expected_version) || !/^[a-f0-9]{64}$/.test(value.request_sha256)) throw new Error("Invalid correction receipt; retain the operation for inspection.");
   return value;
 }
 

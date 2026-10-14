@@ -1,0 +1,45 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { laptopCacheHistory, laptopCacheList } from "../../api";
+import { ReplicaHistory } from "./ReplicaHistory";
+import type { LaptopCacheHistoryResponse, LaptopCacheProject } from "./types";
+vi.mock("../../api", () => ({ laptopCacheHistory: vi.fn(), laptopCacheList: vi.fn() }));
+const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const project: LaptopCacheProject = {subscription_id:id(1), device_id:id(2), company_id:id(3), owner_instance_id:id(4), project_id:id(5), space_id:id(6), area:"workshop", cursor:3, observed_at:null, initialized:true, read_only:true};
+const page: LaptopCacheHistoryResponse = {schema_version:1, project, canonical_id:id(7), read_only:true, next_after_version:1,current_state:{importance:3,confidence:0.8,status:"active"}, versions:[{id:id(8),memory_type:"domain_fact",version:1,author:"owner",authored_at:"2026-10-14T10:00:00Z",updated_at:"2026-10-14T10:00:00Z",tombstone:true,text:"<script>owner history</script>",summary:"historical",digest:"a".repeat(64),unavailable_source_ids:[id(9)]}]};
+afterEach(cleanup);
+beforeEach(() => {vi.mocked(laptopCacheHistory).mockReset().mockResolvedValue(page); vi.mocked(laptopCacheList).mockReset().mockResolvedValue({schema_version:1,area:"workshop",instance_id:id(10),projects:[project]});});
+it("reads and pages exact owner history without local detail or write actions", async () => {
+  const {container} = render(<ReplicaHistory canonical={id(7)} project={project} />);
+  fireEvent.click(screen.getByText("View owner history"));
+  await screen.findByText("<script>owner history</script>");
+  expect(laptopCacheHistory).toHaveBeenCalledWith(project.subscription_id,id(7),0,expect.any(AbortSignal));
+  expect(screen.getByLabelText("Read-only owner history")).toHaveTextContent("tombstone");
+  expect(container.querySelector("script")).toBeNull();
+  vi.mocked(laptopCacheHistory).mockResolvedValue({...page,next_after_version:null,versions:[{...page.versions[0],id:id(11),version:2,text:"next version"}]});
+  fireEvent.click(screen.getByText("More owner versions"));
+  await screen.findByText("next version");
+  expect(laptopCacheHistory).toHaveBeenLastCalledWith(project.subscription_id,id(7),1,expect.any(AbortSignal));
+});
+it("resolves normal query history only from one exact owner/project subscription", async () => {
+  render(<ReplicaHistory canonical={id(7)} owner={project.owner_instance_id} projectId={project.project_id} />);
+  fireEvent.click(screen.getByText("View owner history"));
+  await screen.findByText("<script>owner history</script>");
+  expect(laptopCacheHistory).toHaveBeenCalledWith(project.subscription_id,id(7),0,expect.any(AbortSignal));
+  cleanup(); vi.mocked(laptopCacheHistory).mockClear();
+  vi.mocked(laptopCacheList).mockResolvedValue({schema_version:1,area:"workshop",instance_id:id(10),projects:[project,{...project,subscription_id:id(12)}]});
+  render(<ReplicaHistory canonical={id(7)} owner={project.owner_instance_id} projectId={project.project_id} />);
+  fireEvent.click(screen.getByText("View owner history"));
+  expect(await screen.findByRole("alert")).toHaveTextContent("ambiguous");
+  expect(laptopCacheHistory).not.toHaveBeenCalled();
+});
+it("fences late history replies when the selected canonical changes", async () => {
+  let resolve!: (value: LaptopCacheHistoryResponse) => void;
+  vi.mocked(laptopCacheHistory).mockReturnValue(new Promise(r => {resolve = r;}));
+  const {rerender} = render(<ReplicaHistory canonical={id(7)} project={project} />);
+  fireEvent.click(screen.getByText("View owner history"));
+  await waitFor(() => expect(laptopCacheHistory).toHaveBeenCalled());
+  rerender(<ReplicaHistory canonical={id(13)} project={project} />);
+  resolve(page);
+  await waitFor(() => expect(screen.queryByText("<script>owner history</script>")).toBeNull());
+});

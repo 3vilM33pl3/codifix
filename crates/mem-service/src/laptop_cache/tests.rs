@@ -134,6 +134,101 @@ async fn curated_replica_search_retains_source_identity_without_inventing_public
     assert_eq!(hit["unavailable_source_ids"][0], source.to_string());
     assert!(hit.get("locator").is_none());
     assert!(hit.get("shared_version").is_none());
+    for (version, tombstone) in [(1, false), (2, true)] {
+        let record = DeviceReplicaRecord::MemoryVersion(DeviceMemoryVersion {
+            id: Uuid::new_v4(),
+            canonical_id: canonical,
+            version,
+            tombstone,
+            text: format!("historical version {version}"),
+            summary: "owner history".into(),
+            memory_type: MemoryType::DomainFact,
+            scope: "project".into(),
+            author: "original author".into(),
+            authored_at: now,
+            updated_at: now,
+            tags: vec![],
+            unavailable_source_ids: vec![source],
+        });
+        sqlx::query(
+            "INSERT INTO device_replica_records(subscription,record_key,record) VALUES($1,$2,$3)",
+        )
+        .bind(binding.subscription_id)
+        .bind(record.key())
+        .bind(sqlx::types::Json(record))
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    }
+    let first = body(
+        history(
+            State(f.state.clone()),
+            Extension(actor.clone()),
+            peer(),
+            Path((binding.subscription_id, canonical)),
+            Query(LaptopCacheHistoryRequest {
+                after_version: 0,
+                limit: 1,
+            }),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(first["versions"].as_array().unwrap().len(), 1);
+    assert_eq!(first["versions"][0]["version"], 1);
+    assert_eq!(first["next_after_version"], 1);
+    let second = body(
+        history(
+            State(f.state.clone()),
+            Extension(actor.clone()),
+            peer(),
+            Path((binding.subscription_id, canonical)),
+            Query(LaptopCacheHistoryRequest {
+                after_version: 1,
+                limit: 2,
+            }),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(second["versions"][0]["tombstone"], true);
+    assert_eq!(second["versions"][1]["id"], id.to_string());
+    assert_eq!(
+        second["versions"][1]["unavailable_source_ids"][0],
+        source.to_string()
+    );
+    assert_eq!(second["next_after_version"], Value::Null);
+    assert_eq!(second["read_only"], true);
+    assert!(
+        history(
+            State(f.state.clone()),
+            Extension(actor.clone()),
+            peer(),
+            Path((Uuid::new_v4(), canonical)),
+            Query(LaptopCacheHistoryRequest {
+                after_version: 0,
+                limit: 16
+            })
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        history(
+            State(f.state.clone()),
+            Extension(actor.clone()),
+            ConnectInfo("10.0.0.1:40000".parse().unwrap()),
+            Path((binding.subscription_id, canonical)),
+            Query(LaptopCacheHistoryRequest {
+                after_version: 0,
+                limit: 16
+            })
+        )
+        .await
+        .is_err()
+    );
     let local = Uuid::new_v4();
     sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,'diagnosis curated replica text','local fact','domain_fact','project',3,0.8,now(),now(),to_tsvector('english','diagnosis curated replica text'))").bind(local).bind(f.project).execute(&f.db.pool).await.unwrap();
     let mut tx = f.db.pool.begin().await.unwrap();
@@ -225,6 +320,26 @@ async fn curated_replica_search_retains_source_identity_without_inventing_public
     assert!(
         answer.results.is_empty(),
         "downloaded current tombstone must suppress the pruned accepted local copy"
+    );
+    // The projector retains this metadata when the owner purges tombstoned rows.
+    sqlx::query("INSERT INTO device_replica_owner_watermarks(subscription,canonical_id,version) VALUES($1,$2,4)").bind(binding.subscription_id).bind(canonical).execute(&f.db.pool).await.unwrap();
+    sqlx::query("UPDATE laptop_curated_outbox SET receipt=receipt || $2 WHERE operation_id=$1")
+        .bind(local)
+        .bind(json!({"owner_version":3}))
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM device_replica_records WHERE subscription=$1")
+        .bind(binding.subscription_id)
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    let answer = crate::laptop_query::query(&f.state, &actor, peer().0, &request)
+        .await
+        .unwrap();
+    assert!(
+        answer.results.is_empty(),
+        "retention must not resurrect an acknowledged local copy"
     );
 }
 async fn body(response: Response) -> Value {

@@ -7,7 +7,9 @@ use crate::{
     },
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use mem_record::{LaptopCacheList, LaptopCacheProject, LaptopCacheSearchResponse};
+use mem_record::{
+    LaptopCacheHistoryResponse, LaptopCacheList, LaptopCacheProject, LaptopCacheSearchResponse,
+};
 use ratatui::{
     layout::Rect,
     text::Line,
@@ -18,6 +20,7 @@ use ratatui::{
 pub(in crate::tui) struct OfflineState {
     pub list: Option<LaptopCacheList>,
     pub result: Option<LaptopCacheSearchResponse>,
+    pub history: Option<LaptopCacheHistoryResponse>,
     pub error: Option<String>,
     pub busy: bool,
     pub editing: bool,
@@ -30,6 +33,7 @@ pub(in crate::tui) struct OfflineState {
 pub(in crate::tui) enum OfflineResult {
     List(LaptopCacheList),
     Search(LaptopCacheSearchResponse),
+    History(LaptopCacheHistoryResponse),
 }
 impl OfflineState {
     pub(in crate::tui) fn invalidate(&mut self) {
@@ -38,6 +42,7 @@ impl OfflineState {
             task.abort();
         }
         self.result = None;
+        self.history = None;
         self.error = None;
         self.busy = false;
         self.scroll = 0;
@@ -55,9 +60,12 @@ impl OfflineState {
         }
         self.busy = false;
         self.task = None;
-        self.result = None;
         match result {
-            Err(e) => self.error = Some(e),
+            Err(e) => {
+                self.result = None;
+                self.history = None;
+                self.error = Some(e);
+            }
             Ok(OfflineResult::List(list)) => {
                 self.list = Some(list);
                 self.selected = 0;
@@ -70,6 +78,28 @@ impl OfflineState {
                     self.result = Some(value);
                 } else {
                     self.error = Some("Local cache scope changed; refresh before searching".into());
+                }
+            }
+            Ok(OfflineResult::History(value)) => {
+                if self
+                    .project()
+                    .is_some_and(|p| cache_scope_matches(p, &value.project))
+                {
+                    if let Some(prior) = &mut self.history {
+                        if prior.canonical_id == value.canonical_id {
+                            prior.versions.extend(value.versions);
+                            prior.next_after_version = value.next_after_version;
+                        } else {
+                            self.history = Some(value);
+                        }
+                    } else {
+                        self.history = Some(value);
+                    }
+                } else {
+                    self.history = None;
+                    self.result = None;
+                    self.error =
+                        Some("Owner history scope changed; refresh the subscription".into());
                 }
             }
         }
@@ -89,6 +119,58 @@ impl Drop for OfflineState {
     }
 }
 impl App {
+    fn request_offline_history(&mut self, api: &ApiClient, next: bool) {
+        let Some(project) = self.offline.project().cloned() else {
+            return;
+        };
+        let canonical = if next {
+            self.offline.history.as_ref().map(|h| h.canonical_id)
+        } else {
+            self.offline
+                .result
+                .as_ref()
+                .and_then(|r| {
+                    r.hits
+                        .iter()
+                        .find(|h| matches!(h.origin, mem_record::LaptopCacheOrigin::CuratedProject))
+                })
+                .map(|h| h.stream_id)
+        };
+        let Some(canonical) = canonical else {
+            return;
+        };
+        let after = if next {
+            let Some(cursor) = self
+                .offline
+                .history
+                .as_ref()
+                .and_then(|h| h.next_after_version)
+            else {
+                return;
+            };
+            cursor
+        } else {
+            self.offline.history = None;
+            0
+        };
+        self.offline.generation = self.offline.generation.wrapping_add(1);
+        if let Some(task) = self.offline.task.take() {
+            task.abort();
+        }
+        self.offline.busy = true;
+        self.offline.error = None;
+        let generation = self.offline.generation;
+        let api = api.clone();
+        let tx = self.background_tx.clone();
+        self.offline.task = Some(tokio::spawn(async move {
+            let result = api
+                .laptop_cache_history(&project, canonical, after, 16)
+                .await
+                .map(OfflineResult::History)
+                .map_err(|e| e.to_string());
+            let _ = tx.send(BackgroundEvent::Offline { generation, result });
+        }));
+    }
     fn request_offline(&mut self, api: &ApiClient, search: bool) {
         let project = self.offline.project().cloned();
         if search
@@ -149,6 +231,8 @@ impl App {
             return true;
         }
         match key.code {
+            KeyCode::Char('h') => self.request_offline_history(api, false),
+            KeyCode::Char('n') => self.request_offline_history(api, true),
             KeyCode::Char('r') => self.request_offline(api, false),
             KeyCode::Char('/') => {
                 self.offline.invalidate();
@@ -188,9 +272,40 @@ fn plain(value: &str) -> String {
 }
 fn content(state: &OfflineState) -> Vec<Line<'static>> {
     let mut lines = vec![
+        Line::from("h: first curated result's owner history; n: next history page"),
         Line::from("Read-only local excerpts; no remote search or model forwarding."),
         Line::from("Offline copy may be stale; observed sync is NOT current remote authority."),
     ];
+    if let Some(history) = &state.history {
+        lines.push(Line::from(format!(
+            "Owner history {} · read-only",
+            history.canonical_id
+        )));
+        for version in &history.versions {
+            lines.push(Line::from(format!(
+                "v{}{} · {} · {} · SHA256 {}",
+                version.version,
+                if version.tombstone { " tombstone" } else { "" },
+                plain(&version.author),
+                version.id,
+                version.digest
+            )));
+            lines.extend(
+                plain(&version.text)
+                    .lines()
+                    .map(|s| Line::from(s.to_owned())),
+            );
+            if !version.unavailable_source_ids.is_empty() {
+                lines.push(Line::from(format!(
+                    "{} unavailable source references retained",
+                    version.unavailable_source_ids.len()
+                )));
+            }
+        }
+        if history.next_after_version.is_some() {
+            lines.push(Line::from("n: more downloaded owner versions"));
+        }
+    }
     if state.busy {
         lines.push(Line::from("Loading local cache…"));
     }
@@ -215,6 +330,12 @@ fn content(state: &OfflineState) -> Vec<Line<'static>> {
         ));
     }
     if let Some(p) = state.project() {
+        if let Some(error) = &p.sync_error {
+            lines.push(Line::from(format!(
+                "Synchronization needs attention: {}",
+                plain(error)
+            )));
+        }
         lines.push(Line::from(format!(
             "Area {} | project {} | owner {}",
             plain(&p.area),
@@ -311,6 +432,46 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn owner_history_is_read_only_and_cleared_on_scope_change() {
+        let mut state = state();
+        let project = state.project().unwrap().clone();
+        let canonical = Uuid::new_v4();
+        let mut page = LaptopCacheHistoryResponse {
+            schema_version: 1,
+            project,
+            canonical_id: canonical,
+            versions: vec![mem_record::LaptopCacheHistoryVersion {
+                memory_type: mem_record::MemoryType::DomainFact,
+                id: Uuid::new_v4(),
+                version: 2,
+                author: "original author".into(),
+                authored_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                tombstone: true,
+                text: "retained owner history".into(),
+                summary: "historical".into(),
+                digest: "a".repeat(64),
+                unavailable_source_ids: vec![Uuid::new_v4()],
+            }],
+            next_after_version: None,
+            read_only: true,
+            current_state: None,
+        };
+        state.receive(state.generation, Ok(OfflineResult::History(page.clone())));
+        let rendered = content(&state)
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(rendered.contains("v2 tombstone"));
+        assert!(rendered.contains("original author"));
+        assert!(rendered.contains("unavailable source references"));
+        page.project.owner_instance_id = Uuid::new_v4();
+        state.receive(state.generation, Ok(OfflineResult::History(page)));
+        assert!(state.history.is_none());
+        assert!(state.error.as_ref().unwrap().contains("scope changed"));
+    }
     use uuid::Uuid;
     fn project() -> LaptopCacheProject {
         LaptopCacheProject {
@@ -326,6 +487,7 @@ mod tests {
             initialized: true,
             read_only: true,
             uploads: Default::default(),
+            sync_error: None,
         }
     }
     fn state() -> OfflineState {

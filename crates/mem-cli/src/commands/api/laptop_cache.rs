@@ -4,7 +4,8 @@ use super::ApiClient;
 use crate::commands::output::service_url;
 use anyhow::{Result, ensure};
 use mem_record::{
-    LaptopCacheList, LaptopCacheProject, LaptopCacheSearchRequest, LaptopCacheSearchResponse,
+    LaptopCacheHistoryResponse, LaptopCacheList, LaptopCacheProject, LaptopCacheSearchRequest,
+    LaptopCacheSearchResponse,
 };
 use reqwest::{Client, header::CACHE_CONTROL};
 use uuid::Uuid;
@@ -30,7 +31,7 @@ fn valid_question(q: &str, limit: u32) -> bool {
 impl ApiClient {
     async fn cache_operation<T: serde::de::DeserializeOwned>(
         &self,
-        subscription: Option<Uuid>,
+        path: &str,
         request: Option<&LaptopCacheSearchRequest>,
     ) -> Result<T> {
         ensure!(
@@ -47,14 +48,10 @@ impl ApiClient {
             .timeout(std::time::Duration::from_secs(30))
             .build()?;
         let headers = self.local_session_headers(&client, true).await?;
-        let path = subscription.map_or_else(
-            || "/v1/onboarding/cache".into(),
-            |id| format!("/v1/onboarding/cache/{id}/search"),
-        );
         let builder = if let Some(request) = request {
-            client.post(service_url(&self.config, &path)).json(request)
+            client.post(service_url(&self.config, path)).json(request)
         } else {
-            client.get(service_url(&self.config, &path))
+            client.get(service_url(&self.config, path))
         };
         let mut response = builder
             .headers(headers)
@@ -90,7 +87,7 @@ impl ApiClient {
         serde_json::from_slice(&bytes).map_err(|_| anyhow::anyhow!("Invalid local cache response"))
     }
     pub(crate) async fn laptop_cache(&self) -> Result<LaptopCacheList> {
-        let value: LaptopCacheList = self.cache_operation(None, None).await?;
+        let value: LaptopCacheList = self.cache_operation("/v1/onboarding/cache", None).await?;
         let mut ids = std::collections::HashSet::new();
         ensure!(
             value.schema_version == 1
@@ -114,7 +111,10 @@ impl ApiClient {
         );
         let request = LaptopCacheSearchRequest { question, limit };
         let value: LaptopCacheSearchResponse = self
-            .cache_operation(Some(project.subscription_id), Some(&request))
+            .cache_operation(
+                &format!("/v1/onboarding/cache/{}/search", project.subscription_id),
+                Some(&request),
+            )
             .await?;
         let hex = |s: &str| s.len() == 64 && s.bytes().all(|c| c.is_ascii_hexdigit());
         ensure!(
@@ -126,6 +126,39 @@ impl ApiClient {
                     && hex(&h.digest)
                     && h.evidence.iter().all(|e| hex(&e.digest))),
             "Local cache result scope/provenance mismatch"
+        );
+        Ok(value)
+    }
+    pub(crate) async fn laptop_cache_history(
+        &self,
+        project: &LaptopCacheProject,
+        canonical: Uuid,
+        after_version: u32,
+        limit: u32,
+    ) -> Result<LaptopCacheHistoryResponse> {
+        ensure!(
+            valid_project(project) && !canonical.is_nil() && (1..=32).contains(&limit),
+            "exact selected cache scope and bounded history required"
+        );
+        let value: LaptopCacheHistoryResponse = self.cache_operation(&format!("/v1/onboarding/cache/{}/history/{canonical}?after_version={after_version}&limit={limit}", project.subscription_id), None).await?;
+        ensure!(
+            value.schema_version == 1
+                && value.read_only
+                && value.canonical_id == canonical
+                && cache_scope_matches(project, &value.project)
+                && value.versions.len() <= limit as usize
+                && value.versions.iter().all(|v| !v.id.is_nil()
+                    && v.version > after_version
+                    && v.digest.len() == 64
+                    && v.digest.bytes().all(|c| c.is_ascii_hexdigit()))
+                && value
+                    .versions
+                    .windows(2)
+                    .all(|v| v[0].version < v[1].version)
+                && value
+                    .next_after_version
+                    .is_none_or(|next| value.versions.last().is_some_and(|v| v.version == next)),
+            "cache history identity/provenance mismatch"
         );
         Ok(value)
     }
@@ -209,6 +242,7 @@ mod tests {
             initialized: true,
             read_only: true,
             uploads: Default::default(),
+            sync_error: None,
         };
         let owner = Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-local-owner");
         let list = serde_json::json!({"schema_version":1,"area":"workshop","instance_id":Uuid::new_v4(),"projects":[p]}).to_string();

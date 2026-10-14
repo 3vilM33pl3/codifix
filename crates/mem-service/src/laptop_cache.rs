@@ -3,7 +3,7 @@
 use crate::{ApiError, AppState, AuthenticatedPrincipal, CredentialSource};
 use axum::{
     Extension, Json,
-    extract::{ConnectInfo, Path, State},
+    extract::{ConnectInfo, Path, Query, State},
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
@@ -85,6 +85,7 @@ fn describe(
         initialized: status.is_some(),
         read_only: true,
         uploads: Default::default(),
+        sync_error: None,
     }
 }
 fn response(value: &impl serde::Serialize) -> Result<Response, ApiError> {
@@ -103,6 +104,120 @@ fn response(value: &impl serde::Serialize) -> Result<Response, ApiError> {
         bytes,
     )
         .into_response())
+}
+pub(crate) async fn history(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthenticatedPrincipal>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    Path((subscription, canonical)): Path<(Uuid, Uuid)>,
+    Query(request): Query<LaptopCacheHistoryRequest>,
+) -> Result<Response, ApiError> {
+    authorize(&state, &actor, peer)?;
+    if canonical.is_nil() || !(1..=32).contains(&request.limit) {
+        return Err(ApiError::status_message(
+            StatusCode::BAD_REQUEST,
+            "canonical identity and history limit 1..32 required",
+        ));
+    }
+    let area = state.config.area.as_ref().ok_or_else(unavailable)?;
+    let binding = state
+        .config
+        .laptop_cache
+        .as_ref()
+        .and_then(|c| {
+            c.subscriptions
+                .iter()
+                .find(|s| s.subscription_id == subscription)
+        })
+        .ok_or_else(|| ApiError::not_found("subscription was not selected for this laptop area"))?;
+    if binding.replication_mode != LaptopCacheReplicationMode::CuratedProjectV1 {
+        return Err(ApiError::not_found(
+            "curated owner history is unavailable for a publication-only subscription",
+        ));
+    }
+    let expected = scope(&area.name, binding)?;
+    let pool = state.pool().map_err(|_| unavailable())?;
+    let mut tx = pool.begin().await.map_err(|_| unavailable())?;
+    let row = sqlx::query("SELECT device,scope,cursor,observed_at FROM device_replica_projections WHERE subscription=$1 FOR SHARE")
+        .bind(subscription).fetch_optional(&mut *tx).await.map_err(|_| unavailable())?.ok_or_else(unavailable)?;
+    if row
+        .try_get::<Uuid, _>("device")
+        .map_err(|_| unavailable())?
+        != binding.device_id
+        || row
+            .try_get::<SqlJson<ProjectScope>, _>("scope")
+            .map_err(|_| unavailable())?
+            .0
+            != expected
+    {
+        return Err(unavailable());
+    }
+    let status = ProjectProjectionStatus {
+        cursor: u64::try_from(row.try_get::<i64, _>("cursor").map_err(|_| unavailable())?)
+            .map_err(|_| unavailable())?,
+        observed_at: row.try_get("observed_at").map_err(|_| unavailable())?,
+    };
+    use mem_federation::device_replica::DeviceReplicaRecord;
+    let records: Vec<SqlJson<DeviceReplicaRecord>> = sqlx::query_scalar("SELECT record FROM device_replica_records WHERE subscription=$1 AND record->>'kind'='memory_version' AND record->'value'->>'canonical_id'=$2 AND (record->'value'->>'version')::bigint>$3 ORDER BY (record->'value'->>'version')::bigint LIMIT $4")
+        .bind(subscription).bind(canonical.to_string()).bind(i64::from(request.after_version)).bind(i64::from(request.limit) + 1).fetch_all(&mut *tx).await.map_err(|_| unavailable())?;
+    let current_record: Option<SqlJson<DeviceReplicaRecord>> = sqlx::query_scalar(
+        "SELECT record FROM device_replica_records WHERE subscription=$1 AND record_key=$2",
+    )
+    .bind(subscription)
+    .bind(format!("state:{canonical}"))
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| unavailable())?;
+    let current_state = match current_record {
+        Some(SqlJson(DeviceReplicaRecord::CanonicalState(s))) if s.canonical_id == canonical => {
+            Some(LaptopCacheHistoryState {
+                importance: s.importance,
+                confidence: s.confidence.as_confidence(),
+                status: s.status,
+            })
+        }
+        None => None,
+        _ => return Err(unavailable()),
+    };
+    tx.commit().await.map_err(|_| unavailable())?;
+    let has_more = records.len() > request.limit as usize;
+    let mut versions = Vec::new();
+    for SqlJson(record) in records.into_iter().take(request.limit as usize) {
+        let digest = mem_federation_store::audit_digest(&record)
+            .map_err(|_| unavailable())?
+            .as_hex()
+            .to_owned();
+        let DeviceReplicaRecord::MemoryVersion(v) = record else {
+            return Err(unavailable());
+        };
+        versions.push(LaptopCacheHistoryVersion {
+            memory_type: v.memory_type,
+            id: v.id,
+            version: v.version,
+            author: v.author,
+            authored_at: v.authored_at,
+            updated_at: v.updated_at,
+            tombstone: v.tombstone,
+            text: v.text,
+            summary: v.summary,
+            digest,
+            unavailable_source_ids: v.unavailable_source_ids,
+        });
+    }
+    let next_after_version = if has_more {
+        versions.last().map(|v| v.version)
+    } else {
+        None
+    };
+    response(&LaptopCacheHistoryResponse {
+        schema_version: 1,
+        project: describe(&area.name, binding, Some(status)),
+        canonical_id: canonical,
+        versions,
+        next_after_version,
+        read_only: true,
+        current_state,
+    })
 }
 pub(crate) async fn list(
     State(state): State<AppState>,
@@ -155,6 +270,14 @@ pub(crate) async fn list(
             let counts:Vec<(String,i64)>=sqlx::query_as("SELECT state,count(*) FROM laptop_curated_outbox WHERE local_project_id=$1 AND binding->>'device_id'=$2 AND binding->'scope'->>'company_id'=$3 AND binding->'scope'->>'owner_instance_id'=$4 AND binding->'scope'->>'space_id'=$5 AND binding->'scope'->>'area'=$6 GROUP BY state")
                 .bind(binding.project_id).bind(binding.device_id.to_string()).bind(binding.company_id.to_string()).bind(binding.owner_instance_id.to_string()).bind(binding.space_id.to_string()).bind(&area.name).fetch_all(&pool).await.map_err(|_|unavailable())?;
             described.uploads = counts.into_iter().collect();
+            described.sync_error = sqlx::query_scalar(
+                "SELECT last_sync_error FROM device_replica_projections WHERE subscription=$1",
+            )
+            .bind(binding.subscription_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|_| unavailable())?
+            .flatten();
         }
         projects.push(described);
     }
