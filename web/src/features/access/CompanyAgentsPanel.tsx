@@ -151,6 +151,7 @@ export function CompanyAgentsPanel({ readOnly, initialRequest }: { readOnly: boo
     {status ? <div className="panel" role="status">{status}</div> : null}
     {envelope ? <section className="panel" aria-label="Exact company agent request"><h3>Exact agent identity and disclosure</h3>
       <p>Parent device {envelope.device_id}; reviewing human {identity}. Caller {envelope.request.caller} / provider {envelope.request.provider_id}. Fixed expiry {envelope.request.expires_at}.</p>
+      <p>Knowledge approved for disclosure: {envelope.request.replication_mode === "curated_project_v1" ? "all curated project memories, including knowledge not published to other instances" : "explicitly shared publications only"}.</p>
       <p>Credential SHA-256 fingerprint: <code>{envelope.request.credential_sha256}</code>. These are public hashes/IDs, not usable credentials.</p>
       <pre>{JSON.stringify(envelope, null, 2)}</pre>
       <p>Reader-only project-cache disclosure to {envelope.request.caller === "codex" ? "Codex / OpenAI" : "Claude / Anthropic"}. Server independently requires the reviewed caller/provider/destination ({envelope.request.caller}/{envelope.request.provider_id}/{envelope.request.provider_id}). Offline copies may persist after expiry/revocation. No Trust copy, write privileges, automatic model call, budget grant or browser credential generation.</p>
@@ -164,6 +165,7 @@ export function CompanyAgentsPanel({ readOnly, initialRequest }: { readOnly: boo
     </section> : null}
     {envelope ? <section className="panel"><h3>Own device agent receipts</h3><p>Historical approval/expiry/revocation only; not current remote rights. Native activation checks current parents and owners separately.</p>
       {agents.length === 0 ? <p>No recorded child agents for this exact parent/device.</p> : agents.map(agent => <article key={agent.agent_id} className="panel"><h4>{agent.caller} / {agent.provider_id} · {agent.agent_id}</h4>
+        <p>Knowledge scope: {agent.replication_mode === "curated_project_v1" ? "all curated project memories" : "shared publications only"}.</p>
         <p>Request {agent.request_id}; principal {agent.principal_id}; token ID {agent.token_id}; company {agent.company_id}; human {agent.human_id}; fingerprint {agent.credential_sha256}; expires {agent.expires_at}; {agent.revoked_at ? `revoked ${agent.revoked_at}` : "not revoked in this receipt"}.</p>
         {agent.projects.map(p => <p key={agentScopeKey(p.selection)}>{agentScopeKey(p.selection)} · revision {p.selection.manifest_revision} · SHA-256 {p.selection.manifest_sha256} · disclosure {p.destination.name}/{p.destination.provider_id}/{p.destination.destination_id}</p>)}
         <button type="button" disabled={!writable || busy || Boolean(agent.revoked_at) || revokeAttempted} onClick={() => { setTarget(agent); setRevokeRetryable(true); }}>Review revoke agent {agent.agent_id}</button>

@@ -9,7 +9,8 @@ use crate::commands::auth_enrollment::{
 use anyhow::{Result, bail, ensure};
 use chrono::Utc;
 use mem_federation_runtime::{
-    DeviceProjectSubscription, LocalProjectReplicaProfile, ProjectReplica,
+    DeviceProjectReplica, DeviceProjectSubscription, LocalProjectReplicaProfile, ProjectReplica,
+    ProjectReplicationMode,
 };
 use mem_mcp::laptop::LaptopCacheBackend;
 use mem_record::{
@@ -123,6 +124,7 @@ fn eligible(r: &Record, receipt: &CompanyAgentReceipt) -> Result<()> {
             && receipt.principal_id == q.principal_id
             && receipt.token_id == q.token_id
             && receipt.caller == q.caller
+            && receipt.replication_mode == q.replication_mode
             && receipt.provider_id == q.provider_id
             && receipt.credential_sha256 == q.credential_sha256
             && receipt.expires_at == q.expires_at
@@ -147,6 +149,11 @@ fn eligible(r: &Record, receipt: &CompanyAgentReceipt) -> Result<()> {
     Ok(())
 }
 pub(super) async fn prepare(args: &Prepare) -> Result<()> {
+    let replication_mode = match args.replication_mode.as_str() {
+        "shared_publications_v1" => mem_record::CompanyAgentReplicationMode::SharedPublicationsV1,
+        "curated_project_v1" => mem_record::CompanyAgentReplicationMode::CuratedProjectV1,
+        _ => bail!("unsupported agent replication mode"),
+    };
     let origin = CompanyOrigin::parse(&args.company.company, args.company.allow_loopback)?;
     let store = NativeKeychain;
     let enrollment = workspace::active(&store, &origin)?;
@@ -182,7 +189,7 @@ pub(super) async fn prepare(args: &Prepare) -> Result<()> {
                 && d.destination_id == caller.provider_id()),
         "operator has not reviewed this caller/model disclosure destination"
     );
-    let index = format!(
+    let mut index = format!(
         "{}:{}:{}:{}:{}",
         device,
         caller.as_str(),
@@ -190,6 +197,9 @@ pub(super) async fn prepare(args: &Prepare) -> Result<()> {
         manifest.entry.owner_instance_id,
         manifest.project_id
     );
+    if !replication_mode.is_shared() {
+        index.push_str(":curated_project_v1");
+    }
     let saved = if let Some(index) = store.get(&service(&origin), &index)? {
         let id = std::str::from_utf8(&index)?.parse::<Uuid>()?;
         load(&store, &origin, id)?.into()
@@ -232,6 +242,7 @@ pub(super) async fn prepare(args: &Prepare) -> Result<()> {
             company: origin.0.clone(),
             device_id: device,
             request: CompanyAgentApproveRequest {
+                replication_mode,
                 request_id: Uuid::new_v4(),
                 agent_id: Uuid::new_v4(),
                 principal_id: Uuid::new_v4(),
@@ -266,6 +277,7 @@ pub(super) async fn prepare(args: &Prepare) -> Result<()> {
     };
     ensure!(
         r.request.caller == caller
+            && r.request.replication_mode == replication_mode
             && r.request.projects[0].manifest_revision == manifest.revision
             && r.request.projects[0].manifest_sha256
                 == mem_federation_runtime::onboarding_manifest_digest(&manifest)?,
@@ -576,6 +588,21 @@ struct CacheBroker {
     profile: PathBuf,
     allow_offline: bool,
 }
+fn mode_matches(
+    approved: mem_record::CompanyAgentReplicationMode,
+    profile: ProjectReplicationMode,
+) -> bool {
+    matches!(
+        (approved, profile),
+        (
+            mem_record::CompanyAgentReplicationMode::SharedPublicationsV1,
+            ProjectReplicationMode::SharedPublicationsV1
+        ) | (
+            mem_record::CompanyAgentReplicationMode::CuratedProjectV1,
+            ProjectReplicationMode::CuratedProjectV1
+        )
+    )
+}
 impl CacheBroker {
     async fn authorize(&self) -> Result<(Record, LocalProjectReplicaProfile, bool)> {
         let origin = CompanyOrigin::parse(&self.company, self.allow_loopback)?;
@@ -595,7 +622,9 @@ impl CacheBroker {
         )?;
         let profile = LocalProjectReplicaProfile::read(&self.profile)?;
         ensure!(
-            profile.company == r.company && profile.bootstrap == r.bootstrap,
+            profile.company == r.company
+                && profile.bootstrap == r.bootstrap
+                && mode_matches(r.request.replication_mode, profile.replication_mode),
             "native cache profile does not match the exact approved project/trust"
         );
         Ok((r, profile, current))
@@ -607,7 +636,7 @@ impl CacheBroker {
                 && current.bootstrap == prior.bootstrap
                 && confirmed.bootstrap == profile.bootstrap
                 && confirmed.subscription == profile.subscription
-                && confirmed.local_database_url == profile.local_database_url,
+                && serde_json::to_value(&confirmed)? == serde_json::to_value(profile)?,
             "agent grant/profile changed during cache read"
         );
         Ok(online)
@@ -616,25 +645,45 @@ impl CacheBroker {
 impl LaptopCacheBackend for CacheBroker {
     async fn status(&self) -> Result<Value> {
         let (r, profile, _) = self.authorize().await?;
-        let status = ProjectReplica::connect(&profile, false)
-            .await?
-            .status()
-            .await?;
+        let status = match profile.replication_mode {
+            ProjectReplicationMode::SharedPublicationsV1 => {
+                ProjectReplica::connect(&profile, false)
+                    .await?
+                    .status()
+                    .await?
+            }
+            ProjectReplicationMode::CuratedProjectV1 => {
+                DeviceProjectReplica::connect(&profile, false)
+                    .await?
+                    .status()
+                    .await?
+            }
+        };
         let current = self.recheck(&r, &profile).await?;
         Ok(
-            json!({"read_only":true,"scope":profile.bootstrap.scope,"subscription":profile.subscription,"cursor":status.cursor,"last_committed_page":status.observed_at,"current_remote_access_verified":current,"disclosure_expires_at":r.request.expires_at,"caller":r.request.caller,"provider_id":r.request.provider_id}),
+            json!({"read_only":true,"replication_mode":r.request.replication_mode,"scope":profile.bootstrap.scope,"subscription":profile.subscription,"cursor":status.cursor,"last_committed_page":status.observed_at,"current_remote_access_verified":current,"disclosure_expires_at":r.request.expires_at,"caller":r.request.caller,"provider_id":r.request.provider_id}),
         )
     }
     async fn search(&self, question: String, limit: u32) -> Result<Value> {
         let (r, profile, _) = self.authorize().await?;
-        let hits = ProjectReplica::connect(&profile, false)
-            .await?
-            .search(&question, limit)
-            .await?;
+        let hits = match profile.replication_mode {
+            ProjectReplicationMode::SharedPublicationsV1 => serde_json::to_value(
+                ProjectReplica::connect(&profile, false)
+                    .await?
+                    .search(&question, limit)
+                    .await?,
+            )?,
+            ProjectReplicationMode::CuratedProjectV1 => serde_json::to_value(
+                DeviceProjectReplica::connect(&profile, false)
+                    .await?
+                    .search(&question, limit)
+                    .await?,
+            )?,
+        };
         // Both remote and local observed revocation fence awaited reads.
         let current = self.recheck(&r, &profile).await?;
         Ok(
-            json!({"read_only":true,"scope":profile.bootstrap.scope,"subscription":profile.subscription,"current_remote_access_verified":current,"disclosure_expires_at":r.request.expires_at,"results":hits}),
+            json!({"read_only":true,"replication_mode":r.request.replication_mode,"scope":profile.bootstrap.scope,"subscription":profile.subscription,"current_remote_access_verified":current,"disclosure_expires_at":r.request.expires_at,"results":hits}),
         )
     }
 }
@@ -654,6 +703,17 @@ pub(super) async fn mcp(args: &Mcp) -> Result<()> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    #[test]
+    fn legacy_disclosure_cannot_authorize_curated_replica() {
+        assert!(!mode_matches(
+            Default::default(),
+            ProjectReplicationMode::CuratedProjectV1
+        ));
+        assert!(mode_matches(
+            mem_record::CompanyAgentReplicationMode::CuratedProjectV1,
+            ProjectReplicationMode::CuratedProjectV1
+        ));
+    }
     use mem_record::{CompanyAgentCaller, CompanyAgentScope, OnboardingDestination};
     use std::{collections::BTreeMap, sync::Mutex};
     #[test]
@@ -706,6 +766,7 @@ mod tests {
         let bootstrap=serde_json::from_value(json!({"schema_version":1,"device":device,"catalog_revision":1,"authority":Uuid::new_v4(),"receipt_keys":security.trust().keys(),"scope":{"company":company,"area":"workshop","owner":owner,"project":project,"space":Uuid::new_v4()}})).unwrap();
         let credential = format!("mlt_{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
         let request = CompanyAgentApproveRequest {
+            replication_mode: Default::default(),
             request_id: Uuid::new_v4(),
             agent_id: Uuid::new_v4(),
             principal_id: Uuid::new_v4(),
@@ -726,6 +787,7 @@ mod tests {
             }],
         };
         let receipt = CompanyAgentReceipt {
+            replication_mode: Default::default(),
             schema_version: 1,
             request_id: request.request_id,
             agent_id: request.agent_id,

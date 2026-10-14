@@ -41,6 +41,9 @@ impl Caller {
 }
 #[derive(Debug, Args)]
 struct Prepare {
+    /// Exact corpus approved for this agent; changing it needs a new identity.
+    #[arg(long, default_value = "shared_publications_v1", value_parser = ["shared_publications_v1", "curated_project_v1"])]
+    replication_mode: String,
     #[command(flatten)]
     company: CompanyArgs,
     #[arg(long)]

@@ -55,6 +55,7 @@ fn request(s: &Setup, caller: CompanyAgentCaller) -> (CompanyAgentApproveRequest
         .collect();
     (
         CompanyAgentApproveRequest {
+            replication_mode: Default::default(),
             request_id: Uuid::new_v4(),
             agent_id: Uuid::new_v4(),
             principal_id: Uuid::new_v4(),
@@ -290,6 +291,26 @@ async fn independent_siblings_have_no_generic_authority_and_only_exact_child_rec
     );
     server.abort();
     let _ = server.await;
+    close(s).await;
+}
+
+#[tokio::test]
+async fn curated_disclosure_is_immutable_and_requires_a_separate_approved_identity() {
+    let s = setup(destinations()).await;
+    let (legacy, _) = request(&s, CompanyAgentCaller::Codex);
+    let old = call(&s, &legacy).await.unwrap();
+    assert_eq!(old.replication_mode, Default::default());
+    let mut altered = legacy.clone();
+    altered.replication_mode = CompanyAgentReplicationMode::CuratedProjectV1;
+    assert!(call(&s, &altered).await.is_err());
+    let (mut fresh, _) = request(&s, CompanyAgentCaller::Codex);
+    fresh.replication_mode = CompanyAgentReplicationMode::CuratedProjectV1;
+    let approved = call(&s, &fresh).await.unwrap();
+    assert_eq!(
+        approved.replication_mode,
+        CompanyAgentReplicationMode::CuratedProjectV1
+    );
+    assert_ne!(approved.agent_id, old.agent_id);
     close(s).await;
 }
 

@@ -5,6 +5,25 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CompanyAgentReplicationMode {
+    #[default]
+    SharedPublicationsV1,
+    CuratedProjectV1,
+}
+impl CompanyAgentReplicationMode {
+    pub fn is_shared(&self) -> bool {
+        *self == Self::SharedPublicationsV1
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::SharedPublicationsV1 => "shared_publications_v1",
+            Self::CuratedProjectV1 => "curated_project_v1",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CompanyAgentCaller {
@@ -28,6 +47,11 @@ impl CompanyAgentCaller {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct CompanyAgentApproveRequest {
+    #[serde(
+        default,
+        skip_serializing_if = "CompanyAgentReplicationMode::is_shared"
+    )]
+    pub replication_mode: CompanyAgentReplicationMode,
     pub request_id: Uuid,
     pub agent_id: Uuid,
     pub principal_id: Uuid,
@@ -48,6 +72,11 @@ pub struct CompanyAgentScope {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompanyAgentReceipt {
+    #[serde(
+        default,
+        skip_serializing_if = "CompanyAgentReplicationMode::is_shared"
+    )]
+    pub replication_mode: CompanyAgentReplicationMode,
     pub schema_version: u32,
     pub request_id: Uuid,
     pub agent_id: Uuid,

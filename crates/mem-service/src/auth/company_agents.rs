@@ -208,6 +208,7 @@ async fn locked_relation(
         || saved.principal_id != request.principal_id
         || saved.token_id != request.token_id
         || saved.caller != request.caller
+        || saved.replication_mode != request.replication_mode
         || saved.provider_id != request.provider_id
         || saved.credential_sha256 != request.credential_sha256
         || saved.expires_at != request.expires_at
@@ -551,6 +552,7 @@ pub(crate) async fn approve(
             .await
             .map_err(ApiError::sql)?;
         let receipt = CompanyAgentReceipt {
+            replication_mode: request.replication_mode,
             schema_version: 1,
             request_id: request.request_id,
             agent_id: request.agent_id,

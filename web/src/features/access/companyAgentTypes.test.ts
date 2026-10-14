@@ -3,6 +3,16 @@ import { parseCompanyAgentEnvelope, validAgentReceipt, matchesAgentRequest } fro
 import { consumeAgentRequestLink } from "./agentRequestLink";
 import { aid, agentEnvelope, agentReceipt } from "./companyAgentFixtures.testdata";
 afterEach(() => window.history.replaceState(null, "", "/"));
+it("binds curated corpus disclosure and rejects a legacy receipt for that request", () => {
+  const envelope = agentEnvelope();
+  envelope.request.replication_mode = "curated_project_v1";
+  expect(parseCompanyAgentEnvelope(JSON.stringify(envelope)).request.replication_mode).toBe("curated_project_v1");
+  const receipt = agentReceipt(envelope);
+  expect(validAgentReceipt(receipt, aid(2), aid(1))).toBe(true);
+  expect(matchesAgentRequest(receipt, envelope.request)).toBe(true);
+  delete receipt.replication_mode;
+  expect(matchesAgentRequest(receipt, envelope.request)).toBe(false);
+});
 it("accepts exact public metadata, including same project UUID on different owners", () => {
   const value = agentEnvelope(); expect(parseCompanyAgentEnvelope(JSON.stringify(value))).toEqual(value);
   delete value.automatic_approval; expect(parseCompanyAgentEnvelope(JSON.stringify(value))).toEqual(value);

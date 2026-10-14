@@ -2,6 +2,7 @@ import type { CompanyDeviceSelection } from "../onboarding/types";
 import type { OnboardingManifest } from "./types";
 
 export interface CompanyAgentRequest {
+  replication_mode?: "shared_publications_v1" | "curated_project_v1";
   request_id: string; agent_id: string; principal_id: string; token_id: string;
   caller: "codex" | "claude"; provider_id: "openai" | "anthropic";
   credential_sha256: string; expires_at: string; projects: CompanyDeviceSelection[]; confirmed: boolean;
@@ -31,9 +32,11 @@ function scopes(v: unknown): v is CompanyDeviceSelection[] {
     && new Set(v.map(agentScopeKey)).size === v.length;
 }
 const requestKeys = ["request_id", "agent_id", "principal_id", "token_id", "caller", "provider_id", "credential_sha256", "expires_at", "projects", "confirmed"];
+const modeKeys = (v: unknown, keys: string[]) => v && typeof v === "object" && "replication_mode" in v ? [...keys, "replication_mode"] : keys;
 function identity(v: Record<string, unknown>): boolean {
   const ids = [v.request_id, v.agent_id, v.principal_id, v.token_id];
   return ids.every(uuid) && new Set(ids).size === 4 && ((v.caller === "codex" && v.provider_id === "openai") || (v.caller === "claude" && v.provider_id === "anthropic"))
+    && (v.replication_mode === undefined || v.replication_mode === "shared_publications_v1" || v.replication_mode === "curated_project_v1")
     && typeof v.credential_sha256 === "string" && SHA.test(v.credential_sha256) && date(v.expires_at);
 }
 export function parseCompanyAgentEnvelope(input: string): CompanyAgentEnvelope {
@@ -43,7 +46,7 @@ export function parseCompanyAgentEnvelope(input: string): CompanyAgentEnvelope {
     const keys = ["device_id", "approval_endpoint", "request", "agent_id", "contains_secret"];
     if (v && typeof v === "object" && "automatic_approval" in v) keys.push("automatic_approval");
     if (!exact(v, keys) || !uuid(v.device_id) || v.contains_secret !== false || ("automatic_approval" in v && v.automatic_approval !== false)
-      || v.approval_endpoint !== `/v1/onboarding/devices/${v.device_id}/agents` || !exact(v.request, requestKeys) || !identity(v.request)
+      || v.approval_endpoint !== `/v1/onboarding/devices/${v.device_id}/agents` || !exact(v.request, modeKeys(v.request, requestKeys)) || !identity(v.request)
       || v.request.confirmed !== false || v.agent_id !== v.request.agent_id || !scopes(v.request.projects)
       || [v.request.request_id, v.request.agent_id, v.request.principal_id, v.request.token_id].includes(v.device_id)) throw new Error();
     return v as unknown as CompanyAgentEnvelope;
@@ -51,7 +54,7 @@ export function parseCompanyAgentEnvelope(input: string): CompanyAgentEnvelope {
 }
 export function validAgentReceipt(v: unknown, device: string, human: string): v is CompanyAgentReceipt {
   const keys = [...requestKeys.filter(k => !["confirmed", "projects"].includes(k)), "schema_version", "device_id", "human_id", "issuer", "subject", "company_id", "projects", "approved_at", "revoked_at"];
-  if (!exact(v, keys) || !identity(v) || v.schema_version !== 1 || v.device_id !== device || v.human_id !== human || !uuid(v.company_id)
+  if (!exact(v, modeKeys(v, keys)) || !identity(v) || v.schema_version !== 1 || v.device_id !== device || v.human_id !== human || !uuid(v.company_id)
     || !text(v.issuer) || !text(v.subject) || !date(v.approved_at) || (v.revoked_at !== null && !date(v.revoked_at)) || !Array.isArray(v.projects)) return false;
   return scopes(v.projects.map(p => p?.selection)) && v.projects.every(p => exact(p, ["selection", "destination"])
     && exact(p.destination, ["name", "provider_id", "destination_id"]) && p.destination.name === v.caller && p.destination.provider_id === v.provider_id && p.destination.destination_id === v.provider_id);
@@ -60,5 +63,6 @@ export function matchesAgentRequest(receipt: CompanyAgentReceipt, request: Compa
   const same = ["request_id", "agent_id", "principal_id", "token_id", "caller", "provider_id", "credential_sha256"] as const;
   const scope = (p: CompanyDeviceSelection) => `${agentScopeKey(p)}/${p.manifest_revision}/${p.manifest_sha256}/${p.offline_confirmed}`;
   return same.every(k => receipt[k] === request[k]) && receipt.expires_at === request.expires_at
+    && (receipt.replication_mode ?? "shared_publications_v1") === (request.replication_mode ?? "shared_publications_v1")
     && receipt.projects.map(p => scope(p.selection)).sort().join("|") === request.projects.map(scope).sort().join("|");
 }
