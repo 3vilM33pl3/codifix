@@ -24,6 +24,12 @@ pub struct OwnerDeviceApprovalRequest {
     pub manifest_sha256: String,
     pub delivery_policy_revision: i64,
     pub expires_at: DateTime<Utc>,
+    /// Immutable device consent; omitted legacy approvals remain download-only.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub curated_contributions_allowed: bool,
+}
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -51,6 +57,8 @@ pub struct OwnerDeviceCatalogRequest {
 pub struct OwnerDeviceCatalogProject {
     pub project: OnboardingDeviceReviewProject,
     pub manifest_sha256: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub curated_contributions_available: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

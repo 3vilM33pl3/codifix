@@ -26,7 +26,7 @@ export interface DeviceApprovalReceipt {
 export interface CompanyDeviceReview extends Omit<DeviceReview, "projects"> {
   company_id: string;
   observed_at: string;
-  projects: { project: DeviceReview["projects"][number]; manifest_sha256: string }[];
+  projects: { project: DeviceReview["projects"][number]; manifest_sha256: string; curated_contributions_available?: boolean }[];
 }
 export interface CompanyDeviceSelection {
   area: "workshop" | "homelab" | "general";
@@ -35,6 +35,7 @@ export interface CompanyDeviceSelection {
   manifest_revision: number;
   manifest_sha256: string;
   offline_confirmed: true;
+  contribution_confirmed?: boolean;
 }
 export interface CompanyDeviceApprovalRequest {
   user_code: string;

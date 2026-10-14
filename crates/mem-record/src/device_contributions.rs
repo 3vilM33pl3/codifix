@@ -98,6 +98,8 @@ pub struct DeviceContributionReceipt {
     pub operation_id: Uuid,
     pub binding: LaptopContributionBinding,
     pub local_memory_id: Uuid,
+    /// Canonical SHA-256 of the complete CuratedDeviceContribution. The owner
+    /// additionally retains the exact approval identity in its receipt journal.
     pub request_sha256: String,
     pub human_principal_id: Uuid,
     pub outcome: DeviceContributionOutcome,

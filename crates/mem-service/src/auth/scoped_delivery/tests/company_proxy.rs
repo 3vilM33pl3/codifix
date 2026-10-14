@@ -167,6 +167,7 @@ impl CompanyFixture {
                 manifest_revision: selected.project.manifest.revision,
                 manifest_sha256: selected.manifest_sha256.clone(),
                 offline_confirmed: true,
+                contribution_confirmed: false,
             }],
         };
         let Json(result) = super::super::super::company_devices::approve(

@@ -248,6 +248,7 @@ pub(super) async fn prepare(args: &Prepare) -> Result<()> {
                     manifest_revision: manifest.revision,
                     manifest_sha256: mem_federation_runtime::onboarding_manifest_digest(&manifest)?,
                     offline_confirmed: true,
+                    contribution_confirmed: false,
                 }],
             },
             credential,
@@ -721,6 +722,7 @@ mod tests {
                 manifest_revision: 1,
                 manifest_sha256: "a".repeat(64),
                 offline_confirmed: true,
+                contribution_confirmed: false,
             }],
         };
         let receipt = CompanyAgentReceipt {

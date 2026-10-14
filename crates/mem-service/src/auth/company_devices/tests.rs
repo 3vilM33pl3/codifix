@@ -42,6 +42,7 @@ async fn fake_catalog(
         request_sha256: company_catalog::digest(&request).unwrap(),
         observed_at: Utc::now(),
         projects: vec![OwnerDeviceCatalogProject {
+            curated_contributions_available: false,
             manifest_sha256: company_catalog::digest(&fake.manifest).unwrap(),
             project: OnboardingDeviceReviewProject {
                 manifest: fake.manifest,
@@ -313,6 +314,7 @@ pub(crate) async fn request(
             manifest_revision: m.revision,
             manifest_sha256: item.manifest_sha256.clone(),
             offline_confirmed: true,
+            contribution_confirmed: false,
         }],
     }
 }

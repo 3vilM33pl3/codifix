@@ -66,7 +66,7 @@ pub(crate) async fn company_submit(
     if receipt.operation_id != input.operation_id
         || receipt.binding != input.binding
         || receipt.local_memory_id != input.local_memory_id
-        || receipt.request_sha256 != digest(&transport)?
+        || receipt.request_sha256 != digest(&input)?
     {
         return Err(changed());
     }
@@ -131,6 +131,9 @@ async fn authorize(
     approval: Uuid,
 ) -> Result<(OwnerDeviceApprovalReceipt, OnboardingProject), ApiError> {
     let result = approved(state, tx, actor, approval).await?;
+    if !result.0.request.curated_contributions_allowed {
+        return Err(ApiError::forbidden("device approval permits download only"));
+    }
     let permissions = super::locked_project_permissions(
         state,
         tx,
@@ -157,7 +160,7 @@ pub(crate) async fn submit(
         .validate()
         .map_err(ApiError::validation)?;
     let input = &request.contribution;
-    let hash = digest(&request)?;
+    let hash = digest(&request.contribution)?;
     let mut tx = state.pool()?.begin().await.map_err(ApiError::sql)?;
     let (approval, manifest) = authorize(&state, &mut tx, &actor, request.approval_id).await?;
     let binding = &input.binding;
@@ -185,15 +188,16 @@ pub(crate) async fn submit(
         .execute(&mut *tx)
         .await
         .map_err(ApiError::sql)?;
-    let existing: Option<SqlJson<DeviceContributionReceipt>> = sqlx::query_scalar(
-        "SELECT receipt_json FROM device_curated_contribution_receipts WHERE operation_id=$1",
+    let existing: Option<(Uuid,SqlJson<DeviceContributionReceipt>)> = sqlx::query_as(
+        "SELECT approval_id,receipt_json FROM device_curated_contribution_receipts WHERE operation_id=$1",
     )
     .bind(input.operation_id)
     .fetch_optional(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
-    if let Some(existing) = existing {
-        if existing.0.request_sha256 != hash
+    if let Some((original_approval, existing)) = existing {
+        if original_approval != request.approval_id
+            || existing.0.request_sha256 != hash
             || existing.0.binding != *binding
             || existing.0.human_principal_id != approval.human_principal_id
         {

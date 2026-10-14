@@ -31,10 +31,17 @@ pub async fn bind_project(
 pub struct ClaimedContribution {
     pub contribution: CuratedDeviceContribution,
     pub lease_token: Uuid,
+    pub request_sha256: String,
 }
 /// One queue row is fenced at a time; no network call belongs in this transaction.
-pub async fn claim(tx: &mut Transaction<'_, Postgres>) -> Result<Option<ClaimedContribution>> {
-    let row=sqlx::query("SELECT q.*,m.canonical_id,m.version_no,m.canonical_text,m.summary,m.memory_type,m.importance,m.confidence,m.created_at FROM laptop_curated_outbox q JOIN memory_entries m ON m.id=q.local_memory_id JOIN laptop_curated_bindings b ON b.local_project_id=q.local_project_id WHERE b.enabled AND (q.state='queued' OR (q.state='running' AND q.lease_until<clock_timestamp())) ORDER BY q.updated_at,q.operation_id LIMIT 1 FOR UPDATE OF q SKIP LOCKED").fetch_optional(&mut **tx).await?;
+pub async fn claim(
+    tx: &mut Transaction<'_, Postgres>,
+    binding: &LaptopContributionBinding,
+) -> Result<Option<ClaimedContribution>> {
+    binding
+        .validate()
+        .map_err(|_| Error::Invalid("claim binding"))?;
+    let row=sqlx::query("SELECT q.*,m.canonical_id,m.version_no,m.canonical_text,m.summary,m.memory_type,m.importance,m.confidence,m.created_at FROM laptop_curated_outbox q JOIN memory_entries m ON m.id=q.local_memory_id JOIN laptop_curated_bindings b ON b.local_project_id=q.local_project_id WHERE b.enabled AND q.binding=$1 AND b.binding=$1 AND (q.state='queued' OR (q.state='running' AND q.lease_until<clock_timestamp())) ORDER BY q.updated_at,q.operation_id LIMIT 1 FOR UPDATE OF q SKIP LOCKED").bind(Json(binding)).fetch_optional(&mut **tx).await?;
     let Some(row) = row else { return Ok(None) };
     let operation: Uuid = row.try_get("operation_id")?;
     let payload: Option<Json<CuratedDeviceContribution>> = row.try_get("payload")?;
@@ -82,9 +89,15 @@ pub async fn claim(tx: &mut Transaction<'_, Postgres>) -> Result<Option<ClaimedC
         .map_err(|_| Error::Invalid("curated queue payload"))?;
     let lease = Uuid::new_v4();
     sqlx::query("UPDATE laptop_curated_outbox SET state='running',payload=$2,lease_token=$3,lease_until=clock_timestamp()+interval '120 seconds',updated_at=clock_timestamp() WHERE operation_id=$1").bind(operation).bind(Json(&contribution)).bind(lease).execute(&mut **tx).await?;
+    use sha2::{Digest, Sha256};
+    let request_sha256 = format!(
+        "{:x}",
+        Sha256::digest(serde_json_canonicalizer::to_vec(&contribution)?)
+    );
     Ok(Some(ClaimedContribution {
         contribution,
         lease_token: lease,
+        request_sha256,
     }))
 }
 pub async fn acknowledge(
@@ -96,6 +109,7 @@ pub async fn acknowledge(
         || receipt.binding != claim.contribution.binding
         || receipt.local_memory_id != claim.contribution.local_memory_id
         || receipt.schema_version != 2
+        || receipt.request_sha256 != claim.request_sha256
     {
         return Err(Error::Conflict);
     }
@@ -183,12 +197,17 @@ mod tests {
             .execute(&db.pool)
             .await
             .unwrap();
+        let mut other = binding.clone();
+        other.scope.project_id = Uuid::new_v4();
         let mut tx = db.pool.begin().await.unwrap();
-        let first = claim(&mut tx).await.unwrap().unwrap();
+        assert!(claim(&mut tx, &other).await.unwrap().is_none());
+        tx.commit().await.unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        let first = claim(&mut tx, &binding).await.unwrap().unwrap();
         tx.commit().await.unwrap();
         assert_eq!(first.contribution.local_memory_id, version);
         let mut tx = db.pool.begin().await.unwrap();
-        assert!(claim(&mut tx).await.unwrap().is_none());
+        assert!(claim(&mut tx, &binding).await.unwrap().is_none());
         tx.commit().await.unwrap();
         sqlx::query(
             "UPDATE laptop_curated_outbox SET lease_until=clock_timestamp()-interval '1 second'",
@@ -197,7 +216,7 @@ mod tests {
         .await
         .unwrap();
         let mut tx = db.pool.begin().await.unwrap();
-        let second = claim(&mut tx).await.unwrap().unwrap();
+        let second = claim(&mut tx, &binding).await.unwrap().unwrap();
         tx.commit().await.unwrap();
         assert_eq!(first.contribution, second.contribution);
         assert_ne!(first.lease_token, second.lease_token);
@@ -206,7 +225,7 @@ mod tests {
             operation_id: version,
             binding,
             local_memory_id: version,
-            request_sha256: "a".repeat(64),
+            request_sha256: second.request_sha256.clone(),
             human_principal_id: Uuid::new_v4(),
             outcome: DeviceContributionOutcome::Accepted,
             owner_memory_id: Some(Uuid::new_v4()),
@@ -215,6 +234,14 @@ mod tests {
             proposal_id: None,
             committed_at: chrono::Utc::now(),
         };
+        let mut tx = db.pool.begin().await.unwrap();
+        let mut altered = receipt.clone();
+        altered.request_sha256 = "f".repeat(64);
+        assert!(matches!(
+            acknowledge(&mut tx, &second, &altered).await,
+            Err(Error::Conflict)
+        ));
+        tx.rollback().await.unwrap();
         let mut tx = db.pool.begin().await.unwrap();
         assert!(matches!(
             acknowledge(&mut tx, &first, &receipt).await,

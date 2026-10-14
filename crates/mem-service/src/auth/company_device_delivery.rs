@@ -169,6 +169,12 @@ async fn manifest(
     {
         return Err(denied());
     }
+    if request.curated_contributions_allowed
+        && (!permissions.contains(Permission::MemoryCurate)
+            || !permissions.contains(Permission::ActivityCapture))
+    {
+        return Err(denied());
+    }
     sqlx::query("SELECT id FROM projects WHERE id=$1 FOR SHARE")
         .bind(request.project_id)
         .fetch_optional(&mut **tx)
@@ -324,6 +330,9 @@ pub(crate) async fn catalog(
                 offline_available,
             },
             manifest_sha256,
+            curated_contributions_available: offline_available
+                && current.contains(Permission::MemoryCurate)
+                && current.contains(Permission::ActivityCapture),
         });
     }
     let response = OwnerDeviceCatalogResponse {

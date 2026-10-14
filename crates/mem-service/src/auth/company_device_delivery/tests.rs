@@ -53,6 +53,7 @@ pub(crate) async fn setup(f: &mut Fixture) -> (AuthenticatedPrincipal, OwnerDevi
         manifest_sha256: digest(&manifest).unwrap(),
         delivery_policy_revision: 1,
         expires_at: chrono::Utc::now() + chrono::Duration::days(1),
+        curated_contributions_allowed: false,
     };
     (actor, request)
 }

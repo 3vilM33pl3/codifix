@@ -194,6 +194,7 @@ pub(crate) async fn approve(
                     })
                     .ok_or_else(denied)?;
                 if !item.project.offline_available
+                    || (selection.contribution_confirmed && !item.curated_contributions_available)
                     || !item.project.manifest.entry.offline_allowed
                     || item.project.allowed_roles != vec![AuthRole::Reader]
                     || item.project.manifest.revision != selection.manifest_revision
@@ -222,6 +223,7 @@ pub(crate) async fn approve(
                     manifest_sha256: selection.manifest_sha256.clone(),
                     delivery_policy_revision: owner.delivery_policy_revision.ok_or_else(denied)?,
                     expires_at: grant_until,
+                    curated_contributions_allowed: selection.contribution_confirmed,
                 };
                 bindings.push(Binding {
                     manifest: item.project.manifest.clone(),

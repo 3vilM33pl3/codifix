@@ -28,6 +28,11 @@ pub struct CompanyDeviceSelection {
     pub manifest_revision: i64,
     pub manifest_sha256: String,
     pub offline_confirmed: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub contribution_confirmed: bool,
+}
+fn is_false(value: &bool) -> bool {
+    !value
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]

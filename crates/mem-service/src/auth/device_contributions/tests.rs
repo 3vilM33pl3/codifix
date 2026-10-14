@@ -4,7 +4,8 @@ use crate::auth::device::tests::fixture;
 #[tokio::test]
 async fn curated_receipts_are_atomic_idempotent_and_authority_checked() {
     let Some(mut f) = fixture().await else { return };
-    let (actor, approval) = crate::auth::company_device_delivery::tests::setup(&mut f).await;
+    let (actor, mut approval) = crate::auth::company_device_delivery::tests::setup(&mut f).await;
+    approval.curated_contributions_allowed = true;
     let _ = crate::auth::company_device_delivery::approve(
         State(f.state.clone()),
         Extension(actor.clone()),

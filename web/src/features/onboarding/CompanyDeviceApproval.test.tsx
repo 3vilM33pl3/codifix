@@ -58,6 +58,19 @@ it("never offers absent projects and cannot select unavailable offline or Trust 
   expect(screen.getByText("Trust — remote-only; no offline copy")).toBeInTheDocument();
   expect(screen.queryByLabelText(check(id(7)))).toBeNull(); expect(screen.queryByRole("combobox", { name: /role/i })).toBeNull();
 });
+it("freezes explicit curated upload consent only for an available selected project", async () => {
+  vi.mocked(companyDeviceReview).mockResolvedValue({ ...review, projects: [{ ...first, curated_contributions_available: true }] });
+  await inspect();
+  const upload = screen.getByLabelText(`Allow curated uploads for ${manifest.project_id}`);
+  expect(upload).toBeDisabled();
+  fireEvent.click(screen.getByLabelText(check()));
+  fireEvent.click(upload);
+  fireEvent.click(screen.getByText("Review selected company access"));
+  expect(screen.getByLabelText("Exact company device approval")).toHaveTextContent('"contribution_confirmed": true');
+  await submit();
+  await waitFor(() => expect(approveCompanyDevice).toHaveBeenCalledOnce());
+  expect(vi.mocked(approveCompanyDevice).mock.calls[0][0].projects[0].contribution_confirmed).toBe(true);
+});
 it.each(["pending", "uncertain"])("retains the identical frozen selection after %s without refresh or fallback", async outcome => {
   if (outcome === "pending") vi.mocked(approveCompanyDevice).mockResolvedValueOnce({ status: "pending" });
   else vi.mocked(approveCompanyDevice).mockRejectedValueOnce(new Error("Company device outcome unconfirmed; retry exact bytes"));

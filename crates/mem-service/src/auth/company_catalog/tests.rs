@@ -80,6 +80,7 @@ async fn handle(
         manifest.entry.owner_instance_id = Uuid::new_v4();
     }
     let mut item = OwnerDeviceCatalogProject {
+        curated_contributions_available: false,
         manifest_sha256: digest(&manifest).unwrap(),
         project: OnboardingDeviceReviewProject {
             manifest,

@@ -36,6 +36,7 @@ export function CompanyDeviceApproval({ initialCode, onLock }: { initialCode: st
   const [review, setReview] = useState<CompanyDeviceReview | null>(null);
   const [identity, setIdentity] = useState<string | null>(null);
   const [selection, setSelection] = useState<Record<string, boolean>>({});
+  const [contributions, setContributions] = useState<Record<string, boolean>>({});
   const [confirmation, setConfirmation] = useState<CompanyDeviceApprovalRequest | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [attempted, setAttempted] = useState(false);
@@ -57,7 +58,7 @@ export function CompanyDeviceApproval({ initialCode, onLock }: { initialCode: st
   const allowed = auth !== null && human(auth) && !auth.read_only;
   const expired = review !== null && now >= Date.parse(review.expires_at);
   const disabled = !allowed || busy || loading || expired;
-  function cancelReview() { generation.current++; request.current?.abort(); setLoading(false); setReview(null); setIdentity(null); setSelection({}); setError(""); }
+  function cancelReview() { generation.current++; request.current?.abort(); setLoading(false); setReview(null); setIdentity(null); setSelection({}); setContributions({}); setError(""); }
   async function currentHuman() {
     let a: AuthMeResponse;
     try { a = await getAuthMe(true); } catch { throw new Error("Human authentication unavailable. No approval is confirmed."); }
@@ -85,7 +86,7 @@ export function CompanyDeviceApproval({ initialCode, onLock }: { initialCode: st
       const m = p.project.manifest;
       if (!selection[key(m)]) continue;
       if (m.area === "trust" || !m.offline_allowed || !p.project.offline_available) return;
-      projects.push({ area: m.area, owner_instance_id: m.owner_instance_id, project_id: m.project_id, manifest_revision: m.revision, manifest_sha256: p.manifest_sha256, offline_confirmed: true });
+      projects.push({ area: m.area, owner_instance_id: m.owner_instance_id, project_id: m.project_id, manifest_revision: m.revision, manifest_sha256: p.manifest_sha256, offline_confirmed: true, ...(p.curated_contributions_available && contributions[key(m)] ? { contribution_confirmed: true } : {}) });
     }
     if (projects.length > 32) { setError("Select at most 32 exact owner projects for one device request."); return; }
     if (projects.length) { setConfirmation({ user_code: code, confirmed: true, projects }); setConfirmed(false); setError(""); }
@@ -117,8 +118,8 @@ export function CompanyDeviceApproval({ initialCode, onLock }: { initialCode: st
     finally { if (!controller.signal.aborted && version === generation.current) { setBusy(false); setConfirmed(false); } }
   }
   return <div className="app-shell"><header className="topbar"><h1>Memory Layer company device approval</h1></header><main className="panel-stack">
-    <section className="panel"><h2>Company-reviewed read-only offline access</h2>
-      <p>Verify the requesting device and exact company/owner project identities. This freezes reader-only offline grants; it does not install tools, provision agent identities or start synchronization.</p>
+    <section className="panel"><h2>Company project access</h2>
+      <p>Select projects for offline knowledge and optionally permit this device to upload locally curated changes. Corrections remain subject to the owning project's review.</p>
       {auth && human(auth) ? <p>Approving as {auth.principal.display_name}.</p> : <><p>Company approval requires an OIDC human browser session, never local-owner or service credentials.</p><a href={authLoginUrl(`/?device_code=${CODE.test(code) ? encodeURIComponent(code) : ""}&company_device=1`)}>Sign in to review this device</a></>}
       {auth?.read_only ? <p>This service is read-only. Company approval is disabled.</p> : null}
       <label>User code<input autoComplete="off" maxLength={9} value={code} disabled={busy || Boolean(confirmation)} onChange={e => { cancelReview(); setCode(e.target.value.toUpperCase()); }} /></label>
@@ -142,6 +143,7 @@ export function CompanyDeviceApproval({ initialCode, onLock }: { initialCode: st
             <p>{m.area} · project {m.project_id} · owner {m.owner_instance_id} · revision {m.revision} · reader only · manifest SHA-256 {p.manifest_sha256}</p>
             <p>Repository (text only): {m.repository_url}; branch {m.default_branch}; reviewed by {m.reviewed_by} at {m.reviewed_at}.</p>
             <p>{m.area === "trust" ? "Trust — remote-only; no offline copy" : selectable ? "Offline policy permits a retained read-only copy." : "Offline copy unavailable; cannot select."}</p>
+            {selectable && p.curated_contributions_available ? <label><input type="checkbox" aria-label={`Allow curated uploads for ${m.project_id}`} checked={Boolean(contributions[id])} disabled={disabled || Boolean(confirmation) || !selection[id]} onChange={e => setContributions(current => ({ ...current, [id]: e.target.checked }))} />Allow this device to synchronize locally curated changes. Raw captures and sessions stay local.</label> : null}
             <h3>Reviewed pinned tools</h3>{m.tools.length ? <ul>{m.tools.map((t, i) => <li key={i}>{t.name} · {t.version} · {t.url} · SHA-256 {t.sha256}</li>)}</ul> : <p>No reviewed tools.</p>}
             <h3>Reviewed model destinations</h3>{m.destinations.length ? <ul>{m.destinations.map((d, i) => <li key={i}>{d.name} · provider {d.provider_id} · destination {d.destination_id}</li>)}</ul> : <p>No reviewed destinations.</p>}
           </article>;
@@ -151,7 +153,7 @@ export function CompanyDeviceApproval({ initialCode, onLock }: { initialCode: st
       {confirmation ? <section className="panel" aria-label="Exact company device approval"><h2>Confirm exact retained copy</h2>
         <p>Company {review.company_id}; device {review.device_id}; request {review.request_id}; credential SHA-256 {review.credential_sha256}; expires {review.expires_at}.</p>
         <pre>{JSON.stringify(confirmation, null, 2)}</pre>
-        <p>Reader-only access; offline_confirmed grants retention of a shared copy. Revocation cannot recall delivered bytes. Closing this page does not cancel a request or undo an approval.</p>
+        <p>Selected projects retain an offline copy. Projects marked contribution_confirmed also permit curated uploads under current project permissions. Revocation stops future synchronization.</p>
         <label><input type="checkbox" checked={confirmed} disabled={disabled} onChange={e => setConfirmed(e.target.checked)} />I verified the device fingerprint, exact owner/project revisions and digests, and permit retained offline copies.</label>
         <button disabled={disabled || !confirmed} onClick={() => void approve()}>{attempted ? "Retry exact company approval" : "Approve selected company access"}</button>
         <button disabled={busy || attempted} onClick={() => { setConfirmation(null); setConfirmed(false); }}>Change company selection</button>
