@@ -52,7 +52,9 @@ def port(value):
 
 
 def metadata(value):
-    exact(value, {"schema_version", "company", "subscription", "bootstrap", "allow_loopback_development"})
+    exact(value, {"schema_version", "company", "subscription", "bootstrap", "allow_loopback_development"} | ({"replication_mode"} if "replication_mode" in value else set()))
+    if value.get("replication_mode", "shared_publications_v1") not in {"shared_publications_v1", "curated_project_v1"}:
+        raise Refused("unsupported device replication mode")
     if value["schema_version"] != 1 or type(value["allow_loopback_development"]) is not bool:
         raise Refused("unsupported subscription metadata")
     identifier(value["subscription"])
@@ -83,9 +85,19 @@ def metadata(value):
 
 
 def make_plan(source, *, prerequisites_only=False):
-    exact(source, {"schema_version", "root", "memory", "postgres", "pg_port", "areas", "subscriptions"})
-    if source["schema_version"] != 1:
+    exact(source, {"schema_version", "root", "memory", "postgres", "pg_port", "areas", "subscriptions"} | ({"curated_sync", "repositories"} if source.get("schema_version") == 2 else set()))
+    if type(source["schema_version"]) is not int or source["schema_version"] not in {1, 2}:
         raise Refused("unsupported operator schema")
+    if source["schema_version"] == 2:
+        if source["curated_sync"] is not True or not isinstance(source["repositories"], list) or not 1 <= len(source["repositories"]) <= 8:
+            raise Refused("curated native workflow requires exact selected repository routes")
+        seen_repositories = set()
+        for route in source["repositories"]:
+            exact(route, {"area", "repository", "project"})
+            repository = str(files.path(route["repository"]))
+            if route["area"] not in AREAS or not isinstance(route["project"], str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", route["project"]) or repository in seen_repositories:
+                raise Refused("duplicate repository or unsupported exact project route")
+            seen_repositories.add(repository)
     root = files.path(source["root"])
     if not root.parent.is_dir():
         raise Refused("existing current-user private operator parent prerequisite missing")
@@ -154,6 +166,11 @@ def make_plan(source, *, prerequisites_only=False):
         selections.append({"path": str(file), "metadata": value, "sha256": files.sha(file)})
     if not prerequisites_only and seen != {s["metadata"]["bootstrap"]["scope"]["area"] for s in selections}:
         raise Refused("each selected local area requires reviewed project subscription metadata")
+    if source["schema_version"] == 2:
+        if {r["area"] for r in source["repositories"]} != seen:
+            raise Refused("repository routing must cover exactly the selected areas")
+        if any(s["metadata"].get("replication_mode") != "curated_project_v1" for s in selections):
+            raise Refused("writable local workflow requires curated-project subscription profiles")
     if instances & {s["metadata"]["bootstrap"][key] for s in selections for key in ["device", "authority"]} or instances & {s["metadata"]["bootstrap"]["scope"]["owner"] for s in selections}:
         raise Refused("local area identities must not impersonate enrolled devices or remote owners/authorities")
     return {"input": source, "pins": pins, "selections": selections,
@@ -288,7 +305,7 @@ instance_id = "{area['instance_id']}"
 [service]
 bind_addr = "127.0.0.1:{area['api_port']}"
 api_token = "{secret['api_token']}"
-read_only = true
+read_only = {str(value['plan']['input']['schema_version'] == 1).lower()}
 [database]
 url = {json.dumps(url)}
 [background_work]
@@ -315,16 +332,25 @@ service_id = "memory-onboarding-{area['instance_id']}"
 enabled = false
 http_enabled = false
 [automation]
-enabled = false
+enabled = {str(value['plan']['input']['schema_version'] == 2).lower()}
 [embeddings]
 enabled = false
 create_enabled = false
 [features]
 llm_curation = false
 [offline]
-enabled = false
+enabled = {str(value['plan']['input']['schema_version'] == 2).lower()}
 path = {json.dumps(str(root / (name + '.offline.sqlite')), ensure_ascii=False)}
 '''.encode()
+
+
+def routing(value):
+    root = state_root(value)
+    areas = {a["name"]: {"instance_id": a["instance_id"], "config": str(root / (a["name"] + ".toml"))} for a in value["plan"]["input"]["areas"]}
+    # Unknown repositories must not fall into another selected area's database.
+    areas.setdefault("general", {"instance_id": value["request_id"], "config": None})
+    return {"version": 1, "default_area": "general", "areas": areas,
+            "routes": value["plan"]["input"]["repositories"]}
 
 
 def database_url(value, area, password):
@@ -337,6 +363,8 @@ def verify_files(value):
     if files.read(root / "receipt.json") != receipt:
         raise Refused("operator root receipt changed; no adoption/reinitialization")
     secret = secrets_at(value)
+    if value["plan"]["input"]["schema_version"] == 2 and files.read(root / "area-routing.json") != routing(value):
+        raise Refused("selected repository routing changed; no fallback")
     for area in value["plan"]["input"]["areas"]:
         if files.bytes_at(root / (area["name"] + ".toml")) != area_config(value, area, secret["areas"][area["name"]]):
             raise Refused("owned area settings changed; preserve and inspect")
@@ -392,6 +420,8 @@ def apply(journal, digest, confirm, native):
             files.missing(root / "postgresql.conf", b"listen_addresses = '127.0.0.1'\npassword_encryption = 'scram-sha-256'\nshared_preload_libraries = ''\n")
             for area in plan["input"]["areas"]:
                 files.missing(root / (area["name"] + ".toml"), area_config(value, area, secret["areas"][area["name"]]))
+            if plan["input"]["schema_version"] == 2:
+                files.missing(root / "area-routing.json", files.encoded(routing(value)))
             for selection in plan["selections"]:
                 profile = dict(selection["metadata"])
                 name = profile["bootstrap"]["scope"]["area"]
@@ -438,6 +468,9 @@ def apply(journal, digest, confirm, native):
         for selection in plan["selections"]:
             subscription = selection["metadata"]["subscription"]
             stage(journal, value, "sync_agent:" + subscription, lambda: job(value, native, "sync", subscription, wrapper(value, "run-sync", "--journal", str(journal), "--subscription", subscription), 300), always=True)
+        if plan["input"]["schema_version"] == 2:
+            for index, route in enumerate(plan["input"]["repositories"]):
+                stage(journal, value, "watcher_agent:" + str(index), lambda index=index: job(value, native, "watcher", str(index), wrapper(value, "run-watcher", "--journal", str(journal), "--repository-index", str(index))), always=True)
         return value
 
 
@@ -455,6 +488,13 @@ def run_job(journal, mode, selected, native):
         if selected not in {a["name"] for a in plan["input"]["areas"]}:
             raise Refused("area not in exact prepared plan")
         args = [plan["input"]["memory"]["path"], "--config", str(root / (selected + ".toml")), "service", "run"]
+    elif mode == "run-watcher":
+        if plan["input"]["schema_version"] != 2:
+            raise Refused("legacy read-only onboarding cannot activate watchers")
+        if not isinstance(selected, str) or not selected.isdigit() or int(selected) >= len(plan["input"]["repositories"]):
+            raise Refused("watcher repository is not in exact selected plan")
+        route = plan["input"]["repositories"][int(selected)]
+        args = [plan["input"]["memory"]["path"], "--config", str(root / (route["area"] + ".toml")), "watcher", "run", "--project", route["project"], "--repo-root", route["repository"]]
     else:
         if selected not in {s["metadata"]["subscription"] for s in plan["selections"]}:
             raise Refused("subscription not in exact prepared plan")
@@ -489,11 +529,12 @@ def main():
     first.add_argument("--no-browser", action="store_true")
     first.add_argument("--allow-loopback-development", action="store_true")
     first.add_argument("--prepare-only", action="store_true", help="save selected inputs without cloning or starting local services")
+    first.add_argument("--curated-sync", action="store_true", help="review full curated project replication and local capture; requires compatible device contributions support")
     agents = commands.add_parser("journey-agents")
     agents.add_argument("--journal", required=True, type=Path)
     agents.add_argument("--allow-offline", action="store_true", help="explicit bounded cached model-disclosure choice; observed denial always fences it")
     agents.add_argument("--renew-grant", help="explicitly replace this denied/expired agent UUID; retains history and requires fresh browser approval")
-    for name, option in [("run-postgres", None), ("run-service", "--area"), ("run-sync", "--subscription")]:
+    for name, option in [("run-postgres", None), ("run-service", "--area"), ("run-sync", "--subscription"), ("run-watcher", "--repository-index")]:
         child = commands.add_parser(name)
         child.add_argument("--journal", required=True, type=Path)
         if option:
@@ -505,7 +546,7 @@ def main():
             onboarding_first_run.run(company=args.company, name=args.name, runtime=args.runtime, memory=args.memory,
                 state=args.state, workspace_parent=args.workspace_parent, native=Native(), no_browser=args.no_browser,
                 allow_loopback=args.allow_loopback_development, pg_port=args.pg_port, api_base_port=args.api_base_port,
-                prepare_only=args.prepare_only)
+                prepare_only=args.prepare_only, curated_sync=args.curated_sync)
             return
         if args.command == "journey-agents":
             import onboarding_agents
@@ -525,7 +566,7 @@ def main():
         elif args.command == "status":
             value = inspect(args.journal)
         else:
-            run_job(args.journal, args.command, getattr(args, "area", getattr(args, "subscription", None)), Native())
+            run_job(args.journal, args.command, getattr(args, "area", getattr(args, "subscription", getattr(args, "repository_index", None))), Native())
             return
         print(json.dumps(value, indent=2, sort_keys=True))
         print("Metadata/stages only: native Mac acceptance, signed prerequisites and self-contained distribution remain unverified. Agent identity provisioning is not performed.")

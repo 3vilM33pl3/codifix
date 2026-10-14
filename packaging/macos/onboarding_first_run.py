@@ -129,11 +129,13 @@ def native_user():
 
 def run(*, company, name, runtime, memory, state, workspace_parent, native, no_browser=False,
         allow_loopback=False, pg_port=55432, api_base_port=55440, prepare_only=False, question=ask,
-        memory_factory=journey.Memory, journey_runner=journey.run):
+        memory_factory=journey.Memory, journey_runner=journey.run, curated_sync=False):
     # Test dependencies are Python-only injections. The command-line has no
     # platform/Keychain/architecture bypass flag and no arbitrary executable hook.
     native_user()
     bound = bindings(company, name, no_browser, allow_loopback, runtime, memory, state, workspace_parent, pg_port, api_base_port)
+    if curated_sync:
+        bound["curated_sync"] = True
     descriptor, installed = prerequisite(runtime, memory, native)
     state, workspace_parent = files.path(state), files.path(workspace_parent)
     if not state.parent.is_dir() or not workspace_parent.is_dir():
@@ -182,6 +184,15 @@ def run(*, company, name, runtime, memory, state, workspace_parent, native, no_b
             cli.login()
             _, text = native.command(cli.args(["projects", "available", *cli.company()]))
             picked = choose(catalog(text), workspace_parent, question=question)
+            if curated_sync:
+                projects = catalog(text)
+                native_input.update(schema_version=2, curated_sync=True, repositories=[
+                    {"area": item["selection"]["area"], "repository": item["workspace"], "project": next(
+                        entry["manifest"]["project"] for entry in projects
+                        if entry["manifest"]["project_id"] == item["selection"]["project_id"]
+                        and entry["manifest"]["entry"]["area"] == item["selection"]["area"]
+                        and entry["manifest"]["entry"]["owner_instance_id"] == item["selection"]["owner_instance_id"])}
+                    for item in picked])
             areas = sorted({item["selection"]["area"] for item in picked})
             native_input["areas"] = [{"name": area, "instance_id": str(uuid.uuid4()), "api_port": api_base_port + index} for index, area in enumerate(areas)]
             source = copy.deepcopy(skeleton)

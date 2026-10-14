@@ -50,7 +50,7 @@ def plan(source, journal):
         raise Refused("bounded public device name without controls required")
     if not isinstance(source["projects"], list) or not 1 <= len(source["projects"]) <= 8:
         raise Refused("one to eight explicit project output slots required")
-    operator.exact(source["native"], {"schema_version", "root", "memory", "postgres", "pg_port", "areas"})
+    operator.exact(source["native"], {"schema_version", "root", "memory", "postgres", "pg_port", "areas"} | ({"curated_sync", "repositories"} if source["native"].get("schema_version") == 2 else set()))
     journal = files.path(journal)
     private_parent(journal)
     outputs, workspaces = [journal, Path(str(journal) + ".memory-lock")], []
@@ -178,8 +178,11 @@ class Memory:
 
     def subscription_args(self, receipt, output):
         manifest = receipt["manifest"]
-        return ["projects", "subscription", *self.company(), "--project", manifest["project_id"], "--area", manifest["entry"]["area"],
+        args = ["projects", "subscription", *self.company(), "--project", manifest["project_id"], "--area", manifest["entry"]["area"],
                 "--owner-instance", manifest["entry"]["owner_instance_id"], "--revision", manifest["revision"], "--output", output]
+        if self.source["native"].get("curated_sync"):
+            args.extend(["--replication-mode", "curated_project_v1"])
+        return args
 
     def subscription_preview(self, receipt, output):
         _, text = self.native.command(self.args(self.subscription_args(receipt, output)))
@@ -259,11 +262,15 @@ def public_manifest(manifest, *, offline=True):
 
 
 def bootstrap_preview(value, receipt, source, output):
-    operator.exact(value, {"company", "bootstrap", "bootstrap_sha256", "output", "contains_database_credentials", "creates_services", "downloads_knowledge"})
+    operator.exact(value, {"company", "bootstrap", "bootstrap_sha256", "output", "contains_database_credentials", "creates_services", "downloads_knowledge"} | ({"replication_mode"} if "replication_mode" in value else set()))
+    if source["native"].get("curated_sync") and value.get("replication_mode") != "curated_project_v1":
+        raise Refused("curated local workflow requires an explicitly approved curated-project feed")
     if value["company"] != source["company"] or value["output"] != output or any(value[k] is not False for k in ["contains_database_credentials", "creates_services", "downloads_knowledge"]):
         raise Refused("subscription preview differs from the exact output/disclosure scope")
     operator.pin(value["bootstrap_sha256"])
     sample = {"schema_version": 1, "company": value["company"], "subscription": str(uuid.uuid4()), "bootstrap": value["bootstrap"], "allow_loopback_development": source["allow_loopback_development"]}
+    if "replication_mode" in value:
+        sample["replication_mode"] = value["replication_mode"]
     operator.metadata(sample)
     bootstrap = value["bootstrap"]
     scope = bootstrap["scope"]
@@ -309,6 +316,8 @@ def publish_subscription(memory, slot, receipt, preview, source, entry):
     memory.subscription_confirm(receipt, slot["subscription_output"], preview["bootstrap_sha256"])
     subscription = files.read(slot["subscription_output"], 64 * 1024)
     operator.metadata(subscription)
+    if subscription.get("replication_mode", "shared_publications_v1") != preview.get("replication_mode", "shared_publications_v1"):
+        raise Refused("subscription feed changed after review; no native provisioning")
     if subscription["company"] != source["company"] or subscription["bootstrap"] != preview["bootstrap"] or subscription["allow_loopback_development"] != source["allow_loopback_development"] or entry["subscription"] is not None and entry["subscription"] != subscription:
         raise Refused("subscription receipt identity changed; no native provisioning")
     entry["subscription"] = subscription

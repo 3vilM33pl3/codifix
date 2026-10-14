@@ -81,6 +81,31 @@ The builder/runtime hash tests use synthetic files. No usable native dependency
 bundle or clean-Mac acceptance result is claimed. The lightweight package still
 uses the explicit installed prerequisites below and has no runtime launcher.
 
+### Curated project synchronization and local work
+
+For a compatible company/device service, add `--curated-sync` to first-run. This
+selects `curated_project_v1` explicitly in each reviewed subscription and binds
+native schema 2 to the exact selected repository, project and area. An older
+service or CLI that cannot issue this profile blocks provisioning before local
+services are created. Existing schema-1 journeys remain read-only.
+
+Schema 2 enables local capture and the offline queue in each selected area and
+installs one named watcher LaunchAgent per selected repository. These jobs use
+the exact area configuration and repository path; they do not discover or start
+watchers for unrelated repositories. The private `area-routing.json` is under
+the native state root and can be used with `memory --area-routing PATH` for
+interactive commands. Missing General remains unavailable rather than routing
+unknown work to Workshop or Homelab. Paid curation and model execution remain
+disabled until separately configured through the normal application settings.
+
+Watcher stages, service stages and five-minute synchronization jobs retain their
+immutable journal identities across interruption and reboot. Rerun the same
+first-run invocation to recover an interrupted installation. Existing loaded
+jobs are not restarted or duplicated. Changes to routing, area configuration,
+subscription mode or reviewed runtime pins require explicit repair rather than
+silently changing an existing journey. The native Mac acceptance demonstration
+must still verify capture, curated contributions, restart and offline replay.
+
 ## Inputs and preview
 
 First enroll the device and produce credential-free, current reviewed selections

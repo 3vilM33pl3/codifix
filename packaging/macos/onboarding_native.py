@@ -65,6 +65,8 @@ class Native:
                     "--output", selected["path"]]
             if value.get("allow_loopback_development"):
                 args.append("--allow-loopback")
+            if value.get("replication_mode"):
+                args.extend(["--replication-mode", value["replication_mode"]])
             _, output = self.command(args)
             try:
                 preview = json.loads(output)
@@ -72,6 +74,10 @@ class Native:
                 raise Refused("subscription preview unreadable; output suppressed, no confirmation") from None
             expected = {"company", "bootstrap", "bootstrap_sha256", "output",
                         "contains_database_credentials", "creates_services", "downloads_knowledge"}
+            if value.get("replication_mode"):
+                expected.add("replication_mode")
+                if preview.get("replication_mode") != value["replication_mode"]:
+                    raise Refused("subscription replication mode changed; no local provisioning")
             if not isinstance(preview, dict) or set(preview) != expected or preview["company"] != value["company"] or preview["bootstrap"] != value["bootstrap"] or preview["output"] != selected["path"] or any(preview[key] is not False for key in ["contains_database_credentials", "creates_services", "downloads_knowledge"]) or not isinstance(preview["bootstrap_sha256"], str) or not re.fullmatch("[a-f0-9]{64}", preview["bootstrap_sha256"]):
                 raise Refused("current subscription preview differs from exact prepared metadata; no confirmation")
             # Use only the CLI's current preview digest. Do not reconstruct a
