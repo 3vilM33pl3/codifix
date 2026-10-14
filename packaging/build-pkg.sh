@@ -213,6 +213,10 @@ if [[ "$STAGE_PARENT" != /* || ! -d "$STAGE_PARENT" ]]; then
   echo "Temporary staging parent must be an existing absolute directory." >&2
   exit 1
 fi
+# macOS commonly supplies /var/folders through TMPDIR, while /var aliases
+# /private/var. Canonicalize only this build-owned temporary parent before
+# creating a new stage; installed/user data path validation stays unchanged.
+STAGE_PARENT="$(cd "$STAGE_PARENT" && pwd -P)"
 STAGE_DIR="$(mktemp -d "${STAGE_PARENT%/}/memory-layer-macos-pkg.XXXXXXXX")"
 # Only clean the private directory returned by mktemp, never a workspace stage.
 case "$STAGE_DIR" in

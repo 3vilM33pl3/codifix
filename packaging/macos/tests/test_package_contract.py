@@ -3,8 +3,10 @@
 import os
 from pathlib import Path
 import shutil
+import shlex
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 import test_runtime_bundle
@@ -18,7 +20,7 @@ class PackageContract(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="memory-pkg-contract-")
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.tools = self.root / "tools"
         self.tools.mkdir()
         self.env = dict(os.environ, PATH=f"{self.tools}:/usr/bin:/bin",
@@ -60,6 +62,7 @@ class PackageContract(unittest.TestCase):
         self.script("uname", f'if [[ "$1" == -s ]]; then echo {"Darwin" if darwin else "Linux"}; else echo x86_64; fi\n')
         self.script("cargo", 'printf "%s\\n" "$@" >> "$TRACE"\n')
         self.script("npm", 'printf "npm %s\\n" "$*" >> "$TRACE"\n')
+        self.script("python3", f'exec {shlex.quote(sys.executable)} "$@"\n')
         if pkgbuild:
             self.script("pkgbuild", '''payload=""; scripts=""; output=""
 while [[ $# -gt 0 ]]; do
@@ -97,8 +100,22 @@ touch "$output"
 
     def test_missing_tool_fails_before_staging(self):
         repo, trace = self.fixture(pkgbuild=False)
+        # A real Darwin host has pkgbuild in /usr/bin. Hide it deliberately
+        # instead of accidentally executing Apple's tool in a synthetic test.
+        for name in ("dirname", "awk", "mktemp", "install", "cp", "ln", "find", "chmod", "mkdir", "rm", "du", "cut"):
+            (self.tools / name).symlink_to(shutil.which(name))
+        self.env["PATH"] = str(self.tools)
         result = self.assert_no_build(repo, trace)
         self.assertIn("tool unavailable: pkgbuild", result.stderr)
+
+    def test_aliased_temporary_parent_is_canonicalized(self):
+        repo, _ = self.fixture()
+        alias = self.root / "temp-alias"
+        alias.symlink_to(self.env["TMPDIR"], target_is_directory=True)
+        self.env["TMPDIR"] = str(alias)
+        result = self.run_script(repo / "packaging/build-pkg.sh")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(list(alias.iterdir()), [])
 
     def test_missing_flag_value_fails_before_build(self):
         repo, trace = self.fixture()

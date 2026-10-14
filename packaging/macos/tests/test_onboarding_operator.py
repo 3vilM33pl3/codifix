@@ -461,7 +461,8 @@ class OperatorContract(unittest.TestCase):
             def command(self, args, **kwargs):
                 calls.append(args)
                 raise files.Refused("synthetic lipo architecture mismatch")
-        with patch.object(native_module.sys, "platform", "darwin"), patch.object(os, "getuid", return_value=1000), patch.object(os, "geteuid", return_value=1000), patch.object(native_module.platform, "machine", return_value="arm64"):
+        fixture_uid = os.getuid() or 1000
+        with patch.object(native_module.sys, "platform", "darwin"), patch.object(os, "getuid", return_value=fixture_uid), patch.object(os, "geteuid", return_value=fixture_uid), patch.object(native_module.platform, "machine", return_value="arm64"):
             with self.assertRaisesRegex(files.Refused, "architecture mismatch"):
                 Mismatched().preflight(value["plan"])
         self.assertEqual(calls[0][:3], ["/usr/bin/lipo", "-verify_arch", "arm64"])
