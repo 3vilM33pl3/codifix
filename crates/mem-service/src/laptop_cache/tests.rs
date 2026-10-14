@@ -191,6 +191,41 @@ async fn curated_replica_search_retains_source_identity_without_inventing_public
         answer.results.is_empty(),
         "withdrawn accepted source must not reappear as local knowledge"
     );
+    // A tombstone is a content version; canonical state may remain active.
+    // After pruning the accepted source, that newer downloaded version wins.
+    let tombstone_id = Uuid::new_v4();
+    let tombstone = DeviceReplicaRecord::MemoryVersion(DeviceMemoryVersion {
+        id: tombstone_id,
+        canonical_id: canonical,
+        version: 4,
+        tombstone: true,
+        text: String::new(),
+        summary: String::new(),
+        memory_type: MemoryType::DomainFact,
+        scope: "project".into(),
+        author: "original-author".into(),
+        authored_at: now,
+        updated_at: now,
+        tags: vec![],
+        unavailable_source_ids: vec![],
+    });
+    sqlx::query(
+        "INSERT INTO device_replica_records(subscription,record_key,record) VALUES($1,$2,$3)",
+    )
+    .bind(binding.subscription_id)
+    .bind(tombstone.key())
+    .bind(json!(tombstone))
+    .execute(&f.db.pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE device_replica_records SET record=jsonb_set(jsonb_set(record,'{value,status}','\"active\"'::jsonb),'{value,current_version_id}',$3) WHERE subscription=$1 AND record_key=$2").bind(binding.subscription_id).bind(format!("state:{canonical}")).bind(json!(tombstone_id)).execute(&f.db.pool).await.unwrap();
+    let answer = crate::laptop_query::query(&f.state, &actor, peer().0, &request)
+        .await
+        .unwrap();
+    assert!(
+        answer.results.is_empty(),
+        "downloaded current tombstone must suppress the pruned accepted local copy"
+    );
 }
 async fn body(response: Response) -> Value {
     assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
