@@ -116,7 +116,7 @@ def validate_manifest(value, arch):
         raise Refused("runtime requires bounded unique pgvector SQL paths")
     control = relative(pg["vector_control"])
     library = relative(pg["vector_library"])
-    if Path(control).name != "vector.control" or Path(library).name != "vector.so":
+    if Path(control).name != "vector.control" or Path(library).name not in {"vector.so", "vector.dylib"}:
         raise Refused("runtime pgvector control/library layout unsupported")
     for name in pg["vector_sql"]:
         relative(name)

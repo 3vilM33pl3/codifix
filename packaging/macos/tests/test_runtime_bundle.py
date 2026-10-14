@@ -64,6 +64,18 @@ class RuntimeBundle(unittest.TestCase):
     def validate(self):
         return bundle.validate_bundle(self.source, self.manifest, "x86_64")
 
+    def test_native_dylib_extension_is_hash_bound(self):
+        old, new = "postgres/lib/vector.so", "postgres/lib/vector.dylib"
+        (self.source / old).rename(self.source / new)
+        self.value["files"][new] = self.value["files"].pop(old)
+        self.value["postgres"]["vector_library"] = new
+        self.save()
+        self.validate()
+        self.value["postgres"]["vector_library"] = "postgres/lib/other.dylib"
+        self.save()
+        with self.assertRaisesRegex(Refused, "layout unsupported"):
+            self.validate()
+
     def test_stage_exact_immutable_tree_and_prerequisite_descriptor(self):
         result = bundle.stage_bundle(self.source, self.manifest, "x86_64", self.payload)
         expected = self.payload / self.value["install_prefix"].lstrip("/")

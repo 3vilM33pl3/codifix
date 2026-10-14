@@ -51,7 +51,7 @@ class Native:
                 raise Refused("PostgreSQL tools are not the same reviewed major")
         share = self.command([Path(pg["bin_dir"]) / "pg_config", "--sharedir"])[1]
         lib = self.command([Path(pg["bin_dir"]) / "pg_config", "--pkglibdir"])[1]
-        if str(Path(share) / "extension/vector.control") != pg["vector_control"] or str(Path(lib) / "vector.so") != pg["vector_library"]:
+        if str(Path(share) / "extension/vector.control") != pg["vector_control"] or pg["vector_library"] not in {str(Path(lib) / name) for name in ("vector.so", "vector.dylib")}:
             raise Refused("pgvector does not belong to the selected installed PostgreSQL distribution")
 
     def review(self, plan):

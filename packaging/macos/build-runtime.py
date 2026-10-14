@@ -51,6 +51,20 @@ def run(argv, cwd, env):
     subprocess.run(list(map(str, argv)), cwd=cwd, env=env, check=True)
 
 
+def vector_commands(pg, prefix, stage, jobs):
+    # pg_config relocates its answers to the staged executable. Build against
+    # that tree, but give installation the final directories before DESTDIR.
+    flags = [f"PG_CONFIG={pg}/bin/pg_config", f"PGXS={pg}/lib/pgxs/src/makefiles/pgxs.mk"]
+    build = ["make", f"-j{jobs}", "OPTFLAGS=", *flags,
+             f"includedir={pg}/include", f"includedir_server={pg}/include/server"]
+    installed = f"{prefix}/postgres"
+    install = ["make", "install", f"DESTDIR={stage}", *flags,
+               f"pkglibdir={installed}/lib", f"datadir={installed}/share",
+               f"docdir={installed}/share/doc", f"includedir={installed}/include",
+               f"includedir_server={installed}/include/server"]
+    return build, install
+
+
 def flatten_links(root):
     # Upstream executable aliases become independent hash-bound regular files.
     for file in sorted(root.rglob("*")):
@@ -158,9 +172,10 @@ def produce(args):
             run(["make", "install", f"DESTDIR={stage}"], source, env)
         elif key == "vector":
             pg = root / "postgres"
-            flags = [f"PG_CONFIG={pg}/bin/pg_config", f"PGXS={pg}/lib/pgxs/src/makefiles/pgxs.mk", f"includedir={pg}/include", f"includedir_server={pg}/include/server"]
-            run(["make", f"-j{args.jobs}", "OPTFLAGS=", *flags], source, env)
-            run(["make", "install", f"DESTDIR={stage}", *flags], source, env)
+            for command in vector_commands(pg, prefix, stage, args.jobs):
+                run(command, source, env)
+            if not (pg / "lib/vector.dylib").is_file() or not (pg / "share/extension/vector.control").is_file():
+                raise ValueError("pgvector installation did not produce native files at the exact staged prefix")
         else:
             run(["./configure", f"--prefix={prefix}/python", "--without-ensurepip", "--disable-test-modules"], source, env)
             run(["make", f"-j{args.jobs}"], source, env)
@@ -184,7 +199,7 @@ def produce(args):
             file.chmod(0o755)
     value = {"schema_version": 1, "bundle_id": bundle_id, "arch": arch, "install_prefix": prefix,
              "relocatable_for_prefix": True, "python": {"path": "python/bin/python3", "version": pinned["python"]["version"]},
-             "postgres": {"bin_dir": "postgres/bin", "version": pinned["postgres"]["version"], "vector_library": "postgres/lib/vector.so", "vector_control": "postgres/share/extension/vector.control", "vector_version": pinned["vector"]["version"], "vector_sql": sorted(n for n in entries if n.startswith("postgres/share/extension/vector--") and n.endswith(".sql"))},
+             "postgres": {"bin_dir": "postgres/bin", "version": pinned["postgres"]["version"], "vector_library": "postgres/lib/vector.dylib", "vector_control": "postgres/share/extension/vector.control", "vector_version": pinned["vector"]["version"], "vector_sql": sorted(n for n in entries if n.startswith("postgres/share/extension/vector--") and n.endswith(".sql"))},
              "files": entries, "notices": sorted(n for n in entries if n.startswith("notices/"))}
     bundle.validate_manifest(value, arch)
     manifest.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")

@@ -17,6 +17,17 @@ spec.loader.exec_module(producer)
 
 
 class RuntimeProducer(unittest.TestCase):
+    def test_vector_destdir_is_applied_once(self):
+        prefix = "/usr/local/share/memory-layer/runtime/fixture"
+        stage = Path("/private/build/stage")
+        pg = stage / prefix.lstrip("/") / "postgres"
+        build, install = producer.vector_commands(pg, prefix, stage, 4)
+        self.assertIn(f"includedir_server={pg}/include/server", build)
+        self.assertIn(f"DESTDIR={stage}", install)
+        for key, suffix in [("pkglibdir", "lib"), ("datadir", "share"), ("includedir_server", "include/server")]:
+            self.assertIn(f"{key}={prefix}/postgres/{suffix}", install)
+            self.assertFalse(any(arg.startswith(f"{key}={stage}") for arg in install))
+
     def test_pinned_sources_and_supported_prefix(self):
         pins = producer.sources(MACOS / "runtime-sources.json")
         self.assertEqual(pins["postgres"]["version"], "17.11")
