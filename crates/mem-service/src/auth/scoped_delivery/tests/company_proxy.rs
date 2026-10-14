@@ -26,7 +26,7 @@ async fn observe(
     assert!(!request.headers().contains_key(header::COOKIE));
     observed.seen.lock().unwrap().push(path.clone());
     let mut response = next.run(request).await;
-    if path.ends_with("/snapshot") {
+    if path.ends_with("/snapshot") || path.ends_with("/replica") {
         let hook = observed.revoke.lock().unwrap().take();
         if let Some((pool, human)) = hook {
             sqlx::query("UPDATE auth_principals SET disabled_at=now() WHERE id=$1")
@@ -38,10 +38,10 @@ async fn observe(
         let corrupt = std::mem::take(&mut *observed.corrupt.lock().unwrap());
         if corrupt && response.status().is_success() {
             let (parts, body) = response.into_parts();
-            let mut signed: SignedProjectPage =
+            let mut signed: serde_json::Value =
                 serde_json::from_slice(&axum::body::to_bytes(body, 4 * 1024 * 1024).await.unwrap())
                     .unwrap();
-            signed.signature[0] ^= 1;
+            signed["signature"][0] = json!(signed["signature"][0].as_u64().unwrap() ^ 1);
             response = Response::from_parts(
                 parts,
                 axum::body::Body::from(serde_json::to_vec(&signed).unwrap()),
@@ -65,6 +65,9 @@ struct CompanyFixture {
 }
 impl CompanyFixture {
     async fn new(n: u8) -> Option<Self> {
+        Self::with_contributions(n, false).await
+    }
+    async fn with_contributions(n: u8, contribution_confirmed: bool) -> Option<Self> {
         let mut owner = DeliveryFixture::new(n).await?;
         let (delegate, example) =
             super::super::super::company_device_delivery::tests::setup(&mut owner.base).await;
@@ -167,7 +170,7 @@ impl CompanyFixture {
                 manifest_revision: selected.project.manifest.revision,
                 manifest_sha256: selected.manifest_sha256.clone(),
                 offline_confirmed: true,
-                contribution_confirmed: false,
+                contribution_confirmed,
             }],
         };
         let Json(result) = super::super::super::company_devices::approve(
@@ -247,6 +250,154 @@ impl CompanyFixture {
         self.company.db.cleanup().await.unwrap();
         self.owner.close().await;
     }
+}
+
+#[tokio::test]
+async fn company_private_replica_delivers_unpublished_curated_rows_and_rechecks_access() {
+    use mem_federation::device_replica::DeviceReplicaRequest;
+    use mem_federation_runtime::SignedDeviceReplicaPage;
+    let Some(f) = CompanyFixture::with_contributions(129, true).await else {
+        return;
+    };
+    let response = f.http("GET", &f.path("subscription"), None).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let bootstrap: mem_federation_runtime::DeviceProjectSubscription = serde_json::from_slice(
+        &axum::body::to_bytes(response.into_body(), 65536)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    let memory = Uuid::new_v4();
+    sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,FALSE,'UNPUBLISHED_CURATED_SENTINEL','curated','project','project',3,0.8,now(),now(),to_tsvector('simple','curated'))")
+        .bind(memory).bind(f.owner.base.project).execute(&f.owner.base.db.pool).await.unwrap();
+    sqlx::query("INSERT INTO memory_sources(id,memory_entry_id,file_path,source_kind,excerpt,created_at) VALUES($1,$2,'/PRIVATE_PATH','file','RAW_SESSION_SENTINEL',now())").bind(Uuid::new_v4()).bind(memory).execute(&f.owner.base.db.pool).await.unwrap();
+    let request = DeviceReplicaRequest {
+        schema_version: 1,
+        nonce: Uuid::new_v4(),
+        device: bootstrap.device,
+        scope: bootstrap.scope.clone(),
+        catalog_revision: bootstrap.catalog_revision,
+        after: 0,
+        through: None,
+        limit: 32,
+    };
+    let response = f
+        .http("POST", &f.path("replica"), Some(json!(request)))
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+    let bytes = axum::body::to_bytes(response.into_body(), 4 * 1024 * 1024)
+        .await
+        .unwrap();
+    assert!(String::from_utf8_lossy(&bytes).contains("UNPUBLISHED_CURATED_SENTINEL"));
+    assert!(!String::from_utf8_lossy(&bytes).contains("RAW_SESSION_SENTINEL"));
+    assert!(!String::from_utf8_lossy(&bytes).contains("/PRIVATE_PATH"));
+    let signed: SignedDeviceReplicaPage = serde_json::from_slice(&bytes).unwrap();
+    bootstrap
+        .validate()
+        .unwrap()
+        .verify_device_replica_page(&signed, &request, bootstrap.authority)
+        .unwrap();
+    let contribution = mem_record::CuratedDeviceContribution {
+        schema_version: 2,
+        operation_id: Uuid::new_v4(),
+        local_memory_id: Uuid::new_v4(),
+        authored_at: chrono::Utc::now(),
+        binding: mem_record::LaptopContributionBinding {
+            scope: mem_record::LaptopContributionScope {
+                company_id: bootstrap.scope.company,
+                area: mem_record::OnboardingArea::Workshop,
+                owner_instance_id: bootstrap.scope.owner.as_uuid(),
+                project_id: bootstrap.scope.project,
+                space_id: bootstrap.scope.space.as_uuid(),
+            },
+            device_id: bootstrap.device,
+            manifest_revision: bootstrap.catalog_revision as i64,
+            manifest_sha256: f.approval.projects[0].manifest_sha256.clone(),
+        },
+        change: mem_record::CuratedDeviceChange::Add {
+            content: mem_record::CuratedDeviceContent {
+                canonical_text: "LAPTOP_CURATED_ADDITION".into(),
+                summary: "local addition".into(),
+                memory_type: mem_record::MemoryType::Project,
+                importance: 3,
+                confidence: 0.8,
+            },
+        },
+    };
+    let mut saved = None;
+    for _ in 0..2 {
+        let response = f
+            .http("POST", &f.path("contributions"), Some(json!(contribution)))
+            .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let receipt: mem_record::DeviceContributionReceipt = serde_json::from_slice(
+            &axum::body::to_bytes(response.into_body(), 65536)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.outcome,
+            mem_record::DeviceContributionOutcome::Accepted
+        );
+        if let Some(previous) = &saved {
+            assert_eq!(previous, &receipt);
+        }
+        saved = Some(receipt);
+    }
+    let mut next = request.clone();
+    next.nonce = Uuid::new_v4();
+    next.after = signed.claims.page.next;
+    let response = f.http("POST", &f.path("replica"), Some(json!(next))).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), 4 * 1024 * 1024)
+        .await
+        .unwrap();
+    assert!(String::from_utf8_lossy(&bytes).contains("LAPTOP_CURATED_ADDITION"));
+    let delta: SignedDeviceReplicaPage = serde_json::from_slice(&bytes).unwrap();
+    bootstrap
+        .validate()
+        .unwrap()
+        .verify_device_replica_page(&delta, &next, bootstrap.authority)
+        .unwrap();
+    let mut wrong = request.clone();
+    wrong.scope.project = Uuid::new_v4();
+    assert_eq!(
+        f.http("POST", &f.path("replica"), Some(json!(wrong)))
+            .await
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    *f.observed.corrupt.lock().unwrap() = true;
+    let response = f
+        .http("POST", &f.path("replica"), Some(json!(request)))
+        .await;
+    assert!(!response.status().is_success());
+    *f.observed.revoke.lock().unwrap() = Some((f.company.db.pool.clone(), f.company.human.id));
+    let response = f
+        .http("POST", &f.path("replica"), Some(json!(request)))
+        .await;
+    assert!(!response.status().is_success());
+    // Restore only this synthetic company principal, then revoke at the owner
+    // before the next transfer. Revocation cannot recall already transmitted bytes.
+    sqlx::query("UPDATE auth_principals SET disabled_at=NULL WHERE id=$1")
+        .bind(f.company.human.id)
+        .execute(&f.company.db.pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE auth_principals SET disabled_at=now() WHERE id=$1")
+        .bind(f.owner.base.human.id)
+        .execute(&f.owner.base.db.pool)
+        .await
+        .unwrap();
+    assert!(
+        !f.http("POST", &f.path("replica"), Some(json!(request)))
+            .await
+            .status()
+            .is_success()
+    );
+    f.close().await;
 }
 
 #[tokio::test]

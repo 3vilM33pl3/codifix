@@ -239,6 +239,27 @@ async fn register(
     )
     .into_response()
 }
+async fn private_replica(
+    State(fake): State<FakeGateway>,
+    headers: axum::http::HeaderMap,
+    Json(page): Json<mem_federation::device_replica::DeviceReplicaPage>,
+) -> Response {
+    assert_eq!(
+        headers.get(header::AUTHORIZATION).unwrap(),
+        "Bearer synthetic-owner-token-that-is-not-a-device-token"
+    );
+    let authority = fake
+        .store
+        .authorize_device_replica_attestation(fake.fence, fake.owner, &page)
+        .await
+        .unwrap();
+    Json(
+        fake.security
+            .sign_device_replica_page(authority, page)
+            .unwrap(),
+    )
+    .into_response()
+}
 async fn page(
     State(fake): State<FakeGateway>,
     headers: axum::http::HeaderMap,
@@ -335,6 +356,10 @@ impl DeliveryFixture {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
         let router = axum::Router::new()
+            .route(
+                "/v1/projects/device-replica/attest",
+                axum::routing::post(private_replica),
+            )
             .route("/v1/projects/register", axum::routing::post(register))
             .route("/v1/projects/page", axum::routing::post(page))
             .with_state(fake.clone());
