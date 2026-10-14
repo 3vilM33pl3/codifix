@@ -200,7 +200,13 @@ def produce(args):
     notices = root / "notices"
     notices.mkdir(exist_ok=True)
     for key in ("postgres", "vector", "python"):
-        shutil.copyfile(src / pinned[key]["directory"] / pinned[key]["notice"], notices / ("LICENSE-" + key))
+        source_notice = src / pinned[key]["directory"] / pinned[key]["notice"]
+        notice = notices / ("LICENSE-" + key)
+        if notice.exists():
+            if notice.is_symlink() or notice.read_bytes() != source_notice.read_bytes():
+                raise ValueError("resumed redistribution notice differs from pinned source")
+        else:
+            shutil.copyfile(source_notice, notice)
     flatten_links(root)
     audit_and_sign(root, prefix, env)
     entries = {}
