@@ -3,9 +3,10 @@
 use super::ApiClient;
 use crate::commands::output::service_url;
 use anyhow::{Result, ensure};
+#[cfg(any(feature = "tui", test))]
+use mem_record::LaptopCacheSearchResponse;
 use mem_record::{
     LaptopCacheHistoryResponse, LaptopCacheList, LaptopCacheProject, LaptopCacheSearchRequest,
-    LaptopCacheSearchResponse,
 };
 use reqwest::{Client, header::CACHE_CONTROL};
 use uuid::Uuid;
@@ -22,6 +23,7 @@ pub(crate) fn cache_scope_matches(a: &LaptopCacheProject, b: &LaptopCacheProject
 fn valid_project(p: &LaptopCacheProject) -> bool {
     p.read_only && matches!(p.area.as_str(), "workshop" | "homelab" | "general")
 }
+#[cfg(any(feature = "tui", test))]
 fn valid_question(q: &str, limit: u32) -> bool {
     !q.trim().is_empty()
         && q.len() <= 4096
@@ -99,6 +101,7 @@ impl ApiClient {
         );
         Ok(value)
     }
+    #[cfg(any(feature = "tui", test))]
     pub(crate) async fn laptop_cache_search(
         &self,
         project: &LaptopCacheProject,
