@@ -317,3 +317,72 @@ pub(crate) async fn status(
     tx.commit().await.map_err(ApiError::sql)?;
     Ok(Json(receipt.map(|r| r.0)))
 }
+
+pub(crate) async fn owner_resolution(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthenticatedPrincipal>,
+    Json(request): Json<OwnerDeviceContributionStatusRequest>,
+) -> Result<Json<Option<DeviceContributionStatus>>, ApiError> {
+    let mut tx = state.pool()?.begin().await.map_err(ApiError::sql)?;
+    let (approval, _) = authorize(&state, &mut tx, &actor, request.approval_id).await?;
+    let receipt:Option<SqlJson<DeviceContributionReceipt>>=sqlx::query_scalar("SELECT receipt_json FROM device_curated_contribution_receipts WHERE operation_id=$1 AND approval_id=$2 AND device_id=$3 AND project_id=$4 AND human_principal_id=$5")
+        .bind(request.operation_id).bind(request.approval_id).bind(approval.request.device_id).bind(approval.request.project_id).bind(approval.human_principal_id).fetch_optional(&mut *tx).await.map_err(ApiError::sql)?;
+    let result = if let Some(receipt) = receipt {
+        let resolution:Option<SqlJson<DeviceContributionResolution>>=sqlx::query_scalar("SELECT resolution_json FROM device_curated_contribution_resolutions WHERE operation_id=$1").bind(request.operation_id).fetch_optional(&mut *tx).await.map_err(ApiError::sql)?;
+        Some(DeviceContributionStatus {
+            receipt: receipt.0,
+            resolution: resolution.map(|v| v.0),
+        })
+    } else {
+        None
+    };
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(Json(result))
+}
+pub(crate) async fn company_resolution(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthenticatedPrincipal>,
+    Path((area, owner, project)): Path<(String, Uuid, Uuid)>,
+    Json(operation): Json<Uuid>,
+) -> Result<Json<Option<DeviceContributionStatus>>, ApiError> {
+    let mut tx = state.pool()?.begin().await.map_err(ApiError::sql)?;
+    let binding =
+        super::company_devices::company_binding(&state, &mut tx, &actor, &area, owner, project)
+            .await?
+            .ok_or_else(|| ApiError::forbidden("selected company device required"))?;
+    let before = super::company_device_proxy::binding_hash(&binding)?;
+    tx.commit().await.map_err(ApiError::sql)?;
+    let result: Option<DeviceContributionStatus> = super::company_device_proxy::post(
+        &binding.owner,
+        "/v1/onboarding/company-delivery/contributions/resolution",
+        &OwnerDeviceContributionStatusRequest {
+            approval_id: binding.approval.request.operation_id,
+            operation_id: operation,
+        },
+        65536,
+    )
+    .await?;
+    if result.as_ref().is_some_and(|s| {
+        s.receipt.operation_id != operation
+            || s.receipt.binding.device_id != binding.device_id
+            || s.receipt.binding.scope.project_id != project
+            || s.receipt.binding.scope.owner_instance_id != owner
+            || s.resolution.as_ref().is_some_and(|r| {
+                r.operation_id != operation
+                    || Some(r.proposal_id) != s.receipt.proposal_id
+                    || r.request_sha256 != s.receipt.request_sha256
+            })
+    }) {
+        return Err(changed());
+    }
+    let mut tx = state.pool()?.begin().await.map_err(ApiError::sql)?;
+    let current =
+        super::company_devices::company_binding(&state, &mut tx, &actor, &area, owner, project)
+            .await?
+            .ok_or_else(|| ApiError::forbidden("selected device access revoked"))?;
+    if super::company_device_proxy::binding_hash(&current)? != before {
+        return Err(changed());
+    }
+    tx.commit().await.map_err(ApiError::sql)?;
+    Ok(Json(result))
+}

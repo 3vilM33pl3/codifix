@@ -33,6 +33,11 @@ pub struct ClaimedContribution {
     pub lease_token: Uuid,
     pub request_sha256: String,
 }
+async fn block_ineligible(tx: &mut Transaction<'_, Postgres>, operation: Uuid) -> Result<()> {
+    sqlx::query("UPDATE laptop_curated_outbox SET state='blocked',blocked_reason='invalid_curated_content',lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE operation_id=$1")
+        .bind(operation).execute(&mut **tx).await?;
+    Ok(())
+}
 /// One queue row is fenced at a time; no network call belongs in this transaction.
 pub async fn claim(
     tx: &mut Transaction<'_, Postgres>,
@@ -44,7 +49,13 @@ pub async fn claim(
     let row=sqlx::query("SELECT q.*,m.canonical_id,m.version_no,m.canonical_text,m.summary,m.memory_type,m.importance,m.confidence,m.created_at FROM laptop_curated_outbox q JOIN memory_entries m ON m.id=q.local_memory_id JOIN laptop_curated_bindings b ON b.local_project_id=q.local_project_id WHERE b.enabled AND q.binding=$1 AND b.binding=$1 AND (q.state='queued' OR (q.state='running' AND q.lease_until<clock_timestamp())) ORDER BY q.updated_at,q.operation_id LIMIT 1 FOR UPDATE OF q SKIP LOCKED").bind(Json(binding)).fetch_optional(&mut **tx).await?;
     let Some(row) = row else { return Ok(None) };
     let operation: Uuid = row.try_get("operation_id")?;
-    let payload: Option<Json<CuratedDeviceContribution>> = row.try_get("payload")?;
+    let payload: Option<Json<CuratedDeviceContribution>> = match row.try_get("payload") {
+        Ok(value) => value,
+        Err(_) => {
+            block_ineligible(tx, operation).await?;
+            return Ok(None);
+        }
+    };
     let contribution = if let Some(payload) = payload {
         payload.0
     } else {
@@ -57,12 +68,18 @@ pub async fn claim(
             sqlx::query("UPDATE laptop_curated_outbox SET state='queued',lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE operation_id=$1").bind(operation).execute(&mut **tx).await?;
             return Ok(None);
         }
+        let memory_type =
+            match serde_json::from_value(serde_json::Value::String(row.try_get("memory_type")?)) {
+                Ok(value) => value,
+                Err(_) => {
+                    block_ineligible(tx, operation).await?;
+                    return Ok(None);
+                }
+            };
         let content = CuratedDeviceContent {
             canonical_text: row.try_get("canonical_text")?,
             summary: row.try_get("summary")?,
-            memory_type: serde_json::from_value(serde_json::Value::String(
-                row.try_get("memory_type")?,
-            ))?,
+            memory_type,
             importance: row.try_get("importance")?,
             confidence: row.try_get("confidence")?,
         };
@@ -84,9 +101,13 @@ pub async fn claim(
             },
         }
     };
-    contribution
-        .validate()
-        .map_err(|_| Error::Invalid("curated queue payload"))?;
+    if contribution.validate().is_err() {
+        // Local curation supports larger content than the device wire contract.
+        // Commit a fixed actionable status rather than rolling back this claim
+        // repeatedly and preventing every later queued item from progressing.
+        block_ineligible(tx, operation).await?;
+        return Ok(None);
+    }
     let lease = Uuid::new_v4();
     sqlx::query("UPDATE laptop_curated_outbox SET state='running',payload=$2,lease_token=$3,lease_until=clock_timestamp()+interval '120 seconds',updated_at=clock_timestamp() WHERE operation_id=$1").bind(operation).bind(Json(&contribution)).bind(lease).execute(&mut **tx).await?;
     use sha2::{Digest, Sha256};
@@ -141,11 +162,133 @@ pub async fn release(
     claim: &ClaimedContribution,
     blocked: bool,
 ) -> Result<()> {
-    let result=sqlx::query("UPDATE laptop_curated_outbox SET state=$3,lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE operation_id=$1 AND lease_token=$2 AND state='running' AND lease_until>clock_timestamp()")
+    let result=sqlx::query("UPDATE laptop_curated_outbox SET state=$3,blocked_reason=CASE WHEN $3='blocked' THEN 'authority_denied' ELSE NULL END,lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE operation_id=$1 AND lease_token=$2 AND state='running' AND lease_until>clock_timestamp()")
         .bind(claim.contribution.operation_id).bind(claim.lease_token).bind(if blocked {"blocked"} else {"queued"}).execute(&mut **tx).await?;
     if result.rows_affected() != 1 {
         return Err(Error::StaleLease);
     }
+    Ok(())
+}
+
+/// Trusted owner proposal decision hook; caller owns authorization, mutation,
+/// event append and commit. Other proposal families have no device receipt.
+pub async fn record_decision(
+    tx: &mut Transaction<'_, Postgres>,
+    proposal: Uuid,
+    decision: DeviceContributionDecision,
+    memory: Option<Uuid>,
+    reviewer: &str,
+) -> Result<()> {
+    let receipt:Option<Json<DeviceContributionReceipt>>=sqlx::query_scalar("SELECT receipt_json FROM device_curated_contribution_receipts WHERE receipt_json->>'proposal_id'=$1 FOR UPDATE").bind(proposal.to_string()).fetch_optional(&mut **tx).await?;
+    let Some(Json(receipt)) = receipt else {
+        return Ok(());
+    };
+    if reviewer.is_empty() || reviewer.len() > 512 || reviewer.chars().any(char::is_control) {
+        return Err(Error::Invalid("proposal reviewer identity"));
+    }
+    let (owner_memory_id, owner_canonical_id, owner_version) = if decision
+        == DeviceContributionDecision::Approved
+    {
+        let memory = memory.ok_or(Error::Invalid("approved device correction memory missing"))?;
+        let row: (Uuid, i32) = sqlx::query_as(
+            "SELECT canonical_id,version_no FROM memory_entries WHERE id=$1 AND project_id=$2",
+        )
+        .bind(memory)
+        .bind(receipt.binding.scope.project_id)
+        .fetch_one(&mut **tx)
+        .await?;
+        if Some(row.0) != receipt.owner_canonical_id {
+            return Err(Error::Conflict);
+        }
+        (Some(memory), Some(row.0), Some(row.1))
+    } else {
+        (None, None, None)
+    };
+    let resolution = DeviceContributionResolution {
+        operation_id: receipt.operation_id,
+        proposal_id: proposal,
+        request_sha256: receipt.request_sha256,
+        decision,
+        owner_memory_id,
+        owner_canonical_id,
+        owner_version,
+        reviewer: reviewer.into(),
+        decided_at: sqlx::query_scalar("SELECT clock_timestamp()")
+            .fetch_one(&mut **tx)
+            .await?,
+    };
+    sqlx::query("INSERT INTO device_curated_contribution_resolutions(operation_id,proposal_id,resolution_json) VALUES($1,$2,$3)").bind(resolution.operation_id).bind(proposal).bind(Json(resolution)).execute(&mut **tx).await?;
+    Ok(())
+}
+
+/// A trusted authenticated transport supplies this owner outcome. An immutable
+/// original receipt must match locally before any origin/version advances.
+pub async fn reconcile_resolution(
+    tx: &mut Transaction<'_, Postgres>,
+    binding: &LaptopContributionBinding,
+    status: &DeviceContributionStatus,
+) -> Result<()> {
+    let Some(resolution) = &status.resolution else {
+        return Ok(());
+    };
+    let receipt = &status.receipt;
+    if &receipt.binding != binding
+        || resolution.operation_id != receipt.operation_id
+        || Some(resolution.proposal_id) != receipt.proposal_id
+        || resolution.request_sha256 != receipt.request_sha256
+    {
+        return Err(Error::Conflict);
+    }
+    let row=sqlx::query("SELECT q.*,m.canonical_id FROM laptop_curated_outbox q JOIN memory_entries m ON m.id=q.local_memory_id WHERE q.operation_id=$1 AND q.binding=$2 FOR UPDATE OF q").bind(receipt.operation_id).bind(Json(binding)).fetch_optional(&mut **tx).await?.ok_or(Error::Conflict)?;
+    let saved: Json<DeviceContributionReceipt> = row.try_get("receipt")?;
+    if saved.0 != *receipt {
+        return Err(Error::Conflict);
+    }
+    let previous: Option<Json<DeviceContributionResolution>> = row.try_get("resolution_json")?;
+    if let Some(previous) = previous {
+        return if previous.0 == *resolution {
+            Ok(())
+        } else {
+            Err(Error::Conflict)
+        };
+    }
+    let state: String = row.try_get("state")?;
+    if !matches!(state.as_str(), "proposed" | "conflict") {
+        return Err(Error::Conflict);
+    }
+    let canonical: Uuid = row.try_get("canonical_id")?;
+    let (state, reason) = match resolution.decision {
+        DeviceContributionDecision::Approved => {
+            let owner = resolution
+                .owner_canonical_id
+                .filter(|v| !v.is_nil())
+                .ok_or(Error::Invalid("approved canonical missing"))?;
+            let version = resolution
+                .owner_version
+                .filter(|v| *v > 0)
+                .ok_or(Error::Invalid("approved version missing"))?;
+            if Some(owner) != receipt.owner_canonical_id
+                || resolution.owner_memory_id.is_none_or(|v| v.is_nil())
+            {
+                return Err(Error::Conflict);
+            }
+            let result=sqlx::query("INSERT INTO laptop_curated_origins(local_canonical_id,owner_canonical_id,owner_version) VALUES($1,$2,$3) ON CONFLICT(local_canonical_id) DO UPDATE SET owner_version=GREATEST(laptop_curated_origins.owner_version,EXCLUDED.owner_version) WHERE laptop_curated_origins.owner_canonical_id=EXCLUDED.owner_canonical_id").bind(canonical).bind(owner).bind(version).execute(&mut **tx).await?;
+            if result.rows_affected() != 1 {
+                return Err(Error::Conflict);
+            }
+            ("accepted", None)
+        }
+        DeviceContributionDecision::Rejected => {
+            if resolution.owner_memory_id.is_some()
+                || resolution.owner_canonical_id.is_some()
+                || resolution.owner_version.is_some()
+            {
+                return Err(Error::Conflict);
+            }
+            ("blocked", Some("proposal_rejected"))
+        }
+    };
+    sqlx::query("UPDATE laptop_curated_outbox SET state=$2,blocked_reason=$3,resolution_json=$4,updated_at=clock_timestamp() WHERE operation_id=$1").bind(receipt.operation_id).bind(state).bind(reason).bind(Json(resolution)).execute(&mut **tx).await?;
     Ok(())
 }
 
@@ -261,6 +404,115 @@ mod tests {
             .await
             .unwrap()
         );
+        let oversized = Uuid::new_v4();
+        let valid = Uuid::new_v4();
+        for (id, text) in [
+            (oversized, "x".repeat(32769)),
+            (valid, "eligible later curated fact".into()),
+        ] {
+            sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) SELECT $1,project_id,$1,1,$2,summary,memory_type,scope,importance,confidence,now(),now(),to_tsvector('english',$2) FROM memory_entries WHERE id=$3")
+                .bind(id).bind(text).bind(version).execute(&db.pool).await.unwrap();
+        }
+        sqlx::query("UPDATE laptop_curated_outbox SET updated_at='2000-01-01T00:00:00Z' WHERE operation_id=$1").bind(oversized).execute(&db.pool).await.unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        assert!(claim(&mut tx, &receipt.binding).await.unwrap().is_none());
+        tx.commit().await.unwrap();
+        let status: (String, Option<String>) = sqlx::query_as(
+            "SELECT state,blocked_reason FROM laptop_curated_outbox WHERE operation_id=$1",
+        )
+        .bind(oversized)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            status,
+            ("blocked".into(), Some("invalid_curated_content".into()))
+        );
+        let mut tx = db.pool.begin().await.unwrap();
+        let next = claim(&mut tx, &receipt.binding).await.unwrap().unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(
+            next.contribution.local_memory_id, valid,
+            "an invalid oldest item cannot poison later work"
+        );
+        let original_owner = receipt.owner_canonical_id.unwrap();
+        for (version_no, decision) in [
+            (2, DeviceContributionDecision::Approved),
+            (3, DeviceContributionDecision::Rejected),
+        ] {
+            let id = Uuid::new_v4();
+            sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) SELECT $1,project_id,canonical_id,$2,'corrected fact',summary,memory_type,scope,importance,confidence,now(),now(),to_tsvector('english','corrected fact') FROM memory_entries WHERE id=$3").bind(id).bind(version_no).bind(version).execute(&db.pool).await.unwrap();
+            let mut tx = db.pool.begin().await.unwrap();
+            let work = claim(&mut tx, &receipt.binding).await.unwrap().unwrap();
+            tx.commit().await.unwrap();
+            assert_eq!(work.contribution.local_memory_id, id);
+            let submitted = DeviceContributionReceipt {
+                schema_version: 2,
+                operation_id: id,
+                binding: receipt.binding.clone(),
+                local_memory_id: id,
+                request_sha256: work.request_sha256.clone(),
+                human_principal_id: receipt.human_principal_id,
+                outcome: DeviceContributionOutcome::Proposed,
+                owner_memory_id: None,
+                owner_canonical_id: Some(original_owner),
+                owner_version: Some(version_no - 1),
+                proposal_id: Some(Uuid::new_v4()),
+                committed_at: chrono::Utc::now(),
+            };
+            let mut tx = db.pool.begin().await.unwrap();
+            acknowledge(&mut tx, &work, &submitted).await.unwrap();
+            tx.commit().await.unwrap();
+            let approved = decision == DeviceContributionDecision::Approved;
+            let resolution = DeviceContributionResolution {
+                operation_id: id,
+                proposal_id: submitted.proposal_id.unwrap(),
+                request_sha256: submitted.request_sha256.clone(),
+                decision,
+                owner_memory_id: approved.then(Uuid::new_v4),
+                owner_canonical_id: approved.then_some(original_owner),
+                owner_version: approved.then_some(version_no),
+                reviewer: "synthetic-reviewer".into(),
+                decided_at: chrono::Utc::now(),
+            };
+            let status = DeviceContributionStatus {
+                receipt: submitted.clone(),
+                resolution: Some(resolution),
+            };
+            let mut tx = db.pool.begin().await.unwrap();
+            reconcile_resolution(&mut tx, &receipt.binding, &status)
+                .await
+                .unwrap();
+            tx.commit().await.unwrap();
+            let mut tx = db.pool.begin().await.unwrap();
+            reconcile_resolution(&mut tx, &receipt.binding, &status)
+                .await
+                .unwrap();
+            tx.commit().await.unwrap();
+            let saved: Json<DeviceContributionReceipt> = sqlx::query_scalar(
+                "SELECT receipt FROM laptop_curated_outbox WHERE operation_id=$1",
+            )
+            .bind(id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+            assert_eq!(saved.0, submitted);
+            let current: i32 = sqlx::query_scalar(
+                "SELECT owner_version FROM laptop_curated_origins WHERE local_canonical_id=$1",
+            )
+            .bind(version)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+            assert_eq!(current, 2, "rejected resolution must not advance origin");
+            let state: String =
+                sqlx::query_scalar("SELECT state FROM laptop_curated_outbox WHERE operation_id=$1")
+                    .bind(id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(state, if approved { "accepted" } else { "blocked" });
+        }
         db.cleanup().await.unwrap();
     }
 }

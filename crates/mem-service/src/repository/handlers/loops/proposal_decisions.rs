@@ -2,6 +2,7 @@
 
 //! Reviewed proposal writes, learning, traces, enrichment and activity share one commit.
 use super::*;
+use mem_record::DeviceContributionDecision;
 use mem_store::{
     events::{MutationContext, TimelineEvent},
     jobs::JobActor,
@@ -125,6 +126,19 @@ pub(crate) async fn decide_tx(
     } else {
         mem_reinforce::RewardEvent::ProposalApproved
     };
+    mem_store::device_contributions::record_decision(
+        tx,
+        id,
+        if status == "approved" {
+            DeviceContributionDecision::Approved
+        } else {
+            DeviceContributionDecision::Rejected
+        },
+        memory_id,
+        &context.actor_id,
+    )
+    .await
+    .map_err(|error| ApiError::io(error.into()))?;
     emit_proposal_reward(tx, procedural, &proposal, reward).await?;
     sqlx::query("UPDATE memory_proposals SET status=$2,resolved_at=now() WHERE id=$1")
         .bind(id)

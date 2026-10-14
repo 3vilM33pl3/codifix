@@ -109,3 +109,30 @@ pub struct DeviceContributionReceipt {
     pub proposal_id: Option<Uuid>,
     pub committed_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceContributionDecision {
+    Approved,
+    Rejected,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceContributionResolution {
+    pub operation_id: Uuid,
+    pub proposal_id: Uuid,
+    pub request_sha256: String,
+    pub decision: DeviceContributionDecision,
+    pub owner_memory_id: Option<Uuid>,
+    pub owner_canonical_id: Option<Uuid>,
+    pub owner_version: Option<i32>,
+    pub reviewer: String,
+    pub decided_at: DateTime<Utc>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceContributionStatus {
+    /// Original immutable submission result, even after a proposal decision.
+    pub receipt: DeviceContributionReceipt,
+    pub resolution: Option<DeviceContributionResolution>,
+}

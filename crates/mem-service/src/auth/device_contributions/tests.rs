@@ -102,7 +102,7 @@ async fn curated_receipts_are_atomic_idempotent_and_authority_checked() {
         expected_version: 2,
         content,
     };
-    let proposal = call(correction).await.unwrap().0;
+    let proposal = call(correction.clone()).await.unwrap().0;
     assert_eq!(proposal.outcome, DeviceContributionOutcome::Conflict);
     assert!(proposal.proposal_id.is_some());
     assert_eq!(
@@ -116,13 +116,111 @@ async fn curated_receipts_are_atomic_idempotent_and_authority_checked() {
     // A timeline failure rolls back both the accepted content and its receipt.
     sqlx::query("CREATE FUNCTION fail_device_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic event unavailable'; END $$").execute(&f.db.pool).await.unwrap();
     sqlx::query("CREATE TRIGGER fail_device_event BEFORE INSERT ON project_timeline_events FOR EACH ROW EXECUTE FUNCTION fail_device_event()").execute(&f.db.pool).await.unwrap();
+    let context = mem_store::events::MutationContext {
+        actor_id: f.human.id.to_string(),
+        actor_name: "Synthetic reviewer".into(),
+        source: "device-proposal-test".into(),
+        occurred_at: None,
+    };
+    let decision = LoopMemoryProposalDecisionRequest {
+        reviewer: None,
+        reason: None,
+        edited_candidate: None,
+        edited_evidence: None,
+        edited_risk_notes: None,
+    };
+    let jobactor = mem_store::jobs::JobActor::Principal(f.human.id);
+    let decide = |id, status| {
+        crate::repository::handlers::loops::proposal_decisions::decide(
+            &f.db.pool,
+            &f.state.config.procedural,
+            id,
+            status,
+            &decision,
+            &context,
+            &jobactor,
+        )
+    };
+    assert!(
+        decide(proposal.proposal_id.unwrap(), "approved")
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        0,
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM device_curated_contribution_resolutions"
+        )
+        .fetch_one(&f.db.pool)
+        .await
+        .unwrap()
+    );
+    sqlx::query("DROP TRIGGER fail_device_event ON project_timeline_events")
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    let accepted = decide(proposal.proposal_id.unwrap(), "approved")
+        .await
+        .unwrap();
+    let outcome = owner_resolution(
+        State(f.state.clone()),
+        Extension(actor.clone()),
+        Json(OwnerDeviceContributionStatusRequest {
+            approval_id: approval.operation_id,
+            operation_id: proposal.operation_id,
+        }),
+    )
+    .await
+    .unwrap()
+    .0
+    .unwrap();
+    assert_eq!(
+        outcome.receipt, proposal,
+        "historical conflict receipt must remain immutable"
+    );
+    let resolution = outcome.resolution.unwrap();
+    assert_eq!(resolution.decision, DeviceContributionDecision::Approved);
+    assert_eq!(resolution.owner_memory_id, accepted.response.memory_id);
+    assert_eq!(resolution.owner_version, Some(2));
+    assert_eq!(call(correction.clone()).await.unwrap().0, proposal);
+    let mut rejected_input = correction;
+    rejected_input.contribution.operation_id = Uuid::new_v4();
+    rejected_input.contribution.local_memory_id = Uuid::new_v4();
+    if let CuratedDeviceChange::Correct {
+        expected_version, ..
+    } = &mut rejected_input.contribution.change
+    {
+        *expected_version = 2
+    }
+    let rejected = call(rejected_input).await.unwrap().0;
+    decide(rejected.proposal_id.unwrap(), "rejected")
+        .await
+        .unwrap();
+    let status = owner_resolution(
+        State(f.state.clone()),
+        Extension(actor.clone()),
+        Json(OwnerDeviceContributionStatusRequest {
+            approval_id: approval.operation_id,
+            operation_id: rejected.operation_id,
+        }),
+    )
+    .await
+    .unwrap()
+    .0
+    .unwrap();
+    assert_eq!(status.receipt, rejected);
+    assert_eq!(
+        status.resolution.unwrap().decision,
+        DeviceContributionDecision::Rejected
+    );
+    sqlx::query("CREATE TRIGGER fail_device_event BEFORE INSERT ON project_timeline_events FOR EACH ROW EXECUTE FUNCTION fail_device_event()").execute(&f.db.pool).await.unwrap();
     let mut retry = request.clone();
     retry.contribution.operation_id = Uuid::new_v4();
     retry.contribution.local_memory_id = Uuid::new_v4();
     assert!(call(retry.clone()).await.is_err());
     assert!(!sqlx::query_scalar::<_,bool>("SELECT EXISTS(SELECT 1 FROM device_curated_contribution_receipts WHERE operation_id=$1)").bind(retry.contribution.operation_id).fetch_one(&f.db.pool).await.unwrap());
     assert_eq!(
-        1,
+        2,
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM memory_entries WHERE project_id=$1")
             .bind(f.project)
             .fetch_one(&f.db.pool)
