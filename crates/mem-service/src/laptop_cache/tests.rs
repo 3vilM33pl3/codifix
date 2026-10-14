@@ -114,7 +114,7 @@ async fn curated_replica_search_retains_source_identity_without_inventing_public
     let result = body(
         search(
             State(f.state.clone()),
-            Extension(actor),
+            Extension(actor.clone()),
             peer(),
             Path(binding.subscription_id),
             Json(LaptopCacheSearchRequest {
@@ -134,6 +134,22 @@ async fn curated_replica_search_retains_source_identity_without_inventing_public
     assert_eq!(hit["unavailable_source_ids"][0], source.to_string());
     assert!(hit.get("locator").is_none());
     assert!(hit.get("shared_version").is_none());
+    let local=Uuid::new_v4();
+    sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,'diagnosis curated replica text','local fact','domain_fact','project',3,0.8,now(),now(),to_tsvector('english','diagnosis curated replica text'))").bind(local).bind(f.project).execute(&f.db.pool).await.unwrap();
+    let mut tx=f.db.pool.begin().await.unwrap();mem_curate::rebuild_memory_chunks_tx(&mut tx,local).await.unwrap();tx.commit().await.unwrap();
+    let request:QueryRequest=serde_json::from_value(json!({"project":"local","query":"diagnosis","top_k":8})).unwrap();
+    let answer=crate::laptop_query::query(&f.state,&actor,peer().0,&request).await.unwrap();
+    assert!(answer.results.iter().any(|r|r.memory_id==id && r.origin.as_ref().is_some_and(|o|o.read_only)));
+    assert!(answer.results.iter().any(|r|r.memory_id==local));
+    sqlx::query("INSERT INTO laptop_curated_outbox(operation_id,local_project_id,local_memory_id,binding,state,receipt) VALUES($1,$2,$1,$3,'accepted',$4)").bind(local).bind(f.project).bind(json!({"device_id":binding.device_id,"scope":{"owner_instance_id":binding.owner_instance_id}})).bind(json!({"owner_memory_id":id})).execute(&f.db.pool).await.unwrap();
+    let answer=crate::laptop_query::query(&f.state,&actor,peer().0,&request).await.unwrap();
+    assert_eq!(answer.results.len(),1);assert_eq!(answer.results[0].memory_id,id);
+    assert_eq!(answer.answer_citations[0].memory_id,id);
+    sqlx::query("DELETE FROM device_replica_records WHERE subscription=$1 AND record_key=$2").bind(binding.subscription_id).bind(format!("version:{id}")).execute(&f.db.pool).await.unwrap();
+    let answer=crate::laptop_query::query(&f.state,&actor,peer().0,&request).await.unwrap();
+    assert!(answer.results.iter().any(|r|r.memory_id==local));
+    let mut filtered=request.clone();filtered.filters.types.push(MemoryType::Incident);
+    assert!(crate::laptop_query::query(&f.state,&actor,peer().0,&filtered).await.is_err());
 }
 async fn body(response: Response) -> Value {
     assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");

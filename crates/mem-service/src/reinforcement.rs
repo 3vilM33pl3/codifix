@@ -385,6 +385,7 @@ mod tests {
             answer: String::new(),
             confidence: 1.0,
             results: vec![QueryResult {
+                origin: None,
                 memory_id,
                 canonical_id: None,
                 version_no: None,

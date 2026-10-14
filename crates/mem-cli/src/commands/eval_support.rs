@@ -1165,6 +1165,7 @@ pub(crate) fn external_retriever_response_to_query_response(
             .filter_map(external_citation_to_query_source)
             .collect::<Vec<_>>();
         let query_result = QueryResult {
+            origin: None,
             memory_id,
             canonical_id: None,
             version_no: None,

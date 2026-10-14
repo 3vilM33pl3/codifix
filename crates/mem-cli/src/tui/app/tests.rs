@@ -205,6 +205,7 @@ fn test_query_response_with_timings() -> QueryResponse {
         answer: "Use the selected memory. [1]".to_string(),
         confidence: 0.82,
         results: vec![QueryResult {
+            origin: None,
             memory_id: Uuid::new_v4(),
             canonical_id: None,
             version_no: None,
@@ -252,6 +253,7 @@ fn test_query_response_with_timings() -> QueryResponse {
 fn test_query_response_with_two_results() -> QueryResponse {
     let mut response = test_query_response_with_timings();
     response.results.push(QueryResult {
+        origin: None,
         memory_id: Uuid::new_v4(),
         canonical_id: None,
         version_no: None,

@@ -11,6 +11,7 @@ mod error;
 pub mod federation;
 mod handlers;
 mod laptop_cache;
+mod laptop_query;
 mod llm;
 mod mcp_http;
 #[cfg(feature = "offline")]

@@ -41,7 +41,7 @@ fn scope(area: &str, binding: &LaptopCacheSubscription) -> Result<ProjectScope, 
     }
     Ok(value)
 }
-fn authorize(
+pub(crate) fn authorize(
     state: &AppState,
     actor: &AuthenticatedPrincipal,
     peer: SocketAddr,

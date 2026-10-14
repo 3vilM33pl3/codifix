@@ -5,6 +5,31 @@ use crate::*;
 use axum::Extension;
 use mem_record::GlobalQueryRequest;
 
+pub(crate) async fn query_authenticated(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthenticatedPrincipal>,
+    peer: Result<
+        axum::extract::ConnectInfo<std::net::SocketAddr>,
+        axum::extract::rejection::ExtensionRejection,
+    >,
+    Json(request): Json<QueryRequest>,
+) -> Result<Json<mem_record::QueryResponse>, ApiError> {
+    request.validate().map_err(ApiError::validation)?;
+    if state.config.laptop_cache.as_ref().is_some_and(|c| {
+        c.subscriptions
+            .iter()
+            .any(|s| s.replication_mode == mem_config::LaptopCacheReplicationMode::CuratedProjectV1)
+    }) {
+        let peer = peer
+            .map_err(|_| ApiError::forbidden("laptop query requires verified local peer"))?
+            .0;
+        return crate::laptop_query::query(&state, &actor, peer, &request)
+            .await
+            .map(Json);
+    }
+    query(State(state), Json(request)).await
+}
+
 pub(crate) async fn query(
     State(state): State<AppState>,
     Json(request): Json<QueryRequest>,

@@ -198,6 +198,8 @@ pub struct QuerySource {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryResult {
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub origin: Option<QueryResultOrigin>,
     pub memory_id: Uuid,
     /// Stable identity of the memory across versions; `memory_id` is the
     /// exact version row and may be pruned by retention.
@@ -232,6 +234,15 @@ pub struct QueryResult {
     /// penalty rather than excluded; consumers should caveat it.
     #[serde(default)]
     pub needs_review: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueryResultOrigin {
+    pub owner_instance_id: Uuid,
+    pub project_id: Uuid,
+    pub author: String,
+    pub content_digest: String,
+    pub read_only: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

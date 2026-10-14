@@ -558,6 +558,7 @@ async fn query_memory_execution(
             .context("fetch query result sources")?;
         let identity = canonical_ids.get(&candidate.memory_id).copied();
         results.push(QueryResult {
+            origin: None,
             memory_id: candidate.memory_id,
             canonical_id: identity.map(|(canonical_id, _)| canonical_id),
             version_no: identity.map(|(_, version_no)| version_no),
@@ -1837,6 +1838,7 @@ mod tests {
     fn provenance_warnings_include_stale_source_statuses() {
         let memory_id = Uuid::new_v4();
         let results = vec![QueryResult {
+            origin: None,
             memory_id,
             canonical_id: None,
             version_no: None,
@@ -1929,6 +1931,7 @@ mod tests {
 
     fn synthesis_result(summary: &str, score: f64, memory_confidence: f32) -> QueryResult {
         QueryResult {
+            origin: None,
             memory_id: Uuid::new_v4(),
             canonical_id: None,
             version_no: None,

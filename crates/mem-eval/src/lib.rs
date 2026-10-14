@@ -1959,6 +1959,7 @@ mod tests {
             answer: String::new(),
             confidence: 1.0,
             results: vec![mem_record::QueryResult {
+                origin: None,
                 memory_id: Uuid::new_v4(),
                 canonical_id: None,
                 version_no: None,
@@ -2001,6 +2002,7 @@ mod tests {
 
     fn tagged_result(memory_id: Uuid, tag: &str) -> mem_record::QueryResult {
         mem_record::QueryResult {
+            origin: None,
             memory_id,
             canonical_id: None,
             version_no: None,

@@ -410,6 +410,7 @@ fn test_query_response() -> QueryResponse {
         answer: "fallback answer".to_string(),
         confidence: 0.5,
         results: vec![mem_record::QueryResult {
+            origin: None,
             memory_id: uuid::Uuid::new_v4(),
             canonical_id: None,
             version_no: None,
