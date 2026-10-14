@@ -32,7 +32,7 @@ fn unavailable() -> ApiError {
         "selective owner delivery unavailable; no owner diagnostics or alternate destination used",
     )
 }
-fn binding_hash(binding: &CompanyDeviceBinding) -> Result<Vec<u8>, ApiError> {
+pub(super) fn binding_hash(binding: &CompanyDeviceBinding) -> Result<Vec<u8>, ApiError> {
     use sha2::{Digest, Sha256};
     CanonicalJsonCodec::encode(&json!({"device":binding.device_id,"human":binding.human_id,
         "issuer":binding.issuer,"subject":binding.subject,"company":binding.company_id,
@@ -58,7 +58,7 @@ fn origin(owner: &mem_config::CompanyOwnerConfig) -> Result<reqwest::Url, ApiErr
     }
     Ok(url)
 }
-async fn post<T: Serialize, R: DeserializeOwned>(
+pub(super) async fn post<T: Serialize, R: DeserializeOwned>(
     owner: &mem_config::CompanyOwnerConfig,
     path: &str,
     request: &T,

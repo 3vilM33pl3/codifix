@@ -291,6 +291,34 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DeviceProjectSubscription' }
         '403': { description: Current exact device approval/delegate/human authority denied. }
+  /v1/onboarding/company-delivery/contributions:
+    post:
+      operationId: submitCuratedDeviceContribution
+      x-stability: internal
+      summary: Apply curated device additions or propose owner corrections
+      description: Exact current delivery delegate, approved external device and owner-local human curation/capture authority. Schema 2 accepts only bounded curated content; raw captures, sessions and local paths have no representation. Full-input immutable receipts make retry idempotent. Additions, enrichment intent, events and receipts commit together. Corrections remain pending owner proposals, with conflict recorded when the expected version changed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: OwnerDeviceContributionRequest }
+      responses:
+        '200': { description: DeviceContributionReceipt with accepted, proposed or conflict outcome. }
+        '403': { description: Current device, delegate or human authority denied. }
+        '409': { description: Altered retry, manifest, source identity or missing correction target. }
+  /v1/onboarding/company-delivery/contributions/status:
+    post:
+      operationId: readCuratedDeviceContributionReceipt
+      x-stability: internal
+      summary: Read an exact device contribution receipt under current authority
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: OwnerDeviceContributionStatusRequest }
+      responses:
+        '200': { description: Exact device/project/approval receipt or null when absent. }
+        '403': { description: Current device, delegate or human authority denied. }
   /v1/onboarding/company-delivery/snapshot:
     post:
       operationId: deliverCompanyDeviceOwnerProjectPage
