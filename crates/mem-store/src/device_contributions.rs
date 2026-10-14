@@ -46,9 +46,13 @@ pub async fn claim(
     binding
         .validate()
         .map_err(|_| Error::Invalid("claim binding"))?;
-    let row=sqlx::query("SELECT q.*,m.canonical_id,m.version_no,m.canonical_text,m.summary,m.memory_type,m.importance,m.confidence,m.created_at FROM laptop_curated_outbox q JOIN memory_entries m ON m.id=q.local_memory_id JOIN laptop_curated_bindings b ON b.local_project_id=q.local_project_id WHERE b.enabled AND q.binding=$1 AND b.binding=$1 AND (q.state='queued' OR (q.state='running' AND q.lease_until<clock_timestamp())) ORDER BY q.updated_at,q.operation_id LIMIT 1 FOR UPDATE OF q SKIP LOCKED").bind(Json(binding)).fetch_optional(&mut **tx).await?;
+    let row=sqlx::query("SELECT q.*,m.canonical_id,m.version_no,m.canonical_text,m.summary,m.memory_type,m.importance,m.confidence,m.created_at,EXISTS(SELECT 1 FROM memory_canonical_state cs JOIN memory_entries latest ON latest.canonical_id=cs.canonical_id WHERE cs.canonical_id=m.canonical_id AND cs.status='active' AND latest.version_no=(SELECT max(version_no) FROM memory_entries WHERE canonical_id=m.canonical_id) AND NOT latest.is_tombstone) AS eligible FROM laptop_curated_outbox q JOIN memory_entries m ON m.id=q.local_memory_id JOIN laptop_curated_bindings b ON b.local_project_id=q.local_project_id WHERE b.enabled AND q.binding=$1 AND b.binding=$1 AND (q.state='queued' OR (q.state='running' AND q.lease_until<clock_timestamp())) ORDER BY q.updated_at,q.operation_id LIMIT 1 FOR UPDATE OF q SKIP LOCKED").bind(Json(binding)).fetch_optional(&mut **tx).await?;
     let Some(row) = row else { return Ok(None) };
     let operation: Uuid = row.try_get("operation_id")?;
+    if !row.try_get::<bool, _>("eligible")? {
+        block_ineligible(tx, operation).await?;
+        return Ok(None);
+    }
     let payload: Option<Json<CuratedDeviceContribution>> = match row.try_get("payload") {
         Ok(value) => value,
         Err(_) => {
@@ -63,10 +67,16 @@ pub async fn claim(
         let version: i32 = row.try_get("version_no")?;
         let origin:Option<(Uuid,i32)>=sqlx::query_as("SELECT owner_canonical_id,owner_version FROM laptop_curated_origins WHERE local_canonical_id=$1").bind(canonical).fetch_optional(&mut **tx).await?;
         if version > 1 && origin.is_none() {
-            // Previous local versions must reach their origin before corrections.
-            // Leave queued; ordering by updated_at lets other work make progress.
-            sqlx::query("UPDATE laptop_curated_outbox SET state='queued',lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE operation_id=$1").bind(operation).execute(&mut **tx).await?;
-            return Ok(None);
+            let predecessor:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM laptop_curated_outbox q JOIN memory_entries m ON m.id=q.local_memory_id WHERE m.canonical_id=$1 AND m.version_no<$2 AND q.state<>'blocked')")
+                .bind(canonical).bind(version).fetch_one(&mut **tx).await?;
+            if predecessor {
+                // Previous local versions must reach their origin before corrections.
+                // Leave queued; ordering by updated_at lets other work make progress.
+                sqlx::query("UPDATE laptop_curated_outbox SET state='queued',lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE operation_id=$1").bind(operation).execute(&mut **tx).await?;
+                return Ok(None);
+            }
+            // Earlier invalid/withdrawn blocked versions remain local history.
+            // The first eligible content starts independent owner version one.
         }
         let memory_type =
             match serde_json::from_value(serde_json::Value::String(row.try_get("memory_type")?)) {
@@ -435,6 +445,19 @@ mod tests {
             next.contribution.local_memory_id, valid,
             "an invalid oldest item cannot poison later work"
         );
+        let repaired = Uuid::new_v4();
+        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) SELECT $1,project_id,canonical_id,2,'repaired bounded fact',summary,memory_type,scope,importance,confidence,now(),now(),to_tsvector('english','repaired bounded fact') FROM memory_entries WHERE id=$2").bind(repaired).bind(oversized).execute(&db.pool).await.unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        let repaired_work = claim(&mut tx, &receipt.binding).await.unwrap().unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(repaired_work.contribution.local_memory_id, repaired);
+        assert!(
+            matches!(
+                repaired_work.contribution.change,
+                CuratedDeviceChange::Add { .. }
+            ),
+            "valid repair after blocked first version must start an owner version"
+        );
         let original_owner = receipt.owner_canonical_id.unwrap();
         for (version_no, decision) in [
             (2, DeviceContributionDecision::Approved),
@@ -512,6 +535,34 @@ mod tests {
                     .await
                     .unwrap();
             assert_eq!(state, if approved { "accepted" } else { "blocked" });
+        }
+        for tombstone in [false, true] {
+            let withdrawn = Uuid::new_v4();
+            sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) SELECT $1,project_id,$1,1,'withdrawn fact',summary,memory_type,scope,importance,confidence,now(),now(),to_tsvector('english','withdrawn fact') FROM memory_entries WHERE id=$2").bind(withdrawn).bind(version).execute(&db.pool).await.unwrap();
+            if tombstone {
+                sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) SELECT $1,project_id,canonical_id,2,TRUE,'',summary,memory_type,scope,importance,confidence,now(),now(),to_tsvector('english','') FROM memory_entries WHERE id=$2").bind(Uuid::new_v4()).bind(withdrawn).execute(&db.pool).await.unwrap();
+            } else {
+                sqlx::query(
+                    "UPDATE memory_canonical_state SET status='archived' WHERE canonical_id=$1",
+                )
+                .bind(withdrawn)
+                .execute(&db.pool)
+                .await
+                .unwrap();
+            }
+            let mut tx = db.pool.begin().await.unwrap();
+            assert!(claim(&mut tx, &receipt.binding).await.unwrap().is_none());
+            tx.commit().await.unwrap();
+            assert_eq!(
+                "blocked",
+                sqlx::query_scalar::<_, String>(
+                    "SELECT state FROM laptop_curated_outbox WHERE operation_id=$1"
+                )
+                .bind(withdrawn)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap()
+            );
         }
         db.cleanup().await.unwrap();
     }
