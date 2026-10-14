@@ -144,6 +144,7 @@ export function QueryTab({
                   <span className="badge">#{index + 1}</span>
                   <span className="badge">{result.memory_type}</span>
                   <span className="badge">{result.match_kind}</span>
+                  {result.origin?.read_only && <span className="badge">Owner copy · read-only</span>}
                   {queryResponse?.answer_generation.cited_result_numbers.includes(index + 1) ? <span className="badge badge-active">cited</span> : null}
                   <span>{result.score.toFixed(2)}</span>
                 </div>
@@ -159,8 +160,9 @@ export function QueryTab({
                   <h2>{activeQueryResult.summary}</h2>
                   <p>{activeQueryResult.memory_type} · {activeQueryResult.match_kind} · score {activeQueryResult.score.toFixed(2)}</p>
                 </div>
-                <button className="danger" onClick={() => onDelete(activeQueryResult.memory_id)} type="button">Delete</button>
+                {!activeQueryResult.origin?.read_only && <button className="danger" onClick={() => onDelete(activeQueryResult.memory_id)} type="button">Delete</button>}
               </div>
+              {activeQueryResult.origin && <p>Owner {activeQueryResult.origin.owner_instance_id}; author {activeQueryResult.origin.author}; version {activeQueryResult.version_no}; digest {activeQueryResult.origin.content_digest}. Owner-controlled history cannot be edited locally.</p>}
               <section className="detail-section">
                 <h3>Snippet</h3>
                 <p>{activeQueryResult.snippet}</p>

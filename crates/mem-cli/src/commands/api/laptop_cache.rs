@@ -208,6 +208,7 @@ mod tests {
             observed_at: None,
             initialized: true,
             read_only: true,
+            uploads: Default::default(),
         };
         let owner = Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-local-owner");
         let list = serde_json::json!({"schema_version":1,"area":"workshop","instance_id":Uuid::new_v4(),"projects":[p]}).to_string();

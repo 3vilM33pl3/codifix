@@ -84,6 +84,7 @@ fn describe(
         observed_at: status.as_ref().and_then(|s| s.observed_at),
         initialized: status.is_some(),
         read_only: true,
+        uploads: Default::default(),
     }
 }
 fn response(value: &impl serde::Serialize) -> Result<Response, ApiError> {
@@ -149,7 +150,13 @@ pub(crate) async fn list(
         } else {
             None
         };
-        projects.push(describe(&area.name, binding, status));
+        let mut described = describe(&area.name, binding, status);
+        if binding.replication_mode == LaptopCacheReplicationMode::CuratedProjectV1 {
+            let counts:Vec<(String,i64)>=sqlx::query_as("SELECT state,count(*) FROM laptop_curated_outbox WHERE local_project_id=$1 AND binding->>'device_id'=$2 AND binding->'scope'->>'company_id'=$3 AND binding->'scope'->>'owner_instance_id'=$4 AND binding->'scope'->>'space_id'=$5 AND binding->'scope'->>'area'=$6 GROUP BY state")
+                .bind(binding.project_id).bind(binding.device_id.to_string()).bind(binding.company_id.to_string()).bind(binding.owner_instance_id.to_string()).bind(binding.space_id.to_string()).bind(&area.name).fetch_all(&pool).await.map_err(|_|unavailable())?;
+            described.uploads = counts.into_iter().collect();
+        }
+        projects.push(described);
     }
     response(&LaptopCacheList {
         schema_version: 1,

@@ -198,7 +198,7 @@ pub struct QuerySource {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryResult {
-    #[serde(default, skip_serializing_if="Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<QueryResultOrigin>,
     pub memory_id: Uuid,
     /// Stable identity of the memory across versions; `memory_id` is the

@@ -18,6 +18,9 @@ pub struct LaptopCacheProject {
     pub observed_at: Option<DateTime<Utc>>,
     pub initialized: bool,
     pub read_only: bool,
+    /// Metadata-only local contribution counts; not remote acknowledgement of replication.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub uploads: std::collections::BTreeMap<String, i64>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LaptopCacheList {

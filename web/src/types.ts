@@ -695,6 +695,7 @@ export interface ReembedResponse {
 }
 
 export interface QueryResult {
+  origin?: { owner_instance_id: string; project_id: string; author: string; content_digest: string; read_only: boolean };
   memory_id: string;
   canonical_id?: string;
   version_no?: number;

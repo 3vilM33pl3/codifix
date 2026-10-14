@@ -2,6 +2,7 @@ export type LaptopCacheProject = {
   subscription_id: string; device_id: string; company_id: string; area: string;
   owner_instance_id: string; project_id: string; space_id: string; cursor: number;
   observed_at: string | null; initialized: boolean; read_only: true;
+  uploads?: Record<string, number>;
 };
 export type LaptopCacheList = { schema_version: 1; area: string; instance_id: string; projects: LaptopCacheProject[] };
 export type LaptopCacheEvidence = { label: string; text: string; digest: string; reviewer: string; reviewed_at: string };

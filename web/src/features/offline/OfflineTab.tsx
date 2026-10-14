@@ -41,7 +41,7 @@ export function OfflineTab() {
   const observed = result?.project ?? project;
   return <section aria-label="Synchronized knowledge">
     <h2>Synchronized knowledge</h2>
-    <p>Read-only, untrusted shared text from this laptop’s exact configured subscription. Local deterministic search only: no remote search or model forwarding.</p>
+    <p>Read-only copies of selected project knowledge from this laptop’s exact configured subscription. Local deterministic search only: no remote search or model forwarding. Local capture and curation are separate from these owner-controlled copies.</p>
     <p>Offline copies may be stale. Observed synchronization is not current remote authority; revocation cannot recall previously delivered bytes.</p>
     <button onClick={() => { resetSearch(); setRevision(v => v + 1); }}>Refresh synchronized projects</button>
     {error ? <p role="alert">{error}</p> : null}
@@ -54,6 +54,7 @@ export function OfflineTab() {
     </> : null}
     {project && observed ? <>
       <p>Company {project.company_id}; area {project.area}; owner {project.owner_instance_id}; project {project.project_id}; space {project.space_id}; device {project.device_id}; subscription {project.subscription_id}.</p>
+      {project.uploads && Object.keys(project.uploads).length > 0 && <p>Curated uploads: {Object.entries(project.uploads).map(([state, count]) => `${state}: ${count}`).join(" · ")}. Proposed/conflicting changes need owner review; blocked work needs access or policy repair. Refresh to update.</p>}
       <p>Last observed sync: {observed.observed_at ?? "unknown"}; verified local cursor: {Number.isSafeInteger(observed.cursor) ? observed.cursor : "large cursor (numeric precision unavailable)"}. {observed.initialized ? "Cache initialized; freshness is not guaranteed." : "Cache not initialized; no searchable data confirmed."}</p>
       <form onSubmit={e => { e.preventDefault(); void submit(); }}>
         <label>Local search question <textarea value={question} onChange={e => { resetSearch(); setQuestion(e.target.value); }} /></label>

@@ -250,6 +250,27 @@ fn test_query_response_with_timings() -> QueryResponse {
     }
 }
 
+#[tokio::test]
+async fn owner_query_copy_never_uses_local_detail_or_delete_endpoint() {
+    let mut app = new_test_app();
+    let mut response = test_query_response_with_timings();
+    response.results[0].origin = Some(mem_record::QueryResultOrigin {
+        owner_instance_id: Uuid::new_v4(),
+        project_id: Uuid::new_v4(),
+        author: "original".into(),
+        content_digest: "sha256:fixture".into(),
+        read_only: true,
+    });
+    app.query.query_response = Some(response);
+    let config=serde_json::from_value(serde_json::json!({"service":{"bind_addr":"127.0.0.1:1","api_token":"synthetic-owner"},"database":{"url":"postgresql://unused/unused"}})).unwrap();
+    let api = super::ApiClient::new(reqwest::Client::new(), config);
+    app.fetch_selected_query_detail(&api);
+    assert!(!app.query.query_detail_loading);
+    app.delete_selected_query_memory(&api).await.unwrap();
+    assert!(app.chrome.status_message.contains("read-only"));
+    assert_eq!(app.query_results().len(), 1);
+}
+
 fn test_query_response_with_two_results() -> QueryResponse {
     let mut response = test_query_response_with_timings();
     response.results.push(QueryResult {

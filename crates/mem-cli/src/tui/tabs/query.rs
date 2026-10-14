@@ -311,6 +311,12 @@ pub(in crate::tui) fn draw_query_tab(
         ];
 
         lines.push(Line::from(""));
+        if let Some(origin) = &result.origin {
+            lines.push(Line::from(format!(
+                "Owner copy (read-only): {} | author {} | {}",
+                origin.owner_instance_id, origin.author, origin.content_digest
+            )));
+        }
         lines.push(Line::from(vec![section_span("Search Diagnostics")]));
         lines.push(Line::from(Span::styled(
             format!(

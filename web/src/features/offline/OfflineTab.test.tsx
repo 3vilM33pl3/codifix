@@ -16,6 +16,14 @@ async function submit() {
   fireEvent.change(screen.getByLabelText("Local search question"), { target: { value: "Exact local question" } });
   fireEvent.click(screen.getByRole("button", { name: "Search local cache" }));
 }
+it("shows sanitized contribution progress without claiming proposals are accepted", async () => {
+  vi.mocked(laptopCacheList).mockResolvedValue({...inventory,projects:[{...project,uploads:{queued:2,proposed:1,blocked:1}}]});
+  render(<OfflineTab />);
+  const status=await screen.findByText(/Curated uploads:/);
+  expect(status).toHaveTextContent("queued: 2");
+  expect(status).toHaveTextContent("proposed: 1");
+  expect(status).toHaveTextContent("need owner review");
+});
 it("shows private curated versions without implying an ATProto publication", async () => {
   vi.mocked(laptopCacheSearch).mockResolvedValue({ ...result, hits: [{ ...result.hits[0], origin: "curated_project", locator: undefined, shared_version: undefined, unavailable_source_ids: [uuid(20)], evidence: [] }] });
   render(<OfflineTab />);

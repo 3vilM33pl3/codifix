@@ -2933,6 +2933,15 @@ impl App {
     fn fetch_selected_query_detail(&mut self, api: &ApiClient) {
         self.query.query_selected_detail = None;
         self.query.query_detail_loading = false;
+        if self
+            .query_results()
+            .get(self.query.query_selected_index)
+            .is_some_and(|r| r.origin.as_ref().is_some_and(|o| o.read_only))
+        {
+            self.query.query_detail_request_id =
+                self.query.query_detail_request_id.saturating_add(1);
+            return;
+        }
         if let Some(memory_id) = self
             .query_results()
             .get(self.query.query_selected_index)
@@ -3186,6 +3195,12 @@ impl App {
             self.chrome.status_message = "No selected query result to delete.".to_string();
             return Ok(());
         };
+        if result.origin.as_ref().is_some_and(|o| o.read_only) {
+            self.chrome.status_message =
+                "Owner-controlled knowledge is read-only; submit a correction proposal instead."
+                    .into();
+            return Ok(());
+        }
         let response = api.delete_memory(result.memory_id).await?;
         self.chrome.status_message = format!("Deleted memory: {}", response.summary);
         self.query.query_selected_detail = None;

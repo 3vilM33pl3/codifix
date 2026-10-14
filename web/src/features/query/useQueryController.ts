@@ -49,6 +49,7 @@ export function useQueryController({
     setSelectedQueryMemory(null);
     setSelectedQueryMemoryLoading(true);
     setSelectedQueryMemoryError(null);
+    if (result.origin?.read_only) { setSelectedQueryMemoryLoading(false); return; }
     void getMemory(result.memory_id)
       .then((detail) => {
         if (active) setSelectedQueryMemory(detail);
@@ -143,6 +144,10 @@ export function useQueryController({
   }
 
   async function handleDelete(memoryId: string) {
+    if (queryResponse?.results.some(r => r.memory_id === memoryId && r.origin?.read_only)) {
+      setStatusMessage("Owner-controlled knowledge is read-only; submit a correction proposal instead.");
+      return;
+    }
     try {
       const response = await deleteMemory(memoryId);
       setStatusMessage(`Deleted memory: ${response.summary}`);

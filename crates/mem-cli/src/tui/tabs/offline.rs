@@ -226,6 +226,16 @@ fn content(state: &OfflineState) -> Vec<Line<'static>> {
             p.subscription_id, p.company_id, p.space_id, p.device_id
         )));
         let observed = state.result.as_ref().map_or(p, |r| &r.project);
+        if !p.uploads.is_empty() {
+            lines.push(Line::from(format!(
+                "Curated uploads: {} (refresh to update)",
+                p.uploads
+                    .iter()
+                    .map(|(s, n)| format!("{} {n}", plain(s)))
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            )));
+        }
         lines.push(Line::from(format!(
             "Observed sync {} | cursor {} | initialized {} (not guaranteed fresh)",
             observed
@@ -315,6 +325,7 @@ mod tests {
             observed_at: None,
             initialized: true,
             read_only: true,
+            uploads: Default::default(),
         }
     }
     fn state() -> OfflineState {
