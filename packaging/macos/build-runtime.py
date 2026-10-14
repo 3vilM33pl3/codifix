@@ -76,6 +76,13 @@ def flatten_links(root):
             file.unlink()
             file.write_bytes(data)
             file.chmod(mode)
+        elif file.is_file() and file.stat().st_nlink != 1:
+            # PostgreSQL's timezone installer uses hard links for equivalent
+            # zones. The package contract hashes independent regular files.
+            data, mode = file.read_bytes(), file.stat().st_mode & 0o777
+            file.unlink()
+            file.write_bytes(data)
+            file.chmod(mode)
     for directory in sorted((p for p in root.rglob("*") if p.is_dir()), reverse=True):
         if not any(directory.iterdir()):
             directory.rmdir()
@@ -90,6 +97,9 @@ def audit_and_sign(root, prefix, env):
             macho = stream.read(4) in magics
         if not macho:
             continue
+        # A resumed producer may be repairing a previously read-only staging
+        # tree. Only producer-owned output is signed; final modes follow below.
+        file.chmod(file.stat().st_mode & 0o777 | 0o200)
         output = subprocess.check_output(["otool", "-L", str(file)], text=True, env=env)
         for line in output.splitlines()[1:]:
             dep = line.strip().split(" (", 1)[0]
@@ -208,6 +218,7 @@ def produce(args):
     bundle.validate_manifest(value, arch)
     manifest.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
     manifest.chmod(0o444)
+    bundle.validate_bundle(root, manifest, arch)
     print(json.dumps({"runtime_bundle": str(root), "runtime_manifest": str(manifest), "arch": arch}))
 
 

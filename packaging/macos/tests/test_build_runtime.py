@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tarfile
@@ -73,6 +74,17 @@ class RuntimeProducer(unittest.TestCase):
             (root / "outside").symlink_to("/etc/passwd")
             with self.assertRaises(ValueError):
                 producer.flatten_links(root)
+
+    def test_flatten_installed_timezone_hardlinks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            original, alias = root / "zone", root / "zone-alias"
+            original.write_bytes(b"timezone")
+            os.link(original, alias)
+            producer.flatten_links(root)
+            self.assertEqual(original.stat().st_nlink, 1)
+            self.assertEqual(alias.stat().st_nlink, 1)
+            self.assertEqual(alias.read_bytes(), original.read_bytes())
 
     def test_source_directory_alias_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
