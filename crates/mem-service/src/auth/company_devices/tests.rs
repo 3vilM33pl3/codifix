@@ -345,6 +345,7 @@ async fn remote_only_activation_has_zero_generic_authority_exact_scope_and_no_fa
     let Some(mut f) = fixture().await else { return };
     let owner = Owner::new(&f).await;
     configure(&mut f, &owner);
+    f.state.config.auth.oidc.issuer_url.push('/');
     let (start, credential, _) = start(&f).await;
     let request = request(&f, &start).await;
     let result = call(&f, &request).await.unwrap();

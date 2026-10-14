@@ -121,7 +121,7 @@ fn delegation<'a>(
         || Some(cfg.token_id) != actor.token_id
         || cfg.policy_revision < 1
         || cfg.projects.len() > 256
-        || cfg.issuer != state.config.auth.oidc.issuer_url
+        || cfg.issuer != mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url)
         // Existing local OIDC storage uses a no-trailing-slash namespace. Do
         // not silently alias a forwarded namespace or create unreachable users.
         || cfg.issuer.ends_with('/')

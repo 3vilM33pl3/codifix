@@ -315,12 +315,32 @@ async fn exact_namespace_token_project_ceiling_and_local_ownership_fail_closed()
     );
     f.state.config.service.read_only = false;
     f.state.config.auth.oidc.issuer_url.push('/');
-    f.state.config.auth.company_delegations[0].issuer.push('/');
+    // Discovery's canonical trailing slash does not change stored identities.
+    assert_eq!(
+        apply(&f, f.request.clone()).await.unwrap_err().status,
+        StatusCode::CONFLICT
+    );
     let mut noncanonical = f.request.clone();
+    noncanonical.operation_id = Uuid::new_v4();
     noncanonical.issuer.push('/');
     assert_eq!(
         apply(&f, noncanonical).await.unwrap_err().status,
-        StatusCode::FORBIDDEN
+        StatusCode::CONFLICT
+    );
+    f.db.cleanup().await.unwrap();
+}
+
+#[tokio::test]
+async fn canonical_oidc_discovery_url_accepts_exact_normalized_company_claims() {
+    let Some(mut f) = fixture().await else { return };
+    f.state.config.auth.oidc.issuer_url.push('/');
+    assert!(apply(&f, f.request.clone()).await.is_ok());
+    let mut other = f.request.clone();
+    other.operation_id = Uuid::new_v4();
+    other.issuer = "https://auth.example.test/application/o/other".into();
+    assert_eq!(
+        apply(&f, other).await.unwrap_err().status,
+        StatusCode::CONFLICT
     );
     f.db.cleanup().await.unwrap();
 }

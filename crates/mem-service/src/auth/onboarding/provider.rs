@@ -32,7 +32,9 @@ pub(super) async fn operate(
 ) -> Result<OnboardingIdpOperation, ApiError> {
     let cfg = &state.config.auth.authentik_management;
     if !cfg.enabled
-        || !safe_https(state.config.auth.oidc.issuer_url.trim_end_matches('/'))
+        || !safe_https(mem_config::oidc_principal_namespace(
+            &state.config.auth.oidc.issuer_url,
+        ))
         || cfg.token_env.is_empty()
         || cfg.user_path.trim().is_empty()
         || cfg.user_path.len() > 256

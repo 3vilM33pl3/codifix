@@ -22,7 +22,8 @@ pub(crate) async fn company_configuration(
     for cfg in &registry.owners {
         if cfg.owner_instance_id.is_nil()
             || !identities.insert(cfg.owner_instance_id)
-            || cfg.issuer != state.config.auth.oidc.issuer_url
+            || cfg.issuer
+                != mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url)
             || cfg.issuer.ends_with('/')
             || !super::super::safe_https(&cfg.issuer)
             || cfg.delegation_policy_revision < 1
@@ -60,7 +61,8 @@ fn owner<'a>(
     if registry.company_id != request.company_id
         || registry.company_id.is_nil()
         || registry.owners.len() > 16
-        || request.issuer != state.config.auth.oidc.issuer_url
+        || request.issuer
+            != mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url)
     {
         return Err(ApiError::forbidden(
             "exact company and shared issuer required",

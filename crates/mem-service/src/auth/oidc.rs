@@ -184,7 +184,7 @@ pub(crate) async fn auth_callback(
         .or_else(|| email.clone())
         .unwrap_or_else(|| subject.clone());
     let groups = groups_from_id_token(&id_token.to_string(), &state.config.auth.oidc.groups_claim)?;
-    let issuer = state.config.auth.oidc.issuer_url.trim_end_matches('/');
+    let issuer = mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url);
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
     let principal_id = upsert_human_principal_tx(
         &mut tx,

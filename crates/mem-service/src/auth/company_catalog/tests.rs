@@ -202,6 +202,7 @@ async fn authorized_catalog_uses_fresh_human_and_delivery_only_transport_retains
             delivery_policy_revision: None,
         });
     let mut actor = f.human.clone();
+    f.state.config.auth.oidc.issuer_url.push('/');
     actor.subject = Some("stale-or-forged-cached-subject".into());
     actor.issuer = Some("https://cached-wrong.example".into());
     let response = catalog(State(f.state.clone()), Extension(actor))
@@ -232,7 +233,10 @@ async fn authorized_catalog_uses_fresh_human_and_delivery_only_transport_retains
         let (request, headers) = &seen[0];
         assert_eq!(request.company_id, company);
         assert_eq!(request.subject, "Human");
-        assert_eq!(request.issuer, f.state.config.auth.oidc.issuer_url);
+        assert_eq!(
+            request.issuer,
+            mem_config::oidc_principal_namespace(&f.state.config.auth.oidc.issuer_url)
+        );
         assert_eq!(headers["authorization"], format!("Bearer {}", owner.secret));
         for absent in [
             "cookie",

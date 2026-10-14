@@ -102,9 +102,9 @@ pub(crate) async fn register_user(
     Extension(actor): Extension<AuthenticatedPrincipal>,
     Json(request): Json<OnboardingUserRequest>,
 ) -> Result<Json<OnboardingUser>, ApiError> {
-    let issuer = state.config.auth.oidc.issuer_url.trim_end_matches('/');
+    let issuer = mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url);
     if issuer.is_empty()
-        || request.issuer.trim_end_matches('/') != issuer
+        || mem_config::oidc_principal_namespace(&request.issuer) != issuer
         || !safe_https(issuer)
         || !text(&request.subject, 512)
         || !text(&request.display_name, 256)

@@ -124,7 +124,9 @@ fn registry(state: &AppState) -> Result<Registry, ApiError> {
         .ok_or_else(denied)?;
     if cfg.company_id.is_nil()
         || cfg.owners.len() > 16
-        || !issuer(&state.config.auth.oidc.issuer_url)
+        || !issuer(mem_config::oidc_principal_namespace(
+            &state.config.auth.oidc.issuer_url,
+        ))
     {
         return Err(denied());
     }
@@ -133,7 +135,7 @@ fn registry(state: &AppState) -> Result<Registry, ApiError> {
     for o in &cfg.owners {
         if o.owner_instance_id.is_nil()
             || !identities.insert(o.owner_instance_id)
-            || o.issuer != state.config.auth.oidc.issuer_url
+            || o.issuer != mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url)
         {
             return Err(denied());
         }
@@ -219,7 +221,9 @@ async fn human(
         .try_get::<Option<String>, _>("subject")
         .map_err(|_| unavailable())?
         .ok_or_else(denied)?;
-    if issuer != state.config.auth.oidc.issuer_url || !bounded_text(&subject, 512) {
+    if issuer != mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url)
+        || !bounded_text(&subject, 512)
+    {
         return Err(denied());
     }
     let live:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_web_sessions WHERE id=$1 AND principal_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR SHARE)").bind(actor.session_id).bind(actor.id).fetch_one(&mut **tx).await.map_err(|_|unavailable())?;

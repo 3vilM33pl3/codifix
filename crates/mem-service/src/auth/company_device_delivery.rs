@@ -115,7 +115,7 @@ async fn human(
     issuer: &str,
     subject: &str,
 ) -> Result<Uuid, ApiError> {
-    if issuer != state.config.auth.oidc.issuer_url
+    if issuer != mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url)
         || subject.is_empty()
         || subject.len() > 512
         || subject.chars().any(char::is_control)

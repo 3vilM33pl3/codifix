@@ -67,7 +67,7 @@ async fn human(
         .try_get::<Option<String>, _>("subject")
         .map_err(ApiError::sql)?
         .ok_or_else(denied)?;
-    if issuer != state.config.auth.oidc.issuer_url
+    if issuer != mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url)
         || subject.is_empty()
         || subject.len() > 512
         || subject.chars().any(char::is_control)
@@ -333,7 +333,7 @@ pub(super) async fn parent_binding(
     if intent.identity.id != human_id
         || intent.identity.issuer != issuer
         || intent.identity.subject != subject
-        || issuer != state.config.auth.oidc.issuer_url
+        || issuer != mem_config::oidc_principal_namespace(&state.config.auth.oidc.issuer_url)
         || intent.registry_sha256 != registry_sha256
         || intent.device_id != device_id
         || row

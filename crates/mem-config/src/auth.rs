@@ -26,6 +26,12 @@ use uuid::Uuid;
 #[allow(unused_imports)]
 use super::*;
 
+/// Stable namespace used for stored human identities and delegated claims.
+/// OIDC discovery still uses the configured issuer URL verbatim.
+pub fn oidc_principal_namespace(issuer: &str) -> &str {
+    issuer.trim_end_matches('/')
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OidcAuthConfig {
     #[serde(default)]
@@ -98,7 +104,7 @@ pub struct CompanyProjectDelegation {
 #[serde(deny_unknown_fields)]
 pub struct CompanyDelegationConfig {
     pub company_id: Uuid,
-    /// Exact shared OIDC namespace, also equal to this owner's configured issuer.
+    /// Exact stored OIDC namespace: configured issuer without trailing slashes.
     pub issuer: String,
     pub principal_id: Uuid,
     pub token_id: Uuid,
@@ -228,7 +234,7 @@ impl AuthConfig {
                 || cfg.principal_id == cfg.token_id
                 || cfg.policy_revision < 1
                 || cfg.area == OnboardingArea::Trust
-                || cfg.issuer != self.oidc.issuer_url
+                || cfg.issuer != oidc_principal_namespace(&self.oidc.issuer_url)
                 || cfg.issuer.ends_with('/')
                 || !cfg.issuer.starts_with("https://")
                 || cfg.issuer.len() <= 8
@@ -277,7 +283,7 @@ impl AuthConfig {
                 || cfg.token_id.is_nil()
                 || cfg.principal_id == cfg.token_id
                 || cfg.policy_revision < 1
-                || cfg.issuer != self.oidc.issuer_url
+                || cfg.issuer != oidc_principal_namespace(&self.oidc.issuer_url)
                 || cfg.issuer.ends_with('/')
                 || !cfg.issuer.starts_with("https://")
                 || cfg.issuer.len() <= 8
@@ -365,6 +371,26 @@ mod company_delegations_tests {
         ] {
             let mut changed = auth.clone();
             changed.company_delegations[0].issuer = issuer.into();
+            assert!(changed.validate_company_delegations().is_err());
+        }
+    }
+
+    #[test]
+    fn canonical_oidc_url_keeps_discovery_slash_with_exact_principal_namespace() {
+        let mut auth = delivery_configured();
+        auth.oidc.issuer_url.push('/');
+        assert!(auth.validate_company_delivery_delegations().is_ok());
+        assert!(auth.oidc.issuer_url.ends_with('/'));
+        assert_eq!(
+            oidc_principal_namespace(&auth.oidc.issuer_url),
+            auth.company_delegations[0].issuer
+        );
+        for other in [
+            "https://identity.example/application/o/other",
+            "https://IDENTITY.example/application/o/memory",
+        ] {
+            let mut changed = auth.clone();
+            changed.company_delegations[0].issuer = other.into();
             assert!(changed.validate_company_delegations().is_err());
         }
     }

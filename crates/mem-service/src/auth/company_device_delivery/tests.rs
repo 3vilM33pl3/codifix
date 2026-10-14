@@ -75,6 +75,7 @@ async fn call(
 async fn external_approval_replays_without_creating_local_identity_or_device() {
     let Some(mut f) = fixture().await else { return };
     let (actor, request) = setup(&mut f).await;
+    f.state.config.auth.oidc.issuer_url.push('/');
     let before: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_principals")
         .fetch_one(&f.db.pool)
         .await
