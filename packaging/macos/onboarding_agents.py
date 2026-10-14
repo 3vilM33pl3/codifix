@@ -36,6 +36,9 @@ def inspect_saved(saved, value):
         selected = value["projects"][index]
         if entry["approval"] is not None:
             approval(entry["approval"], selected["selection"], entry["caller"])
+            expected_mode = "curated_project_v1" if value["plan"]["input"]["native"].get("curated_sync") else "shared_publications_v1"
+            if entry["approval"]["request"].get("replication_mode", "shared_publications_v1") != expected_mode:
+                raise Refused("agent corpus mode differs from this native journey")
         if entry["receipt"] is not None:
             if entry["approval"] is None:
                 raise Refused("agent receipt without an exact prepared request")
@@ -71,6 +74,7 @@ class Memory(journey.Memory):
 
     def prepare_agent(self, slot, caller, *, new_request=False):
         return self.public(["projects", "agents", "prepare", *self.company(), "--caller", caller,
+                            *(["--replication-mode", "curated_project_v1"] if self.source["native"].get("curated_sync") else []),
                             "--workspace-journal", slot["journal"], *(["--new-request"] if new_request else []),
                             *([] if self.source["no_browser"] else ["--open-browser"])])
 
@@ -94,7 +98,9 @@ def approval(value, selected, caller):
     if value["device_id"] != selected["device_id"] or value["approval_endpoint"] != f"/v1/onboarding/devices/{value['device_id']}/agents" or value["contains_secret"] is not False or value["automatic_approval"] is not False:
         raise Refused("agent request parent/disclosure metadata differs")
     r = value["request"]
-    operator.exact(r, {"request_id", "agent_id", "principal_id", "token_id", "caller", "provider_id", "credential_sha256", "expires_at", "projects", "confirmed"})
+    operator.exact(r, {"request_id", "agent_id", "principal_id", "token_id", "caller", "provider_id", "credential_sha256", "expires_at", "projects", "confirmed"} | ({"replication_mode"} if "replication_mode" in r else set()))
+    if r.get("replication_mode", "shared_publications_v1") not in {"shared_publications_v1", "curated_project_v1"}:
+        raise Refused("unsupported agent knowledge scope")
     for name in ["request_id", "agent_id", "principal_id", "token_id"]:
         operator.identifier(r[name])
     operator.pin(r["credential_sha256"])
@@ -112,8 +118,10 @@ def approval(value, selected, caller):
 
 
 def verified(receipt, prepared, company_id):
-    operator.exact(receipt, {"schema_version", "request_id", "agent_id", "device_id", "human_id", "company_id", "principal_id", "token_id", "issuer", "subject", "caller", "provider_id", "credential_sha256", "expires_at", "projects", "approved_at", "revoked_at"})
+    operator.exact(receipt, {"schema_version", "request_id", "agent_id", "device_id", "human_id", "company_id", "principal_id", "token_id", "issuer", "subject", "caller", "provider_id", "credential_sha256", "expires_at", "projects", "approved_at", "revoked_at"} | ({"replication_mode"} if "replication_mode" in receipt else set()))
     r = prepared["request"]
+    if receipt.get("replication_mode", "shared_publications_v1") != r.get("replication_mode", "shared_publications_v1"):
+        raise Refused("agent knowledge scope changed from the explicit request")
     for name in ["request_id", "agent_id", "principal_id", "token_id", "caller", "provider_id", "credential_sha256", "expires_at"]:
         if receipt[name] != r[name]:
             raise Refused("approved agent receipt changed from the exact request")
@@ -167,8 +175,6 @@ def run(journal, native, *, allow_offline=False, renew_grant=None, memory=None, 
     if value["stages"].get("native services") != "done":
         raise Refused("finish the native journey before project agent configuration")
     source = value["plan"]["input"]
-    if source["native"].get("curated_sync"):
-        raise Refused("curated-project MCP disclosure requires a mode-bound approval; shared-publication agent grants cannot authorize the larger project corpus")
     _, native_journal = journey.native_paths(journal, value)
     native_value = operator.inspect(native_journal)
     native.preflight(native_value["plan"])
@@ -205,6 +211,9 @@ def run(journal, native, *, allow_offline=False, renew_grant=None, memory=None, 
             else:
                 approval(entry["approval"], selected, caller)
             prepared = entry["approval"]
+            expected_mode = "curated_project_v1" if source["native"].get("curated_sync") else "shared_publications_v1"
+            if prepared["request"].get("replication_mode", "shared_publications_v1") != expected_mode:
+                raise Refused("prepared agent corpus mode differs from the selected native workflow")
             if entry["receipt"] is None:
                 browser_prompt(prepared)
             receipt = verified(memory.agent_status(prepared["agent_id"]), prepared, subscription["bootstrap"]["scope"]["company"])

@@ -23,6 +23,7 @@ native_module = importlib.import_module("onboarding_native")
 class FakeNative:
     def __init__(self):
         self.commands, self.sql_calls, self.labels, self.bootstraps = [], [], set(), []
+        self.events = []
         self.reviews = 0
         self.lose_init = self.lose_bootstrap = self.revoked = self.mismatch = False
     def preflight(self, plan):
@@ -38,6 +39,7 @@ class FakeNative:
     def command(self, args, **kwargs):
         args = [str(a) for a in args]
         self.commands.append(args)
+        self.events.append(("command", args))
         if Path(args[0]).name == "initdb":
             data = Path(args[args.index("-D") + 1])
             data.mkdir(mode=0o700, exist_ok=True)
@@ -57,6 +59,7 @@ class FakeNative:
         data = plistlib.loads(Path(file).read_bytes())
         self.labels.add(data["Label"])
         self.bootstraps.append(data)
+        self.events.append(("bootstrap", data["Label"]))
         if self.lose_bootstrap:
             self.lose_bootstrap = False
             raise files.Refused("synthetic accepted bootstrap reply lost")
@@ -198,6 +201,19 @@ class OperatorContract(unittest.TestCase):
             with self.assertRaises(files.Refused):
                 operator.run_job(self.journal, "run-watcher", "1", self.fake)
             self.assertEqual(execute.call_count, 1)
+
+    def test_initial_curated_sync_binds_project_before_watcher_activation(self):
+        self.curated_input()
+        self.apply()
+        first_sync = next(i for i, (kind, value) in enumerate(self.fake.events) if kind == "command" and "sync" in value)
+        watcher = next(i for i, (kind, value) in enumerate(self.fake.events) if kind == "bootstrap" and ".watcher." in value)
+        self.assertLess(first_sync, watcher)
+        sync_job = next(j for j in self.fake.bootstraps if ".sync." in j["Label"])
+        self.assertTrue(sync_job["KeepAlive"])
+        self.assertNotIn("StartInterval", sync_job)
+        with patch.object(os, "execve") as execute:
+            operator.run_job(self.journal, "run-sync", self.metadata["subscription"], self.fake)
+            self.assertIn("--watch", execute.call_args.args[1])
     def test_confirm_and_prerequisites_before_native_effects(self):
         value = self.prepare()
         for digest, confirm in [(value["plan_sha256"], False), ("0" * 64, True)]:

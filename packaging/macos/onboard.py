@@ -493,7 +493,10 @@ def apply(journal, digest, confirm, native):
             native.health(area)
         for selection in plan["selections"]:
             subscription = selection["metadata"]["subscription"]
-            stage(journal, value, "sync_agent:" + subscription, lambda: job(value, native, "sync", subscription, wrapper(value, "run-sync", "--journal", str(journal), "--subscription", subscription), 300), always=True)
+            if plan["input"]["schema_version"] == 2:
+                stage(journal, value, "initial_sync:" + subscription, lambda: native.command([plan["input"]["memory"]["path"], "projects", "sync", "--profile", str(root / "profiles" / (subscription + ".json"))], timeout=120))
+            interval = None if plan["input"]["schema_version"] == 2 else 300
+            stage(journal, value, "sync_agent:" + subscription, lambda: job(value, native, "sync", subscription, wrapper(value, "run-sync", "--journal", str(journal), "--subscription", subscription), interval), always=True)
         if plan["input"]["schema_version"] == 2:
             for index, route in enumerate(plan["input"]["repositories"]):
                 stage(journal, value, "watcher_agent:" + str(index), lambda index=index: job(value, native, "watcher", str(index), wrapper(value, "run-watcher", "--journal", str(journal), "--repository-index", str(index))), always=True)
@@ -525,6 +528,8 @@ def run_job(journal, mode, selected, native):
         if selected not in {s["metadata"]["subscription"] for s in plan["selections"]}:
             raise Refused("subscription not in exact prepared plan")
         args = [plan["input"]["memory"]["path"], "projects", "sync", "--profile", str(root / "profiles" / (selected + ".json"))]
+        if plan["input"]["schema_version"] == 2:
+            args.append("--watch")
     os.execve(args[0], args, clean_env())
 
 

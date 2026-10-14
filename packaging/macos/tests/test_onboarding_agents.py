@@ -133,6 +133,18 @@ class AgentJourneyContract(unittest.TestCase):
             for forbidden in ["mlt_", "local_database_url", "poll_secret", "password", "api_token"]:
                 self.assertNotIn(forbidden, text)
 
+    def test_curated_disclosure_requires_the_same_mode_in_the_receipt(self):
+        slot = self.fixture.source["projects"][0]
+        selected = self.fixture.memory.workspace_status(slot["journal"])["plan"]
+        prepared = self.memory.prepare_agent(slot, "codex")
+        prepared["request"]["replication_mode"] = "curated_project_v1"
+        agents.approval(prepared, selected, "codex")
+        receipt = self.memory.agent_status(prepared["agent_id"])
+        with self.assertRaises(files.Refused):
+            agents.verified(receipt, prepared, receipt["company_id"])
+        receipt["replication_mode"] = "curated_project_v1"
+        agents.verified(receipt, prepared, receipt["company_id"])
+
     def test_exact_resume_retains_credentials_ids_and_configuration_intents(self):
         self.run_agents()
         original = self.saved()

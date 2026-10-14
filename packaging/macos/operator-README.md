@@ -104,8 +104,17 @@ Curated profiles bind the reviewed manifest digest and the local repository to
 the exact remote project ID. Selecting this workflow requires writer access and
 the company browser approval must explicitly permit curated contributions.
 Existing shared-publication agent grants do not authorize sending the larger
-curated corpus to Codex or Claude; `journey-agents` currently stops for curated
-journeys until a separate mode-bound agent approval is implemented.
+curated corpus to Codex or Claude. `journey-agents` prepares separate identities
+with `curated_project_v1` disclosure explicitly shown in the company browser.
+Only its matching approved receipt can read a curated profile; legacy grants
+cannot be reused for the larger corpus.
+
+Before watchers start, the first curated synchronization initializes the exact
+local project and its outbound binding. A failed initial synchronization retains
+the journal and leaves watchers off until recovery succeeds. The curated sync
+LaunchAgent then runs `--watch`: it checks queued contributions every two seconds
+and downloads remote updates on the normal five-minute schedule. Legacy shared
+profiles retain their interval-based one-shot synchronization jobs.
 
 Watcher stages, service stages and five-minute synchronization jobs retain their
 immutable journal identities across interruption and reboot. Rerun the same
