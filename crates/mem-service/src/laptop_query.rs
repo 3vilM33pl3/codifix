@@ -99,7 +99,7 @@ pub(crate) async fn query(
     .map_err(ApiError::io)?;
     // Exact device/project matching below avoids assuming manifest revisions from
     // local configuration. Retained receipts are knowledge identity, not grants.
-    let acknowledged:Vec<Uuid>=sqlx::query_scalar("SELECT q.local_memory_id FROM laptop_curated_outbox q JOIN device_replica_records r ON r.subscription=$1 AND r.record_key='version:'||(q.receipt->>'owner_memory_id') WHERE q.state='accepted' AND q.local_project_id=$2 AND q.binding->>'device_id'=$3 AND q.binding->'scope'->>'owner_instance_id'=$4 AND r.record->>'kind'='memory_version' AND r.record->'value'->>'id'=q.receipt->>'owner_memory_id'").bind(binding.subscription_id).bind(project).bind(binding.device_id.to_string()).bind(binding.owner_instance_id.to_string()).fetch_all(&pool).await.map_err(ApiError::sql)?;
+    let acknowledged:Vec<Uuid>=sqlx::query_scalar("SELECT q.local_memory_id FROM laptop_curated_outbox q WHERE q.state='accepted' AND q.local_project_id=$2 AND q.binding->>'device_id'=$3 AND q.binding->'scope'->>'owner_instance_id'=$4 AND EXISTS(SELECT 1 FROM device_replica_records r WHERE r.subscription=$1 AND ((r.record_key='version:'||(q.receipt->>'owner_memory_id') AND r.record->>'kind'='memory_version' AND r.record->'value'->>'id'=q.receipt->>'owner_memory_id') OR (r.record_key='state:'||(q.receipt->>'owner_canonical_id') AND r.record->>'kind'='canonical_state' AND r.record->'value'->>'status'<>'active'))))").bind(binding.subscription_id).bind(project).bind(binding.device_id.to_string()).bind(binding.owner_instance_id.to_string()).fetch_all(&pool).await.map_err(ApiError::sql)?;
     response
         .results
         .retain(|r| !acknowledged.contains(&r.memory_id));
@@ -109,7 +109,7 @@ pub(crate) async fn query(
                 owner_instance_id: binding.owner_instance_id,
                 project_id: project,
                 author: hit.version.author.clone(),
-                content_digest: format!("sha256:{}",hit.digest.as_hex()),
+                content_digest: format!("sha256:{}", hit.digest.as_hex()),
                 read_only: true,
             }),
             memory_id: hit.version.id,
