@@ -56,9 +56,44 @@ Read-only inventory confirmed existing private DNS and Authentik infrastructure
 can be reused without creating public DNS records. Live Homelab/Workshop remain
 single-user preview services with no company registry/delegates configured.
 Canonical Authentik issuer discovery includes a trailing slash while stored
-identity namespaces do not; a focused compatibility fix is being tested before
-any live configuration change. The identity provider's subject mode is not
-changed by this fix.
+identity namespaces do not. Commit `f91d15c9` preserves both contracts; five
+configuration tests and 35 database-backed company tests passed. The identity
+provider's subject mode is not changed by this fix.
+
+The running owner containers have no default route and only internal networks.
+Their loopback relay must not be exposed as the LAN proxy because it conveys
+local-peer semantics. The planned minimal change is one internal ingress network
+per owner, connecting only that owner and Caddy; exact HTTPS aliases resolve to
+Caddy on that network. Caddy retains its existing Authentik upstream. Owners keep
+their current database/federation networks and receive no general egress route.
+The new listeners must use multi-user authentication before LAN routing starts.
+Existing token callers need an identity/continuity check before that switch.
+
+## Native portability fixes and current status
+
+- PostgreSQL 17.11 compiled natively; its server executable links only Apple's
+  system library in the observed `otool -L` output. This is not yet a database
+  initialization/restart test.
+- pgvector compiled, exposing two actual packaging mismatches: macOS emits
+  `vector.dylib`, and staged `pg_config` relocates its directory answers. The
+  original install applied `DESTDIR` twice. Commit `5e2f26cf` separates compile
+  and final installation paths and accepts hash-bound `.dylib` metadata while
+  retaining existing `.so` manifest compatibility.
+- Python's first build autodetected Homebrew OpenSSL and failed installation of
+  `_ssl`. Commit `aec41938` restricts the build PATH and disables the unused
+  Python `_ssl`/`_hashlib` extensions. The operator uses Memory for HTTPS, and
+  Python's built-in digest implementations remain available. The incomplete
+  Python tree was moved aside, not deleted; native production is being resumed.
+- All 112 Python packaging/operator tests pass on Linux after these changes.
+  These are not native acceptance evidence.
+- SSH became intermittently unavailable during compilation. Existing builds
+  survived the first interruption. A temporary two-hour idle-sleep assertion was
+  started; no persistent power setting was changed.
+
+The native source snapshot must receive the issuer fix and final packaging fixes
+before a candidate is frozen. Neither the full native executable nor the runtime
+manifest is recorded as completed yet. User Keychain trust, privileged package
+installation, actual login and the two-project journey remain open.
 
 No live owner database migration, company exposure, device grant, paid provider
 call, source-data transfer, or laptop service activation is claimed here.
