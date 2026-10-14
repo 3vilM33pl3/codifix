@@ -145,6 +145,25 @@ pub(crate) async fn query(
     response
         .results
         .retain(|r| !acknowledged.contains(&r.memory_id));
+    let local_ids: Vec<Uuid> = response.results.iter().map(|r| r.memory_id).collect();
+    let pending:Vec<(Uuid,String,Option<String>)>=sqlx::query_as("SELECT local_memory_id,state,blocked_reason FROM laptop_curated_outbox WHERE local_memory_id=ANY($1) AND local_project_id=$2 AND binding->>'device_id'=$3 AND binding->'scope'->>'owner_instance_id'=$4")
+        .bind(&local_ids).bind(project).bind(binding.device_id.to_string()).bind(binding.owner_instance_id.to_string()).fetch_all(&pool).await.map_err(ApiError::sql)?;
+    for result in &mut response.results {
+        if let Some((_, status, reason)) = pending.iter().find(|(id, _, _)| *id == result.memory_id)
+        {
+            result.score_explanation.insert(
+                0,
+                format!(
+                    "Local contribution: {status}{}; not an editable copy of owner history.",
+                    reason
+                        .as_ref()
+                        .map(|r| format!(" ({r})"))
+                        .unwrap_or_default()
+                ),
+            );
+            result.needs_review |= matches!(status.as_str(), "proposed" | "conflict" | "blocked");
+        }
+    }
     for hit in remote {
         response.results.push(QueryResult {
             origin: Some(QueryResultOrigin {

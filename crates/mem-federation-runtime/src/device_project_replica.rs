@@ -134,6 +134,30 @@ impl DeviceProjectReplica {
         client: &ScopedDeviceClient,
         max_pages: u32,
     ) -> Result<ProjectSyncProgress> {
+        let result = self.synchronize_once(client, max_pages).await;
+        let error = match &result {
+            Ok(_) => None,
+            Err(RuntimeError::Unauthorized) => Some("authority_denied"),
+            Err(_) => Some("synchronization_incomplete"),
+        };
+        sqlx::query("UPDATE device_replica_projections SET last_sync_error=$2,last_sync_attempt_at=clock_timestamp() WHERE subscription=$1")
+            .bind(self.binding.subscription).bind(error).execute(&self.pool).await.map_err(|_|RuntimeError::Unavailable)?;
+        result
+    }
+    pub async fn last_error(&self) -> Result<Option<String>> {
+        sqlx::query_scalar(
+            "SELECT last_sync_error FROM device_replica_projections WHERE subscription=$1",
+        )
+        .bind(self.binding.subscription)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| RuntimeError::Unavailable)
+    }
+    async fn synchronize_once(
+        &self,
+        client: &ScopedDeviceClient,
+        max_pages: u32,
+    ) -> Result<ProjectSyncProgress> {
         if !(1..=128).contains(&max_pages) {
             return Err(RuntimeError::Configuration);
         }
@@ -494,6 +518,10 @@ mod tests {
             "download committed despite failed upload"
         );
         assert_eq!(replica.uploads().await.unwrap().get("queued"), Some(&1));
+        assert_eq!(
+            replica.last_error().await.unwrap().as_deref(),
+            Some("synchronization_incomplete")
+        );
         let mut last = Uuid::nil();
         for _ in 0..33 {
             last = Uuid::new_v4();
