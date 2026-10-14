@@ -11,6 +11,7 @@ from pathlib import Path
 import plistlib
 import re
 import secrets
+import shlex
 import sys
 import uuid
 from urllib.parse import urlsplit
@@ -52,9 +53,11 @@ def port(value):
 
 
 def metadata(value):
-    exact(value, {"schema_version", "company", "subscription", "bootstrap", "allow_loopback_development"} | ({"replication_mode"} if "replication_mode" in value else set()))
+    exact(value, {"schema_version", "company", "subscription", "bootstrap", "allow_loopback_development"} | ({"replication_mode"} if "replication_mode" in value else set()) | ({"manifest_sha256"} if "manifest_sha256" in value else set()))
     if value.get("replication_mode", "shared_publications_v1") not in {"shared_publications_v1", "curated_project_v1"}:
         raise Refused("unsupported device replication mode")
+    if value.get("replication_mode") == "curated_project_v1":
+        pin(value.get("manifest_sha256"))
     if value["schema_version"] != 1 or type(value["allow_loopback_development"]) is not bool:
         raise Refused("unsupported subscription metadata")
     identifier(value["subscription"])
@@ -93,7 +96,8 @@ def make_plan(source, *, prerequisites_only=False):
             raise Refused("curated native workflow requires exact selected repository routes")
         seen_repositories = set()
         for route in source["repositories"]:
-            exact(route, {"area", "repository", "project"})
+            exact(route, {"area", "repository", "project", "project_id"})
+            identifier(route["project_id"])
             repository = str(files.path(route["repository"]))
             if route["area"] not in AREAS or not isinstance(route["project"], str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", route["project"]) or repository in seen_repositories:
                 raise Refused("duplicate repository or unsupported exact project route")
@@ -171,6 +175,8 @@ def make_plan(source, *, prerequisites_only=False):
             raise Refused("repository routing must cover exactly the selected areas")
         if any(s["metadata"].get("replication_mode") != "curated_project_v1" for s in selections):
             raise Refused("writable local workflow requires curated-project subscription profiles")
+        if not prerequisites_only and {(r["area"], r["project_id"]) for r in source["repositories"]} != {(s["metadata"]["bootstrap"]["scope"]["area"], s["metadata"]["bootstrap"]["scope"]["project"]) for s in selections}:
+            raise Refused("watcher routes must cover exactly the approved device projects")
     if instances & {s["metadata"]["bootstrap"][key] for s in selections for key in ["device", "authority"]} or instances & {s["metadata"]["bootstrap"]["scope"]["owner"] for s in selections}:
         raise Refused("local area identities must not impersonate enrolled devices or remote owners/authorities")
     return {"input": source, "pins": pins, "selections": selections,
@@ -287,6 +293,8 @@ def area_config(value, area, secret):
         if scope["area"] != name:
             continue
         cache += "\n[[laptop_cache.subscriptions]]\n"
+        if metadata.get("replication_mode"):
+            cache += "replication_mode = " + json.dumps(metadata["replication_mode"]) + "\n"
         for key, identifier in {
             "subscription_id": metadata["subscription"],
             "device_id": metadata["bootstrap"]["device"],
@@ -350,11 +358,28 @@ def routing(value):
     # Unknown repositories must not fall into another selected area's database.
     areas.setdefault("general", {"instance_id": value["request_id"], "config": None})
     return {"version": 1, "default_area": "general", "areas": areas,
-            "routes": value["plan"]["input"]["repositories"]}
+            "routes": [{k: r[k] for k in ["area", "repository", "project"]} for r in value["plan"]["input"]["repositories"]]}
+
+
+def client_launcher(value):
+    command = [value["plan"]["input"]["memory"]["path"], "--area-routing", str(state_root(value) / "area-routing.json")]
+    return ("#!/bin/sh\nexec " + " ".join(shlex.quote(a) for a in command) + ' "$@"\n').encode()
 
 
 def database_url(value, area, password):
     return f"postgresql://memory_laptop_{area}:{password}@127.0.0.1:{value['plan']['input']['pg_port']}/memory_laptop_{area}"
+
+
+def local_profile(value, metadata, secret):
+    profile = dict(metadata)
+    area = metadata["bootstrap"]["scope"]["area"]
+    profile["local_database_url"] = database_url(value, area, secret[area]["password"])
+    if metadata.get("replication_mode") == "curated_project_v1":
+        routes = [r for r in value["plan"]["input"]["repositories"] if r["area"] == area and r["project_id"] == metadata["bootstrap"]["scope"]["project"]]
+        if len(routes) != 1:
+            raise Refused("curated subscription must have one exact cloned repository binding")
+        profile["local_project"] = {"slug": routes[0]["project"], "repository": routes[0]["repository"]}
+    return profile
 
 
 def verify_files(value):
@@ -365,13 +390,13 @@ def verify_files(value):
     secret = secrets_at(value)
     if value["plan"]["input"]["schema_version"] == 2 and files.read(root / "area-routing.json") != routing(value):
         raise Refused("selected repository routing changed; no fallback")
+    if value["plan"]["input"]["schema_version"] == 2 and files.bytes_at(root / "bin/memory") != client_launcher(value):
+        raise Refused("owned routed client changed; preserve and inspect")
     for area in value["plan"]["input"]["areas"]:
         if files.bytes_at(root / (area["name"] + ".toml")) != area_config(value, area, secret["areas"][area["name"]]):
             raise Refused("owned area settings changed; preserve and inspect")
     for selection in value["plan"]["selections"]:
-        profile = dict(selection["metadata"])
-        name = profile["bootstrap"]["scope"]["area"]
-        profile["local_database_url"] = database_url(value, name, secret["areas"][name]["password"])
+        profile = local_profile(value, selection["metadata"], secret["areas"])
         if files.read(root / "profiles" / (profile["subscription"] + ".json"), 64 * 1024) != profile:
             raise Refused("private replica profile changed; no fallback")
     expected = {"pg_hba.conf": b"local all all reject\nhost all all 127.0.0.1/32 scram-sha-256\nhost all all 0.0.0.0/0 reject\nhost all all ::0/0 reject\n",
@@ -422,10 +447,11 @@ def apply(journal, digest, confirm, native):
                 files.missing(root / (area["name"] + ".toml"), area_config(value, area, secret["areas"][area["name"]]))
             if plan["input"]["schema_version"] == 2:
                 files.missing(root / "area-routing.json", files.encoded(routing(value)))
+                files.directory(root / "bin")
+                files.missing(root / "bin/memory", client_launcher(value))
+                (root / "bin/memory").chmod(0o700)
             for selection in plan["selections"]:
-                profile = dict(selection["metadata"])
-                name = profile["bootstrap"]["scope"]["area"]
-                profile["local_database_url"] = database_url(value, name, secret["areas"][name]["password"])
+                profile = local_profile(value, selection["metadata"], secret["areas"])
                 files.missing(root / "profiles" / (profile["subscription"] + ".json"), files.encoded(profile))
         stage(journal, value, "layout", layout)
         verify_files(value)

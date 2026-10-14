@@ -167,6 +167,8 @@ def run(journal, native, *, allow_offline=False, renew_grant=None, memory=None, 
     if value["stages"].get("native services") != "done":
         raise Refused("finish the native journey before project agent configuration")
     source = value["plan"]["input"]
+    if source["native"].get("curated_sync"):
+        raise Refused("curated-project MCP disclosure requires a mode-bound approval; shared-publication agent grants cannot authorize the larger project corpus")
     _, native_journal = journey.native_paths(journal, value)
     native_value = operator.inspect(native_journal)
     native.preflight(native_value["plan"])

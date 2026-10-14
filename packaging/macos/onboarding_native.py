@@ -78,6 +78,10 @@ class Native:
                 expected.add("replication_mode")
                 if preview.get("replication_mode") != value["replication_mode"]:
                     raise Refused("subscription replication mode changed; no local provisioning")
+            if value.get("manifest_sha256"):
+                expected.add("manifest_sha256")
+                if preview.get("manifest_sha256") != value["manifest_sha256"]:
+                    raise Refused("subscription project manifest changed; no local provisioning")
             if not isinstance(preview, dict) or set(preview) != expected or preview["company"] != value["company"] or preview["bootstrap"] != value["bootstrap"] or preview["output"] != selected["path"] or any(preview[key] is not False for key in ["contains_database_credentials", "creates_services", "downloads_knowledge"]) or not isinstance(preview["bootstrap_sha256"], str) or not re.fullmatch("[a-f0-9]{64}", preview["bootstrap_sha256"]):
                 raise Refused("current subscription preview differs from exact prepared metadata; no confirmation")
             # Use only the CLI's current preview digest. Do not reconstruct a

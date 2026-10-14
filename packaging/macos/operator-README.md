@@ -97,6 +97,15 @@ the native state root and can be used with `memory --area-routing PATH` for
 interactive commands. Missing General remains unavailable rather than routing
 unknown work to Workshop or Homelab. Paid curation and model execution remain
 disabled until separately configured through the normal application settings.
+An installation-owned `bin/memory` launcher also supplies this routing argument;
+invoke it from a selected repository or add this installation's `bin` directory
+to your PATH. It does not replace an existing global Memory command.
+Curated profiles bind the reviewed manifest digest and the local repository to
+the exact remote project ID. Selecting this workflow requires writer access and
+the company browser approval must explicitly permit curated contributions.
+Existing shared-publication agent grants do not authorize sending the larger
+curated corpus to Codex or Claude; `journey-agents` currently stops for curated
+journeys until a separate mode-bound agent approval is implemented.
 
 Watcher stages, service stages and five-minute synchronization jobs retain their
 immutable journal identities across interruption and reboot. Rerun the same

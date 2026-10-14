@@ -262,7 +262,7 @@ def public_manifest(manifest, *, offline=True):
 
 
 def bootstrap_preview(value, receipt, source, output):
-    operator.exact(value, {"company", "bootstrap", "bootstrap_sha256", "output", "contains_database_credentials", "creates_services", "downloads_knowledge"} | ({"replication_mode"} if "replication_mode" in value else set()))
+    operator.exact(value, {"company", "bootstrap", "bootstrap_sha256", "output", "contains_database_credentials", "creates_services", "downloads_knowledge"} | ({"replication_mode"} if "replication_mode" in value else set()) | ({"manifest_sha256"} if "manifest_sha256" in value else set()))
     if source["native"].get("curated_sync") and value.get("replication_mode") != "curated_project_v1":
         raise Refused("curated local workflow requires an explicitly approved curated-project feed")
     if value["company"] != source["company"] or value["output"] != output or any(value[k] is not False for k in ["contains_database_credentials", "creates_services", "downloads_knowledge"]):
@@ -271,6 +271,10 @@ def bootstrap_preview(value, receipt, source, output):
     sample = {"schema_version": 1, "company": value["company"], "subscription": str(uuid.uuid4()), "bootstrap": value["bootstrap"], "allow_loopback_development": source["allow_loopback_development"]}
     if "replication_mode" in value:
         sample["replication_mode"] = value["replication_mode"]
+    if "manifest_sha256" in value:
+        sample["manifest_sha256"] = value["manifest_sha256"]
+        if value["manifest_sha256"] != receipt["manifest_sha256"]:
+            raise Refused("curated profile manifest differs from reviewed project")
     operator.metadata(sample)
     bootstrap = value["bootstrap"]
     scope = bootstrap["scope"]
@@ -318,6 +322,8 @@ def publish_subscription(memory, slot, receipt, preview, source, entry):
     operator.metadata(subscription)
     if subscription.get("replication_mode", "shared_publications_v1") != preview.get("replication_mode", "shared_publications_v1"):
         raise Refused("subscription feed changed after review; no native provisioning")
+    if subscription.get("manifest_sha256") != preview.get("manifest_sha256"):
+        raise Refused("subscription manifest changed after review; no native provisioning")
     if subscription["company"] != source["company"] or subscription["bootstrap"] != preview["bootstrap"] or subscription["allow_loopback_development"] != source["allow_loopback_development"] or entry["subscription"] is not None and entry["subscription"] != subscription:
         raise Refused("subscription receipt identity changed; no native provisioning")
     entry["subscription"] = subscription

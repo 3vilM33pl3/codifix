@@ -79,6 +79,19 @@ class FirstRunContract(unittest.TestCase):
         for forbidden in ["credential", "password", "local_database_url", "poll_secret"]:
             self.assertNotIn('"' + forbidden + '"', (self.state / "first-run.json").read_text())
 
+    def test_curated_selection_binds_repository_and_refuses_reader_only_projects(self):
+        with self.assertRaises(files.Refused):
+            self.invoke(curated_sync=True)
+        self.entries[0]["allowed_roles"] = ["reader", "writer"]
+        self.invoke(curated_sync=True)
+        source = files.read(self.state / "journey-input.json")
+        self.assertEqual(source["native"]["schema_version"], 2)
+        self.assertTrue(source["native"]["curated_sync"])
+        self.assertEqual(source["native"]["repositories"][0]["project_id"], self.entries[0]["manifest"]["project_id"])
+        self.assertEqual(source["native"]["repositories"][0]["repository"], source["projects"][0]["workspace"])
+        with self.assertRaises(files.Refused):
+            self.invoke(curated_sync=False)
+
     def test_exact_resume_keeps_selection_local_ids_and_existing_repository(self):
         existing = self.repositories / "Unicode café project"
         existing.mkdir(mode=0o700)

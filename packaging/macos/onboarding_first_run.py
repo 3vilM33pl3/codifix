@@ -186,8 +186,12 @@ def run(*, company, name, runtime, memory, state, workspace_parent, native, no_b
             picked = choose(catalog(text), workspace_parent, question=question)
             if curated_sync:
                 projects = catalog(text)
+                for item in picked:
+                    eligible = [entry for entry in projects if entry["manifest"]["project_id"] == item["selection"]["project_id"] and entry["manifest"]["entry"]["area"] == item["selection"]["area"] and entry["manifest"]["entry"]["owner_instance_id"] == item["selection"]["owner_instance_id"]]
+                    if len(eligible) != 1 or "writer" not in eligible[0]["allowed_roles"]:
+                        raise Refused("curated contributions require an authorized writer project; use the read-only workflow for reader access")
                 native_input.update(schema_version=2, curated_sync=True, repositories=[
-                    {"area": item["selection"]["area"], "repository": item["workspace"], "project": next(
+                    {"area": item["selection"]["area"], "project_id": item["selection"]["project_id"], "repository": item["workspace"], "project": next(
                         entry["manifest"]["project"] for entry in projects
                         if entry["manifest"]["project_id"] == item["selection"]["project_id"]
                         and entry["manifest"]["entry"]["area"] == item["selection"]["area"]

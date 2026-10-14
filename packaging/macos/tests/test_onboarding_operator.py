@@ -143,6 +143,61 @@ class OperatorContract(unittest.TestCase):
         self.assertEqual(self.fake.commands, [])
         self.assertEqual(self.fake.bootstraps, [])
         self.assertNotIn("local_database_url", json.dumps(value))
+
+    def curated_input(self):
+        repository = self.root / "memory-repository"
+        repository.mkdir(mode=0o700)
+        self.metadata["replication_mode"] = "curated_project_v1"
+        self.metadata["manifest_sha256"] = "a" * 64
+        self.write(self.metadata_file, self.metadata)
+        self.input.update(schema_version=2, curated_sync=True, repositories=[
+            {"area": "workshop", "repository": str(repository), "project": "memory", "project_id": self.metadata["bootstrap"]["scope"]["project"]}])
+        self.write(self.input_file, self.input)
+
+    def test_curated_workflow_is_writable_scoped_and_recoverable(self):
+        self.curated_input()
+        value = self.apply()
+        root = Path(self.input["root"])
+        config = tomllib.loads((root / "workshop.toml").read_text())
+        self.assertFalse(config["service"]["read_only"])
+        self.assertTrue(config["automation"]["enabled"])
+        self.assertTrue(config["offline"]["enabled"])
+        self.assertFalse(config["features"]["llm_curation"])
+        route = files.read(root / "area-routing.json")
+        self.assertEqual(route["routes"], [{k: r[k] for k in ["area", "project", "repository"]} for r in self.input["repositories"]])
+        self.assertIsNone(route["areas"]["general"]["config"])
+        self.assertEqual(stat.S_IMODE((root / "bin/memory").stat().st_mode), 0o700)
+        self.assertIn(b'"$@"', (root / "bin/memory").read_bytes())
+        watchers = [j for j in self.fake.bootstraps if ".watcher." in j["Label"]]
+        self.assertEqual(len(watchers), 1)
+        self.assertIn("run-watcher", watchers[0]["ProgramArguments"])
+        before = len(self.fake.bootstraps)
+        self.apply(value)
+        self.assertEqual(len(self.fake.bootstraps), before)
+        route["routes"][0]["area"] = "general"
+        self.write(root / "area-routing.json", route)
+        with self.assertRaises(files.Refused):
+            self.apply(value)
+
+    def test_curated_workflow_refuses_publication_only_subscription(self):
+        self.curated_input()
+        self.metadata["replication_mode"] = "shared_publications_v1"
+        self.write(self.metadata_file, self.metadata)
+        with self.assertRaises(files.Refused):
+            self.prepare()
+        self.assertFalse(Path(self.input["root"]).exists())
+
+    def test_watcher_executes_only_the_selected_repository_and_area(self):
+        self.curated_input()
+        self.apply()
+        with patch.object(os, "execve") as execute:
+            operator.run_job(self.journal, "run-watcher", "0", self.fake)
+            args = execute.call_args.args[1]
+            self.assertEqual(args, [str(self.memory), "--config", str(Path(self.input["root"]) / "workshop.toml"),
+                                    "watcher", "run", "--project", "memory", "--repo-root", self.input["repositories"][0]["repository"]])
+            with self.assertRaises(files.Refused):
+                operator.run_job(self.journal, "run-watcher", "1", self.fake)
+            self.assertEqual(execute.call_count, 1)
     def test_confirm_and_prerequisites_before_native_effects(self):
         value = self.prepare()
         for digest, confirm in [(value["plan_sha256"], False), ("0" * 64, True)]:
