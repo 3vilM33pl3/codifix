@@ -90,10 +90,41 @@ Existing token callers need an identity/continuity check before that switch.
   survived the first interruption. A temporary two-hour idle-sleep assertion was
   started; no persistent power setting was changed.
 
-The native source snapshot must receive the issuer fix and final packaging fixes
-before a candidate is frozen. Neither the full native executable nor the runtime
-manifest is recorded as completed yet. User Keychain trust, privileged package
-installation, actual login and the two-project journey remain open.
+## Verified native build milestone
+
+- Full-feature ARM64 Memory compiled and ran `--version`, reporting
+  `memory 2.1.0-rc.5-dev`. The initial `e7f1966c` executable SHA-256 is
+  `f6c77a81d4d7848629407449930b1e3db9ba69ce126793cb8dfbec2bf6bbb84f`;
+  this is not the final candidate hash. Its inspected dependencies are exclusively
+  macOS system libraries/frameworks. The issuer fix was transferred and the
+  package build is rebuilding against it.
+- The 177 MiB runtime now passes exhaustive file/mode/hash validation as well as
+  Mach-O dependency and ad-hoc signature checks. PostgreSQL timezone hard links
+  are flattened into independent files. Resume preserves matching read-only
+  license notices instead of trying to overwrite them.
+- Runtime manifest:
+  `/Users/olivier/Library/Caches/memory-layer-build/runtime-arm64-v1/runtime-manifest.json`,
+  SHA-256 `77d8e304b63856ca5d2f434ca4cd548b3773be20ee38b7ea16ff00cb0c240de2`.
+- All **114** packaging/operator tests passed on the real Mac under the bundled
+  Python. Native tests exposed `/var` temporary-path aliases, fixture assumptions
+  about UID 1000, an installed system `pkgbuild`, and macOS's older `/usr/bin/python3`.
+  Fixtures now use the actual user/interpreter and controlled tool discovery.
+  Package staging canonicalizes only its build-owned temporary parent; installed
+  and user-data path checks remain unchanged.
+- A synthetic native PostgreSQL cluster initialized, loaded pgvector **0.8.7**,
+  stored a vector, stopped, restarted and returned the same row. No TCP listener
+  was enabled. The server was stopped and its disposable state preserved at
+  `/Users/olivier/Library/Caches/memory-pg-smoke.LxrJ5G`.
+  This test used a staging-only `DYLD_LIBRARY_PATH` for the uninstalled libpq;
+  it does **not** replace exact-installed-prefix acceptance.
+- The Monolith full release build including the issuer fix passed. It reports
+  `memory 2.1.0-rc.5-dev`, SHA-256
+  `b37d8a057f99640727755e9971e951c3f1424ba29a2e1e080150de872347d248`.
+
+The PKG, final rebuilt Mac executable hash, user Keychain trust, privileged
+package installation, actual company login and two-project journey remain open.
+Ad-hoc signing is not Developer ID signing or notarization. No live service has
+been switched merely because these native build checks passed.
 
 No live owner database migration, company exposure, device grant, paid provider
 call, source-data transfer, or laptop service activation is claimed here.
