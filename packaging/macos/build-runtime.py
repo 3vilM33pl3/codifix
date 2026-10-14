@@ -134,7 +134,7 @@ def produce(args):
             raise ValueError("new build requires empty work directory")
         journal.write_text(json.dumps(descriptor, indent=2) + "\n")
     env = dict(os.environ)
-    env.update({"LC_ALL": "C", "MACOSX_DEPLOYMENT_TARGET": "12.0", "PYTHONDONTWRITEBYTECODE": "1",
+    env.update({"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C", "MACOSX_DEPLOYMENT_TARGET": "12.0", "PYTHONDONTWRITEBYTECODE": "1",
                 "PKG_CONFIG": "/usr/bin/false"})
     for key in ("PYTHONPATH", "PYTHONHOME", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "CPATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "PKG_CONFIG_LIBDIR", "CFLAGS", "CPPFLAGS", "LDFLAGS"):
         env.pop(key, None)
@@ -177,6 +177,10 @@ def produce(args):
             if not (pg / "lib/vector.dylib").is_file() or not (pg / "share/extension/vector.control").is_file():
                 raise ValueError("pgvector installation did not produce native files at the exact staged prefix")
         else:
+            # This is an operator runtime, not a network Python distribution.
+            # Memory owns HTTPS. Do not autodiscover Homebrew OpenSSL or ship
+            # extensions whose loader paths require a build-host installation.
+            (source / "Modules/Setup.local").write_text("*disabled*\n_ssl\n_hashlib\n")
             run(["./configure", f"--prefix={prefix}/python", "--without-ensurepip", "--disable-test-modules"], source, env)
             run(["make", f"-j{args.jobs}"], source, env)
             run(["make", "install", f"DESTDIR={stage}"], source, env)
