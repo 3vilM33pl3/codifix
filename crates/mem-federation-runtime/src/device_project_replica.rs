@@ -137,7 +137,10 @@ impl DeviceProjectReplica {
         if !(1..=128).contains(&max_pages) {
             return Err(RuntimeError::Configuration);
         }
-        self.upload(client).await?;
+        // A contribution-specific failure must not stop receiving owner changes.
+        // Report it only after the independent download has committed its cursor.
+        let upload = self.upload(client).await;
+        let resolutions = self.reconcile(client).await;
         let mut cursor = self.status().await?.cursor;
         let mut through = None;
         for index in 0..max_pages {
@@ -158,6 +161,8 @@ impl DeviceProjectReplica {
             cursor = self.projection.apply_verified(page).await?;
             through = Some(page.through);
             if cursor == page.through || index + 1 == max_pages {
+                upload?;
+                resolutions?;
                 return Ok(ProjectSyncProgress {
                     cursor,
                     through: page.through,
@@ -201,7 +206,12 @@ impl DeviceProjectReplica {
                     mem_store::device_contributions::release(
                         &mut tx,
                         &claim,
-                        matches!(error, RuntimeError::Unauthorized),
+                        matches!(
+                            error,
+                            RuntimeError::Unauthorized
+                                | RuntimeError::InvalidResponse
+                                | RuntimeError::Configuration
+                        ),
                     )
                     .await
                     .map_err(|_| RuntimeError::InvalidResponse)?;
@@ -212,9 +222,64 @@ impl DeviceProjectReplica {
         }
         Ok(())
     }
+    async fn reconcile(&self, client: &ScopedDeviceClient) -> Result<()> {
+        let Some(binding) = &self.contribution else {
+            return Ok(());
+        };
+        let operations:Vec<Uuid>=sqlx::query_scalar("SELECT operation_id FROM laptop_curated_outbox WHERE binding=$1 AND state IN ('proposed','conflict') AND receipt->>'proposal_id' IS NOT NULL ORDER BY updated_at,operation_id LIMIT 32")
+            .bind(sqlx::types::Json(binding)).fetch_all(&self.pool).await.map_err(|_|RuntimeError::Unavailable)?;
+        for operation in operations {
+            let response = client.curated_contribution_resolution(operation).await;
+            // Persist fair polling even for a still-pending or failed response.
+            // Otherwise the first 32 pending proposals starve later decisions.
+            sqlx::query("UPDATE laptop_curated_outbox SET updated_at=clock_timestamp() WHERE operation_id=$1 AND binding=$2 AND state IN ('proposed','conflict')")
+                .bind(operation).bind(sqlx::types::Json(binding)).execute(&self.pool).await.map_err(|_|RuntimeError::Unavailable)?;
+            if let Some(status) = response? {
+                if status.receipt.operation_id != operation {
+                    return Err(RuntimeError::InvalidResponse);
+                }
+                let mut tx = self
+                    .pool
+                    .begin()
+                    .await
+                    .map_err(|_| RuntimeError::Unavailable)?;
+                mem_store::device_contributions::reconcile_resolution(&mut tx, binding, &status)
+                    .await
+                    .map_err(|_| RuntimeError::InvalidResponse)?;
+                tx.commit().await.map_err(|_| RuntimeError::Unavailable)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ScopedDeviceClient {
+    pub async fn curated_contribution_resolution(
+        &self,
+        operation: Uuid,
+    ) -> Result<Option<mem_record::DeviceContributionStatus>> {
+        let scope = self.scope.as_ref().ok_or(RuntimeError::Configuration)?;
+        let path = format!(
+            "/v1/onboarding/areas/{}/owners/{}/projects/{}/contributions/resolution",
+            scope.area,
+            scope.owner.as_uuid(),
+            scope.project
+        );
+        let response = self
+            .endpoint
+            .client
+            .post(self.endpoint.url(&path)?)
+            .bearer_auth(&self.credential)
+            .json(&operation)
+            .send()
+            .await
+            .map_err(|_| RuntimeError::Unavailable)?;
+        match response.status().as_u16() {
+            200..=299 => crate::http::json(response, 64 * 1024).await,
+            401 | 403 => Err(RuntimeError::Unauthorized),
+            _ => Err(RuntimeError::Unavailable),
+        }
+    }
     pub async fn curated_contribution(
         &self,
         request: &mem_record::CuratedDeviceContribution,
@@ -250,6 +315,7 @@ impl ScopedDeviceClient {
         match response.status().as_u16() {
             200..=299 => crate::http::json(response, 64 * 1024).await,
             401 | 403 => Err(RuntimeError::Unauthorized),
+            400 | 409 | 413 | 422 => Err(RuntimeError::InvalidResponse),
             _ => Err(RuntimeError::Unavailable),
         }
     }
@@ -281,5 +347,170 @@ impl ScopedDeviceClient {
             409 => Err(mem_federation_store::StoreError::Resync.into()),
             _ => Err(RuntimeError::Unavailable),
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use axum::{Json, Router, routing::post};
+    use mem_federation::{
+        CanonicalJsonCodec,
+        publication::{InstanceId, SpaceId},
+        subscription::ProjectScope,
+    };
+    #[tokio::test]
+    async fn failed_upload_does_not_block_verified_download() {
+        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
+            return;
+        };
+        let project = Uuid::new_v4();
+        let scope = ProjectScope {
+            company: Uuid::new_v4(),
+            area: "workshop".into(),
+            owner: InstanceId::new(Uuid::new_v4()).unwrap(),
+            project,
+            space: SpaceId::new(Uuid::new_v4()).unwrap(),
+        };
+        let binding = ProjectReplicaBinding {
+            subscription: Uuid::new_v4(),
+            device: Uuid::new_v4(),
+            scope: scope.clone(),
+            catalog_revision: 1,
+            authority: scope.owner,
+        };
+        let contribution = mem_record::LaptopContributionBinding {
+            scope: mem_record::LaptopContributionScope {
+                company_id: scope.company,
+                area: mem_record::OnboardingArea::Workshop,
+                owner_instance_id: scope.owner.as_uuid(),
+                project_id: project,
+                space_id: scope.space.as_uuid(),
+            },
+            device_id: binding.device,
+            manifest_revision: 1,
+            manifest_sha256: "a".repeat(64),
+        };
+        sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,'local','local','/synthetic/local')").bind(project).execute(&db.pool).await.unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        mem_store::device_contributions::bind_project(&mut tx, project, &contribution)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,'local fact','fact','domain_fact','project',3,0.8,now(),now(),to_tsvector('simple','fact'))").bind(Uuid::new_v4()).bind(project).execute(&db.pool).await.unwrap();
+        let security = crate::GatewaySecurity::initial(&[79; 32], Default::default()).unwrap();
+        let trust = security.trust();
+        let authority = scope.owner;
+        let record = Some(DeviceReplicaRecord::CanonicalState(DeviceCanonicalState {
+            canonical_id: Uuid::new_v4(),
+            current_version_id: Uuid::new_v4(),
+            status: mem_record::MemoryStatus::Active,
+            confidence: mem_federation::publication::ConfidencePpm::from_confidence(0.8).unwrap(),
+            importance: 3,
+            updated_at: chrono::Utc::now(),
+            archived_at: None,
+        }));
+        let entry = DeviceReplicaEntry {
+            sequence: 1,
+            key: record.as_ref().unwrap().key(),
+            digest: CanonicalJsonCodec::digest(&record).unwrap(),
+            record,
+        };
+        let path = format!(
+            "/v1/onboarding/areas/{}/owners/{}/projects/{}/replica",
+            scope.area,
+            scope.owner.as_uuid(),
+            project
+        );
+        let resolution_path = path.replace("/replica", "/contributions/resolution");
+        let polled = std::sync::Arc::new(std::sync::Mutex::new(Vec::<Uuid>::new()));
+        let observed = polled.clone();
+        let app = Router::new()
+            .route(
+                &resolution_path,
+                post(move |Json(operation): Json<Uuid>| {
+                    let observed = observed.clone();
+                    async move {
+                        observed.lock().unwrap().push(operation);
+                        Json(Option::<mem_record::DeviceContributionStatus>::None)
+                    }
+                }),
+            )
+            .route(
+                &path,
+                post(move |Json(request): Json<DeviceReplicaRequest>| {
+                    let entry = entry.clone();
+                    let security = security.clone();
+                    async move {
+                        Json(
+                            security
+                                .sign_device_replica_page(
+                                    authority,
+                                    DeviceReplicaPage {
+                                        request,
+                                        through: 1,
+                                        next: 1,
+                                        entries: vec![entry],
+                                    },
+                                )
+                                .unwrap(),
+                        )
+                    }
+                }),
+            )
+            .fallback(|| async { axum::http::StatusCode::SERVICE_UNAVAILABLE });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = ScopedDeviceClient::for_scope(
+            crate::Endpoint::new(&format!("http://{address}"), true).unwrap(),
+            format!("mlt_{}", "a".repeat(64)),
+            scope.clone(),
+        )
+        .unwrap();
+        let projection = DeviceProjectionStore::initialize(
+            db.pool.clone(),
+            binding.subscription,
+            binding.device,
+            scope,
+        )
+        .await
+        .unwrap();
+        let replica = DeviceProjectReplica {
+            binding,
+            projection,
+            trust,
+            pool: db.pool.clone(),
+            contribution: Some(contribution),
+        };
+        assert!(
+            replica.synchronize(&client, 8).await.is_err(),
+            "upload failure remains visible"
+        );
+        assert_eq!(
+            replica.status().await.unwrap().cursor,
+            1,
+            "download committed despite failed upload"
+        );
+        assert_eq!(replica.uploads().await.unwrap().get("queued"), Some(&1));
+        let mut last = Uuid::nil();
+        for _ in 0..33 {
+            last = Uuid::new_v4();
+            sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,'pending correction','pending','domain_fact','project',3,0.8,now(),now(),to_tsvector('simple','pending'))").bind(last).bind(project).execute(&db.pool).await.unwrap();
+            sqlx::query("UPDATE laptop_curated_outbox SET state='proposed',receipt=$2 WHERE operation_id=$1").bind(last).bind(serde_json::json!({"proposal_id":Uuid::new_v4()})).execute(&db.pool).await.unwrap();
+        }
+        replica.reconcile(&client).await.unwrap();
+        assert_eq!(polled.lock().unwrap().len(), 32);
+        assert!(!polled.lock().unwrap().contains(&last));
+        replica.reconcile(&client).await.unwrap();
+        assert_eq!(
+            polled.lock().unwrap()[32],
+            last,
+            "later decisions must not be starved by the first 32 pending proposals"
+        );
+        server.abort();
+        drop(replica);
+        db.cleanup().await.unwrap();
     }
 }

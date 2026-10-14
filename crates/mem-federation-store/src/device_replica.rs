@@ -216,7 +216,7 @@ records AS (
  SELECT jsonb_build_object('kind','memory_version','value',jsonb_build_object(
  'id',m.id,'canonical_id',m.canonical_id,'version',m.version_no,'tombstone',m.is_tombstone,
  'text',m.canonical_text,'summary',m.summary,'memory_type',m.memory_type,'scope',m.scope,
- 'author',COALESCE((SELECT NULLIF(s.writer_id,'') FROM memory_sources ms JOIN tasks t ON t.id=ms.task_id JOIN sessions s ON s.id=t.session_id WHERE ms.memory_entry_id=m.id AND s.project_id=$1 ORDER BY ms.created_at,ms.id LIMIT 1),(SELECT human_principal_id::text FROM device_curated_contribution_receipts WHERE receipt_json->>'owner_memory_id'=m.id::text LIMIT 1),'unknown:local-author'),
+ 'author',COALESCE((SELECT NULLIF(s.writer_id,'') FROM memory_sources ms JOIN tasks t ON t.id=ms.task_id JOIN sessions s ON s.id=t.session_id WHERE ms.memory_entry_id=m.id AND s.project_id=$1 ORDER BY ms.created_at,ms.id LIMIT 1),(SELECT c.human_principal_id::text FROM device_curated_contribution_receipts c LEFT JOIN device_curated_contribution_resolutions r USING(operation_id) WHERE COALESCE(r.resolution_json->>'owner_memory_id',c.receipt_json->>'owner_memory_id')=m.id::text LIMIT 1),'unknown:local-author'),
  'authored_at',m.created_at,'updated_at',m.updated_at,
  'tags',COALESCE((SELECT jsonb_agg(tag ORDER BY tag) FROM memory_tags WHERE memory_entry_id=m.id),'[]'::jsonb),
  'unavailable_source_ids',COALESCE((SELECT jsonb_agg(id ORDER BY id) FROM memory_sources WHERE memory_entry_id=m.id),'[]'::jsonb))) AS record FROM versions m
@@ -418,6 +418,17 @@ pub async fn apply_device_replica_page(
     }
     for entry in &page.entries {
         if let Some(record) = &entry.record {
+            match record {
+                DeviceReplicaRecord::MemoryVersion(v) => {
+                    sqlx::query("INSERT INTO device_replica_owner_watermarks(subscription,canonical_id,version) VALUES($1,$2,$3) ON CONFLICT(subscription,canonical_id) DO UPDATE SET version=GREATEST(device_replica_owner_watermarks.version,EXCLUDED.version)")
+                        .bind(subscription).bind(v.canonical_id).bind(i64::from(v.version)).execute(&mut **tx).await?;
+                }
+                DeviceReplicaRecord::CanonicalState(s) => {
+                    sqlx::query("INSERT INTO device_replica_owner_watermarks(subscription,canonical_id,inactive) VALUES($1,$2,$3) ON CONFLICT(subscription,canonical_id) DO UPDATE SET inactive=EXCLUDED.inactive")
+                        .bind(subscription).bind(s.canonical_id).bind(s.status != mem_record::MemoryStatus::Active).execute(&mut **tx).await?;
+                }
+                DeviceReplicaRecord::Relation(_) => {}
+            }
             sqlx::query("INSERT INTO device_replica_records(subscription,record_key,record) VALUES($1,$2,$3) ON CONFLICT(subscription,record_key) DO UPDATE SET record=EXCLUDED.record")
                 .bind(subscription).bind(&entry.key).bind(Json(record)).execute(&mut **tx).await?;
         } else {
@@ -584,6 +595,47 @@ mod tests {
         tx.commit().await.unwrap();
         assert!(projection.search("procedure", 8).await.unwrap().is_empty());
         assert_eq!(projection.history(version).await.unwrap().len(), 1);
+        let tombstone = Uuid::new_v4();
+        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$3,2,true,'','','project','project',0,0,now(),now(),to_tsvector('simple',''))")
+            .bind(tombstone).bind(project).bind(version).execute(&db.pool).await.unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        refresh_device_replica(&mut tx, &scope).await.unwrap();
+        next.after = archived.next;
+        next.nonce = Uuid::new_v4();
+        let deleted = device_replica_page(&mut tx, &next).await.unwrap();
+        apply_device_replica_page(&mut tx, subscription, &deleted)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        let history = projection.history(version).await.unwrap();
+        assert_eq!(history.len(), 2);
+        assert!(history[1].tombstone);
+        assert!(projection.search("procedure", 8).await.unwrap().is_empty());
+        // Retention removes content but never forgets the observed owner version.
+        sqlx::query(
+            "DELETE FROM memory_relations WHERE src_canonical_id=$1 OR dst_canonical_id=$1",
+        )
+        .bind(version)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM memory_entries WHERE canonical_id=$1")
+            .bind(version)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        refresh_device_replica(&mut tx, &scope).await.unwrap();
+        next.after = deleted.next;
+        next.nonce = Uuid::new_v4();
+        let retained = device_replica_page(&mut tx, &next).await.unwrap();
+        apply_device_replica_page(&mut tx, subscription, &retained)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert!(projection.history(version).await.unwrap().is_empty());
+        let observed:i64=sqlx::query_scalar("SELECT version FROM device_replica_owner_watermarks WHERE subscription=$1 AND canonical_id=$2").bind(subscription).bind(version).fetch_one(&db.pool).await.unwrap();
+        assert_eq!(observed, 2);
         db.cleanup().await.unwrap();
     }
 }

@@ -319,6 +319,7 @@ mod native {
                 mem_federation_runtime::DeviceProjectReplica::connect(&profile, true).await?;
             loop {
                 let result = replica.synchronize(&client, 128).await;
+                let failed = result.is_err();
                 let delay = match result {
                     Ok(progress) => {
                         let caught_up = progress.caught_up;
@@ -338,7 +339,18 @@ mod native {
                 if !args.watch {
                     return Ok(());
                 }
-                tokio::select! {result=replica.wait_for_work(std::time::Duration::from_secs(delay))=>{result?;},signal=tokio::signal::ctrl_c()=>{signal?;return Ok(());}}
+                // Queued work accelerates healthy synchronization, not retry loops.
+                let wait = async {
+                    if failed {
+                        tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+                        Ok(())
+                    } else {
+                        replica
+                            .wait_for_work(std::time::Duration::from_secs(delay))
+                            .await
+                    }
+                };
+                tokio::select! {result=wait=>{result?;},signal=tokio::signal::ctrl_c()=>{signal?;return Ok(());}}
             }
         }
         let replica = replica(&profile, true).await?;

@@ -101,16 +101,24 @@ pub(crate) async fn query(
     // local configuration. Retained receipts are knowledge identity, not grants.
     let acknowledged: Vec<Uuid> = sqlx::query_scalar(
         r#"
-        SELECT q.local_memory_id FROM laptop_curated_outbox q
+        SELECT q.local_memory_id FROM (
+          SELECT *,COALESCE(resolution_json,receipt) AS owner_result
+          FROM laptop_curated_outbox
+        ) q
         WHERE q.state='accepted' AND q.local_project_id=$2
           AND q.binding->>'device_id'=$3
           AND q.binding->'scope'->>'owner_instance_id'=$4
-          AND EXISTS (
+          AND (EXISTS (
+            SELECT 1 FROM device_replica_owner_watermarks w
+            WHERE w.subscription=$1
+              AND w.canonical_id::text=q.owner_result->>'owner_canonical_id'
+              AND (w.inactive OR w.version >= (q.owner_result->>'owner_version')::bigint)
+          ) OR EXISTS (
             SELECT 1 FROM device_replica_records r WHERE r.subscription=$1 AND (
-              (r.record_key='version:'||(q.receipt->>'owner_memory_id')
+              (r.record_key='version:'||(q.owner_result->>'owner_memory_id')
                 AND r.record->>'kind'='memory_version'
-                AND r.record->'value'->>'id'=q.receipt->>'owner_memory_id')
-              OR (r.record_key='state:'||(q.receipt->>'owner_canonical_id')
+                AND r.record->'value'->>'id'=q.owner_result->>'owner_memory_id')
+              OR (r.record_key='state:'||(q.owner_result->>'owner_canonical_id')
                 AND r.record->>'kind'='canonical_state' AND (
                   r.record->'value'->>'status'<>'active'
                   OR EXISTS (
@@ -119,12 +127,12 @@ pub(crate) async fn query(
                       AND v.record_key='version:'||(r.record->'value'->>'current_version_id')
                       AND v.record->>'kind'='memory_version'
                       AND v.record->'value'->>'id'=r.record->'value'->>'current_version_id'
-                      AND v.record->'value'->>'canonical_id'=q.receipt->>'owner_canonical_id'
+                      AND v.record->'value'->>'canonical_id'=q.owner_result->>'owner_canonical_id'
                   )
                 )
               )
             )
-          )
+          ))
     "#,
     )
     .bind(binding.subscription_id)
