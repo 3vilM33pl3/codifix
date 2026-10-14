@@ -80,6 +80,28 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )],
         ),
         (
+            "/v1/onboarding/cache/{subscription_id}/history/{canonical_id}",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/cache/{subscription_id}/corrections",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryCurate,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
             "/v1/onboarding/delegated-grants",
             &[(
                 Method::POST,
@@ -321,11 +343,25 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
         ),
         (
             "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/replica",
-            &[(Method::POST, RoutePolicy { permission:Permission::BundleExport, scope:ProjectScope::Authenticated, semantic_read:false })],
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::BundleExport,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
         ),
         (
             "/v1/onboarding/company-delivery/replica",
-            &[(Method::POST, RoutePolicy { permission:Permission::ScopedProjectDelivery, scope:ProjectScope::Authenticated, semantic_read:false })],
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::ScopedProjectDelivery,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
         ),
         (
             "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/subscription",
@@ -371,8 +407,50 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
                 },
             )],
         ),
-        ("/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions", &[(Method::POST,RoutePolicy {permission:Permission::BundleExport,scope:ProjectScope::Authenticated,semantic_read:false})]),
-        ("/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions/status", &[(Method::POST,RoutePolicy {permission:Permission::BundleExport,scope:ProjectScope::Authenticated,semantic_read:true})]),
+        (
+            "/v1/onboarding/company-delivery/contributions/resolution",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::ScopedProjectDelivery,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::BundleExport,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions/status",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::BundleExport,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions/resolution",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::BundleExport,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: true,
+                },
+            )],
+        ),
         (
             "/v1/onboarding/company-delivery/approve",
             &[(

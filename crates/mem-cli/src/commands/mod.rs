@@ -29,6 +29,7 @@ mod ingest;
 mod init;
 pub(crate) mod init_support;
 pub(crate) mod jobs;
+mod laptop_corrections;
 mod loops;
 mod mcp;
 pub(crate) mod memory_ops;

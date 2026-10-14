@@ -384,23 +384,16 @@ mod native {
     }
     pub(super) async fn status(args: &SyncStatusArgs) -> Result<()> {
         let profile = LocalProjectReplicaProfile::read(&args.profile)?;
-        let uploads = if profile.replication_mode.is_shared() {
-            None
+        let (status, uploads, sync_error) = if profile.replication_mode.is_shared() {
+            (replica(&profile, false).await?.status().await?, None, None)
         } else {
-            Some(
-                mem_federation_runtime::DeviceProjectReplica::connect(&profile, false)
-                    .await?
-                    .uploads()
-                    .await?,
+            let replica =
+                mem_federation_runtime::DeviceProjectReplica::connect(&profile, false).await?;
+            (
+                replica.status().await?,
+                Some(replica.uploads().await?),
+                replica.last_error().await?,
             )
-        };
-        let status = if profile.replication_mode.is_shared() {
-            replica(&profile, false).await?.status().await?
-        } else {
-            mem_federation_runtime::DeviceProjectReplica::connect(&profile, false)
-                .await?
-                .status()
-                .await?
         };
         println!(
             "{}",
@@ -408,7 +401,7 @@ mod native {
                 "area":profile.bootstrap.scope.area,"project":profile.bootstrap.scope.project,
                 "owner":profile.bootstrap.scope.owner,"subscription":profile.subscription,
                 "cursor":status.cursor,"last_committed_page":status.observed_at,
-                "uploads":uploads,"replication_mode":profile.replication_mode,
+                "uploads":uploads,"sync_error":sync_error,"replication_mode":profile.replication_mode,
                 "current_remote_access":"unknown_offline_observation_only",
                 "stale":status.observed_at.is_none_or(|t|chrono::Utc::now()-t>chrono::Duration::minutes(5))
             }))?

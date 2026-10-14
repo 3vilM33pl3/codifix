@@ -245,7 +245,9 @@ impl ProjectReplica {
         initialize: bool,
     ) -> Result<Self> {
         profile.validate()?;
-        if !profile.replication_mode.is_shared() {return Err(RuntimeError::Configuration);}
+        if !profile.replication_mode.is_shared() {
+            return Err(RuntimeError::Configuration);
+        }
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(3)
             .acquire_timeout(Duration::from_secs(5))

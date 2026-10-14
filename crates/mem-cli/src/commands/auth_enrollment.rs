@@ -17,6 +17,8 @@ use std::time::Duration;
 use super::runtime::{AuthCommand, Command};
 use credentials::{CredentialStore, NativeKeychain};
 
+pub(in crate::commands) const HELP: &str = "Agent notes:\nDocs: docs/user/cli/projects.md\nCompany credentials stay in Keychain. Review exact project, owner and disclosure policy before confirmation. Local pending work is not owner acceptance; Git pushes remain separate.";
+
 #[derive(Debug, Args)]
 pub(super) struct CompanyArgs {
     /// Exact company HTTPS origin, without a path, credentials, query or fragment.
@@ -28,6 +30,9 @@ pub(super) struct CompanyArgs {
 }
 
 #[derive(Debug, Args)]
+#[command(
+    after_help = "Agent notes:\nRequires human browser approval on the exact company origin. Secrets stay in Keychain. This does not grant Git access or model disclosure."
+)]
 pub(super) struct LoginArgs {
     #[command(flatten)]
     pub(super) company: CompanyArgs,
@@ -40,6 +45,9 @@ pub(super) struct LoginArgs {
 }
 
 #[derive(Debug, Args)]
+#[command(
+    after_help = "Agent notes:\nNormally revoke remotely before deleting the Keychain credential. Explicit local-only deletion does not revoke server access or recall downloaded bytes."
+)]
 pub(super) struct LogoutArgs {
     #[command(flatten)]
     pub(super) company: CompanyArgs,
@@ -52,31 +60,45 @@ pub(super) struct LogoutArgs {
 }
 
 #[derive(Debug, Args)]
+#[command(after_help = HELP)]
 pub(super) struct ProjectsArgs {
     #[command(subcommand)]
     pub(super) command: ProjectsCommand,
 }
 #[derive(Debug, Subcommand)]
 pub(super) enum ProjectsCommand {
+    /// Preview or queue a correction to downloaded knowledge for owner review.
+    #[command(after_help = HELP)]
+    ProposeCorrection(super::laptop_corrections::CorrectionArgs),
     /// Prepare independent, browser-approved Codex/Claude disclosure identities.
+    #[command(after_help = HELP)]
     Agents(agents::AgentArgs),
     /// List reviewed projects currently available to this enrolled device.
+    #[command(after_help = HELP)]
     Available(CompanyArgs),
     /// Interactively review one approved project and prepare metadata only.
+    #[command(after_help = HELP)]
     Select(project_picker::SelectArgs),
     /// Preview an exact reviewed project and persist a resumable local plan.
+    #[command(after_help = HELP)]
     Prepare(workspace::PrepareArgs),
     /// Apply the confirmed immutable plan without replacing existing settings.
+    #[command(after_help = HELP)]
     Apply(workspace::ApplyArgs),
     /// Inspect local preparation stages (does not assert current remote access).
+    #[command(after_help = HELP)]
     Status(workspace::StatusArgs),
     /// Apply approved, attested pages to a separate local read-only projection.
+    #[command(after_help = HELP)]
     Sync(replica::SyncArgs),
     /// Review and prepare credential-free metadata for the native provisioner.
+    #[command(after_help = HELP)]
     Subscription(replica::SubscriptionArgs),
     /// Show committed cursor/freshness without claiming current remote authority.
+    #[command(after_help = HELP)]
     SyncStatus(replica::SyncStatusArgs),
     /// Search only the selected project's cached, cited read-only projection.
+    #[command(after_help = HELP)]
     OfflineSearch(replica::OfflineSearchArgs),
 }
 
@@ -142,6 +164,7 @@ pub(super) async fn handle_command(command: &Command) -> Result<bool> {
             _ => return Ok(false),
         },
         Command::Projects(args) => match &args.command {
+            ProjectsCommand::ProposeCorrection(_) => return Ok(false),
             ProjectsCommand::Agents(args) => agents::handle(args).await?,
             ProjectsCommand::Available(args) => {
                 available(args, &store).await?;

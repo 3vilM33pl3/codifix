@@ -27,7 +27,7 @@ use super::{
     project_replacement_policy, project_replacement_policy_update,
     project_replacement_proposal_approve, project_replacement_proposal_reject,
     project_replacement_proposals, project_resume, project_structure, project_up_to_speed,
-    prune_embeddings, prune_history, query, query_global, read_skill, reembed, reindex,
+    prune_embeddings, prune_history, query_global, read_skill, reembed, reindex,
     reject_loop_approval, reject_loop_memory_proposal, repair_skills, review_validation_run,
     route_loop_trigger, run_loop, runtime_status, session_bootstrap,
     set_embedding_creation_enabled, set_llm_audit_enabled, skills, start_agent_workspace,
@@ -54,6 +54,14 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         .route(
             "/v1/onboarding/cache/{subscription_id}/search",
             post(crate::laptop_cache::search).layer(axum::extract::DefaultBodyLimit::max(8192)),
+        )
+        .route(
+            "/v1/onboarding/cache/{subscription_id}/history/{canonical_id}",
+            get(crate::laptop_cache::history),
+        )
+        .route(
+            "/v1/onboarding/cache/{subscription_id}/corrections",
+            post(crate::laptop_corrections::stage).layer(axum::extract::DefaultBodyLimit::max(65536)),
         )
         .route(
             "/v1/onboarding/device/cancel",
@@ -89,8 +97,16 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
             post(crate::auth::device::logout),
         )
         .route("/v1/onboarding/projects", get(crate::auth::device::catalog))
-        .route("/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/replica", post(crate::auth::device_replication::company_page).layer(axum::extract::DefaultBodyLimit::max(4096)))
-        .route("/v1/onboarding/company-delivery/replica", post(crate::auth::device_replication::owner_page).layer(axum::extract::DefaultBodyLimit::max(4096)))
+        .route(
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/replica",
+            post(crate::auth::device_replication::company_page)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/v1/onboarding/company-delivery/replica",
+            post(crate::auth::device_replication::owner_page)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
         .route(
             "/v1/onboarding/devices/{device_id}/agents",
             get(crate::auth::company_agents::inspect)
@@ -129,8 +145,26 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
             post(crate::auth::device_contributions::status)
                 .layer(axum::extract::DefaultBodyLimit::max(4096)),
         )
-        .route("/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions",post(crate::auth::device_contributions::company_submit).layer(axum::extract::DefaultBodyLimit::max(65536)))
-        .route("/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions/status",post(crate::auth::device_contributions::company_status).layer(axum::extract::DefaultBodyLimit::max(4096)))
+        .route(
+            "/v1/onboarding/company-delivery/contributions/resolution",
+            post(crate::auth::device_contributions::owner_resolution)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions",
+            post(crate::auth::device_contributions::company_submit)
+                .layer(axum::extract::DefaultBodyLimit::max(65536)),
+        )
+        .route(
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions/status",
+            post(crate::auth::device_contributions::company_status)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions/resolution",
+            post(crate::auth::device_contributions::company_resolution)
+                .layer(axum::extract::DefaultBodyLimit::max(4096)),
+        )
         .route(
             "/v1/onboarding/company-delivery/approve",
             post(crate::auth::company_device_delivery::approve)
@@ -317,7 +351,10 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         .route("/v1/skills", get(skills))
         .route("/v1/skills/repair", post(repair_skills))
         .route("/v1/skills/{skill_name}", get(read_skill))
-        .route("/v1/query", post(query))
+        .route(
+            "/v1/query",
+            post(crate::handlers::query::query_authenticated),
+        )
         .route("/v1/query/global", post(query_global))
         .route("/v1/activity", post(ingest_activity))
         .route("/v1/commits/sync", post(sync_commits))

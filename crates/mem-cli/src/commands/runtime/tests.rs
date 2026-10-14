@@ -1012,21 +1012,27 @@ fn restart_notice_ignores_prod_marker_for_dev_tui() {
 }
 
 #[test]
-fn debian_stays_opt_in_while_existing_macos_hooks_mark_restarts() {
+fn native_installers_do_not_restart_unrelated_services() {
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
         .unwrap();
     let postinst = fs::read_to_string(workspace.join("packaging/debian/postinst")).unwrap();
     let pkg = fs::read_to_string(workspace.join("packaging/build-pkg.sh")).unwrap();
+    let mac_postinstall =
+        fs::read_to_string(workspace.join("packaging/macos/postinstall.sh")).unwrap();
     let formula = fs::read_to_string(workspace.join("Formula/memory-layer.rb")).unwrap();
 
     assert!(!postinst.contains("service restart-all"));
     assert!(!postinst.contains("ensure-api-token"));
-    for contents in [pkg, formula] {
-        assert!(contents.contains("service restart-all"));
-        assert!(contents.contains("--mark-tui-restart"));
+    assert!(pkg.contains("packaging/macos/postinstall.sh"));
+    for contents in [pkg, mac_postinstall] {
+        assert!(!contents.contains("service restart-all"));
+        assert!(!contents.contains("--mark-tui-restart"));
     }
+    // The separate legacy Homebrew hook still marks any restart it performs.
+    assert!(formula.contains("service restart-all"));
+    assert!(formula.contains("--mark-tui-restart"));
 }
 
 #[test]

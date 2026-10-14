@@ -17,12 +17,16 @@ pub(in crate::commands) struct AgentArgs {
 #[derive(Debug, Subcommand)]
 enum AgentCommand {
     /// Save a separate Keychain credential and print its public approval request.
+    #[command(after_help = super::HELP)]
     Prepare(Prepare),
     /// Check this independent credential and cache its exact approved receipt.
+    #[command(after_help = super::HELP)]
     Status(Status),
     /// Serve only this project's cache under the approved caller disclosure.
+    #[command(after_help = super::HELP)]
     Mcp(Mcp),
     /// Preview or explicitly apply only this project's secret-free MCP entry.
+    #[command(after_help = super::HELP)]
     Configure(Configure),
 }
 #[derive(Debug, Clone, Copy, ValueEnum)]

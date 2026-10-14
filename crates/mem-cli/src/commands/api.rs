@@ -29,6 +29,7 @@ use crate::commands::output::{service_url, write_headers};
 
 #[cfg(any(feature = "tui", test))]
 mod laptop_cache;
+mod laptop_corrections;
 mod local_session;
 mod supervisor_questions;
 #[cfg(any(feature = "tui", test))]

@@ -4,8 +4,8 @@
 //! transactions; this crate neither executes providers nor broadcasts events.
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
-pub mod effects;
 pub mod device_contributions;
+pub mod effects;
 pub mod events;
 pub mod executions;
 pub mod jobs;

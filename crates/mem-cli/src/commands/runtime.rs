@@ -2079,6 +2079,13 @@ pub(in crate::commands) struct HistoryArgs {
     /// Any version's id (including a tombstone). The chain resolves via
     /// canonical_id so passing any version id returns the same history.
     pub(crate) memory_id: Uuid,
+    /// Inspect this selected device replica; the positional ID must be its canonical ID.
+    #[arg(long)]
+    pub(crate) subscription: Option<Uuid>,
+    #[arg(long, requires = "subscription")]
+    pub(crate) after_version: Option<u32>,
+    #[arg(long, requires="subscription",value_parser=clap::value_parser!(u32).range(1..=32))]
+    pub(crate) limit: Option<u32>,
     /// Emit the result as JSON.
     #[arg(long)]
     pub(crate) json: bool,
@@ -3741,7 +3748,12 @@ pub(super) async fn run() -> Result<()> {
         }) => unreachable!("service run is handled before config loading"),
         Command::Service(_) => unreachable!("service management is handled before config loading"),
         Command::Auth(args) => crate::commands::auth::handle(args, client, config).await?,
-        Command::Projects(_) => unreachable!("company projects are handled before config loading"),
+        Command::Projects(args) => match args.command {
+            super::auth_enrollment::ProjectsCommand::ProposeCorrection(args) => {
+                super::laptop_corrections::handle(args, &ApiClient::new(client, config)).await?;
+            }
+            _ => unreachable!("company enrollment is handled before local configuration"),
+        },
         Command::Federation(args) => {
             crate::commands::federation::handle(args, client, config).await?
         }

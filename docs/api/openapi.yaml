@@ -352,6 +352,71 @@ paths:
       responses:
         '200': { description: Exact device/project/approval receipt or null when absent. }
         '403': { description: Current device, delegate or human authority denied. }
+  /v1/onboarding/company-delivery/contributions/resolution:
+    post:
+      operationId: readCuratedDeviceContributionResolution
+      x-stability: internal
+      summary: Read immutable contribution receipt and separately recorded owner proposal decision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: OwnerDeviceContributionStatusRequest }
+      responses:
+        '200': { description: DeviceContributionStatus or null, under exact current device approval. }
+        '403': { description: Current delivery authority denied. }
+  /v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions:
+    parameters:
+      - { in: path, name: area, required: true, schema: { type: string } }
+      - { in: path, name: owner, required: true, schema: { type: string, format: uuid } }
+      - { in: path, name: project_id, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: submitCompanyCuratedContribution
+      x-stability: internal
+      summary: Submit bounded curated knowledge through the selected company owner binding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: CuratedDeviceContribution schema 2 }
+      responses:
+        '200': { description: Immutable accepted, proposed or conflict receipt. }
+        '403': { description: Device or current project contribution authority denied. }
+        '409': { description: Altered operation or binding. }
+  /v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions/status:
+    parameters:
+      - { in: path, name: area, required: true, schema: { type: string } }
+      - { in: path, name: owner, required: true, schema: { type: string, format: uuid } }
+      - { in: path, name: project_id, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: readCompanyCuratedContributionReceipt
+      x-stability: internal
+      summary: Read a device operation receipt through current company authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Immutable receipt or null. }
+        '403': { description: Current device or project access denied. }
+  /v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/contributions/resolution:
+    parameters:
+      - { in: path, name: area, required: true, schema: { type: string } }
+      - { in: path, name: owner, required: true, schema: { type: string, format: uuid } }
+      - { in: path, name: project_id, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: readCompanyCuratedContributionResolution
+      x-stability: internal
+      summary: Reconcile owner-approved or rejected corrections without changing original receipts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Immutable receipt and optional decision, or null. }
+        '403': { description: Current device or project access denied. }
   /v1/onboarding/company-delivery/snapshot:
     post:
       operationId: deliverCompanyDeviceOwnerProjectPage
@@ -423,7 +488,7 @@ paths:
       operationId: listSelectedLaptopCache
       x-stability: internal
       summary: Inspect explicitly configured local read-only project subscriptions
-      description: Opt-in isolated laptop service only. Requires a loopback local-owner credential, exact area and bindings, read-only mode, and disabled model/MCP/background work. Never contacts an owner or gateway. Freshness is last committed verified-page time, not a claim of current permission. Missing subscriptions are shown as uninitialized; arbitrary database rows are never listed. No-store.
+      description: Opt-in isolated laptop service only. Requires a loopback local-owner credential and exact area/subscription bindings. Owner projections are read-only; curated mode can separately enable local capture and contributions. Never contacts an owner or gateway. Freshness is last committed verified-page time, not current permission. Lists metadata-only upload counts. Missing subscriptions are uninitialized; arbitrary database rows are never listed. No-store.
       responses:
         '200':
           description: Selected subscriptions and local freshness only.
@@ -440,6 +505,38 @@ paths:
         '403': { description: Authenticated loopback local owner required. }
         '404': { description: No laptop cache configured; not a successful empty cache. }
         '503': { description: Bound local projection unavailable or changed; no fallback. }
+  /v1/onboarding/cache/{subscription_id}/history/{canonical_id}:
+    parameters:
+      - { in: path, name: subscription_id, required: true, schema: { type: string, format: uuid } }
+      - { in: path, name: canonical_id, required: true, schema: { type: string, format: uuid } }
+      - { in: query, name: after_version, schema: { type: integer, minimum: 0, default: 0 } }
+      - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 32, default: 16 } }
+    get:
+      operationId: readCuratedLaptopHistory
+      x-stability: internal
+      summary: Inspect a selected curated projection's read-only version history
+      description: Loopback local owner only; source IDs never cause private source lookups. Versions retain author, digest and tombstone status. No-store and bounded to 256 KiB.
+      responses:
+        '200': { description: Bounded typed history and pagination metadata. }
+        '403': { description: Local owner or subscription policy denied. }
+        '404': { description: Selected curated history unavailable. }
+  /v1/onboarding/cache/{subscription_id}/corrections:
+    parameters:
+      - { in: path, name: subscription_id, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: stageCuratedLaptopCorrection
+      x-stability: internal
+      summary: Queue an explicit correction to an exact downloaded owner version
+      description: Writable loopback local owner with curation/capture permissions. Exact selected subscription, source digest and current nonwithdrawn version. Creates local proposal work and transactional outbox intent, never edits owner history. Exact operation retry reuses its receipt. The owner separately checks live authority and reviews the correction after upload.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: LaptopCorrectionRequest }
+      responses:
+        '200': { description: Local staging receipt, not owner acceptance. }
+        '403': { description: Local write or selected-project authority denied. }
+        '409': { description: Source version, digest or retried operation changed. }
   /v1/onboarding/cache/{subscription_id}/search:
     parameters:
       - in: path
@@ -450,7 +547,7 @@ paths:
       operationId: searchSelectedLaptopCache
       x-stability: internal
       summary: Search one explicitly selected local approved knowledge projection
-      description: Semantic read, permitted in the required read-only mode. Ordinary cookie Origin/CSRF protections still apply. No model, embeddings, learning, broader project search, network lookup or timeline write. Plain reviewed text and exact provenance only; results and freshness read from one committed projection snapshot. Responses over 256 KiB fail without partial disclosure. No-store.
+      description: Semantic read of read-only owner projections. Ordinary cookie Origin/CSRF protections still apply. No model, embeddings, learning, broader project search, network lookup or timeline write. Explicitly selected publications or curated knowledge with provenance; results and freshness read from one committed projection snapshot. Responses over 256 KiB fail without partial disclosure. No-store.
       requestBody:
         required: true
         content:
@@ -3885,6 +3982,8 @@ components:
         observed_at: { type: [string, 'null'], format: date-time }
         initialized: { type: boolean }
         read_only: { type: boolean, const: true }
+        uploads: { type: object, additionalProperties: { type: integer, minimum: 0 }, description: Metadata-only counts of local contribution outcomes. }
+        sync_error: { type: string, enum: [authority_denied, synchronization_incomplete], description: Last sanitized curated sync failure; absence is not a current-authority claim. }
     LaptopCacheEvidence:
       type: object
       required: [label, text, digest, reviewer, reviewed_at]
@@ -3896,14 +3995,16 @@ components:
         reviewed_at: { type: string, format: date-time }
     LaptopCacheHit:
       type: object
-      required: [stream_id, author, authored_at, locator, digest, shared_version, source_record_id, source_version, text, summary, evidence, read_only]
+      required: [stream_id, author, authored_at, digest, source_record_id, source_version, text, summary, evidence, read_only]
       properties:
         stream_id: { type: string, format: uuid }
         author: { type: string }
         authored_at: { type: string, format: date-time }
-        locator: { type: string, description: Original accepted record locator; no invented evidence AT-URI. }
-        digest: { type: string, pattern: '^[0-9a-f]{64}$', description: SHA-256 of accepted publication envelope. }
+        locator: { type: string, description: Present for shared publications only; never invented for private curated copies. }
+        digest: { type: string, pattern: '^[0-9a-f]{64}$', description: SHA-256 of accepted publication envelope or exact curated record. }
         shared_version: { type: integer, minimum: 1 }
+        origin: { type: string, enum: [shared_publication, curated_project] }
+        unavailable_source_ids: { type: array, items: { type: string, format: uuid }, description: Identity-only references; no permission or endpoint for source lookup. }
         source_record_id: { type: string, format: uuid }
         source_version: { type: integer, minimum: 1 }
         text: { type: string }
