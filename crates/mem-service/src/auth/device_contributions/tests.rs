@@ -44,6 +44,35 @@ async fn curated_receipts_are_atomic_idempotent_and_authority_checked() {
         approval_id: approval.operation_id,
         contribution: input.clone(),
     };
+    let mut read_only = approval.clone();
+    read_only.operation_id = Uuid::new_v4();
+    read_only.curated_contributions_allowed = false;
+    assert!(
+        serde_json::to_value(&read_only)
+            .unwrap()
+            .get("curated_contributions_allowed")
+            .is_none()
+    );
+    let _ = crate::auth::company_device_delivery::approve(
+        State(f.state.clone()),
+        Extension(actor.clone()),
+        Json(read_only.clone()),
+    )
+    .await
+    .unwrap();
+    let mut legacy = request.clone();
+    legacy.approval_id = read_only.operation_id;
+    assert_eq!(
+        submit(
+            State(f.state.clone()),
+            Extension(actor.clone()),
+            Json(legacy)
+        )
+        .await
+        .unwrap_err()
+        .status,
+        StatusCode::FORBIDDEN
+    );
     let call = |r: OwnerDeviceContributionRequest| {
         submit(State(f.state.clone()), Extension(actor.clone()), Json(r))
     };
