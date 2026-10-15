@@ -9,6 +9,9 @@ struct MemoryLayerApp: App {
             AppShellView(model: model)
                 .frame(minWidth: 900, minHeight: 620)
                 .preferredColorScheme(.light)
+                #if DEBUG
+                .background(ValidationWindowSize().frame(width: 0, height: 0))
+                #endif
         }
         .defaultSize(width: 1280, height: 800)
         .commands {
