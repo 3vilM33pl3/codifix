@@ -279,12 +279,14 @@ struct GraphView: View {
     }
 
     private func noMatchesTitle(_ snapshot: GraphServiceSnapshot) -> String {
+        if visibleLayers.isEmpty { return "No graph layers selected" }
         if appliedFilters.isActive { return "No nodes match these filters" }
         if !snapshot.status.hasGraph { return "No extracted code graph" }
         return "No nodes in the selected layers"
     }
 
     private func noMatchesDescription(_ snapshot: GraphServiceSnapshot) -> String {
+        if visibleLayers.isEmpty { return "Enable Code, Provenance, or Memory relationships to display available project data." }
         if appliedFilters.isActive {
             let fullCount = snapshot.codeGraph.stats.totalNodes
             return "The service reports \(fullCount) total code nodes. Clear the filters or enable another graph layer."
