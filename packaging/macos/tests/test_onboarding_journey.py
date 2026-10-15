@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Synthetic Memory/native commands only; no Mac/provider/network acceptance."""
 import copy
+import hashlib
 import importlib
 import io
 import json
@@ -190,6 +191,25 @@ class JourneyContract(unittest.TestCase):
                         dict(flattened, unexpected="field"), {k: v for k, v in flattened.items() if k != "area"}]:
             with self.subTest(fields=list(invalid)), self.assertRaises(files.Refused):
                 journey.public_manifest(invalid)
+
+    def test_curated_preview_checks_canonical_manifest_without_replacing_workspace_hash(self):
+        manifest = self.memory.manifest
+        manifest.update(manifest.pop("entry"))
+        manifest["project"] = "café 🦀"
+        workspace_hash = hashlib.sha256(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+        receipt = {"manifest": manifest, "manifest_sha256": workspace_hash, "device_id": self.memory.bootstrap["device"]}
+        original = copy.deepcopy(receipt)
+        output = self.source["projects"][0]["subscription_output"]
+        preview = self.memory.subscription_preview(receipt, output)
+        preview.update(replication_mode="curated_project_v1", manifest_sha256=journey.curated_manifest_digest(manifest))
+        self.source["native"]["curated_sync"] = True
+        self.assertNotEqual(preview["manifest_sha256"], workspace_hash)
+        self.assertEqual(journey.bootstrap_preview(preview, receipt, self.source, output), preview)
+        self.assertEqual(receipt, original)
+        for wrong in [workspace_hash, "f" * 64]:
+            preview["manifest_sha256"] = wrong
+            with self.subTest(digest=wrong), self.assertRaisesRegex(files.Refused, "manifest differs"):
+                journey.bootstrap_preview(preview, receipt, self.source, output)
 
     def test_cancel_selection_or_repository_confirmation_creates_no_repo_native_effects(self):
         self.memory.cancel_select = True
@@ -449,6 +469,34 @@ class JourneyContract(unittest.TestCase):
         self.assertEqual(exit_result.exception.code, 130)
         self.assertIn("resume exact inputs", output.getvalue())
         self.assertNotIn("Traceback", output.getvalue())
+
+
+class CuratedManifestDigestContract(unittest.TestCase):
+    # Produced from mem_record::OnboardingProject with Rust's actual
+    # CanonicalJsonCodec::digest, not Python's journal serialization.
+    manifest = {
+        "project_id": "11111111-1111-4111-8111-111111111111", "project": "café 🦀",
+        "area": "workshop", "owner_instance_id": "22222222-2222-4222-8222-222222222222",
+        "repository_url": "https://git.example.invalid/café.git", "default_branch": "étude",
+        "offline_allowed": True, "tools": [], "destinations": [], "revision": 7,
+        "reviewed_by": "33333333-3333-4333-8333-333333333333", "reviewed_at": "2026-10-15T12:00:00Z"}
+    rust_digest = "3c3c4fd0c889b72f184ef35959e8c242866fb415ae8675e910675513c2fd3c49"
+
+    def test_unicode_rust_vector_and_legacy_shape_have_same_canonical_digest(self):
+        original = copy.deepcopy(self.manifest)
+        self.assertEqual(journey.curated_manifest_digest(original), self.rust_digest)
+        self.assertNotEqual(files.digest(original), self.rust_digest)
+        fields = {"area", "owner_instance_id", "repository_url", "default_branch", "offline_allowed", "tools", "destinations"}
+        nested = {key: value for key, value in original.items() if key not in fields}
+        nested["entry"] = {key: original[key] for key in fields}
+        self.assertEqual(journey.curated_manifest_digest(nested), self.rust_digest)
+        self.assertEqual(original, self.manifest)
+
+    def test_exact_integer_limit_and_lone_surrogates_fail_closed(self):
+        for changes in [{"revision": 2**53}, {"revision": 7.0}, {"project": "bad\ud800"}, {"default_branch": "bad\udfff"}]:
+            with self.subTest(fields=list(changes)), self.assertRaises(files.Refused):
+                journey.curated_manifest_digest(dict(self.manifest, **changes))
+        self.assertEqual(len(journey.curated_manifest_digest(dict(self.manifest, revision=2**53 - 1))), 64)
 
 
 if __name__ == "__main__":

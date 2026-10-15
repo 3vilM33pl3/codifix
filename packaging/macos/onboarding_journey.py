@@ -4,6 +4,7 @@ No prerequisite downloads, builds, global config overlay or legacy service
 control. Public CLI metadata is validated; batch process output is suppressed.
 """
 import ipaddress
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -274,6 +275,25 @@ def public_manifest(manifest, *, offline=True):
             public_text(v)
 
 
+def curated_manifest_digest(manifest):
+    """RFC 8785 for the bounded manifest schema, separate from CLI journal hashes."""
+    try:
+        public_manifest(manifest)
+    except UnicodeError:
+        raise Refused("curated manifest must contain valid Unicode scalar strings") from None
+    if manifest["revision"] > 2**53 - 1:
+        raise Refused("curated manifest revision exceeds exact JSON integer range")
+    # Rust serializes OnboardingProjectEntry flattened. Nested old journals are
+    # read without changing their stored data or opaque workspace digest.
+    wire = {key: value for key, value in manifest.items() if key != "entry"}
+    wire.update(manifest_entry(manifest))
+    try:
+        canonical = json.dumps(wire, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    except (ValueError, UnicodeError):
+        raise Refused("curated manifest must contain valid Unicode scalar strings") from None
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def bootstrap_preview(value, receipt, source, output):
     operator.exact(value, {"company", "bootstrap", "bootstrap_sha256", "output", "contains_database_credentials", "creates_services", "downloads_knowledge"} | ({"replication_mode"} if "replication_mode" in value else set()) | ({"manifest_sha256"} if "manifest_sha256" in value else set()))
     if source["native"].get("curated_sync") and value.get("replication_mode") != "curated_project_v1":
@@ -286,7 +306,7 @@ def bootstrap_preview(value, receipt, source, output):
         sample["replication_mode"] = value["replication_mode"]
     if "manifest_sha256" in value:
         sample["manifest_sha256"] = value["manifest_sha256"]
-        if value["manifest_sha256"] != receipt["manifest_sha256"]:
+        if value["manifest_sha256"] != curated_manifest_digest(receipt["manifest"]):
             raise Refused("curated profile manifest differs from reviewed project")
     operator.metadata(sample)
     bootstrap = value["bootstrap"]
