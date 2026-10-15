@@ -27,7 +27,9 @@ private final class ValidationSizingView: NSView {
         default: return
         }
         applied = true
-        DispatchQueue.main.async { [weak window] in
+        // AppKit restores saved window geometry after the content view attaches.
+        // Apply the explicit acceptance-test size after that initial restoration.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak window] in
             guard let window else { return }
             let origin = window.screen?.visibleFrame.origin ?? window.frame.origin
             window.setFrame(NSRect(origin: origin, size: size), display: true)
