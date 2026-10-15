@@ -113,3 +113,46 @@ export interface CompanyOperation {
     permissions: string[];
   };
 }
+
+interface CompanyDelegateIdentity {
+  company_id: string;
+  owner_instance_id: string;
+  area: MemoryArea;
+  issuer: string;
+  principal_id: string;
+  token_id: string;
+}
+export interface CompanyManagementDelegatePlan extends CompanyDelegateIdentity {
+  delegation_policy_revision: number;
+  projects: { project_id: string; role_ceiling: AuthRole }[];
+  status: string;
+  expires_at: string | null;
+}
+export interface CompanyDeliveryDelegatePlan extends CompanyDelegateIdentity {
+  delivery_policy_revision: number;
+  projects: string[];
+  permissions: string[];
+  status: string;
+  expires_at: string | null;
+}
+interface DelegateConsent {
+  request_id: string;
+  name: string;
+  expires_in_days: number;
+  confirmed: boolean;
+}
+export type CompanyManagementDelegateRequest = CompanyDelegateIdentity & DelegateConsent
+  & Pick<CompanyManagementDelegatePlan, "delegation_policy_revision" | "projects">;
+export type CompanyDeliveryDelegateRequest = CompanyDelegateIdentity & DelegateConsent
+  & Pick<CompanyDeliveryDelegatePlan, "delivery_policy_revision" | "projects">;
+interface DelegateReceipt extends CompanyDelegateIdentity {
+  request_id: string;
+  expires_at: string;
+  replayed: boolean;
+  credential_issued: boolean;
+  token: string | null;
+}
+export type CompanyDelegateResponse = DelegateReceipt & (
+  { delegation_policy_revision: number; projects: { project_id: string; role_ceiling: AuthRole; permissions: string[] }[] }
+  | { delivery_policy_revision: number; projects: string[]; permissions: string[] }
+);

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { onboardingRequest } from "../../api";
 import type { CompanyConfiguration, CompanyGrantRequest, CompanyOperation } from "./types";
+import { CompanyDelegatesPanel } from "./CompanyDelegatesPanel";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NIL = "00000000-0000-0000-0000-000000000000";
@@ -81,7 +82,7 @@ export function CompanyPanel({ readOnly = false }: { readOnly?: boolean }) {
     } catch (reason) { setError(`${(reason as Error).message} Original operation ${operation.request.operation_id} retained.`); }
     finally { setBusy(false); }
   }
-  return <section className="panel panel-stack">
+  return <><CompanyDelegatesPanel readOnly={readOnly} /><section className="panel panel-stack">
     <h3>Cross-area project access</h3>
     <p>Use a verified identity-provider subject, not an email address. Owners enforce their exact project and role ceilings. Project access does not grant federation capabilities or model disclosure.</p>
     <button type="button" disabled={busy} onClick={() => void refresh()}>Refresh company operations</button>
@@ -125,5 +126,5 @@ export function CompanyPanel({ readOnly = false }: { readOnly?: boolean }) {
         <p>Effective permissions: {selected.current_access.permissions.join(", ") || "none"}.</p>
       </> : <p>Current effective access is unknown. A historical direct-grant receipt does not prove current access.</p>}
     </section> : null}
-  </section>;
+  </section></>;
 }
