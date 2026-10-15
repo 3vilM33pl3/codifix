@@ -144,8 +144,37 @@ returns HTTP 200 over SSH, but the same binary as an Aqua LaunchAgent returns
 `HostUnreachable` / OS error 65 for `10.22.6.42:443`. This is consistent with macOS
 Local Network privacy; it is not evidence of a TLS failure. Olivier was asked
 to allow Memory through the native Local Network prompt/settings. Device
-approval, local services and synchronization remain unverified pending that
-restriction. Temporary operator probes use public health metadata only.
+approval, local services and synchronization were blocked by that restriction.
+Temporary operator probes use public health metadata only.
+
+### Actual Mac enrollment and installer contract correction
+
+Olivier enabled **Python** in macOS Local Network settings. The bundled-Python
+first-run process then reached the company service from its native login session.
+Olivier explicitly approved `Olivier Mac`, device
+`edeb80fd-e57b-4900-a45d-eea632515676`, fingerprint prefix `9987b4f64f16`,
+for offline Homelab/Memory knowledge and locally curated contributions. The Web
+reported approval recorded and the Mac persisted enrollment in Keychain. This
+does not authorize Codex/Claude onward disclosure or paid model execution.
+
+The real catalog exposed two integration defects not represented by the earlier
+Python fixtures: Rust flattens the onboarding manifest, and a company device's
+ordinary role remains `reader` even when separately approved for contributions.
+Commits `0f67763d` and `d6169434` correct the parser and report explicit current
+device contribution consent separately from roles. Original manifest bytes and
+digests are unchanged; missing consent defaults to denied. All 88 onboarding
+Python tests and five required-PostgreSQL company-device tests passed, including
+reader-only contribution consent and owner-denial revalidation.
+
+Homelab was subsequently replaced with the corrected candidate SHA-256
+`853da77a3ba5f8194327fea8a9cfbd24e4b887b3d930fd652f1baf49e4b8f5ae`;
+container `47acdba062f8b2b520cd7d46f350c99146c745d66c8008d68d274474c949d867`.
+Its previous same-schema container is retained stopped/restart-disabled with
+`-before-catalog-consent-20261015`. Configuration, credentials, mounts other than
+the executable, network addresses and schema 84 are preserved. Both owners'
+verified HTTPS health checks report `ok` and database `up` after the replacement.
+The native Mac rebuild and project installation remain in progress; enrollment
+is not evidence of a completed download or upload.
 
 Homelab infra commits: `01bae42` (management listener restriction), `9ca42f8`
 (private authenticated Memory origins). Memory replacement operator's focused
@@ -156,7 +185,7 @@ tests: 11 passed, including schema-changing upgrade forward-recovery behavior.
 - Keep company transport credentials in the **process environment**; unlike
   OIDC, current company transports do not read the adjacent env file. Renew the
   four bounded credentials before their expiry; renewal is not automatic.
-- Enroll the Mac device, select projects, retain existing Homelab checkout, clone
+- Select projects, retain existing Homelab checkout, clone
   Memory, start local instances and demonstrate both synchronization directions.
 - Verify capture/retry behavior beyond service liveness, scoped denial, conflict,
   revocation, reboot and independent Codex/Claude disclosure approvals.
