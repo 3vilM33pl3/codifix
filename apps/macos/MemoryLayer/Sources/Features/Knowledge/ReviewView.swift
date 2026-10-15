@@ -36,10 +36,8 @@ struct ReviewView: View {
                 subtitle: "\(proposals.count) replacement proposal\(proposals.count == 1 ? "" : "s") need a decision",
                 actionTitle: policy.map { "Policy: \($0.replacementPolicy.capitalized)" } ?? "Policy"
             ) {
-                if canEditPolicy {
-                    policySelection = policy?.replacementPolicy ?? "balanced"
-                    policySheet = true
-                }
+                policySelection = policy?.replacementPolicy ?? "balanced"
+                policySheet = true
             }
 
             if !context.permissions.allows(.memoryRead) {
@@ -255,6 +253,7 @@ struct ReviewView: View {
                 Text("Aggressive").tag("aggressive")
             }
             .pickerStyle(.menu)
+            .disabled(!canEditPolicy)
             VStack(alignment: .leading, spacing: 5) {
                 Text("Conservative · Prefer retaining existing memory")
                 Text("Balanced · Weigh evidence and confidence")
@@ -263,6 +262,13 @@ struct ReviewView: View {
             .font(.callout)
             Text("Proposal decisions remain available when policy editing is disabled.")
                 .font(.caption).foregroundStyle(.secondary)
+            if !canCurate {
+                Label("This connection can inspect policy but does not have curation permission.", systemImage: "lock.fill")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if !canEditPolicy {
+                Label("Policy editing is unavailable for this repository connection.", systemImage: "lock.fill")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             HStack {
                 Button("Cancel") { policySheet = false }.keyboardShortcut(.cancelAction)
                 Spacer()
