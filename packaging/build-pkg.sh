@@ -6,6 +6,7 @@ set -euo pipefail
 #   ./packaging/build-pkg.sh
 #   ./packaging/build-pkg.sh --arch x86_64
 #   ./packaging/build-pkg.sh --arch aarch64
+#   ./packaging/build-pkg.sh --application-update
 #   ./packaging/build-pkg.sh --runtime-bundle /ABS/REVIEWED/TREE \
 #     --runtime-manifest /ABS/REVIEWED/manifest.json
 #   ./packaging/build-pkg.sh \
@@ -42,6 +43,7 @@ PKG_ARCH=""
 RUST_TARGET=""
 RUNTIME_BUNDLE=""
 RUNTIME_MANIFEST=""
+APPLICATION_UPDATE=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --arch|--target|--sign|--sign-app|--sign-pkg|--notary-profile|--apple-id|--team-id|--apple-password|--runtime-bundle|--runtime-manifest)
@@ -52,6 +54,10 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
   case "$1" in
+    --application-update)
+      APPLICATION_UPDATE=1
+      shift
+      ;;
     --arch)
       PKG_ARCH="$2"
       shift 2
@@ -104,6 +110,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$APPLICATION_UPDATE" -eq 1 && ( -n "$RUNTIME_BUNDLE" || -n "$RUNTIME_MANIFEST" ) ]]; then
+  echo "Application-only updates cannot contain or replace a runtime bundle." >&2
+  exit 1
+fi
 if [[ -n "$RUNTIME_BUNDLE" && -z "$RUNTIME_MANIFEST" || -z "$RUNTIME_BUNDLE" && -n "$RUNTIME_MANIFEST" ]]; then
   echo "Optional runtime requires both --runtime-bundle and --runtime-manifest." >&2
   exit 1
@@ -197,6 +207,7 @@ fi
 for source in "$ROOT_DIR/.codex/config.toml" "$ROOT_DIR/.codex/agents/astra_adviser.toml" \
   "$ROOT_DIR/packaging/macos/postinstall.sh" "$ROOT_DIR/packaging/macos/seed-user.sh" \
   "$ROOT_DIR/packaging/macos/preinstall-lightweight.sh" \
+  "$ROOT_DIR/packaging/macos/preinstall-application-update.sh" \
   "$ROOT_DIR/packaging/macos/onboard.py" "$ROOT_DIR/packaging/macos/onboarding_files.py" \
   "$ROOT_DIR/packaging/macos/onboarding_native.py" "$ROOT_DIR/packaging/macos/onboarding_journey.py" \
   "$ROOT_DIR/packaging/macos/onboarding_agents.py" \
@@ -237,6 +248,11 @@ trap cleanup EXIT
 PAYLOAD="$STAGE_DIR/payload"
 SCRIPTS="$STAGE_DIR/scripts"
 PKG_PATH="$ROOT_DIR/target/memory-layer-${VERSION}-macos-${PKG_ARCH}.pkg"
+PKG_IDENTIFIER="com.memory-layer.pkg"
+if [[ "$APPLICATION_UPDATE" -eq 1 ]]; then
+  PKG_PATH="$ROOT_DIR/target/memory-layer-${VERSION}-macos-${PKG_ARCH}-application-update.pkg"
+  PKG_IDENTIFIER="com.memory-layer.application"
+fi
 BINARY_PATH="$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory"
 
 mkdir -p \
@@ -265,7 +281,11 @@ if [[ -n "$RUNTIME_BUNDLE" ]]; then
     --bundle "$RUNTIME_BUNDLE" --manifest "$RUNTIME_MANIFEST" --arch "$PKG_ARCH" \
     --manifest-sha256 "$RUNTIME_MANIFEST_SHA256" --payload "$PAYLOAD" --scripts "$SCRIPTS"
 else
-  install -m 0755 "$ROOT_DIR/packaging/macos/preinstall-lightweight.sh" "$SCRIPTS/preinstall"
+  if [[ "$APPLICATION_UPDATE" -eq 1 ]]; then
+    install -m 0755 "$ROOT_DIR/packaging/macos/preinstall-application-update.sh" "$SCRIPTS/preinstall"
+  else
+    install -m 0755 "$ROOT_DIR/packaging/macos/preinstall-lightweight.sh" "$SCRIPTS/preinstall"
+  fi
 fi
 install -m 0755 "$BINARY_PATH" "$PAYLOAD/usr/local/bin/memory"
 
@@ -305,7 +325,7 @@ echo "Assembling .pkg..."
 PKGBUILD_ARGS=(
   --root "$PAYLOAD"
   --scripts "$SCRIPTS"
-  --identifier "com.memory-layer.pkg"
+  --identifier "$PKG_IDENTIFIER"
   --version "$VERSION"
   --install-location /
 )

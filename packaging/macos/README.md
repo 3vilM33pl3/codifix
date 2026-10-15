@@ -105,10 +105,20 @@ Do not install a lightweight package over a bundled-runtime installation. Both
 variants use `com.memory-layer.pkg`; macOS Installer can delete previously
 receipted runtime and `memory-onboard` files omitted from the replacement payload.
 New lightweight packages refuse this replacement in preinstall when either the
-runtime directory or launcher is present, before payload changes. Use a reviewed
-runtime-inclusive package instead, respecting its existing bundle-ID guard.
+runtime directory or launcher is present, before payload changes.
 Older lightweight packages lack this protection and must not be used for such
 an update. This guard does not implement runtime upgrades or repair missing files.
+
+For application-only updates of an existing native installation, build with
+`./packaging/build-pkg.sh --arch aarch64 --application-update` (or `x86_64`).
+This creates `memory-layer-<version>-macos-<arch>-application-update.pkg` with
+the separate `com.memory-layer.application` receipt. It updates Memory, Web
+assets and onboarding helpers without taking ownership of or omitting files
+from the original runtime receipt. It requires an existing non-symlinked native
+installation on the startup volume and cannot include runtime inputs. It does
+not upgrade runtime dependencies or start services. Verify the installed
+application and existing runtime after installation; package contract tests
+alone do not prove macOS Installer behavior.
 
 The bundled `journey` connector joins login, project selection, reviewed workspace
 setup and native provisioning. `journey-agents` adds separately approved

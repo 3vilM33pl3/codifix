@@ -43,7 +43,7 @@ class PackageContract(unittest.TestCase):
                           "web/dist", "target/macos-pkg", "target/x86_64-apple-darwin/release"):
             (repo / directory).mkdir(parents=True, exist_ok=True)
         shutil.copy2(BUILDER, repo / "packaging/build-pkg.sh")
-        for name in ("postinstall.sh", "seed-user.sh", "preinstall-lightweight.sh", "onboard.py", "onboarding_files.py",
+        for name in ("postinstall.sh", "seed-user.sh", "preinstall-lightweight.sh", "preinstall-application-update.sh", "onboard.py", "onboarding_files.py",
                      "onboarding_native.py", "onboarding_journey.py", "onboarding_agents.py", "onboarding_first_run.py", "runtime_bundle.py", "operator-README.md"):
             shutil.copy2(MACOS / name, repo / "packaging/macos" / name)
         for name in ("config.toml", "agents/astra_adviser.toml"):
@@ -64,7 +64,8 @@ class PackageContract(unittest.TestCase):
         self.script("npm", 'printf "npm %s\\n" "$*" >> "$TRACE"\n')
         self.script("python3", f'exec {shlex.quote(sys.executable)} "$@"\n')
         if pkgbuild:
-            self.script("pkgbuild", '''payload=""; scripts=""; output=""
+            self.script("pkgbuild", '''printf "pkgbuild %s\\n" "$*" >> "$TRACE"
+payload=""; scripts=""; output=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --root) payload="$2"; shift 2 ;;
@@ -132,6 +133,33 @@ touch "$output"
         repo, trace = self.fixture()
         result = self.assert_no_build(repo, trace, "--runtime-bundle", "/missing", "--runtime-manifest", "/missing")
         self.assertIn("Runtime bundle refused", result.stderr)
+
+    def test_application_update_has_separate_receipt_and_no_runtime_payload(self):
+        repo, trace = self.fixture()
+        result = self.run_script(repo / "packaging/build-pkg.sh", "--application-update")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("--identifier com.memory-layer.application", trace.read_text())
+        self.assertTrue((repo / "target/memory-layer-0.0.0-test-macos-x86_64-application-update.pkg").exists())
+        capture = Path(self.env["CAPTURE"])
+        self.assertEqual((capture / "scripts/preinstall").read_bytes(), (MACOS / "preinstall-application-update.sh").read_bytes())
+        self.assertFalse((capture / "payload/usr/local/share/memory-layer/runtime").exists())
+        self.assertFalse((capture / "payload/usr/local/bin/memory-onboard").exists())
+
+    def test_application_update_rejects_runtime_before_build(self):
+        repo, trace = self.fixture()
+        result = self.assert_no_build(repo, trace, "--application-update", "--runtime-bundle", "/unused")
+        self.assertIn("cannot contain or replace a runtime", result.stderr)
+
+    def test_application_update_requires_existing_native_installation(self):
+        prefix = self.root / "installed"
+        guard = self.root / "update-preinstall"
+        guard.write_text((MACOS / "preinstall-application-update.sh").read_text().replace("/usr/local", str(prefix)))
+        self.assertNotEqual(self.run_script(guard, "fixture.pkg", "/", "/").returncode, 0)
+        (prefix / "bin").mkdir(parents=True)
+        (prefix / "bin/memory").write_text("existing")
+        self.assertEqual(self.run_script(guard, "fixture.pkg", "/", "/").returncode, 0)
+        self.assertEqual((prefix / "bin/memory").read_text(), "existing")
+        self.assertNotEqual(self.run_script(guard, "fixture.pkg", "/", "/Volumes/Other").returncode, 0)
 
     def test_optional_runtime_stages_exact_read_only_tree_without_running_it(self):
         repo, trace = self.fixture()
