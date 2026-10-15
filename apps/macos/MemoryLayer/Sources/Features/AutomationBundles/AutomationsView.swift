@@ -453,7 +453,13 @@ public struct AutomationsView: View {
             case let .proposal(snapshot, proposal): _ = try await AutomationService(context: snapshot).decide(proposal, action: action, edited: edited)
             }
             try Task.checkCancellation()
-            actionResult = "The loop item was \(action)d."; await loadApprovals()
+            let outcome = switch action {
+            case "approve": "approved"
+            case "reject": "rejected"
+            case "edit": "updated"
+            default: "completed"
+            }
+            actionResult = "The loop item was \(outcome)."; await loadApprovals()
         } catch is CancellationError { actionError = "The \(action) request was interrupted; the service outcome may be unknown. Refresh the queue before retrying." }
         catch { actionError = error.localizedDescription }
         operation = nil; busy = false
