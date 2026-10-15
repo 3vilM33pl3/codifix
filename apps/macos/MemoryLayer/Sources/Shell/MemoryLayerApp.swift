@@ -22,6 +22,11 @@ struct MemoryLayerApp: App {
                     .keyboardShortcut("i", modifiers: [.command, .option])
             }
             CommandMenu("Navigate") {
+                Button("Focus Search or Question") {
+                    NotificationCenter.default.post(name: .focusMemorySearch, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: .command)
+                Divider()
                 ForEach(Array(AppDestination.allCases.prefix(9).enumerated()), id: \.element.id) { index, destination in
                     Button(destination.rawValue) {
                         NotificationCenter.default.post(name: .selectDestination, object: destination)
@@ -38,4 +43,5 @@ extension Notification.Name {
     static let selectDestination = Notification.Name("MemoryLayer.selectDestination")
     static let refreshMemoryLayer = Notification.Name("MemoryLayer.refresh")
     static let toggleMemoryInspector = Notification.Name("MemoryLayer.toggleInspector")
+    static let focusMemorySearch = Notification.Name("MemoryLayer.focusSearch")
 }

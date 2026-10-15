@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MemoriesView: View {
     let context: FeatureContext
+    @FocusState private var searchFocused: Bool
 
     @State private var response: ProjectMemoriesResponse?
     @State private var selectedMemoryID: String?
@@ -109,6 +110,9 @@ struct MemoriesView: View {
         .onChange(of: tagText) { reconcileSelection() }
         .onChange(of: statusFilter) { reconcileSelection() }
         .onChange(of: typeFilter) { reconcileSelection() }
+        .onReceive(NotificationCenter.default.publisher(for: .focusMemorySearch)) { _ in
+            searchFocused = true
+        }
         .alert("Delete memory?", isPresented: $presentsDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete memory", role: .destructive) { Task { await deletePendingMemory() } }
@@ -125,6 +129,7 @@ struct MemoriesView: View {
     private var memoryList: some View {
         VStack(alignment: .leading, spacing: 10) {
             TextField("Search summaries and content", text: $searchText)
+                .focused($searchFocused)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("memories.search")
             HStack(spacing: 8) {

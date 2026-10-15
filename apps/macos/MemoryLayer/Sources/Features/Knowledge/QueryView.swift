@@ -7,6 +7,7 @@ private struct MemorySheetRequest: Identifiable {
 struct QueryView: View {
     let context: FeatureContext
     @ObservedObject var sessionStore: KnowledgeSessionStore
+    @FocusState private var questionFocused: Bool
 
     @State private var question = ""
     @State private var includeStale = false
@@ -70,6 +71,9 @@ struct QueryView: View {
             queryTask?.cancel()
             requestGate.invalidate()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .focusMemorySearch)) { _ in
+            questionFocused = true
+        }
         .sheet(isPresented: $showsHistory) { historySheet }
         .sheet(item: $memorySheet) { request in
             KnowledgeMemoryDetailView(context: context, memoryID: request.id)
@@ -81,6 +85,7 @@ struct QueryView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Question").font(.caption).foregroundStyle(.secondary)
                 TextField("Ask a question about this project…", text: $question, axis: .vertical)
+                    .focused($questionFocused)
                     .lineLimit(1...3)
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("query.question")
