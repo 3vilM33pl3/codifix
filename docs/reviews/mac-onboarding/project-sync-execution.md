@@ -15,7 +15,8 @@ loopback port 4250 were restarted. Production services were not changed.
 ## Delivery checklist
 
 - [x] Versioned full curated-project device download, separate from shared
-  publication consent; histories/state/tombstones/relations and bounded provenance.
+  publication consent; histories/state/tombstones/asserted same-project relations
+  and bounded provenance. The derived heuristic graph remains owner-local.
 - [x] Transactional curated contribution queue and current-authority owner
   submission/receipts; corrections/conflicts preserve owner history.
 - [ ] Startup/reconnect/five-minute and post-curation synchronization, local
@@ -38,8 +39,9 @@ new paid providers and additional plugin formats remain separate.
 ## Implemented software (2026-10-14)
 
 - Separate `curated_project_v1` device mode: origin-authorized histories,
-  canonical state, tombstones and same-project relations; unavailable provenance
-  remains an ID, not permission to fetch raw bytes. Existing shared-publication
+  canonical state, tombstones and asserted same-project relations; the derived
+  heuristic graph remains owner-local. Unavailable provenance remains an ID, not
+  permission to fetch raw bytes. Existing shared-publication
   profiles and schemas remain compatible.
 - Signed, nonce/device/project/cursor-bound pages and atomic projection commits.
   The company and owner recheck current authority around transport. Gateway
@@ -91,6 +93,11 @@ used.
 - Focused runtime test proves a failed upload still commits a signed incoming
   page. Store test covers archive, tombstone and physical owner retention while
   retaining suppression watermarks.
+- Required-database release `mem-federation-store --lib device_replica` checks
+  passed on 2026-10-15: 2 passed, 0 ignored. A synthetic 100,806-edge derived
+  graph stays outside the feed; asserted same-project edges sync, cross-project
+  edges stay excluded, reclassification/deletion removes replicas, replay is
+  harmless, and the 100,000-record authoritative-feed bound still fails closed.
 - Contribution tests cover mutation/event rollback, oversized queue recovery,
   approved/rejected correction outcomes and immutable receipt replay.
 - Web offline/query tests and build passed before the history-view slice;

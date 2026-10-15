@@ -228,7 +228,8 @@ records AS (
  UNION ALL
  SELECT jsonb_build_object('kind','relation','value',jsonb_build_object(
  'id',r.id,'source_canonical',r.src_canonical_id,'target_canonical',r.dst_canonical_id,'relation_type',r.relation_type))
- FROM memory_relations r WHERE EXISTS(SELECT 1 FROM versions a WHERE a.canonical_id=r.src_canonical_id)
+ FROM memory_relations r WHERE r.origin='asserted'
+ AND EXISTS(SELECT 1 FROM versions a WHERE a.canonical_id=r.src_canonical_id)
  AND EXISTS(SELECT 1 FROM versions b WHERE b.canonical_id=r.dst_canonical_id)
 )
 SELECT record FROM records LIMIT 100001
@@ -453,6 +454,153 @@ pub async fn apply_device_replica_page(
 mod tests {
     use super::*;
     use mem_federation::publication::{InstanceId, SpaceId};
+
+    #[tokio::test]
+    async fn device_replica_only_syncs_asserted_same_project_relations() {
+        let Some(db) = mem_test_support::IsolatedDatabase::new().await else {
+            return;
+        };
+        let project = Uuid::new_v4();
+        let other = Uuid::new_v4();
+        for id in [project, other] {
+            sqlx::query("INSERT INTO projects(id,slug,name,root_path) VALUES($1,$2,'fixture','/private/repo')")
+                .bind(id).bind(id.to_string()).execute(&db.pool).await.unwrap();
+        }
+        // 318 * 317 = 100,806 distinct heuristic edges: the old selection
+        // exhausted the 100,000-record bound before producing a usable feed.
+        let memories: Vec<Uuid> = sqlx::query_scalar("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) SELECT id,$1,id,1,false,'curated fixture','summary','project','project',3,0.8,now(),now(),to_tsvector('simple','curated fixture') FROM (SELECT md5($1::text || ':' || n::text)::uuid AS id FROM generate_series(1,318) n) fixture RETURNING id")
+            .bind(project).fetch_all(&db.pool).await.unwrap();
+        let foreign = Uuid::new_v4();
+        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,is_tombstone,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,false,'foreign','summary','project','project',3,0.8,now(),now(),to_tsvector('simple','foreign'))")
+            .bind(foreign).bind(other).execute(&db.pool).await.unwrap();
+        let derived = sqlx::query("INSERT INTO memory_relations(id,src_canonical_id,dst_canonical_id,relation_type,origin) SELECT md5(a.id::text || b.id::text)::uuid,a.id,b.id,'supports','derived' FROM memory_entries a CROSS JOIN memory_entries b WHERE a.project_id=$1 AND b.project_id=$1 AND a.id<>b.id")
+            .bind(project).execute(&db.pool).await.unwrap();
+        assert!(derived.rows_affected() > 100_000);
+        let reclassified = Uuid::new_v4();
+        let removed = Uuid::new_v4();
+        for (id, source, target) in [
+            (reclassified, memories[0], memories[1]),
+            (removed, memories[1], memories[0]),
+            (Uuid::new_v4(), memories[0], foreign),
+            (Uuid::new_v4(), foreign, memories[0]),
+        ] {
+            sqlx::query("INSERT INTO memory_relations(id,src_canonical_id,dst_canonical_id,relation_type,origin) VALUES($1,$2,$3,'summarizes','asserted')")
+                .bind(id).bind(source).bind(target).execute(&db.pool).await.unwrap();
+        }
+        let scope = ProjectScope {
+            company: Uuid::new_v4(),
+            area: "workshop".into(),
+            owner: InstanceId::new(Uuid::new_v4()).unwrap(),
+            project,
+            space: SpaceId::new(Uuid::new_v4()).unwrap(),
+        };
+        let mut tx = db.pool.begin().await.unwrap();
+        let records = curated_project_records(&mut tx, project).await.unwrap();
+        assert_eq!(records.len(), 318 * 2 + 2);
+        let mut relation_ids = records
+            .iter()
+            .filter_map(|record| match record {
+                DeviceReplicaRecord::Relation(relation) => Some(relation.id),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        relation_ids.sort();
+        let mut expected = vec![reclassified, removed];
+        expected.sort();
+        assert_eq!(relation_ids, expected);
+        let head = refresh_device_replica(&mut tx, &scope).await.unwrap();
+        assert_eq!(head, records.len() as u64);
+        let subscription = Uuid::new_v4();
+        let mut request = DeviceReplicaRequest {
+            schema_version: 1,
+            nonce: Uuid::new_v4(),
+            device: Uuid::new_v4(),
+            scope: scope.clone(),
+            catalog_revision: 1,
+            after: 0,
+            through: Some(head),
+            limit: DEVICE_REPLICA_PAGE_LIMIT,
+        };
+        initialize_device_projection(&mut tx, subscription, request.device, &scope)
+            .await
+            .unwrap();
+        while request.after < head {
+            let page = device_replica_page(&mut tx, &request).await.unwrap();
+            assert_eq!(
+                apply_device_replica_page(&mut tx, subscription, &page)
+                    .await
+                    .unwrap(),
+                page.next
+            );
+            request.after = page.next;
+            request.nonce = Uuid::new_v4();
+        }
+        tx.commit().await.unwrap();
+
+        sqlx::query("UPDATE memory_relations SET origin='derived' WHERE id=$1")
+            .bind(reclassified)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM memory_relations WHERE id=$1")
+            .bind(removed)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        let mut tx = db.pool.begin().await.unwrap();
+        assert_eq!(
+            refresh_device_replica(&mut tx, &scope).await.unwrap(),
+            head + 2
+        );
+        request.through = None;
+        let delta = device_replica_page(&mut tx, &request).await.unwrap();
+        assert_eq!(delta.entries.len(), 2);
+        assert!(delta.entries.iter().all(|entry| entry.record.is_none()));
+        let mut removed_keys = delta
+            .entries
+            .iter()
+            .map(|entry| entry.key.clone())
+            .collect::<Vec<_>>();
+        removed_keys.sort();
+        let mut expected_keys = expected
+            .iter()
+            .map(|id| format!("relation:{id}"))
+            .collect::<Vec<_>>();
+        expected_keys.sort();
+        assert_eq!(removed_keys, expected_keys);
+        assert_eq!(
+            apply_device_replica_page(&mut tx, subscription, &delta)
+                .await
+                .unwrap(),
+            head + 2
+        );
+        assert_eq!(
+            apply_device_replica_page(&mut tx, subscription, &delta)
+                .await
+                .unwrap(),
+            head + 2
+        );
+        assert_eq!(
+            refresh_device_replica(&mut tx, &scope).await.unwrap(),
+            head + 2
+        );
+        let projected_relations: i64 = sqlx::query_scalar("SELECT count(*) FROM device_replica_records WHERE subscription=$1 AND record->>'kind'='relation'")
+            .bind(subscription).fetch_one(&mut *tx).await.unwrap();
+        assert_eq!(projected_relations, 0);
+        tx.commit().await.unwrap();
+        // The limit still fails closed for an oversized authoritative feed.
+        let mut tx = db.pool.begin().await.unwrap();
+        sqlx::query("UPDATE memory_relations SET origin='asserted' WHERE origin='derived'")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        assert!(matches!(
+            curated_project_records(&mut tx, project).await,
+            Err(StoreError::Limits)
+        ));
+        tx.rollback().await.unwrap();
+        db.cleanup().await.unwrap();
+    }
 
     #[tokio::test]
     async fn device_replica_is_private_repeatable_and_transactional() {

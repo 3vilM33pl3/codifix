@@ -53,8 +53,9 @@ device approval, explicitly allow curated contributions for each selected projec
 this option is available only when your current owner-side permissions allow it.
 Existing reader devices do not acquire write permission automatically.
 
-This mode downloads curated histories, canonical state and same-project relations,
-including knowledge that has **not** been published to other federation participants.
+This mode downloads curated histories, canonical state and asserted same-project
+relations, including knowledge that has **not** been published to other federation
+participants. The derived heuristic graph remains owner-local.
 Raw captures, session bodies and private source paths are excluded. Unavailable
 source references remain explicitly marked. The existing publication-only mode is
 unchanged and remains read-only.
