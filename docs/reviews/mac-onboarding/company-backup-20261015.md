@@ -105,6 +105,60 @@ Each live `pg_dump` provides a coherent database snapshot separately. PostgreSQL
 sequence values are nontransactional; roles and filesystem files are separate
 reads. These owner backups do not establish gateway/PDS/global consistency, a
 stopped-writer cutover point or recovery of subsequent live writes. No new
-application startup, upgrade compatibility or off-host backup copy was tested.
+application startup, runtime role-grant acceptance or off-host backup copy was tested.
 Whole-company rollback, off-host redundancy and gateway/PDS recovery remain
 outside this scoped preparation. All originals are preserved.
+
+## Candidate schema 76 → 84 rehearsal
+
+Both retained clones subsequently passed the exact candidate's pending
+migrations, without connecting to either live database. Candidate executable
+`/home/olivier/Projects/memory/target/release/memory` was hash-checked as
+`b37d8a057f99640727755e9971e951c3f1424ba29a2e1e080150de872347d248`.
+The current source migrations 0001–0084 were copied into the protected backup
+directory and individually hash-bound before execution. The candidate build
+predates only documentation changes, as confirmed by the coordinating task.
+
+The existing `sqlx-cli 0.8.6` from
+`/data/tmp/memory-agent-rc4.GM1GOp/tools/bin/sqlx` ran inside each clone against
+its exact database over `/var/run/postgresql`, using `--no-dotenv` and the frozen
+migration directory. Tool SHA-256:
+`acff2959b3913ea607caf22f83c8f135168cf5f5fc693ade1121bdc0a6104bc3`.
+It emitted a nonfatal weak `GLIBC_2.39` warning inside Debian; the actual SQLx
+migration and verification runs completed successfully. No migration history was
+edited manually. There was no Memory application startup, application config,
+provider credential mount, scheduler, federation worker or watcher; persisted
+clone jobs could not execute. Sandbox networking remained `none`, with no
+published ports. Only the disposable clones were started/stopped.
+
+| Check | Homelab | Workshop |
+| --- | ---: | ---: |
+| Schema head / successful migration rows | 84 / 84 | 84 / 84 |
+| Failed migration rows | 0 | 0 |
+| Original nonhistory tables with unchanged complete row hashes | 145 | 145 |
+| Original nonhistory rows preserved | 41,319 | 474,271 |
+| Original sequence states unchanged | 4 | 4 |
+| Expected new tables, all empty | 13 | 13 |
+
+Every original data table is covered, including knowledge, provenance,
+federation, durable jobs and usage/budget records. The original 76 SQLx history
+rows also match their backup row hashes, while all 84 applied SHA-384 checksums
+match the frozen migration files. New tables match the explicit expected set for
+0077–0084; no unexpected table or new data row appeared. Both clones have zero
+invalid indexes or unvalidated constraints. Repeating `sqlx migrate run` after
+completion is a no-op. Both containers are stopped again; their retained
+sensitive plaintext volumes now hold schema 84. Original encrypted schema-76
+backups remain unchanged.
+
+Protected evidence: `homelab-schema84-receipt.json`,
+`workshop-schema84-receipt.json`, both `*-schema84-inventory.json`,
+`migration-source-manifest.json` and `schema84-rehearsal.json` under the backup
+directory. Migration source manifest SHA-256:
+`988e7a2dd773ac4ee404fb990729b25162c6d911ddc8df980a52cf088613913f`.
+Combined rehearsal receipt SHA-256:
+`710da295d6fca737ad2940068302b39933dfab5159b13dbaf9aa7d619d125bf4`.
+
+This proves the SQLx schema upgrade and preservation of those two snapshot
+datasets. It does not prove application runtime privileges, new company login,
+background behavior, federation compatibility or a safe live writer-fencing
+cutover. Those remain separate acceptance steps.
