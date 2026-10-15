@@ -123,6 +123,28 @@ final class WorkFeatureTests: XCTestCase {
         }
     }
 
+    func testOptionalLiveReadSmoke() async throws {
+        guard ProcessInfo.processInfo.environment["MEMORY_LAYER_LIVE_READ_SMOKE"] == "1" ||
+                ProcessInfo.processInfo.environment["TEST_RUNNER_MEMORY_LAYER_LIVE_READ_SMOKE"] == "1" else {
+            throw XCTSkip("Set MEMORY_LAYER_LIVE_READ_SMOKE=1 to exercise the local development service.")
+        }
+
+        let profile = ConnectionProfile(name: "Local development service",
+                                        baseURL: URL(string: "http://127.0.0.1:4250")!,
+                                        projectSlug: "memory",
+                                        repositoryRoot: URL(fileURLWithPath: "/Users/olivier/Projects/memory"),
+                                        kind: .localSession)
+        let context = FeatureContext(
+            client: MemoryServiceClient(profile: profile, transport: URLSessionTransport(), secrets: WorkTestSecrets()),
+            profile: profile, auth: nil, revision: 1
+        )
+        let service = WorkService(context: context)
+        _ = try await context.client.bootstrapLocalSession(context: context.requestContext)
+        let snapshot = try await service.agentSnapshot()
+        let activityList = try await service.activities(kind: nil, limit: 100)
+        print("Live Work read smoke decoded agents=\(snapshot.sessions.count) activities=\(activityList.items.count)")
+    }
+
     private func testProfile() -> ConnectionProfile {
         ConnectionProfile(name: "Test", baseURL: URL(string: "https://memory.example.test")!,
                           projectSlug: "project / one", repositoryRoot: URL(fileURLWithPath: "/repo"), kind: .serviceToken)
