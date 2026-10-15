@@ -8,6 +8,7 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var auth: AuthMeResponse?
     @Published public private(set) var connectionState: ConnectionState = .disconnected
     @Published public private(set) var revision = 0
+    @Published public private(set) var serviceVersion: String?
     @Published public var selectedDestination: AppDestination = .memories
     @Published public var isInspectorPresented = false
     @Published public var alertMessage: String?
@@ -49,6 +50,7 @@ public final class AppModel: ObservableObject {
         guard attempt == revision else { return }
         connectionState = .connecting
         auth = nil
+        serviceVersion = nil
         activeProfile = profile
         do {
             if profile.kind == .serviceToken, let token {
@@ -77,6 +79,7 @@ public final class AppModel: ObservableObject {
             activeProfile = connected
             auth = identity
             connectionState = .connected
+            await refreshServiceVersion(client: client, profile: connected, attempt: attempt)
         } catch is CancellationError {
             return
         } catch {
@@ -92,6 +95,7 @@ public final class AppModel: ObservableObject {
         client = nil
         activeProfile = nil
         auth = nil
+        serviceVersion = nil
         connectionState = .disconnected
         await previousClient?.cancelAll()
     }
@@ -105,6 +109,7 @@ public final class AppModel: ObservableObject {
             auth = identity
             connectionState = .connected
             revision += 1
+            await refreshServiceVersion(client: client, profile: profile, attempt: revision)
         } catch {
             guard revision == attempt, activeProfile?.id == profile.id else { return }
             connectionState = .failed(error.localizedDescription)
@@ -122,4 +127,15 @@ public final class AppModel: ObservableObject {
             alertMessage = "The connection could not be removed: \(error.localizedDescription)"
         }
     }
+
+    private func refreshServiceVersion(client: MemoryServiceClient, profile: ConnectionProfile, attempt: Int) async {
+        let health = try? await client.get(APIRoute<ServiceHealthIdentity>(path: "/healthz"),
+                                          context: RequestContext(profile: profile, revision: attempt))
+        guard attempt == revision, activeProfile?.id == profile.id else { return }
+        serviceVersion = health?.version
+    }
+}
+
+private struct ServiceHealthIdentity: Decodable, Sendable {
+    let version: String?
 }

@@ -8,6 +8,7 @@ struct MemoryLayerApp: App {
         WindowGroup {
             AppShellView(model: model)
                 .frame(minWidth: 900, minHeight: 620)
+                .preferredColorScheme(.light)
         }
         .defaultSize(width: 1280, height: 800)
         .commands {

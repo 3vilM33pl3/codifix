@@ -77,6 +77,13 @@ struct AppShellView: View {
                     .lineLimit(1)
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
+                    if model.serviceVersion?.hasSuffix("-dev") == true {
+                        Text("DEV").font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 5))
+                            .help("Connected to the development service")
+                    }
                     connectionBadge
                     Button("Refresh", systemImage: "arrow.clockwise") {
                         Task { await reloadIdentity() }
