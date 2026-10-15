@@ -551,9 +551,8 @@ public struct AccessView: View {
     }
 
     @MainActor private func startMutation(_ operation: @escaping @MainActor () async -> Void) {
-        guard !writing else { return }
-        mutationTask?.cancel()
-        mutationTask = Task { await operation() }
+        guard !writing, mutationTask == nil else { return }
+        mutationTask = Task { await operation(); mutationTask = nil }
     }
 
     @MainActor private func finishSheetDismissal() {

@@ -147,6 +147,7 @@ struct AccessTokenCreateSheet: View {
             }
         }
         .padding(22)
+        .interactiveDismissDisabled(submitting)
         .onDisappear {
             operationGeneration = UUID()
             submissionTask?.cancel()

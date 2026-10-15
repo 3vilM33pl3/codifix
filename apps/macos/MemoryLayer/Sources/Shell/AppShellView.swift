@@ -189,15 +189,8 @@ struct DestinationContentView: View {
             AutomationsView(context: context)
         case .bundles:
             BundlesView(context: context)
-        default:
-        VStack(spacing: 12) {
-            Image(systemName: destination.symbol).font(.system(size: 30)).foregroundStyle(.secondary)
-            Text(destination.rawValue).font(.title2.weight(.semibold))
-            Text("This screen is being connected to the Memory Layer service.")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .combine)
+        case .access:
+            AccessView(context: context)
         }
     }
 }
