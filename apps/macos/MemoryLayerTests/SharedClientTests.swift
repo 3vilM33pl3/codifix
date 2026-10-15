@@ -32,7 +32,9 @@ final class SharedClientTests: XCTestCase {
         XCTAssertFalse(permissions.allows(.memoryCurate))
         XCTAssertFalse(permissions.canAdministerAccess)
 
-        let ungranted = EffectivePermissions(auth: auth, projectSlug: "other")
+        let ungrantedJSON = #"{"authenticated":true,"mode":"multi_user","read_only":false,"principal":{"id":"p-2","kind":"service_token","display_name":"Limited","groups":[]}}"#
+        let ungrantedAuth = try JSONDecoder.memoryLayer.decode(AuthMeResponse.self, from: Data(ungrantedJSON.utf8))
+        let ungranted = EffectivePermissions(auth: ungrantedAuth, projectSlug: "other")
         XCTAssertTrue(ungranted.allowed.isEmpty)
     }
 
@@ -40,6 +42,28 @@ final class SharedClientTests: XCTestCase {
         let json = #"{"authenticated":true,"mode":"multi_user","read_only":false,"principal":{"id":"p-1","kind":"service_token","display_name":"Robot","groups":[],"projects":[{"project":"alpha","role":"admin","permissions":["auth_manage"],"source":"membership"}]}}"#
         let auth = try JSONDecoder.memoryLayer.decode(AuthMeResponse.self, from: Data(json.utf8))
         XCTAssertFalse(EffectivePermissions(auth: auth, projectSlug: "alpha").canAdministerAccess)
+    }
+
+    func testExplicitEmptyPermissionsDenyInsteadOfApplyingRolePreset() throws {
+        let json = #"{"authenticated":true,"mode":"multi_user","read_only":false,"principal":{"id":"p-1","kind":"service_token","display_name":"Robot","groups":[],"global_role":"admin","global_permissions":[],"projects":[{"project":"alpha","role":"admin","permissions":[],"source":"membership"}]}}"#
+        let auth = try JSONDecoder.memoryLayer.decode(AuthMeResponse.self, from: Data(json.utf8))
+        let permissions = EffectivePermissions(auth: auth, projectSlug: "alpha")
+        XCTAssertTrue(permissions.allowed.isEmpty)
+        XCTAssertTrue(permissions.globalAllowed.isEmpty)
+        XCTAssertFalse(permissions.canAdministerAccess)
+    }
+
+    func testOldAuthPayloadFallsBackToRolePresetAndGlobalPermissionHasNoProjectFilter() throws {
+        let legacy = #"{"authenticated":true,"mode":"multi_user","read_only":false,"principal":{"id":"p-1","kind":"service_token","display_name":"Old","groups":[],"projects":[{"project":"alpha","role":"operator","source":"membership"}]}}"#
+        let oldAuth = try JSONDecoder.memoryLayer.decode(AuthMeResponse.self, from: Data(legacy.utf8))
+        let oldPermissions = EffectivePermissions(auth: oldAuth, projectSlug: "alpha")
+        XCTAssertTrue(oldPermissions.allows(.memoryCurate))
+        XCTAssertTrue(oldPermissions.allows(.loopsRun))
+        XCTAssertFalse(oldPermissions.allows(.loopsConfigure))
+
+        let global = #"{"authenticated":true,"mode":"multi_user","read_only":false,"principal":{"id":"p-2","kind":"service_token","display_name":"Global reader","groups":[],"global_role":"reader","global_permissions":["memory_read","bundle_export"]}}"#
+        let globalAuth = try JSONDecoder.memoryLayer.decode(AuthMeResponse.self, from: Data(global.utf8))
+        XCTAssertTrue(EffectivePermissions(auth: globalAuth, projectSlug: "other-project").allows(.memoryRead))
     }
 
     func testCookiesAreKeptPerConnectionJar() async {
@@ -88,24 +112,98 @@ final class SharedClientTests: XCTestCase {
         let savedRequest = await transport.lastRequest()
         XCTAssertNil(savedRequest)
     }
+
+    func testRemoteTokenIsScopedToItsProfileAndRemoteCookiesAreIgnored() async throws {
+        let remote = ConnectionProfile(name: "Remote", baseURL: URL(string: "https://memory.example")!, projectSlug: "alpha", kind: .serviceToken)
+        let local = ConnectionProfile(name: "Local", baseURL: URL(string: "http://127.0.0.1:4040")!, projectSlug: "alpha", kind: .localSession)
+        let secrets = InMemorySecretStore(values: [remote.id: "mlt_private-token"])
+        let remoteTransport = CapturingTransport(body: Data(#"{"ok":true}"#.utf8), headers: ["set-cookie": ["memory_session=remote-cookie"]])
+        let remoteClient = MemoryServiceClient(profile: remote, transport: remoteTransport, secrets: secrets)
+        _ = try await remoteClient.get(APIRoute<OKPayload>(path: "/healthz"), context: RequestContext(profile: remote))
+        let remoteSavedRequest = await remoteTransport.lastRequest()
+        let remoteRequest = try XCTUnwrap(remoteSavedRequest)
+        XCTAssertEqual(remoteRequest.value(forHTTPHeaderField: "Authorization"), "Bearer mlt_private-token")
+        XCTAssertNil(remoteRequest.value(forHTTPHeaderField: "Cookie"))
+
+        let localTransport = CapturingTransport(body: Data(#"{"ok":true}"#.utf8))
+        let localClient = MemoryServiceClient(profile: local, transport: localTransport, secrets: secrets)
+        _ = try await localClient.get(APIRoute<OKPayload>(path: "/healthz"), context: RequestContext(profile: local))
+        let localSavedRequest = await localTransport.lastRequest()
+        let localRequest = try XCTUnwrap(localSavedRequest)
+        XCTAssertNil(localRequest.value(forHTTPHeaderField: "Authorization"))
+    }
+
+    func testCancelAllCancelsInFlightTransportAndRejectsOldContext() async throws {
+        let profile = ConnectionProfile(name: "Local", baseURL: URL(string: "http://127.0.0.1:4250")!, projectSlug: "alpha", kind: .localSession)
+        let transport = GateTransport()
+        let client = MemoryServiceClient(profile: profile, transport: transport, secrets: EmptySecretStore())
+        let task = Task {
+            try await client.get(APIRoute<OKPayload>(path: "/v1/projects/alpha/overview"), context: RequestContext(profile: profile))
+        }
+        await transport.waitUntilBlocked()
+        await client.cancelAll()
+        do {
+            _ = try await task.value
+            XCTFail("Expected cancelled request")
+        } catch is CancellationError {
+            // Expected: switching or refreshing a connection cancels its requests.
+        } catch let error as MemoryServiceError {
+            XCTAssertEqual(error, .staleConnection)
+        }
+    }
 }
 
 private struct OKPayload: Decodable, Sendable { let ok: Bool }
 
 private actor CapturingTransport: HTTPTransport {
     private let body: Data
+    private let headers: [String: [String]]
     private var request: URLRequest?
 
-    init(body: Data) { self.body = body }
+    init(body: Data, headers: [String: [String]] = [:]) {
+        self.body = body
+        self.headers = headers
+    }
 
     func send(_ request: URLRequest) async throws -> HTTPReply {
         self.request = request
-        return HTTPReply(statusCode: 200, headers: [:], data: body)
+        return HTTPReply(statusCode: 200, headers: headers, data: body)
     }
 
     func cancelAll() async {}
 
     func lastRequest() -> URLRequest? { request }
+}
+
+private actor GateTransport: HTTPTransport {
+    private var pending: CheckedContinuation<HTTPReply, Error>?
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func send(_ request: URLRequest) async throws -> HTTPReply {
+        try await withCheckedThrowingContinuation { continuation in
+            pending = continuation
+            waiters.forEach { $0.resume() }
+            waiters.removeAll()
+        }
+    }
+
+    func cancelAll() async {
+        let continuation = pending
+        pending = nil
+        continuation?.resume(throwing: CancellationError())
+    }
+
+    func waitUntilBlocked() async {
+        if pending != nil { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+}
+
+private struct InMemorySecretStore: SecretStore {
+    let values: [UUID: String]
+    func read(profileID: UUID) throws -> String? { values[profileID] }
+    func write(_ secret: String, profileID: UUID) throws {}
+    func remove(profileID: UUID) throws {}
 }
 
 private struct EmptySecretStore: SecretStore {

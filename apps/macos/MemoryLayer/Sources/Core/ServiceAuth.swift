@@ -74,14 +74,14 @@ public enum AuthRole: Sendable, Codable, Equatable, Comparable {
 public struct AuthProjectAccess: Decodable, Sendable, Equatable {
     public let project: String
     public let role: AuthRole
-    public let permissions: [String]
+    public let permissions: [String]?
     public let source: String
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         project = try container.decode(String.self, forKey: .project)
         role = try container.decode(AuthRole.self, forKey: .role)
-        permissions = try container.decodeIfPresent([String].self, forKey: .permissions) ?? []
+        permissions = try container.decodeIfPresent([String].self, forKey: .permissions)
         source = try container.decodeIfPresent(String.self, forKey: .source) ?? ""
     }
 
@@ -95,7 +95,7 @@ public struct AuthPrincipal: Decodable, Sendable, Equatable {
     public let email: String?
     public let groups: [String]
     public let globalRole: AuthRole?
-    public let globalPermissions: [String]
+    public let globalPermissions: [String]?
     public let projects: [AuthProjectAccess]
 
     private enum CodingKeys: String, CodingKey {
@@ -113,7 +113,7 @@ public struct AuthPrincipal: Decodable, Sendable, Equatable {
         email = try c.decodeIfPresent(String.self, forKey: .email)
         groups = try c.decodeIfPresent([String].self, forKey: .groups) ?? []
         globalRole = try c.decodeIfPresent(AuthRole.self, forKey: .globalRole)
-        globalPermissions = try c.decodeIfPresent([String].self, forKey: .globalPermissions) ?? []
+        globalPermissions = try c.decodeIfPresent([String].self, forKey: .globalPermissions)
         projects = try c.decodeIfPresent([AuthProjectAccess].self, forKey: .projects) ?? []
     }
 }
@@ -144,6 +144,7 @@ public enum MemoryPermission: String, Sendable, CaseIterable {
 public struct EffectivePermissions: Sendable, Equatable {
     public let role: AuthRole
     public let allowed: Set<MemoryPermission>
+    public let globalAllowed: Set<MemoryPermission>
     public let readOnly: Bool
     public let globalAdministrator: Bool
 
@@ -151,29 +152,53 @@ public struct EffectivePermissions: Sendable, Equatable {
         guard let auth, auth.authenticated else {
             role = .reader
             allowed = [.memoryRead]
+            globalAllowed = [.memoryRead]
             readOnly = true
             globalAdministrator = false
             return
         }
         let projectGrant = auth.principal.projects.first { $0.project == projectSlug }
         let roles = [auth.principal.globalRole, projectGrant?.role].compactMap { $0 }
-        let effectiveRole = roles.max() ?? .unknown("ungranted")
+        let effectiveRole: AuthRole
+        if auth.mode == .singleUser {
+            effectiveRole = auth.principal.globalRole ?? .reader
+        } else {
+            effectiveRole = roles.max() ?? .unknown("ungranted")
+        }
         role = effectiveRole
         readOnly = auth.readOnly
         globalAdministrator = auth.principal.globalRole == .admin
-        let strings = Set(auth.principal.globalPermissions + (projectGrant?.permissions ?? []))
-        let rolePermissions: Set<MemoryPermission> = switch effectiveRole {
+        let mappedGlobal = auth.principal.globalPermissions.map(Self.mapPermissions)
+        globalAllowed = mappedGlobal ?? Self.preset(auth.principal.globalRole)
+        let rolePermissions = Self.preset(effectiveRole)
+        let hasExplicitPermissions = auth.principal.globalPermissions != nil || projectGrant?.permissions != nil
+        if hasExplicitPermissions {
+            allowed = (mappedGlobal ?? []).union(projectGrant?.permissions.map(Self.mapPermissions) ?? [])
+        } else {
+            allowed = rolePermissions
+        }
+    }
+
+    public func allows(_ permission: MemoryPermission) -> Bool { allowed.contains(permission) }
+    public var canAdministerAccess: Bool {
+        !readOnly && globalAdministrator && globalAllowed.contains(.authManage)
+    }
+
+    private static func mapPermissions(_ values: [String]) -> Set<MemoryPermission> {
+        let names = Set(values)
+        return Set(MemoryPermission.allCases.filter { names.contains($0.rawValue) })
+    }
+
+    private static func preset(_ role: AuthRole?) -> Set<MemoryPermission> {
+        guard let role else { return [] }
+        return switch role {
         case .reader: [.memoryRead, .bundleExport]
         case .writer: [.memoryRead, .activityCapture, .bundleExport]
         case .operatorRole: [.memoryRead, .activityCapture, .memoryCurate, .loopsRun, .bundleExport, .bundleImport]
         case .admin: Set(MemoryPermission.allCases)
         case .unknown: []
         }
-        allowed = strings.isEmpty ? rolePermissions : Set(MemoryPermission.allCases.filter { strings.contains($0.rawValue) })
     }
-
-    public func allows(_ permission: MemoryPermission) -> Bool { allowed.contains(permission) }
-    public var canAdministerAccess: Bool { !readOnly && globalAdministrator && allows(.authManage) }
 }
 
 extension JSONDecoder {
