@@ -457,6 +457,7 @@ async fn manifests(
             && manifest.entry.offline_allowed
             && permissions.contains(Permission::BundleExport);
         result.push(OnboardingDeviceReviewProject {
+            curated_contributions_allowed: false,
             manifest,
             allowed_roles,
             offline_available,

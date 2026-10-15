@@ -390,6 +390,7 @@ mod tests {
 
     pub(super) fn project() -> OnboardingDeviceReviewProject {
         OnboardingDeviceReviewProject {
+            curated_contributions_allowed: false,
             manifest: OnboardingProject {
                 project_id: uuid::Uuid::new_v4(),
                 project: "same-display-name".into(),

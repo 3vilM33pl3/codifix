@@ -325,6 +325,7 @@ pub(crate) async fn catalog(
             selected.entry.offline_allowed && current.contains(Permission::BundleExport);
         projects.push(OwnerDeviceCatalogProject {
             project: OnboardingDeviceReviewProject {
+                curated_contributions_allowed: false,
                 manifest: selected,
                 allowed_roles: vec![AuthRole::Reader],
                 offline_available,

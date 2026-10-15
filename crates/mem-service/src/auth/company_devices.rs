@@ -518,6 +518,7 @@ pub(super) async fn catalog_for_device(
             return Err(changed());
         }
         projects.push(OnboardingDeviceReviewProject {
+            curated_contributions_allowed: current.approval.request.curated_contributions_allowed,
             manifest: current.manifest,
             allowed_roles: vec![AuthRole::Reader],
             offline_available: true,

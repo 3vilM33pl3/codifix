@@ -484,6 +484,7 @@ mod native {
                 pending_logout: false,
             };
             let entry = OnboardingDeviceReviewProject {
+                curated_contributions_allowed: false,
                 manifest: OnboardingProject {
                     project_id: project,
                     project: "same-name".into(),

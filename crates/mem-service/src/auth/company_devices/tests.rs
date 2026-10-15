@@ -42,9 +42,10 @@ async fn fake_catalog(
         request_sha256: company_catalog::digest(&request).unwrap(),
         observed_at: Utc::now(),
         projects: vec![OwnerDeviceCatalogProject {
-            curated_contributions_available: false,
+            curated_contributions_available: true,
             manifest_sha256: company_catalog::digest(&fake.manifest).unwrap(),
             project: OnboardingDeviceReviewProject {
+                curated_contributions_allowed: false,
                 manifest: fake.manifest,
                 allowed_roles: vec![AuthRole::Reader],
                 offline_available: true,
@@ -432,6 +433,11 @@ async fn remote_only_activation_has_zero_generic_authority_exact_scope_and_no_fa
         .await
         .unwrap();
     assert_eq!(catalog["projects"].as_array().unwrap().len(), 1);
+    assert!(
+        catalog["projects"][0]
+            .get("curated_contributions_allowed")
+            .is_none()
+    );
     assert_eq!(
         catalog["projects"][0]["manifest"]["project_id"],
         json!(selection.project_id)
@@ -473,6 +479,46 @@ async fn remote_only_activation_has_zero_generic_authority_exact_scope_and_no_fa
         .is_err()
     );
     drop(tx);
+    owner.close().await;
+    f.db.cleanup().await.unwrap();
+}
+
+#[tokio::test]
+async fn device_catalog_reports_explicit_contribution_consent_without_writer_role() {
+    let Some(mut f) = fixture().await else { return };
+    let owner = Owner::new(&f).await;
+    configure(&mut f, &owner);
+    let (started, credential, _) = start(&f).await;
+    let mut request = request(&f, &started).await;
+    request.projects[0].contribution_confirmed = true;
+    call(&f, &request).await.unwrap();
+    let machine = actor(&f, &credential).await;
+    let Json(catalog) = device::catalog(State(f.state.clone()), Extension(machine.clone()))
+        .await
+        .unwrap();
+    assert_eq!(catalog["projects"][0]["allowed_roles"], json!(["reader"]));
+    assert_eq!(
+        catalog["projects"][0]["curated_contributions_allowed"],
+        true
+    );
+    let mut legacy = catalog["projects"][0].clone();
+    legacy
+        .as_object_mut()
+        .unwrap()
+        .remove("curated_contributions_allowed");
+    assert!(
+        !serde_json::from_value::<OnboardingDeviceReviewProject>(legacy)
+            .unwrap()
+            .curated_contributions_allowed
+    );
+    assert!(machine.global.is_empty());
+    assert!(machine.project_roles.is_empty());
+    owner.fake.mode.store(10, Ordering::SeqCst);
+    assert!(
+        device::catalog(State(f.state.clone()), Extension(machine))
+            .await
+            .is_err()
+    );
     owner.close().await;
     f.db.cleanup().await.unwrap();
 }

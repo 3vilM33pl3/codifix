@@ -83,6 +83,7 @@ async fn handle(
         curated_contributions_available: false,
         manifest_sha256: digest(&manifest).unwrap(),
         project: OnboardingDeviceReviewProject {
+            curated_contributions_allowed: false,
             manifest,
             allowed_roles: vec![AuthRole::Reader],
             offline_available: true,

@@ -51,6 +51,9 @@ pub struct OnboardingDeviceReviewProject {
     pub manifest: OnboardingProject,
     pub allowed_roles: Vec<AuthRole>,
     pub offline_available: bool,
+    /// Explicit current device consent, independent of ordinary project roles.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub curated_contributions_allowed: bool,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OnboardingDeviceReview {

@@ -101,6 +101,7 @@ async fn agent_settings_require_completed_tools_templates_and_exact_clone_receip
 }
 pub(super) fn project() -> OnboardingDeviceReviewProject {
     OnboardingDeviceReviewProject {
+        curated_contributions_allowed: false,
         manifest: OnboardingProject {
             project_id: Uuid::new_v4(),
             project: "not-an-authority-key".into(),
