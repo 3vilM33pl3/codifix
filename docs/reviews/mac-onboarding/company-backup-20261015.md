@@ -1,7 +1,8 @@
 # Company owner backup preparation — 2026-10-15
 
-Status: **blocked before data capture**. This is not a verified fresh backup or
-authorization to migrate either live owner.
+Status: **fresh encrypted owner backups and isolated restore verification
+complete** at `2026-10-15T06:28:33Z`. This is backup preparation, not live
+migration or company cutover acceptance.
 
 ## Confirmed scope and inventory
 
@@ -27,43 +28,83 @@ uses `/home/olivier/.local/state/memory-homelab-preview-20260919/app.toml`.
 Both applications bind their executable from
 `/home/olivier/.local/state/memory-company-20260919/runtime-dependable-20260919/memory`.
 
-## Noninteractive key prerequisite
+## Captured artifacts and verification
 
-The existing recipient was read from protected configuration
+Private backup directory (mode 0700):
+`/data/tmp/memory-owner-backup-20261015-BohNpprC`.
+Ciphertexts and receipts are mode 0600. The existing recipient was read from
 `/home/olivier/.local/state/memory-company-20260919/dependable-backup-config.json`.
-A synthetic, nonsensitive public-key encryption probe succeeded. Decrypting that
-probe with `--batch --no-tty --pinentry-mode error` failed with
-`public key decryption failed: No pinentry` and `decryption failed: No pinentry`.
-No interactive pinentry, key unlock, credential change or alternate recipient
-was attempted.
+The initial error-mode pinentry probe failed; one subsequent attempt using normal
+existing GPG pinentry succeeded. All seven ciphertexts were then independently
+decrypted and hashed successfully. No recipient, key, credential or trust
+configuration was changed. There is no remaining decryption-verification gap.
 
-Preparation stopped before any live database dump or configuration capture.
-The private directory
-`/data/tmp/memory-owner-backup-20261015-BohNpprC` contains only `prepare.mjs`;
-there are no fresh ciphertexts, dump hashes, restore receipts or off-host copies
-from this attempt. All original files and running services remain intact.
+| Ciphertext filename | SHA-256 |
+| --- | --- |
+| `homelab.pgdump.gpg` | `160fdad344f8cb6556c36b9da94d6627029d6d373f7d2beec3eac89af705c65d` |
+| `workshop.pgdump.gpg` | `12e1789021e4d76af5b32aa3e112527e9c4cf23efcb9332177041ba606e079be` |
+| `owner-config-runtime.tar.gpg` | `afa0c94249f0304df2b8de8b938dc1e1dab120f4c64767b0cdb2ef60078b5d16` |
+| `homelab.globals.sql.gpg` | `09fc5070b2224f8c156a2ec345a2d5b8f8508f3b6edf08c4f7fe71bfe023271e` |
+| `workshop.globals.sql.gpg` | `f1019e8347a3a8b8dec27b1b84f729818e3a7a77f0b4395b84c38cfc5c21b94e` |
+| `container-metadata.json.gpg` | `ad9560ea22209fb56f5aa8c4a3616a7889d615cb6a3a9eb322aa5ea6d92b798b` |
+| `container-metadata-after.json.gpg` | `f697e0a72a56181e46ae7ff347d1422cb0a25167f7e9ac690ab19b9a3eb158a2` |
 
-The prepared operator reuses the repository's row/sequence inventory and role
-restore helpers, but **has not completed** its backup/restore path. Its intended
-checks are encrypted owner custom dumps, separately encrypted roles and exact
-active configuration/runtime mounts, successful decryption, `pg_restore --list`,
-and separate network-none restore containers with complete row hashes, sequence
-states, schema, owners and grants compared. It will preserve the fresh restore
-containers stopped and retain their volumes; no live restore is planned.
+The configuration archive captures 25 explicit paths: every active application
+bind mount, the owner client/deployment/relay configuration and owner secrets.
+It includes the active Workshop config, runtime executable/web/interaction files,
+state, member configuration, exact per-owner gateway tokens and public CA file;
+it does not traverse the whole gateway or PDS. Exact inventory is in protected
+`config-inventory.json`; complete live container metadata is encrypted.
+
+Both custom dump buffers passed `pg_restore --list`, then restored with roles,
+ownership and privileges into separate fresh PostgreSQL 17.11 containers using
+the exact existing image above. Each sandbox used network `none`, a read-only
+root, no published ports, no restart policy, fresh data volume and private tmpfs
+for PostgreSQL sockets. No application/provider process ran. The existing
+repository `archiveInventory`, `inventoryDifferences` and `roleRestoreSql`
+helpers verified every table's row multiset and every sequence state.
+
+| Owner | Dump UTC window | Tables | Rows | Sequences | Restored migrations |
+| --- | --- | ---: | ---: | ---: | --- |
+| Homelab | 06:27:27–06:27:28 | 146 | 41,395 | 4 | 76 successful, 0 failed |
+| Workshop | 06:27:34–06:27:39 | 146 | 474,347 | 4 | 76 successful, 0 failed |
+
+Both restores also match schema DDL, owners, object grants and global
+roles/grants, with zero invalid indexes or unvalidated constraints. Extensions
+are `pg_trgm=1.6`, `pgcrypto=1.3`, `plpgsql=1.0`, `vector=0.8.6`.
+Normalized schema SHA-256s are Homelab
+`5a4581f301db78bbbdd026a115db9497986523509cf30802081dd4d117ea3b18`
+and Workshop
+`d9cdefe51cda413901ee11f5e6baa73792bdfb7252d4ef37c9cc70d79859a7a3`.
+Private `manifest.json`, per-owner receipts and restore inventories bind the
+exact ciphertext/plaintext hashes, container/volume identities and row hashes.
+Manifest SHA-256:
+`885e8fb765e7c86fb0dc5ece044565b0fe00e7795083b46006773121c2ce29e0`.
+
+No plaintext dump, roles SQL or configuration file was written to disk; their
+transient process buffers ended with the operator processes. Restored database
+volumes remain sensitive plaintext and are explicitly retained for the pending
+schema-84 migration rehearsal, with their containers stopped and network `none`.
+Containers are `memory-four-area-restore-owner-homelab-20261015-bohnpprc` and
+`memory-four-area-restore-owner-workshop-20261015-bohnpprc`; each data volume uses
+the same name plus `-data`. Exact IDs are in the protected per-owner receipts.
+All live owner
+container IDs, start times and complete active mount mappings were unchanged.
+Docker varied mount array order during inspection; sorted complete mappings
+matched. No live service was stopped/restarted, and no source record was written.
 
 ## Sufficiency and remaining gaps
 
-This attempt is **insufficient for owner-only migrations** because no fresh
-backup was captured or restored. Noninteractive decryption must become available
-through the existing authorized key before the prepared end-to-end verification
-can succeed; then rerun into a fresh private directory.
+This provides a decryptable, restore-verified pre-migration snapshot sufficient
+as the backup input for **owner-only migration rehearsal**. It does not by itself
+approve or prove a future live upgrade. Test the exact intended migrations on a
+recovered clone before changing live owners, and arrange a fresh final backup
+appropriate to the authorized cutover and its rollback needs.
 
-Even a successful live `pg_dump` would give a coherent snapshot of each database
-separately. PostgreSQL sequence values are nontransactional; roles and filesystem
-files are separate reads. Two owner dumps do not establish gateway/PDS/global
-consistency, a stopped-writer cutover point or recovery of later live writes.
-Independent restore verification would prove that snapshot's recovery, not new
-application startup or migration compatibility. An owner-only migration still
-needs its exact upgrade tested on the recovered clone and a fresh final backup
-appropriate to the authorized cutover. A whole-company rollback, off-host
-redundancy and gateway/PDS recovery remain outside this scoped preparation.
+Each live `pg_dump` provides a coherent database snapshot separately. PostgreSQL
+sequence values are nontransactional; roles and filesystem files are separate
+reads. These owner backups do not establish gateway/PDS/global consistency, a
+stopped-writer cutover point or recovery of subsequent live writes. No new
+application startup, upgrade compatibility or off-host backup copy was tested.
+Whole-company rollback, off-host redundancy and gateway/PDS recovery remain
+outside this scoped preparation. All originals are preserved.
