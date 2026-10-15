@@ -9,6 +9,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 MACOS = Path(__file__).resolve().parents[1]
@@ -19,11 +20,32 @@ spec.loader.exec_module(producer)
 
 
 class RuntimeProducer(unittest.TestCase):
+    def test_resume_rejects_missing_or_changed_openssl_options_before_build_steps(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary) / "work"
+            work.mkdir()
+            args = SimpleNamespace(work_dir=str(work), bundle_id="fixture-v3", resume=True, jobs=4)
+            original = {"sources": producer.sources(MACOS / "runtime-sources.json"), "arch": "aarch64",
+                        "prefix": f"{producer.bundle.BASE}/fixture-v3"}
+            changed = dict(original, producer_revision=2, openssl_options=["no-shared"])
+            for descriptor in (original, changed):
+                (work / "build-inputs.json").write_text(json.dumps(descriptor))
+                (work / "openssl.complete").write_text("old completion must not be reused")
+                with patch.object(producer.platform, "system", return_value="Darwin"), patch.object(producer.platform, "machine", return_value="arm64"), patch.object(producer, "run") as command:
+                    with self.assertRaisesRegex(ValueError, "resume inputs changed"):
+                        producer.produce(args)
+                    command.assert_not_called()
+                self.assertFalse((work / "sources").exists())
+                self.assertEqual((work / "openssl.complete").read_text(), "old completion must not be reused")
+
     def test_postgres_builds_required_contrib_with_explicit_vendored_static_openssl(self):
         dependency = Path("/private/build/openssl-static")
         commands = producer.openssl_commands(dependency, "aarch64", 4)
         self.assertIn("darwin64-arm64-cc", commands[0])
         self.assertTrue({"no-shared", "no-module", "no-apps", "no-tests"}.issubset(commands[0]))
+        self.assertTrue({"no-atexit", "no-thread-pool", "no-quic"}.issubset(commands[0]))
+        self.assertNotIn("no-threads", commands[0])
+        self.assertNotIn("no-async", commands[0])
         self.assertEqual(commands[-1], ["make", "install_dev"])
         prefix = "/usr/local/share/memory-layer/runtime/fixture-v2"
         stage = Path("/private/build/stage")

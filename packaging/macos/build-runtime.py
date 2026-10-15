@@ -20,6 +20,8 @@ import runtime_bundle as bundle
 
 SOURCE_ORDER = ("openssl", "postgres", "vector", "python")
 POSTGRES_CONTRIB = ("pgcrypto", "pg_trgm")
+OPENSSL_OPTIONS = ("no-shared", "no-module", "no-tests", "no-apps", "no-docs",
+                   "no-atexit", "no-thread-pool", "no-quic")
 
 
 def sources(file):
@@ -72,7 +74,10 @@ def vector_commands(pg, prefix, stage, jobs):
 def openssl_commands(dependency, arch, jobs):
     target = {"aarch64": "darwin64-arm64-cc", "x86_64": "darwin64-x86_64-cc"}[arch]
     return [
-        ["./Configure", target, "no-shared", "no-module", "no-tests", "no-apps", "no-docs",
+        # libpq rejects any exit-symbol reference, including references pulled
+        # in from static dependencies. These supported OpenSSL options remove
+        # process-exit cleanup and optional worker pools/QUIC, not thread safety.
+        ["./Configure", target, *OPENSSL_OPTIONS,
          f"--prefix={dependency}", "--libdir=lib"],
         ["make", f"-j{jobs}"],
         ["make", "install_dev"],
@@ -195,7 +200,8 @@ def produce(args):
     if work.is_symlink():
         raise ValueError("work directory cannot be a link")
     work.mkdir(mode=0o700, parents=False, exist_ok=args.resume)
-    descriptor = {"sources": pinned, "arch": arch, "prefix": prefix}
+    descriptor = {"sources": pinned, "arch": arch, "prefix": prefix,
+                  "producer_revision": 2, "openssl_options": list(OPENSSL_OPTIONS)}
     journal = work / "build-inputs.json"
     if journal.exists():
         if json.loads(journal.read_text()) != descriptor:
