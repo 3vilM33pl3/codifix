@@ -277,6 +277,27 @@ Commit `299a90f5` gives new runtime generations separate digest-bound receipts,
 preserving earlier installed runtime files. Neither compilation nor installer
 contract tests alone complete native acceptance.
 
+Native v3 production subsequently passed. Commit `24e0b002` normalizes validated
+in-bundle Mach-O dependencies to relative loader paths before signing, permitting
+the same files to run in staging and at their final prefix without build-host
+libraries. Twelve producer tests pass. The full packaging suite passed 141 tests
+before that final focused loader change. The staged runtime's non-superuser
+extension test passed, then a separate disposable full Memory service applied
+all 84 migrations successfully and reached healthy status. Extensions observed:
+`pgcrypto 1.3`, `pg_trgm 1.6`, `vector 0.8.7`.
+
+The complete package is
+`target/memory-layer-2.1.0-rc.5-macos-complete-runtime-v3.pkg` in the existing Mac
+build checkout; SHA-256
+`478cb98995c0ca0bd6b69c2d7a3e32024368d307da5b387c3a94783a6568ec2d`.
+Runtime manifest SHA-256:
+`e8a19916b51067739d9c68e7a8afebb7819993bee274a5700cabfda56091468a`.
+Olivier installed it. Exhaustive installed v3 runtime verification passed, the
+Memory executable hash is unchanged, and the previous v1 runtime remains intact.
+The same approved Keychain device is resuming in `onboarding-v4`; earlier
+journals and the stopped incomplete v3 cluster are retained. Native migration
+success in the disposable probe does not yet establish actual project sync.
+
 The earlier first-run stopped before project selection/native effects. Its
 executable-bound journal is preserved. The prepared next attempt uses sibling
 state `onboarding-v2` with the existing Keychain device, not a new enrollment.
