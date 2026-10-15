@@ -99,13 +99,11 @@ struct MemoriesView: View {
                 history = nil
                 return
             }
+            if selectedMemory?.id != id {
+                selectedMemory = nil
+                history = nil
+            }
             await loadSelectedMemory(id: id)
-        }
-        .onChange(of: selectedMemoryID) { _, _ in
-            detailGate.invalidate()
-            selectedMemory = nil
-            history = nil
-            detailError = nil
         }
         .onChange(of: searchText) { reconcileSelection() }
         .onChange(of: tagText) { reconcileSelection() }
