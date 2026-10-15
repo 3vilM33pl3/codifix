@@ -400,13 +400,22 @@ Set-Location C:\path\to\your-project
 memory wizard --dry-run
 memory wizard
 memory service enable
-memory watcher manager enable
 memory doctor
 memory health
 memory tui
 ```
 
-The backend and watcher manager are current-user, least-privilege Task Scheduler tasks named `MemoryLayer-Backend` and `MemoryLayer-WatcherManager`. Their config, state, cache, and task metadata live under `%LOCALAPPDATA%\memory-layer`.
+The backend is a current-user, least-privilege Task Scheduler task named
+`MemoryLayer-Backend`. If you want Codex-linked background watcher automation,
+enable the separate optional task:
+
+```powershell
+memory watcher manager enable
+```
+
+Its task is named `MemoryLayer-WatcherManager`. Backend and watcher-manager
+config, state, cache, and task metadata live under
+`%LOCALAPPDATA%\memory-layer`.
 
 ## What The Wizard Will Ask For
 
@@ -415,7 +424,7 @@ The wizard can set up:
 - shared/global settings when that scope is enabled:
   - the PostgreSQL database URL
   - the shared service API token override, if you want to replace the auto-generated one
-  - an optional shared `writer.id`
+  - an optional shared `writer.id` advisory label
 - optional LLM settings for `scan`
 - user-local project config plus the repo-local `.mem/project.toml` marker
 - optional watcher setup
@@ -507,7 +516,7 @@ Use this for project-specific overrides:
 - watcher settings
 - local backend ports
 - project-specific DB override if needed
-- repo-specific `writer.id` override if one project should write under a different custom writer identity
+- repo-specific `writer.id` override if one project needs a different activity label
 
 ### Project memory behavior
 
@@ -581,9 +590,11 @@ audit activity.
 
 ## Writer ID
 
-Each coding agent or tool that writes memory gets a writer ID.
+Memory Layer v2 derives durable authorship from the authenticated principal.
+The writer ID is an advisory runtime label for activity and diagnostics; it
+does not grant access and cannot replace principal identity.
 
-If you do nothing, Memory Layer derives one automatically from:
+If you do nothing, Memory Layer derives the label automatically from:
 
 - the writing tool
 - the local user
@@ -594,7 +605,7 @@ That gives stable defaults such as:
 - `memory-olivier-monolith`
 - `memory-watcher-olivier-monolith`
 
-For most setups, that automatic writer identity is enough.
+For most setups, that automatic label is enough.
 
 You can configure it in TOML:
 
@@ -610,7 +621,9 @@ or with an environment variable:
 export MEMORY_LAYER_WRITER_ID=codex-cli-main
 ```
 
-Use an explicit writer ID only when you want a custom stable label shared across tools or machines.
+Use an explicit writer ID only when you want a custom stable label shared
+across tools or machines. It changes display/runtime attribution, not the
+authenticated author.
 
 ## Primary And Relay Services
 

@@ -1,37 +1,21 @@
 # Watchers Tab
 
-Use the `Watchers` tab to inspect the live watcher processes for the current project.
+**Watchers** shows live watcher processes for the active project.
 
-![Watchers tab](../../img/tui/watchers-tab.png)
+![Watcher health and ownership details in the TUI](https://www.memory-layer.dev/images/tui/watchers-tab.png)
 
-## What It Shows
+It reports watcher mode, repository root, owning agent session, heartbeat, restart attempts, and health such as `healthy`, `stale`, `restarting`, or `failed`. This is the liveness view; the Project tab is the broader summary.
 
-- the active watcher summary for the project
-- one row per watcher when watchers are present
-- host, process, mode, repo root, owning agent session, heartbeat, and restart details
-- an explicit **Desktop session** or **CLI session** monitoring label; older
-  watchers without session-type metadata are labelled **Session type unknown**
-- watcher health states such as `healthy`, `stale`, `restarting`, and `failed`
+Watchers carry an explicit **Desktop session** or **CLI session** monitoring
+label; older watchers without that metadata show **Session type unknown**.
 
-This tab is specifically for watcher liveness and watchdog status, not for the higher-level project summary.
+## Controls
 
-## Key Controls
+- `j` / `k` choose a watcher.
+- `PgUp` / `PgDn` and `Home` navigate details.
+- `r` forces a fresh project snapshot.
+- `h` opens help.
 
-- `j/k` scroll the watcher list
-- `PgUp/PgDn` page through longer watcher lists
-- `Home` jump back to the top
-- `r` refresh the project snapshot if you want to force a fresh read
-- `h` open or close detailed help for this tab
+For normal Codex-linked work, prefer the watcher manager. Legacy service-managed and foreground watchers remain available for advanced cases.
 
-## When To Use It
-
-- confirming that a watcher is running for the current project
-- confirming which Codex session owns an agent-linked watcher
-- seeing whether a service-managed watcher restarted cleanly
-- distinguishing a healthy watcher from a stale or failed one
-- checking the project repo root and mode reported by the watcher
-
-## See Also
-
-- [Watcher Health](../cli/watchers.md)
-- [TUI Guide](README.md)
+See also: [Watcher guide](https://www.memory-layer.dev/docs/watchers) and [watcher commands](https://www.memory-layer.dev/docs/reference/cli/integrations-evals).

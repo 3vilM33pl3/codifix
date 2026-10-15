@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 
 function GitHubIcon() {
@@ -57,9 +59,9 @@ const socialLinks = [
     icon: <GitHubIcon />,
   },
   {
-    label: 'GitHub releases',
-    text: 'Releases',
-    href: 'https://github.com/3vilM33pl3/memory/releases',
+    label: 'Memory Layer v2.0.0 release',
+    text: 'v2.0.0',
+    href: 'https://github.com/3vilM33pl3/memory/releases/tag/v2.0.0',
     icon: <ReleaseIcon />,
   },
   {
@@ -97,10 +99,13 @@ export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
       title: (
-        <img
+        <Image
           src="/images/memory-layer-logo.png"
           alt="Memory Layer"
           className="memory-site-logo"
+          height={32}
+          priority
+          width={32}
         />
       ),
     },

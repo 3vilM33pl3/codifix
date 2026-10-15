@@ -50,7 +50,7 @@ export interface DemoGraphLink {
 export const demoSnapshot = {
   project: "memory",
   repoRoot: "/workspace/memory",
-  version: "0.9.5",
+  version: "2.0.0",
   capturedAt: "2026-06-27T18:00:00Z",
   overview: {
     activeMemories: 184,
@@ -335,7 +335,7 @@ export const demoSnapshot = {
       tokens: "92k / 256k",
       contextPressure: "36%",
       session: "web-demo-build",
-      childProcesses: ["next dev", "cargo run --bin memory service run"],
+      childProcesses: ["next dev", "cargo run --bin memory -- service run"],
       ports: ["3001", "4040"],
       rateLimit: "normal",
     },
@@ -490,7 +490,7 @@ export const demoSnapshot = {
       code: "service_down",
       severity: "error",
       message: "Could not reach http://127.0.0.1:4250/healthz",
-      fix: "Start the foreground dev service with cargo run --bin memory service run.",
+      fix: "Start the foreground dev service with cargo run --bin memory -- service run.",
     },
     {
       code: "stale_skill_bundle",

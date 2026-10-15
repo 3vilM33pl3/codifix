@@ -1,5 +1,78 @@
 # Web UI
 
+The Web UI is the browser companion to the TUI. It is served by the same local Memory Layer service and reads the same project data: memory, cited queries, code graph context, activity, watchers, proposals, skills, embeddings, and resume briefings.
+
+Open the installed service at `http://127.0.0.1:4040/`. From a source checkout, start the isolated dev service with:
+
+```bash
+cargo run --bin memory -- service run
+```
+
+The dev service uses `http://127.0.0.1:4250/` and its header carries a **DEV MODE** badge. That badge means the browser is connected to the isolated source profile, not the packaged service.
+
+## Navigation
+
+The main bar keeps everyday inspection visible:
+
+| Primary tab | Use it for |
+| --- | --- |
+| Memories | Browse canonical memory, provenance, history, and related context. |
+| Agents | Inspect local coding-agent sessions and their runtime state. |
+| Query | Ask a cited question and inspect ranking/timing evidence. |
+| Graph | Explore code and memory relationships visually. |
+| Activity | Inspect persisted work and build handoff briefings. |
+| Errors | Read actionable diagnostics and fix hints. |
+| Project | See project-wide health, counts, and recent activity. |
+| Review | Approve or reject replacement proposals. |
+| Watchers | Check watcher ownership, heartbeat, and recovery. |
+| Skills | Inspect managed and visible agent skills. |
+| Embeddings | Check backends, coverage, activation, and maintenance controls. |
+| Resume | Re-enter interrupted work with the current briefing. |
+
+The **More** menu holds the lower-frequency control surfaces:
+
+| More item | Use it for |
+| --- | --- |
+| Automations | Review loop definitions, effective modes, runs, and approval queues. |
+| Jobs | Inspect durable background stages and explicitly confirmed retries. |
+| Supervisor | Inspect instance-wide policy and bounded action metadata. |
+| Offline | Browse explicitly configured read-only laptop knowledge. |
+| Federation | Review private sharing and exact consent workflows. |
+| Bundles | Preview, export, and import portable memory bundles. |
+| Access | Administer Authentik-backed identity, service tokens, and project memberships. This is visible only to global administrators. |
+
+Automations, Bundles, and Access are not primary tabs. That keeps the everyday browser path focused while preserving the deeper controls when you need them.
+
+## Graph explorer
+
+The Graph tab is a WebGL-only 3D explorer with three independently visible layers:
+
+- **Code** shows parser-backed code neighborhoods and is visible by default.
+- **Provenance** adds active-memory-to-source links, including available file, symbol, commit, and verification information. It is off by default.
+- **Memory relationships** adds active memory relationships such as `supports`, `supersedes`, `duplicates`, `depends_on`, and `related_to`. It is off by default.
+
+The browser only reads graph data. Build or refresh the code layer from the CLI:
+
+```bash
+memory graph extract --project <project-slug>
+```
+
+The initial view is a bounded neighborhood, not an unlimited repository render. You can filter it by text, file, symbol, edge kind, depth, node cap, and edge cap; the service caps depth at `2`, nodes at `1000`, and edges at `2000`, and reports truncation when a cap applies.
+
+Hovering a layer control or a visible node/edge highlights that layer and dims the others. Toggling Provenance or Memory relationships changes only the browser view; it does not rewrite graph data or backend filters. Click a code node to inspect it. Shift-click a second code node to show connecting paths in the loaded **Code** layer; clear the selection, use Back/Forward, or refresh to leave that local connection view.
+
+Memory and source selections expose their corresponding type, identifiers, metadata, and relationships. Browsers without WebGL show an unsupported state: there is no 2D fallback for this view.
+
+## Work safely
+
+- Query answers expose cited memories, confidence, diagnostics, and graph context. Treat `insufficient_evidence` as a reason to investigate, not a hidden answer.
+- Browser identity uses an HttpOnly session; the browser does not download a service token. Service-token secrets are displayed once when created and should go into a secret manager.
+- Changes to loops, replacement proposals, embeddings, and access control write state. Review scope and confirmation controls before applying them.
+
+For terminal-oriented inspection, use the [TUI](https://www.memory-layer.dev/docs/tui). For service and login recovery, start with [Help](https://www.memory-layer.dev/docs/help) or [service diagnostics](https://www.memory-layer.dev/docs/reference/cli/service-health).
+
+## Synchronized knowledge and private sharing
+
 **More → offline (Synchronized knowledge)** inspects explicitly configured
 read-only laptop subscriptions. Select by subscription UUID; the panel also
 shows company, area, owner instance, project UUID, space and device identity.
@@ -27,7 +100,7 @@ does not enable edits, credential enrollment, installation, or synchronization.
 
 **More → jobs** provides filtered, bounded background-work inspection, dependency
 and attempt history, queue statistics and explicit retry confirmation. See
-[Background jobs](cli/jobs.md). Enrichment is separate from curation success.
+[Background jobs](https://github.com/3vilM33pl3/memory/blob/main/docs/user/cli/jobs.md). Enrichment is separate from curation success.
 
 Activity recovery polls bounded sequence-based pages every five seconds, even
 when live notifications are unavailable. The WebSocket reconnects automatically.
@@ -41,7 +114,7 @@ grants, authority enrollment, reviewed publication, shared citations, correction
 proposals, approval/rejection, subscriptions and sync controls. Mutations display
 their exact request and require confirmation. Drafts are cleared on project
 changes; imported text is escaped and never forwarded to a model from this view.
-See [Federation workflow](federation-workflow.md) for consent and offline-copy limits.
+See [Federation workflow](https://github.com/3vilM33pl3/memory/blob/main/docs/user/federation-workflow.md) for consent and offline-copy limits.
 
 On a single-user loopback installation, opening Federation establishes the local
 owner's revocable browser session before discovery, including read-only requests.
@@ -74,7 +147,7 @@ question**. Review the exact destination, collection revision, question, identit
 deadline and digest before checking the consent box and sending. Preparation does
 not send a question. No history, files or local search results are attached;
 ordinary queries remain local. The operator must enable the experimental browser
-policy and explicit grants described in [Federation runtime](federation-runtime.md).
+policy and explicit grants described in [Federation runtime](https://github.com/3vilM33pl3/memory/blob/main/docs/user/federation-runtime.md).
 
 Only deterministic excerpts and `local_human` output are supported here. Remote
 content is displayed as untrusted text with its citation/attribution data, never
@@ -142,23 +215,8 @@ uncertain response, the confirmation is discarded: inspect current grant state
 and deliberately review a new change. Do not replay an old grant over newer
 policy. Stored enabled state alone is not current execution authorization.
 
-The web UI is the web companion to the TUI. It is served by `mem-service` and uses the same backend APIs for memories, query, code graph inspection, activities, watchers, embeddings, resume briefings, and curation review.
 
-Open it while the service is running:
-
-```text
-http://127.0.0.1:4040/
-```
-
-When building from source, run:
-
-```bash
-npm --prefix web ci
-npm --prefix web run build
-cargo run --bin memory -- service run
-```
-
-## Tabs
+## Supervisor and project-private questions
 
 **More → Supervisor** shows this instance's supervisor policy, exact budget
 amounts and bounded action history. It requires global `memory_read` and is not
@@ -166,7 +224,7 @@ scoped by the project selector. This build explicitly reports execution **not
 integrated** for full autonomous agency, even if a policy is enabled. Inspecting
 this operational feed never starts work or exposes private bodies. The separate
 project-private interaction panel below has its own permissions and explicit
-consent; see [Supervisor inspection](cli/supervisor.md).
+consent; see [Supervisor inspection](https://github.com/3vilM33pl3/memory/blob/main/docs/user/cli/supervisor.md).
 
 ### Workshop questions and saved proposals
 
@@ -221,36 +279,10 @@ An enabled policy, visible controls or queued request does not prove the worker
 is running. These are software/operator requirements, not a claim that paid
 question execution is already deployed. This workflow does not enable the other
 three areas or cross-area communication. See the
-[CLI/TUI and operator instructions](cli/supervisor.md#explicit-private-questions).
+[CLI/TUI and operator instructions](https://github.com/3vilM33pl3/memory/blob/main/docs/user/cli/supervisor.md#explicit-private-questions).
 
-The main tabs match the TUI order:
 
-| Tab | What it shows |
-| --- | --- |
-| Memories | Canonical memories, filters, markdown-style canonical text, embeddings, sources, history, and related memories. |
-| Agents | Local Codex/Claude sessions, with the current project sorted first, plus tokens, context pressure, child processes, ports, and rate limits. |
-| Query | Cited answers, ranked memory results, lexical/semantic/graph timing, token usage, ranking explanations, and graph connections. |
-| Graph | 3D WebGL graph explorer with code neighborhoods, optional memory provenance links, optional memory relationship edges, and typed node/edge detail. |
-| Activity | Persisted activity, token/duration metadata, get-up-to-speed briefings, and LLM audit/debug status. |
-| Errors | Persisted diagnostics plus browser-session errors with explanations, fix hints, `memory doctor` hints, commands, and raw errors. |
-| Project | Project-level counts, memory type/source breakdowns, embedding coverage, automation state, watcher status, and recent activity. |
-| Review | Replacement proposals with policy, target/candidate detail, and approve/reject actions. |
-| Watchers | Watcher presence, heartbeat state, owner agent/session, restart attempts, and recovery details. |
-| Skills | Repo-local Memory skills, version status, upgrade action, file paths, `SKILL.md` content, and repair controls. |
-| Embeddings | Configured embedding backends, active search backend, automatic creation, coverage, re-embed, and reindex controls. |
-| Resume | Re-entry briefing with checkpoint, current thread, next steps, recent changes, context memories, timeline, warnings, and commits. |
-| Automations | Loop-engineering approval queue, automation cards, effective mode, scope, risk, last run, next trigger, daily budget, outputs, and controls. |
-| Access | Global-admin view of Authentik users, service tokens, explicit project memberships, and one-time token creation. |
-
-The web-only `Bundles` tool remains under the More menu for memory export/import
-previews and transfer. `Automations` is a primary browser tab and also has a
-read-oriented TUI tab.
-
-In multi-user mode, the top bar shows the Authentik identity. The browser keeps
-the opaque session in an HttpOnly cookie and sends a separate CSRF value on
-writes; it never downloads a service token. The Access tab appears only for a
-global admin. Newly created service-token secrets are shown once and should be
-stored in OpenBao or another secret manager before dismissal.
+## Local administration
 
 On a writable single-user installation, click **Open administration** beside
 **local owner** in the top bar. This explicitly requests the existing loopback-only
@@ -258,6 +290,7 @@ browser session, checks the server's administrator permissions, and opens Access
 (Users, Projects, Devices and Company). Anonymous reads do not grant administration.
 The button is unavailable for read-only services, machine identities and multi-user
 installations, which use their normal Authentik login instead.
+
 
 ## Automations
 
@@ -331,61 +364,6 @@ downloads the current GitHub skill bundle when available, falls back to the
 installed template when offline, backs up replaced files, and only mutates
 Memory-owned skill directories.
 
-## Graph Explorer
-
-The Graph tab is a WebGL-only 3D explorer with three independently visible
-layers:
-
-- `Code`: parser-backed code graph neighborhoods from the latest completed
-  graph extraction run. This layer is on by default.
-- `Provenance`: memory-to-source links derived from active memories and their
-  source records, including file, symbol, commit, and provenance verification
-  status when available. This layer is off by default.
-- `Memory relationships`: active memory-to-memory relation edges such as
-  `supports`, `supersedes`, `duplicates`, `depends_on`, and `related_to`. This
-  layer is off by default.
-
-The browser does not extract or mutate graph data. The code layer reads
-`/v1/projects/{project}/graph`; the memory layers read the separate read-only
-`/v1/projects/{project}/memory-graph` endpoint and then merge visible layers in
-the browser.
-
-Build or refresh the code graph with:
-
-```bash
-memory graph extract --project memory
-```
-
-The default view is a bounded neighborhood, not an unlimited whole-repository
-render. Filters can seed the graph from text search, file path, symbol name, edge
-kind, depth, node cap, and edge cap. The service enforces hard caps of depth `2`,
-`1000` nodes, and `2000` edges. When results are capped, the tab shows the
-truncation reason.
-
-The layer checkboxes sit underneath the 3D scene. Hovering a checkbox or a
-visible node/edge brightens that whole layer and dims the others. Toggling the
-provenance or relationship layers only changes the browser view; it does not
-change backend code graph filters.
-
-Clicking a code node selects it. Shift-clicking a second code node switches the
-current browser view to the nodes and edges that connect those two nodes through
-any simple path in the loaded code graph. This is a local view mode; normal node
-selection, clearing the selection, Back/Forward, or refreshing the graph exits
-it. The Shift-click connection view applies only to the Code layer in this
-release.
-
-Clicking a memory node shows its memory type, confidence, importance, tags, and
-memory id. Clicking a source node shows source type, file path, symbol, commit,
-verification status, and source id. Clicking provenance or relationship edges
-shows their endpoints and edge-specific metadata.
-
-Query result graph connections and graph extraction activity details include
-actions that open the Graph tab with matching file, symbol, edge kind, or run id
-filters.
-
-Browsers without WebGL show an unsupported state. There is no SVG or 2D fallback
-because the graph view is intended to exercise the same WebGL minimum supported
-surface in every client.
 
 ## Runtime Status
 

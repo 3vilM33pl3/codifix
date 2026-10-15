@@ -9,13 +9,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: memory-self-hosted-runners
+  group: memory-release
   cancel-in-progress: false
 
 jobs:
   validate-release:
     name: Validate Release
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -56,7 +56,7 @@ jobs:
 
   source-release:
     name: Build Source Archive
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: ubuntu-24.04
     needs: validate-release
     steps:
       - uses: actions/checkout@v7
@@ -73,7 +73,10 @@ jobs:
             --prefix="memory-${version}/" \
             --output="target/source/memory-${version}.tar.gz" \
             "$GITHUB_SHA"
-          sha256sum "target/source/memory-${version}.tar.gz" > "target/source/memory-${version}.tar.gz.sha256"
+          (
+            cd target/source
+            sha256sum "memory-${version}.tar.gz" > "memory-${version}.tar.gz.sha256"
+          )
 
       - uses: actions/upload-artifact@v4
         with:
@@ -83,16 +86,16 @@ jobs:
 
   linux-release:
     name: Build Linux ${{ matrix.deb_arch }} Package
-    runs-on: ${{ fromJSON(matrix.runner) }}
+    runs-on: ${{ matrix.runner }}
     needs: validate-release
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: '["self-hosted", "memory", "Linux", "X64"]'
+          - runner: ubuntu-24.04
             deb_arch: amd64
             rust_target: x86_64-unknown-linux-gnu
-          - runner: '["self-hosted", "memory", "Linux", "ARM64"]'
+          - runner: ubuntu-24.04-arm
             deb_arch: arm64
             rust_target: aarch64-unknown-linux-gnu
     steps:
@@ -111,8 +114,11 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          deb="target/debian/memory-layer_${version}_${{ matrix.deb_arch }}.deb"
-          sha256sum "$deb" > "${deb}.sha256"
+          deb="memory-layer_${version}_${{ matrix.deb_arch }}.deb"
+          (
+            cd target/debian
+            sha256sum "$deb" > "${deb}.sha256"
+          )
 
       - uses: actions/upload-artifact@v4
         with:
@@ -124,16 +130,16 @@ jobs:
 
   macos-release:
     name: Build macOS ${{ matrix.pkg_arch }} Package
-    runs-on: ${{ fromJSON(matrix.runner) }}
+    runs-on: ${{ matrix.runner }}
     needs: validate-release
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: '["self-hosted", "memory", "macOS", "X64"]'
+          - runner: macos-15-intel
             pkg_arch: x86_64
             rust_target: x86_64-apple-darwin
-          - runner: '["self-hosted", "memory", "macOS", "ARM64"]'
+          - runner: macos-15
             pkg_arch: aarch64
             rust_target: aarch64-apple-darwin
     steps:
@@ -152,8 +158,11 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          pkg="target/memory-layer-${version}-macos-${{ matrix.pkg_arch }}.pkg"
-          shasum -a 256 "$pkg" > "${pkg}.sha256"
+          pkg="memory-layer-${version}-macos-${{ matrix.pkg_arch }}.pkg"
+          (
+            cd target
+            shasum -a 256 "$pkg" > "${pkg}.sha256"
+          )
 
       - uses: actions/upload-artifact@v4
         with:
@@ -165,7 +174,7 @@ jobs:
 
   windows-release:
     name: Build Windows x86_64 Package
-    runs-on: [self-hosted, memory, Windows, X64]
+    runs-on: windows-2025
     needs: validate-release
     steps:
       - uses: actions/checkout@v7
@@ -197,7 +206,7 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: ubuntu-24.04
     needs:
       - source-release
       - linux-release
