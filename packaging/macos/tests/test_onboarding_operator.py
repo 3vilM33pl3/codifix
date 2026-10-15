@@ -174,6 +174,8 @@ class OperatorContract(unittest.TestCase):
         watchers = [j for j in self.fake.bootstraps if ".watcher." in j["Label"]]
         self.assertEqual(len(watchers), 1)
         self.assertIn("run-watcher", watchers[0]["ProgramArguments"])
+        sync = next(j for j in self.fake.bootstraps if ".sync." in j["Label"])
+        self.assertEqual(sync["AssociatedBundleIdentifiers"], ["dev.memory-layer.network-access"])
         before = len(self.fake.bootstraps)
         self.apply(value)
         self.assertEqual(len(self.fake.bootstraps), before)
@@ -181,6 +183,29 @@ class OperatorContract(unittest.TestCase):
         self.write(root / "area-routing.json", route)
         with self.assertRaises(files.Refused):
             self.apply(value)
+
+    def test_sync_uses_responsible_bundle_without_bypassing_verified_operator(self):
+        self.curated_input()
+        application = self.home / "Applications/Memory Network Access.app/Contents/MacOS"
+        application.mkdir(parents=True)
+        (application / "memory-network-access").write_text("synthetic native helper")
+        self.apply()
+        sync = next(j for j in self.fake.bootstraps if ".sync." in j["Label"])
+        self.assertEqual(sync["ProgramArguments"], [
+            str(application / "memory-network-access"), "--sync", "--python", str(Path(sys.executable).resolve()),
+            "--python-sha256", files.sha(Path(sys.executable).resolve()), "--operator", str(operator.__file__),
+            "--operator-sha256", files.sha(operator.__file__), "--journal", str(self.journal),
+            "--subscription", self.metadata["subscription"]])
+
+    def test_legacy_periodic_sync_stays_periodic_when_network_app_is_installed(self):
+        application = self.home / "Applications/Memory Network Access.app/Contents/MacOS"
+        application.mkdir(parents=True)
+        (application / "memory-network-access").write_text("synthetic native helper")
+        self.apply()
+        sync = next(j for j in self.fake.bootstraps if ".sync." in j["Label"])
+        self.assertEqual(sync["StartInterval"], 300)
+        self.assertIn("run-sync", sync["ProgramArguments"])
+        self.assertNotIn("--sync", sync["ProgramArguments"])
 
     def test_curated_workflow_refuses_publication_only_subscription(self):
         self.curated_input()

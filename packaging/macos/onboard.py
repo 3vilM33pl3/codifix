@@ -256,6 +256,20 @@ def plist(value, label, arguments, interval=None):
     else:
         job["KeepAlive"] = True
         job["ThrottleInterval"] = 10
+    if ".sync." in label:
+        # macOS attributes a launchd agent's LAN access to this visible app.
+        # It requests consent without ever reading device/server credentials.
+        job["AssociatedBundleIdentifiers"] = ["dev.memory-layer.network-access"]
+        for application in (Path("/Applications/Memory Network Access.app"), Path.home() / "Applications/Memory Network Access.app"):
+            helper = application / "Contents/MacOS/memory-network-access"
+            if helper.is_file() and value["plan"]["input"]["schema_version"] == 2:
+                # Keep the granted, bundled app responsible for the child.
+                # Retain the complete verified run-sync wrapper under the app.
+                # Schema-v1 StartInterval jobs keep their original lifecycle.
+                job["ProgramArguments"] = [str(helper), "--sync", "--python", value["plan"]["python"],
+                    "--python-sha256", files.sha(value["plan"]["python"]), "--operator", value["plan"]["operator"],
+                    "--operator-sha256", files.sha(value["plan"]["operator"]), *arguments[-4:]]
+                break
     return plistlib.dumps(job, sort_keys=True)
 
 

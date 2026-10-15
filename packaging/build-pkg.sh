@@ -171,7 +171,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "Building a macOS .pkg requires Darwin and Apple's packaging tools." >&2
   exit 1
 fi
-REQUIRED_TOOLS=(cargo npm pkgbuild mktemp install cp ln find chmod mkdir rm awk du cut)
+REQUIRED_TOOLS=(cargo npm pkgbuild mktemp install cp ln find chmod mkdir rm awk du cut xcrun codesign plutil)
 if [[ -n "$RUNTIME_BUNDLE" ]]; then REQUIRED_TOOLS+=(python3); fi
 if [[ -n "$APP_SIGN_IDENTITY" ]]; then REQUIRED_TOOLS+=(codesign); fi
 if [[ "$NOTARIZE" -eq 1 ]]; then REQUIRED_TOOLS+=(xcrun); fi
@@ -217,6 +217,9 @@ for source in "$ROOT_DIR/.codex/config.toml" "$ROOT_DIR/.codex/agents/astra_advi
     echo "Required package input unavailable: $source" >&2
     exit 1
   fi
+done
+for source in "$ROOT_DIR/packaging/macos/build-network-access.sh" "$ROOT_DIR/packaging/macos/network-access.m"; do
+  [[ -f "$source" ]] || { echo "Required package input unavailable: $source" >&2; exit 1; }
 done
 
 umask 022
@@ -293,11 +296,15 @@ else
   fi
 fi
 install -m 0755 "$BINARY_PATH" "$PAYLOAD/usr/local/bin/memory"
+mkdir -p "$PAYLOAD/Applications"
+bash "$ROOT_DIR/packaging/macos/build-network-access.sh" "$PAYLOAD/Applications/Memory Network Access.app" "$PKG_ARCH"
 
 if [[ -n "$APP_SIGN_IDENTITY" ]]; then
   echo "Signing binary with Developer ID Application certificate..."
   codesign --force --sign "$APP_SIGN_IDENTITY" --options runtime --timestamp "$PAYLOAD/usr/local/bin/memory"
   codesign --verify --verbose=2 "$PAYLOAD/usr/local/bin/memory"
+  codesign --force --sign "$APP_SIGN_IDENTITY" --options runtime --timestamp "$PAYLOAD/Applications/Memory Network Access.app"
+  codesign --verify --strict "$PAYLOAD/Applications/Memory Network Access.app"
 fi
 
 ln -sf memory "$PAYLOAD/usr/local/bin/mem-cli"

@@ -46,6 +46,10 @@ class PackageContract(unittest.TestCase):
         for name in ("postinstall.sh", "seed-user.sh", "preinstall-lightweight.sh", "preinstall-application-update.sh", "onboard.py", "onboarding_files.py",
                      "onboarding_native.py", "onboarding_journey.py", "onboarding_agents.py", "onboarding_first_run.py", "runtime_bundle.py", "operator-README.md"):
             shutil.copy2(MACOS / name, repo / "packaging/macos" / name)
+        shutil.copy2(MACOS / "network-access.m", repo / "packaging/macos/network-access.m")
+        # The real AppKit compilation is checked on the Mac, not this Linux fixture.
+        (repo / "packaging/macos/build-network-access.sh").write_text(
+            '#!/bin/bash\nset -eu\nmkdir -p "$1/Contents/MacOS"\nprintf "synthetic-app-%s" "$2" > "$1/Contents/MacOS/memory-network-access"\n')
         for name in ("config.toml", "agents/astra_adviser.toml"):
             shutil.copy2(REPO / ".codex" / name, repo / ".codex" / name)
         (repo / "Cargo.toml").write_text('version = "0.0.0-test"\n')
@@ -63,6 +67,8 @@ class PackageContract(unittest.TestCase):
         self.script("cargo", 'printf "%s\\n" "$@" >> "$TRACE"\n')
         self.script("npm", 'printf "npm %s\\n" "$*" >> "$TRACE"\n')
         self.script("python3", f'exec {shlex.quote(sys.executable)} "$@"\n')
+        for tool in ("xcrun", "codesign", "plutil"):
+            self.script(tool, 'exit 0\n')
         if pkgbuild:
             self.script("pkgbuild", '''printf "pkgbuild %s\\n" "$*" >> "$TRACE"
 payload=""; scripts=""; output=""

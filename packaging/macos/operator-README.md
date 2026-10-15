@@ -6,6 +6,29 @@ not run Python, install PostgreSQL, log in, start services or provision agent
 identities during postinstall. Native macOS/Keychain/launchd/APFS acceptance is
 still pending.
 
+## macOS local-network permission
+
+Packages include **Memory Network Access.app**. Open it once with the configured
+company origin, for example:
+
+```bash
+open -a 'Memory Network Access' --args https://company.example
+```
+
+Allow the macOS local-network prompt. The helper checks HTTPS reachability without
+reading credentials; its success message does not claim successful synchronization.
+Schema-v2 synchronization LaunchAgents run their existing verified operator under
+this application so macOS attributes background network access consistently.
+The helper pins Python and operator bytes, and the operator still verifies its
+journal, Memory executable, profiles and current permissions. Startup failures
+retry after 30 seconds; stopping the job terminates its child with a five-second
+grace period. Legacy schema-v1 periodic jobs retain their original lifecycle.
+
+This follows [Apple's local-network privacy guidance](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
+For internal unsigned candidates the app is signed ad hoc; native permission
+behavior must be retested after replacing it. Release packages use the provided
+Developer ID identity when configured. No system-wide network exception is added.
+
 ## Prerequisites
 
 Run as a non-root logged-in Mac user. Supply an already installed Python 3.11+
