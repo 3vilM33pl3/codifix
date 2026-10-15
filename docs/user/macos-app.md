@@ -74,6 +74,14 @@ Actions follow service permissions and read-only mode. Failure messages remain
 visible, and the app does not automatically retry writes. Destructive actions
 require confirmation.
 
+## Keyboard navigation
+
+Use **Command-F** to focus the memory search or question field, **Command-R** to
+refresh the current connection, and **Command-comma** to open connection settings.
+**Command-Option-I** toggles the inspector. The **Navigate** menu lists destination
+shortcuts; standard sidebar, list selection, Tab, Return, and Escape behavior
+remain available.
+
 ## Development validation
 
 Run the macOS tests with:
