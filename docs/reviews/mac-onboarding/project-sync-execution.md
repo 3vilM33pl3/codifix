@@ -128,11 +128,13 @@ used.
 
 ## Deployment and native acceptance remain open
 
-Read-only inspection found the live Homelab and Workshop containers still use
-the existing release/configuration; no company/onboarding section is configured
-in those mounted app TOMLs. The dev company console is not the production company
-service. This turn has not upgraded those containers, migrated their databases,
-changed Authentik or issued live device grants.
+On October 15, the backed-up Homelab and Workshop owners were upgraded to the
+frozen candidate and schema 84. Their company origins use verified HTTPS and
+multi-user authentication; scoped local client credentials and existing watchers
+were renewed. See the [company deployment ledger](company-deployment-20261015.md)
+for exact changes, preserved identities and forward-recovery requirements.
+The dev company console remains separate from the live company service. Human
+login, company delegate provisioning and live device grants remain incomplete.
 
 The real ARM64 Mac is now reachable and has the native candidate installed.
 PostgreSQL 17.11, pgvector 0.8.7 and Python 3.14.8 were built and bundled on that
@@ -141,8 +143,8 @@ verified; the user-approved login-Keychain trust verifies Authentik HTTPS.
 See [native evidence and package hashes](native-mac-20261014.md). This is not yet
 the completed company login and two-project synchronization journey.
 
-Next deployment actions are a backed-up owner/company release upgrade,
-configuration of the real stable Authentik identity and the two reviewed project
+Next deployment actions are completion of the real Authentik login, exact owner
+delegate configuration, stable human project assignments and the two reviewed project
 manifests, then the exact two-project
 login/clone/offline/search/upload/correction/revoke/reboot acceptance sequence.
 The six-step plan is not complete, and no final plan-verification claim has been

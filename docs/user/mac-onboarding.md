@@ -3,10 +3,13 @@
 This feature is under implementation. The development package now includes a
 resumable sign-in/select/clone/offline-sync operator and a separate Codex/Claude
 setup stage. Optional runtime-bundle packaging and guided first-run now exist.
-It still needs a produced reviewed native runtime and real-Mac acceptance;
-it is not yet a verified self-contained first-run installer.
+An ARM64 candidate with a native runtime has been built and installed on the
+test Mac; its installed PostgreSQL/pgvector restart smoke test passed. The complete
+sign-in and two-project journey still needs real-Mac acceptance, so it is not yet
+a verified end-to-end first-run installer.
 See the [execution contract](../reviews/mac-onboarding/README.md) for completion
-checks. No Mac installation or existing area has been changed by this work.
+checks and the [deployment ledger](../reviews/mac-onboarding/company-deployment-20261015.md)
+for the installed candidate and owner changes.
 
 ## Guided first-run candidate
 
@@ -59,7 +62,7 @@ views provide **View owner history**; TUI Synchronized knowledge uses `h` for
 history and `n` for more versions. These are read-only owner copies.
 
 This is unreleased implementation, not Mac acceptance evidence. In particular,
-native dependencies still need a Mac build/rehearsal, and mutable-state/tombstone
+the complete native journey still needs rehearsal, and mutable-state/tombstone
 upload plus the complete review/status journey remain on the execution checklist.
 
 To propose a correction to an owner copy, inspect its downloaded version and
