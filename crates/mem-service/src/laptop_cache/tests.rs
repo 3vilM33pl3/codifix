@@ -406,7 +406,7 @@ async fn curated_memories_browse_merges_scoped_owner_rows_without_echoes() {
     let local = Uuid::new_v4();
     let twin = Uuid::new_v4();
     for local_id in [local, twin] {
-        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at) VALUES($1,$2,$1,1,'diagnosis curated replica text','curated summary','domain_fact','project',1,0.8,clock_timestamp(),clock_timestamp())")
+        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_id,version_no,canonical_text,summary,memory_type,scope,importance,confidence,created_at,updated_at,search_document) VALUES($1,$2,$1,1,'diagnosis curated replica text','curated summary','domain_fact','project',1,0.8,clock_timestamp(),clock_timestamp(),to_tsvector('english','diagnosis curated replica text'))")
             .bind(local_id).bind(f.project).execute(&f.db.pool).await.unwrap();
     }
     let browse = |status, limit, offset| {

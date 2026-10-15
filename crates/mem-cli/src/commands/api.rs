@@ -306,7 +306,7 @@ impl ApiClient {
         &self,
         project: &str,
     ) -> Result<ProjectMemoriesResponse> {
-        if self.config.laptop_cache.is_some() {
+        if let Some(cache) = &self.config.laptop_cache {
             let mut combined = ProjectMemoriesResponse {
                 project: project.into(),
                 total: 0,
@@ -339,11 +339,7 @@ impl ApiClient {
                     if let Some(origin) = &row.origin {
                         anyhow::ensure!(
                             origin.read_only
-                                && self
-                                    .config
-                                    .laptop_cache
-                                    .as_ref()
-                                    .unwrap()
+                                && cache
                                     .subscriptions
                                     .iter()
                                     .any(|s| s.subscription_id == origin.subscription_id

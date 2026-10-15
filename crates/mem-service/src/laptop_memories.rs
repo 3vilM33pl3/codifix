@@ -32,7 +32,7 @@ pub(crate) async fn list(
         .config
         .laptop_cache
         .as_ref()
-        .unwrap()
+        .ok_or_else(|| ApiError::not_found("laptop cache unavailable"))?
         .subscriptions
         .iter()
         .filter(|b| {
