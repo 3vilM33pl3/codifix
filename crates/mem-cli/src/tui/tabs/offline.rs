@@ -258,7 +258,7 @@ impl App {
         true
     }
 }
-fn plain(value: &str) -> String {
+pub(in crate::tui) fn plain(value: &str) -> String {
     value
         .chars()
         .map(|c| {

@@ -1249,6 +1249,7 @@ fn test_project_memory_list_item(
 ) -> mem_record::ProjectMemoryListItem {
     let id = Uuid::new_v4();
     mem_record::ProjectMemoryListItem {
+        origin: None,
         id,
         summary: summary.to_string(),
         preview: summary.to_string(),
@@ -1264,6 +1265,82 @@ fn test_project_memory_list_item(
         version_no: 1,
         is_tombstone: false,
     }
+}
+
+#[tokio::test]
+async fn synchronized_memories_are_labelled_and_mutation_keys_never_dispatch() {
+    let mut app = new_test_app();
+    let mut item =
+        test_project_memory_list_item("Owner knowledge", MemoryType::DomainFact, Utc::now());
+    item.origin = Some(mem_record::ProjectMemoryOrigin {
+        subscription_id: Uuid::new_v4(),
+        owner_instance_id: Uuid::new_v4(),
+        project_id: Uuid::new_v4(),
+        author: "owner author".into(),
+        content_digest: format!("sha256:{}", "a".repeat(64)),
+        read_only: true,
+    });
+    let origin = item.origin.clone().unwrap();
+    let selected = item.id;
+    app.memories.all_memories = vec![item.clone()];
+    app.apply_filters();
+    let config = serde_json::from_value(serde_json::json!({"service":{"bind_addr":"127.0.0.1:1","api_token":"synthetic-owner"},"database":{"url":"postgresql://unused/unused"}})).unwrap();
+    let api = super::ApiClient::new(reqwest::Client::new(), config);
+    app.start_selected_memory_validation(&api);
+    assert!(!app.memories.validation.loading);
+    app.apply_selected_validation_preview(&api).await.unwrap();
+    app.delete_selected_memory(&api).await.unwrap();
+    assert!(app.chrome.status_message.contains("read-only"));
+    app.memories.selected_owner_detail = Some((
+        selected,
+        mem_record::LaptopCacheHistoryResponse {
+            schema_version: 1,
+            project: mem_record::LaptopCacheProject {
+                subscription_id: origin.subscription_id,
+                device_id: Uuid::new_v4(),
+                company_id: Uuid::new_v4(),
+                area: "homelab".into(),
+                owner_instance_id: origin.owner_instance_id,
+                project_id: origin.project_id,
+                space_id: Uuid::new_v4(),
+                cursor: 4,
+                observed_at: Some(Utc::now()),
+                initialized: true,
+                read_only: true,
+                uploads: Default::default(),
+                sync_error: None,
+            },
+            canonical_id: item.canonical_id,
+            versions: vec![mem_record::LaptopCacheHistoryVersion {
+                memory_type: item.memory_type,
+                id: selected,
+                version: 1,
+                author: "owner author".into(),
+                authored_at: Utc::now(),
+                updated_at: Utc::now(),
+                tombstone: false,
+                text: "Synchronized knowledge is readable here".into(),
+                summary: item.summary,
+                digest: "a".repeat(64),
+                unavailable_source_ids: vec![Uuid::new_v4()],
+            }],
+            next_after_version: None,
+            read_only: true,
+            current_state: None,
+        },
+    ));
+    let text = build_memory_detail_lines(&app)
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(text.contains("READ-ONLY"));
+    assert!(text.contains("Synchronized knowledge is readable here"));
+    assert!(text.contains("owner author"));
+    assert!(text.contains("private source bytes are not downloaded"));
+    app.filters.text = "no matching memory".into();
+    app.apply_filters();
+    assert!(app.memories.selected_owner_detail.is_none());
 }
 
 fn empty_automation_snapshot() -> AutomationSnapshot {

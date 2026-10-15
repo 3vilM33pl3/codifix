@@ -301,6 +301,73 @@ impl ApiClient {
         .await
     }
 
+    #[cfg(feature = "tui")]
+    pub(crate) async fn project_memories_for_browsing(
+        &self,
+        project: &str,
+    ) -> Result<ProjectMemoriesResponse> {
+        if self.config.laptop_cache.is_some() {
+            let mut combined = ProjectMemoriesResponse {
+                project: project.into(),
+                total: 0,
+                items: vec![],
+            };
+            let mut revision = None;
+            let mut seen = std::collections::HashSet::new();
+            loop {
+                let snapshot: mem_record::ProjectMemoryBrowseResponse = self.cache_operation(
+                    &format!("/v1/projects/{project}/memories?include_synchronized=true&limit=100&offset={}", combined.items.len()), None).await?;
+                anyhow::ensure!(
+                    revision
+                        .as_ref()
+                        .is_none_or(|r| r == &snapshot.browse_revision),
+                    "Synchronized view changed during pagination; refresh again"
+                );
+                revision = Some(snapshot.browse_revision);
+                let page = snapshot.memories;
+                anyhow::ensure!(
+                    page.project == project
+                        && (0..=100_000).contains(&page.total)
+                        && page.items.len() <= 100,
+                    "Unexpected synchronized project or browse bound"
+                );
+                for row in &page.items {
+                    anyhow::ensure!(
+                        seen.insert((row.id, row.origin.as_ref().map(|o| o.subscription_id))),
+                        "Synchronized view repeated a record; refresh again"
+                    );
+                    if let Some(origin) = &row.origin {
+                        anyhow::ensure!(
+                            origin.read_only
+                                && self
+                                    .config
+                                    .laptop_cache
+                                    .as_ref()
+                                    .unwrap()
+                                    .subscriptions
+                                    .iter()
+                                    .any(|s| s.subscription_id == origin.subscription_id
+                                        && s.project_id == origin.project_id
+                                        && s.owner_instance_id == origin.owner_instance_id),
+                            "Synchronized browse scope changed"
+                        );
+                    }
+                }
+                let empty = page.items.is_empty();
+                combined.total = page.total;
+                combined.items.extend(page.items);
+                if combined.items.len() as i64 >= combined.total {
+                    return Ok(combined);
+                }
+                anyhow::ensure!(
+                    !empty,
+                    "Synchronized browse changed during pagination; refresh again"
+                );
+            }
+        }
+        self.project_memories(project).await
+    }
+
     pub(crate) async fn project_memories(&self, project: &str) -> Result<ProjectMemoriesResponse> {
         get_json(
             self.client

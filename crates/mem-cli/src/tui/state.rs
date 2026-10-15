@@ -93,6 +93,8 @@ pub(super) struct MemoriesTabState {
     pub(in crate::tui) filtered_memories: Vec<ProjectMemoryListItem>,
     pub(in crate::tui) total_memories: i64,
     pub(in crate::tui) selected_detail: Option<MemoryEntryResponse>,
+    pub(in crate::tui) selected_owner_detail:
+        Option<(uuid::Uuid, mem_record::LaptopCacheHistoryResponse)>,
     pub(in crate::tui) selected_history: Option<mem_record::MemoryHistoryResponse>,
     pub(in crate::tui) selected_index: usize,
     pub(in crate::tui) table_state: TableState,

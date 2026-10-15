@@ -113,6 +113,57 @@ pub(in crate::tui) fn build_history_lines(
 }
 
 pub(in crate::tui) fn build_memory_detail_lines(app: &App) -> Vec<Line<'static>> {
+    if let Some((id, history)) = &app.memories.selected_owner_detail
+        && app
+            .memories
+            .filtered_memories
+            .get(app.memories.selected_index)
+            .is_some_and(|r| r.id == *id && r.origin.is_some())
+    {
+        let mut lines = vec![
+            Line::from("SYNCHRONIZED OWNER KNOWLEDGE — READ-ONLY"),
+            Line::from(format!(
+                "Area: {} | owner: {}",
+                history.project.area, history.project.owner_instance_id
+            )),
+            Line::from(format!("Canonical: {}", history.canonical_id)),
+            Line::from("H: retained owner history. Corrections require owner review."),
+            Line::from(""),
+        ];
+        for version in &history.versions {
+            lines.push(Line::from(format!(
+                "v{} | {} | author: {}",
+                version.version,
+                super::super::tabs::offline::plain(&version.summary),
+                super::super::tabs::offline::plain(&version.author)
+            )));
+            lines.push(Line::from(format!(
+                "Authored: {} | SHA-256: {}",
+                format_timestamp_medium(version.authored_at),
+                version.digest
+            )));
+            if version.tombstone {
+                lines.push(Line::from("Deleted version (tombstone)."));
+            } else {
+                lines.extend(render_markdown_lines(&super::super::tabs::offline::plain(
+                    &version.text,
+                )));
+            }
+            if !version.unavailable_source_ids.is_empty() {
+                lines.push(Line::from(format!(
+                    "{} provenance references retained; private source bytes are not downloaded.",
+                    version.unavailable_source_ids.len()
+                )));
+            }
+            lines.push(Line::from(""));
+        }
+        if history.next_after_version.is_some() {
+            lines.push(Line::from(
+                "Additional history pages are available in Offline.",
+            ));
+        }
+        return lines;
+    }
     if let Some(history) = &app.memories.selected_history {
         return build_history_lines(history);
     }
@@ -560,6 +611,12 @@ pub(in crate::tui) fn memory_row(item: &ProjectMemoryListItem) -> Row<'static> {
     // user can tell at a glance that the row is a replacement rather than
     // an original capture. v1 never shows a badge to keep the list clean.
     let mut summary_spans = Vec::with_capacity(2);
+    if item.origin.is_some() {
+        summary_spans.push(Span::styled(
+            "[Synced/read-only] ",
+            Style::default().fg(Theme::ACCENT_STRONG),
+        ));
+    }
     summary_spans.push(Span::styled(
         item.summary.clone(),
         Style::default().fg(Theme::TEXT),

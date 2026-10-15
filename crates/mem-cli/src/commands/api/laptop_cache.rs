@@ -31,7 +31,7 @@ fn valid_question(q: &str, limit: u32) -> bool {
         && !q.chars().any(|c| c.is_control() && !c.is_whitespace())
 }
 impl ApiClient {
-    async fn cache_operation<T: serde::de::DeserializeOwned>(
+    pub(super) async fn cache_operation<T: serde::de::DeserializeOwned>(
         &self,
         path: &str,
         request: Option<&LaptopCacheSearchRequest>,
@@ -170,6 +170,43 @@ impl ApiClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "tui")]
+    #[tokio::test]
+    async fn synchronized_browse_rejects_changed_pages_and_preserves_protected_transport() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let owner = Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-local-owner");
+        let row = |id| serde_json::json!({"id":id,"summary":"one","preview":"one","memory_type":"domain_fact","status":"active","confidence":0.8,"importance":1,"updated_at":chrono::Utc::now(),"tags":[],"tag_count":0,"source_count":0});
+        let page = |id, revision| {
+            serde_json::json!({"project":"local","total":2,"items":[row(id)],"browse_revision":revision}).to_string()
+        };
+        let server = tokio::spawn(serve(listener, vec![
+            (200, String::new(), serde_json::json!({"authenticated":true,"mode":"single_user","read_only":false,"principal":{"id":owner,"kind":"internal","display_name":"synthetic","global_role":"admin"}}).to_string()),
+            (200,"Set-Cookie: memory_session=synthetic-session; HttpOnly\r\nSet-Cookie: memory_csrf=synthetic-csrf\r\n".into(),"{}".into()),
+            (200,String::new(),page(Uuid::new_v4(),"before")),
+            (200,String::new(),page(Uuid::new_v4(),"after")),
+        ]));
+        let mut config: mem_config::AppConfig = serde_json::from_value(serde_json::json!({"service":{"bind_addr":address.to_string(),"api_token":"synthetic-owner"},"database":{"url":"postgresql://unused/unused"}})).unwrap();
+        config.laptop_cache = Some(mem_config::LaptopCacheConfig {
+            subscriptions: vec![],
+        });
+        let api = ApiClient::new(Client::new(), config);
+        let error = api
+            .project_memories_for_browsing("local")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("changed during pagination"));
+        let requests = server.await.unwrap();
+        assert_eq!(requests.len(), 4);
+        assert!(requests[2].contains("include_synchronized=true&limit=100&offset=0"));
+        for request in &requests[2..] {
+            assert!(request.contains("cache-control: no-store"));
+            assert!(request.contains("memory_session=synthetic-session"));
+            assert!(!request.contains("x-api-token"));
+        }
+    }
     #[test]
     fn cache_question_is_bounded_utf8_and_never_accepts_control_input() {
         assert!(valid_question("exact\nquestion", 8));

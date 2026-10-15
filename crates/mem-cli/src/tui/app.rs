@@ -95,7 +95,14 @@ pub(crate) async fn run(api: ApiClient, project: String, repo_root: PathBuf) -> 
     let mut last_stream_connect_attempt = Instant::now();
 
     let mut last_draw = Instant::now();
+    let mut last_laptop_refresh = Instant::now();
     loop {
+        if api.config.laptop_cache.is_some()
+            && last_laptop_refresh.elapsed() >= Duration::from_secs(30)
+        {
+            app.request_refresh(&api, RefreshMode::Full);
+            last_laptop_refresh = Instant::now();
+        }
         let mut stream_failed = false;
         if let Some(current_stream) = stream.as_mut() {
             match current_stream.try_recv() {
@@ -331,7 +338,7 @@ async fn load_project_refresh(
 ) -> ProjectRefreshResult {
     let health_fut = api.health();
     let overview_fut = api.project_overview(&project);
-    let memories_fut = api.project_memories(&project);
+    let memories_fut = api.project_memories_for_browsing(&project);
     let proposals_fut = api.replacement_proposals(&project);
     let automations_fut = load_automation_snapshot(api, &project, &repo_root);
     let (health, overview, memories, proposals, automations) = tokio::join!(
@@ -472,6 +479,7 @@ impl App {
                 filtered_memories: Vec::new(),
                 total_memories: 0,
                 selected_detail: None,
+                selected_owner_detail: None,
                 selected_history: None,
                 selected_index: 0,
                 table_state,
@@ -650,6 +658,7 @@ impl App {
             UiStatus::Busy
         };
         self.memories.selected_detail = None;
+        self.memories.selected_owner_detail = None;
         self.memories.validation = MemoryValidationState::default();
         self.review.replacement_policy =
             load_repo_replacement_policy(&self.repo_root).unwrap_or_default();
@@ -701,6 +710,11 @@ impl App {
     }
 
     fn request_stream_connect(&mut self, api: &ApiClient) {
+        // Local-only stream snapshots cannot represent read-only owner copies.
+        // Laptop browsing polls the authorized HTTP view instead.
+        if api.config.laptop_cache.is_some() {
+            return;
+        }
         if self.service.stream_connecting {
             return;
         }
@@ -831,6 +845,13 @@ impl App {
     }
 
     fn apply_project_refresh(&mut self, result: ProjectRefreshResult) -> bool {
+        if result
+            .memories
+            .as_ref()
+            .is_ok_and(|r| r.project != self.project)
+        {
+            return false;
+        }
         let mode = result.mode;
         let mut had_error = false;
         let mut loaded_memories = false;
@@ -908,6 +929,7 @@ impl App {
                 self.memories.filtered_memories.clear();
                 self.memories.total_memories = 0;
                 self.memories.selected_detail = None;
+                self.memories.selected_owner_detail = None;
                 self.memories.table_state.select(None);
                 if self.service.health_ok {
                     self.chrome.status_message = error.to_string();
@@ -2139,6 +2161,10 @@ impl App {
     }
 
     async fn toggle_selected_history(&mut self, api: &ApiClient) {
+        if self.selected_memory_is_owner_copy() {
+            self.fetch_owner_detail(api, true).await;
+            return;
+        }
         // Second press hides the chain and returns to the single-version
         // detail view — cheap UX for users who don't want a dedicated
         // close key.
@@ -2175,6 +2201,11 @@ impl App {
     }
 
     fn start_selected_memory_validation(&mut self, api: &ApiClient) {
+        if self.selected_memory_is_owner_copy() {
+            self.chrome.status_message =
+                "Owner knowledge is read-only; propose a correction instead.".into();
+            return;
+        }
         let Some(memory_id) = self.selected_memory_id() else {
             self.chrome.status_message = "No memory selected to validate.".to_string();
             return;
@@ -2250,6 +2281,11 @@ impl App {
     }
 
     async fn apply_selected_validation_preview(&mut self, api: &ApiClient) -> Result<()> {
+        if self.selected_memory_is_owner_copy() {
+            self.chrome.status_message =
+                "Owner knowledge is read-only; propose a correction instead.".into();
+            return Ok(());
+        }
         let Some(run) = self.memories.validation.run.clone() else {
             self.chrome.status_message = "No validation preview to apply.".to_string();
             return Ok(());
@@ -2576,10 +2612,15 @@ impl App {
         mut stream: Option<&mut StreamSession>,
     ) {
         self.memories.selected_detail = None;
+        self.memories.selected_owner_detail = None;
         self.memories.selected_history = None;
         self.memories.validation = MemoryValidationState::default();
         self.memories.memory_detail_scroll = 0;
         self.memories.memories_focus = MemoriesFocus::List;
+        if self.selected_memory_is_owner_copy() {
+            self.fetch_owner_detail(api, false).await;
+            return;
+        }
         if let Some(item) = self
             .memories
             .filtered_memories
@@ -2608,12 +2649,81 @@ impl App {
             .map(|item| item.id)
     }
 
+    fn selected_memory_is_owner_copy(&self) -> bool {
+        self.memories
+            .filtered_memories
+            .get(self.memories.selected_index)
+            .is_some_and(|r| r.origin.is_some())
+    }
+
+    async fn fetch_owner_detail(&mut self, api: &ApiClient, history: bool) {
+        self.memories.selected_owner_detail = None;
+        let Some(item) = self
+            .memories
+            .filtered_memories
+            .get(self.memories.selected_index)
+            .cloned()
+        else {
+            return;
+        };
+        let Some(origin) = item.origin else {
+            return;
+        };
+        let result = async {
+            let list = api.laptop_cache().await?;
+            let project = list
+                .projects
+                .iter()
+                .find(|p| {
+                    p.subscription_id == origin.subscription_id
+                        && p.owner_instance_id == origin.owner_instance_id
+                        && p.project_id == origin.project_id
+                })
+                .ok_or_else(|| anyhow::anyhow!("Owner binding changed; refresh the list"))?;
+            let response = api
+                .laptop_cache_history(
+                    project,
+                    item.canonical_id,
+                    if history {
+                        0
+                    } else {
+                        item.version_no.saturating_sub(1) as u32
+                    },
+                    if history { 32 } else { 1 },
+                )
+                .await?;
+            if !history {
+                anyhow::ensure!(
+                    response.versions.first().is_some_and(|v| v.id == item.id
+                        && format!("sha256:{}", v.digest) == origin.content_digest),
+                    "Owner version changed; refresh the list"
+                );
+            }
+            Ok::<_, anyhow::Error>(response)
+        }
+        .await;
+        match result {
+            Ok(response) => {
+                self.memories.selected_owner_detail = Some((item.id, response));
+                self.chrome.status_message =
+                    "Synchronized owner knowledge — read-only; H shows retained history.".into();
+            }
+            Err(error) => self.chrome.status_message = error.to_string(),
+        }
+    }
+
     fn apply_filters(&mut self) -> bool {
         let previous_detail_id = self
             .memories
             .selected_detail
             .as_ref()
-            .map(|detail| detail.id);
+            .map(|detail| detail.id)
+            .or_else(|| {
+                self.memories
+                    .selected_owner_detail
+                    .as_ref()
+                    .map(|(id, _)| *id)
+            });
 
         self.memories.filtered_memories = self
             .memories
@@ -2627,6 +2737,7 @@ impl App {
             self.memories.selected_index = 0;
             self.memories.table_state.select(None);
             self.memories.selected_detail = None;
+            self.memories.selected_owner_detail = None;
             self.memories.selected_history = None;
             self.memories.validation = MemoryValidationState::default();
             self.memories.memories_focus = MemoriesFocus::List;
@@ -2643,6 +2754,7 @@ impl App {
             let selected_id = self.selected_memory_id();
             if previous_detail_id.is_some() && previous_detail_id != selected_id {
                 self.memories.selected_detail = None;
+                self.memories.selected_owner_detail = None;
                 self.memories.selected_history = None;
                 self.memories.validation = MemoryValidationState::default();
                 self.memories.memory_detail_scroll = 0;
@@ -3176,6 +3288,11 @@ impl App {
     }
 
     async fn delete_selected_memory(&mut self, api: &ApiClient) -> Result<()> {
+        if self.selected_memory_is_owner_copy() {
+            self.chrome.status_message =
+                "Owner knowledge is read-only; propose a correction instead.".into();
+            return Ok(());
+        }
         let Some(item) = self
             .memories
             .filtered_memories
@@ -3456,7 +3573,12 @@ impl App {
 
     fn toggle_memories_focus(&mut self) {
         self.memories.memories_focus = match self.memories.memories_focus {
-            MemoriesFocus::List if self.memories.selected_detail.is_some() => MemoriesFocus::Detail,
+            MemoriesFocus::List
+                if self.memories.selected_detail.is_some()
+                    || self.memories.selected_owner_detail.is_some() =>
+            {
+                MemoriesFocus::Detail
+            }
             MemoriesFocus::Detail => MemoriesFocus::List,
             MemoriesFocus::List => MemoriesFocus::List,
         };
