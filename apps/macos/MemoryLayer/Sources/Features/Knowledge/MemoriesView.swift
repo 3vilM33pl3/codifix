@@ -24,6 +24,7 @@ struct MemoriesView: View {
     @State private var detailGate = KnowledgeRequestGate()
     @State private var pendingDelete: (id: String, title: String)?
     @State private var refreshID = 0
+    @State private var deleteTask: Task<Void, Never>?
 
     private enum DetailTab: String, CaseIterable, Identifiable {
         case content = "Content"
@@ -113,9 +114,13 @@ struct MemoriesView: View {
         .onReceive(NotificationCenter.default.publisher(for: .focusMemorySearch)) { _ in
             searchFocused = true
         }
+        .onDisappear { deleteTask?.cancel(); listGate.invalidate(); detailGate.invalidate() }
         .alert("Delete memory?", isPresented: $presentsDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Delete memory", role: .destructive) { Task { await deletePendingMemory() } }
+            Button("Delete memory", role: .destructive) {
+                guard !isDeleting else { return }
+                deleteTask = Task { await deletePendingMemory() }
+            }
         } message: {
             Text("This deletes \(pendingDelete?.title ?? "the selected memory") from \(context.profile.projectSlug). Its version history remains available as a tombstone.")
         }
@@ -395,7 +400,10 @@ struct MemoriesView: View {
         isDeleting = true
         do {
             let result = try await service.delete(memoryID: target.id)
+            try Task.checkCancellation()
             guard result.deleted else { throw MemoryServiceError.httpStatus(409, "The service did not delete this memory.") }
+            // A list request begun before the deletion must not restore the row.
+            listGate.invalidate()
             if let response {
                 self.response = ProjectMemoriesResponse(
                     project: response.project,
@@ -410,6 +418,9 @@ struct MemoriesView: View {
             }
             deleteError = nil
             if response?.items.isEmpty == true { errorMessage = nil }
+            refreshID += 1
+        } catch is CancellationError {
+            deleteError = "The deletion was interrupted. Its outcome is unknown; refresh before trying again."
         } catch {
             deleteError = error.localizedDescription
         }
