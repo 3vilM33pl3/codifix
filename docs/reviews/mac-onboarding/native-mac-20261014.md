@@ -133,6 +133,11 @@ Existing token callers need an identity/continuity check before that switch.
 - The installed bundled Python executes `memory-onboard --help`. Exhaustive
   installed-prefix validation passes for all **4,718** runtime files, including
   hashes and protected modes. No staging loader override is used for this check.
+- Installed-prefix PostgreSQL also initialized a fresh private synthetic cluster,
+  loaded pgvector 0.8.7, stored a vector and returned it after stop/restart. This
+  test used no `DYLD_LIBRARY_PATH`, no TCP listener and no Homebrew runtime.
+  The stopped cluster is retained at
+  `/Users/olivier/Library/Caches/memory-installed-pg-smoke.DFDuiK`.
 - With explicit user approval, the existing verified public homelab root is now
   trusted for SSL in Olivier's login Keychain. User trust inspection lists that
   root and default `/usr/bin/curl` verifies Authentik discovery with HTTP 200.
