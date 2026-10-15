@@ -2401,6 +2401,11 @@ pub(in crate::commands) struct EvalArgs {
 
 #[derive(Debug, Subcommand)]
 pub(in crate::commands) enum EvalCommand {
+    #[command(
+        about = "Measure experimental capture classification locally.",
+        after_help = "Agent notes:\n  Rules are offline; Jev sends fixture text to Typesafe. No canonical memory writes.\n\nExamples:\n  memory eval capture-quality --suite suite.json --dry-run --out /tmp/capture-preview\n  memory eval capture-quality --suite suite.json --backend both --out /tmp/capture-run\n\nRules are offline. Jev sends fixture text to Typesafe; live runs require TYPESAFE_API_KEY. No memory writes.\n\nSee also:\n  docs/user/cli/eval.md"
+    )]
+    CaptureQuality(EvalCaptureQualityArgs),
     #[command(about = "Plan, execute or report an isolated R3 campaign.", after_help = EVAL_CAMPAIGN_AFTER_HELP)]
     Campaign(EvalCampaignArgs),
     #[command(
@@ -2443,6 +2448,25 @@ pub(in crate::commands) enum EvalCommand {
         after_help = EVAL_GATE_AFTER_HELP
     )]
     Gate(EvalGateArgs),
+}
+
+#[derive(Debug, Args)]
+pub(in crate::commands) struct EvalCaptureQualityArgs {
+    /// Capture-quality JSON fixture file.
+    #[arg(long)]
+    pub(crate) suite: PathBuf,
+    /// Experimental backend: rules, jev, or both.
+    #[arg(long, default_value = "rules", value_parser = ["rules", "jev", "both"])]
+    pub(crate) backend: String,
+    /// Validate and render requests without network, credentials or service access.
+    #[arg(long, conflicts_with = "replay")]
+    pub(crate) dry_run: bool,
+    /// New directory for immutable local run.json and report.md evidence.
+    #[arg(long)]
+    pub(crate) out: PathBuf,
+    /// Replay a previous run.json (or its directory), without network or new spend.
+    #[arg(long)]
+    pub(crate) replay: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -3643,6 +3667,13 @@ pub(super) async fn run() -> Result<()> {
     // credentials or the selected service are unavailable.
     if let Command::Urls(args) = &command {
         return super::urls::handle(args, cli_config, area, area_routing);
+    }
+    // This local pilot never loads area/service configuration or service credentials.
+    if let Command::Eval(EvalArgs {
+        command: EvalCommand::CaptureQuality(args),
+    }) = command
+    {
+        return super::capture_quality::handle(args).await;
     }
     // Company enrollment never loads local configuration, area routing or the
     // default API client: those may carry unrelated owner/service credentials.

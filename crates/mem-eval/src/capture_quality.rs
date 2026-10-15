@@ -126,8 +126,12 @@ pub fn type_description(kind: &MemoryType) -> &'static str {
         }
         MemoryType::DomainFact => "Knowledge about the problem domain or business rules.",
         MemoryType::Documentation => "Documentation content, organization or changes.",
-        MemoryType::Task => "A bounded request or work item and its scope.",
-        MemoryType::Plan => "Proposed future steps, sequencing or implementation strategy.",
+        MemoryType::Task => {
+            "An actionable user instruction whose execution began without an approved plan."
+        }
+        MemoryType::Plan => {
+            "An approved execution checklist or plan guiding current implementation, not an unapproved proposal."
+        }
         MemoryType::Implementation => "Completed functional code or capability and how it works.",
         MemoryType::Refactor => "Internal restructuring intended to preserve behavior.",
         MemoryType::User => "A user preference, role or personal working context.",
@@ -538,6 +542,15 @@ mod tests {
             bad["answers"]["memory_type"][field] = value;
             assert!(parse_response(&bad).is_err());
         }
+        let mut wrong_winner = r.clone();
+        wrong_winner["answers"]["memory_type"]["choice"] = json!("decision");
+        assert!(parse_response(&wrong_winner).is_err());
+        let mut missing = r.clone();
+        missing["answers"]
+            .as_object_mut()
+            .unwrap()
+            .remove("lasting_value");
+        assert!(parse_response(&missing).is_err());
         let mut bad = r;
         bad["answers"]["lasting_value"]["noul"] = json!(-0.1);
         assert!(parse_response(&bad).is_err());
@@ -575,6 +588,13 @@ mod tests {
             raw_response: None,
             raw_response_hash: None,
         };
+        let mut abstained_inferable = observation.clone();
+        abstained_inferable.case_id = "a".into();
+        let both_abstained = score(&s, &[observation.clone(), abstained_inferable], "jev");
+        assert_eq!(both_abstained.inferred.inferable_abstentions, 1);
+        assert_eq!(both_abstained.inferred.abstentions, 2);
+        assert_eq!(both_abstained.inferred.accuracy, Some(0.5));
+        assert_eq!(both_abstained.inferred.coverage, Some(0.0));
         let scored = score(&s, &[observation], "jev");
         assert_eq!(scored.inferred.accuracy, Some(0.5));
         assert_eq!(scored.inferred.coverage, Some(0.0));

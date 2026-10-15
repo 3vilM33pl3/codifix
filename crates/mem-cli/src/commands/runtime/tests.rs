@@ -3258,3 +3258,38 @@ fn unique_temp_dir(name: &str) -> PathBuf {
     }
     path
 }
+
+#[test]
+fn capture_quality_help_and_flag_contract() {
+    let output = rendered_help(&["memory", "eval", "capture-quality", "--help"]);
+    for expected in [
+        "--suite",
+        "--backend",
+        "--out",
+        "--dry-run",
+        "--replay",
+        "TYPESAFE_API_KEY",
+        "Agent notes:",
+        "Examples:",
+        "docs/user/cli/eval.md",
+    ] {
+        assert!(output.contains(expected), "missing {expected}");
+    }
+    let parse = |tail: &[&str]| {
+        let mut args = vec![
+            "memory",
+            "eval",
+            "capture-quality",
+            "--suite",
+            "suite.json",
+            "--out",
+            "run",
+        ];
+        args.extend_from_slice(tail);
+        Cli::try_parse_from(args)
+    };
+    assert!(parse(&[]).is_ok());
+    assert!(parse(&["--backend", "both", "--dry-run"]).is_ok());
+    assert!(parse(&["--backend", "unknown"]).is_err());
+    assert!(parse(&["--dry-run", "--replay", "previous.json"]).is_err());
+}

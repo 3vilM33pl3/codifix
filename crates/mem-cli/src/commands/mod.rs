@@ -9,6 +9,7 @@ mod auth;
 mod auth_enrollment;
 mod bundle;
 mod capture;
+mod capture_quality;
 mod checkpoint;
 mod commits;
 mod completion;

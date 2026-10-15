@@ -14,6 +14,7 @@ clap_complete.workspace = true
 crossterm = { workspace = true, optional = true }
 mem-agenttop = { path = "../mem-agenttop" }
 mem-analyze = { path = "../mem-analyze" }
+mem-curate = { path = "../mem-curate" }
 mem-config = { path = "../mem-config" }
 mem-record = { path = "../mem-record" }
 mem-federation-runtime = { path = "../mem-federation-runtime", optional = true }

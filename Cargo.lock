@@ -2892,6 +2892,7 @@ dependencies = [
  "mem-agenttop",
  "mem-analyze",
  "mem-config",
+ "mem-curate",
  "mem-eval",
  "mem-federation-runtime",
  "mem-graph",

@@ -280,6 +280,9 @@ async fn reproduce_suite(args: EvalReproduceArgs, cwd: &Path, api: &ApiClient) -
 
 pub(super) async fn handle_eval_command(args: EvalArgs, cwd: &Path, api: &ApiClient) -> Result<()> {
     match args.command {
+        EvalCommand::CaptureQuality(args) => {
+            super::capture_quality::handle(args).await?;
+        }
         EvalCommand::Campaign(args) => {
             super::eval_campaign::handle(args.command).await?;
         }
