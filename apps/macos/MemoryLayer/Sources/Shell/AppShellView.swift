@@ -3,6 +3,7 @@ import SwiftUI
 struct AppShellView: View {
     @ObservedObject var model: AppModel
     @State private var presentsConnectionSettings = false
+    @StateObject private var knowledgeSession = KnowledgeSessionStore()
 
     private var destinationsByGroup: [(MemoryFeatureGroup, [AppDestination])] {
         MemoryFeatureGroup.allCases.map { group in
@@ -54,7 +55,7 @@ struct AppShellView: View {
         } detail: {
             Group {
                 if let context = model.featureContext {
-                    DestinationContentView(destination: model.selectedDestination, context: context)
+                    DestinationContentView(destination: model.selectedDestination, context: context, knowledgeSession: knowledgeSession)
                         .id(model.revision)
                 } else {
                     ConnectionWelcomeView(state: model.connectionState) {
@@ -148,8 +149,18 @@ struct AppShellView: View {
 struct DestinationContentView: View {
     let destination: AppDestination
     let context: FeatureContext
+    @ObservedObject var knowledgeSession: KnowledgeSessionStore
 
+    @ViewBuilder
     var body: some View {
+        switch destination {
+        case .memories:
+            MemoriesView(context: context)
+        case .query:
+            QueryView(context: context, sessionStore: knowledgeSession)
+        case .review:
+            ReviewView(context: context)
+        default:
         VStack(spacing: 12) {
             Image(systemName: destination.symbol).font(.system(size: 30)).foregroundStyle(.secondary)
             Text(destination.rawValue).font(.title2.weight(.semibold))
@@ -158,6 +169,7 @@ struct DestinationContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
+        }
     }
 }
 
