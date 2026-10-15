@@ -167,6 +167,12 @@ struct DestinationContentView: View {
             QueryView(context: context, sessionStore: knowledgeSession)
         case .review:
             ReviewView(context: context)
+        case .agents:
+            AgentsView(context: context)
+        case .activity:
+            ActivityView(context: context)
+        case .resume:
+            ResumeView(context: context)
         default:
         VStack(spacing: 12) {
             Image(systemName: destination.symbol).font(.system(size: 30)).foregroundStyle(.secondary)
