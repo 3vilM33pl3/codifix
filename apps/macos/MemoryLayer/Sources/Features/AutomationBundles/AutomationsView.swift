@@ -270,7 +270,7 @@ public struct AutomationsView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { approvalQueuePresented = false } }
                 ToolbarItem(placement: .primaryAction) { Button("Refresh") { launchAction { await loadApprovals() } }.disabled(busy || queueLoading) }
             }
-            .confirmationDialog("Reject this loop item?", isPresented: Binding(get: { rejectTarget != nil }, set: { if !$0 { rejectTarget = nil } }), titleVisibility: .visible) {
+            .alert("Reject this loop item?", isPresented: Binding(get: { rejectTarget != nil }, set: { if !$0 { rejectTarget = nil } })) {
                 Button("Reject item", role: .destructive) {
                     guard let target = rejectTarget else { return }; rejectTarget = nil
                     launchAction { await resolve(target, action: "reject") }
