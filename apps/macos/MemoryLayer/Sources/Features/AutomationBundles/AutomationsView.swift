@@ -119,15 +119,6 @@ public struct AutomationsView: View {
         } message: {
             Text("This changes the service-wide loop kill switch for the selected project connection, \(stopTarget?.context.profile.projectSlug ?? context.profile.projectSlug). Global control requires global loops_configure permission.")
         }
-        .confirmationDialog("Reject this loop item?", isPresented: Binding(get: { rejectTarget != nil }, set: { if !$0 { rejectTarget = nil } }), titleVisibility: .visible) {
-            Button("Reject item", role: .destructive) {
-                guard let target = rejectTarget else { return }; rejectTarget = nil
-                launchAction { await resolve(target, action: "reject") }
-            }
-            Button("Cancel", role: .cancel) { rejectTarget = nil }
-        } message: {
-            Text("This records a rejection for the selected loop approval or memory proposal.")
-        }
     }
 
     private var loopList: some View {
@@ -278,6 +269,15 @@ public struct AutomationsView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { approvalQueuePresented = false } }
                 ToolbarItem(placement: .primaryAction) { Button("Refresh") { launchAction { await loadApprovals() } }.disabled(busy || queueLoading) }
+            }
+            .confirmationDialog("Reject this loop item?", isPresented: Binding(get: { rejectTarget != nil }, set: { if !$0 { rejectTarget = nil } }), titleVisibility: .visible) {
+                Button("Reject item", role: .destructive) {
+                    guard let target = rejectTarget else { return }; rejectTarget = nil
+                    launchAction { await resolve(target, action: "reject") }
+                }
+                Button("Cancel", role: .cancel) { rejectTarget = nil }
+            } message: {
+                Text("This records a rejection for the selected loop approval or memory proposal.")
             }
         }
         .frame(minWidth: 620, minHeight: 540)
