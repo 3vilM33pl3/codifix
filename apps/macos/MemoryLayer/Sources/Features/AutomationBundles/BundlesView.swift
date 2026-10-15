@@ -15,6 +15,8 @@ public struct BundlesView: View {
     @State private var loading = false
     @State private var busy = false
     @State private var requestID = UUID()
+    @State private var operationTask: Task<Void, Never>?
+    @State private var operationTaskID = UUID()
     @State private var activeReview: BundleReviewSheet?
     @State private var presentedReview: BundleReviewSheet?
     @State private var actionError: String?
@@ -26,13 +28,14 @@ public struct BundlesView: View {
     private var canExport: Bool { context.permissions.allows(.bundleExport) }
     private var canImport: Bool { !context.permissions.readOnly && context.permissions.allows(.bundleImport) }
     private var canAccessBundles: Bool { canExport || canImport }
+    private var operationActive: Bool { busy || operationTask != nil }
     private var exportIsCurrent: Bool { exportPreview != nil && exportSnapshot?.matches(options: options, project: context.profile.projectSlug, revision: context.revision) == true }
     private var importIsCurrent: Bool { importPreview != nil && importSnapshot?.matches(bytes: selectedFileBytes, project: context.profile.projectSlug, revision: context.revision) == true }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ProjectPageHeader(title: "Memory bundles", subtitle: "Preview, export and import a versioned bundle · \(context.profile.projectSlug)") {
-                Button("Clear previews") { activeReview = nil; clearVolatileState() }.disabled(busy)
+                Button("Clear previews") { activeReview = nil; clearVolatileState() }.disabled(operationActive)
             }
             if let actionError { ProjectBanner(title: "Bundle operation failed", message: actionError, tone: .failure) }
             if let operationWarning { ProjectBanner(title: "Service outcome needs review", message: operationWarning, tone: .warning) }
@@ -51,14 +54,16 @@ public struct BundlesView: View {
             switch result {
             case let .success(urls):
                 guard let url = urls.first else { status = "No bundle file was selected."; return }
-                Task { await loadSelectedFile(url) }
+                launchOperation { await loadSelectedFile(url) }
             case let .failure(error):
                 if (error as? CocoaError)?.code == .userCancelled { status = "File selection was cancelled." }
                 else { actionError = error.localizedDescription }
             }
         }
         .sheet(item: $activeReview, onDismiss: dismissReview) { sheet in reviewSheet(sheet) }
+        .onDisappear { cancelOperation() }
         .task(id: context.revision) {
+            cancelOperation()
             activeReview = nil; clearVolatileState(); busy = false; loading = false; requestID = UUID()
             actionError = nil; operationWarning = nil; status = nil
         }
@@ -69,15 +74,15 @@ public struct BundlesView: View {
             VStack(alignment: .leading, spacing: 14) {
                 ProjectCard(title: "Export bundle") {
                     Text("Choose which optional data to include. Preview the exact options before saving the archive.").font(.caption).foregroundStyle(.secondary)
-                    Toggle("Include archived memories", isOn: optionBinding(\.includeArchived)).disabled(busy)
-                    Toggle("Include tags", isOn: optionBinding(\.includeTags)).disabled(busy)
-                    Toggle("Include relations", isOn: optionBinding(\.includeRelations)).disabled(busy)
-                    Toggle("Include source file paths", isOn: optionBinding(\.includeSourceFilePaths)).disabled(busy)
-                    Toggle("Include git commit hashes", isOn: optionBinding(\.includeGitCommits)).disabled(busy)
-                    Toggle("Include source excerpts", isOn: optionBinding(\.includeSourceExcerpts)).disabled(busy)
+                    Toggle("Include archived memories", isOn: optionBinding(\.includeArchived)).disabled(operationActive)
+                    Toggle("Include tags", isOn: optionBinding(\.includeTags)).disabled(operationActive)
+                    Toggle("Include relations", isOn: optionBinding(\.includeRelations)).disabled(operationActive)
+                    Toggle("Include source file paths", isOn: optionBinding(\.includeSourceFilePaths)).disabled(operationActive)
+                    Toggle("Include git commit hashes", isOn: optionBinding(\.includeGitCommits)).disabled(operationActive)
+                    Toggle("Include source excerpts", isOn: optionBinding(\.includeSourceExcerpts)).disabled(operationActive)
                     HStack {
-                        Button("Preview export") { Task { await previewExport() } }.buttonStyle(.borderedProminent).disabled(!canExport || busy)
-                        Button("Review and save…") { activeReview = .export; presentedReview = .export }.disabled(!canExport || busy || !exportIsCurrent)
+                        Button("Preview export") { launchOperation { await previewExport() } }.buttonStyle(.borderedProminent).disabled(!canExport || operationActive)
+                        Button("Review and save…") { activeReview = .export; presentedReview = .export }.disabled(!canExport || operationActive || !exportIsCurrent)
                         if busy && loading { ProgressView().controlSize(.small) }
                     }
                 }
@@ -103,12 +108,12 @@ public struct BundlesView: View {
                 ProjectCard(title: "Import bundle") {
                     Text("Choose a Memory Layer bundle archive, then inspect the service preview and warnings before importing.").font(.caption).foregroundStyle(.secondary)
                     HStack {
-                        Button("Choose bundle file…") { isChoosingFile = true }.disabled(busy || !canImport)
+                        Button("Choose bundle file…") { isChoosingFile = true }.disabled(operationActive || !canImport)
                         if let selectedFileName { Text("\(selectedFileName) · \(selectedFileBytes?.count.formatted() ?? "0") bytes").font(.caption).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary) }
                     }
                     HStack {
-                        Button("Preview import") { Task { await previewImport() } }.buttonStyle(.borderedProminent).disabled(!canImport || busy || selectedFileBytes == nil)
-                        Button("Review import…") { activeReview = .import; presentedReview = .import }.disabled(!canImport || busy || !importIsCurrent)
+                        Button("Preview import") { launchOperation { await previewImport() } }.buttonStyle(.borderedProminent).disabled(!canImport || operationActive || selectedFileBytes == nil)
+                        Button("Review import…") { activeReview = .import; presentedReview = .import }.disabled(!canImport || operationActive || !importIsCurrent)
                         if busy && !loading { ProgressView().controlSize(.small) }
                     }
                 }
@@ -228,9 +233,9 @@ public struct BundlesView: View {
             importPreview = nil; importSnapshot = nil; selectedFileBytes = nil; selectedFileName = nil
             activeReview = nil
         } catch is CancellationError {
-            operationWarning = "The import request was interrupted. The service may have completed it; inspect the project before retrying."
+            operationWarning = "The import request for \(frozen.project) was interrupted. The service may have completed it; inspect that project on the original connection before retrying."
         } catch {
-            operationWarning = "The service did not confirm whether this import completed (\(error.localizedDescription)). Inspect the project before retrying."
+            operationWarning = "The service did not confirm whether this import into \(frozen.project) completed (\(error.localizedDescription)). Inspect that project on the original connection before retrying."
         }
     }
 
@@ -245,6 +250,7 @@ public struct BundlesView: View {
     }
 
     private func dismissReview() {
+        guard !operationActive else { return }
         switch presentedReview {
         case .export: exportPreview = nil; exportSnapshot = nil
         case .import: importPreview = nil; importSnapshot = nil; selectedFileBytes = nil; selectedFileName = nil
@@ -257,6 +263,10 @@ public struct BundlesView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    if let actionError { ProjectBanner(title: "Bundle operation failed", message: actionError, tone: .failure) }
+                    if let operationWarning { ProjectBanner(title: "Service outcome needs review", message: operationWarning, tone: .warning) }
+                    if let status { ProjectBanner(title: "Bundle status", message: status, tone: .success) }
+                    if operationActive { ProgressView(loading ? "Preparing bundle review…" : "Processing bundle…").frame(maxWidth: .infinity, alignment: .leading) }
                     switch sheet {
                     case .export:
                         if let preview = exportPreview {
@@ -265,7 +275,7 @@ public struct BundlesView: View {
                                 Text("\(preview.sourceProject) · bundle \(preview.bundleID)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                                 Text(preview.summaryMarkdown).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                                 warningList(preview.warnings)
-                                Button("Save bundle…") { Task { await saveExport() } }.buttonStyle(.borderedProminent).disabled(!canExport || busy || !exportIsCurrent)
+                                Button("Save bundle…") { launchOperation { await saveExport() } }.buttonStyle(.borderedProminent).disabled(!canExport || operationActive || !exportIsCurrent)
                             }
                         }
                     case .import:
@@ -276,16 +286,31 @@ public struct BundlesView: View {
                                 Text(preview.summaryMarkdown).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                                 warningList(preview.warnings)
                                 if preview.replacingCount > 0 { ProjectBanner(title: "Existing memories may be replaced", message: "The preview reports \(preview.replacingCount) replacements. Confirm import only if this change is expected.", tone: .warning) }
-                                Button("Import \(preview.memoryCount) memories", role: .destructive) { Task { await importBundle() } }.disabled(!canImport || busy || !importIsCurrent)
+                                Button("Import \(preview.memoryCount) memories", role: .destructive) { launchOperation { await importBundle() } }.disabled(!canImport || operationActive || !importIsCurrent)
                             }
                         }
                     }
                 }.padding(18)
             }
             .navigationTitle(sheet == .export ? "Export bundle review" : "Import bundle review")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { activeReview = nil } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { activeReview = nil }.disabled(operationActive) } }
         }
         .frame(minWidth: 580, minHeight: 420)
+        .interactiveDismissDisabled(operationActive)
+    }
+
+    private func launchOperation(_ operation: @escaping () async -> Void) {
+        guard operationTask == nil else { return }
+        let token = UUID(); operationTaskID = token
+        operationTask = Task {
+            await operation()
+            guard operationTaskID == token else { return }
+            operationTask = nil
+        }
+    }
+
+    private func cancelOperation() {
+        operationTask?.cancel()
     }
 }
 
