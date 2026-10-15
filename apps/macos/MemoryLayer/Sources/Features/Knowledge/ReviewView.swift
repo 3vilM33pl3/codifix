@@ -20,6 +20,9 @@ struct ReviewView: View {
     @State private var policySelection = "balanced"
     @State private var memorySheet: ReviewMemorySheet?
     @State private var refreshID = 0
+    @State private var actionTask: Task<Void, Never>?
+    @State private var resultMessage: String?
+    @State private var pendingDecision: (proposal: ReplacementProposal, approve: Bool)?
 
     private var service: KnowledgeService { KnowledgeService(context: context) }
     private var activeProposal: ReplacementProposal? { proposals.first(where: { $0.id == selectedProposalID }) ?? proposals.first }
@@ -39,6 +42,11 @@ struct ReviewView: View {
             ) {
                 policySelection = policy?.replacementPolicy ?? "balanced"
                 policySheet = true
+            }
+
+            if let resultMessage {
+                Label(resultMessage, systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green).accessibilityIdentifier("review.result")
             }
 
             if !context.permissions.allows(.memoryRead) {
@@ -82,6 +90,22 @@ struct ReviewView: View {
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task(id: "\(context.revision)-\(refreshID)") { await refresh() }
+        .onDisappear { actionTask?.cancel(); requestGate.invalidate() }
+        .confirmationDialog(pendingDecision?.approve == true ? "Approve replacement?" : "Reject proposal?",
+            isPresented: Binding(get: { pendingDecision != nil }, set: { if !$0 { pendingDecision = nil } }),
+            titleVisibility: .visible) {
+            if let decision = pendingDecision {
+                Button(decision.approve ? "Approve replacement" : "Reject proposal", role: .destructive) {
+                    pendingDecision = nil
+                    launchAction { await resolve(decision.proposal, approve: decision.approve) }
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingDecision = nil }
+        } message: {
+            Text(pendingDecision?.approve == true
+                ? "Replace the canonical content for this memory with the proposed version? Its version history is retained."
+                : "Remove this proposal from the pending review queue?")
+        }
         .sheet(isPresented: $policySheet) { policyEditor }
         .sheet(item: $memorySheet) { request in
             KnowledgeMemoryDetailView(context: context, memoryID: request.id)
@@ -194,11 +218,11 @@ struct ReviewView: View {
 
                     if let errorMessage { Label(errorMessage, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
                     HStack(spacing: 8) {
-                        Button("Approve replacement", systemImage: "checkmark") { Task { await resolve(proposal, approve: true) } }
+                        Button("Approve replacement", systemImage: "checkmark") { pendingDecision = (proposal, true) }
                             .buttonStyle(.borderedProminent)
                             .disabled(!canCurate || isResolving)
                             .accessibilityIdentifier("review.approve")
-                        Button("Reject proposal", systemImage: "xmark") { Task { await resolve(proposal, approve: false) } }
+                        Button("Reject proposal", systemImage: "xmark") { pendingDecision = (proposal, false) }
                             .buttonStyle(.bordered)
                             .disabled(!canCurate || isResolving)
                             .accessibilityIdentifier("review.reject")
@@ -255,7 +279,7 @@ struct ReviewView: View {
                 Text("Aggressive").tag("aggressive")
             }
             .pickerStyle(.menu)
-            .disabled(!canEditPolicy)
+            .disabled(!canEditPolicy || isSavingPolicy)
             VStack(alignment: .leading, spacing: 5) {
                 Text("Conservative · Prefer retaining existing memory")
                 Text("Balanced · Weigh evidence and confidence")
@@ -272,10 +296,10 @@ struct ReviewView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             HStack {
-                Button("Cancel") { policySheet = false }.keyboardShortcut(.cancelAction)
+                Button("Cancel") { policySheet = false }.keyboardShortcut(.cancelAction).disabled(isSavingPolicy)
                 Spacer()
                 if isSavingPolicy { ProgressView().controlSize(.small) }
-                Button("Save policy") { Task { await savePolicy() } }
+                Button("Save policy") { launchAction { await savePolicy() } }
                     .buttonStyle(.borderedProminent)
                     .disabled(!canEditPolicy || isSavingPolicy || policySelection == policy?.replacementPolicy)
                     .accessibilityIdentifier("review.savePolicy")
@@ -284,6 +308,7 @@ struct ReviewView: View {
         .padding(20)
         .frame(minWidth: 480, maxWidth: 560)
         .accessibilityIdentifier("review.policySheet")
+        .interactiveDismissDisabled(isSavingPolicy)
     }
 
     private func refresh() async {
@@ -321,11 +346,17 @@ struct ReviewView: View {
         guard canCurate, !isResolving else { return }
         isResolving = true
         errorMessage = nil
+        resultMessage = nil
         do {
-            _ = try await service.resolveProposal(id: proposal.id, approve: approve)
+            let result = try await service.resolveProposal(id: proposal.id, approve: approve)
+            try Task.checkCancellation()
+            requestGate.invalidate()
+            resultMessage = "Proposal \(result.status): \(proposal.candidateSummary)"
             proposals.removeAll { $0.id == proposal.id }
             selectedProposalID = proposals.first?.id
             refreshID += 1
+        } catch is CancellationError {
+            errorMessage = "The decision was interrupted. Its outcome is unknown; refresh before trying again."
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -333,15 +364,22 @@ struct ReviewView: View {
     }
 
     private func savePolicy() async {
-        guard canEditPolicy, let repositoryRoot else { return }
+        guard canEditPolicy, !isSavingPolicy, let repositoryRoot else { return }
         isSavingPolicy = true
         do {
-            policy = try await service.saveReplacementPolicy(policySelection, repositoryRoot: repositoryRoot)
+            let updated = try await service.saveReplacementPolicy(policySelection, repositoryRoot: repositoryRoot)
+            try Task.checkCancellation()
+            policy = updated
             policySheet = false
         } catch {
             policyError = error.localizedDescription
         }
         isSavingPolicy = false
+    }
+
+    private func launchAction(_ action: @escaping () async -> Void) {
+        guard actionTask == nil else { return }
+        actionTask = Task { await action(); actionTask = nil }
     }
 
     private func stateKind(for message: String) -> KnowledgeStateView.Kind {
