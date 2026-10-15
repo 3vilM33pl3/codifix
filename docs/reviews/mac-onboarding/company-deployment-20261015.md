@@ -217,6 +217,30 @@ passed. The original Keychain/device identity is reused. The GUI-session
 first-run was restarted with `onboarding-v2`; macOS requested Keychain access
 for the updated executable before project selection.
 
+After Olivier approved Keychain access, the catalog displayed both authorized
+projects and their explicit curated-contribution consent. Both were selected;
+the Homelab checkout was preserved and missing project Codex templates installed.
+Skill installation then correctly refused a version mismatch: the approved,
+SHA-256-matching archive declares `2.1.0-rc.5`, while the reviewed pin contains
+build metadata, `2.1.0-rc.5+89d52aa8`. No local database or service was created.
+Commit `a4bc8b91` permits omission of valid SemVer build metadata only; archive
+hashes, prereleases, project manifests and journal identities remain checked.
+All 33 focused workspace tests passed; the ARM64 release built natively.
+
+Commit `e68612a6` adds an explicit application-only package using the separate
+`com.memory-layer.application` receipt, with no runtime/launcher ownership.
+All 21 packaging contract tests passed. The Mac candidate is
+`target/memory-layer-2.1.0-rc.5-macos-aarch64-application-update.pkg` in the
+existing build checkout, SHA-256
+`d636ca9279d7cd5301ec500deef5872b49aa74c9180a9a02a66987a9ddf02b18`.
+Its executable SHA-256 is
+`0f1950566296b25f138cea3b8285e0b45430fae59814017951ce2a4b4b6c6fdc`.
+This unsigned internal candidate has been opened for normal local Installer
+authorization; installed runtime preservation remains to be verified, not
+inferred from the receipt design. The old executable-bound journals and attempt
+logs are preserved; `onboarding-v3` will use the existing approved device and
+same two projects. No new login or expanded permission is requested.
+
 The earlier first-run stopped before project selection/native effects. Its
 executable-bound journal is preserved. The prepared next attempt uses sibling
 state `onboarding-v2` with the existing Keychain device, not a new enrollment.
