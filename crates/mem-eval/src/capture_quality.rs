@@ -556,6 +556,41 @@ mod tests {
         assert!(parse_response(&bad).is_err());
     }
     #[test]
+    fn paired_markdown_keeps_all_type_rows_before_durability() {
+        let suite = suite();
+        let metrics = [
+            ("jev".into(), score(&suite, &[], "jev")),
+            ("rules".into(), score(&suite, &[], "rules")),
+        ]
+        .into_iter()
+        .collect();
+        let run = Run {
+            schema_version: 1,
+            suite,
+            suite_hash: "fixture-hash".into(),
+            prompt_version: PROMPT_VERSION.into(),
+            dry_run: false,
+            completed: true,
+            backend: "both".into(),
+            requests: BTreeMap::new(),
+            observations: Vec::new(),
+            metrics,
+        };
+        let rendered = markdown(&run).unwrap();
+        let durability = rendered.find("\nJev durability:").unwrap();
+        for backend in ["jev", "rules"] {
+            for track in ["inferred", "explicit handling"] {
+                assert!(rendered.find(&format!("| {backend} | {track} |")).unwrap() < durability);
+            }
+        }
+        let rows = rendered[rendered.find("| Backend |").unwrap()..durability]
+            .lines()
+            .filter(|line| line.starts_with('|'))
+            .count();
+        assert_eq!(rows, 6); // Header, separator and four paired measurement rows.
+    }
+
+    #[test]
     fn failures_and_ambiguity_remain_in_denominators() {
         let mut s = suite();
         let mut ambiguous = s.cases[0].clone();
