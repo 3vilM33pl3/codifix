@@ -2800,6 +2800,10 @@ paths:
         in: path
         required: true
         schema: { type: string }
+      - name: include_synchronized
+        in: query
+        description: "Opt-in local laptop browse view. Requires the authenticated loopback local owner; configured curated copies include read-only origin metadata and a content-bound browse_revision. Default and repository reads remain local-only."
+        schema: { type: boolean, default: false }
     get:
       operationId: get_v1_projects_slug_memories
       summary: "List a project's canonical memories."

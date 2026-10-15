@@ -21,8 +21,10 @@ does not redirect writes somewhere else.
 
 Use **Query** for normal local retrieval, or **More → Offline** for downloaded
 owner knowledge, citations, source versions, synchronization freshness and upload
-status. The **Memories** tab's local count is not the number of downloaded owner
-versions. In the TUI, use **Synchronized knowledge** to inspect those copies.
+status in the Web UI. The Web **Memories** tab's local count is not the number
+of downloaded owner versions. The updated TUI **Memories** tab combines local
+and synchronized records, clearly marking owner copies read-only. Its **Offline**
+tab remains available for detailed subscription status and cache history.
 `memory urls` lists configuration-derived entry points; their presence alone
 does not assert live service health.
 

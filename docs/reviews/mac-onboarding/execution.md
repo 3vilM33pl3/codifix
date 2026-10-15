@@ -1,5 +1,10 @@
 # Mac onboarding execution ledger
 
+Latest focused follow-up: [Main Mac Memories tab, 15 October](main-memories-20261015.md)
+records the deployed TUI browsing update, exact native artifact and observed
+Homelab/Workshop totals. Earlier entries below retain their original scope and
+limitations rather than asserting current deployment status.
+
 ## Approved scope and environment
 
 The [approved contract](README.md) remains the completion checklist. Work started

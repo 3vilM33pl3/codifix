@@ -12,6 +12,19 @@ The `Memories` tab is the main browsing view for canonical project memory.
 
 This is the best tab for reading what Memory Layer already knows about a project.
 
+On a curated-sync laptop, this includes downloaded owner knowledge as well as
+local work. Downloaded rows are labelled **Synced/read-only**; selecting one
+shows its content, original author, owner, version and digest. `Shift+H` reads
+retained owner history. Delete and validation actions cannot modify these copies;
+use a correction proposal for owner review. Accepted local contributions are
+hidden once their authoritative owner copy has arrived, without deleting local
+history. Pending or conflicting local work stays visible.
+
+The laptop list refreshes locally every 30 seconds (`r` refreshes immediately).
+It uses a protected, revision-bound browsing view rather than the local-only
+stream. This does not change exports, plan selection, evaluation, or the owner
+database. An unconfigured or publication-only project retains its local list.
+
 ## Validation Proof
 
 Press `v` on a selected memory to search for proof and run a dry-run validation.
