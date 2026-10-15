@@ -173,6 +173,16 @@ struct DestinationContentView: View {
             ActivityView(context: context)
         case .resume:
             ResumeView(context: context)
+        case .overview:
+            OverviewView(context: context)
+        case .errors:
+            ErrorsView(context: context)
+        case .watchers:
+            WatchersView(context: context)
+        case .skills:
+            SkillsView(context: context)
+        case .embeddings:
+            EmbeddingsView(context: context)
         default:
         VStack(spacing: 12) {
             Image(systemName: destination.symbol).font(.system(size: 30)).foregroundStyle(.secondary)
