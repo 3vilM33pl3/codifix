@@ -180,6 +180,15 @@ test('Mac onboarding replacement has a distinct retained name and forbids post-s
   assert.throws(() => validate({ ...c, retained_name: `${c.name}-before-mac-onboarding-other` }), /invalid_recovery_directory/);
 });
 
+test('Mac project sync repair preserves the previous onboarding container and requires forward recovery', t => {
+  const { c, docker } = fixture(t, 'memory-workshop-preview-app-20260918');
+  c.retained_name = `${c.name}-before-mac-project-sync-20261015`;
+  const review = execute(c, 'review', undefined, docker);
+  execute(c, 'replace', review.review, docker);
+  assert.equal(docker.containers.get(oldId).Name, `/${c.retained_name}`);
+  assert.throws(() => execute(c, 'restore-old', review.review, docker), /post_start_requires_forward_recovery/);
+});
+
 test('rc2 pre-start recovery uses its own retained namespace', t => {
   const { c, docker } = fixture(t); c.retained_name = `${c.name}-before-rc2`;
   const review = execute(c, 'review', undefined, docker);
