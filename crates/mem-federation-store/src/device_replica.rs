@@ -91,16 +91,14 @@ impl DeviceProjectionStore {
         let mut tx = self.pool.begin().await?;
         self.inspect(&mut tx).await?;
         let rows: Vec<(Json<DeviceReplicaRecord>, Json<DeviceReplicaRecord>)> = sqlx::query_as(
-            "SELECT v.record,s.record FROM device_replica_records s
-             JOIN device_replica_records v ON v.subscription=s.subscription
-               AND v.record_key='version:'||(s.record->'value'->>'current_version_id')
-             WHERE s.subscription=$1 AND s.record->>'kind'='canonical_state'
-               AND v.record->>'kind'='memory_version'
+            "WITH latest AS (
+               SELECT DISTINCT ON (record->'value'->>'canonical_id') record
+               FROM device_replica_records WHERE subscription=$1 AND record->>'kind'='memory_version'
+               ORDER BY record->'value'->>'canonical_id',(record->'value'->>'version')::bigint DESC
+             ) SELECT v.record,s.record FROM device_replica_records s
+             JOIN latest v ON v.record->'value'->>'id'=s.record->'value'->>'current_version_id'
                AND v.record->'value'->>'canonical_id'=s.record->'value'->>'canonical_id'
-               AND NOT EXISTS (SELECT 1 FROM device_replica_records newer
-                 WHERE newer.subscription=s.subscription AND newer.record->>'kind'='memory_version'
-                   AND newer.record->'value'->>'canonical_id'=s.record->'value'->>'canonical_id'
-                   AND (newer.record->'value'->>'version')::bigint>(v.record->'value'->>'version')::bigint)
+             WHERE s.subscription=$1 AND s.record->>'kind'='canonical_state'
              ORDER BY s.record_key LIMIT 100001",
         ).bind(self.subscription).fetch_all(&mut *tx).await?;
         if rows.len() > 100_000 {
