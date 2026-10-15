@@ -176,6 +176,31 @@ verified HTTPS health checks report `ok` and database `up` after the replacement
 The native Mac rebuild and project installation remain in progress; enrollment
 is not evidence of a completed download or upload.
 
+The subsequent contract check found that workspace journals hash Rust struct
+serialization, whereas curated subscriptions hash RFC 8785 JSON. Commit
+`fa5ff196` verifies the latter against the reviewed manifest without changing
+the original journal digest. An actual Rust-generated Unicode golden vector
+backs the regression test. All 26 journey tests passed on Linux and the Mac;
+the Mac's 13 first-run tests also passed. Targeted service Clippy and formatting
+passed.
+
+The corrected ARM64 executable is SHA-256
+`7ce155d69ed06dc5d80ccb440d196c01e3f02bf3f77b1abdfd4a59fece3f163d`.
+Its update package is SHA-256
+`c8db0383e1cd4ba9b22eff590d0f19f8e03ae75a1007e20710210b7a7c1e818a`,
+at the existing Mac build directory's
+`target/memory-layer-2.1.0-rc.5-macos-aarch64.pkg`.
+This unsigned internal update reuses the already installed runtime instead of
+trying to reinstall its immutable bundle ID. The original runtime-containing
+package is retained as `memory-layer-2.1.0-rc.5-macos-aarch64-with-runtime-original.pkg`.
+Installer is open for Olivier's local authorization; installation of the update
+is **not yet verified**. Before continuing, check the installed executable and
+operator hashes and confirm that the runtime/launcher remain intact.
+
+The earlier first-run stopped before project selection/native effects. Its
+executable-bound journal is preserved. The prepared next attempt uses sibling
+state `onboarding-v2` with the existing Keychain device, not a new enrollment.
+
 Homelab infra commits: `01bae42` (management listener restriction), `9ca42f8`
 (private authenticated Memory origins). Memory replacement operator's focused
 tests: 11 passed, including schema-changing upgrade forward-recovery behavior.
