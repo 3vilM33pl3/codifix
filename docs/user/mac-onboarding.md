@@ -34,9 +34,17 @@ settings are preserved. Trust is shown as remote-only, not copied to your Mac.
 Use the installed runtime descriptor included in your package; `--runtime` is
 required. Run from your logged-in Mac session with its login Keychain unlocked.
 An SSH session can report `macOS Keychain write failed` / `User interaction is
-not allowed` before enrollment starts. Unlock the login Keychain locally with
-`security unlock-keychain` (enter the Mac password locally), then retry the same
-command. There is no plaintext credential fallback.
+not allowed` before enrollment starts, even when the login Keychain is already
+unlocked. Run first-run in Terminal on the Mac's logged-in desktop, not an SSH
+login session. If the Keychain is locked, use `security unlock-keychain` there
+and enter the Mac password locally. There is no plaintext credential fallback.
+
+On macOS, allow Memory's Local Network access when prompted so it can reach your
+private company server. Check **System Settings → Privacy & Security → Local
+Network** if a desktop process cannot reach the server although SSH/curl can.
+Those processes can have different privacy permissions; successful curl alone
+does not prove that Memory's background services can connect. Keep TLS validation
+enabled and verify actual service synchronization after granting access.
 
 ### Full curated-project synchronization candidate
 

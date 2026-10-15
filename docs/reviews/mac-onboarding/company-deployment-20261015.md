@@ -132,6 +132,21 @@ Olivier was asked to unlock the login Keychain locally; no password collection,
 credential fallback or Keychain security change was attempted. Its first-run
 journal is retained for exact-input resume.
 
+After Olivier unlocked the Keychain locally, SSH still could not use it. A
+temporary, non-persistent Aqua LaunchAgent successfully read Keychain settings,
+and native `memory auth login` in that session progressed past Keychain storage.
+No Keychain security settings were weakened. This distinguishes a login-session
+restriction from an incorrect password or a locked Keychain.
+
+The next observed failure is transport access from the GUI session. A standalone
+read-only HTTPS probe linked against the candidate's exact reqwest dependencies
+returns HTTP 200 over SSH, but the same binary as an Aqua LaunchAgent returns
+`HostUnreachable` / OS error 65 for `10.22.6.42:443`. This is consistent with macOS
+Local Network privacy; it is not evidence of a TLS failure. Olivier was asked
+to allow Memory through the native Local Network prompt/settings. Device
+approval, local services and synchronization remain unverified pending that
+restriction. Temporary operator probes use public health metadata only.
+
 Homelab infra commits: `01bae42` (management listener restriction), `9ca42f8`
 (private authenticated Memory origins). Memory replacement operator's focused
 tests: 11 passed, including schema-changing upgrade forward-recovery behavior.
