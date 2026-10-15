@@ -344,14 +344,27 @@ fn publish_skill(
     }
     filesystem::install_missing(&stage, ".memory-onboarding-pin.json", &receipt)?;
     if filesystem::exists(&target)? {
-        if filesystem::receipt_matches(&target, ".memory-onboarding-pin.json", &receipt)? {
-            filesystem::publish_directory(
-                &stage,
-                &target,
-                ".memory-onboarding-pin.json",
-                &receipt,
-            )?;
-            return Ok(());
+        if let Some(prior) = filesystem::receipt_bytes(&target, ".memory-onboarding-pin.json")? {
+            if prior == receipt {
+                filesystem::publish_directory(
+                    &stage,
+                    &target,
+                    ".memory-onboarding-pin.json",
+                    &receipt,
+                )?;
+                return Ok(());
+            }
+            #[derive(serde::Deserialize)]
+            struct PublicationOwner {
+                request_id: uuid::Uuid,
+            }
+            let prior: PublicationOwner = serde_json::from_slice(&prior)
+                .map_err(|_| anyhow::anyhow!("managed skill publication receipt is invalid"))?;
+            if prior.request_id == journal.request_id || prior.request_id.is_nil() {
+                bail!("managed publication belongs to different immutable inputs");
+            }
+            // Another request's installed skills are existing project content.
+            // Preserve both content and receipt; never adopt or repair them.
         }
         if !journal.preserved_paths.contains(&relative) {
             journal.preserved_paths.push(relative);

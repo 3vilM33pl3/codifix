@@ -333,10 +333,10 @@ pub(super) fn owned_directory(path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn receipt_matches(root: &Path, relative: &str, bytes: &[u8]) -> Result<bool> {
+pub(super) fn receipt_bytes(root: &Path, relative: &str) -> Result<Option<Vec<u8>>> {
     let path = root.join(relative);
     if !exists(&path)? {
-        return Ok(false);
+        return Ok(None);
     }
     no_symlinks(&path)?;
     if fs::metadata(&path)?.len() > 4096 {
@@ -344,6 +344,16 @@ pub(super) fn receipt_matches(root: &Path, relative: &str, bytes: &[u8]) -> Resu
     }
     let mut actual = Vec::new();
     fs::File::open(path)?.take(4097).read_to_end(&mut actual)?;
+    if actual.len() > 4096 {
+        bail!("managed publication receipt exceeds limit");
+    }
+    Ok(Some(actual))
+}
+
+pub(super) fn receipt_matches(root: &Path, relative: &str, bytes: &[u8]) -> Result<bool> {
+    let Some(actual) = receipt_bytes(root, relative)? else {
+        return Ok(false);
+    };
     if actual != bytes {
         bail!("managed publication belongs to different immutable inputs");
     }

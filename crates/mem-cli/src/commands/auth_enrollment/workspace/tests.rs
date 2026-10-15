@@ -848,6 +848,104 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
     assert_eq!(downloads.calls.get(), 1);
 }
 #[tokio::test]
+async fn later_request_preserves_existing_managed_skills_and_their_original_receipts() {
+    for changed_pin in [false, true] {
+        let fixture = Fixture::new();
+        let (origin, record) = identity();
+        let bytes = bundle("2.1.0");
+        let tool = pin(&bytes, "2.1.0");
+        let catalog = FakeCatalog::new(project());
+        let mut args = fixture.prepare(&catalog.project.manifest);
+        fs::create_dir(&args.workspace).unwrap();
+        fs::create_dir(args.workspace.join(".git")).unwrap();
+        let mut first = prepare_with(&args, &origin, &record, &catalog)
+            .await
+            .unwrap();
+        artifacts::apply(
+            &args.journal,
+            &mut first,
+            &tool,
+            &FakeDownloads {
+                bytes,
+                calls: Cell::new(0),
+            },
+        )
+        .await
+        .unwrap();
+        let mut original = Vec::new();
+        for root in [".agents", ".claude"] {
+            let skill = args.workspace.join(format!("{root}/skills/memory-layer"));
+            let content = skill.join("SKILL.md");
+            fs::write(&content, "user customization of earlier managed skill").unwrap();
+            for path in [content, skill.join(".memory-onboarding-pin.json")] {
+                original.push((path.clone(), fs::read(path).unwrap()));
+            }
+        }
+        args.journal = fixture.0.join("later-plan.json");
+        let mut later = prepare_with(&args, &origin, &record, &catalog)
+            .await
+            .unwrap();
+        assert_ne!(first.request_id, later.request_id);
+        let bytes = bundle(if changed_pin { "2.1.1" } else { "2.1.0" });
+        let tool = pin(&bytes, if changed_pin { "2.1.1" } else { "2.1.0" });
+        artifacts::apply(
+            &args.journal,
+            &mut later,
+            &tool,
+            &FakeDownloads {
+                bytes,
+                calls: Cell::new(0),
+            },
+        )
+        .await
+        .unwrap();
+        for (path, bytes) in original {
+            assert_eq!(fs::read(path).unwrap(), bytes);
+        }
+        for root in [".agents", ".claude"] {
+            assert!(
+                later
+                    .preserved_paths
+                    .contains(&format!("{root}/skills/memory-layer"))
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn same_request_conflicting_skill_receipt_remains_blocked_without_replacement() {
+    let fixture = Fixture::new();
+    let (origin, record) = identity();
+    let bytes = bundle("2.1.0");
+    let tool = pin(&bytes, "2.1.0");
+    let catalog = FakeCatalog::new(project());
+    let args = fixture.prepare(&catalog.project.manifest);
+    fs::create_dir(&args.workspace).unwrap();
+    fs::create_dir(args.workspace.join(".git")).unwrap();
+    let mut journal = prepare_with(&args, &origin, &record, &catalog)
+        .await
+        .unwrap();
+    let downloads = FakeDownloads {
+        bytes,
+        calls: Cell::new(0),
+    };
+    artifacts::apply(&args.journal, &mut journal, &tool, &downloads)
+        .await
+        .unwrap();
+    let receipt = args
+        .workspace
+        .join(".agents/skills/memory-layer/.memory-onboarding-pin.json");
+    let changed = serde_json::to_vec(&serde_json::json!({"request_id":journal.request_id,"sha256":"0".repeat(64),"version":tool.version})).unwrap();
+    fs::write(&receipt, &changed).unwrap();
+    let error = artifacts::apply(&args.journal, &mut journal, &tool, &downloads)
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("different immutable inputs"));
+    assert_eq!(fs::read(receipt).unwrap(), changed);
+    assert!(journal.preserved_paths.is_empty());
+}
+
+#[tokio::test]
 async fn hash_failure_unknown_plugin_and_wrong_version_are_explicitly_blocked() {
     for mode in 0..3 {
         let fixture = Fixture::new();
