@@ -33,10 +33,11 @@ class FakeAgents:
             return copy.deepcopy(self.prepared[self.indices[key]])
         selected = self.fixture.memory.workspace_status(slot["journal"])["plan"]
         m = selected["manifest"]
+        entry = m.get("entry", m)
         r = {"request_id": str(uuid.uuid4()), "agent_id": str(uuid.uuid4()), "principal_id": str(uuid.uuid4()), "token_id": str(uuid.uuid4()),
              "caller": caller, "provider_id": agents.CALLERS[caller], "credential_sha256": "a" * 64,
              "expires_at": "2026-10-06T10:00:00Z", "confirmed": False,
-             "projects": [{"area": m["entry"]["area"], "owner_instance_id": m["entry"]["owner_instance_id"], "project_id": m["project_id"],
+             "projects": [{"area": entry["area"], "owner_instance_id": entry["owner_instance_id"], "project_id": m["project_id"],
                            "manifest_revision": m["revision"], "manifest_sha256": "b" * 64, "offline_confirmed": True}]}
         value = {"device_id": selected["device_id"], "approval_endpoint": f"/v1/onboarding/devices/{selected['device_id']}/agents",
                  "request": r, "agent_id": r["agent_id"], "contains_secret": False, "automatic_approval": False}
@@ -107,6 +108,9 @@ class AgentJourneyContract(unittest.TestCase):
         location.start()
         self.addCleanup(location.stop)
         self.fixture.memory.manifest["entry"]["destinations"] = [{"name": c, "provider_id": p, "destination_id": p} for c, p in agents.CALLERS.items()]
+        if getattr(self, "flattened_manifest", False):
+            manifest = self.fixture.memory.manifest
+            manifest.update(manifest.pop("entry"))
         self.fixture.run_journey()
         self.memory = FakeAgents(self.fixture)
         self.prompts, self.browser = [], []
@@ -232,7 +236,7 @@ class AgentJourneyContract(unittest.TestCase):
     def test_operator_destination_review_is_required_even_with_device_membership(self):
         selected = agents.journey.inspect(self.fixture.journal)["projects"][0]["selection"]
         public = self.memory.prepare_agent(self.fixture.source["projects"][0], "codex")
-        selected["manifest"]["entry"]["destinations"] = []
+        selected["manifest"].get("entry", selected["manifest"])["destinations"] = []
         with self.assertRaises(files.Refused): agents.approval(public, selected, "codex")
         public["request"]["credential"] = "SECRET_SENTINEL"
         with self.assertRaises(files.Refused): agents.approval(public, selected, "codex")
@@ -251,6 +255,11 @@ class AgentJourneyContract(unittest.TestCase):
         self.assertIn("--caller", calls[0])
         self.assertIn("--allow-offline", calls[2])
         self.assertFalse(any("token" in str(a) or "password" in str(a) for args in calls for a in args))
+
+
+class FlattenedAgentJourneyContract(AgentJourneyContract):
+    """Run the agent flow and recovery matrix with Rust's actual wire shape."""
+    flattened_manifest = True
 
 
 class PublicConfirmationContract(unittest.TestCase):

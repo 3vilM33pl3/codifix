@@ -178,8 +178,9 @@ class Memory:
 
     def subscription_args(self, receipt, output):
         manifest = receipt["manifest"]
-        args = ["projects", "subscription", *self.company(), "--project", manifest["project_id"], "--area", manifest["entry"]["area"],
-                "--owner-instance", manifest["entry"]["owner_instance_id"], "--revision", manifest["revision"], "--output", output]
+        entry = manifest_entry(manifest)
+        args = ["projects", "subscription", *self.company(), "--project", manifest["project_id"], "--area", entry["area"],
+                "--owner-instance", entry["owner_instance_id"], "--revision", manifest["revision"], "--output", output]
         if self.source["native"].get("curated_sync"):
             args.extend(["--replication-mode", "curated_project_v1"])
         return args
@@ -204,9 +205,7 @@ def selection(value, source, slot):
     operator.pin(p["manifest_sha256"])
     operator.identifier(p["device_id"])
     manifest = p["manifest"]
-    operator.exact(manifest, {"project_id", "project", "entry", "revision", "reviewed_by", "reviewed_at"})
-    entry = manifest["entry"]
-    operator.exact(entry, {"area", "owner_instance_id", "repository_url", "default_branch", "offline_allowed", "tools", "destinations"})
+    entry = manifest_entry(manifest)
     operator.identifier(manifest["project_id"])
     operator.identifier(entry["owner_instance_id"])
     if p["company"] != source["company"] or p["workspace"] != slot["workspace"] or entry["area"] not in {a["name"] for a in source["native"]["areas"]} or entry["offline_allowed"] is not True or type(manifest["revision"]) is not int or manifest["revision"] < 1:
@@ -234,14 +233,28 @@ def public_url(value):
         raise Refused("reviewed repository/tool URLs must be credential-free HTTPS")
 
 
+def manifest_entry(manifest):
+    """Read Rust's flattened wire manifest or an older nested journal unchanged.
+
+    Never normalize the manifest itself: its original serialization is bound by
+    the selection receipts. Exact field sets also reject mixed representations.
+    """
+    metadata = {"project_id", "project", "revision", "reviewed_by", "reviewed_at"}
+    fields = {"area", "owner_instance_id", "repository_url", "default_branch", "offline_allowed", "tools", "destinations"}
+    if isinstance(manifest, dict) and "entry" in manifest:
+        operator.exact(manifest, metadata | {"entry"})
+        operator.exact(manifest["entry"], fields)
+        return manifest["entry"]
+    operator.exact(manifest, metadata | fields)
+    return {key: manifest[key] for key in fields}
+
+
 def public_manifest(manifest, *, offline=True):
-    operator.exact(manifest, {"project_id", "project", "entry", "revision", "reviewed_by", "reviewed_at"})
+    entry = manifest_entry(manifest)
     operator.identifier(manifest["project_id"])
     public_text(manifest["project"], 256)
     operator.identifier(manifest["reviewed_by"])
     public_text(manifest["reviewed_at"], 64)
-    entry = manifest["entry"]
-    operator.exact(entry, {"area", "owner_instance_id", "repository_url", "default_branch", "offline_allowed", "tools", "destinations"})
     operator.identifier(entry["owner_instance_id"])
     if entry["area"] not in operator.AREAS | {"trust"} or type(entry["offline_allowed"]) is not bool or entry["area"] == "trust" and entry["offline_allowed"] or offline and not entry["offline_allowed"] or type(manifest["revision"]) is not int or not 1 <= manifest["revision"] <= 2**63 - 1:
         raise Refused("exact reviewed offline project scope required")
@@ -279,7 +292,8 @@ def bootstrap_preview(value, receipt, source, output):
     bootstrap = value["bootstrap"]
     scope = bootstrap["scope"]
     manifest = receipt["manifest"]
-    if bootstrap["device"] != receipt["device_id"] or bootstrap["catalog_revision"] != manifest["revision"] or scope["area"] != manifest["entry"]["area"] or scope["owner"] != manifest["entry"]["owner_instance_id"] or scope["project"] != manifest["project_id"]:
+    entry = manifest_entry(manifest)
+    if bootstrap["device"] != receipt["device_id"] or bootstrap["catalog_revision"] != manifest["revision"] or scope["area"] != entry["area"] or scope["owner"] != entry["owner_instance_id"] or scope["project"] != manifest["project_id"]:
         raise Refused("subscription bootstrap does not match the reviewed device/composite project/revision")
     return value
 
@@ -377,7 +391,7 @@ def run(input_file, journal, native, *, memory=None, prompt=confirm):
             value["stages"][f"select:{index}"] = "done"
             persisted(journal, value)
         selected = [entry["selection"] for entry in value["projects"]]
-        identities = [(r["manifest"]["entry"]["area"], r["manifest"]["entry"]["owner_instance_id"], r["manifest"]["project_id"]) for r in selected]
+        identities = [(manifest_entry(r["manifest"])["area"], manifest_entry(r["manifest"])["owner_instance_id"], r["manifest"]["project_id"]) for r in selected]
         if len(set(identities)) != len(identities) or len({r["device_id"] for r in selected}) != 1:
             raise Refused("duplicate composite projects or changed enrolled device; no repository/native effects")
         if {key[0] for key in identities} != {a["name"] for a in source["native"]["areas"]}:

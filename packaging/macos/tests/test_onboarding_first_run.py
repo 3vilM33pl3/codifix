@@ -79,10 +79,17 @@ class FirstRunContract(unittest.TestCase):
         for forbidden in ["credential", "password", "local_database_url", "poll_secret"]:
             self.assertNotIn('"' + forbidden + '"', (self.state / "first-run.json").read_text())
 
-    def test_curated_selection_binds_repository_and_refuses_reader_only_projects(self):
+    def test_curated_selection_requires_explicit_permission_even_with_writer_role(self):
         with self.assertRaises(files.Refused):
             self.invoke(curated_sync=True)
         self.entries[0]["allowed_roles"] = ["reader", "writer"]
+        with self.assertRaises(files.Refused):
+            self.invoke(curated_sync=True)
+        self.entries[0]["curated_contributions_allowed"] = False
+        with self.assertRaises(files.Refused):
+            self.invoke(curated_sync=True)
+        self.entries[0]["allowed_roles"] = ["reader"]
+        self.entries[0]["curated_contributions_allowed"] = True
         self.invoke(curated_sync=True)
         source = files.read(self.state / "journey-input.json")
         self.assertEqual(source["native"]["schema_version"], 2)
@@ -91,6 +98,29 @@ class FirstRunContract(unittest.TestCase):
         self.assertEqual(source["native"]["repositories"][0]["repository"], source["projects"][0]["workspace"])
         with self.assertRaises(files.Refused):
             self.invoke(curated_sync=False)
+
+    def test_rust_flattened_catalog_preserves_manifest_digest_and_curated_reader_permission(self):
+        manifest = self.entries[0]["manifest"]
+        manifest.update(manifest.pop("entry"))
+        original = copy.deepcopy(manifest)
+        self.entries[0]["curated_contributions_allowed"] = True
+        self.invoke(curated_sync=True)
+        source = files.read(self.state / "journey-input.json")
+        self.assertEqual(source["projects"][0]["selection"]["manifest_digest"], files.digest(original))
+        self.assertEqual(self.entries[0]["manifest"], original)
+        self.assertEqual(source["native"]["repositories"][0]["project"], original["project"])
+
+    def test_catalog_rejects_mixed_manifest_and_nonboolean_curated_permission(self):
+        manifest = self.entries[0]["manifest"]
+        manifest["area"] = manifest["entry"]["area"]
+        with self.assertRaises(files.Refused):
+            self.invoke()
+        del manifest["area"]
+        for invalid in [1, "true", None, [], {}]:
+            with self.subTest(permission=invalid):
+                self.entries[0]["curated_contributions_allowed"] = invalid
+                with self.assertRaises(files.Refused):
+                    self.invoke()
 
     def test_exact_resume_keeps_selection_local_ids_and_existing_repository(self):
         existing = self.repositories / "Unicode café project"

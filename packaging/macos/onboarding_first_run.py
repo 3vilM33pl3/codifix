@@ -34,13 +34,16 @@ def catalog(text):
         raise Refused("bounded versioned authorized project catalog required")
     identities = set()
     for entry in value["projects"]:
-        operator.exact(entry, {"manifest", "allowed_roles", "offline_available"})
+        operator.exact(entry, {"manifest", "allowed_roles", "offline_available"} | ({"curated_contributions_allowed"} if "curated_contributions_allowed" in entry else set()))
+        if type(entry.get("curated_contributions_allowed", False)) is not bool:
+            raise Refused("explicit boolean curated contribution permission required")
         journey.public_manifest(entry["manifest"], offline=False)
         manifest = entry["manifest"]
-        identity = (manifest["entry"]["area"], manifest["entry"]["owner_instance_id"], manifest["project_id"])
+        metadata = journey.manifest_entry(manifest)
+        identity = (metadata["area"], metadata["owner_instance_id"], manifest["project_id"])
         if identity in identities or type(entry["offline_available"]) is not bool or not isinstance(entry["allowed_roles"], list) or not 1 <= len(entry["allowed_roles"]) <= 2 or len(set(entry["allowed_roles"])) != len(entry["allowed_roles"]) or any(r not in {"reader", "writer"} for r in entry["allowed_roles"]):
             raise Refused("duplicate project identity or unsupported device permissions")
-        if entry["offline_available"] and (not manifest["entry"]["offline_allowed"] or identity[0] == "trust"):
+        if entry["offline_available"] and (not metadata["offline_allowed"] or identity[0] == "trust"):
             raise Refused("catalog offline policy is inconsistent; Trust stays CA-local")
         identities.add(identity)
     return value["projects"]
@@ -56,9 +59,10 @@ def ask(prompt):
 def choose(entries, workspace_parent, *, question=ask):
     for index, entry in enumerate(entries, 1):
         manifest = entry["manifest"]
-        area = manifest["entry"]["area"]
+        metadata = journey.manifest_entry(manifest)
+        area = metadata["area"]
         mode = "offline eligible" if entry["offline_available"] else "remote-only; not installed by this workflow"
-        print(f"{index}. {area} / {manifest['project']} / owner {manifest['entry']['owner_instance_id']} ({mode})")
+        print(f"{index}. {area} / {manifest['project']} / owner {metadata['owner_instance_id']} ({mode})")
     answer = question("Select up to eight offline projects by number, separated by commas (blank cancels): ")
     if not re.fullmatch(r"[0-9]+(\s*,\s*[0-9]+){0,7}", answer):
         raise Refused("select one to eight explicit project numbers")
@@ -72,7 +76,8 @@ def choose(entries, workspace_parent, *, question=ask):
             raise Refused("selected project is not approved for offline installation; Trust remains remote-only")
         manifest = entry["manifest"]
         journey.public_manifest(manifest)
-        composite = {"area": manifest["entry"]["area"], "owner_instance_id": manifest["entry"]["owner_instance_id"],
+        metadata = journey.manifest_entry(manifest)
+        composite = {"area": metadata["area"], "owner_instance_id": metadata["owner_instance_id"],
                      "project_id": manifest["project_id"], "revision": manifest["revision"], "manifest_digest": files.digest(manifest)}
         slug = re.sub(r"[^a-z0-9]+", "-", manifest["project"].lower()).strip("-")[:48] or "project"
         default = workspace_parent / f"{composite['area']}-{slug}-{files.digest(composite)[:12]}"
@@ -187,15 +192,15 @@ def run(*, company, name, runtime, memory, state, workspace_parent, native, no_b
             if curated_sync:
                 projects = catalog(text)
                 for item in picked:
-                    eligible = [entry for entry in projects if entry["manifest"]["project_id"] == item["selection"]["project_id"] and entry["manifest"]["entry"]["area"] == item["selection"]["area"] and entry["manifest"]["entry"]["owner_instance_id"] == item["selection"]["owner_instance_id"]]
-                    if len(eligible) != 1 or "writer" not in eligible[0]["allowed_roles"]:
-                        raise Refused("curated contributions require an authorized writer project; use the read-only workflow for reader access")
+                    eligible = [entry for entry in projects if entry["manifest"]["project_id"] == item["selection"]["project_id"] and journey.manifest_entry(entry["manifest"])["area"] == item["selection"]["area"] and journey.manifest_entry(entry["manifest"])["owner_instance_id"] == item["selection"]["owner_instance_id"]]
+                    if len(eligible) != 1 or eligible[0].get("curated_contributions_allowed") is not True:
+                        raise Refused("curated contributions require explicit current device catalog permission")
                 native_input.update(schema_version=2, curated_sync=True, repositories=[
                     {"area": item["selection"]["area"], "project_id": item["selection"]["project_id"], "repository": item["workspace"], "project": next(
                         entry["manifest"]["project"] for entry in projects
                         if entry["manifest"]["project_id"] == item["selection"]["project_id"]
-                        and entry["manifest"]["entry"]["area"] == item["selection"]["area"]
-                        and entry["manifest"]["entry"]["owner_instance_id"] == item["selection"]["owner_instance_id"])}
+                        and journey.manifest_entry(entry["manifest"])["area"] == item["selection"]["area"]
+                        and journey.manifest_entry(entry["manifest"])["owner_instance_id"] == item["selection"]["owner_instance_id"])}
                     for item in picked])
             areas = sorted({item["selection"]["area"] for item in picked})
             native_input["areas"] = [{"name": area, "instance_id": str(uuid.uuid4()), "api_port": api_base_port + index} for index, area in enumerate(areas)]

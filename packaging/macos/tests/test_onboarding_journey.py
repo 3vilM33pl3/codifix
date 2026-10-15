@@ -79,8 +79,9 @@ class FakeMemory:
     def bootstrap_for(self, receipt):
         result = copy.deepcopy(self.bootstrap)
         manifest = receipt["manifest"]
+        entry = manifest.get("entry", manifest)
         result["catalog_revision"] = manifest["revision"]
-        result["scope"].update(area=manifest["entry"]["area"], owner=manifest["entry"]["owner_instance_id"], project=manifest["project_id"])
+        result["scope"].update(area=entry["area"], owner=entry["owner_instance_id"], project=manifest["project_id"])
         return result
 
     def subscription_confirm(self, receipt, output, digest):
@@ -159,6 +160,36 @@ class JourneyContract(unittest.TestCase):
         self.assertEqual(self.memory.clones, 1)
         self.assertEqual(len(self.native.bootstraps), 3)
         self.assertEqual(len([c for c in self.memory.calls if isinstance(c, tuple) and c[0] == "apply"]), 2)
+
+    def test_rust_flattened_manifest_round_trips_selection_bootstrap_and_resume(self):
+        manifest = self.memory.manifest
+        manifest.update(manifest.pop("entry"))
+        original = copy.deepcopy(manifest)
+        self.source["schema_version"] = 2
+        self.source["projects"][0]["selection"] = {
+            "area": manifest["area"], "owner_instance_id": manifest["owner_instance_id"],
+            "project_id": manifest["project_id"], "revision": manifest["revision"],
+            "manifest_digest": files.digest(manifest)}
+        self.fixture.write(self.input, self.source)
+        self.run_journey()
+        selected = files.read(self.journal)["projects"][0]["selection"]
+        self.assertEqual(selected["manifest"], original)
+        self.assertEqual(selected["manifest_sha256"], "b" * 64)
+        self.assertEqual(selected["plan_digest"], files.digest(files.read(self.source["projects"][0]["journal"])["plan"]))
+        cli = journey.Memory(self.source)
+        args = cli.subscription_args(selected, "output.json")
+        self.assertEqual(args[args.index("--owner-instance") + 1], manifest["owner_instance_id"])
+        self.run_journey()
+        self.assertEqual(files.read(self.journal)["projects"][0]["selection"], selected)
+
+    def test_manifest_representations_reject_mixed_missing_and_unknown_fields(self):
+        nested = copy.deepcopy(self.memory.manifest)
+        flattened = copy.deepcopy(nested)
+        flattened.update(flattened.pop("entry"))
+        for invalid in [dict(nested, area=nested["entry"]["area"]), dict(flattened, entry=nested["entry"]),
+                        dict(flattened, unexpected="field"), {k: v for k, v in flattened.items() if k != "area"}]:
+            with self.subTest(fields=list(invalid)), self.assertRaises(files.Refused):
+                journey.public_manifest(invalid)
 
     def test_cancel_selection_or_repository_confirmation_creates_no_repo_native_effects(self):
         self.memory.cancel_select = True

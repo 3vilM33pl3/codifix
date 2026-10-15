@@ -108,11 +108,12 @@ def approval(value, selected, caller):
     if r["agent_id"] != value["agent_id"] or r["caller"] != caller or r["provider_id"] != CALLERS[caller] or r["confirmed"] is not False or not isinstance(r["projects"], list) or len(r["projects"]) != 1:
         raise Refused("separate caller/provider and explicit human approval required")
     p, m = r["projects"][0], selected["manifest"]
+    entry = journey.manifest_entry(m)
     operator.exact(p, {"area", "owner_instance_id", "project_id", "manifest_revision", "manifest_sha256", "offline_confirmed"})
     operator.pin(p["manifest_sha256"])
-    if p["area"] != m["entry"]["area"] or p["owner_instance_id"] != m["entry"]["owner_instance_id"] or p["project_id"] != m["project_id"] or type(p["manifest_revision"]) is not int or p["manifest_revision"] != m["revision"] or p["offline_confirmed"] is not True:
+    if p["area"] != entry["area"] or p["owner_instance_id"] != entry["owner_instance_id"] or p["project_id"] != m["project_id"] or type(p["manifest_revision"]) is not int or p["manifest_revision"] != m["revision"] or p["offline_confirmed"] is not True:
         raise Refused("agent selection differs from the exact reviewed project")
-    if {"name": caller, "provider_id": CALLERS[caller], "destination_id": CALLERS[caller]} not in m["entry"]["destinations"]:
+    if {"name": caller, "provider_id": CALLERS[caller], "destination_id": CALLERS[caller]} not in entry["destinations"]:
         raise Refused("project operator has not approved this model/output destination")
     return value
 
