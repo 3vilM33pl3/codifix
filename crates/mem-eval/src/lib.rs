@@ -4,6 +4,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 pub mod campaign;
+pub mod capture_quality;
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
