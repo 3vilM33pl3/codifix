@@ -1,7 +1,129 @@
 # Company onboarding deployment — 2026-10-15
 
-Status: **owners upgraded; Olivier login and two-project company credentials verified**.
-This is not completed laptop synchronization acceptance.
+Status: **native Mac services, both project downloads and bidirectional curated
+synchronization are operating**. The latest observed state is recorded below;
+earlier entries are a chronological failure/recovery ledger, not current blockers.
+Full reboot, real-device revocation and a clean-install replay of the final
+network-helper package have not been observed. The whole acceptance plan is
+therefore not marked complete.
+
+## Current Mac operating state — 2026-10-15
+
+All 14 native setup journal stages are `done`, including both initial downloads,
+both synchronization agents and both repository watchers. The Mac's approved
+device and login-Keychain credentials were reused; no replacement identity,
+plaintext credential fallback or paid provider was introduced.
+
+| Area | Repository | Local Web | Retained versions | Canonical states | Cursor |
+| --- | --- | --- | ---: | ---: | ---: |
+| Homelab | `/Users/olivier/Projects/homelab` | `http://127.0.0.1:55440/` | 484 | 434 | 60736 |
+| Workshop / Memory | `/Users/olivier/Projects/memory` | `http://127.0.0.1:55441/` | 1819 | 1678 | 3498 |
+
+Counts include agent-created acceptance notes and their reviewed corrections;
+they are not an immutable count of the original source dataset. Each area's
+ordered `record_key || ':' || record::text` projection hash matches its owner's
+`device_replica_sources` using PostgreSQL SHA-256 over newline-separated rows:
+
+- Homelab, 918 records:
+  `5b6d85cb5737158ee92e543e0624941e8f21533214da0f2d3e30e292d8938a8f`.
+- Workshop, 3497 records:
+  `672872e294763e50c42f197911c3b06a1999e0449c629a2ce7eaf0f46f0c0376`.
+
+The native runtime is PostgreSQL 17.11, pgvector 0.8.7, pgcrypto 1.3,
+pg_trgm 1.6 and Python 3.14.8; both local databases have all 84 migrations.
+The installed Memory executable remains SHA-256
+`0f1950566296b25f138cea3b8285e0b45430fae59814017951ce2a4b4b6c6fdc`,
+avoiding another executable/Keychain change. Both local services report healthy.
+The original Homelab checkout was retained; Memory was cloned and nine reviewed
+skills installed. Git commits and pushes are still independent user operations.
+
+### Actual synchronization and interface evidence
+
+- Two locally curated memories per project were accepted by the appropriate
+  Monolith owner and returned with authenticated authorship and owner IDs.
+  Downloaded copies do not become new outgoing additions.
+- An independent Workshop owner delta, canonical
+  `e021b07f-bb23-4de9-8dec-49e5d3ceb29d`, reached the Mac and appeared in Web
+  **More → Offline** with its author, version, digest and provenance references.
+  It was not assigned a fabricated ATProto publication locator.
+- Raw-only test markers stayed in the collecting machine's raw store. Mac
+  markers were absent from owner raw captures; the owner-only marker was absent
+  from both Mac raw stores. Normal query results contained no raw marker.
+- Agent-created correction proposals `517240ea-8277-5525-aa6d-1e3202e4081b`
+  and `26383ccc-67ea-59aa-864c-094ed4646f05` were explicitly reviewed through
+  the ordinary owner proposal API. Versions 1, 2 and 3 of canonical
+  `65478926-703c-5bde-a7a0-9a57badf53ee` remain visible on the Mac. Both
+  proposals were submitted before the first approval: neither is evidence of
+  an owner rejecting a stale submission. A later attempt bound to version 1's
+  digest was rejected locally with HTTP 409 after the new history arrived.
+  Agent review is not Olivier's personal approval; no unrelated proposal was
+  approved and no proposal was automatically approved by synchronization.
+- Workshop synchronization was stopped, a correction queued durably, and the
+  job restarted. The queued operation reached the owner. A second restart
+  retained accepted receipts and all history. Original helper/child PIDs were
+  gone; exactly one helper and one sync child per project remained active.
+  Both status commands report no synchronization error. This is a process
+  restart test, not a host reboot or physical network-disconnection test.
+- Actual native CLI normal queries and offline cache searches returned results
+  in both areas. The native TUI connected over an SSH PTY. The real Mac Web
+  service's synchronized search was exercised through a temporary SSH forward,
+  not presented as a Safari interaction test.
+
+### Native network consent and installation repair
+
+macOS initially permitted SSH probes but denied background LAN traffic. The
+native `Memory Network Access.app` now remains responsible for each sync child,
+using the existing verified `onboard.py run-sync` wrapper with pinned Python
+and operator hashes. Olivier granted Local Network consent and confirmed the
+application could reach the server. Actual background downloads/uploads, not
+that foreground probe alone, verify the repair.
+
+Source commit `cf218ea4` packages the helper and generates the corresponding
+LaunchAgent definitions. On this Mac it is currently installed under the user's
+`~/Applications`, with exact prior plists retained in `network-access-repair`
+and `network-access-launcher-repair` under the runtime root. The installed
+root-owned operator predates this rendering change. Do not run a different
+operator against the existing journal and silently replace its reviewed job
+definitions. The successful private native continuation and repair receipts are
+retained under `~/Library/Caches/memory-login-session.377hHG`; the final package
+still needs a separate clean-install replay. No additional Installer dialog was
+opened just to replace this now-working setup.
+
+### Current Monolith selector repair
+
+The full-project download initially tried to export 423,068 recomputable
+Workshop graph edges and hit the feed bound. Commit `e477fb9d` exports asserted
+same-project relations only; derived graphs remain on the owners. Existing
+Homelab derived replicas were removed through the ordinary delta stream, not
+by resetting the local cursor or deleting owner graph data. Both projections
+now contain zero relations because these projects have no asserted edges.
+
+Current owner binary SHA-256:
+`f1658aeb06ae9d7d1e2f765b896f2f9f8e7ee6098548177204c807b1f8fced55`.
+Homelab container:
+`d3768e969f1602b5ae7d446884b936a834f194207e73733df75bc0eea13f6f20`;
+Workshop container:
+`8cf054e8460b73e6995e10ca007fae1f547bc4a18b588314adc32a3e11584bdb`.
+Fresh encrypted backups, replacement plans and prior stopped containers are
+retained separately with `before-mac-project-sync-20261015` recovery names.
+No schema or federation identity changed during this replacement. Recover
+forward; do not start an old binary against the migrated databases.
+
+### Remaining bounded work
+
+- Observe host reboot/login recovery and physical disconnect/reconnect; service
+  restart alone is not equivalent evidence.
+- Real-device revocation remains covered by synthetic tests rather than a live
+  revoke/re-enroll cycle of Olivier's working laptop.
+- Replay the final package from a clean Mac state; current live acceptance used
+  preserved journals and documented repairs.
+- Renew the gateway trust lifecycle before the leaf expires **18 October 2026,
+  15:48 UTC** and its issuer expires **19 October**. The approved same-CA leaf
+  repair is temporary, not authorization to replace the CA trust root.
+- Dev Memory on port 4250 is offline. Final plan verification/remembering is
+  pending; production Memory is not substituted for the dev checkpoint.
+
+## Earlier chronological deployment entries
 
 ## Applied changes
 

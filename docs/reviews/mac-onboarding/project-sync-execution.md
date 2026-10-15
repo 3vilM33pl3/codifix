@@ -19,7 +19,7 @@ loopback port 4250 were restarted. Production services were not changed.
   and bounded provenance. The derived heuristic graph remains owner-local.
 - [x] Transactional curated contribution queue and current-authority owner
   submission/receipts; corrections/conflicts preserve owner history.
-- [ ] Startup/reconnect/five-minute and post-curation synchronization, local
+- [x] Startup/reconnect/five-minute and post-curation synchronization, local
   writable workflow, normal retrieval/history/agent access and watcher routing.
 - [x] Homelab company configuration, identity/project assignments and manifests.
 - [ ] Native package with dependencies, guided resumable setup, Keychain and
@@ -133,7 +133,30 @@ used.
   `b5c28efa-e521-4e4e-a6c9-cb68874de7aa`. This deliberately records partial
   implementation evidence, not completion of the approved deployment plan.
 
-## Deployment and native acceptance remain open
+## Native operational milestone; final acceptance remains bounded
+
+The October 15 real Mac now runs both local services, two independent databases,
+repository watchers and background synchronization. All 14 native journal stages
+are complete. Homelab has 484 retained versions / 434 states; Workshop has 1819
+versions / 1678 states after acceptance notes and reviewed corrections. Each
+projection's ordered content hash matches its owner. Both Mac-to-owner additions
+and independent owner-to-Mac updates were observed. Normal CLI queries, the
+native TUI and the Mac service's Web Offline view returned local knowledge.
+
+An actual stop/queue/restart delivered a persisted correction, a further restart
+retained receipts without duplicate additions, reviewed versions 1–3 remain
+available, and a correction bound to the superseded version was refused with
+HTTP 409. Raw-only markers did not cross between raw stores. No paid provider
+was called. See the [current deployment evidence](company-deployment-20261015.md#current-mac-operating-state--2026-10-15).
+
+The network helper and final installer sources are committed, but this working
+Mac used explicit, receipted repairs to existing journals. The final combined
+package has not been replayed on a clean Mac. Host reboot, physical disconnect
+and live device revocation are not claimed as observed acceptance. The native
+package and end-to-end checklist entries therefore remain open. Gateway leaf
+expiry on October 18 and issuer expiry on October 19 require separate follow-up.
+
+### Earlier deployment progress
 
 On October 15, the backed-up Homelab and Workshop owners were upgraded to the
 frozen candidate and schema 84. Their company origins use verified HTTPS and
@@ -148,10 +171,7 @@ The real ARM64 Mac is now reachable and has the native candidate installed.
 PostgreSQL 17.11, pgvector 0.8.7 and Python 3.14.8 were built and bundled on that
 Mac. Installed runtime hashes/modes and the installed Memory executable are
 verified; the user-approved login-Keychain trust verifies Authentik HTTPS.
-See [native evidence and package hashes](native-mac-20261014.md). This is not yet
-the completed company login and two-project synchronization journey.
-
-Next deployment actions are the corrected native installer, exact two-project
-selection/clone/offline/search/upload/correction/revoke/reboot acceptance sequence.
-The six-step plan is not complete, and no final plan-verification claim has been
-recorded.
+See [native evidence and package hashes](native-mac-20261014.md). The current
+operational evidence above supersedes earlier partial-download failures, without
+turning the remaining reboot/revocation/clean-install checks into passed tests.
+No final plan-completion claim has been recorded.
