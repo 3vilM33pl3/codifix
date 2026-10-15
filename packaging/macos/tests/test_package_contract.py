@@ -181,6 +181,9 @@ touch "$output"
         self.assertNotIn("Lightweight package", preinstall.read_text())
         self.assertEqual(list(Path(self.env["TMPDIR"]).iterdir()), [])
         self.assertIn("--locked", trace.read_text())
+        import hashlib
+        manifest_hash = hashlib.sha256(runtime.manifest.read_bytes()).hexdigest()
+        self.assertIn(f"--identifier com.memory-layer.runtime.{manifest_hash}", trace.read_text())
 
     def test_failed_build_cleans_private_stage_only(self):
         repo, _ = self.fixture()

@@ -120,6 +120,14 @@ not upgrade runtime dependencies or start services. Verify the installed
 application and existing runtime after installation; package contract tests
 alone do not prove macOS Installer behavior.
 
+New runtime-containing packages use a manifest-digest-specific
+`com.memory-layer.runtime.<sha256>` receipt. Each new bundle ID is installed
+side by side; Installer must not obsolete the earlier runtime. The launcher
+selects the new generation for new setup. Existing services retain their pinned
+paths and require an explicit migration/review; installing does not switch them.
+Old runtime files and receipts remain until an operator confirms no remaining
+consumer uses them. This does not change the existing-prefix overwrite guard.
+
 The bundled `journey` connector joins login, project selection, reviewed workspace
 setup and native provisioning. `journey-agents` adds separately approved
 Codex/OpenAI and Claude/Anthropic Keychain identities and project MCP entries,

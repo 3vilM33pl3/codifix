@@ -249,6 +249,11 @@ PAYLOAD="$STAGE_DIR/payload"
 SCRIPTS="$STAGE_DIR/scripts"
 PKG_PATH="$ROOT_DIR/target/memory-layer-${VERSION}-macos-${PKG_ARCH}.pkg"
 PKG_IDENTIFIER="com.memory-layer.pkg"
+if [[ -n "$RUNTIME_BUNDLE" ]]; then
+  # Immutable runtime generations must not obsolete earlier receipt payloads.
+  # Preinstall separately refuses overwriting an existing bundle prefix.
+  PKG_IDENTIFIER="com.memory-layer.runtime.${RUNTIME_MANIFEST_SHA256}"
+fi
 if [[ "$APPLICATION_UPDATE" -eq 1 ]]; then
   PKG_PATH="$ROOT_DIR/target/memory-layer-${VERSION}-macos-${PKG_ARCH}-application-update.pkg"
   PKG_IDENTIFIER="com.memory-layer.application"
