@@ -206,8 +206,16 @@ the original verified runtime tree, with no source/dependency rebuild. SHA-256:
 It is `target/memory-layer-2.1.0-rc.5-macos-runtime-repair.pkg` in the Mac build
 directory. The immutable runtime prefix is currently absent, so the existing
 full-package preinstall permits restoration. Local Installer authorization and
-restored-runtime verification remain pending. A lightweight preinstall guard
-is being added to prevent repeating this omission.
+restored-runtime verification initially remained pending. Commit `5e782a13`
+adds a lightweight preinstall guard to prevent repeating this omission; all
+18 package contract tests passed.
+
+Olivier subsequently installed the complete repair. The installed executable
+and corrected journey helper match their expected SHA-256s, `memory-onboard`
+executes again, and exhaustive installed-runtime file/mode/hash validation
+passed. The original Keychain/device identity is reused. The GUI-session
+first-run was restarted with `onboarding-v2`; macOS requested Keychain access
+for the updated executable before project selection.
 
 The earlier first-run stopped before project selection/native effects. Its
 executable-bound journal is preserved. The prepared next attempt uses sibling
