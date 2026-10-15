@@ -1,0 +1,20 @@
+{
+  "bundle_id": "bundle-1",
+  "source_project": "synthetic-project",
+  "exported_at": "2026-10-15T10:00:00Z",
+  "summary_markdown": "# Export",
+  "memory_count": 3,
+  "relation_count": 1,
+  "warning_count": 1,
+  "warnings": [
+    "One path omitted"
+  ],
+  "options": {
+    "include_archived": false,
+    "include_tags": true,
+    "include_relations": false,
+    "include_source_file_paths": false,
+    "include_git_commits": false,
+    "include_source_excerpts": false
+  }
+}

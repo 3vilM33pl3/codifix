@@ -1,0 +1,43 @@
+{
+  "project": "synthetic-project",
+  "total": 2,
+  "items": [
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "summary": "Cache location",
+      "preview": "The application cache lives under the user cache directory.",
+      "memory_type": "fact",
+      "confidence": 0.92,
+      "importance": 3,
+      "status": "active",
+      "updated_at": "2026-10-14T11:10:00Z",
+      "tags": [
+        "storage",
+        "desktop"
+      ],
+      "tag_count": 2,
+      "source_count": 2,
+      "canonical_id": "10000000-0000-4000-8000-000000000011",
+      "version_no": 2,
+      "is_tombstone": false
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "summary": "Build check",
+      "preview": "Run the fast checks before the full suite.",
+      "memory_type": "procedure",
+      "confidence": 0.81,
+      "importance": 2,
+      "status": "archived",
+      "updated_at": "2026-10-13T09:00:00Z",
+      "tags": [
+        "testing"
+      ],
+      "tag_count": 1,
+      "source_count": 1,
+      "canonical_id": "10000000-0000-4000-8000-000000000012",
+      "version_no": 1,
+      "is_tombstone": false
+    }
+  ]
+}
