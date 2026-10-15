@@ -19,11 +19,6 @@ struct AgentsView: View {
     }
 
     private var selectedSession: WorkAgentSession? { sessions.first { $0.id == selectedSessionID } }
-    private var snapshotIsStale: Bool {
-        guard let collectedAt = snapshot?.collectedAt else { return false }
-        return Date.now.timeIntervalSince(collectedAt) > 120
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(alignment: .center) {
@@ -33,9 +28,6 @@ struct AgentsView: View {
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if let collectedAt = snapshot?.collectedAt {
-                    Text("Updated \(workRelativeDate(collectedAt))").font(.caption).foregroundStyle(.secondary)
-                }
                 Button {
                     refreshID += 1
                 } label: { Label("Refresh snapshot", systemImage: "arrow.clockwise") }
@@ -44,10 +36,17 @@ struct AgentsView: View {
                     .accessibilityIdentifier("work.agents.refresh")
             }
 
-            if let refreshError, snapshot != nil {
-                WorkNotice(title: "Agent snapshot is stale", message: "\(refreshError.localizedDescription) The displayed session state is from the previous successful snapshot.", tone: .warning)
-            } else if snapshotIsStale {
-                WorkNotice(title: "Agent snapshot is stale", message: "The last session snapshot is more than two minutes old. Displayed status may have changed.", tone: .warning)
+            TimelineView(.periodic(from: .now, by: 30)) { timeline in
+                VStack(alignment: .leading, spacing: 8) {
+                    if let collectedAt = snapshot?.collectedAt {
+                        Text("Updated \(workRelativeDate(collectedAt))").font(.caption).foregroundStyle(.secondary)
+                        if let refreshError {
+                            WorkNotice(title: "Agent snapshot is stale", message: "\(refreshError.localizedDescription) The displayed session state is from the previous successful snapshot.", tone: .warning)
+                        } else if timeline.date.timeIntervalSince(collectedAt) > 120 {
+                            WorkNotice(title: "Agent snapshot is stale", message: "The last session snapshot is more than two minutes old. Displayed status may have changed.", tone: .warning)
+                        }
+                    }
+                }
             }
 
             if loading && snapshot == nil {
@@ -140,7 +139,7 @@ struct AgentsView: View {
                             }
                             if let prompt = selectedSession.firstAssistantText, !prompt.isEmpty {
                                 Divider()
-                                Text("Latest response").font(.subheadline.weight(.semibold))
+                                Text("First assistant response").font(.subheadline.weight(.semibold))
                                 Text(prompt).font(.callout).textSelection(.enabled)
                             } else if let prompt = selectedSession.initialPrompt, !prompt.isEmpty {
                                 Divider()

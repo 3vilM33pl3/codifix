@@ -101,7 +101,7 @@ struct ResumeView: View {
                     KnowledgeCard {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Next steps").font(.headline)
-                            ForEach(Array(response.nextSteps.enumerated()), id: \.element.id) { index, action in
+                            ForEach(Array(response.nextSteps.enumerated()), id: \.offset) { index, action in
                                 HStack(alignment: .top, spacing: 9) {
                                     Text("\(index + 1).").font(.callout.weight(.medium)).foregroundStyle(.secondary)
                                     VStack(alignment: .leading, spacing: 3) {
