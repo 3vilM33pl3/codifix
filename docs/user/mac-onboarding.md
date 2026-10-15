@@ -19,6 +19,7 @@ With your existing projects folder, start:
 
 ```bash
 memory-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
+  --runtime /ABS/INSTALLED-RUNTIME/runtime-prerequisites.json \
   --name "My Mac" --workspace-parent "$HOME/Projects" \
   --state "$HOME/Library/Application Support/memory-layer/onboarding"
 ```
@@ -29,6 +30,13 @@ review and confirm the repository/tools, offline-copy and local-services plans
 with `yes`. No installer JSON, source build or provider key is needed. Git still
 uses your own Git credentials. Existing repositories, dirty work and custom
 settings are preserved. Trust is shown as remote-only, not copied to your Mac.
+
+Use the installed runtime descriptor included in your package; `--runtime` is
+required. Run from your logged-in Mac session with its login Keychain unlocked.
+An SSH session can report `macOS Keychain write failed` / `User interaction is
+not allowed` before enrollment starts. Unlock the login Keychain locally with
+`security unlock-keychain` (enter the Mac password locally), then retry the same
+command. There is no plaintext credential fallback.
 
 ### Full curated-project synchronization candidate
 

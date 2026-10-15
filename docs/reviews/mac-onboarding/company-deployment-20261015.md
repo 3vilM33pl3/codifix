@@ -1,6 +1,6 @@
 # Company onboarding deployment — 2026-10-15
 
-Status: **owners upgraded; Olivier login verified; company provisioning in progress**.
+Status: **owners upgraded; Olivier login and two-project company credentials verified**.
 This is not completed laptop synchronization acceptance.
 
 ## Applied changes
@@ -67,7 +67,7 @@ prepared company configuration. Treat it as sensitive operator state.
 
 New running container IDs:
 
-- Homelab: `8ed1006729fa5d44805142d7eab4bb103a9479eb0c8b9ec555e360798d3f9e3b`
+- Homelab: `df3667a60a79c2c37ae7dbba1afe5e4590f77d3fbdfd3b199d9b63cc787e1e6c`
 - Workshop: `6ace99e22a673eaad7c515614aaf8c9a63850adf8a3be350c4fb9255b9aa892f`
 
 The previous containers are stopped, restart-disabled and retained with
@@ -96,12 +96,41 @@ The Authentik Memory application tile still pointed at the obsolete
 permissions were unchanged. Starting from that tile now initiates the actual
 Memory callback rather than opening a machine-local legacy installation.
 
-The two project manifests have been prepared for review, not saved. Their
+The two project manifests were approved and saved at revision 1. Their
 first-party skills archive is pinned to commit `89d52aa8`, SHA-256
 `9b60f54852a038a057c3c51c7cc71d7358d42c832bbb1e5b54357a7b104cbbdb`.
 A verified HTTPS fetch on the Mac matched that hash. Its existing Homelab
 checkout is clean and retains its HTTPS origin; the Memory clone destination
 is absent. No project content has yet been downloaded to the Mac.
+
+### Approved two-project company activation
+
+Olivier explicitly approved four 90-day server-only credentials: management and
+scoped device delivery for each exact Homelab/Memory project. All four were
+issued through the human-authenticated Web delegate review flow and expire on
+**2027-01-13**. Private receipts were saved outside the repository; no token was
+printed or transferred to the Mac. The Web delegate panel is commit `c4b37e48`;
+85 focused access tests and its production build passed.
+
+Homelab was recreated with these four credentials in its process environment.
+The prior same-version container is retained stopped/restart-disabled as
+`memory-homelab-preview-app-20260919-before-company-delegates-20261015`.
+Executable, configuration, Web/state mounts, network addresses and schema are
+unchanged. HTTPS `/healthz` reports `ok`, version `2.1.0-rc.5`.
+
+Authenticated delivery-catalog checks against **both owners** returned exactly
+the intended project at revision 1 for issuer/subject `olivier`, with offline
+access and curated contributions available. Existing group-derived human rights
+already authorize this; no redundant direct human grant was created. Trust and
+General are absent. Catalog agent destination declarations do not grant actual
+Codex/Claude disclosure consent.
+
+The real Mac first-run reached native prerequisite checks but stopped before
+device enrollment: SSH could not write the login Keychain. A separate native
+`security show-keychain-info` check reported `User interaction is not allowed`.
+Olivier was asked to unlock the login Keychain locally; no password collection,
+credential fallback or Keychain security change was attempted. Its first-run
+journal is retained for exact-input resume.
 
 Homelab infra commits: `01bae42` (management listener restriction), `9ca42f8`
 (private authenticated Memory origins). Memory replacement operator's focused
@@ -109,12 +138,9 @@ tests: 11 passed, including schema-changing upgrade forward-recovery behavior.
 
 ## Still required
 
-- Provision and privately configure exact owner management/delivery delegates
-  using the verified human administration session.
-- Supply company transport credentials in the **process environment**; unlike
-  OIDC, current company transports do not read the adjacent env file. Merely
-  writing that file is not a completed company setup.
-- Review/publish the two onboarding manifests and assign current user access.
+- Keep company transport credentials in the **process environment**; unlike
+  OIDC, current company transports do not read the adjacent env file. Renew the
+  four bounded credentials before their expiry; renewal is not automatic.
 - Enroll the Mac device, select projects, retain existing Homelab checkout, clone
   Memory, start local instances and demonstrate both synchronization directions.
 - Verify capture/retry behavior beyond service liveness, scoped denial, conflict,
