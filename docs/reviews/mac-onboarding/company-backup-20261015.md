@@ -105,7 +105,7 @@ Each live `pg_dump` provides a coherent database snapshot separately. PostgreSQL
 sequence values are nontransactional; roles and filesystem files are separate
 reads. These owner backups do not establish gateway/PDS/global consistency, a
 stopped-writer cutover point or recovery of subsequent live writes. No new
-application startup, runtime role-grant acceptance or off-host backup copy was tested.
+application startup or off-host backup copy was tested.
 Whole-company rollback, off-host redundancy and gateway/PDS recovery remain
 outside this scoped preparation. All originals are preserved.
 
@@ -159,6 +159,66 @@ Combined rehearsal receipt SHA-256:
 `710da295d6fca737ad2940068302b39933dfab5159b13dbaf9aa7d619d125bf4`.
 
 This proves the SQLx schema upgrade and preservation of those two snapshot
-datasets. It does not prove application runtime privileges, new company login,
-background behavior, federation compatibility or a safe live writer-fencing
-cutover. Those remain separate acceptance steps.
+datasets. Runtime table privileges were subsequently checked below. New company
+login, application/background behavior, federation compatibility and a safe live
+writer-fencing cutover remain separate acceptance steps.
+
+## Runtime grants on schema-84 clones
+
+The existing `homelab_app` and `workshop_app` roles already hold exactly
+`SELECT, INSERT, UPDATE, DELETE` on analogous tables including
+`onboarding_project_projections`, `laptop_contribution_drafts`, `memory_entries`
+and `onboarding_delegated_device_approvals`. The 13 new tables initially lacked
+those runtime grants. Their least-equivalent extension is:
+
+```sql
+-- Homelab database only, after its successful schema-84 migration.
+BEGIN;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+    public.device_replica_heads,
+    public.device_replica_sources,
+    public.device_replica_events,
+    public.device_replica_projections,
+    public.device_replica_records,
+    public.device_replica_pages,
+    public.device_curated_contribution_receipts,
+    public.laptop_curated_bindings,
+    public.laptop_curated_outbox,
+    public.laptop_curated_origins,
+    public.device_curated_contribution_resolutions,
+    public.device_replica_owner_watermarks,
+    public.laptop_correction_staging_receipts
+TO homelab_app;
+COMMIT;
+```
+
+Workshop uses the exact same table/privilege list with `TO workshop_app`, in
+`memory_workshop_preview_20260918` only. Reviewed per-database executable SQL is
+preserved at `homelab-schema84-runtime-grants.sql` and
+`workshop-schema84-runtime-grants.sql` under the private backup directory.
+These SQL files were applied **only to the isolated clones**. This report does
+not authorize their live execution. Production migration remains a separate
+SQLx operation as `postgres`; live applications retain `migrations="verify_only"`.
+
+For each clone, `SET LOCAL ROLE` to its existing application role successfully
+performed a real insert, select, update and delete on **every one of the 13 new
+tables**, including their foreign-key dependencies, inside a rolled-back
+transaction. Synthetic approval/proposal fixtures were also rolled back. All
+159 table row hashes and all four original sequence states exactly matched the
+pre-probe schema-84 inventory afterward. No new sequence exists, so no sequence
+grant is required. The clone grants remain for further runtime rehearsal;
+containers are stopped again with network `none` and no application ever started.
+
+The extension adds no `TRUNCATE`, `REFERENCES`, `TRIGGER`, grant option, ownership,
+schema/default privilege, elevated role flags, or database-level permission.
+Both runtime roles remain non-superusers without role creation, database
+creation, replication or RLS-bypass authority. No live grant or data mutation
+occurred. Exact privilege matrices, SQL hashes and transaction-probe results
+are in the protected per-owner `*-schema84-runtime-grant-receipt.json` and
+combined `schema84-runtime-grants.json`.
+Combined receipt SHA-256:
+`c1411d85e24bf6ba0fa2c3222a5a18fd19f149e3339431ce79ddca1c4477ae3f`.
+Executable grant SQL SHA-256s: Homelab
+`6167b74c93001bb45218a5fc0e6327789ca18b5d22e151e95c8e6f0f6a8fe9d7`,
+Workshop
+`8d7547fe77d86323d96a2bba01d63e8111fd09e841bc6e8a071c11726cbc4d8b`.
