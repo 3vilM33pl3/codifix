@@ -330,11 +330,22 @@ dump catalog is readable. This bounded backup is not a whole-company restore
 exercise. Gateway attestation unit test and all 11 replacement-operator tests
 passed. The new route rejects malformed input with 422 rather than 404.
 
-A further live blocker is the existing gateway TLS leaf: it expired on
-2026-10-10. Its unchanged private preview CA expires on 2026-10-19. Certificate
-verification has not been bypassed; permission for a bounded same-CA leaf renewal
-has been requested. New root trust would be a separate operation. No successful
-download, bidirectional transfer or reboot acceptance is claimed yet.
+The existing gateway TLS leaf had expired on 2026-10-10. With Olivier's explicit
+approval, a replacement was issued under the same private CA using the same leaf
+key; only the TLS proxy restarted. Certificate verification succeeds for the
+gateway hostname. New certificate SHA-256:
+`77af8525e8d8cabf951f195454c3beb53fe8d5c4257275491a18cabb749cac66`, valid
+through **2026-10-18 15:48:03 UTC**. The issuer expires on 2026-10-19, so this
+bounded repair does not solve the separate preview-CA lifecycle requirement.
+Previous certificate, intent and result are preserved in the private operation
+root's `gateway-leaf-renewal` directory.
+
+The gateway signed both empty and actual curated pages through verified TLS,
+and the owner returned a valid signed page. A GUI-session Mac diagnostic
+committed Homelab cursor 2048 of 30823 with no sync error. The native operator's
+initial-sync invocation still fails, so its background sync/watcher stages
+remain pending while the execution-context difference is investigated. Partial
+download is not full synchronization or bidirectional/reboot acceptance.
 
 Normal CLI routing is now active through a newly created user-owned
 `~/Library/Application Support/memory-layer/area-routing.json` symlink to the
