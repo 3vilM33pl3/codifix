@@ -12,6 +12,7 @@ pub mod federation;
 mod handlers;
 mod laptop_cache;
 mod laptop_corrections;
+mod laptop_memories;
 mod laptop_query;
 mod llm;
 mod mcp_http;

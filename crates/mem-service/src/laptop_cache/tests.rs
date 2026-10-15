@@ -342,6 +342,179 @@ async fn curated_replica_search_retains_source_identity_without_inventing_public
         "retention must not resurrect an acknowledged local copy"
     );
 }
+#[tokio::test]
+async fn curated_memories_browse_merges_scoped_owner_rows_without_echoes() {
+    let Some((mut f, mut binding, actor)) = fixture().await else {
+        return;
+    };
+    binding.replication_mode = LaptopCacheReplicationMode::CuratedProjectV1;
+    f.state.config.laptop_cache.as_mut().unwrap().subscriptions[0] = binding.clone();
+    f.state.config.service.read_only = false;
+    let store = DeviceProjectionStore::initialize(
+        f.state.pool().unwrap(),
+        binding.subscription_id,
+        binding.device_id,
+        scope("workshop", &binding).unwrap(),
+    )
+    .await
+    .unwrap();
+    assert!(store.browse().await.unwrap().is_empty());
+    let now = chrono::Utc::now();
+    let id = Uuid::new_v4();
+    let canonical = Uuid::new_v4();
+    let source = Uuid::new_v4();
+    use mem_federation::device_replica::*;
+    let records = [
+        DeviceReplicaRecord::MemoryVersion(DeviceMemoryVersion {
+            id,
+            canonical_id: canonical,
+            version: 3,
+            tombstone: false,
+            text: "diagnosis curated replica text".into(),
+            summary: "curated summary".into(),
+            memory_type: MemoryType::DomainFact,
+            scope: "project".into(),
+            author: "original author".into(),
+            authored_at: now,
+            updated_at: now,
+            tags: vec![],
+            unavailable_source_ids: vec![source],
+        }),
+        DeviceReplicaRecord::CanonicalState(DeviceCanonicalState {
+            canonical_id: canonical,
+            current_version_id: id,
+            status: MemoryStatus::Active,
+            confidence: ConfidencePpm::try_from(800_000).unwrap(),
+            importance: 1,
+            updated_at: now,
+            archived_at: None,
+        }),
+    ];
+    for record in records {
+        sqlx::query(
+            "INSERT INTO device_replica_records(subscription,record_key,record) VALUES($1,$2,$3)",
+        )
+        .bind(binding.subscription_id)
+        .bind(record.key())
+        .bind(sqlx::types::Json(record))
+        .execute(&f.state.pool().unwrap())
+        .await
+        .unwrap();
+    }
+    // The main list is a local-human browse adapter, not a changed repository
+    // helper. Exact-text twins stay distinct; accepted device echoes do not.
+    let local = Uuid::new_v4();
+    let twin = Uuid::new_v4();
+    for local_id in [local, twin] {
+        sqlx::query("INSERT INTO memory_entries(id,project_id,canonical_text,summary,memory_type,scope,importance,confidence) VALUES($1,$2,'diagnosis curated replica text','curated summary','domain_fact','project',1,0.8)")
+            .bind(local_id).bind(f.project).execute(&f.db.pool).await.unwrap();
+    }
+    let browse = |status, limit, offset| {
+        crate::laptop_memories::list(&f.state, &actor, peer().0, "local", status, limit, offset)
+    };
+    let all = browse(None, 10, 0).await.unwrap();
+    assert_eq!(
+        crate::laptop_cache::response(&all).unwrap().headers()[header::CACHE_CONTROL],
+        "no-store"
+    );
+    assert_eq!(all.memories.total, 3);
+    let remote = all
+        .memories
+        .items
+        .iter()
+        .find(|r| r.origin.is_some())
+        .unwrap();
+    assert_eq!(remote.id, id);
+    assert_eq!(remote.version_no, 3);
+    assert!(remote.origin.as_ref().unwrap().read_only);
+    assert_eq!(remote.origin.as_ref().unwrap().author, "original author");
+    assert_eq!(remote.source_count, 1);
+    let first_page = browse(None, 1, 0).await.unwrap();
+    let second_page = browse(None, 1, 1).await.unwrap();
+    assert_eq!(first_page.memories.total, 3);
+    assert_eq!(first_page.browse_revision, second_page.browse_revision);
+    assert_ne!(
+        first_page.memories.items[0].id,
+        second_page.memories.items[0].id
+    );
+    let outbox_binding = json!({"device_id":binding.device_id,"scope":{"owner_instance_id":binding.owner_instance_id}});
+    sqlx::query("INSERT INTO laptop_curated_outbox(operation_id,local_project_id,local_memory_id,binding,state,receipt) VALUES($1,$2,$1,$3,'accepted',$4)")
+        .bind(local).bind(f.project).bind(outbox_binding)
+        .bind(json!({"owner_canonical_id":canonical,"owner_memory_id":id,"owner_version":3}))
+        .execute(&f.db.pool).await.unwrap();
+    let accepted_view = browse(None, 10, 0).await.unwrap();
+    assert_eq!(accepted_view.memories.total, 2);
+    assert_ne!(first_page.browse_revision, accepted_view.browse_revision);
+    sqlx::query("UPDATE laptop_curated_outbox SET state='conflict' WHERE operation_id=$1")
+        .bind(local)
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(browse(None, 10, 0).await.unwrap().memories.total, 3);
+    sqlx::query("UPDATE laptop_curated_outbox SET state='accepted' WHERE operation_id=$1")
+        .bind(local)
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        crate::repository::fetch_project_memories(&f.db.pool, "local", None, 10, 0)
+            .await
+            .unwrap()
+            .total,
+        2
+    );
+    assert!(
+        crate::laptop_memories::list(
+            &f.state,
+            &actor,
+            "10.0.0.1:40000".parse().unwrap(),
+            "local",
+            None,
+            10,
+            0
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        crate::laptop_memories::list(&f.state, &actor, peer().0, "other", None, 10, 0)
+            .await
+            .unwrap()
+            .memories
+            .total,
+        0
+    );
+    sqlx::query("UPDATE device_replica_records SET record=jsonb_set(record,'{value,status}','\"archived\"') WHERE subscription=$1 AND record_key=$2")
+        .bind(binding.subscription_id).bind(format!("state:{canonical}")).execute(&f.db.pool).await.unwrap();
+    assert_eq!(
+        browse(Some("active"), 10, 0).await.unwrap().memories.total,
+        1
+    );
+    assert_eq!(
+        browse(Some("archived"), 10, 0)
+            .await
+            .unwrap()
+            .memories
+            .total,
+        1
+    );
+    sqlx::query("INSERT INTO device_replica_owner_watermarks(subscription,canonical_id,version,inactive) VALUES($1,$2,3,TRUE)")
+        .bind(binding.subscription_id).bind(canonical).execute(&f.db.pool).await.unwrap();
+    sqlx::query("UPDATE device_replica_records SET record=jsonb_set(record,'{value,tombstone}','true') WHERE subscription=$1 AND record_key=$2")
+        .bind(binding.subscription_id).bind(format!("version:{id}")).execute(&f.db.pool).await.unwrap();
+    assert_eq!(browse(None, 10, 0).await.unwrap().memories.total, 1);
+    sqlx::query("DELETE FROM device_replica_records WHERE subscription=$1")
+        .bind(binding.subscription_id)
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        browse(None, 10, 0).await.unwrap().memories.total,
+        1,
+        "accepted local copy must not resurrect after owner pruning"
+    );
+}
+
 async fn body(response: Response) -> Value {
     assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
     serde_json::from_slice(

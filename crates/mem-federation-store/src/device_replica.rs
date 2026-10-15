@@ -85,6 +85,48 @@ impl DeviceProjectionStore {
     pub async fn search(&self, query: &str, limit: u32) -> Result<Vec<DeviceMemoryHit>> {
         Ok(self.search_with_status(query, limit).await?.1)
     }
+    /// Current owner rows for explicit local browsing, including archived rows.
+    /// This does not alter search, publication, or the local mutation tables.
+    pub async fn browse(&self) -> Result<Vec<DeviceMemoryHit>> {
+        let mut tx = self.pool.begin().await?;
+        self.inspect(&mut tx).await?;
+        let rows: Vec<(Json<DeviceReplicaRecord>, Json<DeviceReplicaRecord>)> = sqlx::query_as(
+            "SELECT v.record,s.record FROM device_replica_records s
+             JOIN device_replica_records v ON v.subscription=s.subscription
+               AND v.record_key='version:'||(s.record->'value'->>'current_version_id')
+             WHERE s.subscription=$1 AND s.record->>'kind'='canonical_state'
+               AND v.record->>'kind'='memory_version'
+               AND v.record->'value'->>'canonical_id'=s.record->'value'->>'canonical_id'
+               AND NOT EXISTS (SELECT 1 FROM device_replica_records newer
+                 WHERE newer.subscription=s.subscription AND newer.record->>'kind'='memory_version'
+                   AND newer.record->'value'->>'canonical_id'=s.record->'value'->>'canonical_id'
+                   AND (newer.record->'value'->>'version')::bigint>(v.record->'value'->>'version')::bigint)
+             ORDER BY s.record_key LIMIT 100001",
+        ).bind(self.subscription).fetch_all(&mut *tx).await?;
+        if rows.len() > 100_000 {
+            return Err(StoreError::Limits);
+        }
+        tx.commit().await?;
+        let mut hits = Vec::new();
+        for (Json(record), Json(state)) in rows {
+            let digest = audit_digest(&record)?;
+            if let (
+                DeviceReplicaRecord::MemoryVersion(version),
+                DeviceReplicaRecord::CanonicalState(state),
+            ) = (record, state)
+                && !version.tombstone
+            {
+                hits.push(DeviceMemoryHit {
+                    scope: self.scope.clone(),
+                    version,
+                    state,
+                    digest,
+                    read_only: true,
+                });
+            }
+        }
+        Ok(hits)
+    }
     pub async fn search_with_status(
         &self,
         query: &str,

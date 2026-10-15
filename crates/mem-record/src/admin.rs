@@ -297,6 +297,9 @@ pub struct PruneEmbeddingsResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectMemoryListItem {
+    /// Present only in the explicitly requested, local laptop browsing view.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<ProjectMemoryOrigin>,
     pub id: Uuid,
     pub summary: String,
     pub preview: String,
@@ -321,10 +324,28 @@ pub struct ProjectMemoryListItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectMemoryOrigin {
+    pub subscription_id: Uuid,
+    pub owner_instance_id: Uuid,
+    pub project_id: Uuid,
+    pub author: String,
+    pub content_digest: String,
+    pub read_only: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectMemoriesResponse {
     pub project: String,
     pub total: i64,
     pub items: Vec<ProjectMemoryListItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectMemoryBrowseResponse {
+    #[serde(flatten)]
+    pub memories: ProjectMemoriesResponse,
+    /// Content-bound revision of the complete ordered browsing view.
+    pub browse_revision: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

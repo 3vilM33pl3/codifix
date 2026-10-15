@@ -88,7 +88,7 @@ fn describe(
         sync_error: None,
     }
 }
-fn response(value: &impl serde::Serialize) -> Result<Response, ApiError> {
+pub(crate) fn response(value: &impl serde::Serialize) -> Result<Response, ApiError> {
     let bytes = serde_json::to_vec(value).map_err(|_| unavailable())?;
     if bytes.len() > 256 * 1024 {
         return Err(ApiError::status_message(

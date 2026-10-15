@@ -35,6 +35,8 @@ pub(crate) async fn sync_commits(
 
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct ProjectMemoriesParams {
+    #[serde(default)]
+    include_synchronized: bool,
     status: Option<String>,
     limit: Option<i64>,
     offset: Option<i64>,
@@ -54,9 +56,11 @@ pub(crate) struct ProjectCommitsParams {
 
 pub(crate) async fn project_memories(
     State(state): State<AppState>,
+    axum::Extension(actor): axum::Extension<AuthenticatedPrincipal>,
+    axum::extract::ConnectInfo(peer): axum::extract::ConnectInfo<std::net::SocketAddr>,
     Path(slug): Path<String>,
     Query(params): Query<ProjectMemoriesParams>,
-) -> Result<Json<ProjectMemoriesResponse>, ApiError> {
+) -> Result<axum::response::Response, ApiError> {
     let limit = params.limit.unwrap_or(200).clamp(1, 500);
     let offset = params.offset.unwrap_or(0).max(0);
     let status_filter = params
@@ -66,7 +70,20 @@ pub(crate) async fn project_memories(
         .transpose()
         .map_err(ApiError::validation)?;
 
-    Ok(Json(
+    if params.include_synchronized && state.config.laptop_cache.is_some() {
+        let value = crate::laptop_memories::list(
+            &state,
+            &actor,
+            peer,
+            &slug,
+            status_filter.as_deref(),
+            limit,
+            offset,
+        )
+        .await?;
+        return crate::laptop_cache::response(&value);
+    }
+    Ok(axum::response::IntoResponse::into_response(Json(
         fetch_project_memories(
             &state.pool()?,
             &slug,
@@ -76,7 +93,7 @@ pub(crate) async fn project_memories(
         )
         .await
         .map_err(ApiError::sql)?,
-    ))
+    )))
 }
 
 pub(crate) async fn project_memory_graph(
@@ -753,6 +770,7 @@ pub(crate) async fn fetch_latest_active_plan_memory(
 
     row.map(|row| {
         Ok(mem_record::ProjectMemoryListItem {
+            origin: None,
             id: row.try_get("id")?,
             summary: row.try_get("summary")?,
             preview: row.try_get("preview")?,
@@ -1665,6 +1683,7 @@ mod tests {
     ) -> mem_record::ProjectMemoryListItem {
         let id = Uuid::new_v4();
         mem_record::ProjectMemoryListItem {
+            origin: None,
             id,
             summary: summary.to_string(),
             preview: summary.to_string(),

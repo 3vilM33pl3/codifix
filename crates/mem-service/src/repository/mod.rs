@@ -122,6 +122,7 @@ pub async fn fetch_project_memories(
     let mut items = Vec::with_capacity(rows.len());
     for row in rows {
         items.push(ProjectMemoryListItem {
+            origin: None,
             id: row.try_get("id")?,
             summary: row.try_get("summary")?,
             preview: row.try_get("preview")?,
