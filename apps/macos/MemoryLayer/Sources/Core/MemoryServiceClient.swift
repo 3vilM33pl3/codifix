@@ -360,9 +360,17 @@ public actor MemoryServiceClient {
             }
         }
         try Task.checkCancellation()
-        let reply = try await transport.send(request)
-        try Task.checkCancellation()
-        return reply
+        do {
+            let reply = try await transport.send(request)
+            try Task.checkCancellation()
+            return reply
+        } catch {
+            // URLSession reports cancellation as URLError.cancelled. Surface the
+            // task cancellation consistently so feature screens do not show it
+            // as a failed operation when their selection or filter changes.
+            try Task.checkCancellation()
+            throw error
+        }
     }
 
     private func validate(_ reply: HTTPReply) throws {
