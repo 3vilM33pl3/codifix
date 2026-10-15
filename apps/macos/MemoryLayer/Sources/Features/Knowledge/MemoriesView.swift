@@ -22,6 +22,7 @@ struct MemoriesView: View {
     @State private var listGate = KnowledgeRequestGate()
     @State private var detailGate = KnowledgeRequestGate()
     @State private var pendingDelete: (id: String, title: String)?
+    @State private var refreshID = 0
 
     private enum DetailTab: String, CaseIterable, Identifiable {
         case content = "Content"
@@ -51,7 +52,7 @@ struct MemoriesView: View {
                 subtitle: response.map { "\($0.total) memories · \($0.project)" } ?? "Canonical records and their evidence",
                 actionTitle: "Refresh"
             ) {
-                Task { await loadMemories() }
+                refreshID += 1
             }
 
             if !context.permissions.allows(.memoryRead) {
@@ -59,9 +60,9 @@ struct MemoriesView: View {
             } else if isLoading && response == nil {
                 KnowledgeStateView(kind: .loading, context: context, retry: nil)
             } else if let errorMessage, response == nil {
-                KnowledgeStateView(kind: stateKind(for: errorMessage), context: context, retry: { Task { await loadMemories() } })
+                KnowledgeStateView(kind: stateKind(for: errorMessage), context: context, retry: { refreshID += 1 })
             } else if let response, response.items.isEmpty {
-                KnowledgeStateView(kind: .empty, context: context, retry: { Task { await loadMemories() } })
+                KnowledgeStateView(kind: .empty, context: context, retry: { refreshID += 1 })
             } else {
                 if let errorMessage {
                     Label("Refresh failed: \(errorMessage)", systemImage: "exclamationmark.triangle.fill")
@@ -88,7 +89,7 @@ struct MemoriesView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task(id: context.revision) { await loadMemories() }
+        .task(id: "\(context.revision)-\(refreshID)") { await loadMemories() }
         .task(id: "\(selectedMemoryID ?? "none")-\(detailTab.rawValue)") {
             guard let id = selectedMemoryID else {
                 detailGate.invalidate()

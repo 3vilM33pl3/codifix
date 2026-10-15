@@ -18,6 +18,7 @@ struct QueryView: View {
     @State private var requestGate = KnowledgeRequestGate()
     @State private var showsHistory = false
     @State private var memorySheet: MemorySheetRequest?
+    @State private var queryTask: Task<Void, Never>?
 
     private var service: KnowledgeService { KnowledgeService(context: context) }
     private var queryHistory: [QueryHistoryEntry] {
@@ -57,12 +58,17 @@ struct QueryView: View {
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task(id: context.revision) {
+            queryTask?.cancel()
             requestGate.invalidate()
             isLoading = false
             response = nil
             selectedResultID = nil
             errorMessage = nil
             errorKind = nil
+        }
+        .onDisappear {
+            queryTask?.cancel()
+            requestGate.invalidate()
         }
         .sheet(isPresented: $showsHistory) { historySheet }
         .sheet(item: $memorySheet) { request in
@@ -78,10 +84,11 @@ struct QueryView: View {
                     .lineLimit(1...3)
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("query.question")
-                    .onSubmit { Task { await ask() } }
+                    .disabled(isLoading)
+                    .onSubmit { startQuery() }
                 HStack(spacing: 10) {
                     Button {
-                        Task { await ask() }
+                        startQuery()
                     } label: {
                         if isLoading { Label("Searching…", systemImage: "hourglass") }
                         else { Label("Ask question", systemImage: "arrow.up.right") }
@@ -91,10 +98,11 @@ struct QueryView: View {
                     .accessibilityIdentifier("query.submit")
                     Button("History") { showsHistory = true }
                         .buttonStyle(.bordered)
-                        .disabled(queryHistory.isEmpty)
+                        .disabled(isLoading || queryHistory.isEmpty)
                         .accessibilityIdentifier("query.history")
                     Spacer()
                     Toggle("Include stale results in ranking", isOn: $includeStale)
+                        .disabled(isLoading)
                         .toggleStyle(.checkbox)
                         .font(.callout)
                         .accessibilityIdentifier("query.includeStale")
@@ -305,6 +313,12 @@ struct QueryView: View {
         }
         .padding(20)
         .frame(minWidth: 480, minHeight: 380)
+    }
+
+    private func startQuery() {
+        guard !isLoading else { return }
+        queryTask?.cancel()
+        queryTask = Task { await ask() }
     }
 
     private func ask() async {

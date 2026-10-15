@@ -19,6 +19,7 @@ struct ReviewView: View {
     @State private var policySheet = false
     @State private var policySelection = "balanced"
     @State private var memorySheet: ReviewMemorySheet?
+    @State private var refreshID = 0
 
     private var service: KnowledgeService { KnowledgeService(context: context) }
     private var activeProposal: ReplacementProposal? { proposals.first(where: { $0.id == selectedProposalID }) ?? proposals.first }
@@ -45,7 +46,7 @@ struct ReviewView: View {
             } else if isLoading && policy == nil && proposals.isEmpty {
                 KnowledgeStateView(kind: .loading, context: context, retry: nil)
             } else if let errorMessage, policy == nil && proposals.isEmpty {
-                KnowledgeStateView(kind: stateKind(for: errorMessage), context: context, retry: { Task { await refresh() } })
+                KnowledgeStateView(kind: stateKind(for: errorMessage), context: context, retry: { refreshID += 1 })
             } else if proposals.isEmpty {
                 if let errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
@@ -80,7 +81,7 @@ struct ReviewView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task(id: context.revision) { await refresh() }
+        .task(id: "\(context.revision)-\(refreshID)") { await refresh() }
         .sheet(isPresented: $policySheet) { policyEditor }
         .sheet(item: $memorySheet) { request in
             KnowledgeMemoryDetailView(context: context, memoryID: request.id)
@@ -97,7 +98,8 @@ struct ReviewView: View {
             HStack {
                 Text("Pending proposals").font(.headline)
                 Spacer()
-                Button("Refresh", systemImage: "arrow.clockwise") { Task { await refresh() } }
+                Button("Refresh", systemImage: "arrow.clockwise") { refreshID += 1 }
+                    .disabled(isResolving || isSavingPolicy)
                     .labelStyle(.iconOnly)
                     .help("Refresh proposals")
                     .accessibilityIdentifier("review.refresh")
@@ -302,7 +304,9 @@ struct ReviewView: View {
         }
         guard !Task.isCancelled, requestGate.accepts(current, revision: context.revision) else { return }
         do {
-            policy = try await service.replacementPolicy()
+            let loadedPolicy = try await service.replacementPolicy()
+            guard !Task.isCancelled, requestGate.accepts(current, revision: context.revision) else { return }
+            policy = loadedPolicy
         } catch is CancellationError {
             return
         } catch {
@@ -321,7 +325,7 @@ struct ReviewView: View {
             _ = try await service.resolveProposal(id: proposal.id, approve: approve)
             proposals.removeAll { $0.id == proposal.id }
             selectedProposalID = proposals.first?.id
-            await refresh()
+            refreshID += 1
         } catch {
             errorMessage = error.localizedDescription
         }
