@@ -3,13 +3,34 @@
 This feature is under implementation. The development package now includes a
 resumable sign-in/select/clone/offline-sync operator and a separate Codex/Claude
 setup stage. Optional runtime-bundle packaging and guided first-run now exist.
-An ARM64 candidate with a native runtime has been built and installed on the
-test Mac; its installed PostgreSQL/pgvector restart smoke test passed. The complete
-sign-in and two-project journey still needs real-Mac acceptance, so it is not yet
-a verified end-to-end first-run installer.
+The ARM64 candidate is operating on the test Mac: sign-in, project selection,
+repository setup, both downloads, local queries, curated uploads and reviewed
+corrections have been observed. Process restart recovery passed. Host reboot,
+live device revocation and clean installation of the final combined package
+remain unverified; the working installation includes documented repair receipts.
 See the [execution contract](../reviews/mac-onboarding/README.md) for completion
 checks and the [deployment ledger](../reviews/mac-onboarding/company-deployment-20261015.md)
 for the installed candidate and owner changes.
+
+## Using an already configured laptop
+
+From a selected repository, run `memory tui`; its operator-owned routing chooses
+the corresponding local area. Outside a mapped repository, use
+`memory --area homelab tui` or `memory --area workshop tui`. An unavailable area
+does not redirect writes somewhere else.
+
+Use **Query** for normal local retrieval, or **More → Offline** for downloaded
+owner knowledge, citations, source versions, synchronization freshness and upload
+status. The **Memories** tab's local count is not the number of downloaded owner
+versions. In the TUI, use **Synchronized knowledge** to inspect those copies.
+`memory urls` lists configuration-derived entry points; their presence alone
+does not assert live service health.
+
+The watcher captures local work. Only curated additions and explicitly staged
+corrections synchronize; raw captures and session bodies stay local. Setup does
+not enable paid curation. Git commit/push and owner correction approval remain
+separate actions. The background worker checks queued work promptly and refreshes
+downloads every five minutes while online.
 
 ## Guided first-run candidate
 
@@ -78,9 +99,10 @@ Use `--after-version N --limit 16` for subsequent pages. The Web query/Offline
 views provide **View owner history**; TUI Synchronized knowledge uses `h` for
 history and `n` for more versions. These are read-only owner copies.
 
-This is unreleased implementation, not Mac acceptance evidence. In particular,
-the complete native journey still needs rehearsal, and mutable-state/tombstone
-upload plus the complete review/status journey remain on the execution checklist.
+This is an internal candidate with the bounded native evidence linked above,
+not a public release. Mutable-state/relation/deletion uploads are not an
+owner-write protocol; the remaining acceptance checks stay on the execution
+checklist.
 
 To propose a correction to an owner copy, inspect its downloaded version and
 digest, then use the correction form in its history view or the local CLI:
@@ -121,8 +143,9 @@ connects a separate durable contribution queue to authenticated owner receipts;
 legacy raw drafts are not uploaded by that path. Trust expertise integration
 with the new laptop identities remains outside this increment.
 
-This candidate has synthetic and disposable-database test evidence, not an
-observed clean-Mac journey. [Runtime packaging and recovery details](../../packaging/macos/operator-README.md)
+This candidate has both synthetic tests and observed two-project native operation,
+but not a clean-Mac replay of the final combined package.
+[Runtime packaging and recovery details](../../packaging/macos/operator-README.md)
 explain prerequisites and remaining native validation.
 
 ## Administration in the development build
