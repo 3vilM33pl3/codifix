@@ -83,6 +83,9 @@ class Handler(BaseHTTPRequestHandler):
             State.scenario = data.get("name", "normal")
             if data.get("reset"):
                 State.proposals = fixture("proposals")["proposals"]
+                for approval in State.approvals:
+                    approval["status"] = "pending"
+                    approval["proposed_action"] = {"summary": "Fixture proposal for review"}
                 State.requests = []
             return self.reply({"scenario": State.scenario})
         State.requests.append({"method": self.command, "path": path})
