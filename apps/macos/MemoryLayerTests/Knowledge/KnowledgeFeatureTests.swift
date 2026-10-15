@@ -121,7 +121,8 @@ final class KnowledgeFeatureTests: XCTestCase {
     }
 
     func testLiveReadSmokeDecodesDevelopmentServiceWhenEnabled() async throws {
-        guard ProcessInfo.processInfo.environment["MEMORY_LAYER_LIVE_READ_SMOKE"] == "1" else {
+        guard ProcessInfo.processInfo.environment["MEMORY_LAYER_LIVE_READ_SMOKE"] == "1" ||
+                ProcessInfo.processInfo.environment["TEST_RUNNER_MEMORY_LAYER_LIVE_READ_SMOKE"] == "1" else {
             throw XCTSkip("Set MEMORY_LAYER_LIVE_READ_SMOKE=1 to run GET-only smoke against the existing dev service.")
         }
         let environment = ProcessInfo.processInfo.environment
