@@ -71,10 +71,37 @@ Remote profiles attach their profile-scoped Keychain token as a bearer header.
 Redirects are rejected, credentials never cross the profile's configured
 origin, and request or response errors do not include credentials.
 
-Run unit and UI tests with:
+Run focused unit tests with:
 
 ```sh
 xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
   -destination 'platform=macOS' -derivedDataPath /tmp/memory-layer-macos \
-  CODE_SIGNING_ALLOWED=NO test
+  CODE_SIGNING_ALLOWED=NO -only-testing:MemoryLayerTests test
 ```
+
+The UI suite uses a separate runner and requires macOS to enable UI automation:
+
+```sh
+xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
+  -destination 'platform=macOS' -derivedDataPath /tmp/memory-layer-macos-ui \
+  CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
+  -only-testing:MemoryLayerUITests test
+```
+
+This uses local ad-hoc signing for the test runner, not distribution signing.
+UI tests isolate connection history in memory and launch their own loopback
+fixture server. If the runner reports that it timed out enabling automation
+mode, no UI tests have passed; resolve the host's automation permission before
+rerunning. Manual flow checks can use the [fixture service](MemoryLayerUITests/Fixtures/README.md).
+
+Debug builds accept `--ui-window-size=1440x960` and
+`--ui-window-size=1024x768` for repeatable window-layout inspection. For example:
+
+```sh
+open -n -a '/tmp/memory-layer-macos/Build/Products/Debug/Memory Layer.app' \
+  --args --ui-window-size=1024x768
+```
+
+Optional live read smoke tests use the existing development service and never
+perform feature mutations. Enable them with
+`TEST_RUNNER_MEMORY_LAYER_LIVE_READ_SMOKE=1` when running the unit suite.

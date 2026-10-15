@@ -84,15 +84,18 @@ remain available.
 
 ## Development validation
 
-Run the macOS tests with:
+Run the macOS unit tests with:
 
 ```sh
 xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
   -destination 'platform=macOS' -derivedDataPath target/macos-tests \
-  CODE_SIGNING_ALLOWED=NO test
+  CODE_SIGNING_ALLOWED=NO -only-testing:MemoryLayerTests test
 ```
 
 Use injectable transport fixtures for destructive and administrative test
 scenarios. Live-service smoke checks should only inspect existing project data.
 Sample data belongs in tests and previews, not as a fallback for failed live
 requests.
+
+See the [macOS build guide](../../apps/macos/README.md) for the separate UI-test
+runner, reproducible window sizes, and the isolated acceptance fixture service.
