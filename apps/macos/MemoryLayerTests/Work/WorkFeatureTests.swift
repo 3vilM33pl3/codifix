@@ -66,7 +66,9 @@ final class WorkFeatureTests: XCTestCase {
         let service = WorkService(context: testContext(profile: profile, transport: transport))
 
         let status = try await service.llmAuditStatus()
-        let changed = try await service.setLLMAudit(enabled: true)
+        let auth = try JSONDecoder.memoryLayer.decode(AuthMeResponse.self, from: Data(#"{"authenticated":true,"mode":"single_user","read_only":false,"principal":{"id":"test-admin","global_role":"admin","global_permissions":["system_admin"],"projects":[]}}"#.utf8))
+        let adminService = WorkService(context: testContext(profile: profile, transport: transport, auth: auth))
+        let changed = try await adminService.setLLMAudit(enabled: true)
 
         XCTAssertTrue(status.enabled)
         XCTAssertTrue(changed.redacted)
@@ -123,6 +125,19 @@ final class WorkFeatureTests: XCTestCase {
         }
     }
 
+    func testAuditMutationDeniesUnprivilegedContextBeforeSending() async throws {
+        let transport = WorkRecordingTransport()
+        let service = WorkService(context: testContext(profile: testProfile(), transport: transport))
+        do {
+            _ = try await service.setLLMAudit(enabled: true)
+            XCTFail("Expected local permission guard")
+        } catch let error as MemoryServiceError {
+            XCTAssertEqual(error, .forbidden)
+        }
+        let requests = await transport.requests
+        XCTAssertTrue(requests.isEmpty)
+    }
+
     func testOptionalLiveReadSmoke() async throws {
         guard ProcessInfo.processInfo.environment["MEMORY_LAYER_LIVE_READ_SMOKE"] == "1" ||
                 ProcessInfo.processInfo.environment["TEST_RUNNER_MEMORY_LAYER_LIVE_READ_SMOKE"] == "1" else {
@@ -150,9 +165,9 @@ final class WorkFeatureTests: XCTestCase {
                           projectSlug: "project / one", repositoryRoot: URL(fileURLWithPath: "/repo"), kind: .serviceToken)
     }
 
-    private func testContext(profile: ConnectionProfile, transport: WorkRecordingTransport) -> FeatureContext {
+    private func testContext(profile: ConnectionProfile, transport: WorkRecordingTransport, auth: AuthMeResponse? = nil) -> FeatureContext {
         let client = MemoryServiceClient(profile: profile, transport: transport, secrets: WorkTestSecrets())
-        return FeatureContext(client: client, profile: profile, auth: nil, revision: 7)
+        return FeatureContext(client: client, profile: profile, auth: auth, revision: 7)
     }
 }
 

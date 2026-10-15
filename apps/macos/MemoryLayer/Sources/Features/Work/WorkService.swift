@@ -39,6 +39,11 @@ struct WorkService: Sendable {
     }
 
     func setLLMAudit(enabled: Bool) async throws -> WorkLlmAuditStatus {
+        guard !context.permissions.readOnly,
+              context.permissions.globalAdministrator,
+              context.permissions.globalAllowed.contains(.systemAdmin) else {
+            throw MemoryServiceError.forbidden
+        }
         let body = try JSONEncoder.workJSON.encode(WorkLlmAuditRequest(enabled: enabled))
         return try await context.client.send(
             APIRoute(method: "POST", path: "/v1/config/llm-audit", body: body),
