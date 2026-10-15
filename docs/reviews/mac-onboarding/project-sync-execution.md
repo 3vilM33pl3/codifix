@@ -134,15 +134,16 @@ in those mounted app TOMLs. The dev company console is not the production compan
 service. This turn has not upgraded those containers, migrated their databases,
 changed Authentik or issued live device grants.
 
-The repository has a native runtime packaging contract, but no verified
-PostgreSQL/pgvector/Python bundle or native Mac candidate was produced on this
-Linux host. A Darwin builder and a reachable MacBook are still required. Do not
-call Linux tests a clean-Mac rehearsal. The user has been asked for an existing
-Mac connection/SSH alias, if available; no availability is assumed.
+The real ARM64 Mac is now reachable and has the native candidate installed.
+PostgreSQL 17.11, pgvector 0.8.7 and Python 3.14.8 were built and bundled on that
+Mac. Installed runtime hashes/modes and the installed Memory executable are
+verified; the user-approved login-Keychain trust verifies Authentik HTTPS.
+See [native evidence and package hashes](native-mac-20261014.md). This is not yet
+the completed company login and two-project synchronization journey.
 
 Next deployment actions are a backed-up owner/company release upgrade,
 configuration of the real stable Authentik identity and the two reviewed project
-manifests, native dependency/package production, then the exact two-project
+manifests, then the exact two-project
 login/clone/offline/search/upload/correction/revoke/reboot acceptance sequence.
 The six-step plan is not complete, and no final plan-verification claim has been
 recorded.

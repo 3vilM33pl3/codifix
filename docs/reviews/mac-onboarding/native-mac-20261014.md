@@ -121,8 +121,25 @@ Existing token callers need an identity/continuity check before that switch.
   `memory 2.1.0-rc.5-dev`, SHA-256
   `b37d8a057f99640727755e9971e951c3f1424ba29a2e1e080150de872347d248`.
 
-The PKG, final rebuilt Mac executable hash, user Keychain trust, privileged
-package installation, actual company login and two-project journey remain open.
+## Installed native candidate — 2026-10-15
+
+- Package assembly completed: `memory-layer-2.1.0-rc.5-macos-aarch64.pkg`
+  (88 MiB), SHA-256
+  `fa5a6ca82fece7a12e6474464bdb60358f98302f8ea08a0726e01d51f82cc353`.
+- Olivier completed the native Installer authorization. Installed
+  `/usr/local/bin/memory` reports `memory 2.1.0-rc.5`; SHA-256
+  `c617e78a2624d67bd892a14bc87338dd6e2c98c51ae1d89cae9f2def1f457694`
+  matches the rebuilt ARM64 package input. Receipt `com.memory-layer.pkg` exists.
+- The installed bundled Python executes `memory-onboard --help`. Exhaustive
+  installed-prefix validation passes for all **4,718** runtime files, including
+  hashes and protected modes. No staging loader override is used for this check.
+- With explicit user approval, the existing verified public homelab root is now
+  trusted for SSL in Olivier's login Keychain. User trust inspection lists that
+  root and default `/usr/bin/curl` verifies Authentik discovery with HTTP 200.
+  No system-Keychain trust or CA private-key transfer was performed. SSH-only
+  trust/administrator requests did not work; the native GUI path was required.
+
+Actual company login and the two-project journey remain open.
 Ad-hoc signing is not Developer ID signing or notarization. No live service has
 been switched merely because these native build checks passed.
 
