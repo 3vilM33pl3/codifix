@@ -1,6 +1,6 @@
 # Company onboarding deployment — 2026-10-15
 
-Status: **owners upgraded; human login and company provisioning in progress**.
+Status: **owners upgraded; Olivier login verified; company provisioning in progress**.
 This is not completed laptop synchronization acceptance.
 
 ## Applied changes
@@ -80,14 +80,37 @@ returns 401; the new scoped credential returns 200. Company HTTPS root returns
 200 on Monolith and the real Mac with normal certificate validation. Login
 redirects through Authentik (307); a redirect alone is not a successful login.
 
+### Verified human login and dashboard correction
+
+The real browser subsequently completed OIDC login as `olivier` on **both**
+company origins. Both displayed the signed-in human, live service and Access
+administration. The stable issuer is
+`https://auth.metatao.net/application/o/memory-layer`, with subject `olivier`;
+the existing `memory-admins` mapping supplies administration. `akadmin` remains
+a separate identity without additional Memory grants. The identical contact
+email on these accounts does not merge their identities or passwords.
+
+The Authentik Memory application tile still pointed at the obsolete
+`http://127.0.0.1:4040/`. Its launch URL alone was changed to
+`https://memory.metatao.net/v1/auth/login`; provider, flows, credentials and
+permissions were unchanged. Starting from that tile now initiates the actual
+Memory callback rather than opening a machine-local legacy installation.
+
+The two project manifests have been prepared for review, not saved. Their
+first-party skills archive is pinned to commit `89d52aa8`, SHA-256
+`9b60f54852a038a057c3c51c7cc71d7358d42c832bbb1e5b54357a7b104cbbdb`.
+A verified HTTPS fetch on the Mac matched that hash. Its existing Homelab
+checkout is clean and retains its HTTPS origin; the Memory clone destination
+is absent. No project content has yet been downloaded to the Mac.
+
 Homelab infra commits: `01bae42` (management listener restriction), `9ca42f8`
 (private authenticated Memory origins). Memory replacement operator's focused
 tests: 11 passed, including schema-changing upgrade forward-recovery behavior.
 
 ## Still required
 
-- Complete actual human login, verify the stable subject, provision and privately
-  configure exact owner management/delivery delegates.
+- Provision and privately configure exact owner management/delivery delegates
+  using the verified human administration session.
 - Supply company transport credentials in the **process environment**; unlike
   OIDC, current company transports do not read the adjacent env file. Merely
   writing that file is not a completed company setup.
