@@ -212,8 +212,14 @@ private struct ConnectionWelcomeView: View {
             if state == .connecting {
                 ProgressView().controlSize(.large)
                 Text("Connecting to Memory Layer")
-            } else if case .failed = state {
-                Label("Connection unavailable", systemImage: "exclamationmark.icloud")
+            } else if case let .failed(message) = state {
+                if message.localizedCaseInsensitiveContains("credentials") {
+                    Label("Authentication required", systemImage: "lock.shield")
+                } else if message.localizedCaseInsensitiveContains("permission") {
+                    Label("Access restricted", systemImage: "lock.shield")
+                } else {
+                    Label("Connection unavailable", systemImage: "exclamationmark.icloud")
+                }
             } else {
                 Label("Choose a Memory Layer connection", systemImage: "externaldrive.connected.to.line.below")
             }
