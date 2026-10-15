@@ -185,6 +185,10 @@ struct DestinationContentView: View {
             SkillsView(context: context)
         case .embeddings:
             EmbeddingsView(context: context)
+        case .automations:
+            AutomationsView(context: context)
+        case .bundles:
+            BundlesView(context: context)
         default:
         VStack(spacing: 12) {
             Image(systemName: destination.symbol).font(.system(size: 30)).foregroundStyle(.secondary)
