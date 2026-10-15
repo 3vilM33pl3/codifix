@@ -165,6 +165,8 @@ struct DestinationContentView: View {
             MemoriesView(context: context)
         case .query:
             QueryView(context: context, sessionStore: knowledgeSession)
+        case .graph:
+            GraphView(context: context)
         case .review:
             ReviewView(context: context)
         case .agents:
