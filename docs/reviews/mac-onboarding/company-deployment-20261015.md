@@ -190,12 +190,24 @@ Its update package is SHA-256
 `c8db0383e1cd4ba9b22eff590d0f19f8e03ae75a1007e20710210b7a7c1e818a`,
 at the existing Mac build directory's
 `target/memory-layer-2.1.0-rc.5-macos-aarch64.pkg`.
-This unsigned internal update reuses the already installed runtime instead of
-trying to reinstall its immutable bundle ID. The original runtime-containing
+This unsigned internal update was intended to reuse the installed runtime. That
+assumption proved incorrect during actual installation (see correction below).
+The original runtime-containing
 package is retained as `memory-layer-2.1.0-rc.5-macos-aarch64-with-runtime-original.pkg`.
-Installer is open for Olivier's local authorization; installation of the update
-is **not yet verified**. Before continuing, check the installed executable and
-operator hashes and confirm that the runtime/launcher remain intact.
+Olivier completed this update. Installed executable and operator hashes match,
+but Installer removed the omitted runtime and `memory-onboard` as obsolete files
+from the same package receipt. No local project database/service had been
+created; Keychain enrollment and user repositories were not removed. Do **not**
+use the lightweight package to update a runtime-containing installation.
+
+A complete repair package was built from the corrected executable/operator plus
+the original verified runtime tree, with no source/dependency rebuild. SHA-256:
+`32b3d53ec91e89a7412bcb5f1acfdbae6b10b4af3a694ff120b6c1033921ebd1`.
+It is `target/memory-layer-2.1.0-rc.5-macos-runtime-repair.pkg` in the Mac build
+directory. The immutable runtime prefix is currently absent, so the existing
+full-package preinstall permits restoration. Local Installer authorization and
+restored-runtime verification remain pending. A lightweight preinstall guard
+is being added to prevent repeating this omission.
 
 The earlier first-run stopped before project selection/native effects. Its
 executable-bound journal is preserved. The prepared next attempt uses sibling
