@@ -70,6 +70,7 @@ Memory Layer currently supports these curated memory types:
 - `feedback`
 - `project`
 - `reference`
+- `insight`
 
 The type list is defined in code, but `memory_entries.memory_type` is stored in PostgreSQL as `TEXT`, not a database enum. The application layer is responsible for validating and interpreting the value.
 
@@ -490,6 +491,13 @@ Should not contain:
 - uncited claims that should be modeled as `domain_fact`
 - implementation summaries
 - raw source dumps without a durable reason to keep them
+
+### `insight`
+
+Use this for a consolidated meta-memory synthesized from a cluster of related
+memories. It captures the common pattern, tensions, and implications while
+retaining the supporting memories as provenance. A single implementation
+outcome or isolated diagnostic lesson is not a consolidated insight.
 
 ## How Types Get Triggered
 

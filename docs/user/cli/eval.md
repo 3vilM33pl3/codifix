@@ -128,6 +128,12 @@ new diagnostics and should be regenerated from the original artifacts.
 
 ## Suite Format
 
+For the separate experimental candidate-classification suite, use
+[`memory eval capture-quality`](capture-quality.md). It compares the existing
+rules with optional Jev type and lasting-value judgments on a local fixture
+file. Its offline default, dry-run, and saved-response replay require neither
+a Memory Layer service nor provider credentials. It never writes memories.
+
 Create a directory containing `suite.toml` and `items.jsonl`:
 
 ```toml

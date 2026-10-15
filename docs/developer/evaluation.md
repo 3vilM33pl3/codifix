@@ -6,6 +6,12 @@ aggregate comparisons and makes statistical tests meaningful.
 
 ## Architecture
 
+The experimental [`capture-quality`](../user/cli/capture-quality.md) command
+uses a separate fixture schema in `mem-eval` for candidate type and lasting-value
+judgments. `mem-cli` calls the existing candidate extractor for its rules
+baseline and owns all optional TypeSafe HTTP I/O. This experiment does not
+change production curation or use its model confidence as evidence confidence.
+
 - `mem-eval` owns suite parsing, result schemas, scoring, and statistics.
 - `memory eval` owns service calls, command execution, dry-run behavior, and
   artifact writing.
