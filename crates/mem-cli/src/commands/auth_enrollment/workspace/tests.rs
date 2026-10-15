@@ -745,9 +745,13 @@ async fn trust_remote_only_and_unsafe_urls_are_rejected() {
 async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
     let fixture = Fixture::new();
     let (origin, record) = identity();
-    let bytes = bundle("2.1.0");
+    let bytes = bundle("2.1.0-rc.5");
     let mut reviewed = project();
-    reviewed.manifest.entry.tools.push(pin(&bytes, "2.1.0"));
+    reviewed
+        .manifest
+        .entry
+        .tools
+        .push(pin(&bytes, "2.1.0-rc.5+89d52aa8"));
     let catalog = FakeCatalog::new(reviewed);
     let args = fixture.prepare(&catalog.project.manifest);
     fs::create_dir(&args.workspace).unwrap();
@@ -785,6 +789,11 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
     .unwrap();
     assert!(done.tools_done);
     assert_eq!(downloads.calls.get(), 1);
+    assert_eq!(
+        done.plan.manifest.entry.tools[0].version,
+        "2.1.0-rc.5+89d52aa8"
+    );
+    assert_eq!(done.plan_sha256, journal.plan_sha256);
     assert_eq!(
         fs::read_to_string(args.workspace.join(".agents/skills/memory-layer/SKILL.md")).unwrap(),
         "custom skill"

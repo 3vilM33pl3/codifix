@@ -15,6 +15,21 @@ use zip::ZipArchive;
 
 const MAX_DOWNLOAD: usize = 16 * 1024 * 1024;
 const MAX_FILE: usize = 2 * 1024 * 1024;
+
+fn skill_version_matches(actual: &str, pinned: &str) -> bool {
+    if actual == pinned {
+        return true;
+    }
+    // Release pins may carry a build label absent from skill frontmatter.
+    // Match the entire remaining SemVer string, including its prerelease.
+    // The archive SHA-256 remains the exact content identity.
+    semver::Version::parse(pinned).is_ok_and(|version| {
+        !version.build.is_empty()
+            && pinned
+                .split_once('+')
+                .is_some_and(|(version, _)| actual == version)
+    })
+}
 pub(super) trait Downloads {
     fn fetch(&self, url: &str) -> impl std::future::Future<Output = Result<Vec<u8>>>;
 }
@@ -242,7 +257,10 @@ pub(super) async fn apply(
                 }
             }
         }
-        if mem_skills::read_skill_version(&stage)?.as_deref() != Some(tool.version.as_str()) {
+        if !mem_skills::read_skill_version(&stage)?
+            .as_deref()
+            .is_some_and(|actual| skill_version_matches(actual, &tool.version))
+        {
             bail!("skill version differs from its reviewed pin; nothing installed");
         }
     }
@@ -253,6 +271,42 @@ pub(super) async fn apply(
     }
     filesystem::save(path, journal)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::skill_version_matches;
+
+    #[test]
+    fn reviewed_build_label_can_be_absent_from_skill_frontmatter() {
+        for (actual, pinned) in [
+            ("2.1.0-rc.5", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0", "2.1.0+build.89d52aa8"),
+            ("2.1.0-rc.5+89d52aa8", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0-rc.5", "2.1.0-rc.5"),
+        ] {
+            assert!(skill_version_matches(actual, pinned), "{actual} / {pinned}");
+        }
+    }
+
+    #[test]
+    fn build_label_compatibility_never_relaxes_version_or_existing_build_identity() {
+        for (actual, pinned) in [
+            ("2.1.0-rc.4", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.1-rc.5", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0-rc.5+other", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0-rc.5+89d52aa8", "2.1.0-rc.5"),
+            ("2.1.0-rc.5", "^2.1.0-rc.5+89d52aa8"),
+            ("2.1.0-rc.5", "2.1.0-rc.5+"),
+            ("v2.1.0-rc.5", "v2.1.0-rc.5+89d52aa8"),
+        ] {
+            assert!(
+                !skill_version_matches(actual, pinned),
+                "{actual} / {pinned}"
+            );
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
