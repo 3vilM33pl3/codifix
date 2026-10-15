@@ -20,7 +20,7 @@ loopback port 4250 were restarted. Production services were not changed.
   submission/receipts; corrections/conflicts preserve owner history.
 - [ ] Startup/reconnect/five-minute and post-curation synchronization, local
   writable workflow, normal retrieval/history/agent access and watcher routing.
-- [ ] Homelab company configuration, identity/project assignments and manifests.
+- [x] Homelab company configuration, identity/project assignments and manifests.
 - [ ] Native package with dependencies, guided resumable setup, Keychain and
   LaunchAgents without changing unrelated repositories/settings/services.
 - [ ] Observed MacBook acceptance: login/select/clone/offline search, both sync
@@ -134,7 +134,8 @@ multi-user authentication; scoped local client credentials and existing watchers
 were renewed. See the [company deployment ledger](company-deployment-20261015.md)
 for exact changes, preserved identities and forward-recovery requirements.
 The dev company console remains separate from the live company service. Human
-login, company delegate provisioning and live device grants remain incomplete.
+login, four bounded company delegates, both reviewed manifests and the approved
+Mac device's offline/contribution grants are now verified in the company ledger.
 
 The real ARM64 Mac is now reachable and has the native candidate installed.
 PostgreSQL 17.11, pgvector 0.8.7 and Python 3.14.8 were built and bundled on that
@@ -143,9 +144,7 @@ verified; the user-approved login-Keychain trust verifies Authentik HTTPS.
 See [native evidence and package hashes](native-mac-20261014.md). This is not yet
 the completed company login and two-project synchronization journey.
 
-Next deployment actions are completion of the real Authentik login, exact owner
-delegate configuration, stable human project assignments and the two reviewed project
-manifests, then the exact two-project
-login/clone/offline/search/upload/correction/revoke/reboot acceptance sequence.
+Next deployment actions are the corrected native installer, exact two-project
+selection/clone/offline/search/upload/correction/revoke/reboot acceptance sequence.
 The six-step plan is not complete, and no final plan-verification claim has been
 recorded.
