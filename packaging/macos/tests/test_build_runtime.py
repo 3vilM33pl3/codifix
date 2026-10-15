@@ -9,6 +9,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 MACOS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(MACOS))
@@ -18,6 +19,70 @@ spec.loader.exec_module(producer)
 
 
 class RuntimeProducer(unittest.TestCase):
+    def test_postgres_builds_required_contrib_with_explicit_vendored_static_openssl(self):
+        dependency = Path("/private/build/openssl-static")
+        commands = producer.openssl_commands(dependency, "aarch64", 4)
+        self.assertIn("darwin64-arm64-cc", commands[0])
+        self.assertTrue({"no-shared", "no-module", "no-apps", "no-tests"}.issubset(commands[0]))
+        self.assertEqual(commands[-1], ["make", "install_dev"])
+        prefix = "/usr/local/share/memory-layer/runtime/fixture-v2"
+        stage = Path("/private/build/stage")
+        commands = producer.postgres_commands(prefix, stage, dependency, 4)
+        self.assertIn("--with-ssl=openssl", commands[0])
+        self.assertIn(f"--with-includes={dependency}/include", commands[0])
+        self.assertIn(f"--with-libraries={dependency}/lib", commands[0])
+        for extension in ("pgcrypto", "pg_trgm"):
+            self.assertIn(["make", "-C", f"contrib/{extension}", "-j4"], commands)
+            self.assertIn(["make", "-C", f"contrib/{extension}", "install", f"DESTDIR={stage}"], commands)
+
+    def extension_fixture(self, root):
+        pg = root / "postgres"
+        (pg / "lib").mkdir(parents=True)
+        (pg / "share/extension").mkdir(parents=True)
+        for name in ("pgcrypto", "pg_trgm", "vector"):
+            for file in [pg / f"lib/{name}.dylib", pg / f"share/extension/{name}.control", pg / f"share/extension/{name}--1.0.sql"]:
+                file.write_text("test fixture")
+        return pg
+
+    def test_missing_required_extension_blocks_runtime_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pg = self.extension_fixture(Path(temporary))
+            producer.required_postgres_extensions(pg)
+            for relative in ["lib/pgcrypto.dylib", "share/extension/pg_trgm.control", "share/extension/vector--1.0.sql"]:
+                file = pg / relative
+                file.unlink()
+                with self.subTest(file=relative), self.assertRaisesRegex(ValueError, "required PostgreSQL extension missing"):
+                    producer.required_postgres_extensions(pg)
+                file.write_text("test fixture")
+
+    def test_extension_smoke_uses_disposable_cluster_and_nonsuperuser_then_stops(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            pg = self.extension_fixture(root)
+            probe = root / "probe"
+            probe.mkdir()
+            for fail_query in (False, True):
+                calls = []
+                def command(argv, cwd, env):
+                    calls.append((list(map(str, argv)), cwd, env))
+                    if fail_query and "CREATE EXTENSION pgcrypto" in str(argv):
+                        raise ValueError("synthetic extension failure")
+                with patch.object(producer.tempfile, "TemporaryDirectory") as directory, patch.object(producer, "run", side_effect=command):
+                    directory.return_value.__enter__.return_value = str(probe)
+                    if fail_query:
+                        with self.assertRaisesRegex(ValueError, "synthetic extension failure"):
+                            producer.smoke_postgres_extensions(pg, "0.8.7", {"PATH": "/usr/bin:/bin", "PGHOST": "live-host", "PGOPTIONS": "live-options"})
+                    else:
+                        producer.smoke_postgres_extensions(pg, "0.8.7", {"PATH": "/usr/bin:/bin", "PGHOST": "live-host"})
+                self.assertIn("listen_addresses=''", str(calls[1][0]))
+                self.assertIn("NOSUPERUSER", str(calls[2][0]))
+                self.assertIn("CREATE EXTENSION vector VERSION '0.8.7'", str(calls[4][0]))
+                query = calls[5][0]
+                self.assertEqual(query[query.index("-U") + 1], "memory_runtime_probe")
+                self.assertIn("CREATE EXTENSION pg_trgm", query[-1])
+                self.assertEqual(calls[-1][0][-4:], ["-m", "immediate", "-w", "stop"])
+                self.assertTrue(all("PGHOST" not in env and "PGOPTIONS" not in env for _, _, env in calls))
+
     def test_vector_destdir_is_applied_once(self):
         prefix = "/usr/local/share/memory-layer/runtime/fixture"
         stage = Path("/private/build/stage")
@@ -34,7 +99,10 @@ class RuntimeProducer(unittest.TestCase):
         self.assertEqual(pins["postgres"]["version"], "17.11")
         self.assertEqual(pins["python"]["version"], "3.14.8")
         self.assertEqual(pins["vector"]["version"], "0.8.7")
-        for item in [pins["postgres"], pins["python"], pins["vector"]]:
+        self.assertEqual(pins["openssl"]["version"], "3.5.9")
+        self.assertEqual(pins["openssl"]["sha256"], "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a")
+        self.assertLess(producer.SOURCE_ORDER.index("openssl"), producer.SOURCE_ORDER.index("postgres"))
+        for item in [pins[key] for key in producer.SOURCE_ORDER]:
             self.assertEqual(len(bytes.fromhex(item["sha256"])), 32)
 
     def archive(self, root, name, *, link=False):
