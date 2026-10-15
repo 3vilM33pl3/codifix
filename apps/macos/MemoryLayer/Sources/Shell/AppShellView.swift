@@ -58,7 +58,7 @@ struct AppShellView: View {
                     DestinationContentView(destination: model.selectedDestination, context: context, knowledgeSession: knowledgeSession)
                         .id(model.revision)
                 } else {
-                    ConnectionWelcomeView(state: model.connectionState) {
+                    ConnectionWelcomeView(state: model.connectionState, profile: model.activeProfile) {
                         presentsConnectionSettings = true
                     }
                 }
@@ -182,13 +182,33 @@ struct DestinationContentView: View {
 
 private struct ConnectionWelcomeView: View {
     let state: ConnectionState
+    let profile: ConnectionProfile?
     let onConfigure: () -> Void
 
     var body: some View {
         ContentUnavailableView {
-            Label("Choose a Memory Layer connection", systemImage: "externaldrive.connected.to.line.below")
+            if state == .connecting {
+                ProgressView().controlSize(.large)
+                Text("Connecting to Memory Layer")
+            } else if case .failed = state {
+                Label("Connection unavailable", systemImage: "exclamationmark.icloud")
+            } else {
+                Label("Choose a Memory Layer connection", systemImage: "externaldrive.connected.to.line.below")
+            }
         } description: {
-            Text("Connect to an existing service and project. The app will show the selected service and project before loading its data.")
+            VStack(spacing: 8) {
+                if let profile {
+                    Text("\(profile.projectSlug) · \(profile.baseURL.absoluteString)")
+                        .textSelection(.enabled)
+                }
+                if case let .failed(message) = state {
+                    Text(message)
+                } else if state == .connecting {
+                    Text("Checking the existing service and your access.")
+                } else {
+                    Text("Connect to an existing service and project. The app will show the selected service and project before loading its data.")
+                }
+            }
         } actions: {
             Button("Review connections…", action: onConfigure).buttonStyle(.borderedProminent)
         }

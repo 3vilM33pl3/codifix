@@ -10,6 +10,7 @@ struct ConnectionSettingsView: View {
     @State private var kind: ConnectionKind = .localSession
     @State private var token = ""
     @State private var formError: String?
+    @State private var pendingRemoval: ConnectionProfile?
 
     #if DEBUG
     private static let suggestedURL = "http://127.0.0.1:4250"
@@ -68,7 +69,7 @@ struct ConnectionSettingsView: View {
                                 }
                                     .disabled(model.connectionState == .connecting)
                                 Button(role: .destructive) {
-                                    Task { await model.removeProfile(profile) }
+                                    pendingRemoval = profile
                                 } label: { Image(systemName: "trash") }
                                 .help("Remove saved connection")
                             }
@@ -90,6 +91,18 @@ struct ConnectionSettingsView: View {
             .padding(16)
         }
         .frame(width: 600, height: 600)
+        .alert("Remove saved connection?", isPresented: Binding(
+            get: { pendingRemoval != nil },
+            set: { if !$0 { pendingRemoval = nil } }
+        ), presenting: pendingRemoval) { profile in
+            Button("Remove connection", role: .destructive) {
+                Task { await model.removeProfile(profile) }
+                pendingRemoval = nil
+            }
+            Button("Cancel", role: .cancel) { pendingRemoval = nil }
+        } message: { profile in
+            Text("Remove \(profile.name) and its saved credentials from this Mac? Memories remain on the service.")
+        }
         .onAppear {
             if let profile = model.activeProfile {
                 name = profile.name
