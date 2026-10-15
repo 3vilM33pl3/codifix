@@ -2,7 +2,17 @@ import SwiftUI
 
 @main
 struct MemoryLayerApp: App {
-    @StateObject private var model = AppModel()
+    @StateObject private var model: AppModel
+
+    init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            _model = StateObject(wrappedValue: AppModel(profileStore: UITestProfileStore()))
+            return
+        }
+        #endif
+        _model = StateObject(wrappedValue: AppModel())
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -40,6 +50,15 @@ struct MemoryLayerApp: App {
         }
     }
 }
+
+#if DEBUG
+/// UI tests must not alter the user's saved service connection history.
+private actor UITestProfileStore: ConnectionProfileStore {
+    private var profiles: [ConnectionProfile] = []
+    func load() -> [ConnectionProfile] { profiles }
+    func save(_ profiles: [ConnectionProfile]) { self.profiles = profiles }
+}
+#endif
 
 extension Notification.Name {
     static let showConnectionSettings = Notification.Name("MemoryLayer.showConnectionSettings")
