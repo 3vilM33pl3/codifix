@@ -101,6 +101,15 @@ runtime. Architecture, loader dependencies and exact-prefix relocatability still
 need observed native validation; a producer assertion or hashes cannot prove
 them. The original lightweight package remains available without these options.
 
+Do not install a lightweight package over a bundled-runtime installation. Both
+variants use `com.memory-layer.pkg`; macOS Installer can delete previously
+receipted runtime and `memory-onboard` files omitted from the replacement payload.
+New lightweight packages refuse this replacement in preinstall when either the
+runtime directory or launcher is present, before payload changes. Use a reviewed
+runtime-inclusive package instead, respecting its existing bundle-ID guard.
+Older lightweight packages lack this protection and must not be used for such
+an update. This guard does not implement runtime upgrades or repair missing files.
+
 The bundled `journey` connector joins login, project selection, reviewed workspace
 setup and native provisioning. `journey-agents` adds separately approved
 Codex/OpenAI and Claude/Anthropic Keychain identities and project MCP entries,

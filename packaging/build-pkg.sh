@@ -196,6 +196,7 @@ if [[ "$NOTARIZE" -eq 1 ]]; then
 fi
 for source in "$ROOT_DIR/.codex/config.toml" "$ROOT_DIR/.codex/agents/astra_adviser.toml" \
   "$ROOT_DIR/packaging/macos/postinstall.sh" "$ROOT_DIR/packaging/macos/seed-user.sh" \
+  "$ROOT_DIR/packaging/macos/preinstall-lightweight.sh" \
   "$ROOT_DIR/packaging/macos/onboard.py" "$ROOT_DIR/packaging/macos/onboarding_files.py" \
   "$ROOT_DIR/packaging/macos/onboarding_native.py" "$ROOT_DIR/packaging/macos/onboarding_journey.py" \
   "$ROOT_DIR/packaging/macos/onboarding_agents.py" \
@@ -263,6 +264,8 @@ if [[ -n "$RUNTIME_BUNDLE" ]]; then
   python3 -I -S -B "$ROOT_DIR/packaging/macos/runtime_bundle.py" stage \
     --bundle "$RUNTIME_BUNDLE" --manifest "$RUNTIME_MANIFEST" --arch "$PKG_ARCH" \
     --manifest-sha256 "$RUNTIME_MANIFEST_SHA256" --payload "$PAYLOAD" --scripts "$SCRIPTS"
+else
+  install -m 0755 "$ROOT_DIR/packaging/macos/preinstall-lightweight.sh" "$SCRIPTS/preinstall"
 fi
 install -m 0755 "$BINARY_PATH" "$PAYLOAD/usr/local/bin/memory"
 

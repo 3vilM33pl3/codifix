@@ -43,7 +43,7 @@ class PackageContract(unittest.TestCase):
                           "web/dist", "target/macos-pkg", "target/x86_64-apple-darwin/release"):
             (repo / directory).mkdir(parents=True, exist_ok=True)
         shutil.copy2(BUILDER, repo / "packaging/build-pkg.sh")
-        for name in ("postinstall.sh", "seed-user.sh", "onboard.py", "onboarding_files.py",
+        for name in ("postinstall.sh", "seed-user.sh", "preinstall-lightweight.sh", "onboard.py", "onboarding_files.py",
                      "onboarding_native.py", "onboarding_journey.py", "onboarding_agents.py", "onboarding_first_run.py", "runtime_bundle.py", "operator-README.md"):
             shutil.copy2(MACOS / name, repo / "packaging/macos" / name)
         for name in ("config.toml", "agents/astra_adviser.toml"):
@@ -150,6 +150,7 @@ touch "$output"
         self.assertTrue((staged / "runtime-prerequisites.json").is_file())
         preinstall = Path(self.env["CAPTURE"]) / "scripts/preinstall"
         self.assertIn("Runtime bundle ID already exists", preinstall.read_text())
+        self.assertNotIn("Lightweight package", preinstall.read_text())
         self.assertEqual(list(Path(self.env["TMPDIR"]).iterdir()), [])
         self.assertIn("--locked", trace.read_text())
 
@@ -181,6 +182,41 @@ touch "$output"
         self.assertFalse((capture / "payload/Users").exists())
         self.assertFalse((capture / "payload/var/root").exists())
         self.assertEqual((capture / "scripts/postinstall").read_bytes(), (MACOS / "postinstall.sh").read_bytes())
+        self.assertEqual((capture / "scripts/preinstall").read_bytes(), (MACOS / "preinstall-lightweight.sh").read_bytes())
+        self.assertEqual(stat.S_IMODE((capture / "scripts/preinstall").stat().st_mode), 0o755)
+
+    def test_lightweight_preinstall_refuses_runtime_or_launcher_before_payload_changes(self):
+        # Relocate only fixed installation literals into this test-owned tree;
+        # the production guard has no path/environment bypass.
+        prefix = self.root / "installed"
+        guard = self.root / "preinstall"
+        guard.write_text((MACOS / "preinstall-lightweight.sh").read_text().replace("/usr/local/", str(prefix) + "/"))
+        result = self.run_script(guard, "fixture.pkg", "/", "/")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(prefix.exists())
+        for relative in ["share/memory-layer/runtime", "bin/memory-onboard"]:
+            installed = prefix / relative
+            installed.parent.mkdir(parents=True, exist_ok=True)
+            for kind in ["directory", "file", "dangling_link"]:
+                with self.subTest(path=relative, kind=kind):
+                    if kind == "directory":
+                        installed.mkdir()
+                    elif kind == "file":
+                        installed.write_text("preserved runtime marker")
+                    else:
+                        installed.symlink_to(self.root / "missing-runtime")
+                    before = installed.lstat()
+                    result = self.run_script(guard, "fixture.pkg", "/", "/")
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("cannot replace a bundled-runtime", result.stderr)
+                    self.assertEqual(installed.lstat(), before)
+                    if kind == "directory":
+                        installed.rmdir()
+                    else:
+                        installed.unlink()
+        result = self.run_script(guard, "fixture.pkg", "/", "/Volumes/Other")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("startup volume", result.stderr)
 
     def seed_fixture(self):
         home = self.root / "User With Spaces"
