@@ -18,8 +18,11 @@ function run(args) {
 }
 const label = 'dev.memory-layer.preview-replace.review';
 const oldLabel = 'dev.memory-layer.preview-replace.old-id';
-const rc2 = c => c.retained_name === `${c.name}-before-rc2`;
-const unconfirmedName = c => `${c.name}-unconfirmed-${rc2(c) ? 'rc2' : 'dependable'}`;
+// Both schema-changing upgrades require forward recovery after start intent.
+const rc2 = c => c.retained_name === `${c.name}-before-rc2`
+  || c.retained_name === `${c.name}-before-mac-onboarding-20261015`;
+const unconfirmedName = c => `${c.name}-unconfirmed-${c.retained_name.endsWith('-mac-onboarding-20261015')
+  ? 'mac-onboarding-20261015' : rc2(c) ? 'rc2' : 'dependable'}`;
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const sorted = values => [...values].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 function dir(p) {
@@ -53,7 +56,7 @@ export function artifactHash(p) {
 }
 export function validate(c, checkPaths = true) {
   check(c.schema_version === 1 && hex.test(c.old_id) && names.test(c.name), 'invalid_target');
-  check([`${c.name}-before-dependable`, `${c.name}-before-rc2`].includes(c.retained_name)
+  check([`${c.name}-before-dependable`, `${c.name}-before-rc2`, `${c.name}-before-mac-onboarding-20261015`].includes(c.retained_name)
     && path.isAbsolute(c.directory) && path.basename(c.directory).startsWith('replace-'), 'invalid_recovery_directory');
   check(path.isAbsolute(c.backup_receipt) && hex.test(c.backup_receipt_sha256), 'backup_binding_required');
   check(Array.isArray(c.mounts) && c.mounts.length > 0 && new Set(c.mounts.map(m => m.destination)).size === c.mounts.length, 'invalid_mount_plan');

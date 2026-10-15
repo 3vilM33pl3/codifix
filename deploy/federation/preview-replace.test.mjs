@@ -169,6 +169,17 @@ test('rc2 retained names remain narrowly scoped and bind the exact reviewed cont
   assert.ok(!docker.commands.some(args => args[0] === 'stop'));
 });
 
+test('Mac onboarding replacement has a distinct retained name and forbids post-start rollback', t => {
+  const { c, docker } = fixture(t, 'memory-homelab-preview-app-20260919');
+  c.retained_name = `${c.name}-before-mac-onboarding-20261015`;
+  const review = execute(c, 'review', undefined, docker);
+  execute(c, 'replace', review.review, docker);
+  assert.equal(docker.containers.get(oldId).Name, `/${c.retained_name}`);
+  assert.ok(fs.existsSync(path.join(c.directory, 'start-intent.json')));
+  assert.throws(() => execute(c, 'restore-old', review.review, docker), /post_start_requires_forward_recovery/);
+  assert.throws(() => validate({ ...c, retained_name: `${c.name}-before-mac-onboarding-other` }), /invalid_recovery_directory/);
+});
+
 test('rc2 pre-start recovery uses its own retained namespace', t => {
   const { c, docker } = fixture(t); c.retained_name = `${c.name}-before-rc2`;
   const review = execute(c, 'review', undefined, docker);
