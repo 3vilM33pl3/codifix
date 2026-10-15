@@ -20,6 +20,57 @@ spec.loader.exec_module(producer)
 
 
 class RuntimeProducer(unittest.TestCase):
+    def test_macho_bundle_dependencies_become_relative_before_signing_and_replay(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prefix = "/usr/local/share/memory-layer/runtime/fixture-v3"
+            executable, library = root / "postgres/bin/initdb", root / "postgres/lib/libpq.5.dylib"
+            for file in (executable, library):
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_bytes(b"\xcf\xfa\xed\xfe" + b"fixture")
+            original = prefix + "/postgres/lib/libpq.5.dylib"
+            dependencies = {str(executable): [original, "/usr/lib/libSystem.B.dylib"], str(library): [original]}
+            identities = {str(executable): None, str(library): original}
+            calls = []
+            def output(argv, **kwargs):
+                file = argv[-1]
+                lines = dependencies[file] if argv[1] == "-L" else ([identities[file]] if identities[file] else [])
+                return file + ":\n" + "\n".join("\t" + line for line in lines)
+            def command(argv, cwd, env):
+                argv = list(map(str, argv))
+                calls.append(argv)
+                if argv[0] == "install_name_tool":
+                    if argv[1] == "-change":
+                        dependencies[argv[-1]][0] = argv[3]
+                    else:
+                        identities[argv[-1]] = argv[2]
+                        dependencies[argv[-1]][0] = argv[2]
+            with patch.object(producer.subprocess, "check_output", side_effect=output), patch.object(producer, "run", side_effect=command):
+                producer.audit_and_sign(root, prefix, {})
+                self.assertEqual(calls[0], ["install_name_tool", "-change", original, "@loader_path/../lib/libpq.5.dylib", str(executable)])
+                self.assertEqual(calls[1][:4], ["codesign", "--force", "--sign", "-"])
+                self.assertEqual(calls[3], ["install_name_tool", "-id", "@loader_path/libpq.5.dylib", str(library)])
+                calls.clear()
+                producer.audit_and_sign(root, prefix, {})
+                self.assertFalse(any(call[0] == "install_name_tool" for call in calls))
+
+    def test_macho_external_missing_and_escaping_dependencies_are_never_rewritten(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            executable = root / "bin/program"
+            executable.parent.mkdir(parents=True)
+            executable.write_bytes(b"\xcf\xfa\xed\xfe" + b"fixture")
+            prefix = "/usr/local/share/memory-layer/runtime/fixture-v3"
+            outside = root.parent / "outside.dylib"
+            outside.write_bytes(b"outside")
+            for dependency in ["/opt/homebrew/lib/libcrypto.dylib", prefix + "/missing.dylib", prefix + "/../outside.dylib"]:
+                def output(argv, **kwargs):
+                    return str(executable) + ":\n" + ("\t" + dependency if argv[1] == "-L" else "")
+                with self.subTest(dependency=dependency), patch.object(producer.subprocess, "check_output", side_effect=output), patch.object(producer, "run") as command:
+                    with self.assertRaises(ValueError):
+                        producer.audit_and_sign(root, prefix, {})
+                    command.assert_not_called()
+
     def test_resume_rejects_missing_or_changed_openssl_options_before_build_steps(self):
         with tempfile.TemporaryDirectory() as temporary:
             work = Path(temporary) / "work"

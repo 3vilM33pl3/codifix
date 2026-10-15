@@ -167,6 +167,10 @@ def audit_and_sign(root, prefix, env):
         # tree. Only producer-owned output is signed; final modes follow below.
         file.chmod(file.stat().st_mode & 0o777 | 0o200)
         output = subprocess.check_output(["otool", "-L", str(file)], text=True, env=env)
+        identity_output = subprocess.check_output(["otool", "-D", str(file)], text=True, env=env)
+        identities = identity_output.splitlines()[1:]
+        identity = identities[0].strip() if len(identities) == 1 else None
+        changes = []
         for line in output.splitlines()[1:]:
             dep = line.strip().split(" (", 1)[0]
             if dep.startswith(("/usr/lib/", "/System/Library/")):
@@ -181,6 +185,16 @@ def audit_and_sign(root, prefix, env):
                 raise ValueError(f"unsupported native dependency in {file.name}: {dep}")
             if not target.is_file() or root.resolve() not in target.resolve().parents:
                 raise ValueError(f"native dependency missing from runtime: {dep}")
+            if dep.startswith(prefix + "/"):
+                # Rewrite only a validated dependency inside this exact bundle.
+                # Relative loader paths work both in staging and after install.
+                relative = "@loader_path/" + os.path.relpath(target, file.parent)
+                if dep == identity:
+                    changes.extend(["-id", relative])
+                else:
+                    changes.extend(["-change", dep, relative])
+        if changes:
+            run(["install_name_tool", *changes, file], root, env)
         run(["codesign", "--force", "--sign", "-", file], root, env)
         run(["codesign", "--verify", "--strict", file], root, env)
 
