@@ -241,6 +241,15 @@ inferred from the receipt design. The old executable-bound journals and attempt
 logs are preserved; `onboarding-v3` will use the existing approved device and
 same two projects. No new login or expanded permission is requested.
 
+Olivier installed the application-only update. The installed executable matches
+`0f1950566296b25f138cea3b8285e0b45430fae59814017951ce2a4b4b6c6fdc`,
+and `pkgutil` reports the separate `com.memory-layer.application` receipt at
+`2.1.0-rc.5`. Exhaustive runtime validation passed again for
+`py3148-pg1711-vector087-aarch64-v1`; the application update preserved the runtime.
+The GUI-session `onboarding-v3` continuation is running and waiting for the new
+executable's normal Keychain access. The dev Memory resume endpoint was offline
+at this check; the existing approved plan and local journals remain preserved.
+
 The earlier first-run stopped before project selection/native effects. Its
 executable-bound journal is preserved. The prepared next attempt uses sibling
 state `onboarding-v2` with the existing Keychain device, not a new enrollment.
