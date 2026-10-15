@@ -123,6 +123,16 @@ forward; do not start an old binary against the migrated databases.
 - Dev Memory on port 4250 is offline. Final plan verification/remembering is
   pending; production Memory is not substituted for the dev checkpoint.
 
+Final focused validation: all 145 macOS packaging/operator tests and 59 subtests
+passed; `cargo fmt --check`, `git diff --check` and the boundary script passed.
+The selector repair's two required-database release tests and targeted
+`mem-federation-store` release Clippy passed earlier in this slice. No fresh
+workspace-wide test pass is claimed. Temporary diagnostic LaunchAgents and the
+verification-only SSH forward were stopped; both area services, watchers and
+the two automatic sync workers remain running. A final dev checkpoint attempt
+with `.mem/config.dev.toml` failed with connection refused at port 4250; the
+remaining unchecked acceptance items were not marked complete.
+
 ## Earlier chronological deployment entries
 
 ## Applied changes
