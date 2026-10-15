@@ -44,11 +44,15 @@ upstream archive SHA-256s obtained from the installed Homebrew formula metadata.
 The producer stages files without writing to `/usr/local`, checks native loader
 dependencies and ad-hoc signs nested Mach-O files before hashing.
 
-The first native PostgreSQL configure attempt rejected `--without-ssl`; the
-producer now uses PostgreSQL's default no-TLS configuration. This distribution
-is only for the private loopback cluster. Company HTTPS remains implemented by
-Memory. Package signing/notarization, privileged installation and actual
-database/vector/Keychain/LaunchAgent behavior still need observed verification.
+The first native PostgreSQL configure attempt rejected `--without-ssl`; v1 used
+PostgreSQL's default no-TLS configuration. **That v1 package is incomplete:**
+October 15 native schema initialization exposed missing `pgcrypto` and `pg_trgm`.
+The corrected producer includes pinned OpenSSL for pgcrypto, both contrib
+extensions and an isolated extension test. See the
+[current deployment ledger](company-deployment-20261015.md) for native rebuild
+and acceptance status. The cluster remains private and loopback-only; company
+HTTPS remains implemented by Memory. Package signing/notarization and complete
+native acceptance remain separate from build success.
 
 ## Company deployment preparation
 

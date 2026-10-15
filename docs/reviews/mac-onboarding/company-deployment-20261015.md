@@ -250,6 +250,33 @@ The GUI-session `onboarding-v3` continuation is running and waiting for the new
 executable's normal Keychain access. The dev Memory resume endpoint was offline
 at this check; the existing approved plan and local journals remain preserved.
 
+Keychain approval succeeded. Both repository/tool stages and curated-project
+subscription stages then completed. Homelab's existing checkout was retained
+at `8202e44315ea558f79659c6c47d937919b92eae4`; Memory cloned `main` at
+`f3ecb4074a900c33ae613e5d6639bd5314eb793d`. Both received the reviewed skill
+archive without changing the catalog pin or adding model disclosure grants.
+Subscriptions are `ae6712ec-e1c4-4b8a-9d8c-242ea45d3b8d` (Homelab) and
+`28c51958-e37c-4090-ba7a-099ed31ff680` (Workshop). These are prepared subscriptions,
+not evidence that any knowledge has downloaded.
+
+The first native service failed migration 0001: the runtime omitted
+`pgcrypto.control`; `pg_trgm` was also absent. The service correctly remained
+degraded, so initial synchronization and watchers did not start. Only this
+attempt's Homelab/PostgreSQL LaunchAgents were stopped and their plists preserved
+in `onboarding-v3/paused-launchagents`. Its cluster/journals remain intact.
+Existing installations were not stopped. No new project knowledge was synced.
+
+Producer fix `27d86c9f` adds pinned OpenSSL 3.5.9 and PostgreSQL contrib
+`pgcrypto`/`pg_trgm`, with a disposable non-superuser extension test before
+manifest generation. Initial static OpenSSL linking hit PostgreSQL's libpq
+exit-symbol check. Fix `80b1e85b` uses documented OpenSSL `no-atexit`,
+`no-thread-pool` and `no-quic` options, retaining thread safety and PostgreSQL's
+check. Ten producer tests pass. A fresh `runtime-arm64-v3` build is in progress;
+it must pass native extension and full Memory schema checks before installation.
+Commit `299a90f5` gives new runtime generations separate digest-bound receipts,
+preserving earlier installed runtime files. Neither compilation nor installer
+contract tests alone complete native acceptance.
+
 The earlier first-run stopped before project selection/native effects. Its
 executable-bound journal is preserved. The prepared next attempt uses sibling
 state `onboarding-v2` with the existing Keychain device, not a new enrollment.
