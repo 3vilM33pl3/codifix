@@ -336,6 +336,14 @@ verification has not been bypassed; permission for a bounded same-CA leaf renewa
 has been requested. New root trust would be a separate operation. No successful
 download, bidirectional transfer or reboot acceptance is claimed yet.
 
+Normal CLI routing is now active through a newly created user-owned
+`~/Library/Application Support/memory-layer/area-routing.json` symlink to the
+generated runtime policy; no prior policy or shell settings were overwritten.
+Running `/usr/local/bin/memory health` from each cloned repository reached the
+correct healthy area service. Enrollment/sync commands use their explicit
+profiles before area resolution. Outside these repositories, select `--area
+homelab` or `--area workshop`; absent General is not a fallback destination.
+
 The earlier first-run stopped before project selection/native effects. Its
 executable-bound journal is preserved. The prepared next attempt uses sibling
 state `onboarding-v2` with the existing Keychain device, not a new enrollment.
@@ -351,7 +359,7 @@ tests: 11 passed, including schema-changing upgrade forward-recovery behavior.
   four bounded credentials before their expiry; renewal is not automatic.
 - Complete initial downloads and demonstrate both synchronization directions.
   Project selection, existing Homelab preservation, Memory clone, reviewed skills
-  and local service startup are complete; ordinary client routing needs verification.
+  and local service startup are complete; ordinary client routing is verified.
 - Verify capture/retry behavior beyond service liveness, scoped denial, conflict,
   revocation, reboot and independent Codex/Claude disclosure approvals.
 
