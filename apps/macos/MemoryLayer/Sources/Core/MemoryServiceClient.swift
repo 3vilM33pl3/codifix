@@ -44,7 +44,9 @@ public actor URLSessionTransport: HTTPTransport {
     }
 
     public func send(_ request: URLRequest) async throws -> HTTPReply {
+        try Task.checkCancellation()
         let id = UUID()
+        defer { tasks[id] = nil }
         let reply = try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HTTPReply, Error>) in
                 let task = session.dataTask(with: request) { data, response, error in
@@ -69,7 +71,6 @@ public actor URLSessionTransport: HTTPTransport {
         }, onCancel: {
             Task { await self.cancel(taskID: id) }
         })
-        defer { tasks[id] = nil }
         return reply
     }
 
