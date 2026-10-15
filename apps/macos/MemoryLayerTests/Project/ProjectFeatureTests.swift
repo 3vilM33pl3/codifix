@@ -151,6 +151,31 @@ final class ProjectFeatureTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder.memoryLayer.decode(ProjectOverviewResponse.self, from: Data(malformed.utf8)))
     }
 
+    func testLiveProjectReadSmokeDecodesDevelopmentServiceWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["MEMORY_LAYER_LIVE_READ_SMOKE"] == "1" else {
+            throw XCTSkip("Set MEMORY_LAYER_LIVE_READ_SMOKE=1 to run GET-only smoke against the existing dev service.")
+        }
+        let environment = ProcessInfo.processInfo.environment
+        let baseURL = URL(string: environment["MEMORY_LAYER_LIVE_BASE_URL"] ?? "http://127.0.0.1:4250")!
+        let project = environment["MEMORY_LAYER_LIVE_PROJECT"] ?? "memory"
+        let repoRoot = URL(fileURLWithPath: environment["MEMORY_LAYER_LIVE_REPO_ROOT"] ?? "/Users/olivier/Projects/memory")
+        let profile = ConnectionProfile(name: "Live project read smoke", baseURL: baseURL,
+                                        projectSlug: project, repositoryRoot: repoRoot, kind: .localSession)
+        let client = MemoryServiceClient(profile: profile)
+        let requestContext = RequestContext(profile: profile, revision: 1)
+        let auth = try await client.bootstrapLocalSession(context: requestContext)
+        let service = ProjectService(context: FeatureContext(client: client, profile: profile, auth: auth, revision: 1))
+
+        let overview = try await service.overview()
+        let backends = try await service.embeddingBackends()
+        let inventory = try await service.skills(filter: .all)
+        XCTAssertEqual(overview.project, project)
+        XCTAssertFalse(inventory.skills.isEmpty, "The live read smoke expects at least one installed skill to verify content decoding.")
+        let skill = try await service.skill(name: try XCTUnwrap(inventory.skills.first?.name), filter: .all)
+
+        print("Live Project GET DTO smoke: watchers=\(overview.watchers?.watchers.count ?? 0) backends=\(backends.backends.count) skills=\(inventory.skills.count) skill_content_chars=\(skill.content?.count ?? 0)")
+    }
+
     private func object(_ request: URLRequest, file: StaticString = #filePath, line: UInt = #line) throws -> [String: Any] {
         let body = try XCTUnwrap(request.httpBody, file: file, line: line)
         return try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any], file: file, line: line)

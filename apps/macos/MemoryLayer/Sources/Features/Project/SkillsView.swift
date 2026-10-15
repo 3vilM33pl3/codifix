@@ -36,7 +36,7 @@ public struct SkillsView: View {
     }
 
     public var body: some View {
-        Group {
+        ZStack {
             if !context.permissions.allows(.memoryRead) {
                 ProjectLoadingState(context: context, title: "Access restricted", message: "This identity does not have permission to inspect project skills.", isLoading: false)
             } else if context.profile.repositoryRoot == nil {

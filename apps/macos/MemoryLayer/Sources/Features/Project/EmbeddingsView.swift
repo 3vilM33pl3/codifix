@@ -21,7 +21,7 @@ public struct EmbeddingsView: View {
     }
 
     public var body: some View {
-        Group {
+        ZStack {
             if !context.permissions.allows(.memoryRead) {
                 ProjectLoadingState(context: context, title: "Access restricted", message: "This identity does not have permission to inspect embedding backend status.", isLoading: false)
             } else if response == nil && loading {

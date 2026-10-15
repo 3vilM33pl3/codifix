@@ -11,7 +11,7 @@ public struct WatchersView: View {
     public init(context: FeatureContext) { self.context = context }
 
     public var body: some View {
-        Group {
+        ZStack {
             if !context.permissions.allows(.memoryRead) {
                 ProjectLoadingState(context: context, title: "Access restricted", message: "This identity does not have permission to read watcher status for this project.", isLoading: false)
             } else if overview == nil && loading {
@@ -35,7 +35,8 @@ public struct WatchersView: View {
         let summary = overview.watchers
         let watchers = summary?.watchers ?? []
         let selected = watchers.first(where: { $0.id == selectedWatcherID }) ?? watchers.first
-        return VStack(alignment: .leading, spacing: 14) {
+        return ScrollView(.vertical) {
+          VStack(alignment: .leading, spacing: 14) {
             ProjectPageHeader(title: "Watchers", subtitle: "Repository presence and heartbeat monitoring") {
                 Button("Refresh") { refreshID = UUID() }.disabled(loading)
             }
@@ -60,15 +61,17 @@ public struct WatchersView: View {
                     TableColumn("Health") { watcher in Label(watcher.health.capitalized, systemImage: healthSymbol(watcher.health)).foregroundStyle(healthColor(watcher.health)) }
                     TableColumn("Ownership") { watcher in Text(watcher.managedByService ? "Managed" : "External") }
                 }
-                .frame(minHeight: 150, maxHeight: .infinity)
+                .frame(minHeight: 150, idealHeight: 220, maxHeight: 260)
 
                 if let selected {
                     watcherDetail(selected)
                 }
                 ProjectBanner(title: "Read-only presence", message: "Start and manage watchers through the Memory Layer CLI.", tone: .info)
             }
+          }
+          .padding(16)
+          .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 

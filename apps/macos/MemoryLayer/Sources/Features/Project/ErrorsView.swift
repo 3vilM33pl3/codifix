@@ -27,7 +27,7 @@ public struct ErrorsView: View {
     public init(context: FeatureContext) { self.context = context }
 
     public var body: some View {
-        Group {
+        ZStack {
             if !context.permissions.allows(.memoryRead) {
                 ProjectLoadingState(context: context, title: "Access restricted", message: "This identity does not have permission to inspect project diagnostics.", isLoading: false)
             } else if overview == nil && loading {

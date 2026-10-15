@@ -18,7 +18,7 @@ public struct OverviewView: View {
     public init(context: FeatureContext) { self.context = context }
 
     public var body: some View {
-        Group {
+        ZStack {
             if !context.permissions.allows(.memoryRead) {
                 ProjectLoadingState(context: context, title: "Access restricted", message: "This identity does not have permission to read the project overview.", isLoading: false)
             } else if overview == nil && loading {
