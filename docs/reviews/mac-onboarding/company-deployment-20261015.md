@@ -294,9 +294,47 @@ Runtime manifest SHA-256:
 `e8a19916b51067739d9c68e7a8afebb7819993bee274a5700cabfda56091468a`.
 Olivier installed it. Exhaustive installed v3 runtime verification passed, the
 Memory executable hash is unchanged, and the previous v1 runtime remains intact.
-The same approved Keychain device is resuming in `onboarding-v4`; earlier
-journals and the stopped incomplete v3 cluster are retained. Native migration
-success in the disposable probe does not yet establish actual project sync.
+The attempted `onboarding-v4` workspace replay exposed a managed-skill receipt
+conflict with the already completed `onboarding-v3` workspace. Commit `e66d6598`
+fixes that software behavior (35 focused tests); that new CLI is not installed
+on the Mac. Instead, the supported native-only operator reused the completed v3
+workspace/subscription receipts and current approval checks. No receipts were
+rewritten and no new enrollment was created.
+
+Native request `35db827a-d7f1-44da-a1fe-03ddca461922` now owns the new
+`onboarding-runtime-v3` root and sibling journal. Its plan digest is
+`ff8c49e3fa421016ef5ca11cfc7c4a03948322c176663e970c02ce1c05471a56`.
+Both native databases applied all 84 migrations and both services report
+`status=ok`, `database=up`, version `2.1.0-rc.5`: Homelab on loopback 55440,
+Workshop on loopback 55441. Old stopped clusters/journals remain intact.
+Initial synchronization has not succeeded; synchronization/watcher LaunchAgents
+are deliberately not yet started by the journal.
+
+### Gateway prerequisite repair
+
+The real download reached the owner but failed: its older gateway had no
+`/v1/projects/device-replica/attest` route, and the TLS edge did not allow it.
+The scoped replacement operator upgraded the gateway executable and enabled
+`scoped_delivery`, then added only that exact route to the TLS edge allowlist.
+Existing image IDs, private networks, addresses, credentials, keys, PDS and
+history were retained. No gateway migration ran: schema remains 76, with 23
+accepted records and 23 audit records before and after the replacement.
+New gateway binary SHA-256:
+`06ecf964560724d689b866579ae535ab93e7171bc29f35545585367bb3cd45cc`.
+The gateway and edge predecessors remain stopped and retained, not deleted.
+
+Protected operation evidence and encrypted backups are in
+`~/.local/state/memory-company-onboarding-20261015-71rLGm/replace-gateway`
+and `replace-gateway-edge`. Decryption and plaintext digests match; the database
+dump catalog is readable. This bounded backup is not a whole-company restore
+exercise. Gateway attestation unit test and all 11 replacement-operator tests
+passed. The new route rejects malformed input with 422 rather than 404.
+
+A further live blocker is the existing gateway TLS leaf: it expired on
+2026-10-10. Its unchanged private preview CA expires on 2026-10-19. Certificate
+verification has not been bypassed; permission for a bounded same-CA leaf renewal
+has been requested. New root trust would be a separate operation. No successful
+download, bidirectional transfer or reboot acceptance is claimed yet.
 
 The earlier first-run stopped before project selection/native effects. Its
 executable-bound journal is preserved. The prepared next attempt uses sibling
@@ -311,10 +349,12 @@ tests: 11 passed, including schema-changing upgrade forward-recovery behavior.
 - Keep company transport credentials in the **process environment**; unlike
   OIDC, current company transports do not read the adjacent env file. Renew the
   four bounded credentials before their expiry; renewal is not automatic.
-- Select projects, retain existing Homelab checkout, clone
-  Memory, start local instances and demonstrate both synchronization directions.
+- Complete initial downloads and demonstrate both synchronization directions.
+  Project selection, existing Homelab preservation, Memory clone, reviewed skills
+  and local service startup are complete; ordinary client routing needs verification.
 - Verify capture/retry behavior beyond service liveness, scoped denial, conflict,
   revocation, reboot and independent Codex/Claude disclosure approvals.
 
-General, Trust, gateway/PDS, existing Pi grants and R3 were not upgraded or enabled
-by this owner-only operation. No paid provider was called.
+General, Trust, PDS, existing Pi grants and R3 were not upgraded or enabled.
+The later gateway/edge prerequisite repair is recorded above separately from the
+owner-only operation. No paid provider was called.
