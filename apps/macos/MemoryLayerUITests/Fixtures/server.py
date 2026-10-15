@@ -25,6 +25,7 @@ def fixture(name):
 
 class State:
     scenario = "normal"
+    delay_seconds = 3
     requests = []
     proposals = fixture("proposals")["proposals"]
     approvals = [{"id": "approval-1", "run_id": None, "project": PROJECT,
@@ -81,6 +82,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(State.requests)
         if path == "/__scenario":
             State.scenario = data.get("name", "normal")
+            State.delay_seconds = min(30, max(0, float(data.get("delay_seconds", 3))))
             if data.get("reset"):
                 State.proposals = fixture("proposals")["proposals"]
                 for approval in State.approvals:
@@ -89,8 +91,8 @@ class Handler(BaseHTTPRequestHandler):
                 State.requests = []
             return self.reply({"scenario": State.scenario})
         State.requests.append({"method": self.command, "path": path})
-        if State.scenario == "loading":
-            time.sleep(3)
+        if State.scenario == "loading" and not path.startswith("/v1/auth/") and path != "/healthz":
+            time.sleep(State.delay_seconds)
         if State.scenario in ("failed", "auth", "restricted") and path != "/healthz":
             status = {"failed": 500, "auth": 401, "restricted": 403}[State.scenario]
             return self.reply({"error": {"code": "fixture", "message": "Explicit fixture failure"}}, status)

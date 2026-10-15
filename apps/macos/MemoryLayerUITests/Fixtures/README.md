@@ -21,7 +21,9 @@ intentional dummy recognized only by this fixture server; do not import it into
 a real Memory Layer service. The displayed service token is an invalid dummy.
 
 Use the `__scenario` endpoint to exercise `normal`, `loading`, `empty`,
-`insufficient`, `auth`, `restricted`, and `failed` responses. For example:
+`insufficient`, `auth`, `restricted`, `backend-unavailable`, and `failed`
+responses. The `loading` scenario accepts `delay_seconds` (0–30, default 3) for
+feature requests while leaving authentication responsive. For example:
 
 ```sh
 curl -s http://127.0.0.1:4261/__scenario \

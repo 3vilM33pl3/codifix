@@ -9,6 +9,9 @@ xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
   -derivedDataPath /tmp/memory-layer-macos CODE_SIGNING_ALLOWED=NO build
 ```
 
+See [VALIDATION.md](VALIDATION.md) for the implementation acceptance results and
+the host's automated UI-runner limitation.
+
 The app does not start a service, create a project, or populate a demo database.
 Connection profiles are saved as metadata in UserDefaults; remote tokens are
 stored in Keychain under the profile UUID. Local profiles must point to a
