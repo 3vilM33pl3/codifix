@@ -103,6 +103,30 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply({"authenticated": True}, headers=[
                 ("Set-Cookie", "memory_session=fixture-session; Path=/; HttpOnly; SameSite=Lax"),
                 ("Set-Cookie", "memory_csrf=fixture-csrf; Path=/; SameSite=Lax")])
+        if path == "/v1/agents":
+            return self.reply({"collected_at": STAMP, "sessions": [{"session_id": "fixture-agent", "status": "working"}],
+                               "orphan_ports": [], "rate_limits": []})
+        if path == "/v1/config/llm-audit":
+            return self.reply({"enabled": False, "redacted": True, "profile": "Fixture", "max_message_chars": 8000, "max_total_chars": 32000})
+        if path.endswith("/activities"):
+            return self.reply(fixture("activity"))
+        if path.endswith("/up-to-speed"):
+            return self.reply(fixture("briefing"))
+        if path.endswith("/resume"):
+            return self.reply(fixture("resume"))
+        if path.endswith("/overview"):
+            return self.reply(fixture("overview"))
+        if path == "/v1/skills":
+            return self.reply(fixture("skills"))
+        if path.startswith("/v1/skills/"):
+            return self.reply(fixture("skill"))
+        if path == "/v1/embeddings/backends":
+            result = fixture("backends")
+            if State.scenario == "backend-unavailable":
+                result["backends"][0]["ready"] = False
+                result["backends"][0]["active"] = False
+                result["active"] = None
+            return self.reply(result)
         if path.endswith("/memories"):
             result = fixture("list")
             if State.scenario == "empty":

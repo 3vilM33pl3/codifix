@@ -1,0 +1,81 @@
+{
+  "project": "synthetic-project",
+  "service_status": "connected",
+  "database_status": "healthy",
+  "memory_entries_total": 4,
+  "active_memories": 3,
+  "archived_memories": 1,
+  "raw_captures_total": 6,
+  "uncurated_raw_captures": 2,
+  "tasks_total": 5,
+  "sessions_total": 4,
+  "curation_runs_total": 3,
+  "recent_memories_7d": 2,
+  "recent_captures_7d": 3,
+  "high_confidence_memories": 2,
+  "medium_confidence_memories": 1,
+  "low_confidence_memories": 1,
+  "last_memory_at": "2026-10-14T09:00:00Z",
+  "last_capture_at": null,
+  "last_curation_at": null,
+  "oldest_uncurated_capture_age_hours": 3,
+  "embedding_chunks_total": 10,
+  "fresh_embedding_chunks": 5,
+  "stale_embedding_chunks": 1,
+  "missing_embedding_chunks": 5,
+  "embedding_spaces_total": 2,
+  "active_embedding_provider": "local",
+  "active_embedding_model": "test-v1",
+  "memory_type_breakdown": [
+    {
+      "memory_type": "architecture",
+      "count": 2
+    }
+  ],
+  "source_kind_breakdown": [
+    {
+      "source_kind": "file",
+      "count": 2
+    }
+  ],
+  "top_tags": [
+    {
+      "name": "swift",
+      "count": 2
+    }
+  ],
+  "top_files": [
+    {
+      "name": "Sources/App.swift",
+      "count": 2
+    }
+  ],
+  "pending_replacement_proposals": 1,
+  "automation": null,
+  "watchers": {
+    "active_count": 1,
+    "unhealthy_count": 0,
+    "stale_after_seconds": 60,
+    "last_heartbeat_at": "2026-10-14T09:00:00Z",
+    "watchers": [
+      {
+        "watcher_id": "watcher-1",
+        "project": "synthetic-project",
+        "repo_root": "/synthetic/repo",
+        "hostname": "MacBook",
+        "host_service_id": "workshop",
+        "pid": 48120,
+        "mode": "auto",
+        "managed_by_service": true,
+        "health": "healthy",
+        "started_at": "2026-10-14T08:00:00Z",
+        "last_heartbeat_at": "2026-10-14T09:00:00Z",
+        "agent_cli": "codex",
+        "agent_session_id": "session-1",
+        "agent_pid": 48121,
+        "last_restart_attempt_at": null,
+        "restart_attempt_count": 0
+      }
+    ]
+  }
+}
