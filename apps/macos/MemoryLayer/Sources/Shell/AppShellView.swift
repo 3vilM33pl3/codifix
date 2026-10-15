@@ -5,7 +5,11 @@ struct AppShellView: View {
     @State private var presentsConnectionSettings = false
 
     private var destinationsByGroup: [(MemoryFeatureGroup, [AppDestination])] {
-        MemoryFeatureGroup.allCases.map { group in (group, AppDestination.allCases.filter { $0.group == group }) }
+        MemoryFeatureGroup.allCases.map { group in
+            (group, AppDestination.allCases.filter {
+                $0.group == group && ($0 != .access || model.featureContext?.permissions.canAdministerAccess == true)
+            })
+        }
     }
 
     var body: some View {
@@ -22,6 +26,21 @@ struct AppShellView: View {
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 175, ideal: 205, max: 260)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Memory Layer").font(.headline)
+                    Text(model.activeProfile?.projectSlug ?? "Choose a project")
+                        .font(.callout).foregroundStyle(.secondary)
+                    if let profile = model.activeProfile {
+                        Text(profile.baseURL.absoluteString)
+                            .font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(2).textSelection(.enabled)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .background(.bar)
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Button { presentsConnectionSettings = true } label: {
                     Label("Connection settings", systemImage: "slider.horizontal.3")
@@ -81,7 +100,21 @@ struct AppShellView: View {
             presentsConnectionSettings = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .selectDestination)) { notification in
-            if let destination = notification.object as? AppDestination { model.selectedDestination = destination }
+            if let destination = notification.object as? AppDestination,
+               destination != .access || model.featureContext?.permissions.canAdministerAccess == true {
+                model.selectedDestination = destination
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshMemoryLayer)) { _ in
+            Task { await reloadIdentity() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleMemoryInspector)) { _ in
+            model.isInspectorPresented.toggle()
+        }
+        .onChange(of: model.featureContext?.permissions.canAdministerAccess) { _, allowed in
+            if allowed != true && model.selectedDestination == .access {
+                model.selectedDestination = .memories
+            }
         }
         .alert("Memory Layer", isPresented: Binding(
             get: { model.alertMessage != nil },
