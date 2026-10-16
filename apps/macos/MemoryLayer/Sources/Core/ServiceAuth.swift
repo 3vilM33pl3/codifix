@@ -180,8 +180,11 @@ public struct EffectivePermissions: Sendable, Equatable {
     }
 
     public func allows(_ permission: MemoryPermission) -> Bool { allowed.contains(permission) }
+    public var canViewAccess: Bool {
+        globalAdministrator && globalAllowed.contains(.authManage)
+    }
     public var canAdministerAccess: Bool {
-        !readOnly && globalAdministrator && globalAllowed.contains(.authManage)
+        !readOnly && canViewAccess
     }
 
     private static func mapPermissions(_ values: [String]) -> Set<MemoryPermission> {

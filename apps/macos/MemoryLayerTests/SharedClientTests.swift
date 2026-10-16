@@ -41,7 +41,17 @@ final class SharedClientTests: XCTestCase {
     func testProjectAdminIsNotGlobalAccessAdministrator() throws {
         let json = #"{"authenticated":true,"mode":"multi_user","read_only":false,"principal":{"id":"p-1","kind":"service_token","display_name":"Robot","groups":[],"projects":[{"project":"alpha","role":"admin","permissions":["auth_manage"],"source":"membership"}]}}"#
         let auth = try JSONDecoder.memoryLayer.decode(AuthMeResponse.self, from: Data(json.utf8))
-        XCTAssertFalse(EffectivePermissions(auth: auth, projectSlug: "alpha").canAdministerAccess)
+        let permissions = EffectivePermissions(auth: auth, projectSlug: "alpha")
+        XCTAssertFalse(permissions.canViewAccess)
+        XCTAssertFalse(permissions.canAdministerAccess)
+    }
+
+    func testReadOnlyGlobalAdministratorCanViewAccessButCannotAdministerIt() throws {
+        let json = #"{"authenticated":true,"mode":"multi_user","read_only":true,"principal":{"id":"p-1","kind":"human_oidc","display_name":"Admin","groups":[],"global_role":"admin"}}"#
+        let auth = try JSONDecoder.memoryLayer.decode(AuthMeResponse.self, from: Data(json.utf8))
+        let permissions = EffectivePermissions(auth: auth, projectSlug: "alpha")
+        XCTAssertTrue(permissions.canViewAccess)
+        XCTAssertFalse(permissions.canAdministerAccess)
     }
 
     func testExplicitEmptyPermissionsDenyInsteadOfApplyingRolePreset() throws {

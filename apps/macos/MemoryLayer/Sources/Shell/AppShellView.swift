@@ -8,7 +8,7 @@ struct AppShellView: View {
     private var destinationsByGroup: [(MemoryFeatureGroup, [AppDestination])] {
         MemoryFeatureGroup.allCases.map { group in
             (group, AppDestination.allCases.filter {
-                $0.group == group && ($0 != .access || model.featureContext?.permissions.canAdministerAccess == true)
+                $0.group == group && ($0 != .access || model.featureContext?.permissions.canViewAccess == true)
             })
         }
     }
@@ -109,7 +109,7 @@ struct AppShellView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .selectDestination)) { notification in
             if let destination = notification.object as? AppDestination,
-               destination != .access || model.featureContext?.permissions.canAdministerAccess == true {
+               destination != .access || model.featureContext?.permissions.canViewAccess == true {
                 model.selectedDestination = destination
             }
         }
@@ -119,7 +119,7 @@ struct AppShellView: View {
         .onReceive(NotificationCenter.default.publisher(for: .toggleMemoryInspector)) { _ in
             model.isInspectorPresented.toggle()
         }
-        .onChange(of: model.featureContext?.permissions.canAdministerAccess) { _, allowed in
+        .onChange(of: model.featureContext?.permissions.canViewAccess) { _, allowed in
             if allowed != true && model.selectedDestination == .access {
                 model.selectedDestination = .memories
             }
