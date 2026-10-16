@@ -497,8 +497,16 @@ fn information(file: &File, directory: bool) -> io::Result<Identity> {
 fn open(path: &Path, directory: bool, private: bool) -> io::Result<File> {
     let file = OpenOptions::new()
         .read(true)
-        .access_mode(GENERIC_READ | READ_CONTROL)
-        .share_mode(FILE_SHARE_READ)
+        // Directory pins need identity/security metadata, not directory data.
+        // Windows opens a rename destination directory for child insertion;
+        // allow that write open without allowing the pinned directory itself
+        // to be renamed/deleted. Protected file readers remain restrictive.
+        .access_mode(if directory {
+            READ_CONTROL | FILE_READ_ATTRIBUTES
+        } else {
+            GENERIC_READ | READ_CONTROL
+        })
+        .share_mode(FILE_SHARE_READ | if directory { FILE_SHARE_WRITE } else { 0 })
         .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
         .open(path)?;
     information(&file, directory)?;
@@ -961,6 +969,10 @@ mod tests {
         create_private_directory(&private.join("target")).unwrap();
         let source = Directory::open(&private.join("stage")).unwrap();
         let target = Directory::open(&private.join("target")).unwrap();
+        // Destination-directory write sharing is needed for child insertion,
+        // not replacement of the verified directory or its parent chain.
+        assert!(std::fs::rename(private.join("target"), private.join("moved-target")).is_err());
+        assert!(std::fs::rename(&private, root.path().join("moved-private")).is_err());
         let mut file = source.create("after").unwrap();
         file.write_all(b"after").unwrap();
         file.sync_all().unwrap();
@@ -974,6 +986,19 @@ mod tests {
         file.sync_all().unwrap();
         drop(file);
         let before = Input::open(&private.join("target/settings"), 6).unwrap();
+        assert!(
+            OpenOptions::new()
+                .write(true)
+                .open(private.join("target/settings"))
+                .is_err()
+        );
+        assert!(
+            std::fs::rename(
+                private.join("target/settings"),
+                private.join("target/moved-settings")
+            )
+            .is_err()
+        );
         assert!(
             publish_reviewed_settings(
                 &source,
