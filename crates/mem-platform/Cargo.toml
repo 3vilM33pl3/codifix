@@ -5,6 +5,14 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[features]
+windows-native-tests = []
+
+[[bin]]
+name = "memory-windows-isolation-probe"
+path = "src/bin/memory-windows-isolation-probe.rs"
+required-features = ["windows-native-tests"]
+
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true
@@ -15,7 +23,7 @@ sysinfo.workspace = true
 mem-platform-files = { path = "../mem-platform-files" }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_Services"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_Services", "Win32_System_SystemInformation", "Win32_System_Pipes"] }
 
 [lints]
 workspace = true
