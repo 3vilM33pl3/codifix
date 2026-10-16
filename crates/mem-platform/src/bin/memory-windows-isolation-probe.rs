@@ -90,7 +90,9 @@ mod native {
             "unlisted inheritable handle leaked"
         );
         let unreviewed = scratch.join("unreviewed.exe");
-        std::fs::copy(std::env::current_exe()?, &unreviewed)?;
+        // Create a new scratch file rather than CopyFile, which may copy source
+        // security metadata and would test a different inheritance path.
+        std::fs::write(&unreviewed, std::fs::read(std::env::current_exe()?)?)?;
         ensure!(
             Command::new(&unreviewed)
                 .arg("--unexpected-third")
