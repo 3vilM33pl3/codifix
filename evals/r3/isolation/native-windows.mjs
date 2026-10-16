@@ -13,6 +13,13 @@ const hex = value => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
 const cap = 1024 * 1024;
 const profileKeys = 'schema_version,helper,io_root,node,guest,toolchains,search_path,library_path';
 
+export function nativeCommandExitCode(code) {
+  if (!Number.isSafeInteger(code) || code < -0x80000000 || code > 0xffffffff) throw Error('invalid native command exit status');
+  const unsigned = code >>> 0;
+  if (unsigned === 0xc0000135 || unsigned === 0xc0000142) throw Error('native toolchain loader failure invalidates execution');
+  return unsigned;
+}
+
 function canonical(value) {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
   if (plain(value)) return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';
@@ -170,9 +177,9 @@ export function createNativeWindowsExecutor({ fileSystem = fs, invoke = invokeHe
     try { result = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(artifacts.get('stdout'))); }
     catch { throw Error('invalid native guest result'); }
     if (!keys(result, 'version,exitCode,stdout,stderr') || result.version !== 1
-        || !Number.isSafeInteger(result.exitCode) || result.exitCode < 0 || result.exitCode > 0xffffffff
         || typeof result.stdout !== 'string' || typeof result.stderr !== 'string'
         || Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr) > cap) throw Error('invalid native command result');
+    result.exitCode = nativeCommandExitCode(result.exitCode);
     return { ...result, files: output, elapsedMs: performance.now() - started,
       execution: { kind: 'windows-native-v1', profile_sha256: execution.profile_sha256,
         descriptor_sha256: hash(bytes), receipt_sha256: hash(JSON.stringify(receipt)), disk_hard_limit_enforced: false },

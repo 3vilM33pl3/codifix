@@ -4,12 +4,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { createNativeWindowsExecutor, nativeProfileHash, validateNativeInput } from './native-windows.mjs';
+import { createNativeWindowsExecutor, nativeCommandExitCode, nativeProfileHash, validateNativeInput } from './native-windows.mjs';
 import { createExecutionRunner, validateExecutionInput } from './execution.mjs';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const id = '12345678-1234-4234-8234-123456789abc';
 
-function fixture({ prepare, receipt: mutateReceipt, artifact: mutateArtifact } = {}) {
+function fixture({ prepare, receipt: mutateReceipt, artifact: mutateArtifact, commandExitCode = 0 } = {}) {
   const storage = new Map();
   const code = (name, text) => { storage.set(name, Buffer.from(text)); return { path: name, sha256: sha(text) }; };
   const helper = code('C:\\private\\helper.exe', 'fake trusted helper');
@@ -50,7 +50,7 @@ function fixture({ prepare, receipt: mutateReceipt, artifact: mutateArtifact } =
     const request = JSON.parse(stdin);
     assert.equal(request.files['src/main.rs'], 'selected source');
     assert.deepEqual(Object.keys(request).sort(), ['argv','files','timeoutMs','version']);
-    const output = Buffer.from(JSON.stringify({ version: 1, exitCode: 0, stdout: 'native synthetic result\n', stderr: '' }));
+    const output = Buffer.from(JSON.stringify({ version: 1, exitCode: commandExitCode, stdout: 'native synthetic result\n', stderr: '' }));
     const artifacts = [];
     for (const [source, file, bytes] of [['stdout','stdout.bin',output], ['stderr','stderr.bin',Buffer.alloc(0)],
       ['src/main.rs','export-000.bin',Buffer.from('edited source')]]) {
@@ -141,4 +141,21 @@ test('non-Windows host never falls back to Docker or claims native evidence', as
   const value = fixture();
   const run = createNativeWindowsExecutor({ platform: 'linux', invoke: async () => { throw Error('must not run'); } });
   await assert.rejects(run(value.options), /explicit Windows host/);
+});
+
+test('loader NTSTATUS exits invalidate fake native results in signed and unsigned form', async () => {
+  for (const status of [0xc0000135, 0xc0000142]) {
+    for (const code of [status, status | 0]) {
+      assert.throws(() => nativeCommandExitCode(code), /loader failure/);
+      const value = fixture({ commandExitCode: code });
+      await assert.rejects(value.run(value.options), /loader failure invalidates execution/);
+    }
+  }
+  // Compiler/test failures and submitted-program crashes remain ordinary
+  // negative outcomes; only known infrastructure loader failures are excluded.
+  for (const code of [1, 65, 66, 101, 0xc0000005, 0xc0000005 | 0]) {
+    const value = fixture({ commandExitCode: code });
+    assert.equal((await value.run(value.options)).exitCode, code >>> 0);
+  }
+  for (const code of [null, -0x80000001, 0x100000000, 1.5]) assert.throws(() => nativeCommandExitCode(code));
 });

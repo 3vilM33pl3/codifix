@@ -40,7 +40,20 @@ const exitCode = await new Promise((resolve, reject) => {
     // DLLs or access failures invalidate execution, not the submitted answer.
     reject(Error('native command startup failed'));
   });
-  child.on('close', code => { clearTimeout(timer); Number.isInteger(code) ? resolve(code) : reject(Error('native command exit unavailable')); });
+  child.on('close', code => {
+    clearTimeout(timer);
+    if (!Number.isInteger(code) || code < -0x80000000 || code > 0xffffffff) {
+      reject(Error('native command exit unavailable')); return;
+    }
+    const unsigned = code >>> 0;
+    // CreateProcess can succeed before loader failure. These statuses mean
+    // missing DLL / DLL initialization failure, not a failed benchmark answer.
+    // Mirror the trusted-host check: a guest result is never grading authority.
+    if (unsigned === 0xc0000135 || unsigned === 0xc0000142) {
+      reject(Error('native toolchain loader failure invalidates execution')); return;
+    }
+    resolve(unsigned);
+  });
 });
 // The host helper reaps the whole Job before exporting selected regular files.
 process.stdout.write(JSON.stringify({ version: 1, exitCode,
