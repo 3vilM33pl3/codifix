@@ -49,7 +49,10 @@ try {
     $junction = Join-Path $outer 'junction'
     $null = New-Item -ItemType Junction -Path $junction -Target $release
     Assert-Rejected { $bad = [MemoryLayer.ProtectedRelease]::Open($junction); $bad.Dispose() } 'Reparse-point release accepted'
-    Remove-Item -LiteralPath $junction -Force
+    # Windows PowerShell 5.1 treats a nonempty junction like a directory and
+    # prompts even with -Force. Delete only the junction entry, never its tree.
+    [IO.Directory]::Delete($junction)
+    if (-not [IO.File]::Exists($file)) { throw 'Removing the junction affected its target' }
     Write-Output 'Native immutable-release ACL, hardlink, reparse and held-handle tests passed'
 } finally {
     if ($guard) { $guard.Dispose() }
