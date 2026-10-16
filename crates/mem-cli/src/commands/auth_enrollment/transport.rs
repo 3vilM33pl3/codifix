@@ -225,7 +225,23 @@ pub(super) fn open_browser(url: &str) -> Result<()> {
         }
         Ok(())
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::Shell::ShellExecuteW;
+        let open: Vec<u16> = "open".encode_utf16().chain([0]).collect();
+        let url: Vec<u16> = url.encode_utf16().chain([0]).collect();
+        // SAFETY: validated company approval URL; no shell interpolation,
+        // credentials, executable selection or inherited application handles.
+        let result = unsafe {
+            ShellExecuteW(std::ptr::null_mut(), open.as_ptr(), url.as_ptr(),
+                std::ptr::null(), std::ptr::null(), 1)
+        };
+        if result as isize <= 32 {
+            bail!("browser could not open; use the printed public approval URL");
+        }
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = url;
         bail!("automatic browser launch is supported only on macOS; use --no-browser")

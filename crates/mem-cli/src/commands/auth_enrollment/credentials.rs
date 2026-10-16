@@ -12,6 +12,9 @@ pub(super) trait CredentialStore {
 }
 
 pub(super) struct NativeKeychain;
+#[cfg(windows)]
+#[path = "windows_credentials.rs"]
+mod windows;
 #[cfg(target_os = "macos")]
 impl CredentialStore for NativeKeychain {
     fn get(&self, service: &str, account: &str) -> Result<Option<Vec<u8>>> {
@@ -38,7 +41,7 @@ impl CredentialStore for NativeKeychain {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 impl CredentialStore for NativeKeychain {
     fn get(&self, _: &str, _: &str) -> Result<Option<Vec<u8>>> {
         bail!(

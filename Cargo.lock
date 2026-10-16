@@ -2915,6 +2915,7 @@ dependencies = [
  "tokio-tungstenite 0.24.0",
  "toml 0.8.23",
  "uuid",
+ "windows-sys 0.61.2",
  "zip 2.4.2",
 ]
 

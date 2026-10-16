@@ -488,7 +488,7 @@ fn public_approval_url_never_accepts_secrets_or_another_origin() {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 #[test]
 fn unsupported_native_store_fails_without_a_plaintext_fallback() {
     assert!(
