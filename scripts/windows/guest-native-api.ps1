@@ -33,7 +33,7 @@ foreach ($artifact in $manifest.artifacts) {
         throw 'Native API executable differs from its reviewed digest'
     }
 }
-$receipt = [ordered]@{format='memory-windows-native-api-result-v1';operation_id=$OperationId.ToString();manifest_sha256=(Get-FileHash $manifestPath).Hash.ToLowerInvariant();state='running';tests=@();execution_verified=$false}
+$receipt = [ordered]@{format='memory-windows-native-api-result-v1';operation_id=$OperationId.ToString();manifest_sha256=(Get-FileHash $manifestPath).Hash.ToLowerInvariant();state='running';tests=@();failed_filters=@();execution_verified=$false}
 function Save-Result {
     $partial = Join-Path $root 'result.partial.json'
     $target = Join-Path $root 'result.json'
@@ -72,7 +72,8 @@ try {
         $exe = Join-Path $inputs $artifact.file
         if ($artifact.kind -eq 'isolation-probe') {
             # Synthetic loopback denial probe only; no provider/service traffic.
-            $null = Invoke-Bounded $exe @() 'isolation-probe' 120
+            try { $null = Invoke-Bounded $exe @() 'isolation-probe' 120 }
+            catch { $receipt.failed_filters += 'isolation-probe'; Save-Result }
             continue
         }
         $filters = switch ($artifact.kind) {
@@ -85,17 +86,26 @@ try {
         $index = 0
         foreach ($filter in $filters) {
             $label = $artifact.kind + '-' + $index
-            $listed = Invoke-Bounded $exe @($filter,'--list') ($label + '-list') 30
-            if (-not ($listed -split '\r?\n' | Where-Object { $_ -match ': test$' })) {
-                throw 'Native API filter selected zero tests'
-            }
-            $output = Invoke-Bounded $exe @($filter,'--test-threads=1') $label 120
-            if ($output -notmatch 'test result: ok\. ([1-9][0-9]*) passed; 0 failed;') {
-                throw 'Native API filter did not report positive passing test counts'
+            try {
+                $listed = Invoke-Bounded $exe @($filter,'--list') ($label + '-list') 30
+                if (-not ($listed -split '\r?\n' | Where-Object { $_ -match ': test$' })) {
+                    throw 'Native API filter selected zero tests'
+                }
+                $output = Invoke-Bounded $exe @($filter,'--test-threads=1') $label 120
+                if ($output -notmatch 'test result: ok\. ([1-9][0-9]*) passed; 0 failed;') {
+                    throw 'Native API filter did not report positive passing test counts'
+                }
+            } catch {
+                # Each filter uses independent synthetic fixtures. Retain its
+                # failure and continue diagnostics, never turn it into a pass
+                # or suppress the mandatory probe. No automatic retries.
+                $receipt.failed_filters += $label
+                Save-Result
             }
             $index++
         }
     }
+    if ($receipt.failed_filters.Count) { throw 'Native API suite has failed filters; inspect retained results' }
     $receipt.state = 'succeeded'
     $receipt.execution_verified = $true
 } catch {

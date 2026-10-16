@@ -55,6 +55,11 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertNotIn('Invoke-Expression', script)
         self.assertNotIn('[string]$Command', script)
         self.assertIn("'zz-isolation'", script)
+        self.assertIn("failed_filters=@()", script)
+        self.assertIn("$receipt.failed_filters += $label", script)
+        self.assertIn("$receipt.failed_filters += 'isolation-probe'", script)
+        self.assertLess(script.index('if ($receipt.failed_filters.Count)'),
+                        script.index('$receipt.execution_verified = $true'))
 
     def test_bootstrap_prepares_ssh_state_before_writing_keys(self):
         script = (Path(__file__).parent / 'guest-bootstrap.ps1').read_text()
