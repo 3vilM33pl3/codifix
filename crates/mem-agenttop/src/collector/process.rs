@@ -212,6 +212,11 @@ fn command_tokens(command: &str, limit: usize) -> Vec<&str> {
 }
 
 pub fn collect_git_stats(cwd: &str) -> (u32, u32) {
+    // Informational unmapped desktop rows have no repository. `git -C ""`
+    // otherwise runs in this monitor's own cwd and misattributes its changes.
+    if cwd.trim().is_empty() {
+        return (0, 0);
+    }
     let output = Command::new("git")
         .args(["-C", cwd, "status", "--porcelain"])
         .output()

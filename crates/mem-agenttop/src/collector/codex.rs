@@ -11,6 +11,8 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 #[cfg(target_os = "macos")]
 use std::process::Command;
+#[cfg(any(windows, test))]
+mod windows;
 
 /// Collector for OpenAI Codex CLI sessions.
 ///
@@ -50,6 +52,7 @@ impl CodexCollector {
     fn collect_sessions(&mut self, shared: &super::SharedProcessData) -> Vec<AgentSession> {
         if !self.sessions_dir.exists() {
             self.last_rate_limit = None;
+            #[cfg(not(windows))]
             return vec![];
         }
 
@@ -103,6 +106,52 @@ impl CodexCollector {
                 &shared.ports,
             ) {
                 sessions.push(session);
+            }
+        }
+
+        #[cfg(windows)]
+        {
+            let desktop_pids: Vec<_> = shared
+                .process_info
+                .iter()
+                .filter(|(_, info)| is_desktop_host(info))
+                .map(|(pid, _)| *pid)
+                .collect();
+            let mut observed = windows::observed_rollouts(&desktop_pids, &self.sessions_dir);
+            for pid in desktop_pids {
+                let Some((started_at, _)) = read_proc_started_at(pid) else {
+                    continue;
+                };
+                let paths = observed.remove(&pid).unwrap_or_default();
+                let mut found = false;
+                for path in paths {
+                    if let Some((mut session, rl)) = self.load_session_with_rate_limit(
+                        Some(pid),
+                        false,
+                        &path,
+                        &shared.process_info,
+                        &shared.children_map,
+                        &shared.ports,
+                    ) {
+                        session
+                            .current_tasks
+                            .insert(0, "Desktop: observed file use (bounded discovery)".into());
+                        if let Some(rl) = rl
+                            && self
+                                .last_rate_limit
+                                .as_ref()
+                                .is_none_or(|old| rl.updated_at > old.updated_at)
+                        {
+                            self.last_rate_limit = Some(rl);
+                        }
+                        seen_jsonl.insert(path);
+                        sessions.push(session);
+                        found = true;
+                    }
+                }
+                if !found && let Some(info) = shared.process_info.get(&pid) {
+                    sessions.push(unmapped_desktop(info, started_at));
+                }
             }
         }
 
@@ -456,12 +505,16 @@ impl CodexCollector {
         map
     }
 
-    /// Windows does not expose per-process open files without extra privileges.
-    /// The caller falls back to a PID/start-time session until rollout metadata
-    /// can be correlated normally.
+    /// Use observed resource ownership, never latest-history inference.
     #[cfg(target_os = "windows")]
-    fn map_pid_to_jsonl(_pids: &[u32]) -> HashMap<u32, PathBuf> {
-        HashMap::new()
+    fn map_pid_to_jsonl(pids: &[u32]) -> HashMap<u32, PathBuf> {
+        let root = mem_platform::user_home_dir()
+            .unwrap_or_default()
+            .join(".codex/sessions");
+        windows::observed_rollouts(pids, &root)
+            .into_iter()
+            .filter_map(|(pid, paths)| paths.into_iter().next().map(|path| (pid, path)))
+            .collect()
     }
 }
 
@@ -529,27 +582,74 @@ pub fn collect_lightweight_sessions(
         }
     }
 
-    // Codex Desktop exposes a long-lived `codex.exe app-server` process rather
-    // than a per-session CLI process. Windows has no unprivileged `lsof`
-    // equivalent, so correlate that host with the most recently updated rollout
-    // file. Use the host's start time for ownership checks: managed watchers
-    // should live for as long as the Desktop app-server that owns the session.
+    // Desktop can own multiple projects. Restart Manager must observe each
+    // resource held by that exact process generation; history recency is not
+    // evidence of ownership. Permission/query failures deliberately map none.
     #[cfg(target_os = "windows")]
-    if sessions.is_empty()
-        && let Some((pid, _)) = process_info.iter().find(|(_, info)| {
-            process::cmd_has_binary(&info.command, "codex") && info.command.contains("app-server")
-        })
-        && let Some(jsonl_path) = latest_rollout_file(&sessions_dir)
-        && let Some(mut session) = parse_codex_jsonl_lightweight(&jsonl_path)
     {
-        session.pid = *pid;
-        if let Some((started_at, _)) = read_proc_started_at(*pid) {
-            session.started_at = started_at;
+        let desktop_pids: Vec<_> = process_info
+            .iter()
+            .filter(|(_, info)| is_desktop_host(info))
+            .map(|(pid, _)| *pid)
+            .collect();
+        for (pid, paths) in windows::observed_rollouts(&desktop_pids, &sessions_dir) {
+            let Some((started_at, _)) = read_proc_started_at(pid) else {
+                continue;
+            };
+            for path in paths {
+                if let Some(mut session) = parse_codex_jsonl_lightweight(&path) {
+                    session.pid = pid;
+                    session.started_at = started_at;
+                    sessions.push(session);
+                }
+            }
         }
-        sessions.push(session);
     }
 
     sessions
+}
+
+#[cfg(any(windows, test))]
+fn is_desktop_host(info: &ProcInfo) -> bool {
+    process::cmd_has_binary(&info.command, "codex") && info.command.contains("app-server")
+}
+
+/// An observed host is not an observed repository. Empty cwd deliberately
+/// prevents this informational row from launching a project watcher.
+#[cfg(any(windows, test))]
+fn unmapped_desktop(info: &ProcInfo, started_at: u64) -> AgentSession {
+    AgentSession {
+        agent_cli: "codex",
+        pid: info.pid,
+        session_id: format!("desktop-unmapped-{}-{started_at}", info.pid),
+        cwd: String::new(),
+        project_name: "Codex Desktop (project unavailable)".into(),
+        started_at,
+        status: SessionStatus::Waiting,
+        model: "-".into(),
+        context_percent: 0.0,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_cache_read: 0,
+        total_cache_create: 0,
+        turn_count: 0,
+        current_tasks: vec![
+            "Desktop host observed; session mapping unavailable. No project inferred from history."
+                .into(),
+        ],
+        mem_mb: info.rss_kb / 1024,
+        version: String::new(),
+        git_branch: String::new(),
+        git_added: 0,
+        git_modified: 0,
+        token_history: Vec::new(),
+        subagents: Vec::new(),
+        mem_file_count: 0,
+        mem_line_count: 0,
+        children: Vec::new(),
+        initial_prompt: String::new(),
+        first_assistant_text: String::new(),
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -568,37 +668,6 @@ fn open_linux_rollouts(pid: u32) -> Vec<PathBuf> {
     paths.sort();
     paths.dedup();
     paths
-}
-
-#[cfg(target_os = "windows")]
-fn latest_rollout_file(sessions_dir: &Path) -> Option<PathBuf> {
-    let mut pending = vec![sessions_dir.to_path_buf()];
-    let mut latest: Option<(std::time::SystemTime, PathBuf)> = None;
-    while let Some(dir) = pending.pop() {
-        for entry in fs::read_dir(dir).ok()?.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                pending.push(path);
-                continue;
-            }
-            if path.extension().and_then(|value| value.to_str()) != Some("jsonl")
-                || !path
-                    .file_name()
-                    .and_then(|value| value.to_str())
-                    .is_some_and(|value| value.starts_with("rollout-"))
-            {
-                continue;
-            }
-            let modified = entry.metadata().ok()?.modified().ok()?;
-            if latest
-                .as_ref()
-                .is_none_or(|(latest_modified, _)| modified > *latest_modified)
-            {
-                latest = Some((modified, path));
-            }
-        }
-    }
-    latest.map(|(_, path)| path)
 }
 
 #[cfg(target_os = "linux")]
@@ -984,6 +1053,25 @@ fn parse_codex_jsonl(path: &Path) -> Option<CodexJSONLResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unmapped_desktop_has_visible_status_but_no_inferred_project_or_content() {
+        let info = ProcInfo {
+            pid: 42,
+            ppid: 0,
+            rss_kb: 4096,
+            cpu_pct: 99.0,
+            command: "codex.exe app-server".into(),
+        };
+        assert!(is_desktop_host(&info));
+        let session = unmapped_desktop(&info, 1000);
+        assert!(session.cwd.is_empty());
+        assert!(session.project_name.contains("unavailable"));
+        assert!(session.current_tasks[0].contains("No project inferred"));
+        assert!(session.initial_prompt.is_empty());
+        assert_eq!(session.status, SessionStatus::Waiting);
+        assert_eq!(session.started_at, 1000);
+        assert_eq!(session.pid, 42);
+    }
     use std::io::Write;
 
     const SESSION_META: &str = r#"{"type":"session_meta","timestamp":"2026-03-28T15:00:00Z","payload":{"id":"sess-123","cwd":"/home/user/project","cli_version":"0.1.5","timestamp":"2026-03-28T15:00:00Z","git":{"branch":"feature/x"}}}"#;
