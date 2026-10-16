@@ -1,6 +1,11 @@
 [CmdletBinding()]
 param(
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    # Windows Installer compares only three numeric fields. RC semver is not an
+    # installer version; advance this number for every published Windows build.
+    [Parameter(Mandatory = $true)]
+    [ValidateRange(1, 65535)]
+    [int]$InstallerBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,14 +22,20 @@ $CargoTargetDir = if ($env:CARGO_TARGET_DIR) {
 }
 $Version = (Select-String -Path (Join-Path $RootDir 'Cargo.toml') -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1).Matches.Groups[1].Value
 if (-not $Version) { $Version = '0.1.0' }
-$MsiVersion = if ($Version -match '^(\d+\.\d+\.\d+)') { $Matches[1] } else { '0.1.0' }
+. (Join-Path $ScriptDir 'release-identity.ps1')
+$Identity = Get-WindowsReleaseIdentity -ApplicationVersion $Version -InstallerBuild $InstallerBuild
+$MsiVersion = $Identity.installer_version
+$SourceCommit = (& git -C $RootDir rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $SourceCommit -notmatch '^[0-9a-f]{40}$') { throw 'Cannot resolve source commit' }
+$SourceChanges = & git -C $RootDir status --porcelain --untracked-files=no
+if ($LASTEXITCODE -ne 0 -or $SourceChanges) { throw 'Windows candidates must be built from a clean committed source tree' }
 
 $BuildRoot = Join-Path $RootDir 'target\windows'
 $StageDir = Join-Path $BuildRoot 'stage'
-$DistDir = Join-Path $BuildRoot 'dist'
+$DistDir = Join-Path $BuildRoot "dist\$($Identity.release_identity)"
 $WxsPath = Join-Path $BuildRoot 'memory-layer.wxs'
-$ZipPath = Join-Path $DistDir "memory-layer-$Version-windows-x86_64.zip"
-$MsiPath = Join-Path $DistDir "memory-layer-$Version-windows-x86_64.msi"
+$ZipPath = Join-Path $DistDir "$($Identity.asset_prefix).zip"
+$MsiPath = Join-Path $DistDir "$($Identity.asset_prefix).msi"
 $WixPdbPath = [System.IO.Path]::ChangeExtension($MsiPath, '.wixpdb')
 
 function Assert-BuildPath([string]$Path) {
@@ -224,7 +235,8 @@ if (-not $SkipBuild) {
 
 $StageDir = Assert-BuildPath $StageDir
 $DistDir = Assert-BuildPath $DistDir
-Remove-Item -Recurse -Force $StageDir, $DistDir -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $DistDir) { throw "Candidate output already exists; use a new InstallerBuild or preserve it elsewhere: $DistDir" }
+Remove-Item -Recurse -Force $StageDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $StageDir, $DistDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'bin') | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\memory-layer') | Out-Null
@@ -279,8 +291,8 @@ $componentRefs += 'cmp_ProgramsFolderCleanup'
 
 $featureRefs = $componentRefs | Sort-Object | ForEach-Object { "      <ComponentRef Id=`"$_`" />" }
 $upgradeCode = '7E6D7DA0-7D74-43F0-B816-E422B9E01B82'
-$productCode = Get-DeterministicGuid "Memory Layer|$MsiVersion|x64|perUser"
-$packageCode = Get-DeterministicGuid "Memory Layer|package|$MsiVersion|x64|perUser"
+$productCode = Get-DeterministicGuid "Memory Layer|$($Identity.release_identity)|x64|perUser"
+$packageCode = Get-DeterministicGuid "Memory Layer|package|$($Identity.release_identity)|$SourceCommit|x64|perUser"
 $programsCleanupGuid = Get-DeterministicGuid 'Memory Layer|component|cmp_ProgramsFolderCleanup'
 $userPathGuid = Get-DeterministicGuid 'Memory Layer|component|cmp_UserPath'
 $wxs = @"
@@ -323,6 +335,27 @@ foreach ($artifact in @($ZipPath, $MsiPath)) {
     $hash = Get-FileHash -Algorithm SHA256 $artifact
     "$($hash.Hash.ToLowerInvariant())  $(Split-Path -Leaf $artifact)" | Set-Content -Encoding ascii "$artifact.sha256"
 }
+
+$artifacts = @($ZipPath, $MsiPath) | ForEach-Object {
+    [ordered]@{ name = (Split-Path -Leaf $_); sha256 = (Get-FileHash -Algorithm SHA256 $_).Hash.ToLowerInvariant(); bytes = (Get-Item $_).Length }
+}
+$manifest = [ordered]@{
+    schema_version = 1
+    platform = 'windows-x86_64'
+    application_version = $Version
+    release_identity = $Identity.release_identity
+    installer_build = $InstallerBuild
+    installer_version = $MsiVersion
+    source_commit = $SourceCommit
+    upgrade_code = $upgradeCode
+    product_code = $productCode
+    package_code = $packageCode
+    signing_status = 'unsigned'
+    capabilities = @('per-user-client')
+    native_stack_bundled = $false
+    artifacts = @($artifacts)
+}
+$manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $DistDir "$($Identity.asset_prefix).manifest.json")
 
 Write-Host "Built $ZipPath"
 Write-Host "Built $MsiPath"
