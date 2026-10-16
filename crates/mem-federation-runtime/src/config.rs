@@ -79,6 +79,18 @@ pub fn load_gateway_config(path: &Path) -> Result<GatewayConfig> {
     serde_json::from_slice(&bytes).map_err(|_| RuntimeError::Configuration)
 }
 
+/// Elevated readiness only; ordinary serving uses the unmodified reader.
+#[cfg(windows)]
+pub fn load_gateway_config_for_service(
+    path: &Path,
+    reader: &mem_platform_files::windows::ServiceReader,
+) -> Result<GatewayConfig> {
+    let bytes = mem_platform_files::windows::ServiceInput::open(path, 1024 * 1024, reader)
+        .and_then(|input| input.read(1024 * 1024))
+        .map_err(|_| RuntimeError::Configuration)?;
+    serde_json::from_slice(&bytes).map_err(|_| RuntimeError::Configuration)
+}
+
 pub fn private_secret(path: &Path) -> Result<String> {
     #[cfg(not(windows))]
     let value = {

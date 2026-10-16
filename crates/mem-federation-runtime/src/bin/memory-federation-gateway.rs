@@ -4,11 +4,12 @@
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let all: Vec<_> = std::env::args_os().skip(1).collect();
     if all.first().is_some_and(|arg| arg == "check-status") {
-        if all.len() != 5 {
-            return Err("expected check-status CONFIG SPACE AUTHORITY AUDIENCE".into());
+        if all.len() != 5 && !(all.len() == 7 && all[5] == "--service-name") {
+            return Err(
+                "expected check-status CONFIG SPACE AUTHORITY AUDIENCE [--service-name NAME]"
+                    .into(),
+            );
         }
-        let config = mem_federation_runtime::load_gateway_config(std::path::Path::new(&all[1]))
-            .map_err(|_| "private gateway configuration unavailable")?;
         let identity = |index: usize| -> Result<uuid::Uuid, &'static str> {
             all[index]
                 .to_str()
@@ -16,10 +17,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .filter(|id| !id.is_nil())
                 .ok_or("invalid readiness identity")
         };
-        let ready = mem_federation_runtime::operator_status::check(&config,
+        let service_name = if all.len() == 7 {
+            Some(all[6].to_str().ok_or("invalid service name")?)
+        } else {
+            None
+        };
+        let ready = mem_federation_runtime::operator_status::check_config_path(std::path::Path::new(&all[1]),
             mem_federation::publication::SpaceId::new(identity(2)?)?,
             mem_federation::publication::InstanceId::new(identity(3)?)?,
-            mem_federation::publication::InstanceId::new(identity(4)?)?).await
+            mem_federation::publication::InstanceId::new(identity(4)?)?, service_name).await
             .map_err(|_| "gateway readiness not verified; inspect private configuration and current membership")?;
         println!("{}", serde_json::to_string(&ready)?);
         return Ok(());

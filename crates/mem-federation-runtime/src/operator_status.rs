@@ -40,6 +40,73 @@ pub async fn check(
     authority: InstanceId,
     audience: InstanceId,
 ) -> Result<LocalGatewayReadiness> {
+    let (address, token_file) = selected(config, space, authority, audience)?;
+    let token = crate::private_secret(token_file)?;
+    probe(
+        address,
+        &token,
+        ReceiptTrust::new(config.receipt_keys.clone())?,
+        space,
+        authority,
+        audience,
+    )
+    .await
+}
+
+pub async fn check_config_path(
+    path: &std::path::Path,
+    space: SpaceId,
+    authority: InstanceId,
+    audience: InstanceId,
+    service_name: Option<&str>,
+) -> Result<LocalGatewayReadiness> {
+    if let Some(name) = service_name {
+        #[cfg(windows)]
+        {
+            let reader = mem_platform_files::windows::ServiceReader::for_named_service(name)
+                .map_err(|_| RuntimeError::Configuration)?;
+            let config = crate::load_gateway_config_for_service(path, &reader)?;
+            let (address, token_file) = selected(&config, space, authority, audience)?;
+            let bytes = mem_platform_files::windows::ServiceInput::open(token_file, 4096, &reader)
+                .and_then(|input| input.read(4096))
+                .map_err(|_| RuntimeError::Configuration)?;
+            let token = std::str::from_utf8(&bytes)
+                .map_err(|_| RuntimeError::Configuration)?
+                .trim();
+            if !(32..=4096).contains(&token.len()) {
+                return Err(RuntimeError::Configuration);
+            }
+            return probe(
+                address,
+                token,
+                ReceiptTrust::new(config.receipt_keys.clone())?,
+                space,
+                authority,
+                audience,
+            )
+            .await;
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = name;
+            return Err(RuntimeError::Configuration);
+        }
+    }
+    check(
+        &crate::load_gateway_config(path)?,
+        space,
+        authority,
+        audience,
+    )
+    .await
+}
+
+fn selected(
+    config: &GatewayConfig,
+    space: SpaceId,
+    authority: InstanceId,
+    audience: InstanceId,
+) -> Result<(SocketAddr, &std::path::Path)> {
     if config.space != space || config.authority != authority {
         return Err(RuntimeError::Configuration);
     }
@@ -52,16 +119,7 @@ pub async fn check(
     if matching.len() != 1 {
         return Err(RuntimeError::Configuration);
     }
-    let token = crate::private_secret(&matching[0].token_file)?;
-    probe(
-        address,
-        &token,
-        ReceiptTrust::new(config.receipt_keys.clone())?,
-        space,
-        authority,
-        audience,
-    )
-    .await
+    Ok((address, &matching[0].token_file))
 }
 
 async fn probe(
