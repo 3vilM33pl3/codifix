@@ -8,6 +8,10 @@ if ($env:OS -ne 'Windows_NT' -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
 }
 $manifest = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'Cargo.toml'
 foreach ($filter in @('credentials::windows::tests','workspace::filesystem::windows::tests')) {
+    $discovered = @(& cargo test --locked -p mem-cli --no-default-features --bin memory --manifest-path $manifest $filter -- --list)
+    if ($LASTEXITCODE -ne 0 -or -not ($discovered | Where-Object { $_ -match ': test$' })) {
+        throw "Native Windows onboarding API filter selected no tests: $filter"
+    }
     & cargo test --locked -p mem-cli --no-default-features --bin memory --manifest-path $manifest $filter
     if ($LASTEXITCODE -ne 0) { throw "Native Windows onboarding API smoke failed: $filter" }
 }
