@@ -33,6 +33,16 @@ OVMF variables, secure firmware and SMM. Cold snapshots now include `lab.json`
 so restoration also restores the matching firmware descriptor. An interrupted
 firmware switch blocks boot until its retained state is inspected.
 
+The first installation failed with `UnattendProcessDiskConfigInfo` /
+`0x8007000D`: the seed incorrectly used partition IDs as modification order,
+skipping order 2. The corrected seed uses orders 1, 2 for partitions 1, 3,
+matching [Microsoft's UEFI example](https://learn.microsoft.com/en-us/windows-hardware/customize/desktop/unattend/microsoft-windows-setup-diskconfiguration-disk-modifypartitions-modifypartition-order).
+For this uninstalled disposable lab only, `refresh-seed` rebuilds the seed while
+preserving the existing account password and SSH key and retaining previous
+seed files. It does not change the disk; subsequent installation still wipes
+only the disposable lab disk as declared in its original answer file. Never
+use installation media/seed recovery to repair an installed working system.
+
 ## Resume installation after KVM is available
 
 The lab was already created; do **not** run `create` over it.
@@ -92,3 +102,19 @@ This provisions the disposable developer snapshot only, not the customer native
 stack. Native PostgreSQL/PDS/Pi and clean-install runtime dependency acceptance
 are separate checklist items. PowerShell parsing and host manifest tests do not
 constitute native installation evidence.
+
+## Native PostgreSQL proof
+
+After the build-tools snapshot, copy `native-postgres.json` and
+`guest-native-postgres.ps1` into the guest. Run the script with that manifest and
+`-Action Prepare`, then `-Action Start` (which also verifies the extensions).
+`Verify` repeats SQL checks; `Stop` stops only its fixed lab cluster. Native
+execution is still pending. The script refuses other hosts and never targets
+the host's or a customer's database.
+
+The reviewed EDB PostgreSQL 17.11 binary archive and pgvector 0.8.7 source are
+SHA-256 bound to verified HTTPS downloads. pgvector is built with MSVC; vector,
+pgcrypto and pg_trgm must load in native PostgreSQL. A local DPAPI-protected
+synthetic password authenticates the loopback-only port 55471; no production
+credential is copied. Preparation and SQL execution have separate receipts.
+This is dependency evidence tooling, not the finished server installer.

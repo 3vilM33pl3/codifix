@@ -59,6 +59,9 @@ class SeedTests(unittest.TestCase):
         self.assertEqual(document.find('.//u:MetaData/u:Value', ns).text,
                          'Windows 11 Enterprise Evaluation')
         self.assertEqual(document.find('.//u:AutoLogon/u:LogonCount', ns).text, '1')
+        modifications = document.findall('.//u:ModifyPartition', ns)
+        self.assertEqual([p.find('u:Order', ns).text for p in modifications], ['1', '2'])
+        self.assertEqual([p.find('u:PartitionID', ns).text for p in modifications], ['1', '3'])
 
     def test_production_and_relative_roots_rejected(self):
         for root in ['/data', '/', '/home/olivier', 'lab']:

@@ -116,13 +116,14 @@ def unattended(password):
         node(part, "Type", kind)
         node(part, "Size" if size else "Extend", size or "true")
     modify = node(disk, "ModifyPartitions")
-    for order, fmt, label in [(1, "FAT32", "System"), (3, "NTFS", "Windows")]:
+    for order, (partition, fmt, label) in enumerate(
+            [(1, "FAT32", "System"), (3, "NTFS", "Windows")], start=1):
         part = node(modify, "ModifyPartition", **{f"{{{wcm}}}action": "add"})
         node(part, "Order", order)
-        node(part, "PartitionID", order)
+        node(part, "PartitionID", partition)
         node(part, "Format", fmt)
         node(part, "Label", label)
-        if order == 3:
+        if partition == 3:
             node(part, "Letter", "C")
     image = node(node(setup, "ImageInstall"), "OSImage")
     meta = node(node(image, "InstallFrom"), "MetaData", **{f"{{{wcm}}}action": "add"})
@@ -207,6 +208,34 @@ def create(args, root):
             "cpus": 8, "memory_mib": 16384, "created_at": int(time.time())}
     write_json(root / "lab.json", data)
     print(json.dumps(data, indent=2))  # No seed credentials or private SSH key.
+
+
+def refresh_seed(root):
+    """Rebuild uninstalled lab seed from current scripts, preserving its identities."""
+    require_stopped(root)
+    seed = root / "seed"
+    ns = {"u": "urn:schemas-microsoft-com:unattend"}
+    original = ET.fromstring((seed / "Autounattend.xml").read_bytes())
+    passwords = [node.text for node in original.findall('.//u:Password/u:Value', ns)]
+    if len(passwords) != 2 or not passwords[0] or passwords[0] != passwords[1]:
+        raise ValueError("existing lab credential is inconsistent; no identity replacement")
+    retained = root / f"seed-refresh-{time.time_ns()}"
+    retained.mkdir(mode=0o700)
+    shutil.copytree(seed, retained / "previous-seed")
+    shutil.copy2(root / "seed.iso", retained / "previous-seed.iso")
+    staging = retained / "next-seed"
+    shutil.copytree(seed, staging)
+    (staging / "Autounattend.xml").write_bytes(unattended(passwords[0]))
+    shutil.copy2(SCRIPT_DIR / "guest-bootstrap.ps1", staging / "bootstrap.ps1")
+    next_iso = retained / "next-seed.iso"
+    run("xorriso", "-as", "mkisofs", "-quiet", "-V", "MEMSEED", "-J", "-r",
+        "-o", next_iso, staging)
+    # The ISO is the sole boot input; retain both versions before switching it.
+    for name in ["Autounattend.xml", "bootstrap.ps1"]:
+        shutil.copy2(staging / name, seed / name)
+    next_iso.replace(root / "seed.iso")
+    print(json.dumps({"seed_refreshed": True, "previous_seed": str(retained),
+                      "identities_preserved": True, "disk_unchanged": True}))
 
 
 def qmp(root, execute, arguments=None):
@@ -437,6 +466,7 @@ def main():
     sub.add_parser("status")
     sub.add_parser("shutdown")
     sub.add_parser("enable-secure-boot")
+    sub.add_parser("refresh-seed")
     snap = sub.add_parser("snapshot")
     snap.add_argument("name")
     restore_args = sub.add_parser("restore")
@@ -465,6 +495,8 @@ def main():
             qmp(root, "system_powerdown")
         elif args.command == "enable-secure-boot":
             enable_secure_boot(root, data)
+        elif args.command == "refresh-seed":
+            refresh_seed(root)
         elif args.command == "snapshot":
             snapshot(root, args.name)
         elif args.command == "restore":
