@@ -2,6 +2,9 @@
 # Runs only in the disposable evaluation VM, once after unattended install.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB') {
+    throw 'Bootstrap is restricted to the disposable Memory VM'
+}
 $Lab = 'C:\MemoryLab'
 New-Item -ItemType Directory -Force $Lab | Out-Null
 Start-Transcript -Path "$Lab\bootstrap.log" -Append
@@ -17,7 +20,14 @@ try {
             $path = Join-Path $root $driver
             if (-not (Test-Path $path)) { throw "Missing pinned driver: $driver" }
             & pnputil.exe /add-driver $path /install
-            if ($LASTEXITCODE -notin @(0, 3010)) { throw "Driver installation failed: $driver" }
+            $driverExit = $LASTEXITCODE
+            # The pinned lab returned 259 for an already-current package. Do
+            # not mistake that for success without a healthy bound device.
+            if ($driverExit -notin @(0, 3010, 259)) { throw "Driver installation failed: $driver ($driverExit)" }
+            $serviceName = if ($driver -like 'NetKVM\*') { 'netkvm' } else { 'VirtioSerial' }
+            $bound = @(Get-CimInstance Win32_PnPEntity -Filter "Service='$serviceName'" |
+                Where-Object ConfigManagerErrorCode -eq 0)
+            if (-not $bound.Count) { throw "Driver has no healthy bound device: $driver" }
         }
         $agent = Join-Path $root 'guest-agent\qemu-ga-x86_64.msi'
         # Recovery must not reinstall/stop the agent through which it is running.

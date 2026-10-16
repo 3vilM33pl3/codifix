@@ -33,6 +33,9 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn("Get-Service -Name 'QEMU-GA'", script)
         self.assertIn('guest-agent-install.log', script)
         self.assertIn('Write-Error -ErrorRecord $_ -ErrorAction Continue', script)
+        self.assertIn('$driverExit -notin @(0, 3010, 259)', script)
+        self.assertIn('Where-Object ConfigManagerErrorCode -eq 0', script)
+        self.assertIn("$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", script)
 
     def test_guest_observation_is_lab_scoped_and_metadata_only(self):
         script = (Path(__file__).parent / 'guest-observe.ps1').read_text()
