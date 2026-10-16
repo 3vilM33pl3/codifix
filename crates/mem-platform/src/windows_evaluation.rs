@@ -418,11 +418,13 @@ pub fn spawn(spec: EvaluationSpec<'_>) -> Result<EvaluationProcess> {
         "Windows directory unavailable"
     );
     let windows = OsString::from_wide(&windows[..count]);
+    let local = crate::windows_process::local_app_data()?;
     let path = std::env::join_paths(&spec.search_path)?;
     let libraries = std::env::join_paths(&spec.library_path)?;
     let environment = [
         ("HOME", spec.scratch.as_os_str()),
         ("LIB", libraries.as_os_str()),
+        ("LOCALAPPDATA", local.as_os_str()),
         ("PATH", path.as_os_str()),
         ("SystemRoot", windows.as_os_str()),
         ("TEMP", spec.scratch.as_os_str()),

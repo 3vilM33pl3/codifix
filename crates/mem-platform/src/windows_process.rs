@@ -44,6 +44,7 @@ use windows_sys::Win32::{
         GetFileInformationByHandle, GetFileType, READ_CONTROL, WRITE_DAC, WRITE_OWNER,
     },
     System::{
+        Com::CoTaskMemFree,
         JobObjects::{
             AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_CPU_RATE_CONTROL_ENABLE,
             JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP, JOB_OBJECT_LIMIT_ACTIVE_PROCESS,
@@ -67,10 +68,47 @@ use windows_sys::Win32::{
             WaitForSingleObject,
         },
     },
+    UI::Shell::{FOLDERID_LocalAppData, SHGetKnownFolderPath},
 };
 
 const MAX_CODE_BYTES: u64 = 512 * 1024 * 1024;
 const JOB_MEMORY_BYTES: usize = 512 * 1024 * 1024;
+
+/// The OS uses LOCALAPPDATA while constructing an AppContainer's redirected
+/// profile environment. Resolve that one launch input from the current Windows
+/// identity, not inherited process variables. This conveys a path, not an ACL
+/// grant; the child remains subject to its zero-capability token.
+pub(crate) fn local_app_data() -> Result<OsString> {
+    struct Folder(*mut u16);
+    impl Drop for Folder {
+        fn drop(&mut self) {
+            unsafe { CoTaskMemFree(self.0.cast()) };
+        }
+    }
+    let mut path = null_mut();
+    let hr = unsafe { SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, null_mut(), &mut path) };
+    let path = Folder(path);
+    ensure!(
+        hr >= 0 && !path.0.is_null(),
+        "local app data folder unavailable"
+    );
+    // Windows filesystem paths are bounded to 32,767 UTF-16 code units. Never
+    // scan an unbounded foreign string, and always release the COM allocation.
+    let mut units = Vec::new();
+    for index in 0..32_768 {
+        let unit = unsafe { *path.0.add(index) };
+        if unit == 0 {
+            let value = OsString::from_wide(&units);
+            ensure!(
+                Path::new(&value).is_absolute(),
+                "local app data folder is not absolute"
+            );
+            return Ok(value);
+        }
+        units.push(unit);
+    }
+    bail!("local app data folder exceeds Windows path limit")
+}
 
 /// Flat, dedicated execution bundle. Every executable/runtime data file is
 /// individually hash-pinned; directories must not contain authority material.
@@ -893,9 +931,11 @@ pub fn spawn(spec: ProcessSpec<'_>) -> Result<SandboxProcess> {
         "Windows directory unavailable"
     );
     let windows = OsString::from_wide(&windows[..count]);
+    let local = local_app_data()?;
     let broker = OsString::from(format!("{}", handles[3] as usize));
     let environment = [
         ("HOME", spec.scratch.as_os_str()),
+        ("LOCALAPPDATA", local.as_os_str()),
         ("MEMORY_BROKER_HANDLE", broker.as_os_str()),
         ("PATH", code.as_os_str()),
         ("SystemRoot", windows.as_os_str()),
@@ -1127,7 +1167,15 @@ pub fn spawn_inherited(
     startup.StartupInfo.hStdError = handles[2];
     startup.lpAttributeList = attrs.pointer();
     let mut environment = std::collections::BTreeMap::<OsString, OsString>::new();
-    for key in ["HOME", "PATH", "SystemRoot", "TEMP", "TMP", "USERPROFILE"] {
+    for key in [
+        "HOME",
+        "LOCALAPPDATA",
+        "PATH",
+        "SystemRoot",
+        "TEMP",
+        "TMP",
+        "USERPROFILE",
+    ] {
         environment.insert(
             key.into(),
             std::env::var_os(key).context("missing admitted driver environment")?,
@@ -1241,6 +1289,14 @@ pub fn spawn_inherited(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_local_app_data_comes_from_current_identity_known_folder() {
+        let folder = local_app_data().unwrap();
+        assert!(Path::new(&folder).is_absolute());
+        assert!(Path::new(&folder).is_dir());
+        assert!(!folder.encode_wide().any(|unit| unit == 0));
+        assert!(folder.encode_wide().count() < 32_768);
+    }
     #[test]
     fn default_and_evaluation_job_profiles_remain_distinct() {
         for (job, processes, bytes) in [
