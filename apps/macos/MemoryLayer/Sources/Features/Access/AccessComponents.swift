@@ -127,7 +127,9 @@ struct AccessTokenCreateSheet: View {
             }
             Form {
                 TextField("Name", text: $name)
+                    .accessibilityIdentifier("access.tokenName")
                 TextField("Project", text: $targetProject)
+                    .accessibilityIdentifier("access.tokenProject")
                 Picker("Role", selection: $role) {
                     ForEach(AccessRole.serviceTokenRoles) { Text($0.title).tag($0) }
                 }
@@ -144,6 +146,7 @@ struct AccessTokenCreateSheet: View {
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!valid || submitting)
+                    .accessibilityIdentifier("access.submitToken")
             }
         }
         .padding(22)
@@ -248,7 +251,9 @@ struct AccessMembershipGrantSheet: View {
                 Picker("Principal", selection: $principalID) {
                     ForEach(principals) { Text($0.displayName).tag($0.id) }
                 }
+                .accessibilityIdentifier("access.membershipPrincipal")
                 TextField("Project", text: $targetProject)
+                    .accessibilityIdentifier("access.membershipProject")
                 Picker("Role", selection: $role) {
                     ForEach(roles) { Text($0.title).tag($0) }
                 }
@@ -262,6 +267,7 @@ struct AccessMembershipGrantSheet: View {
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!valid || isReadOnly || submitting)
+                    .accessibilityIdentifier("access.submitMembership")
             }
         }
         .padding(22)
@@ -309,6 +315,7 @@ struct AccessOneTimeSecretSheet: View {
             Text(secret)
                 .font(.body.monospaced())
                 .textSelection(.enabled)
+                .accessibilityIdentifier("access.oneTimeSecret")
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
@@ -316,9 +323,11 @@ struct AccessOneTimeSecretSheet: View {
                 if copied { Label("Copied", systemImage: "checkmark").foregroundStyle(.green) }
                 Spacer()
                 Button("Dismiss") { close() }.keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("access.dismissSecret")
                 Button(copied ? "Copy again" : "Copy token") { copy() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("access.copyToken")
             }
         }
         .padding(22)

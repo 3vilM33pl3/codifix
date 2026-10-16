@@ -113,6 +113,7 @@ public struct AccessView: View {
                 ForEach(AccessSection.allCases) { section in Text(section.rawValue).tag(section) }
             }
             .pickerStyle(.segmented)
+            .accessibilityIdentifier("access.section")
             .padding(.horizontal)
             .padding(.vertical, 10)
 
@@ -161,8 +162,10 @@ public struct AccessView: View {
             Button { presentedSheet = .createToken } label: { Label("Create token…", systemImage: "plus") }
                 .buttonStyle(.borderedProminent)
                 .disabled(!canMutate || writing)
+                .accessibilityIdentifier("access.createToken")
             Button { presentedSheet = .grantMembership } label: { Label("Grant access…", systemImage: "person.badge.plus") }
                 .disabled(!canMutate || writing || principals.isEmpty)
+                .accessibilityIdentifier("access.grantMembership")
         }
         .padding()
         .background(Color(nsColor: .windowBackgroundColor))
@@ -327,6 +330,7 @@ public struct AccessView: View {
                     Button(role: .destructive) { tokenToRevoke = token } label: {
                         Label("Revoke token…", systemImage: "key.slash")
                     }
+                    .accessibilityIdentifier("access.revokeToken.\(token.id)")
                     .disabled(!canMutate || writing)
                 }
             }
@@ -382,6 +386,7 @@ public struct AccessView: View {
             Button(role: .destructive) { membershipToRevoke = membership } label: {
                 Label("Revoke membership…", systemImage: "person.badge.minus")
             }
+            .accessibilityIdentifier("access.revokeMembership.\(membership.id)")
             .disabled(!canMutate || writing)
             Spacer()
         }

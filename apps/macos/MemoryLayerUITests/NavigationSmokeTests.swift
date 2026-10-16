@@ -12,7 +12,7 @@ final class NavigationSmokeTests: XCTestCase {
         server.arguments = [fixtureURL.path, "--port", "0"]
         server.standardOutput = output
         try server.run()
-        defer { if server.isRunning { server.terminate() } }
+        addTeardownBlock { @MainActor in FixtureUITestSession.terminate(server) }
         let announcement = String(decoding: output.fileHandleForReading.availableData, as: UTF8.self)
         let address = try XCTUnwrap(announcement.split(separator: " ").first { $0.hasPrefix("http://127.0.0.1:") })
         let healthURL = try XCTUnwrap(URL(string: "\(address)/healthz"))
@@ -22,7 +22,7 @@ final class NavigationSmokeTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--uitesting", "--ui-window-size=1440x960"]
         app.launch()
-        defer { app.terminate() }
+        addTeardownBlock { @MainActor in if app.state != .notRunning { app.terminate() } }
         XCTAssertTrue(app.buttons["Review connections…"].waitForExistence(timeout: 5))
         app.buttons["Review connections…"].click()
         let addressField = app.textFields["connection.serviceURL"]
@@ -34,7 +34,7 @@ final class NavigationSmokeTests: XCTestCase {
             }
             return copy
         } ?? []
-        defer {
+        addTeardownBlock { @MainActor in
             pasteboard.clearContents()
             if !originalPasteboard.isEmpty { pasteboard.writeObjects(originalPasteboard) }
         }

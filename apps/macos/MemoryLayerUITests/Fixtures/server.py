@@ -4,15 +4,17 @@
 Never proxies to a real service. All mutations disappear when this process exits.
 Run with --port 4261, then connect the app to that address and synthetic-project.
 POST /__scenario {"name":"empty|normal|insufficient|failed|restricted|auth|loading"}
-changes test responses. GET /__requests returns method/path only, never secrets.
+changes test responses. GET /__requests returns method/path plus selected
+non-secret test fields; it never records tokens or binary request data.
 """
 import argparse
 import copy
+import hashlib
 import json
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 ROOT = Path(__file__).parent
 STAMP = "2026-10-15T10:00:00Z"
@@ -38,8 +40,56 @@ class State:
 
 
 def principal():
+    role = "reader" if State.scenario == "non-admin" else "admin"
     return {"id": "fixture-admin", "kind": "human_oidc", "display_name": "Fixture administrator",
-            "email": "fixture@example.test", "groups": [], "global_role": "admin", "projects": []}
+            "email": "fixture@example.test", "groups": [], "global_role": role,
+            "projects": ([{"project": PROJECT, "role": "admin", "permissions": ["auth_manage"], "source": "membership"}]
+                         if State.scenario == "non-admin" else [])}
+
+
+def audit_request(method, path, query, data, body):
+    """Capture only fields needed to verify fixture-backed UI requests."""
+    item = {"method": method, "path": path}
+    segments = path.split("/")
+    if len(segments) > 3 and segments[1:3] == ["v1", "projects"]:
+        item["project"] = segments[3]
+    for key in ("project", "loop_id"):
+        if key in query:
+            item[key] = query[key][0]
+    if "project" in data:
+        item["project"] = data["project"]
+    if path == "/v1/query":
+        for key in ("project", "query", "top_k", "include_stale", "history"):
+            if key in data:
+                item[key] = data[key]
+    elif path.endswith("/run"):
+        item["dry_run"] = data.get("dry_run")
+    elif "/replacement-proposals/" in path:
+        item["decision"] = path.rsplit("/", 1)[-1]
+    elif path.startswith("/v1/loops/approvals/"):
+        item["decision"] = path.rsplit("/", 1)[-1]
+        edited = data.get("edited_action")
+        if isinstance(edited, dict):
+            item["edited_action_summary"] = edited.get("summary")
+    elif path == "/v1/auth/tokens" and method == "POST":
+        for key, audit_key in (("name", "token_name"), ("project", "project"), ("role", "role"),
+                               ("expires_in_seconds", "expires_in_seconds")):
+            if key in data:
+                item[audit_key] = data[key]
+    elif path.startswith("/v1/auth/tokens/") and path.endswith("/revoke"):
+        item["token_id"] = path.split("/")[-2]
+    elif path == "/v1/auth/memberships" and method == "POST":
+        for key in ("principal_id", "project", "role"):
+            if key in data:
+                item[key] = data[key]
+    elif path.startswith("/v1/auth/memberships/") and method == "DELETE":
+        item["membership_id"] = path.rsplit("/", 1)[-1]
+    elif "/bundle/" in path:
+        item["body_bytes"] = len(body)
+        item["body_sha256"] = hashlib.sha256(body).hexdigest()
+        if path.endswith("/export/preview"):
+            item["options"] = data
+    return item
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -72,7 +122,9 @@ class Handler(BaseHTTPRequestHandler):
         self.handle_request()
 
     def handle_request(self):
-        path = unquote(urlsplit(self.path).path)
+        parsed = urlsplit(self.path)
+        path = unquote(parsed.path)
+        query = parse_qs(parsed.query)
         body = self.rfile.read(min(int(self.headers.get("Content-Length", 0)), 2 * 1024 * 1024))
         try:
             data = json.loads(body) if body else {}
@@ -90,7 +142,7 @@ class Handler(BaseHTTPRequestHandler):
                     approval["proposed_action"] = {"summary": "Fixture proposal for review"}
                 State.requests = []
             return self.reply({"scenario": State.scenario})
-        State.requests.append({"method": self.command, "path": path})
+        State.requests.append(audit_request(self.command, path, query, data, body))
         if State.scenario == "loading" and not path.startswith("/v1/auth/") and path != "/healthz":
             time.sleep(State.delay_seconds)
         if State.scenario in ("failed", "auth", "restricted") and path != "/healthz":
@@ -99,8 +151,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/healthz":
             return self.reply({"version": "fixture-dev", "status": "ok"})
         if path == "/v1/auth/me":
-            return self.reply({"authenticated": True, "mode": "single_user", "read_only": False,
-                               "principal": principal()})
+            identity = principal()
+            if State.requests:
+                State.requests[-1]["global_role"] = identity["global_role"]
+                State.requests[-1]["project_role"] = identity["projects"][0]["role"] if identity["projects"] else None
+            return self.reply({"authenticated": True, "mode": "single_user", "read_only": State.scenario == "read-only",
+                               "principal": identity})
         if path == "/v1/auth/session/bootstrap":
             return self.reply({"authenticated": True}, headers=[
                 ("Set-Cookie", "memory_session=fixture-session; Path=/; HttpOnly; SameSite=Lax"),

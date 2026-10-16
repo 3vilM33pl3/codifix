@@ -97,11 +97,18 @@ This uses local ad-hoc signing for the test runner, not distribution signing.
 The UI-test target alone disables App Sandbox so it can launch its Python
 loopback fixture server; the production app target is unchanged. UI tests
 isolate connection history in memory and launch their own loopback fixture
-server. If Xcode reports that it timed out enabling automation mode, enable
-Developer Tools Security through the standard macOS authorization flow and
-rerun. The current suite covers connection prompt and fixture-backed memory,
-provenance, and history navigation. Manual flow checks can use the
-[fixture service](MemoryLayerUITests/Fixtures/README.md).
+server for each fixture-backed case. The suite covers all seven native flows:
+connection/project selection and memory inspection, memory filters/provenance/
+history, cited Query answers and source inspection, replacement Review approval
+and rejection, automation dry-run and approval decisions, bundle import/export
+previews, and global-admin Access token/membership workflows. Tests assert
+visible outcomes and fixture-recorded routes; bundle tests compare safe SHA-256
+digests so preview and import use the same archive. UI-test fixtures are
+in-memory and loopback-only. If Xcode reports that it timed out enabling
+automation mode, enable Developer Tools Security through the standard macOS
+authorization flow and rerun. See [VALIDATION.md](VALIDATION.md) for the exact
+test mapping and latest results, or the [fixture service guide](MemoryLayerUITests/Fixtures/README.md)
+for manual checks.
 
 Debug builds accept `--ui-window-size=1440x960` and
 `--ui-window-size=1024x768` for repeatable window-layout inspection. For example:

@@ -48,6 +48,7 @@ public struct AutomationsView: View {
                     HStack(spacing: 8) {
                         Button("Approval queue · \(approvals.count + memoryProposals.count)") { approvalQueuePresented = true }
                             .disabled(!context.permissions.allows(.memoryRead))
+                            .accessibilityIdentifier("automation.approvalQueue")
                         Button("Refresh") { refreshID = UUID() }.disabled(loading || busy)
                         Button(globalState?.killSwitchEnabled == true ? "Resume all loops" : "Stop all loops…") {
                             stopTarget = GlobalStopTarget(context: context, stopping: globalState?.killSwitchEnabled != true)
@@ -189,7 +190,7 @@ public struct AutomationsView: View {
     @ViewBuilder private func actionButtons(_ card: AutomationCardState) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
-                Button("Preview run") { launchAction { await preview(card.definition.loopID) } }.buttonStyle(.borderedProminent).disabled(!canRun || busy || selectedRunLoading || globalState?.killSwitchEnabled == true)
+                Button("Preview run") { launchAction { await preview(card.definition.loopID) } }.buttonStyle(.borderedProminent).disabled(!canRun || busy || selectedRunLoading || globalState?.killSwitchEnabled == true).accessibilityIdentifier("automation.previewRun")
                 Button("Inspect last run") { if let id = card.lastRun?.id { inspectRequest = InspectRunRequest(id: id, loopID: card.definition.loopID, token: UUID()) } }.disabled(card.lastRun == nil || busy || selectedRunLoading)
                 if let operation { Text("\(operation)…").font(.caption).foregroundStyle(.secondary) }
             }
@@ -239,7 +240,7 @@ public struct AutomationsView: View {
                 }
             }
             if !run.memoryProposals.isEmpty { Text("\(run.memoryProposals.count) memory proposal(s) associated with this run. Review them in the automation proposal queue.").font(.caption).foregroundStyle(.secondary) }
-        }
+        }.accessibilityIdentifier("automation.runInspector")
     }
 
     private var approvalQueueSheet: some View {
@@ -290,10 +291,11 @@ public struct AutomationsView: View {
             TextEditor(text: Binding(get: { approvalEdits[approval.id] ?? AutomationJSON.object(approval.proposedAction).prettyPrinted() }, set: { approvalEdits[approval.id] = $0 }))
                 .font(.system(.caption, design: .monospaced)).frame(minHeight: 90).overlay { RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor).opacity(0.6)) }
                 .disabled(!canRun || busy || approval.status != "pending")
+                .accessibilityIdentifier("automation.approvalEditor.\(approval.id)")
             HStack {
-                Button("Approve") { launchAction { await resolve(.approval(context, approval), action: "approve") } }.disabled(!canRun || busy || approval.status != "pending")
-                Button("Save edited action") { launchAction { await resolveEditedApproval(approval) } }.disabled(!canRun || busy || approval.status != "pending")
-                Button("Reject…", role: .destructive) { rejectTarget = .approval(context, approval) }.disabled(!canRun || busy || approval.status != "pending")
+                Button("Approve") { launchAction { await resolve(.approval(context, approval), action: "approve") } }.disabled(!canRun || busy || approval.status != "pending").accessibilityIdentifier("automation.approvalApprove.\(approval.id)")
+                Button("Save edited action") { launchAction { await resolveEditedApproval(approval) } }.disabled(!canRun || busy || approval.status != "pending").accessibilityIdentifier("automation.approvalSave.\(approval.id)")
+                Button("Reject…", role: .destructive) { rejectTarget = .approval(context, approval) }.disabled(!canRun || busy || approval.status != "pending").accessibilityIdentifier("automation.approvalReject.\(approval.id)")
             }.controlSize(.small)
         }.padding(.vertical, 4)
     }

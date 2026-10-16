@@ -39,7 +39,7 @@ public struct BundlesView: View {
             }
             if let actionError { ProjectBanner(title: "Bundle operation failed", message: actionError, tone: .failure) }
             if let operationWarning { ProjectBanner(title: "Service outcome needs review", message: operationWarning, tone: .warning) }
-            if let status { ProjectBanner(title: "Bundle status", message: status, tone: .success) }
+            if let status { ProjectBanner(title: "Bundle status", message: status, tone: .success).accessibilityElement(children: .ignore).accessibilityLabel("Bundle status. \(status)").accessibilityIdentifier("bundles.status") }
             if !canAccessBundles {
                 ProjectLoadingState(context: context, title: "Access restricted", message: "This identity does not have bundle export or import permission for this project.", isLoading: false)
             } else {
@@ -81,8 +81,8 @@ public struct BundlesView: View {
                     Toggle("Include git commit hashes", isOn: optionBinding(\.includeGitCommits)).disabled(operationActive)
                     Toggle("Include source excerpts", isOn: optionBinding(\.includeSourceExcerpts)).disabled(operationActive)
                     HStack {
-                        Button("Preview export") { launchOperation { await previewExport() } }.buttonStyle(.borderedProminent).disabled(!canExport || operationActive)
-                        Button("Review and save…") { activeReview = .export; presentedReview = .export }.disabled(!canExport || operationActive || !exportIsCurrent)
+                        Button("Preview export") { launchOperation { await previewExport() } }.buttonStyle(.borderedProminent).disabled(!canExport || operationActive).accessibilityIdentifier("bundles.previewExport")
+                        Button("Review and save…") { activeReview = .export; presentedReview = .export }.disabled(!canExport || operationActive || !exportIsCurrent).accessibilityIdentifier("bundles.reviewExport")
                         if busy && loading { ProgressView().controlSize(.small) }
                     }
                 }
@@ -108,12 +108,12 @@ public struct BundlesView: View {
                 ProjectCard(title: "Import bundle") {
                     Text("Choose a Memory Layer bundle archive, then inspect the service preview and warnings before importing.").font(.caption).foregroundStyle(.secondary)
                     HStack {
-                        Button("Choose bundle file…") { isChoosingFile = true }.disabled(operationActive || !canImport)
+                        Button("Choose bundle file…") { isChoosingFile = true }.disabled(operationActive || !canImport).accessibilityIdentifier("bundles.chooseFile")
                         if let selectedFileName { Text("\(selectedFileName) · \(selectedFileBytes?.count.formatted() ?? "0") bytes").font(.caption).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary) }
                     }
                     HStack {
-                        Button("Preview import") { launchOperation { await previewImport() } }.buttonStyle(.borderedProminent).disabled(!canImport || operationActive || selectedFileBytes == nil)
-                        Button("Review import…") { activeReview = .import; presentedReview = .import }.disabled(!canImport || operationActive || !importIsCurrent)
+                        Button("Preview import") { launchOperation { await previewImport() } }.buttonStyle(.borderedProminent).disabled(!canImport || operationActive || selectedFileBytes == nil).accessibilityIdentifier("bundles.previewImport")
+                        Button("Review import…") { activeReview = .import; presentedReview = .import }.disabled(!canImport || operationActive || !importIsCurrent).accessibilityIdentifier("bundles.reviewImport")
                         if busy && !loading { ProgressView().controlSize(.small) }
                     }
                 }
@@ -265,7 +265,7 @@ public struct BundlesView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     if let actionError { ProjectBanner(title: "Bundle operation failed", message: actionError, tone: .failure) }
                     if let operationWarning { ProjectBanner(title: "Service outcome needs review", message: operationWarning, tone: .warning) }
-                    if let status { ProjectBanner(title: "Bundle status", message: status, tone: .success) }
+                    if let status { ProjectBanner(title: "Bundle status", message: status, tone: .success).accessibilityElement(children: .ignore).accessibilityLabel("Bundle status. \(status)").accessibilityIdentifier("bundles.status") }
                     if operationActive { ProgressView(loading ? "Preparing bundle review…" : "Processing bundle…").frame(maxWidth: .infinity, alignment: .leading) }
                     switch sheet {
                     case .export:
@@ -275,18 +275,18 @@ public struct BundlesView: View {
                                 Text("\(preview.sourceProject) · bundle \(preview.bundleID)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                                 Text(preview.summaryMarkdown).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                                 warningList(preview.warnings)
-                                Button("Save bundle…") { launchOperation { await saveExport() } }.buttonStyle(.borderedProminent).disabled(!canExport || operationActive || !exportIsCurrent)
+                                Button("Save bundle…") { launchOperation { await saveExport() } }.buttonStyle(.borderedProminent).disabled(!canExport || operationActive || !exportIsCurrent).accessibilityIdentifier("bundles.saveExport")
                             }
                         }
                     case .import:
                         if let preview = importPreview {
                             ProjectCard(title: "Review before import") {
-                                Text("\(preview.memoryCount) memories · \(preview.newCount) new · \(preview.unchangedCount) unchanged · \(preview.replacingCount) replacing").font(.headline)
+                        Text("\(preview.memoryCount) memories · \(preview.newCount) new · \(preview.unchangedCount) unchanged · \(preview.replacingCount) replacing").font(.headline).accessibilityIdentifier("bundles.importPreviewCounts")
                                 Text("\(preview.sourceProject) → \(preview.targetProject) · \(preview.warningCount) warnings · bundle \(preview.bundleID)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                                 Text(preview.summaryMarkdown).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                                 warningList(preview.warnings)
                                 if preview.replacingCount > 0 { ProjectBanner(title: "Existing memories may be replaced", message: "The preview reports \(preview.replacingCount) replacements. Confirm import only if this change is expected.", tone: .warning) }
-                                Button("Import \(preview.memoryCount) memories", role: .destructive) { launchOperation { await importBundle() } }.disabled(!canImport || operationActive || !importIsCurrent)
+                                Button("Import \(preview.memoryCount) memories", role: .destructive) { launchOperation { await importBundle() } }.disabled(!canImport || operationActive || !importIsCurrent).accessibilityIdentifier("bundles.confirmImport")
                             }
                         }
                     }

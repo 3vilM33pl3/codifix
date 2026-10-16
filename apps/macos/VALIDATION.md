@@ -45,12 +45,16 @@ tested instead.
 
 ## Automated tests and service contracts
 
-The combined **54-test unit/integration suite passed with zero failures and
-zero skips**, with the opt-in development-service read smokes enabled. Coverage
-includes typed decoding, escaped routes and request bodies, cookie/CSRF handling,
-token isolation, permissions and read-only gates, rejected redirects, request
-cancellation, late connection responses, preview invalidation, and write-failure
-behavior without automatic retries.
+The latest full unit run executed 55 tests: **51 passed, 4 opt-in live-read
+smokes were skipped, and 0 failed**. A focused permission run passed all 12
+`SharedClientTests`. Coverage includes typed decoding, escaped routes and request
+bodies, cookie/CSRF handling, token isolation, permissions and read-only gates,
+rejected redirects, request cancellation, late connection responses, preview
+invalidation, and write-failure behavior without automatic retries. Access
+navigation now separates permission to inspect global administration from
+permission to mutate it: a read-only global administrator can inspect records,
+while token and membership writes remain disabled; a project administrator
+cannot open global Access administration.
 
 The live reads decoded 10 memories (plus detail/history), 29 graph nodes, nine
 automations, one principal, eight skills, one embedding backend, one agent
@@ -85,11 +89,30 @@ was not performed.
 
 ## Automated UI tests
 
-The signed `MemoryLayerUITests` suite passed **2 tests with 0 failures** on
-macOS 26.6 using Xcode 27.0. The tests cover the unconfigured connection prompt
-and a real UI connection to the isolated loopback fixture, including memory
-detail, provenance, and version history. This is navigation smoke coverage; the
-broader feature flows described above were verified manually in the native app.
+The signed `MemoryLayerUITests` suite passed **15 tests with 0 failures and
+0 skips** on macOS 26.6 using Xcode 27.0. The tests exercise all seven native
+flows through the app UI and verify fixture route outcomes:
+
+| Flow | UI tests and assertions |
+| --- | --- |
+| Connect and choose a project | `NavigationSmokeTests.testUnconfiguredAppShowsExistingServiceConnectionPrompt` checks the existing-service prompt and settings fields. `NavigationSmokeTests.testConnectionLoadsSelectedMemoryAndHistoryFromFixture` connects to the loopback service and checks the selected fixture memory, provenance, and history. |
+| Filter and inspect memories | `MemoryFlowUITests.testFilterSwitchesStatusAndSelectedDetailShowsProvenanceAndHistory` switches active/archived filters, opens the canonical record, and checks provenance/history routes. `MemoryFlowUITests.testEmptyServiceProjectStateIdentifiesConnectionAndOffersReview` checks project context and that the empty-state settings action opens connection settings. |
+| Query and source evidence | `KnowledgeFlowUITests.testQueryShowsCitedAnswerAndOpensSourceMemory` checks the answer, citation, and source memory. |
+| Replacement review | `KnowledgeFlowUITests.testReviewApprovalRequiresConfirmationAndRecordsApprovedResult` and `testReviewRejectionRequiresConfirmationAndRecordsRejectedResult` verify cancellation causes no decision write, then verify each confirmed outcome and route. |
+| Automations | `AutomationFlowUITests.testAutomationPreviewIsDryRunAndInspectable` verifies the preview run is sent with `dry_run: true` and opens its inspector. `testAutomationApprovalEditAndApproveAreAudited` checks edited JSON and approve requests. `testAutomationApprovalRejectionCanBeCancelledBeforeWrite` verifies cancel has no write and confirmed rejection removes the pending item. |
+| Bundles | `BundleFlowUITests.testImportUsesNativeFilePickerPreviewWarningsAndExplicitConfirmation` uses the native file picker, checks counts/warnings, verifies closing preview sends no import, compares selected archive and preview/import SHA-256 digests, then checks the result. `testExportPreviewShowsOptionsAndWarningsBeforeSave` checks export options and warnings before the native save action. |
+| Global admin Access | `AccessFlowUITests.testNonGlobalAdministratorCannotOpenAccessAdministration` verifies a project administrator does not gain global Access. `testReadOnlyGlobalAdministratorCanInspectButCannotMutateAccess` verifies principal/token/membership read routes and disabled writes. `testGlobalAdministratorCreatesCopiesDismissesAndRevokesServiceTokenAndMembership` verifies a dummy one-time token is copied and dismissed, only its prefix is listed, token revoke and membership grant/revoke require confirmation, and cancellation sends no revoke. |
+
+The exact UI result bundle is
+`target/macos-ui-signed/Logs/Test/Test-MemoryLayer-2026.10.16_08-04-58-+0100.xcresult`.
+The run took 254.3 seconds. The UI fixture is a Python server bound to a
+temporary loopback port with in-memory data and a request audit that omits token
+secrets and archive contents. Connection profiles are in-memory under
+`--uitesting`; no fixture operation touched the saved development profile or
+service data. XCUITest also emitted SwiftUI “Publishing changes from within view
+updates” and user-interactive/default QoS priority warnings during several
+flows; they did not fail the run and were not changed as part of this UI-test
+task.
 
 The test runner uses an ad-hoc signature and a target-scoped entitlement that
 allows the test process to launch the fixture server. The production app target
@@ -100,11 +123,11 @@ the previous pasteboard items and formats afterward.
 
 The first run did not initialize automation because macOS Developer Tools
 Security was disabled. After enabling it through the standard administrator
-authorization prompt, Xcode ran the suite. That initial run then exposed two
-test issues: the runner sandbox blocked the system Python shim, and simulated
-typing dropped URL punctuation. The UI-test-only entitlement and pasteboard
-entry resolved these issues. The final result bundle is
-`target/macos-ui-signed/Logs/Test/Test-MemoryLayer-2026.10.16_06-38-44-+0100.xcresult`.
-See [README.md](README.md) for the command and
+authorization prompt, Xcode ran the suite. Earlier attempts showed that the
+runner sandbox blocked the system Python shim and simulated typing dropped URL
+punctuation; the UI-test-only entitlement and pasteboard entry resolved these
+issues. A teardown probe confirmed a failed assertion terminates its fixture
+without leaving the test runner waiting on an asynchronous main-actor hop. See
+[README.md](README.md) for the command and
 [the fixture guide](MemoryLayerUITests/Fixtures/README.md) for reproducible
 manual checks.
