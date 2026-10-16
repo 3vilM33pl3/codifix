@@ -132,6 +132,7 @@ fn quote(value: &OsStr) -> Result<OsString> {
 struct Profile {
     name: Vec<u16>,
     sid: PSID,
+    deleted: bool,
 }
 impl Profile {
     fn create() -> Result<Self> {
@@ -155,14 +156,36 @@ impl Profile {
             hr >= 0 && !sid.is_null(),
             "could not create fresh AppContainer"
         );
-        Ok(Self { name, sid })
+        Ok(Self {
+            name,
+            sid,
+            deleted: false,
+        })
+    }
+    fn delete(&mut self) -> Result<()> {
+        self.delete_with(|name| unsafe { DeleteAppContainerProfile(name) })
+    }
+    fn delete_with(&mut self, deletion: impl FnOnce(*const u16) -> i32) -> Result<()> {
+        if self.deleted {
+            return Ok(());
+        }
+        let hr = deletion(self.name.as_ptr());
+        ensure!(
+            hr >= 0,
+            "AppContainer profile cleanup unresolved: {}",
+            OsString::from_wide(&self.name[..self.name.len() - 1]).to_string_lossy()
+        );
+        self.deleted = true;
+        Ok(())
     }
 }
 impl Drop for Profile {
     fn drop(&mut self) {
         // SAFETY: this instance owns exactly this fresh profile and SID.
         unsafe {
-            DeleteAppContainerProfile(self.name.as_ptr());
+            if !self.deleted {
+                DeleteAppContainerProfile(self.name.as_ptr());
+            }
             FreeSid(self.sid);
         }
     }
@@ -580,6 +603,7 @@ impl SandboxProcess {
         )?;
         self.terminate()?;
         self.restore_grants()?;
+        self.delete_profile()?;
         Ok(Some(code))
     }
     pub fn wait(&mut self, deadline: Duration) -> Result<u32> {
@@ -605,6 +629,7 @@ impl SandboxProcess {
         )?;
         self.terminate()?;
         self.restore_grants()?;
+        self.delete_profile()?;
         Ok(code)
     }
     pub fn terminate(&mut self) -> Result<()> {
@@ -659,12 +684,19 @@ impl SandboxProcess {
         }
         Ok(())
     }
+    fn delete_profile(&mut self) -> Result<()> {
+        if let Some(profile) = &mut self.profile {
+            profile.delete()?;
+        }
+        Ok(())
+    }
 }
 impl Drop for SandboxProcess {
     fn drop(&mut self) {
         if self
             .terminate()
             .and_then(|()| self.restore_grants())
+            .and_then(|()| self.delete_profile())
             .is_err()
         {
             // Fail closed on cleanup uncertainty: closing the job still kills
@@ -1218,5 +1250,20 @@ mod tests {
         );
         assert!(quote(OsStr::new("a\0b")).is_err());
         assert!(wide(OsStr::new("a\0b")).is_err());
+    }
+    #[test]
+    fn profile_deletion_failure_retains_identity_for_exact_retry() {
+        let mut profile = Profile::create().unwrap();
+        let identity = profile.name.clone();
+        assert!(profile.delete_with(|_| 0x80004005u32 as i32).is_err());
+        assert!(!profile.deleted);
+        assert_eq!(profile.name, identity);
+        profile.delete().unwrap();
+        assert!(profile.deleted);
+        profile
+            .delete_with(|_| {
+                panic!("already deleted profile must not be recreated or removed twice")
+            })
+            .unwrap();
     }
 }
