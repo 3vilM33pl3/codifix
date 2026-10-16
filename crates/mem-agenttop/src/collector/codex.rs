@@ -69,7 +69,19 @@ impl CodexCollector {
         let mut seen_jsonl = std::collections::HashSet::new();
 
         // Active sessions: running codex processes with open JSONL files
-        for (pid, jsonl_path) in &pid_to_jsonl {
+        for (pid, source) in &pid_to_jsonl {
+            #[cfg(not(windows))]
+            let jsonl_path = source;
+            #[cfg(windows)]
+            let jsonl_path = {
+                if !source.is_live() {
+                    continue;
+                }
+                let Some(path) = source.paths.first() else {
+                    continue;
+                };
+                path
+            };
             let is_exec = pid_is_exec.get(pid).copied().unwrap_or(false);
             if let Some((session, rl)) = self.load_session_with_rate_limit(
                 Some(*pid),
@@ -79,6 +91,15 @@ impl CodexCollector {
                 &shared.children_map,
                 &shared.ports,
             ) {
+                #[cfg(windows)]
+                let session = {
+                    if !source.is_live() {
+                        continue;
+                    }
+                    let mut session = session;
+                    session.started_at = source.started_at;
+                    session
+                };
                 seen_jsonl.insert(jsonl_path.clone());
                 if let Some(new_rl) = rl {
                     let newer = self
@@ -119,37 +140,46 @@ impl CodexCollector {
                 .collect();
             let mut observed = windows::observed_rollouts(&desktop_pids, &self.sessions_dir);
             for pid in desktop_pids {
-                let Some((started_at, _)) = read_proc_started_at(pid) else {
-                    continue;
-                };
-                let paths = observed.remove(&pid).unwrap_or_default();
+                let observation = observed.remove(&pid);
                 let mut found = false;
-                for path in paths {
-                    if let Some((mut session, rl)) = self.load_session_with_rate_limit(
-                        Some(pid),
-                        false,
-                        &path,
-                        &shared.process_info,
-                        &shared.children_map,
-                        &shared.ports,
-                    ) {
-                        session
-                            .current_tasks
-                            .insert(0, "Desktop: observed file use (bounded discovery)".into());
-                        if let Some(rl) = rl
-                            && self
-                                .last_rate_limit
-                                .as_ref()
-                                .is_none_or(|old| rl.updated_at > old.updated_at)
-                        {
-                            self.last_rate_limit = Some(rl);
+                if let Some(observation) = &observation {
+                    for path in &observation.paths {
+                        if !observation.is_live() {
+                            break;
                         }
-                        seen_jsonl.insert(path);
-                        sessions.push(session);
-                        found = true;
+                        if let Some((mut session, rl)) = self.load_session_with_rate_limit(
+                            Some(pid),
+                            false,
+                            path,
+                            &shared.process_info,
+                            &shared.children_map,
+                            &shared.ports,
+                        ) {
+                            if !observation.is_live() {
+                                break;
+                            }
+                            session.started_at = observation.started_at;
+                            session
+                                .current_tasks
+                                .insert(0, "Desktop: observed file use (bounded discovery)".into());
+                            if let Some(rl) = rl
+                                && self
+                                    .last_rate_limit
+                                    .as_ref()
+                                    .is_none_or(|old| rl.updated_at > old.updated_at)
+                            {
+                                self.last_rate_limit = Some(rl);
+                            }
+                            seen_jsonl.insert(path.clone());
+                            sessions.push(session);
+                            found = true;
+                        }
                     }
                 }
-                if !found && let Some(info) = shared.process_info.get(&pid) {
+                if !found
+                    && let Some(info) = shared.process_info.get(&pid)
+                    && let Some((started_at, _)) = read_proc_started_at(pid)
+                {
                     sessions.push(unmapped_desktop(info, started_at));
                 }
             }
@@ -507,14 +537,11 @@ impl CodexCollector {
 
     /// Use observed resource ownership, never latest-history inference.
     #[cfg(target_os = "windows")]
-    fn map_pid_to_jsonl(pids: &[u32]) -> HashMap<u32, PathBuf> {
+    fn map_pid_to_jsonl(pids: &[u32]) -> HashMap<u32, windows::ObservedRollouts> {
         let root = mem_platform::user_home_dir()
             .unwrap_or_default()
             .join(".codex/sessions");
         windows::observed_rollouts(pids, &root)
-            .into_iter()
-            .filter_map(|(pid, paths)| paths.into_iter().next().map(|path| (pid, path)))
-            .collect()
     }
 }
 
@@ -534,11 +561,35 @@ pub fn collect_lightweight_sessions(
     let pid_to_jsonl = CodexCollector::map_pid_to_jsonl(&just_pids);
     let mut sessions = Vec::new();
 
-    for (pid, jsonl_path) in pid_to_jsonl {
-        if let Some(mut session) = parse_codex_jsonl_lightweight(&jsonl_path) {
-            session.pid = pid;
-            if let Some((started_at, _)) = read_proc_started_at(pid) {
-                session.started_at = started_at;
+    for (pid, source) in pid_to_jsonl {
+        #[cfg(not(windows))]
+        let jsonl_path = &source;
+        #[cfg(windows)]
+        let jsonl_path = {
+            if !source.is_live() {
+                continue;
+            }
+            let Some(path) = source.paths.first() else {
+                continue;
+            };
+            path
+        };
+        if let Some(mut session) = parse_codex_jsonl_lightweight(jsonl_path) {
+            #[cfg(not(windows))]
+            {
+                session.pid = pid;
+                if let Some((started_at, _)) = read_proc_started_at(pid) {
+                    session.started_at = started_at;
+                }
+            }
+            #[cfg(windows)]
+            {
+                let Some(bound) =
+                    bind_observed_session(session, pid, source.started_at, source.is_live())
+                else {
+                    continue;
+                };
+                session = bound;
             }
             sessions.push(session);
         }
@@ -592,14 +643,21 @@ pub fn collect_lightweight_sessions(
             .filter(|(_, info)| is_desktop_host(info))
             .map(|(pid, _)| *pid)
             .collect();
-        for (pid, paths) in windows::observed_rollouts(&desktop_pids, &sessions_dir) {
-            let Some((started_at, _)) = read_proc_started_at(pid) else {
-                continue;
-            };
-            for path in paths {
-                if let Some(mut session) = parse_codex_jsonl_lightweight(&path) {
-                    session.pid = pid;
-                    session.started_at = started_at;
+        for (pid, observation) in windows::observed_rollouts(&desktop_pids, &sessions_dir) {
+            for path in &observation.paths {
+                if !observation.is_live() {
+                    break;
+                }
+                if let Some(mut session) = parse_codex_jsonl_lightweight(path) {
+                    let Some(bound) = bind_observed_session(
+                        session,
+                        pid,
+                        observation.started_at,
+                        observation.is_live(),
+                    ) else {
+                        break;
+                    };
+                    session = bound;
                     sessions.push(session);
                 }
             }
@@ -612,6 +670,21 @@ pub fn collect_lightweight_sessions(
 #[cfg(any(windows, test))]
 fn is_desktop_host(info: &ProcInfo) -> bool {
     process::cmd_has_binary(&info.command, "codex") && info.command.contains("app-server")
+}
+
+#[cfg(any(windows, test))]
+fn bind_observed_session(
+    mut session: LightweightAgentSession,
+    pid: u32,
+    observed_start: u64,
+    observed_process_live: bool,
+) -> Option<LightweightAgentSession> {
+    if !observed_process_live {
+        return None;
+    }
+    session.pid = pid;
+    session.started_at = observed_start;
+    Some(session)
 }
 
 /// An observed host is not an observed repository. Empty cwd deliberately
@@ -1053,6 +1126,24 @@ fn parse_codex_jsonl(path: &Path) -> Option<CodexJSONLResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pid_replacement_after_discovery_cannot_rebind_old_rollout() {
+        let old = LightweightAgentSession {
+            agent_cli: "codex",
+            pid: 0,
+            session_id: "old-rollout".into(),
+            cwd: "old-project".into(),
+            started_at: 1,
+        };
+        // Deterministic seam: the originally retained process has exited, but
+        // a new snapshot could now report the same PID with a newer start.
+        let replacement = (42, 13_000);
+        assert!(bind_observed_session(old.clone(), replacement.0, 12_000, false).is_none());
+        let bound = bind_observed_session(old, replacement.0, 12_000, true).unwrap();
+        assert_eq!(bound.started_at, 12_000);
+        assert_ne!(bound.started_at, replacement.1);
+        assert_eq!(bound.cwd, "old-project");
+    }
     #[test]
     fn unmapped_desktop_has_visible_status_but_no_inferred_project_or_content() {
         let info = ProcInfo {

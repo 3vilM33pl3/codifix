@@ -77,6 +77,32 @@ fn same_generation(expected: u64, observed: u64, current: u64) -> bool {
     expected != 0 && expected == observed && current == observed
 }
 
+fn generation_started_at(ticks: u64) -> Option<u64> {
+    // Preserve shared snapshot resolution but never look up this PID again.
+    ticks
+        .checked_sub(116_444_736_000_000_000)
+        .map(|unix| unix / 10_000_000 * 1000)
+}
+
+#[cfg(windows)]
+pub(super) struct ObservedRollouts {
+    handle: std::os::windows::io::OwnedHandle,
+    pub started_at: u64,
+    pub paths: Vec<PathBuf>,
+}
+#[cfg(windows)]
+impl ObservedRollouts {
+    pub fn is_live(&self) -> bool {
+        use std::os::windows::io::AsRawHandle;
+        unsafe {
+            windows_sys::Win32::System::Threading::WaitForSingleObject(
+                self.handle.as_raw_handle(),
+                0,
+            ) == windows_sys::Win32::Foundation::WAIT_TIMEOUT
+        }
+    }
+}
+
 #[cfg(windows)]
 mod native {
     use super::*;
@@ -94,7 +120,10 @@ mod native {
             RestartManager::{
                 RM_PROCESS_INFO, RmEndSession, RmGetList, RmRegisterResources, RmStartSession,
             },
-            Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+            Threading::{
+                GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+                PROCESS_SYNCHRONIZE,
+            },
         },
     };
 
@@ -110,7 +139,13 @@ mod native {
         (u64::from(time.dwHighDateTime) << 32) | u64::from(time.dwLowDateTime)
     }
     fn generation(pid: u32) -> Option<(OwnedHandle, u64)> {
-        let raw = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        let raw = unsafe {
+            OpenProcess(
+                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+                0,
+                pid,
+            )
+        };
         if raw.is_null() {
             return None;
         }
@@ -187,14 +222,14 @@ mod native {
                 .collect(),
         )
     }
-    pub(super) fn observed(pids: &[u32], root: &Path) -> HashMap<u32, Vec<PathBuf>> {
+    pub(super) fn observed(pids: &[u32], root: &Path) -> HashMap<u32, ObservedRollouts> {
         let identities: HashMap<_, _> = pids
             .iter()
             .filter_map(|pid| Some((*pid, generation(*pid)?)))
             .collect();
         let mut mapped = HashMap::<u32, Vec<PathBuf>>::new();
         if identities.is_empty() {
-            return mapped;
+            return HashMap::new();
         }
         for path in candidates(root) {
             let Some(users) = users(&path) else {
@@ -214,7 +249,17 @@ mod native {
             paths.sort();
             paths.dedup();
         }
-        mapped
+        identities
+            .into_iter()
+            .filter_map(|(pid, (handle, ticks))| {
+                let observation = ObservedRollouts {
+                    handle,
+                    started_at: generation_started_at(ticks)?,
+                    paths: mapped.remove(&pid)?,
+                };
+                observation.is_live().then_some((pid, observation))
+            })
+            .collect()
     }
 
     #[cfg(test)]
@@ -228,9 +273,12 @@ mod native {
             fs::write(root.path().join("rollout-closed.jsonl"), b"history").unwrap();
             let pid = std::process::id();
             let mapped = observed(&[pid], root.path());
-            assert_eq!(mapped.get(&pid).unwrap().len(), 2);
+            assert_eq!(mapped.get(&pid).unwrap().paths.len(), 2);
             drop(second);
-            assert_eq!(observed(&[pid], root.path()).get(&pid).unwrap().len(), 1);
+            assert_eq!(
+                observed(&[pid], root.path()).get(&pid).unwrap().paths.len(),
+                1
+            );
             drop(first);
             assert!(observed(&[pid], root.path()).is_empty());
             assert!(observed(&[u32::MAX], root.path()).is_empty());
@@ -241,7 +289,7 @@ mod native {
 pub(super) fn observed_rollouts(
     pids: &[u32],
     root: &Path,
-) -> std::collections::HashMap<u32, Vec<PathBuf>> {
+) -> std::collections::HashMap<u32, ObservedRollouts> {
     native::observed(pids, root)
 }
 
@@ -254,6 +302,11 @@ mod tests {
         assert!(!same_generation(12, 12, 13));
         assert!(!same_generation(12, 11, 12));
         assert!(!same_generation(0, 0, 0));
+        let old = 116_444_736_000_000_000 + 12 * 10_000_000;
+        let replacement = old + 10_000_000;
+        assert!(!same_generation(old, old, replacement));
+        assert_eq!(generation_started_at(old), Some(12_000));
+        assert_eq!(generation_started_at(replacement), Some(13_000));
     }
     #[test]
     fn candidate_scan_is_bounded_and_never_follows_directory_links() {
