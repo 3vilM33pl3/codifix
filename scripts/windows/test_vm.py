@@ -5,12 +5,136 @@ import socket
 import unittest
 import xml.etree.ElementTree as ET
 import tempfile
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 import vm
 
 
 class SeedTests(unittest.TestCase):
+    def test_active_descriptor_never_falls_back_to_legacy_disk(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'lab'
+            root.mkdir(mode=0o700)
+            base = Path(temporary) / 'nvme'
+            base.mkdir(mode=0o700)
+            selected = base / 'active'
+            selected.mkdir(mode=0o700)
+            disk = selected / 'disk.qcow2'
+            (root / 'disk.qcow2').write_bytes(b'legacy')
+            with patch.object(vm, 'ACTIVE_DISK_BASE', base):
+                self.assertEqual(vm.active_disk(root), root / 'disk.qcow2')
+                vm.write_json(root / 'active-disk.json', {'format':vm.ACTIVE_DISK_FORMAT,
+                    'root':str(root),'path':str(disk),'virtual_size':200*1024**3})
+                with self.assertRaisesRegex(ValueError, 'missing'):
+                    vm.active_disk(root)
+                outside = Path(temporary) / 'outside'
+                outside.write_bytes(b'outside')
+                disk.symlink_to(outside)
+                with self.assertRaisesRegex(ValueError, 'symbolic'):
+                    vm.active_disk(root)
+                disk.unlink()
+                disk.write_bytes(b'new')
+                disk.chmod(0o600)
+                with patch.object(vm, 'disk_information', return_value={'format':'qcow2','virtual_size':200*1024**3}):
+                    self.assertEqual(vm.active_disk(root),disk)
+                os.link(disk, selected / 'hardlink')
+                with self.assertRaisesRegex(ValueError, 'single-linked'):
+                    vm.active_disk(root)
+                with self.assertRaises(ValueError):
+                    vm.private_disk_path(base / '..' / 'outside')
+
+    def test_relocation_binds_exact_copy_and_retains_hdd_state(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'lab'
+            root.mkdir(mode=0o700)
+            (root / 'tpm').mkdir(mode=0o700)
+            for entry in ('disk.qcow2','nvram.fd','tpm/state'):
+                (root / entry).write_bytes(b'synthetic-' + entry.encode())
+            data={'format':vm.FORMAT,'root':str(root)}
+            vm.write_json(root / 'lab.json',data)
+            base=Path(temporary) / 'nvme'
+            with patch.object(vm,'ACTIVE_DISK_BASE',base), patch.object(vm,'require_stopped') as stopped, \
+                    patch.object(vm,'disk_information',return_value={'format':'qcow2','virtual_size':200*1024**3}):
+                vm.relocate_disk(root,base / 'active')
+                stopped.assert_called_once_with(root)
+                selected=vm.active_disk(root)
+                self.assertEqual(selected.read_bytes(),(root / 'disk.qcow2').read_bytes())
+                self.assertEqual(json.loads((root / 'lab.json').read_text()),data)
+                descriptor=json.loads((root / 'active-disk.json').read_text())
+                self.assertEqual(descriptor['initial_sha256'],vm.digest(selected))
+                recovery=Path(descriptor['recovery_directory'])
+                self.assertEqual((recovery / 'nvram.fd').read_bytes(),(root / 'nvram.fd').read_bytes())
+                self.assertEqual((recovery / 'tpm/state').read_bytes(),(root / 'tpm/state').read_bytes())
+                self.assertTrue((recovery / 'complete.json').is_file())
+                selected.write_bytes(b'legitimate guest writes')
+                self.assertEqual(vm.active_disk(root),selected)  # Copy hash is historical.
+                with self.assertRaises(ValueError):
+                    vm.relocate_disk(root,base / 'another')
+
+    def test_relocation_failed_copy_retains_original_selection(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary) / 'lab'; root.mkdir(mode=0o700)
+            (root / 'tpm').mkdir(mode=0o700)
+            for entry in ('disk.qcow2','nvram.fd','tpm/state'):
+                (root / entry).write_bytes(b'synthetic')
+            vm.write_json(root / 'lab.json',{'format':vm.FORMAT,'root':str(root)})
+            base=Path(temporary) / 'nvme'; original_run=vm.run
+            def corrupt_copy(*args,**kwargs):
+                result=original_run(*args,**kwargs)
+                if args[0]=='cp' and args[-1]==base / 'active/disk.qcow2':
+                    Path(args[-1]).write_bytes(b'corrupt')
+                return result
+            with patch.object(vm,'ACTIVE_DISK_BASE',base),patch.object(vm,'require_stopped'), \
+                    patch.object(vm,'disk_information',return_value={'format':'qcow2','virtual_size':200*1024**3}), \
+                    patch.object(vm,'run',side_effect=corrupt_copy):
+                with self.assertRaisesRegex(ValueError,'differs'):
+                    vm.relocate_disk(root,base / 'active')
+                self.assertEqual(vm.active_disk(root),root / 'disk.qcow2')
+                self.assertEqual((root / 'disk.qcow2').read_bytes(),b'synthetic')
+                self.assertTrue((base / 'active/disk.qcow2').exists())
+
+    def test_relocated_restore_retains_disks_beside_active_disk_and_recovers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary) / 'lab'; root.mkdir(mode=0o700)
+            (root / 'snapshots').mkdir(); (root / 'tpm').mkdir(mode=0o700)
+            for entry in ('disk.qcow2','nvram.fd','tpm/state'):
+                (root / entry).write_bytes(b'clean')
+            vm.write_json(root / 'lab.json',{'format':vm.FORMAT,'root':str(root),'old_firmware':True})
+            base=Path(temporary) / 'nvme'
+            with patch.object(vm,'ACTIVE_DISK_BASE',base),patch.object(vm,'require_stopped'), \
+                    patch.object(vm,'disk_information',return_value={'format':'qcow2','virtual_size':200*1024**3}):
+                vm.snapshot(root,'old-hdd-snapshot')
+                vm.relocate_disk(root,base / 'active')
+                disk=vm.active_disk(root); disk.write_bytes(b'new work')
+                (root / 'disk.qcow2').write_bytes(b'inactive preserved')
+                rename=Path.rename
+                def interrupt(path,target):
+                    result=rename(path,target)
+                    if path==disk:
+                        raise RuntimeError('synthetic interruption after active disk retention')
+                    return result
+                with patch.object(Path,'rename',interrupt):
+                    with self.assertRaises(RuntimeError):
+                        vm.restore(root,'old-hdd-snapshot')
+                operation=next(root.glob('restore-*'))
+                self.assertFalse((operation / 'complete.json').exists())
+                vm.recover_restore(root,operation.name)
+                vm.recover_restore(root,operation.name)
+                self.assertEqual(vm.active_disk(root),disk)
+                self.assertEqual(disk.read_bytes(),b'clean')
+                self.assertEqual((disk.parent / operation.name / 'previous-disk.qcow2').read_bytes(),b'new work')
+                self.assertFalse((operation / 'previous-disk.qcow2').exists())
+                self.assertEqual((root / 'disk.qcow2').read_bytes(),b'inactive preserved')
+
+    def test_active_disk_qcow_geometry_and_backing_are_checked(self):
+        for info in ({'format':'raw','virtual-size':200*1024**3},
+                     {'format':'qcow2','virtual-size':1024},
+                     {'format':'qcow2','virtual-size':200*1024**3,'backing-filename':'parent'}):
+            with patch.object(vm,'run',return_value=SimpleNamespace(stdout=json.dumps(info))):
+                with self.assertRaises(ValueError):
+                    vm.disk_information(Path('/synthetic'))
+
     def test_start_protects_qga_socket_even_if_qemu_resets_umask(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

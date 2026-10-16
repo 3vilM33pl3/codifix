@@ -29,6 +29,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 QGA_MAX_RESPONSE = 48 * 1024 * 1024  # Two bounded 16 MiB captured streams + base64.
 QGA_COPY_LIMIT = 512 * 1024 * 1024
 QGA_CHUNK = 256 * 1024
+ACTIVE_DISK_FORMAT = "memory-windows-active-disk-v1"
+ACTIVE_DISK_BASE = Path("/home/olivier/.local/share/memory-windows-lab")
 
 
 def run(*args, **kwargs):
@@ -56,11 +58,17 @@ def private_root(path):
 
 def write_json(path, data):
     temporary = path.with_suffix(".partial")
-    with temporary.open("x", encoding="utf-8") as output:
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as output:
         json.dump(data, output, indent=2)
         output.flush()
         os.fsync(output.fileno())
     temporary.replace(path)
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
 def load(root):
@@ -68,6 +76,108 @@ def load(root):
     if data.get("format") != FORMAT or data.get("root") != str(root):
         raise ValueError("not a lab created at this location by this tool")
     return data
+
+
+def private_disk_path(path, missing=False):
+    """Validate the dedicated active-disk storage, never resolve aliases."""
+    path = Path(path)
+    if not path.is_absolute() or ".." in path.parts or not path.is_relative_to(ACTIVE_DISK_BASE) or path == ACTIVE_DISK_BASE:
+        raise ValueError("active disk must remain inside the dedicated NVMe lab directory")
+    if any(not part or any(not char.isascii() or not (char.isalnum() or char in "._-") for char in part)
+           for part in path.relative_to(ACTIVE_DISK_BASE).parts):
+        raise ValueError("active disk names must not contain QEMU option delimiters or ambiguous characters")
+    for parent in [path, *path.parents]:
+        if parent.is_symlink():
+            raise ValueError("active disk path cannot contain symbolic links")
+        if parent.is_relative_to(ACTIVE_DISK_BASE) and parent.exists():
+            info = parent.lstat()
+            if info.st_uid != os.geteuid() or info.st_mode & 0o077:
+                raise ValueError("active disk storage must be operator-owned and private")
+    if path.exists():
+        info = path.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError("active disk must be a regular single-linked file")
+    elif not missing:
+        raise ValueError("configured active disk is missing; no legacy fallback")
+    return path
+
+
+def disk_information(path):
+    result = run("qemu-img", "info", "--output=json", path, capture_output=True, text=True)
+    info = json.loads(result.stdout)
+    specific = info.get("format-specific", {}).get("data", {})
+    if info.get("format") != "qcow2" or info.get("virtual-size") != 200 * 1024 ** 3 or any(
+            key in info or key in specific for key in ("backing-filename", "full-backing-filename", "data-file")):
+        raise ValueError("active disk must be a standalone 200GiB qcow2 image")
+    return {"format": "qcow2", "virtual_size": info["virtual-size"]}
+
+
+def active_disk(root, missing=False):
+    descriptor = root / "active-disk.json"
+    if not descriptor.exists() and not descriptor.is_symlink():
+        return root / "disk.qcow2"  # Existing labs remain unchanged.
+    info = descriptor.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_nlink != 1 or info.st_size > 8192:
+        raise ValueError("active disk descriptor must be a private regular file")
+    saved = json.loads(descriptor.read_text())
+    if saved.get("format") != ACTIVE_DISK_FORMAT or saved.get("root") != str(root) or saved.get("virtual_size") != 200 * 1024 ** 3:
+        raise ValueError("foreign or incompatible active disk descriptor")
+    path = private_disk_path(saved.get("path", ""), missing)
+    if path.exists():
+        disk_information(path)
+    return path
+
+
+def relocate_disk(root, directory):
+    """Cold exact-copy relocation; original HDD state remains recoverable."""
+    require_stopped(root)
+    if (root / "active-disk.json").exists() or (root / "active-disk.json").is_symlink():
+        raise ValueError("active disk already configured; no implicit relocation/adoption")
+    source = root / "disk.qcow2"
+    info = source.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != os.geteuid():
+        raise ValueError("legacy disk must be an operator-owned regular single-linked file")
+    geometry = disk_information(source)
+    destination = Path(directory) / "disk.qcow2"
+    private_disk_path(destination, missing=True)
+    if not ACTIVE_DISK_BASE.exists():
+        ACTIVE_DISK_BASE.mkdir(mode=0o700)
+    if destination.parent.exists():
+        raise ValueError("relocation requires a new dedicated destination directory")
+    destination.parent.mkdir(mode=0o700)
+    operation = root / f"relocate-{time.time_ns()}"
+    operation.mkdir(mode=0o700)
+    for entry in ("nvram.fd", "tpm", "lab.json"):
+        run("cp", "--reflink=auto", "--sparse=always", "-a", root / entry, operation / entry)
+    recovery_files = [Path("nvram.fd"), Path("lab.json")]
+    recovery_files.extend(path.relative_to(root) for path in (root / "tpm").rglob("*") if path.is_file())
+    if len(recovery_files) > 128 or any(path.is_symlink() for path in (root / "tpm").rglob("*")):
+        raise ValueError("unexpected TPM recovery layout; original remains active")
+    recovery_hashes = {}
+    for relative in recovery_files:
+        original_hash = digest(root / relative)
+        if digest(operation / relative) != original_hash:
+            raise ValueError("firmware/TPM recovery copy differs; original remains active")
+        with (operation / relative).open("rb") as copied:
+            os.fsync(copied.fileno())
+        recovery_hashes[str(relative)] = original_hash
+    before = digest(source)
+    write_json(operation / "intent.json", {"format": ACTIVE_DISK_FORMAT, "root": str(root),
+               "source": str(source), "destination": str(destination), "source_sha256": before,
+               "recovery_sha256": recovery_hashes, "original_retained": True})
+    run("cp", "--reflink=auto", "--sparse=always", "-a", source, destination)
+    destination.chmod(0o600)
+    with destination.open("rb") as copied:
+        os.fsync(copied.fileno())
+    private_disk_path(destination)
+    if digest(source) != before or digest(destination) != before or disk_information(destination) != geometry:
+        raise ValueError("relocation copy differs; original remains active and copy is retained")
+    descriptor = {"format": ACTIVE_DISK_FORMAT, "root": str(root), "path": str(destination),
+                  "virtual_size": geometry["virtual_size"], "initial_sha256": before,
+                  "recovery_directory": str(operation), "inactive_original": str(source)}
+    write_json(root / "active-disk.json", descriptor)
+    write_json(operation / "complete.json", {"activated": str(destination), "original_retained": True})
+    print(json.dumps(descriptor))
 
 
 @contextlib.contextmanager
@@ -498,6 +608,7 @@ def require_stopped(root):
 
 def start(root, data, install):
     require_stopped(root)
+    disk = active_disk(root)
     if (root / "secure-boot-nvram.partial").exists():
         raise ValueError("interrupted firmware update must be reconciled before boot")
     if any(not (path / "complete.json").exists() for path in root.glob("restore-*") if path.is_dir()):
@@ -514,7 +625,7 @@ def start(root, data, install):
                "-m", str(data["memory_mib"]), "-rtc", "base=utc",
                "-drive", f"if=pflash,format=raw,readonly=on,file={data['firmware']}",
                "-drive", f"if=pflash,format=raw,file={root / 'nvram.fd'}",
-               "-drive", f"file={root / 'disk.qcow2'},format=qcow2,if=none,id=osdisk",
+               "-drive", f"file={disk},format=qcow2,if=none,id=osdisk",
                "-device", f"ide-hd,drive=osdisk,bus=ide.0,bootindex={2 if install else 1}",
                "-chardev", f"socket,id=chrtpm,path={root / 'tpm.sock'}",
                "-tpmdev", "emulator,id=tpm0,chardev=chrtpm", "-device", "tpm-tis,tpmdev=tpm0",
@@ -621,7 +732,8 @@ def snapshot(root, name):
     target = root / "snapshots" / name
     target.mkdir(mode=0o700)  # Immutable; fail if already present.
     for entry in ["disk.qcow2", "nvram.fd", "tpm"]:
-        run("cp", "--reflink=auto", "--sparse=always", "-a", root / entry, target / entry)
+        selected = active_disk(root) if entry == "disk.qcow2" else root / entry
+        run("cp", "--reflink=auto", "--sparse=always", "-a", selected, target / entry)
     if (root / "lab.json").exists():
         shutil.copy2(root / "lab.json", target / "lab.json")
     write_json(target / "snapshot.json", {"format": FORMAT, "name": name, "root": str(root),
@@ -640,6 +752,11 @@ def restore(root, name):
     # Retain current state in full; interrupted restoration is recoverable locally.
     operation = root / f"restore-{time.time_ns()}"
     operation.mkdir(mode=0o700)
+    disk = active_disk(root)
+    disk_stage = operation
+    if disk != root / "disk.qcow2":
+        disk_stage = disk.parent / operation.name
+        disk_stage.mkdir(mode=0o700)
     entries = ["disk.qcow2", "nvram.fd", "tpm"]
     if (source / "lab.json").exists():
         saved = json.loads((source / "lab.json").read_text())
@@ -647,9 +764,17 @@ def restore(root, name):
             raise ValueError("foreign snapshot firmware configuration")
         entries.append("lab.json")
     write_json(operation / "intent.json", {"format": FORMAT, "snapshot": name,
-                                         "root": str(root), "entries": entries})
+                                         "root": str(root), "entries": entries,
+                                         "active_disk": str(disk), "disk_stage": str(disk_stage)})
     for entry in entries:
-        run("cp", "--reflink=auto", "--sparse=always", "-a", source / entry, operation / f"new-{entry}")
+        staging = disk_stage if entry == "disk.qcow2" else operation
+        run("cp", "--reflink=auto", "--sparse=always", "-a", source / entry, staging / f"new-{entry}")
+    if disk != root / "disk.qcow2":
+        # Legacy snapshots may have inherited a permissive file mode inside
+        # their private snapshot directory. The new active storage is stricter.
+        (disk_stage / "new-disk.qcow2").chmod(0o600)
+        private_disk_path(disk_stage / "new-disk.qcow2")
+        disk_information(disk_stage / "new-disk.qcow2")
     write_json(operation / "prepared.json", {"complete_copy": True})
     recover_restore(root, operation.name)
 
@@ -671,10 +796,18 @@ def recover_restore(root, name):
     if entries not in (["disk.qcow2", "nvram.fd", "tpm"],
                        ["disk.qcow2", "nvram.fd", "tpm", "lab.json"]):
         raise ValueError("unknown restore components")
+    disk = active_disk(root, missing=True)
+    disk_stage = operation if disk == root / "disk.qcow2" else disk.parent / operation.name
+    if intent.get("active_disk", str(root / "disk.qcow2")) != str(disk) or intent.get("disk_stage", str(operation)) != str(disk_stage):
+        raise ValueError("restore active disk binding changed; inspect retained state")
     for entry in entries:
-        previous = operation / f"previous-{entry}"
-        replacement = operation / f"new-{entry}"
-        target = root / entry
+        staging = disk_stage if entry == "disk.qcow2" else operation
+        previous = staging / f"previous-{entry}"
+        replacement = staging / f"new-{entry}"
+        target = disk if entry == "disk.qcow2" else root / entry
+        if entry == "disk.qcow2" and disk != root / "disk.qcow2":
+            private_disk_path(previous, missing=True)
+            private_disk_path(replacement, missing=True)
         if not previous.exists():
             if not replacement.exists() or not target.exists():
                 raise ValueError("restore state requires inspection; no prior state removed")
@@ -706,6 +839,8 @@ def main():
     sub.add_parser("shutdown")
     sub.add_parser("enable-secure-boot")
     sub.add_parser("refresh-seed")
+    relocation = sub.add_parser("relocate-disk", help="cold exact copy to dedicated private NVMe storage; retain original")
+    relocation.add_argument("--destination-directory", type=Path, required=True)
     snap = sub.add_parser("snapshot")
     snap.add_argument("name")
     restore_args = sub.add_parser("restore")
@@ -748,6 +883,8 @@ def main():
             enable_secure_boot(root, data)
         elif args.command == "refresh-seed":
             refresh_seed(root)
+        elif args.command == "relocate-disk":
+            relocate_disk(root, args.destination_directory)
         elif args.command == "snapshot":
             snapshot(root, args.name)
         elif args.command == "restore":
