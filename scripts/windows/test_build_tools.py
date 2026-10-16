@@ -25,6 +25,14 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn('USERPROFILE=$privateProfile; HOME=$privateProfile',script)
         self.assertIn("PSExecutionPolicyPreference='Bypass'",script)
         self.assertNotIn('Set-ExecutionPolicy',script)
+        self.assertIn("CARGO_BUILD_JOBS='2'",script)
+
+    def test_native_build_families_are_separate_but_each_is_serialized(self):
+        script = (Path(__file__).parent / 'guest-stage.ps1').read_text()
+        for required in ["'PiBuild' { 'Local\\MemoryLab-NativePiBuild' }",
+                         "'ProductCheck' { 'Local\\MemoryLab-NativeProductBuild' }",
+                         "default { 'Local\\MemoryLab-NativeBuildStage' }",'$mutex.WaitOne(0)']:
+            self.assertIn(required,script)
 
     def test_product_compilation_is_bounded_native_and_not_workflow_evidence(self):
         script = (Path(__file__).parent / 'guest-native-product.ps1').read_text()

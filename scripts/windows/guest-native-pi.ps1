@@ -75,7 +75,7 @@ try {
         COMSPEC=(Join-Path $system 'System32\cmd.exe'); OS='Windows_NT'; COMPUTERNAME='MEMORY-WINLAB'
         PROCESSOR_ARCHITECTURE='AMD64'; USERPROFILE=$privateProfile; HOME=$privateProfile; TEMP=$temporary; TMP=$temporary
         PATH=($rustBin+';'+(Split-Path -Parent $git)+';'+(Split-Path -Parent $python)+';'+(Join-Path $system 'System32'))
-        CARGO_HOME=(Join-Path $root 'cargo'); RUSTUP_HOME=(Join-Path $root 'rustup'); CARGO_BUILD_JOBS='4'
+        CARGO_HOME=(Join-Path $root 'cargo'); RUSTUP_HOME=(Join-Path $root 'rustup'); CARGO_BUILD_JOBS='2'
         GIT_TERMINAL_PROMPT='0'; GIT_CONFIG_NOSYSTEM='1'; GIT_CONFIG_GLOBAL='NUL'
         # PowerShell stores its process-only -ExecutionPolicy setting in this
         # environment entry. Preserve the fixed lab policy after scrubbing;

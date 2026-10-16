@@ -117,7 +117,15 @@ foreach ($file in $inputRecord.files) {
         throw 'Queued native proof input changed; no execution'
     }
 }
-$mutex = [Threading.Mutex]::new($false, 'Local\MemoryLab-NativeBuildStage')
+# Pi and the product use disjoint source/output/cache trees. Permit these two
+# bounded two-job compilers alongside dependency/API observation; serialize
+# repeated attempts of each family and all shared dependency mutations.
+$mutexName = switch ($Stage) {
+    'PiBuild' { 'Local\MemoryLab-NativePiBuild' }
+    'ProductCheck' { 'Local\MemoryLab-NativeProductBuild' }
+    default { 'Local\MemoryLab-NativeBuildStage' }
+}
+$mutex = [Threading.Mutex]::new($false, $mutexName)
 $held = $false
 try {
     try { $held = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $held = $true }
