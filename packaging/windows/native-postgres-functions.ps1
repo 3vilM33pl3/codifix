@@ -15,6 +15,7 @@ function Get-NativePostgresPlan {
     if (-not [string]::Equals($ClusterPath,$expected,[StringComparison]::OrdinalIgnoreCase)) { throw 'Cluster must be the selected Memory-owned named database directory' }
     if ($PasswordFile.StartsWith($ClusterPath + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Initialization password must remain outside database state' }
     if ($PasswordFile.StartsWith($StateRoot + '\postgres-operations\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Initialization password input must remain outside managed temporary operation files' }
+    if ($PasswordFile.StartsWith($RuntimeBinding.runtime_directory + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Initialization password must not be part of the immutable redistributable runtime' }
     if ($RuntimeBinding.schema_version -ne 1 -or $RuntimeBinding.manifest_sha256 -cnotmatch '^[0-9a-f]{64}$' -or
         $RuntimeBinding.input_sha256 -cnotmatch '^[0-9a-f]{64}$' -or
         $RuntimeBinding.verification_scope -cne 'protected_payload_only' -or

@@ -18,6 +18,8 @@ $original=Get-NativeInputDigest $plan
 foreach ($change in @(@{Name='../outside'},@{Port=543},@{Port=65536},@{ClusterPath='D:\Live'},
     @{ClusterPath='C:\ProgramData\MemoryLayer\databases\workshop\..\homelab'},
     @{PasswordFile='C:\ProgramData\MemoryLayer\databases\workshop\password'},
+    @{PasswordFile='C:\ProgramData\MemoryLayer\postgres-operations\private.password'},
+    @{PasswordFile='C:\Program Files\Memory Layer\runtimes\pinned\private.password'},
     @{PasswordFile='C:\Private\password:alternate'},@{OperationId=[guid]::Empty},@{RecoveryReference=''})) {
     $copy=$arguments.Clone(); foreach ($key in $change.Keys) { $copy[$key]=$change[$key] }
     $rejected=$false; try { $null=Get-NativePostgresPlan @copy } catch { $rejected=$true }
