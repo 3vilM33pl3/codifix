@@ -4,7 +4,7 @@ use super::super::{
     CompanyOrigin,
     credentials::{self, CredentialStore},
 };
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 use anyhow::bail;
 use anyhow::{Result, ensure};
 use mem_record::CompanyAgentCaller;
@@ -15,6 +15,9 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 #[cfg(unix)]
+mod filesystem;
+#[cfg(windows)]
+#[path = "settings/filesystem_windows.rs"]
 mod filesystem;
 #[cfg(test)]
 mod tests;
@@ -70,6 +73,8 @@ struct Plan {
     key: String,
     args: Vec<String>,
     before_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    before_identity: Option<(u64, u64)>,
     after_sha256: String,
     stage_id: Uuid,
 }
@@ -319,16 +324,16 @@ fn save(store: &impl CredentialStore, origin: &CompanyOrigin, journal: &Journal)
     )
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 pub(super) struct Prepared {
     io: filesystem::Settings,
     journal: Journal,
     result: Vec<u8>,
     already: bool,
 }
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 pub(super) struct Prepared;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 pub(super) fn prepare(
     store: &impl CredentialStore,
     origin: &CompanyOrigin,
@@ -341,6 +346,10 @@ pub(super) fn prepare(
     let io = filesystem::Settings::open(&inputs.workspace, inputs.caller, journal_path)?;
     let original = io.read()?;
     let before = original.as_deref().map(bytes_hash);
+    #[cfg(windows)]
+    let before_identity = io.identity();
+    #[cfg(not(windows))]
+    let before_identity = None;
     let args = arguments(&inputs)?;
     let key = owned_key(&inputs)?;
     let result = merge(
@@ -354,7 +363,8 @@ pub(super) fn prepare(
     let existing = read_journal(store, origin, &inputs)?;
     let journal = if let Some(journal) = existing.filter(|j| {
         j.plan.inputs == inputs
-            && (j.plan.before_sha256 == before || before.as_ref() == Some(&j.plan.after_sha256))
+            && ((j.plan.before_sha256 == before && j.plan.before_identity == before_identity)
+                || before.as_ref() == Some(&j.plan.after_sha256))
     }) {
         journal
     } else {
@@ -368,6 +378,7 @@ pub(super) fn prepare(
             key,
             args,
             before_sha256: before.clone(),
+            before_identity,
             after_sha256: after,
             stage_id: Uuid::new_v4(),
         };
@@ -410,7 +421,7 @@ pub(super) fn prepare(
         already,
     })
 }
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 pub(super) fn prepare(
     _: &impl CredentialStore,
     _: &CompanyOrigin,
@@ -420,7 +431,7 @@ pub(super) fn prepare(
 ) -> Result<Prepared> {
     bail!("protected project settings writes unsupported on this platform")
 }
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 impl Prepared {
     pub(super) fn inputs(&self) -> &Inputs {
         &self.journal.plan.inputs
@@ -448,7 +459,7 @@ impl Prepared {
         Ok(self.preview(true, replayed))
     }
 }
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 impl Prepared {
     pub(super) fn inputs(&self) -> &Inputs {
         unreachable!("unsupported platform prepare always fails")
