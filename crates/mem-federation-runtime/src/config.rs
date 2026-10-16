@@ -58,19 +58,50 @@ pub struct InstanceCredential {
     pub token_file: PathBuf,
 }
 
-pub fn private_secret(path: &Path) -> Result<String> {
-    let metadata = std::fs::metadata(path).map_err(|_| RuntimeError::Configuration)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if metadata.permissions().mode() & 0o077 != 0 {
+/// Load operator-owned gateway policy, retaining protected Windows handles
+/// through the bounded read. Callers must not reopen the path after validation.
+pub fn load_gateway_config(path: &Path) -> Result<GatewayConfig> {
+    #[cfg(windows)]
+    let bytes = mem_platform_files::windows::Input::open(path, 1024 * 1024)
+        .and_then(|input| input.read(1024 * 1024))
+        .map_err(|_| RuntimeError::Configuration)?;
+    #[cfg(not(windows))]
+    let bytes = {
+        if std::fs::metadata(path)
+            .map_err(|_| RuntimeError::Configuration)?
+            .len()
+            > 1024 * 1024
+        {
             return Err(RuntimeError::Configuration);
         }
-    }
-    if !metadata.is_file() || metadata.len() > 4096 {
-        return Err(RuntimeError::Configuration);
-    }
-    let value = std::fs::read_to_string(path).map_err(|_| RuntimeError::Configuration)?;
+        std::fs::read(path).map_err(|_| RuntimeError::Configuration)?
+    };
+    serde_json::from_slice(&bytes).map_err(|_| RuntimeError::Configuration)
+}
+
+pub fn private_secret(path: &Path) -> Result<String> {
+    #[cfg(not(windows))]
+    let value = {
+        let metadata = std::fs::metadata(path).map_err(|_| RuntimeError::Configuration)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if metadata.permissions().mode() & 0o077 != 0 {
+                return Err(RuntimeError::Configuration);
+            }
+        }
+        if !metadata.is_file() || metadata.len() > 4096 {
+            return Err(RuntimeError::Configuration);
+        }
+        std::fs::read_to_string(path).map_err(|_| RuntimeError::Configuration)?
+    };
+    #[cfg(windows)]
+    let value = {
+        let bytes = mem_platform_files::windows::Input::open(path, 4096)
+            .and_then(|input| input.read(4096))
+            .map_err(|_| RuntimeError::Configuration)?;
+        String::from_utf8(bytes).map_err(|_| RuntimeError::Configuration)?
+    };
     if value.trim().len() < 32 || value.len() > 4096 {
         return Err(RuntimeError::Configuration);
     }
@@ -265,13 +296,115 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    #[test]
-    fn legacy_static_configuration_and_explicit_rotating_mode_are_mutually_exclusive() {
-        let legacy = json!({"space":uuid::Uuid::new_v4(),"authority":uuid::Uuid::new_v4(),
+    fn legacy_configuration() -> serde_json::Value {
+        json!({"space":uuid::Uuid::new_v4(),"authority":uuid::Uuid::new_v4(),
             "listen":"127.0.0.1:9999","database_url_file":"/private/database",
             "pds":"https://private.example.test","repository":"did:web:private.example.test",
             "signing_key":"fixture","token_file":"/private/access",
-            "audit_key_file":"/private/audit","receipt_keys":[],"policy":{"external_models":[]},"credentials":[]});
+            "audit_key_file":"/private/audit","receipt_keys":[],"policy":{"external_models":[]},"credentials":[]})
+    }
+
+    #[test]
+    fn gateway_loader_parses_bounded_configuration_without_serving() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("private");
+        #[cfg(windows)]
+        mem_platform_files::windows::create_private_directory(&root).unwrap();
+        #[cfg(not(windows))]
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("gateway.json");
+        let value = legacy_configuration();
+        std::fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+        let loaded = load_gateway_config(&path).unwrap();
+        assert_eq!(serde_json::to_value(loaded.space).unwrap(), value["space"]);
+        std::fs::write(&path, b"invalid json").unwrap();
+        assert!(load_gateway_config(&path).is_err());
+        std::fs::write(&path, vec![b' '; 1024 * 1024 + 1]).unwrap();
+        assert!(load_gateway_config(&path).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_gateway_configuration_rejects_acl_reparse_links_and_oversize() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("private");
+        mem_platform_files::windows::create_private_directory(&root).unwrap();
+        let path = root.join("gateway.json");
+        let bytes = serde_json::to_vec(&legacy_configuration()).unwrap();
+        std::fs::write(&path, &bytes).unwrap();
+        assert!(load_gateway_config(&path).is_ok());
+        let alias = root.join("alias.json");
+        std::fs::hard_link(&path, &alias).unwrap();
+        assert!(load_gateway_config(&path).is_err());
+        std::fs::remove_file(alias).unwrap();
+        let junction = temp.path().join("junction");
+        let status = std::process::Command::new("cmd.exe")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&root)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let rejected = load_gateway_config(&junction.join("gateway.json")).is_err();
+        std::fs::remove_dir(junction).unwrap();
+        assert!(rejected);
+        std::fs::write(&path, vec![b' '; 1024 * 1024 + 1]).unwrap();
+        assert!(load_gateway_config(&path).is_err());
+        std::fs::write(&path, &bytes).unwrap();
+        let status = std::process::Command::new("icacls.exe")
+            .arg(&path)
+            .args(["/grant", "*S-1-1-0:M"])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert!(load_gateway_config(&path).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_private_secrets_reject_public_acl_aliases_reparse_and_oversize() {
+        use std::io::Write;
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("private");
+        mem_platform_files::windows::create_private_directory(&root).unwrap();
+        let path = root.join("secret");
+        let mut file = mem_platform_files::windows::create_private_file(&path).unwrap();
+        let scalar = "ab".repeat(32);
+        writeln!(file, "{scalar}").unwrap();
+        drop(file);
+        assert_eq!(private_secret(&path).unwrap(), scalar);
+        assert_eq!(private_key(&path).unwrap(), [0xab; 32]);
+        let alias = root.join("alias");
+        std::fs::hard_link(&path, &alias).unwrap();
+        assert!(private_secret(&path).is_err());
+        assert!(private_key(&alias).is_err());
+        std::fs::remove_file(alias).unwrap();
+        let junction = temp.path().join("junction");
+        let status = std::process::Command::new("cmd.exe")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&root)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let rejected = private_secret(&junction.join("secret")).is_err();
+        std::fs::remove_dir(junction).unwrap();
+        assert!(rejected);
+        std::fs::write(&path, "a".repeat(4097)).unwrap();
+        assert!(private_secret(&path).is_err());
+        std::fs::write(&path, scalar).unwrap();
+        let status = std::process::Command::new("icacls.exe")
+            .arg(&path)
+            .args(["/grant", "*S-1-1-0:R"])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert!(private_secret(&path).is_err());
+    }
+
+    #[test]
+    fn legacy_static_configuration_and_explicit_rotating_mode_are_mutually_exclusive() {
+        let legacy = legacy_configuration();
         let config: GatewayConfig = serde_json::from_value(legacy.clone()).unwrap();
         assert!(config.validate_credential_mode().is_ok());
         let mut rotating = legacy.clone();
