@@ -26,6 +26,7 @@ export function createModelAgent(options) {
   return async input => {
     if (busy) throw Error('sequence agent already running');
     const { stepId, ...container } = structuredClone(input);
+    if (container.execution !== undefined) throw Error('native model command protocol is not integrated; no Linux fallback');
     validateInput(container);
     if (typeof stepId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(stepId)
         || !container.exportPaths) throw Error('explicit step and submission selection required');

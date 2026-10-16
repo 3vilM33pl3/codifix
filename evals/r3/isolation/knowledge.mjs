@@ -81,6 +81,7 @@ function validateAnswer(answer) {
 }
 
 export async function runOfflineKnowledge(options) {
+  if (options.execution !== undefined) throw Error('native knowledge adjudication is not integrated; no Linux fallback');
   // Snapshot caller-owned inputs before the first await. Private sources/rubrics
   // are retained only on the host, not copied alongside the selected context.
   const { runAnswer, ...plain } = options;

@@ -23,7 +23,9 @@ process.stdout.write(run.stdout);
 `;
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-export function validateRustCase({ image, files, probes, timeoutMs = 30000 }) {
+export function validateRustCase(options) {
+  if (options.execution !== undefined) throw Error('native Rust-blackbox grading is not integrated; no Linux fallback');
+  const { image, files, probes, timeoutMs = 30000 } = options;
   if (!files || !Object.hasOwn(files, 'src/main.rs')) throw Error('Rust binary entry point required');
   if (!Array.isArray(probes) || probes.length < 1 || probes.length > 32) throw Error('invalid Rust probes');
   const ids = new Set();

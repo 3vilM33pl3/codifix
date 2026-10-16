@@ -1,5 +1,43 @@
 # R3 offline container boundary
 
+## Explicit native Windows sequence integration
+
+`sequence.mjs` now uses `execution.mjs` for command-grader sequences. Existing
+callers without an `execution` field keep the unchanged Linux container backend
+and image-labelled result format. Windows is selected only by a reviewed
+`execution: { kind: "windows-native-v1", profile, profile_sha256 }` contract;
+`nativeProfileHash(profile)` computes its canonical digest. It has no Docker
+`image` field and does not translate POSIX executables or `/work` paths.
+
+The profile binds the immutable, operator-installed native helper, pinned
+Node/guest files, complete toolchain file inventory, search/library directories
+and an existing private I/O root. The native helper validates that root and
+creates a private invocation directory **before** JavaScript writes payloads.
+JavaScript file modes and fake-helper tests are not Windows ACL evidence.
+
+Pass explicit Windows `argv` values in all three steps and their command graders.
+Every agent command and grader receives a fresh helper invocation. Only selected
+source exports move between steps; grader files, outputs and future-step context
+do not. Missing required source remains a failed step even if a later step repairs
+it. Native results carry the profile digest and per-invocation descriptor/receipt
+digests, are marked `officialEvidence: false`, and explicitly report no hard disk
+quota. They are not interchangeable with Linux image evidence.
+
+Native Rust-blackbox grading, model-command execution, knowledge adjudication
+and full campaign orchestration remain separate work. Their current entrypoints
+reject explicit native requests before execution rather than silently falling
+back to Linux. Native sequence support is therefore **not** full Windows R3
+completion. Paid R3 remains paused; real Windows launch, compilation, denial and
+recovery evidence is still required.
+
+Focused protocol/sequence checks (fake executors, no native-isolation claim):
+
+```bash
+node --test evals/r3/isolation/native-windows.test.mjs \
+  evals/r3/isolation/sequence-native.test.mjs \
+  evals/r3/isolation/sequence.test.mjs
+```
+
 ## Representative task executor
 
 `rehearsal-task.mjs` composes a prepared service session, existing baseline

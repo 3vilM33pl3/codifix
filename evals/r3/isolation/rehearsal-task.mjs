@@ -63,6 +63,7 @@ export async function createProviderExecutor(options) {
 }
 
 async function createExecutor(options, providerOnly) {
+  if (options.configuration?.execution !== undefined) throw Error('native campaign orchestration is not integrated; no Linux fallback');
   const offlineMode = !providerOnly || options.offline;
   const selectedSplit = options.split;
   const { root, manifestSha256, nodeImage, rustImage, scoreBinary, retrieverBinary,
