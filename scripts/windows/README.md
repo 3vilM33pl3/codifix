@@ -71,8 +71,11 @@ it additionally requires valid Microsoft signatures, reuses the existing public
 key and refuses to replace an existing SSH service or race active servicing.
 It does not enable password authentication. This preview OpenSSH package is VM
 administration tooling, not a Memory customer runtime dependency. Its native
-installation remains unverified until `ssh-result.json` and a key-only connection
-are observed. Use QGA meanwhile; do not repeatedly start optional-feature installs.
+installation was observed on 16 October, followed by a key-only connection as
+`memory-winlab\memorylab`. The firewall-rule creation required a `DisplayName`
+fix; only the inspected remaining steps were resumed, without regenerating
+keys. See the [execution evidence](../../docs/reviews/windows-native/parity-20261016.md).
+Use QGA for recovery if necessary; do not repeatedly start optional-feature installs.
 
 Use a local VNC client with `/data/VMs/memory-windows-native/lab/vnc.sock` for
 the installation console. Do not expose VNC or SSH to a public interface.
@@ -219,4 +222,19 @@ task and survives SSH disconnects. `Status` returns metadata; execution logs
 remain in that private operation directory. A failed/interrupted operation is
 never silently rerun under the same ID. Inspect its receipts and use a fresh
 operation ID for a deliberate retry. Take the clean snapshot **before** starting
-BuildTools. This runner's native scheduling behavior still needs VM validation.
+BuildTools. Native scheduling was observed for API diagnostics and BuildTools;
+the latter's completion is still pending in the execution ledger.
+
+The host helper avoids hand-written nested PowerShell quoting:
+
+```bash
+python3 scripts/windows/vm.py guest-stage-start BuildTools --operation-id YOUR-NEW-UUID
+```
+
+Use a real new UUID, not that placeholder. `dispatch_requested` is not success;
+inspect the operation's `status.json` and retained logs. The host and guest
+runner digests must agree before dispatch. Both launch layers use a
+process-scoped execution policy, never a machine-wide policy change. Native API
+checks run as the ordinary interactive user (`Limited`), while dependency
+installers use `Highest`; elevated scheduled logons may lack a usable Credential
+Manager session even when their name/SID matches the desktop user.
