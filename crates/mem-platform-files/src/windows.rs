@@ -614,12 +614,26 @@ pub struct Input {
     before: Identity,
     directory: Directory,
     name: String,
+    replacement_review: bool,
 }
 impl Input {
     pub fn identity(&self) -> Identity {
         self.before
     }
     pub fn open(path: &Path, limit: u64) -> io::Result<Self> {
+        Self::open_mode(path, limit, false)
+    }
+
+    /// Settings-only review handle for an atomic replacement which must retain
+    /// the old readable object. Windows requires delete sharing on that object.
+    /// Content writers stay fenced, but same-user pathname renames are possible:
+    /// callers must serialize their operations and recheck identity/bytes before
+    /// publication. This is not an OS compare-and-swap against arbitrary renamers.
+    pub fn open_for_reviewed_replacement(path: &Path, limit: u64) -> io::Result<Self> {
+        Self::open_mode(path, limit, true)
+    }
+
+    fn open_mode(path: &Path, limit: u64, replacement_review: bool) -> io::Result<Self> {
         validate_path(path)?;
         let directory = Directory::open(path.parent().ok_or_else(denied)?)?;
         let name = path
@@ -627,7 +641,19 @@ impl Input {
             .and_then(OsStr::to_str)
             .ok_or_else(denied)?
             .to_owned();
-        let file = open(path, false, true)?;
+        let file = if replacement_review {
+            let file = OpenOptions::new()
+                .read(true)
+                .access_mode(GENERIC_READ | READ_CONTROL)
+                .share_mode(FILE_SHARE_READ | FILE_SHARE_DELETE)
+                .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+                .open(path)?;
+            information(&file, false)?;
+            acl(&file, true)?;
+            file
+        } else {
+            open(path, false, true)?
+        };
         let before = information(&file, false)?;
         if before.size > limit {
             return Err(denied());
@@ -637,6 +663,7 @@ impl Input {
             before,
             directory,
             name,
+            replacement_review,
         })
     }
 
@@ -788,9 +815,10 @@ pub fn replace_file(source: &Path, target: &Path) -> io::Result<()> {
 /// Publish only reviewed settings from private outside-workspace staging.
 /// Unlike the generic rename helper this intentionally supports cross-directory
 /// moves on the same volume. Retained handles fence ordinary content writers
-/// and path replacement. Windows 11 POSIX rename is required to replace a target
-/// while its reviewed read handle stays open; no weaker fallback is attempted.
-/// As on Unix, a malicious same-user POSIX renamer is not an OS compare-and-swap.
+/// and ancestor replacement. A target must use the explicit settings-only
+/// replacement review handle: it shares deletion so the old readable object
+/// survives Windows 11 POSIX replacement. Target identity/ACL/bytes are checked
+/// immediately before publication; there is no OS CAS against same-user renames.
 pub fn publish_reviewed_settings(
     source: &Directory,
     source_name: &str,
@@ -832,7 +860,7 @@ pub fn publish_reviewed_settings(
     }
     match reviewed_target {
         Some((input, before)) => {
-            if before.len() > 256 * 1024 {
+            if before.len() > 256 * 1024 || !input.replacement_review {
                 return Err(denied());
             }
             input.unchanged().map_err(at("reviewed target unchanged"))?;
@@ -856,6 +884,11 @@ pub fn publish_reviewed_settings(
         .check_entry(source_name, &file)
         .map_err(at("source entry before rename"))?;
     file.sync_all().map_err(at("source flush"))?;
+    if let Some((input, _)) = reviewed_target {
+        input
+            .unchanged()
+            .map_err(at("reviewed target before rename"))?;
+    }
     let filename: Vec<u16> = target
         .path
         .join(target_name)
@@ -1001,7 +1034,7 @@ mod tests {
         file.write_all(b"before").unwrap();
         file.sync_all().unwrap();
         drop(file);
-        let before = Input::open(&private.join("target/settings"), 6).unwrap();
+        let pinned = Input::open(&private.join("target/settings"), 6).unwrap();
         assert!(
             OpenOptions::new()
                 .write(true)
@@ -1015,6 +1048,61 @@ mod tests {
             )
             .is_err()
         );
+        assert!(
+            publish_reviewed_settings(
+                &source,
+                "after",
+                source_identity,
+                &target,
+                "settings",
+                Some((&pinned, b"before")),
+                b"after",
+            )
+            .is_err()
+        );
+        drop(pinned);
+        let before =
+            Input::open_for_reviewed_replacement(&private.join("target/settings"), 6).unwrap();
+        assert!(
+            OpenOptions::new()
+                .write(true)
+                .open(private.join("target/settings"))
+                .is_err()
+        );
+        // The opt-in review permits same-user rename, not content mutation.
+        // A substituted pathname must be detected before publication and leave
+        // the replacement and staged reviewed bytes untouched.
+        std::fs::rename(
+            private.join("target/settings"),
+            private.join("target/moved-settings"),
+        )
+        .unwrap();
+        let mut substituted = target.create("settings").unwrap();
+        substituted.write_all(b"other").unwrap();
+        drop(substituted);
+        assert!(
+            publish_reviewed_settings(
+                &source,
+                "after",
+                source_identity,
+                &target,
+                "settings",
+                Some((&before, b"before")),
+                b"after",
+            )
+            .is_err()
+        );
+        assert_eq!(
+            std::fs::read(private.join("target/settings")).unwrap(),
+            b"other"
+        );
+        assert!(private.join("stage/after").is_file());
+        std::fs::remove_file(private.join("target/settings")).unwrap();
+        std::fs::rename(
+            private.join("target/moved-settings"),
+            private.join("target/settings"),
+        )
+        .unwrap();
         assert!(
             publish_reviewed_settings(
                 &source,

@@ -42,7 +42,7 @@ pub(super) fn write(path: &Path, key: &str, value: &str) -> Result<()> {
     let lock = private_windows::open_private_lock(&lock_path)?;
     lock.lock()?;
     // Read through a retained handle, never a symlink-following ordinary read.
-    let input = match Input::open(&path, 256 * 1024) {
+    let input = match Input::open_for_reviewed_replacement(&path, 256 * 1024) {
         Ok(input) => Some(input),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => return Err(error.into()),

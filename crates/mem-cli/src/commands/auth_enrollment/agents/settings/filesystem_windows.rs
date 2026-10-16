@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Protected Windows settings merge. Handles and a physical-workspace lock
-//! fence normal writers; malicious same-user POSIX renames are not an OS CAS.
+//! fence content writers and ancestor replacement. Settings-only review shares
+//! target deletion for atomic replacement; same-user renames are not an OS CAS.
 use super::{MAX_BYTES, bytes_hash, changed};
 use anyhow::{Context, Result, ensure};
 use mem_platform::private_windows::{self, Directory, Identity, Input};
@@ -24,7 +25,7 @@ fn read(input: &Input) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 fn optional(path: &Path) -> Result<Option<Input>> {
-    match Input::open(path, MAX_BYTES as u64) {
+    match Input::open_for_reviewed_replacement(path, MAX_BYTES as u64) {
         Ok(input) => Ok(Some(input)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(_) => Err(changed()),
@@ -197,7 +198,7 @@ impl Settings {
             result,
         )
         .context("native settings publish reviewed bytes")?;
-        let installed = Input::open(
+        let installed = Input::open_for_reviewed_replacement(
             &self.workspace.join(super::relative(self.caller)),
             MAX_BYTES as u64,
         )
@@ -288,6 +289,41 @@ mod tests {
             allow_loopback: false,
             allow_offline: false,
         }
+    }
+    #[test]
+    fn native_repeated_replace_retains_review_mode_and_rejects_path_substitution() {
+        let f = Fixture::new();
+        let mut settings =
+            Settings::open(&f.workspace, CompanyAgentCaller::Claude, &f.journal).unwrap();
+        let first = b"{\"first\":true}";
+        let second = b"{\"second\":true}";
+        settings
+            .replace(None, &bytes_hash(first), first, Uuid::new_v4())
+            .unwrap();
+        settings
+            .replace(
+                Some(&bytes_hash(first)),
+                &bytes_hash(second),
+                second,
+                Uuid::new_v4(),
+            )
+            .unwrap();
+        assert_eq!(settings.read().unwrap().unwrap(), second);
+        let original = f.workspace.join(".mcp.json");
+        let moved = f.workspace.join("moved.json");
+        std::fs::rename(&original, &moved).unwrap();
+        std::fs::write(&original, b"{\"unreviewed\":true}").unwrap();
+        assert!(
+            settings
+                .replace(
+                    Some(&bytes_hash(second)),
+                    &bytes_hash(first),
+                    first,
+                    Uuid::new_v4()
+                )
+                .is_err()
+        );
+        assert_eq!(std::fs::read(&original).unwrap(), b"{\"unreviewed\":true}");
     }
     #[test]
     fn native_codex_and_claude_merge_and_replay_preserve_custom_settings() {
