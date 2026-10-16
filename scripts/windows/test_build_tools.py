@@ -7,6 +7,25 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_native_api_stage_is_hash_bound_interactive_and_bounded(self):
+        root = Path(__file__).parent
+        stage = (root / 'guest-stage.ps1').read_text()
+        self.assertIn("'NativeApi'", stage)
+        self.assertIn('Get-BoundFiles $Stage', stage)
+        self.assertIn('Queued native proof file inventory changed', stage)
+        self.assertIn('New-TimeSpan -Minutes 20', stage)
+        self.assertIn('-LogonType Interactive', stage)
+        script = (root / 'guest-native-api.ps1').read_text()
+        for required in ['memory-windows-native-api-v1', 'Get-FileHash',
+                         'Native API filter selected zero tests', 'test result: ok',
+                         'WaitForExit($Seconds * 1000)', '/PID $process.Id /T /F',
+                         'execution_verified=$false', 'credentials::windows::tests',
+                         'workspace::filesystem::windows::tests', 'agents::settings::filesystem::tests',
+                         'collector::codex::windows::native::tests']:
+            self.assertIn(required, script)
+        self.assertNotIn('Invoke-Expression', script)
+        self.assertNotIn('[string]$Command', script)
+
     def test_bootstrap_prepares_ssh_state_before_writing_keys(self):
         script = (Path(__file__).parent / 'guest-bootstrap.ps1').read_text()
         self.assertLess(script.index("New-Item -ItemType Directory -Force 'C:\\ProgramData\\ssh'"),

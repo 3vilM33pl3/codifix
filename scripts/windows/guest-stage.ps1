@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Start','Status','Execute')][string]$Action = 'Status',
-    [ValidateSet('BuildTools','PostgresPrepare','PostgresStart','PdsPrepare')][string]$Stage = 'BuildTools',
+    [ValidateSet('BuildTools','PostgresPrepare','PostgresStart','PdsPrepare','NativeApi')][string]$Stage = 'BuildTools',
     [Parameter(Mandatory=$true)][guid]$OperationId,
     [string]$SourceRoot
 )
@@ -16,6 +16,32 @@ $root = Join-Path 'C:\MemoryLab\runs' $OperationId.ToString()
 $descriptor = Join-Path $root 'input.json'
 $statusPath = Join-Path $root 'status.json'
 $taskName = 'MemoryLab-' + $OperationId.ToString()
+function Get-BoundFiles([string]$SelectedStage) {
+    switch ($SelectedStage) {
+        'BuildTools' { @('guest-build-tools.ps1','build-tools.json') }
+        { $_ -in @('PostgresPrepare','PostgresStart') } { @('guest-native-postgres.ps1','native-postgres.json') }
+        'PdsPrepare' { @('guest-native-pds.ps1','native-pds.json') }
+        'NativeApi' {
+            @('guest-native-api.ps1','native-api.json')
+            $api = Get-Content -LiteralPath 'C:\MemoryLab\inputs\native-api.json' -Raw | ConvertFrom-Json
+            if ($api.format -ne 'memory-windows-native-api-v1' -or
+                (@($api.artifacts | ForEach-Object { $_.kind } | Sort-Object) -join ',') -ne 'desktop,isolation-probe,onboarding,platform,protected-files,routing') {
+                throw 'Native API manifest requires exactly six executable kinds'
+            }
+            $seen = @{}
+            foreach ($artifact in ($api.artifacts | Sort-Object kind)) {
+                if ($artifact.file -cnotmatch '^[A-Za-z0-9][A-Za-z0-9_.-]{0,179}\.exe$' -or
+                    $artifact.sha256 -cnotmatch '^[0-9a-f]{64}$' -or $seen.ContainsKey($artifact.file) -or
+                    (Get-FileHash -LiteralPath (Join-Path 'C:\MemoryLab\inputs' $artifact.file)).Hash.ToLowerInvariant() -ne $artifact.sha256) {
+                    throw 'Invalid native API executable binding'
+                }
+                $seen[$artifact.file] = $true
+                $artifact.file
+            }
+        }
+        default { throw 'Unknown native proof stage' }
+    }
+}
 function Save-Status([string]$State, [string]$Reason) {
     @{format='memory-windows-lab-stage-status-v1';operation_id=$OperationId.ToString();stage=$Stage;state=$State;reason=$Reason;observed_at=[DateTime]::UtcNow.ToString('o')} |
         ConvertTo-Json | Set-Content (Join-Path $root 'status.partial.json') -Encoding UTF8
@@ -40,11 +66,7 @@ if ($Action -eq 'Start') {
     if ($SourceRoot -and ($SourceRoot -notlike 'C:\MemoryLab\*' -or $SourceRoot.Contains('"') -or $SourceRoot.Contains('..'))) {
         throw 'SourceRoot must be a copied lab source directory'
     }
-    $boundFiles = switch ($Stage) {
-        'BuildTools' { @('guest-build-tools.ps1','build-tools.json') }
-        { $_ -in @('PostgresPrepare','PostgresStart') } { @('guest-native-postgres.ps1','native-postgres.json') }
-        'PdsPrepare' { @('guest-native-pds.ps1','native-pds.json') }
-    }
+    $boundFiles = @(Get-BoundFiles $Stage)
     $fileHashes = @($boundFiles | ForEach-Object { [ordered]@{name=$_;sha256=(Get-FileHash (Join-Path 'C:\MemoryLab\inputs' $_)).Hash.ToLowerInvariant()} })
     $inputRecord = [ordered]@{format='memory-windows-lab-stage-v1';operation_id=$OperationId.ToString();stage=$Stage;source_root=$SourceRoot;runner_sha256=(Get-FileHash $PSCommandPath).Hash.ToLowerInvariant();files=$fileHashes}
     if (Test-Path -LiteralPath $descriptor) {
@@ -65,7 +87,8 @@ if ($Action -eq 'Start') {
     $arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $PSCommandPath + '" -Action Execute -OperationId ' + $OperationId.ToString()
     $actionSpec = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument $arguments
     $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Highest
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 3) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    $limit = if ($Stage -eq 'NativeApi') { New-TimeSpan -Minutes 20 } else { New-TimeSpan -Hours 3 }
+    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit $limit -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
     Register-ScheduledTask -TaskName $taskName -Action $actionSpec -Principal $principal -Settings $settings | Out-Null
     Start-ScheduledTask -TaskName $taskName
     Get-Content -LiteralPath $statusPath -Raw
@@ -78,9 +101,11 @@ if ($inputRecord.format -ne 'memory-windows-lab-stage-v1' -or
 $Stage = $inputRecord.stage
 $SourceRoot = $inputRecord.source_root
 $inputs = 'C:\MemoryLab\inputs'
+if ((@($inputRecord.files | ForEach-Object { $_.name }) -join ',') -ne (@(Get-BoundFiles $Stage) -join ',')) {
+    throw 'Queued native proof file inventory changed; no execution'
+}
 foreach ($file in $inputRecord.files) {
-    if ($file.name -notin @('guest-build-tools.ps1','build-tools.json','guest-native-postgres.ps1','native-postgres.json','guest-native-pds.ps1','native-pds.json') -or
-        $file.sha256 -ne (Get-FileHash (Join-Path $inputs $file.name)).Hash.ToLowerInvariant()) {
+    if ($file.sha256 -ne (Get-FileHash (Join-Path $inputs $file.name)).Hash.ToLowerInvariant()) {
         throw 'Queued native proof input changed; no execution'
     }
 }
@@ -105,6 +130,7 @@ try {
                 if (-not $SourceRoot) { throw 'Copied lab source is required' }
                 & (Join-Path $inputs 'guest-native-pds.ps1') -ManifestPath (Join-Path $inputs 'native-pds.json') -SourceRoot $SourceRoot
             }
+            'NativeApi' { & (Join-Path $inputs 'guest-native-api.ps1') -OperationId $OperationId }
             default { throw 'Unknown native proof stage' }
         }
         Save-Status 'succeeded' 'stage_completed'
