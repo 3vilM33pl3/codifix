@@ -36,7 +36,9 @@ use crate::commands::{
         render_agent_project_config, render_project_metadata, render_repo_config,
         sync_memory_skill_bundle, upgrade_project_skills,
     },
-    watch_support::{watch_manager_service_status, watch_service_status, yes_no},
+    watch_support::{
+        ManualWatcherTarget, watch_manager_service_status, watch_service_status_routed, yes_no,
+    },
 };
 use crate::writer_identity::resolve_writer_identity;
 
@@ -191,7 +193,18 @@ pub(crate) async fn build_cli_status_report(
         "watcher manager",
         watch_manager_service_status(Profile::detect()),
     );
-    let project_watcher = text_probe("project watcher", watch_service_status(repo_root, &project));
+    let project_watcher = text_probe(
+        "project watcher",
+        watch_service_status_routed(
+            repo_root,
+            &project,
+            &ManualWatcherTarget {
+                config_path: Some(&config_path),
+                routing_path: config.resolved_area_routing_path.as_deref(),
+                area: config.area.as_ref(),
+            },
+        ),
+    );
     let mcp = mem_mcp::status_report(config.clone(), Some(project.clone())).await;
     let doctor = run_doctor(Some(config_path.clone()), repo_root, &project, false).await?;
     let doctor_failures = doctor

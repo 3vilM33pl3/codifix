@@ -26,7 +26,234 @@ use crate::commands::{
     status_support::repair_repo_bootstrap,
 };
 
+/// The already resolved operator binding for a manually installed watcher.
+/// No selected configuration may be replaced with the global default.
+#[derive(Default)]
+#[cfg_attr(not(windows), allow(dead_code))] // Manual service bindings are Windows-specific.
+pub(crate) struct ManualWatcherTarget<'a> {
+    pub(crate) config_path: Option<&'a Path>,
+    pub(crate) routing_path: Option<&'a Path>,
+    pub(crate) area: Option<&'a mem_config::AreaIdentityConfig>,
+}
+
+#[cfg(any(windows, test))]
+fn manual_watch_identity(project: &str, area: Option<&mem_config::AreaIdentityConfig>) -> String {
+    area.map(|area| format!("{}--{project}", area.key()))
+        .unwrap_or_else(|| project.to_owned())
+}
+
+#[cfg(any(windows, test))]
+fn manual_watch_arguments(
+    repo_root: &Path,
+    project: &str,
+    target: &ManualWatcherTarget<'_>,
+) -> Vec<String> {
+    let mut arguments = vec![
+        "--config".into(),
+        target
+            .config_path
+            .map(Path::to_owned)
+            .unwrap_or_else(default_global_config_path)
+            .display()
+            .to_string(),
+    ];
+    if let Some(path) = target.routing_path {
+        arguments.extend(["--area-routing".into(), path.display().to_string()]);
+        if let Some(area) = target.area {
+            arguments.extend(["--area".into(), area.name.clone()]);
+        }
+    }
+    arguments.extend([
+        "watcher".into(),
+        "run".into(),
+        "--project".into(),
+        project.into(),
+        "--repo-root".into(),
+        repo_root.display().to_string(),
+        "--service-managed".into(),
+    ]);
+    arguments
+}
+
+#[cfg(windows)]
+fn manual_watch_binding(target: &ManualWatcherTarget<'_>) -> String {
+    format!(
+        "Area: {}\nConfig: {}",
+        target
+            .area
+            .map(|area| area.key())
+            .unwrap_or_else(|| "legacy (unscoped)".into()),
+        target
+            .config_path
+            .map(Path::to_owned)
+            .unwrap_or_else(default_global_config_path)
+            .display()
+    )
+}
+
+#[cfg(test)]
+mod manual_watcher_routing_tests {
+    use super::*;
+
+    fn area(name: &str, instance: u128) -> mem_config::AreaIdentityConfig {
+        mem_config::AreaIdentityConfig {
+            name: name.into(),
+            instance_id: uuid::Uuid::from_u128(instance),
+        }
+    }
+
+    #[test]
+    fn manual_watcher_identity_distinguishes_same_project_across_areas() {
+        let workshop = area("workshop", 1);
+        let homelab = area("homelab", 2);
+        assert_ne!(
+            manual_watch_identity("shared-project", Some(&workshop)),
+            manual_watch_identity("shared-project", Some(&homelab))
+        );
+        assert_eq!(
+            manual_watch_identity("shared-project", None),
+            "shared-project"
+        );
+        assert!(
+            manual_watch_identity("shared-project", Some(&homelab))
+                .contains(&homelab.instance_id.to_string())
+        );
+    }
+
+    #[test]
+    fn manual_watcher_retains_exact_selected_config_and_routing() {
+        let config = Path::new("/operator/Homelab selected.toml");
+        let routing = Path::new("/operator/areas.json");
+        let identity = area("homelab", 2);
+        let arguments = manual_watch_arguments(
+            Path::new("/repo/Shared Project"),
+            "shared-project",
+            &ManualWatcherTarget {
+                config_path: Some(config),
+                routing_path: Some(routing),
+                area: Some(&identity),
+            },
+        );
+        assert_eq!(
+            &arguments[..6],
+            &[
+                "--config",
+                "/operator/Homelab selected.toml",
+                "--area-routing",
+                "/operator/areas.json",
+                "--area",
+                "homelab"
+            ]
+        );
+        assert_eq!(
+            &arguments[6..],
+            &[
+                "watcher",
+                "run",
+                "--project",
+                "shared-project",
+                "--repo-root",
+                "/repo/Shared Project",
+                "--service-managed"
+            ]
+        );
+    }
+
+    #[test]
+    fn explicit_config_without_routing_does_not_invent_area_flag() {
+        let identity = area("homelab", 2);
+        let arguments = manual_watch_arguments(
+            Path::new("/repo"),
+            "shared-project",
+            &ManualWatcherTarget {
+                config_path: Some(Path::new("/operator/homelab.toml")),
+                routing_path: None,
+                area: Some(&identity),
+            },
+        );
+        assert_eq!(arguments[1], "/operator/homelab.toml");
+        assert!(
+            !arguments
+                .iter()
+                .any(|arg| arg == "--area" || arg == "--area-routing")
+        );
+    }
+
+    #[test]
+    fn unavailable_selected_manual_area_never_falls_back_to_general() {
+        let directory =
+            std::env::temp_dir().join(format!("manual-watch-route-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&directory).unwrap();
+        let general = directory.join("general.toml");
+        fs::write(&general, "").unwrap();
+        let routing = mem_config::AreaRouting {
+            version: 1,
+            default_area: "general".into(),
+            routes: Vec::new(),
+            areas: BTreeMap::from([
+                (
+                    "general".into(),
+                    mem_config::AreaTarget {
+                        instance_id: uuid::Uuid::from_u128(1),
+                        config: Some(general),
+                    },
+                ),
+                (
+                    "homelab".into(),
+                    mem_config::AreaTarget {
+                        instance_id: uuid::Uuid::from_u128(2),
+                        config: Some(directory.join("missing.toml")),
+                    },
+                ),
+            ]),
+        };
+        let error = routing
+            .resolve(Some("homelab"), None, Some("shared-project"))
+            .unwrap_err();
+        assert!(error.to_string().contains("no fallback was attempted"));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_manual_previews_select_same_area_task_for_enable_and_disable() {
+        let identity = area("homelab", 2);
+        let target = ManualWatcherTarget {
+            config_path: Some(Path::new(r"C:\operator\homelab.toml")),
+            routing_path: Some(Path::new(r"C:\operator\areas.json")),
+            area: Some(&identity),
+        };
+        let name = platform::windows_watch_task_name(&manual_watch_identity(
+            "shared-project",
+            target.area,
+        ));
+        let preview = preview_enable_watch_service_routed(
+            Path::new(r"C:\repo\Shared Project"),
+            "shared-project",
+            &target,
+        )
+        .unwrap();
+        assert!(preview.contains(&name));
+        assert!(preview.contains(r"C:\operator\homelab.toml"));
+        assert!(
+            preview_disable_watch_service_routed("shared-project", &target)
+                .unwrap()
+                .contains(&name)
+        );
+    }
+}
+
+#[cfg(feature = "tui")]
 pub(crate) fn enable_watch_service(repo_root: &Path, project: &str) -> Result<String> {
+    enable_watch_service_routed(repo_root, project, &ManualWatcherTarget::default())
+}
+
+pub(crate) fn enable_watch_service_routed(
+    repo_root: &Path,
+    project: &str,
+    target: &ManualWatcherTarget<'_>,
+) -> Result<String> {
+    let _ = target;
     #[cfg(target_os = "macos")]
     {
         let plist_path = watch_launch_agent_path(project)?;
@@ -51,31 +278,23 @@ pub(crate) fn enable_watch_service(repo_root: &Path, project: &str) -> Result<St
 
     #[cfg(target_os = "windows")]
     {
-        let task_name = platform::windows_watch_task_name(project);
+        let task_name =
+            platform::windows_watch_task_name(&manual_watch_identity(project, target.area));
         platform::register_windows_task(&platform::WindowsTaskSpec {
             name: task_name.clone(),
             description: format!("Memory Layer watcher for {project}"),
             executable: memory_binary_path()?,
-            arguments: vec![
-                "--config".to_string(),
-                default_global_config_path().display().to_string(),
-                "watcher".to_string(),
-                "run".to_string(),
-                "--project".to_string(),
-                project.to_string(),
-                "--repo-root".to_string(),
-                repo_root.display().to_string(),
-                "--service-managed".to_string(),
-            ],
+            arguments: manual_watch_arguments(repo_root, project, target),
             working_directory: repo_root.to_path_buf(),
             start_at_logon: true,
             restart_on_failure: true,
         })?;
         platform::run_windows_task(&task_name)?;
         Ok(format!(
-            "Installed and started Windows scheduled task {task_name}.\nRepo: {}\nProject: {}\n\nManage it with:\n- memory watcher status --project {}\n- memory watcher disable --project {}\n- schtasks /Query /TN {task_name}",
+            "Installed and started Windows scheduled task {task_name}.\nRepo: {}\nProject: {}\n{}\n\nManage it with the same --area/--config selection:\n- memory watcher status --project {}\n- memory watcher disable --project {}\n- schtasks /Query /TN {task_name}",
             repo_root.display(),
             project,
+            manual_watch_binding(target),
             project,
             project
         ))
@@ -104,7 +323,17 @@ pub(crate) fn enable_watch_service(repo_root: &Path, project: &str) -> Result<St
     }
 }
 
+#[cfg(any(feature = "tui", all(test, windows)))]
 pub(crate) fn preview_enable_watch_service(repo_root: &Path, project: &str) -> Result<String> {
+    preview_enable_watch_service_routed(repo_root, project, &ManualWatcherTarget::default())
+}
+
+pub(crate) fn preview_enable_watch_service_routed(
+    repo_root: &Path,
+    project: &str,
+    target: &ManualWatcherTarget<'_>,
+) -> Result<String> {
+    let _ = target;
     #[cfg(target_os = "macos")]
     {
         Ok(format!(
@@ -119,10 +348,11 @@ pub(crate) fn preview_enable_watch_service(repo_root: &Path, project: &str) -> R
     #[cfg(target_os = "windows")]
     {
         Ok(format!(
-            "Dry run: would register and start Windows scheduled task {}.\nRepo: {}\nProject: {}",
-            platform::windows_watch_task_name(project),
+            "Dry run: would register and start Windows scheduled task {}.\nRepo: {}\nProject: {}\n{}",
+            platform::windows_watch_task_name(&manual_watch_identity(project, target.area)),
             repo_root.display(),
             project,
+            manual_watch_binding(target),
         ))
     }
 
@@ -140,7 +370,11 @@ pub(crate) fn preview_enable_watch_service(repo_root: &Path, project: &str) -> R
     }
 }
 
-pub(crate) fn disable_watch_service(project: &str) -> Result<String> {
+pub(crate) fn disable_watch_service_routed(
+    project: &str,
+    target: &ManualWatcherTarget<'_>,
+) -> Result<String> {
+    let _ = target;
     #[cfg(target_os = "macos")]
     {
         let plist_path = watch_launch_agent_path(project)?;
@@ -159,7 +393,8 @@ pub(crate) fn disable_watch_service(project: &str) -> Result<String> {
 
     #[cfg(target_os = "windows")]
     {
-        let task_name = platform::windows_watch_task_name(project);
+        let task_name =
+            platform::windows_watch_task_name(&manual_watch_identity(project, target.area));
         platform::delete_windows_task(&task_name)?;
         Ok(format!("Disabled Windows scheduled task {task_name}"))
     }
@@ -182,7 +417,16 @@ pub(crate) fn disable_watch_service(project: &str) -> Result<String> {
     }
 }
 
+#[cfg(all(test, windows))]
 pub(crate) fn preview_disable_watch_service(project: &str) -> Result<String> {
+    preview_disable_watch_service_routed(project, &ManualWatcherTarget::default())
+}
+
+pub(crate) fn preview_disable_watch_service_routed(
+    project: &str,
+    target: &ManualWatcherTarget<'_>,
+) -> Result<String> {
+    let _ = target;
     #[cfg(target_os = "macos")]
     {
         Ok(format!(
@@ -196,7 +440,7 @@ pub(crate) fn preview_disable_watch_service(project: &str) -> Result<String> {
     {
         Ok(format!(
             "Dry run: would stop and delete Windows scheduled task {}",
-            platform::windows_watch_task_name(project),
+            platform::windows_watch_task_name(&manual_watch_identity(project, target.area)),
         ))
     }
 
@@ -212,7 +456,12 @@ pub(crate) fn preview_disable_watch_service(project: &str) -> Result<String> {
     }
 }
 
-pub(crate) fn watch_service_status(repo_root: &Path, project: &str) -> Result<String> {
+pub(crate) fn watch_service_status_routed(
+    repo_root: &Path,
+    project: &str,
+    target: &ManualWatcherTarget<'_>,
+) -> Result<String> {
+    let _ = target;
     #[cfg(target_os = "macos")]
     {
         let plist_path = watch_launch_agent_path(project)?;
@@ -234,13 +483,15 @@ pub(crate) fn watch_service_status(repo_root: &Path, project: &str) -> Result<St
 
     #[cfg(target_os = "windows")]
     {
-        let task_name = platform::windows_watch_task_name(project);
+        let task_name =
+            platform::windows_watch_task_name(&manual_watch_identity(project, target.area));
         let running = platform::windows_task_is_running(&task_name);
         Ok(format!(
-            "Watcher service for project {project}:\n- task: {task_name}\n- repo: {}\n- installed: {}\n- running: {}\n\nInspect with:\n- schtasks /Query /TN {task_name} /V /FO LIST",
+            "Watcher service for project {project}:\n- task: {task_name}\n- repo: {}\n- installed: {}\n- running: {}\n{}\n\nInspect with:\n- schtasks /Query /TN {task_name} /V /FO LIST",
             repo_root.display(),
             yes_no(platform::windows_task_exists(&task_name)),
             yes_no(running),
+            manual_watch_binding(target),
         ))
     }
 
@@ -474,11 +725,18 @@ pub(crate) async fn reconcile_watcher_manager(
             .as_ref()
             .map(|r| format!("{}-{}", r.identity.key(), session.session_id))
             .unwrap_or_else(|| session.session_id.clone());
-        if legacy_watch_service_is_active(&project) {
+        let manual_area = route
+            .as_ref()
+            .map(|route| &route.identity)
+            .or(config.area.as_ref());
+        let active_manual_area = [manual_area, None]
+            .into_iter()
+            .find(|area| legacy_watch_service_is_active(&project, *area));
+        if let Some(area) = active_manual_area {
             state.warnings.push(format!(
-                "Skipped agent-linked watcher for project {} because legacy watcher service {} is active.",
+                "Skipped agent-linked watcher for project {} because manual watcher service {} is active.",
                 project,
-                legacy_watch_service_name(&project)
+                legacy_watch_service_name(&project, area)
             ));
             continue;
         }
@@ -832,7 +1090,11 @@ pub(crate) fn ensure_agent_watch_repo_config(repo_root: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn legacy_watch_service_is_active(project: &str) -> bool {
+pub(crate) fn legacy_watch_service_is_active(
+    project: &str,
+    area: Option<&mem_config::AreaIdentityConfig>,
+) -> bool {
+    let _ = area;
     #[cfg(target_os = "macos")]
     {
         launch_agent_status(&watch_launch_agent_label(project))
@@ -842,7 +1104,7 @@ pub(crate) fn legacy_watch_service_is_active(project: &str) -> bool {
 
     #[cfg(target_os = "windows")]
     {
-        let task = platform::windows_watch_task_name(project);
+        let task = platform::windows_watch_task_name(&manual_watch_identity(project, area));
         platform::windows_task_exists(&task) && platform::windows_task_is_running(&task)
     }
 
@@ -852,7 +1114,11 @@ pub(crate) fn legacy_watch_service_is_active(project: &str) -> bool {
     }
 }
 
-pub(crate) fn legacy_watch_service_name(project: &str) -> String {
+pub(crate) fn legacy_watch_service_name(
+    project: &str,
+    area: Option<&mem_config::AreaIdentityConfig>,
+) -> String {
+    let _ = area;
     #[cfg(target_os = "macos")]
     {
         watch_launch_agent_label(project)
@@ -860,7 +1126,7 @@ pub(crate) fn legacy_watch_service_name(project: &str) -> String {
 
     #[cfg(target_os = "windows")]
     {
-        platform::windows_watch_task_name(project)
+        platform::windows_watch_task_name(&manual_watch_identity(project, area))
     }
 
     #[cfg(all(unix, not(target_os = "macos")))]

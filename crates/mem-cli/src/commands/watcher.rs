@@ -12,11 +12,11 @@ use crate::{
         runtime::{WatcherArgs, WatcherCommand, WatcherManagerCommand, default_global_config_path},
         skill_support::resolve_repo_root,
         watch_support::{
-            disable_watch_manager_service, disable_watch_service,
-            enable_watch_manager_service_routed, enable_watch_service,
-            preview_disable_watch_manager_service, preview_disable_watch_service,
-            preview_enable_watch_manager_service, preview_enable_watch_service,
-            run_watcher_manager, watch_manager_service_status, watch_service_status,
+            ManualWatcherTarget, disable_watch_manager_service, disable_watch_service_routed,
+            enable_watch_manager_service_routed, enable_watch_service_routed,
+            preview_disable_watch_manager_service, preview_disable_watch_service_routed,
+            preview_enable_watch_manager_service, preview_enable_watch_service_routed,
+            run_watcher_manager, watch_manager_service_status, watch_service_status_routed,
             watcher_command_requires_config_load,
         },
     },
@@ -28,9 +28,53 @@ pub(super) async fn handle_pre_config(
     args: &WatcherArgs,
     cli_config: Option<PathBuf>,
     routing_path: Option<&std::path::Path>,
+    route: Option<&mem_config::ResolvedArea>,
 ) -> Result<bool> {
     let cwd = env::current_dir().context("read current directory")?;
     let repo_root = resolve_repo_root(&cwd)?;
+    // Routing has already been validated by the dispatch boundary. An explicit
+    // Windows config without a routing file can still carry a named area.
+    // Resolve relative paths before the scheduled task changes its directory.
+    #[cfg(windows)]
+    let cli_config = if matches!(
+        args.command,
+        WatcherCommand::Enable(_) | WatcherCommand::Disable(_) | WatcherCommand::Status(_)
+    ) {
+        cli_config
+            .map(|path| {
+                path.canonicalize()
+                    .context("resolve selected watcher config; no fallback attempted")
+            })
+            .transpose()?
+    } else {
+        cli_config
+    };
+    #[cfg(windows)]
+    let explicit_area = if route.is_none()
+        && matches!(
+            args.command,
+            WatcherCommand::Enable(_) | WatcherCommand::Disable(_) | WatcherCommand::Status(_)
+        ) {
+        cli_config
+            .as_ref()
+            .map(|path| {
+                AppConfig::load_from_path(Some(path.clone()))
+                    .context("load selected watcher config; no fallback attempted")
+            })
+            .transpose()?
+            .and_then(|config| config.area)
+    } else {
+        None
+    };
+    #[cfg(not(windows))]
+    let explicit_area = None;
+    let target = ManualWatcherTarget {
+        config_path: cli_config.as_deref(),
+        routing_path,
+        area: route
+            .map(|route| &route.identity)
+            .or(explicit_area.as_ref()),
+    };
     match &args.command {
         WatcherCommand::Run(_) | WatcherCommand::Flush(_) => {}
         WatcherCommand::Manager(args) => match &args.command {
@@ -66,24 +110,24 @@ pub(super) async fn handle_pre_config(
         WatcherCommand::Enable(args) => {
             let project = resolve_project_slug(args.project.clone(), &cwd)?;
             let output = if args.dry_run {
-                preview_enable_watch_service(&repo_root, &project)?
+                preview_enable_watch_service_routed(&repo_root, &project, &target)?
             } else {
-                enable_watch_service(&repo_root, &project)?
+                enable_watch_service_routed(&repo_root, &project, &target)?
             };
             println!("{output}");
         }
         WatcherCommand::Disable(args) => {
             let project = resolve_project_slug(args.project.clone(), &cwd)?;
             let output = if args.dry_run {
-                preview_disable_watch_service(&project)?
+                preview_disable_watch_service_routed(&project, &target)?
             } else {
-                disable_watch_service(&project)?
+                disable_watch_service_routed(&project, &target)?
             };
             println!("{output}");
         }
         WatcherCommand::Status(args) => {
             let project = resolve_project_slug(args.project.clone(), &cwd)?;
-            let output = watch_service_status(&repo_root, &project)?;
+            let output = watch_service_status_routed(&repo_root, &project, &target)?;
             println!("{output}");
         }
     }
@@ -180,4 +224,31 @@ pub(super) async fn handle(
         }
     };
     Ok(())
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use crate::commands::runtime::{Cli, Command};
+    use clap::Parser;
+
+    #[tokio::test]
+    async fn manual_watcher_unavailable_explicit_config_fails_before_task_action() {
+        let missing = env::temp_dir().join(format!(
+            "missing-manual-watch-config-{}.toml",
+            uuid::Uuid::new_v4()
+        ));
+        for action in ["enable", "disable", "status"] {
+            let cli =
+                Cli::try_parse_from(["memory", "watcher", action, "--project", "shared-project"])
+                    .unwrap();
+            let Command::Watcher(args) = cli.command else {
+                panic!("watcher command expected")
+            };
+            let error = handle_pre_config(&args, Some(missing.clone()), None, None)
+                .await
+                .unwrap_err();
+            assert!(error.to_string().contains("no fallback attempted"));
+        }
+    }
 }

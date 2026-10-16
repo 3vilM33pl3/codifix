@@ -67,12 +67,14 @@ pub(super) fn resolve_cli_area(
         }
         return Ok((None, None));
     };
-    if matches!(
-        command,
-        Command::Watcher(WatcherArgs {
-            command: WatcherCommand::Enable(_)
-        })
-    ) {
+    if !cfg!(windows)
+        && matches!(
+            command,
+            Command::Watcher(WatcherArgs {
+                command: WatcherCommand::Enable(_)
+            })
+        )
+    {
         bail!(
             "area routing requires the watcher manager; legacy watcher enable creates an unscoped singleton"
         );
@@ -170,6 +172,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn routed_legacy_watch_enable_is_rejected_before_a_side_effect() {
         let matches = Cli::command()
@@ -187,5 +190,37 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.to_string().contains("watcher manager"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn routed_manual_watch_enable_requires_available_operator_policy_on_windows() {
+        let matches = Cli::command()
+            .try_get_matches_from([
+                "memory",
+                "watcher",
+                "enable",
+                "--project",
+                "shared-project",
+                "--dry-run",
+            ])
+            .unwrap();
+        let cli = Cli::from_arg_matches(&matches).unwrap();
+        let missing = std::env::temp_dir().join(format!(
+            "missing-manual-watch-policy-{}.json",
+            uuid::Uuid::new_v4()
+        ));
+        let error = resolve_cli_area(
+            &cli.command,
+            None,
+            Some("homelab"),
+            Some(missing),
+            None,
+            Some("shared-project"),
+            Profile::Prod,
+        )
+        .unwrap_err();
+        assert!(!error.to_string().contains("legacy watcher enable"));
+        assert!(error.to_string().contains("area routing"));
     }
 }

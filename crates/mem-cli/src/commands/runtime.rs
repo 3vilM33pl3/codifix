@@ -3719,6 +3719,7 @@ pub(super) async fn run() -> Result<()> {
             args,
             cli_config.clone(),
             routing_path.as_deref(),
+            route.as_ref(),
         )
         .await?
     {

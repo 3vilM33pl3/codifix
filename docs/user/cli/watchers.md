@@ -62,6 +62,22 @@ Legacy per-project service-managed watchers can still be installed with:
 memory watcher enable --project my-project
 ```
 
+On Windows, manual tasks also support operator-owned area routing:
+
+```powershell
+memory --area homelab watcher enable --project my-project --dry-run
+memory --area homelab watcher enable --project my-project
+memory --area homelab watcher status --project my-project
+memory --area homelab watcher disable --project my-project
+```
+
+The task retains the selected configuration and routing policy. Its identity
+includes the area instance and project, so equally named projects in Homelab and
+Workshop do not replace each other's tasks. An unavailable selected area fails
+without falling back to General. Unrouted legacy tasks keep their existing names;
+the manager avoids starting a duplicate when a matching manual task is running.
+Linux/macOS routed installations continue to use the watcher manager.
+
 Manual foreground watchers can still be run with:
 
 ```bash
