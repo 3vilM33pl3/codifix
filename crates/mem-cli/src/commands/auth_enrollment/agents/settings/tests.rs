@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #![allow(clippy::unwrap_used)]
 use super::*;
+#[cfg(unix)]
 use std::{
     collections::BTreeMap,
     sync::{
@@ -8,11 +9,13 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
+#[cfg(unix)]
 #[derive(Default)]
 struct Store {
     values: Mutex<BTreeMap<(String, String), Vec<u8>>>,
     fail: AtomicBool,
 }
+#[cfg(unix)]
 impl CredentialStore for Store {
     fn get(&self, s: &str, a: &str) -> Result<Option<Vec<u8>>> {
         Ok(self

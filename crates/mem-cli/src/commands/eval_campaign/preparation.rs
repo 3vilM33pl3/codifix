@@ -67,29 +67,19 @@ pub(super) async fn run(
             .write(true)
             .open(dir.join(name))
     };
-    let mut command = tokio::process::Command::new(driver);
-    command
-        .arg(dir.join("request.json"))
-        .current_dir(&dir)
-        .env_clear()
-        .env("PATH", "/usr/local/bin:/usr/bin:/bin")
-        .env("HOME", dir.join("home"))
-        .env("MEMORY_LAYER_PROFILE", "prod")
-        .env("MEMORY_R3_OFFLINE", if offline { "1" } else { "0" })
-        .stdin(Stdio::null())
-        .stdout(log("driver.stdout")?)
-        .stderr(log("driver.stderr")?)
-        .kill_on_drop(true);
-    let status = tokio::time::timeout(
-        std::time::Duration::from_secs(limits.task_seconds),
-        command.status(),
+    let succeeded = trusted_driver::run(
+        manifest_path,
+        manifest,
+        driver,
+        driver_hash,
+        &dir,
+        offline,
+        limits.task_seconds,
+        log("driver.stdout")?,
+        log("driver.stderr")?,
     )
-    .await
-    .context("preparation deadline; retain uncertain evidence")??;
-    ensure!(
-        status.success(),
-        "preparation failed; retain uncertain evidence"
-    );
+    .await?;
+    ensure!(succeeded, "preparation failed; retain uncertain evidence");
     verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
     let receipt = verify(&dir, manifest, &plan.manifest_sha256)?;
     exclusive_json(&dir.join("accepted.json"), &receipt)?;

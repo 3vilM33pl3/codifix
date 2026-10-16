@@ -44,7 +44,7 @@ zip.workspace = true
 security-framework = "=3.7.0"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security_Credentials", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security_Credentials", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_System_SystemInformation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "=1.1.4", features = ["fs", "process"], optional = true }

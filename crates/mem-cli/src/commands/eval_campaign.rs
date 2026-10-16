@@ -5,7 +5,9 @@ use anyhow::{Context, Result, ensure};
 use mem_eval::campaign::budget::{Allowance, RequestBudget};
 use mem_eval::campaign::provider_results::ProviderResults;
 use mem_eval::campaign::{self as c, Artifact, Ledger, Manifest, Observation, Split};
-use std::{fs::OpenOptions, io::Write, path::Path, process::Stdio};
+#[cfg(not(windows))]
+use std::process::Stdio;
+use std::{fs::OpenOptions, io::Write, path::Path};
 
 fn split(value: &str) -> Result<Split> {
     match value {
@@ -34,6 +36,7 @@ mod preparation;
 mod provider_mediation;
 #[cfg(test)]
 mod tests;
+mod trusted_driver;
 
 pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
     match command {
@@ -491,29 +494,19 @@ async fn execute_tasks(
             c::digest(&std::fs::read(driver)?) == driver_hash,
             "driver changed during campaign"
         );
-        let mut process = tokio::process::Command::new(driver);
-        process
-            .arg(dir.join("request.json"))
-            .current_dir(&dir)
-            .env_clear()
-            .env("PATH", "/usr/local/bin:/usr/bin:/bin")
-            .env("HOME", dir.join("home"))
-            .env("MEMORY_LAYER_PROFILE", "prod")
-            .env("MEMORY_R3_OFFLINE", if offline { "1" } else { "0" })
-            .stdin(Stdio::null())
-            .stdout(stdout)
-            .stderr(stderr)
-            .kill_on_drop(true);
-        let status = tokio::time::timeout(
-            std::time::Duration::from_secs(manifest.limits.task_seconds),
-            process.status(),
+        let succeeded = trusted_driver::run(
+            manifest_path,
+            manifest,
+            driver,
+            driver_hash,
+            &dir,
+            offline,
+            manifest.limits.task_seconds,
+            stdout,
+            stderr,
         )
-        .await
-        .context("driver deadline expired; owned containers require reconciliation")??;
-        ensure!(
-            status.success(),
-            "driver failed; inspect sanitized driver logs"
-        );
+        .await?;
+        ensure!(succeeded, "driver failed; inspect sanitized driver logs");
         // Check the last work item too, before accepting evidence or dispatching
         // anything else. A driver cannot rewrite the manifest to bless new assets.
         verify_campaign_inputs(manifest_path, &plan.manifest_sha256)?;
