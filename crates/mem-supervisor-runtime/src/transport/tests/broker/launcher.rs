@@ -75,6 +75,7 @@ async fn run(mode: Mode, cancel: bool) {
         driver,
         driver_sha256,
         private_runtime: directory.path().into(),
+        windows_artifacts: None,
     };
     let pause = Arc::new(tokio::sync::Notify::new());
     if cancel {

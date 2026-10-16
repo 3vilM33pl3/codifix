@@ -117,6 +117,9 @@ impl PinnedWork {
             return Err(WorkError::Manifest);
         }
         private_files::digest(&manifest.sandbox.driver_sha256).map_err(|_| WorkError::Manifest)?;
+        if let Some(artifacts) = &manifest.sandbox.windows_artifacts {
+            artifacts.validate().map_err(|_| WorkError::Manifest)?;
+        }
         Ok(Self {
             manifest,
             digest,

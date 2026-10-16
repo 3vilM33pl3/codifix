@@ -160,9 +160,9 @@ struct WireModel {
     id: String,
 }
 
-pub(crate) async fn handshake(
-    mut stdin: tokio::process::ChildStdin,
-    stdout: tokio::process::ChildStdout,
+pub(crate) async fn handshake<W: tokio::io::AsyncWrite + Unpin, R: tokio::io::AsyncRead + Unpin>(
+    mut stdin: W,
+    stdout: R,
     transcript: &mut Vec<TranscriptEvent>,
 ) -> Result<(), Failure> {
     let mut reader = BufReader::new(stdout);
@@ -181,9 +181,12 @@ pub(crate) async fn handshake(
     Ok(())
 }
 
-pub(crate) async fn confirm_controls(
-    stdin: &mut tokio::process::ChildStdin,
-    reader: &mut BufReader<tokio::process::ChildStdout>,
+pub(crate) async fn confirm_controls<
+    W: tokio::io::AsyncWrite + Unpin,
+    R: tokio::io::AsyncRead + Unpin,
+>(
+    stdin: &mut W,
+    reader: &mut BufReader<R>,
     total: &mut usize,
     transcript: &mut Vec<TranscriptEvent>,
 ) -> Result<(), Failure> {
@@ -229,8 +232,8 @@ pub(crate) async fn confirm_controls(
     Ok(())
 }
 
-pub(crate) async fn read_frame(
-    reader: &mut BufReader<tokio::process::ChildStdout>,
+pub(crate) async fn read_frame<R: tokio::io::AsyncRead + Unpin>(
+    reader: &mut BufReader<R>,
     total: &mut usize,
 ) -> Result<Option<Vec<u8>>, Failure> {
     read_frame_bounded(reader, total, MAX_FRAME_BYTES, MAX_STDOUT_BYTES).await

@@ -1,0 +1,103 @@
+diff --git a/src/http/client.rs b/src/http/client.rs
+--- a/src/http/client.rs
++++ b/src/http/client.rs
+@@ -458,6 +458,12 @@ impl<'a> RequestBuilder<'a> {
+     }
+ 
+     pub async fn send(self) -> Result<Response> {
++        #[cfg(windows)]
++        if std::env::var_os("MEMORY_BROKER_HANDLE").is_some() {
++            // Memory's exact one-work inherited channel, never a network URL.
++            // This branch precedes VCR/provider forwarding and has no fallback.
++            return memory_windows_broker(self.method, &self.url, &self.headers, &self.body);
++        }
+         let RequestBuilder {
+             client,
+             method,
+@@ -677,6 +683,86 @@ fn build_recorded_request(
+     }
+ }
+ 
++#[cfg(windows)]
++fn memory_windows_broker(
++    method: Method,
++    url: &str,
++    headers: &[(String, String)],
++    body: &[u8],
++) -> Result<Response> {
++    use std::io::{Read, Write};
++    use std::os::windows::io::FromRawHandle;
++    use std::sync::atomic::{AtomicBool, Ordering};
++    static USED: AtomicBool = AtomicBool::new(false);
++    let failed = || Error::api("Memory broker exchange failed; inspect durable attempt state");
++    if !matches!(method, Method::Post)
++        || url != "http://memory-broker.invalid/v1/responses"
++        || body.len() > 512 * 1024
++        || headers.len() > 100
++        || headers.iter().any(|(k, v)| k.len() > 128 || v.len() > 4096)
++    {
++        return Err(failed());
++    }
++    let handle = std::env::var("MEMORY_BROKER_HANDLE")
++        .ok()
++        .and_then(|value| value.parse::<usize>().ok())
++        .filter(|value| *value != 0 && *value != usize::MAX)
++        .ok_or_else(failed)?;
++    let body = std::str::from_utf8(body).map_err(|_| failed())?;
++    let payload = serde_json::to_vec(&serde_json::json!({
++        "schema_version": 1,
++        "method": "POST",
++        "path": "/v1/responses",
++        "headers": headers,
++        "body": body
++    }))?;
++    if payload.len() > 4 * 1024 * 1024 || USED.swap(true, Ordering::SeqCst) {
++        return Err(failed());
++    }
++    // SAFETY: only the trusted Memory driver sets this inherited handle. Pi
++    // owns its duplicate; it never opens a pipe name or host-provided socket.
++    let mut pipe = unsafe { std::fs::File::from_raw_handle(handle as _) };
++    pipe.write_all(&(payload.len() as u32).to_be_bytes()).map_err(|_| failed())?;
++    pipe.write_all(&payload).map_err(|_| failed())?;
++    pipe.flush().map_err(|_| failed())?;
++    let mut prefix = [0u8; 4];
++    pipe.read_exact(&mut prefix).map_err(|_| failed())?;
++    let length = u32::from_be_bytes(prefix) as usize;
++    if length == 0 || length > 512 * 1024 {
++        return Err(failed());
++    }
++    let mut bytes = vec![0; length];
++    pipe.read_exact(&mut bytes).map_err(|_| failed())?;
++    #[derive(serde::Deserialize)]
++    #[serde(deny_unknown_fields)]
++    struct Reply {
++        schema_version: u32,
++        status: u16,
++        headers: Vec<(String, String)>,
++        body: String,
++    }
++    let reply: Reply = serde_json::from_slice(&bytes).map_err(|_| failed())?;
++    if reply.schema_version != 1
++        || !(100..=599).contains(&reply.status)
++        || reply.headers.len() > 64
++        || reply.headers.iter().any(|(k, v)| k.len() > 128 || v.len() > 4096)
++        || reply.body.len() > 256 * 1024
++    {
++        return Err(failed());
++    }
++    let payload = reply.body.into_bytes();
++    Ok(Response {
++        status: reply.status,
++        headers: reply.headers,
++        stream: Box::pin(stream::once(async move {
++            Ok::<Vec<u8>, std::io::Error>(payload)
++        })),
++        // The trusted parent enforces the complete external real-time deadline
++        // and kills/reaps the Job. No retry or second physical send is allowed.
++        timeout_info: None,
++    })
++}
++
+ pub struct Response {
+     status: u16,
+     headers: Vec<(String, String)>,

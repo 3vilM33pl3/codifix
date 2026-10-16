@@ -14,6 +14,8 @@ mod artifact;
 mod process;
 mod protocol;
 pub mod sandbox;
+mod windows_artifact;
+pub use windows_artifact::WindowsArtifact;
 
 use std::{path::PathBuf, time::Duration};
 

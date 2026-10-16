@@ -30,6 +30,8 @@ pub struct SandboxConfig {
     pub driver: PathBuf,
     pub driver_sha256: String,
     pub private_runtime: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows_artifacts: Option<mem_supervisor_pi::WindowsArtifact>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -124,6 +126,9 @@ async fn run(
     job: Arc<dyn BrokerJob>,
     control: RunControl,
 ) -> Result<[u8; 32], LaunchError> {
+    if config.windows_artifacts.is_some() {
+        return Err(LaunchError::Artifact);
+    }
     if !cfg!(all(target_os = "linux", target_arch = "x86_64"))
         || rustix::process::geteuid().as_raw() == 0
     {

@@ -1,0 +1,3 @@
+# Reviewed patch/license hashes are byte identities on every build host.
+*.patch -text
+LICENSE.pi -text

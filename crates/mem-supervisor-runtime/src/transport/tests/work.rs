@@ -23,6 +23,7 @@ pub(super) async fn manifest(
             driver: "/no-driver".into(),
             driver_sha256: "0".repeat(64),
             private_runtime: "/no-runtime".into(),
+            windows_artifacts: None,
         },
     };
     let dir = tempfile::Builder::new()
@@ -62,6 +63,7 @@ async fn operator_executes_one_real_pi_proposal_and_restart_only_observes_it() {
         ),
         driver,
         private_runtime: dir.path().into(),
+        windows_artifacts: None,
     };
     let disclosure = crate::local_disclosure::LocalDisclosure::new(
         db.pool.clone(),

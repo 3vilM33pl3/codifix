@@ -268,6 +268,7 @@ mod tests {
                 driver: "/unused-driver".into(),
                 driver_sha256: "0".repeat(64),
                 private_runtime: dir.path().into(),
+                windows_artifacts: None,
             },
         };
         let hash = private(

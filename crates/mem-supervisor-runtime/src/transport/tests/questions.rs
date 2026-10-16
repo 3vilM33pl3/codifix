@@ -401,6 +401,7 @@ async fn operator_run_next_uses_real_pi_with_fake_provider_and_restricted_databa
         ),
         driver,
         private_runtime: dir.path().into(),
+        windows_artifacts: None,
     };
     let hash = super::work::save(&dir, &manifest);
     let profile = PinnedWork::load(

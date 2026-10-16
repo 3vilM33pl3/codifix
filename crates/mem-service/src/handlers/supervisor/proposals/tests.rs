@@ -171,6 +171,7 @@ impl Fixture {
                 driver: "/unused/driver".into(),
                 driver_sha256: "0".repeat(64),
                 private_runtime: "/unused/runtime".into(),
+                windows_artifacts: None,
             },
         };
         let bytes = serde_json::to_vec(&manifest).unwrap();
