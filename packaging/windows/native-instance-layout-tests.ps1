@@ -56,8 +56,15 @@ try {
         (Get-Service $names[$index]).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
         $null = & $probePath --operator-service-read $root $index.ToString() $names[$index]
         if ($LASTEXITCODE -ne 0) { throw 'Elevated exact-service protected reader failed' }
-        $null = & $probePath --operator-service-read $root $index.ToString() $names[(1 - $index)] 2>$null
-        if ($LASTEXITCODE -eq 0) { throw 'Different service reader accepted sibling authority' }
+        # PS5.1 turns redirected native stderr into a terminating error under
+        # Stop, even for this deliberately rejected sibling-reader probe.
+        $savedPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            $null = & $probePath --operator-service-read $root $index.ToString() $names[(1 - $index)] 2>$null
+            $deniedExit = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $savedPreference }
+        if ($deniedExit -eq 0) { throw 'Different service reader accepted sibling authority' }
     }
     Write-Output 'Observed two virtual service identities: own read/write, immutable authority, denied sibling, ancestor grants preserved'
     $passed = $true
