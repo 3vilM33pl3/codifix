@@ -65,7 +65,8 @@ class GuestAgentTests(unittest.TestCase):
             self.assertIn("$env:COMPUTERNAME -ne 'MEMORY-WINLAB'",script)
             self.assertNotIn('Set-ExecutionPolicy',script)
             self.assertNotIn('Password',script)
-        self.assertIn("-LogonType Interactive -RunLevel Highest",outer)
+        self.assertIn("-LogonType Interactive -RunLevel Limited",outer)
+        self.assertEqual(result['stage_execution_identity'],r'MEMORY-WINLAB\memorylab (Interactive, Limited)')
         self.assertIn("'MEMORY-WINLAB\\memorylab'",outer)
         self.assertIn("-NoProfile -ExecutionPolicy Bypass -EncodedCommand",outer)
         self.assertIn('CreateNew',outer)
@@ -75,6 +76,16 @@ class GuestAgentTests(unittest.TestCase):
         self.assertLess(inner.index('Get-FileHash'),inner.index('& $runner'))
         self.assertIn(f"-Action Start -Stage NativeApi -OperationId '{operation}'",inner)
         self.assertIn(f"C:\\MemoryLab\\stage-start-{operation}.log",inner)
+
+    def test_installation_stages_keep_explicit_highest_identity(self):
+        for stage in ['BuildTools','PostgresPrepare','PostgresStart','PdsPrepare']:
+            with self.subTest(stage=stage),patch.object(vm,'guest_exec',return_value={'pid':42}) as execute:
+                source=r'C:\MemoryLab\source' if stage=='PdsPrepare' else None
+                result=vm.guest_stage_start(Path('/unused'),stage,'11111111-1111-4111-8111-111111111111',source)
+                outer=base64.b64decode(execute.call_args.args[2][-1]).decode('utf-16-le')
+                self.assertIn('-LogonType Interactive -RunLevel Highest',outer)
+                self.assertNotIn('-RunLevel Limited',outer)
+                self.assertEqual(result['stage_execution_identity'],r'MEMORY-WINLAB\memorylab (Interactive, Highest)')
 
     def test_stage_start_rejects_unknown_stage_uuid_and_source_injection_before_rpc(self):
         operation='11111111-1111-4111-8111-111111111111'

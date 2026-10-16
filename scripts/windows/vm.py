@@ -476,6 +476,7 @@ def guest_stage_start(root, stage, operation_id, source_root=None):
     elif stage == "PdsPrepare":
         raise ValueError("PdsPrepare requires an explicit copied source directory")
     operation_id = str(operation)
+    run_level = "Limited" if stage == "NativeApi" else "Highest"
     runner = r"C:\MemoryLab\inputs\guest-stage.ps1"
     runner_hash = digest(SCRIPT_DIR / "guest-stage.ps1")
     log = rf"C:\MemoryLab\stage-start-{operation_id}.log"
@@ -503,7 +504,7 @@ def guest_stage_start(root, stage, operation_id, source_root=None):
              "Set-Acl -LiteralPath $log -AclObject $acl; "
              f"$encoded='{encoded}'; $arguments='-NoProfile -ExecutionPolicy Bypass -EncodedCommand '+$encoded; "
              "$action=New-ScheduledTaskAction -Execute 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' -Argument $arguments; "
-             "$principal=New-ScheduledTaskPrincipal -UserId 'MEMORY-WINLAB\\memorylab' -LogonType Interactive -RunLevel Highest; "
+             f"$principal=New-ScheduledTaskPrincipal -UserId 'MEMORY-WINLAB\\memorylab' -LogonType Interactive -RunLevel {run_level}; "
              "$settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -MultipleInstances IgnoreNew; "
              "Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Settings $settings | Out-Null; "
              "Start-ScheduledTask -TaskName $task")
@@ -512,7 +513,7 @@ def guest_stage_start(root, stage, operation_id, source_root=None):
     dispatched = guest_exec(root, r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", arguments, capture=True)
     return {"pid": dispatched["pid"], "status": "dispatch_requested", "stage": stage,
             "operation_id": operation_id, "task_name": task, "log": log,
-            "runner_sha256": runner_hash, "stage_execution_identity": r"MEMORY-WINLAB\memorylab (Interactive, Highest)",
+            "runner_sha256": runner_hash, "stage_execution_identity": rf"MEMORY-WINLAB\memorylab (Interactive, {run_level})",
             "machine_execution_policy_changed": False}
 
 

@@ -88,7 +88,10 @@ if ($Action -eq 'Start') {
     Save-Status 'queued' 'local_scheduled_task'
     $arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $PSCommandPath + '" -Action Execute -OperationId ' + $OperationId.ToString()
     $actionSpec = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument $arguments
-    $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Highest
+    # Product/API checks model an ordinary interactive user, not an elevated
+    # installer. Only explicitly selected installer/dependency stages elevate.
+    $runLevel = if ($Stage -eq 'NativeApi') { 'Limited' } else { 'Highest' }
+    $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel $runLevel
     $limit = if ($Stage -eq 'NativeApi') { New-TimeSpan -Minutes 20 } else { New-TimeSpan -Hours 3 }
     $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit $limit -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
     Register-ScheduledTask -TaskName $taskName -Action $actionSpec -Principal $principal -Settings $settings | Out-Null
