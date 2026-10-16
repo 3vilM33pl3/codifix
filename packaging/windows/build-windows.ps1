@@ -31,6 +31,7 @@ $SourceChanges = & git -C $RootDir status --porcelain --untracked-files=no
 if ($LASTEXITCODE -ne 0 -or $SourceChanges) { throw 'Windows candidates must be built from a clean committed source tree' }
 
 $BuildRoot = Join-Path $RootDir 'target\windows'
+$BuildReceiptPath = Join-Path $BuildRoot 'client-build-receipt.json'
 $StageDir = Join-Path $BuildRoot 'stage'
 $DistDir = Join-Path $BuildRoot "dist\$($Identity.release_identity)"
 $WxsPath = Join-Path $BuildRoot 'memory-layer.wxs'
@@ -220,7 +221,9 @@ function New-WixDirectoryXml([string]$DirectoryPath, [string]$DirectoryId, [arra
 if (-not $SkipBuild) {
     Write-Host 'Building web UI...'
     npm --prefix (Join-Path $RootDir 'web') ci
+    if ($LASTEXITCODE -ne 0) { throw 'Web dependency installation failed' }
     npm --prefix (Join-Path $RootDir 'web') run build
+    if ($LASTEXITCODE -ne 0) { throw 'Web build failed' }
 
     Write-Host 'Building Windows release binary...'
     if (-not $env:CARGO_PROFILE_RELEASE_LTO) {
@@ -231,7 +234,36 @@ if (-not $SkipBuild) {
     }
     Write-Host "Using Windows Cargo release overrides: LTO=$env:CARGO_PROFILE_RELEASE_LTO CODEGEN_UNITS=$env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS"
     cargo build --release --locked --features full --bin memory --target $Target --manifest-path (Join-Path $RootDir 'Cargo.toml')
+    if ($LASTEXITCODE -ne 0) { throw 'Memory build failed' }
+    cargo build --release --locked -p mem-platform --bin memory-windows-service --target $Target --manifest-path (Join-Path $RootDir 'Cargo.toml')
+    if ($LASTEXITCODE -ne 0) { throw 'Native SCM adapter build failed' }
+    New-Item -ItemType Directory -Force -Path $BuildRoot | Out-Null
+    [ordered]@{
+        source_commit = $SourceCommit
+        executables = @(@('memory.exe', 'memory-windows-service.exe') | ForEach-Object {
+            [ordered]@{ name = $_; sha256 = (Get-FileHash -Algorithm SHA256 (Join-Path $CargoTargetDir "$Target\release\$_")).Hash.ToLowerInvariant() }
+        })
+        # Bind cached Web assets as well as the executables for -SkipBuild.
+        web_files = @(Get-ChildItem -LiteralPath (Join-Path $RootDir 'web\dist') -File -Recurse | Sort-Object FullName | ForEach-Object {
+            [ordered]@{ name = Get-RelativePath (Join-Path $RootDir 'web\dist') $_.FullName; sha256 = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant() }
+        })
+    } | ConvertTo-Json -Depth 6 | Set-Content -Encoding utf8 $BuildReceiptPath
 }
+
+if (-not (Test-Path -LiteralPath $BuildReceiptPath)) { throw 'Missing successful build receipt; run without -SkipBuild first' }
+$buildReceipt = Get-Content -LiteralPath $BuildReceiptPath -Raw | ConvertFrom-Json
+if ($buildReceipt.source_commit -ne $SourceCommit) { throw 'Cached binaries were built from another commit' }
+foreach ($exe in @($buildReceipt.executables)) {
+    if ($exe.name -notin @('memory.exe', 'memory-windows-service.exe')) { throw 'Invalid build receipt executable' }
+    $actual = (Get-FileHash -Algorithm SHA256 (Join-Path $CargoTargetDir "$Target\release\$($exe.name)")).Hash.ToLowerInvariant()
+    if ($actual -ne $exe.sha256) { throw 'Cached executable changed since build' }
+}
+if (@($buildReceipt.executables).Count -ne 2) { throw 'Incomplete executable build receipt' }
+$actualWeb = @(Get-ChildItem -LiteralPath (Join-Path $RootDir 'web\dist') -File -Recurse | Sort-Object FullName | ForEach-Object {
+    "$(Get-RelativePath (Join-Path $RootDir 'web\dist') $_.FullName)|$((Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant())"
+})
+$expectedWeb = @($buildReceipt.web_files | ForEach-Object { "$($_.name)|$($_.sha256)" })
+if (Compare-Object -ReferenceObject $expectedWeb -DifferenceObject $actualWeb) { throw 'Cached Web assets changed since build' }
 
 $StageDir = Assert-BuildPath $StageDir
 $DistDir = Assert-BuildPath $DistDir
@@ -244,6 +276,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\memory-lay
 $ExePath = Join-Path $CargoTargetDir "$Target\release\memory.exe"
 if (-not (Test-Path $ExePath)) { throw "Missing Windows binary: $ExePath" }
 Copy-Item -Force $ExePath (Join-Path $StageDir 'bin\memory.exe')
+Copy-Item -Force (Join-Path $CargoTargetDir "$Target\release\memory-windows-service.exe") (Join-Path $StageDir 'bin\memory-windows-service.exe')
 Copy-Item -Force (Join-Path $RootDir 'README.md') (Join-Path $StageDir 'README.md')
 Copy-Item -Force (Join-Path $RootDir 'memory-layer.toml.example') (Join-Path $StageDir 'memory-layer.toml.example')
 Copy-Item -Force (Join-Path $RootDir 'packaging\windows\postgres.compose.yaml') (Join-Path $StageDir 'share\memory-layer\postgres.compose.yaml')
@@ -252,6 +285,7 @@ Copy-Tree (Join-Path $RootDir '.agents\skills') (Join-Path $StageDir 'share\memo
 
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'completions') | Out-Null
 & (Join-Path $StageDir 'bin\memory.exe') completion powershell | Out-File -Encoding utf8 (Join-Path $StageDir 'completions\memory.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'PowerShell completion generation failed' }
 
 $fixedTimestamp = [datetime]::SpecifyKind([datetime]'2000-01-01T00:00:00', [System.DateTimeKind]::Utc)
 Get-ChildItem -LiteralPath $StageDir -Recurse -Force | ForEach-Object { $_.LastWriteTimeUtc = $fixedTimestamp }

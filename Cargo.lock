@@ -2995,6 +2995,9 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chrono",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
  "mem-atproto",
  "mem-atproto-verify",
  "mem-curate",
@@ -3016,6 +3019,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3094,6 +3098,7 @@ dependencies = [
  "sha2",
  "sysinfo",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

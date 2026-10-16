@@ -21,6 +21,39 @@ The unsigned per-user MSI installs under `%LOCALAPPDATA%\Programs\Memory Layer`,
 
 The portable ZIP uses the same `bin`/`share` layout. Add the extracted `bin` directory to `PATH` before running `memory`.
 
+`-SkipBuild` reuses only a successful build receipt for the same committed source,
+with unchanged executable and Web asset hashes. A failed compiler/build tool
+does not silently package an older executable.
+
+## Native service adapter
+
+The bundle includes `memory-windows-service.exe`, an SCM-aware host for one
+foreground Memory/gateway/operator process:
+
+```text
+memory-windows-service --name MemoryLayer-<instance> --directory <absolute-state-directory> -- <absolute-executable> [arguments]
+```
+
+This command is an SCM service entry point, **not** an interactive launcher or
+service installer. A machine operator must separately provision the service
+identity, protected immutable executable tree, exact instance configuration and
+state ACLs. Do not register `memory service run` directly as an SCM executable.
+The adapter starts its child suspended, binds it to a kill-on-close Job Object,
+then resumes it. STOP/shutdown cancel the process tree; normal durable leases and
+intents handle interrupted work. SCM `Running` means the process was launched,
+not that its database/HTTP readiness passed. A dedicated readiness probe remains
+required before switching clients. It does not grant AppContainer isolation,
+perform migrations or implement a complete machine-level installer.
+
+Windows-only adapter argument tests compile with the platform package:
+
+```powershell
+cargo test -p mem-platform --all-targets --locked
+```
+
+Service registration, stop/restart and descendant cancellation still require a
+native VM acceptance test; Linux cross-compilation is not that evidence.
+
 ## Installer identity and upgrades
 
 Keep `memory --version` at the application semver (for example `2.1.0-rc.5`).
