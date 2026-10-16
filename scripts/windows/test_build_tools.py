@@ -7,6 +7,16 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_optional_lab_ssh_is_pinned_key_only_and_never_replaces_service(self):
+        script = (Path(__file__).parent / 'guest-ssh.ps1').read_text()
+        for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", 'Get-FileHash',
+                         'Get-AuthenticodeSignature', "Get-Service sshd", 'Get-Process dismhost',
+                         'PasswordAuthentication no', 'KbdInteractiveAuthentication no',
+                         'Existing SSH key differs', "-RemoteAddress '10.77.0.2'"]:
+            self.assertIn(required, script)
+        self.assertNotIn('Invoke-WebRequest', script)
+        self.assertNotIn('Add-WindowsCapability', script)
+
     def test_native_onboarding_compiles_the_settings_feature_it_tests(self):
         script = (Path(__file__).resolve().parents[2] / 'packaging/windows/check-onboarding.ps1').read_text()
         self.assertEqual(script.count('--features project-sync'), 2)
