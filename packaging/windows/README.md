@@ -103,11 +103,35 @@ Releases are hash-verified against the reviewed ZIP and full payload manifest,
 then retained under `%ProgramFiles%\Memory Layer\releases\<release-identity>`.
 One virtual account `NT SERVICE\MemoryLayer-<name>` receives modify access only
 to `%ProgramData%\MemoryLayer\instances\<name>`, plus read/execute access to its
-release. Admins and SYSTEM retain operational control. The adapter checks paths,
+release. Configuration is administrator-owned under
+`%ProgramData%\MemoryLayer\configurations\<name>` and read-only to that exact
+service. Shared ancestors carry non-inheriting, exact-service read/control ACEs;
+adding another instance preserves these grants without opening sibling data.
+Admins and SYSTEM retain operational control. The adapter checks paths,
 owners and write ACLs; it never relaxes a broad writable directory into trusted
 state. The existing configuration must match on upgrade, and only a strictly
 newer installer build is accepted. Unrelated services, instances and user data
 are not stopped, replaced or deleted.
+
+The elevated gateway probe adds `--service-name MemoryLayer-<name>`. It resolves
+the exact virtual account through SCM and uses an operation-scoped read-only
+exception for that SID on protected configuration and its selected audience
+token. The exception cannot authorize service ownership, writing, deletion or
+ACL changes, and does not change normal protected-file readers. Credential
+files must likewise be administrator-owned and read-only to the gateway service;
+do not put them in its writable runtime directory. Re-preview old unfinished
+operations after this immutable-configuration layout change: their former
+command paths intentionally do not match the new operation digest.
+
+Native identity/layout testing (elevated disposable VM only) is available as
+`native-instance-layout-tests.ps1 -ServiceHostPath <memory-windows-service.exe>
+-IsolationProbePath <memory-windows-isolation-probe.exe>` (build the latter with
+the `windows-native-tests` feature; it is never a release executable).
+It creates two temporary virtual service accounts and verifies their own
+read/write state, immutable authority, sibling denial and first-instance access
+after the second is installed, using the real protected `Input` under both
+identities and the exact-service reader under the elevated operator. These tests have not yet supplied native
+acceptance evidence.
 
 Interrupted extracted staging trees are renamed and recorded, never silently
 deleted. A failed readiness check retains the new release and journal; it does

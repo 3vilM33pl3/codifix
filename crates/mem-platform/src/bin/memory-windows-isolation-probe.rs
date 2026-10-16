@@ -151,6 +151,62 @@ mod native {
     }
     pub fn run() -> Result<()> {
         let args: Vec<_> = std::env::args().skip(1).collect();
+        if args.first().is_some_and(|v| {
+            matches!(
+                v.as_str(),
+                "--service-layout-child" | "--operator-service-read"
+            )
+        }) {
+            let operator = args[0] == "--operator-service-read";
+            ensure!(
+                args.len() == if operator { 4 } else { 3 },
+                "invalid synthetic service fixture arguments"
+            );
+            let root = PathBuf::from(&args[1]);
+            ensure!(
+                root.is_absolute()
+                    && root
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.starts_with("MemoryLayer-layout-test-")),
+                "synthetic service fixture root required"
+            );
+            let index: usize = args[2].parse()?;
+            ensure!(index < 2, "synthetic fixture index required");
+            let own = root.join(format!("configurations/{index}/synthetic.txt"));
+            use mem_platform::private_windows::{Input, ServiceInput, ServiceReader};
+            if operator {
+                let reader = ServiceReader::for_named_service(&args[3])?;
+                ensure!(
+                    Input::open(&own, 9).is_err(),
+                    "ordinary operator reader unexpectedly trusted service ACE"
+                );
+                ensure!(
+                    ServiceInput::open(&own, 9, &reader)?.read(9)? == b"synthetic",
+                    "unexpected synthetic fixture bytes"
+                );
+                println!("{{\"exact_service_read\":true,\"ordinary_policy_unchanged\":true}}");
+            } else {
+                ensure!(
+                    Input::open(&own, 9)?.read(9)? == b"synthetic",
+                    "unexpected synthetic fixture bytes"
+                );
+                let other = root.join(format!("configurations/{}/synthetic.txt", 1 - index));
+                ensure!(
+                    Input::open(&other, 9).is_err() && File::open(&other).is_err(),
+                    "sibling authority readable"
+                );
+                ensure!(
+                    OpenOptions::new().write(true).open(&own).is_err(),
+                    "service authority writable"
+                );
+                let result = root.join(format!("instances/{index}/result.txt"));
+                create_private_file(&result)?.write_all(
+                    b"own=True;siblingDenied=True;immutable=True;protectedAncestors=True",
+                )?;
+            }
+            return Ok(());
+        }
         if args.first().is_some_and(|v| v == "--child") {
             return child(&args[1..]);
         }

@@ -33,32 +33,7 @@ function Assert-NoReparse([string]$Path) {
     }
 }
 function Set-PrivateDirectory([string]$Path, [string]$ServiceSid = '', [switch]$ReadOnly) {
-    if (Test-Path -LiteralPath $Path) {
-        Assert-NoReparse $Path
-        $existingAcl = Get-Acl -LiteralPath $Path
-        $operatorSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-        $allowedWriters = @('S-1-5-18', 'S-1-5-32-544', $operatorSid, $ServiceSid)
-        $owner = $existingAcl.GetOwner([Security.Principal.SecurityIdentifier]).Value
-        if ($owner -notin $allowedWriters) { throw 'Refusing an operator directory owned by another principal' }
-        $writeMask = [Security.AccessControl.FileSystemRights]::Write -bor [Security.AccessControl.FileSystemRights]::Delete -bor [Security.AccessControl.FileSystemRights]::ChangePermissions -bor [Security.AccessControl.FileSystemRights]::TakeOwnership
-        foreach ($rule in $existingAcl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
-            if ($rule.AccessControlType -eq 'Allow' -and ($rule.FileSystemRights -band $writeMask) -ne 0 -and $rule.IdentityReference.Value -notin $allowedWriters) {
-                throw 'Refusing an operator directory writable by another principal'
-            }
-        }
-    } else { New-Item -ItemType Directory -Path $Path | Out-Null }
-    $acl = [Security.AccessControl.DirectorySecurity]::new()
-    $acl.SetAccessRuleProtection($true, $false)
-    $admins = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
-    $acl.SetOwner($admins)
-    foreach ($sid in @('S-1-5-18', 'S-1-5-32-544')) {
-        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($sid), 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
-    }
-    if ($ServiceSid) {
-        $rights = if ($ReadOnly) { 'ReadAndExecute' } else { 'Modify' }
-        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($ServiceSid), $rights, 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
-    }
-    Set-Acl -LiteralPath $Path -AclObject $acl
+    Set-NativePrivateDirectory $Path $ServiceSid -ReadOnly:$ReadOnly
 }
 function Invoke-Sc([string[]]$Arguments) {
     $null = & "$env:SystemRoot\System32\sc.exe" @Arguments 2>&1
@@ -116,7 +91,9 @@ $root = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Memor
 $releasesRoot = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Memory Layer\releases'
 $release = Join-Path $releasesRoot $plan.release_identity
 $state = Join-Path (Join-Path $root 'instances') $Name
-$installedConfig = Join-Path $state $(if ($ExecutableName -eq 'memory.exe') { 'memory-layer.toml' } else { 'gateway.json' })
+$configurationRoot = Join-Path $root 'configurations'
+$configurationDirectory = Join-Path $configurationRoot $Name
+$installedConfig = Join-Path $configurationDirectory $(if ($ExecutableName -eq 'memory.exe') { 'memory-layer.toml' } else { 'gateway.json' })
 $command = @((Join-Path $release 'bin\memory-windows-service.exe'), '--name', $plan.service_name, '--directory', $state, '--', (Join-Path $release "bin\$ExecutableName")) + @(Get-NativeServiceArguments $ExecutableName $installedConfig)
 $binaryPath = ($command | ForEach-Object { ConvertTo-NativeCommandArgument $_ }) -join ' '
 $operationAction = if ($Action -eq 'Preview') { $PreviewAction } else { $Action }
@@ -133,7 +110,8 @@ if (-not $DatabaseCompatibilityConfirmed -or -not $RecoveryReference -or $Recove
 $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run execution in an elevated PowerShell' }
 # Exact machine-owned roots only; never alter another installation or user data.
-foreach ($path in @($root, (Join-Path $root 'instances'), (Join-Path $root 'operations'), (Join-Path $root 'registrations'), (Split-Path -Parent $releasesRoot), $releasesRoot)) { Set-PrivateDirectory $path }
+foreach ($path in @($root, (Join-Path $root 'instances'), $configurationRoot, (Split-Path -Parent $releasesRoot), $releasesRoot)) { Set-NativePrivateDirectory $path -SharedAncestor }
+foreach ($path in @((Join-Path $root 'operations'), (Join-Path $root 'registrations'))) { Set-PrivateDirectory $path }
 $registrationPath = Join-Path (Join-Path $root 'registrations') "$Name.json"
 $operationRoot = Join-Path (Join-Path $root 'operations') $OperationId.ToString()
 Set-PrivateDirectory $operationRoot
@@ -230,12 +208,16 @@ try {
     else { Invoke-Sc @('config', $plan.service_name, 'binPath=', $binaryPath, 'start=', 'demand') }
     Invoke-Sc @('sidtype', $plan.service_name, 'unrestricted')
     $sid = ([Security.Principal.NTAccount]::new($plan.account)).Translate([Security.Principal.SecurityIdentifier]).Value
+    foreach ($path in @($root, (Join-Path $root 'instances'), $configurationRoot, (Split-Path -Parent $releasesRoot), $releasesRoot)) {
+        Set-NativePrivateDirectory $path $sid -SharedAncestor
+    }
     Set-PrivateDirectory $state $sid
+    Set-NativePrivateDirectory $configurationDirectory $sid -ReadOnly
     # Shared release bytes are readable but not writable by virtual services.
     $readRule = [Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($sid), 'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
     $releaseAcl = Get-Acl -LiteralPath $release; $releaseAcl.AddAccessRule($readRule); Set-Acl -LiteralPath $release -AclObject $releaseAcl
     if (-not (Test-Path -LiteralPath $installedConfig)) {
-        $temporaryConfig = Join-Path $state ([guid]::NewGuid().ToString() + '.config.tmp')
+        $temporaryConfig = Join-Path $configurationDirectory ([guid]::NewGuid().ToString() + '.config.tmp')
         $file = [IO.File]::Open($temporaryConfig, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
         try { $file.Write($configBytes, 0, $configBytes.Length); $file.Flush($true) } finally { $file.Dispose() }
         [IO.File]::Move($temporaryConfig, $installedConfig)
@@ -251,7 +233,7 @@ try {
             try {
                 # Reuse Rust's existing signed nonce/key/freshness verifier.
                 # Never place the enrolled bearer on argv or operational output.
-                $output = @(& $probe check-status $installedConfig $ExpectedSpaceId.ToString() $ExpectedInstanceId.ToString() $StatusAudienceId.ToString() 2>$null)
+                $output = @(& $probe check-status $installedConfig $ExpectedSpaceId.ToString() $ExpectedInstanceId.ToString() $StatusAudienceId.ToString() --service-name $plan.service_name 2>$null)
                 $probeExit = $LASTEXITCODE
                 $status = ($output -join "`n") | ConvertFrom-Json
                 if ($probeExit -eq 0 -and (Test-NativeGatewayReadiness $status $ExpectedSpaceId $ExpectedInstanceId $StatusAudienceId) -and (Get-Service -Name $plan.service_name).Status -eq 'Running') { $ready = $true; break }

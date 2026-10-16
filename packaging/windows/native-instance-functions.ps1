@@ -1,5 +1,47 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Pure validation helpers are loaded by tests without SCM/admin side effects.
+function Set-NativePrivateDirectory {
+    param([string]$Path, [string]$ServiceSid = '', [switch]$ReadOnly, [switch]$SharedAncestor)
+    $preserved = @()
+    if (Test-Path -LiteralPath $Path) {
+        $item = Get-Item -LiteralPath $Path -Force
+        while ($null -ne $item) {
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Reparse points forbidden in operator paths' }
+            $parent = Split-Path -Parent $item.FullName
+            $item = if ($parent -and $parent -ne $item.FullName) { Get-Item -LiteralPath $parent -Force } else { $null }
+        }
+        $existing = Get-Acl -LiteralPath $Path
+        $operatorSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $writers = @('S-1-5-18', 'S-1-5-32-544', $operatorSid)
+        if ($ServiceSid -and -not $ReadOnly -and -not $SharedAncestor) { $writers += $ServiceSid }
+        if ($existing.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $writers) { throw 'Unexpected directory owner' }
+        $writeMask = [Security.AccessControl.FileSystemRights]::Write -bor [Security.AccessControl.FileSystemRights]::Delete -bor [Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor [Security.AccessControl.FileSystemRights]::ChangePermissions -bor [Security.AccessControl.FileSystemRights]::TakeOwnership
+        foreach ($rule in $existing.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
+            if ($rule.AccessControlType -eq 'Allow' -and ($rule.FileSystemRights -band $writeMask) -ne 0 -and $rule.IdentityReference.Value -notin $writers) { throw 'Unexpected directory writer' }
+            # Keep only exact previously installed service read ACEs on shared
+            # ancestors. No inheritance into a sibling's state or authority.
+            if ($SharedAncestor -and -not $rule.IsInherited -and $rule.AccessControlType -eq 'Allow' -and
+                $rule.IdentityReference.Value -match '^S-1-5-80-(\d+-){4}\d+$' -and
+                $rule.InheritanceFlags -eq 'None' -and $rule.PropagationFlags -eq 'None' -and
+                ($rule.FileSystemRights -band $writeMask) -eq 0) { $preserved += $rule }
+        }
+    } else { New-Item -ItemType Directory -Path $Path | Out-Null }
+    $acl = [Security.AccessControl.DirectorySecurity]::new()
+    $acl.SetAccessRuleProtection($true, $false)
+    $acl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
+    foreach ($sid in @('S-1-5-18', 'S-1-5-32-544')) {
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($sid), 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    }
+    foreach ($rule in $preserved) { $acl.AddAccessRule($rule) }
+    if ($ServiceSid) {
+        if ($ServiceSid -notmatch '^S-1-5-80-(\d+-){4}\d+$') { throw 'Exact virtual-service SID required' }
+        $rights = if ($ReadOnly -or $SharedAncestor) { 'ReadAndExecute' } else { 'Modify' }
+        $inherit = if ($SharedAncestor) { 'None' } else { 'ContainerInherit,ObjectInherit' }
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($ServiceSid), $rights, $inherit, 'None', 'Allow'))
+    }
+    Set-Acl -LiteralPath $Path -AclObject $acl
+}
+
 function Get-NativeInstancePlan {
     param([string]$Name, [string]$ReleaseIdentity, [string]$ExecutableName,
         [string]$HealthUri, [guid]$ExpectedInstanceId,
