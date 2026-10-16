@@ -15,11 +15,15 @@ param(
     [ValidateSet('memory.exe', 'memory-federation-gateway.exe')][string]$ExecutableName = 'memory.exe',
     [guid]$ExpectedSpaceId = [guid]::Empty,
     [guid]$StatusAudienceId = [guid]::Empty,
+    [string]$NativeRuntimeManifestPath,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$NativeRuntimeManifestSha256,
+    [guid]$NativeRuntimeOperationId = [guid]::Empty,
     [Parameter(Mandatory = $true)][ValidateLength(1, 1024)][string]$RecoveryReference,
     [switch]$DatabaseCompatibilityConfirmed
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'native-instance-functions.ps1')
+. (Join-Path $PSScriptRoot 'native-prerequisites-functions.ps1')
 . (Join-Path $PSScriptRoot 'release-identity.ps1')
 if ($env:OS -ne 'Windows_NT') { throw 'Native Windows is required; no Docker/WSL fallback exists' }
 
@@ -98,9 +102,16 @@ $command = @((Join-Path $release 'bin\memory-windows-service.exe'), '--name', $p
 $binaryPath = ($command | ForEach-Object { ConvertTo-NativeCommandArgument $_ }) -join ' '
 $operationAction = if ($Action -eq 'Preview') { $PreviewAction } else { $Action }
 $binding = [ordered]@{ action = $operationAction; recovery_reference = $RecoveryReference; plan = $plan; manifest_sha256 = $ManifestSha256; package_sha256 = $zipEntry[0].sha256; config_fingerprint = $configHash; binary_path = $binaryPath }
+$runtimeBinding=$null
+if ($NativeRuntimeManifestPath -or $NativeRuntimeManifestSha256 -or $NativeRuntimeOperationId -ne [guid]::Empty) {
+    if (-not $NativeRuntimeManifestPath -or -not $NativeRuntimeManifestSha256 -or $NativeRuntimeOperationId -eq [guid]::Empty) { throw 'Local native runtime binding requires manifest path, digest and verified operation ID together' }
+    $previewLease=Open-NativePrerequisiteLease $NativeRuntimeManifestPath $NativeRuntimeManifestSha256 $NativeRuntimeOperationId
+    try { $runtimeBinding=$previewLease.binding; $binding.native_runtime=$runtimeBinding }
+    finally { Close-NativePrerequisiteLease $previewLease }
+}
 $inputDigest = Get-NativeInputDigest $binding
 if ($Action -eq 'Preview') {
-    [ordered]@{ action = $operationAction; recovery_reference = $RecoveryReference; plan = $plan; input_sha256 = $inputDigest; release_directory = $release; state_directory = $state; signing_status = $manifest.signing_status; native_stack_bundled = $manifest.native_stack_bundled; database_backup_performed = $false } | ConvertTo-Json -Depth 8
+    [ordered]@{ action = $operationAction; recovery_reference = $RecoveryReference; plan = $plan; native_runtime=$runtimeBinding; input_sha256 = $inputDigest; release_directory = $release; state_directory = $state; signing_status = $manifest.signing_status; native_stack_bundled = $manifest.native_stack_bundled; database_backup_performed = $false } | ConvertTo-Json -Depth 8
     exit 0
 }
 if (-not $ExpectedInputSha256 -or $ExpectedInputSha256 -ne $inputDigest) { throw 'Execution inputs differ from the explicitly reviewed preview digest' }
@@ -117,7 +128,14 @@ $operationRoot = Join-Path (Join-Path $root 'operations') $OperationId.ToString(
 Set-PrivateDirectory $operationRoot
 $lock = [IO.File]::Open((Join-Path $root 'operator.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
 $releaseGuard = $null
+$runtimeLease = $null
 try {
+    # Retain exact runtime/receipt handles through service changes. This is file
+    # identity verification, not proof that PostgreSQL is running or reachable.
+    if ($runtimeBinding) {
+        $runtimeLease=Open-NativePrerequisiteLease $NativeRuntimeManifestPath $NativeRuntimeManifestSha256 $NativeRuntimeOperationId
+        if ((Get-NativeInputDigest $runtimeLease.binding) -cne (Get-NativeInputDigest $runtimeBinding)) { throw 'Native runtime changed after preview' }
+    }
     $journalPath = Join-Path $operationRoot 'journal.json'
     if (Test-Path -LiteralPath $journalPath) {
         $journal = Get-Content -LiteralPath $journalPath -Raw | ConvertFrom-Json
@@ -130,6 +148,7 @@ try {
         if ($Action -eq 'Upgrade') {
             if (-not (Test-Path -LiteralPath $registrationPath)) { throw 'Existing service has no operator installation receipt; explicit legacy adoption is not implemented' }
             $registration = Get-Content -LiteralPath $registrationPath -Raw | ConvertFrom-Json
+            if ($registration.native_runtime -and -not $runtimeBinding) { throw 'Upgrade cannot silently discard a prior native runtime binding' }
             if ($registration.binary_path -ne $existing.PathName -or $registration.expected_instance_id -ne $plan.expected_instance_id) { throw 'Existing service differs from its exact-instance installation receipt' }
             if ([version]$manifest.installer_version -le [version]$registration.installer_version) { throw 'Upgrade requires a strictly newer installer build; stale executable recovery is forbidden' }
         }
@@ -262,8 +281,8 @@ try {
     }
     if (-not $ready) { throw 'Exact-instance readiness failed; no old database or executable was automatically restored' }
     Invoke-Sc @('config', $plan.service_name, 'start=', 'delayed-auto')
-    Write-NativeJournal $registrationPath ([ordered]@{ schema_version = 1; operation_id = $OperationId.ToString(); expected_instance_id = $plan.expected_instance_id; installer_version = $manifest.installer_version; release_identity = $plan.release_identity; manifest_sha256 = $ManifestSha256; binary_path = $binaryPath; config_fingerprint = $configHash })
+    Write-NativeJournal $registrationPath ([ordered]@{ schema_version = 1; operation_id = $OperationId.ToString(); expected_instance_id = $plan.expected_instance_id; installer_version = $manifest.installer_version; release_identity = $plan.release_identity; manifest_sha256 = $ManifestSha256; binary_path = $binaryPath; config_fingerprint = $configHash; native_runtime=$runtimeBinding })
     Save-Phase 'completed'
     $readiness = if ($ExecutableName -eq 'memory.exe') { 'exact-instance readiness verified' } else { 'signed gateway space/authority/current Pull and writer fence verified; PDS publication health is separate' }
     Write-Output "Completed: $OperationId ($($plan.service_name)); $readiness; data preserved"
-} finally { if ($releaseGuard) { $releaseGuard.Dispose() }; $lock.Dispose() }
+} finally { if ($releaseGuard) { $releaseGuard.Dispose() }; Close-NativePrerequisiteLease $runtimeLease; $lock.Dispose() }

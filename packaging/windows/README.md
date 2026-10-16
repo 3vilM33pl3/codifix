@@ -216,3 +216,17 @@ Service-account access is a separate explicit service-installation concern.
 Successful file installation is **not native execution or clean-Windows
 acceptance evidence**. Run `test-native-prerequisites.ps1` for portable descriptor
 tests; the full clean Windows runtime still requires observed testing.
+
+To bind a named Memory/gateway installation to these exact local runtime bytes,
+pass `-NativeRuntimeManifestPath`, `-NativeRuntimeManifestSha256` and
+`-NativeRuntimeOperationId` to `native-instance.ps1` in both Preview and execution.
+The operation ID is the successful prerequisite-install receipt, not the named
+service's new operation ID. The preview includes this binding; installed files
+and the verified receipt are rechecked and held against replacement **before
+the selected service stops**, and the registration retains the binding. A later
+upgrade cannot silently omit an existing binding. Without these optional fields,
+the existing externally managed database installation path is unchanged.
+This proves only protected runtime bytes, not PostgreSQL process/database
+readiness. Database provisioning/service operation remains separate, and normal
+Memory or signed-gateway readiness is still required. It does not grant a Memory
+participant access to database credentials or runtime files.

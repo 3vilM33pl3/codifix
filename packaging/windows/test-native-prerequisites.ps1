@@ -37,7 +37,27 @@ foreach ($mutate in @(
 $changed=$manifest | ConvertTo-Json -Depth 16 | ConvertFrom-Json
 $changed.payload_files[0].sha256='b'*64
 if ((Get-NativeInputDigest (Get-NativePrerequisitePlan $changed)) -eq $original) { throw 'Changed runtime input did not change preview digest' }
-foreach ($file in @('native-prerequisites.ps1','native-prerequisites-functions.ps1')) {
+$operation=[guid]'11111111-1111-4111-8111-111111111111'
+$root=Join-Path ([IO.Path]::GetTempPath()) 'synthetic-runtime-root'
+$destination=Join-Path $root ('postgres-17.11-vector-0.8.7-' + $hash)
+$receipt=[pscustomobject]@{schema_version=1;phase='verified';operation_id=$operation.ToString();destination=$destination
+    input_sha256=(Get-NativeInputDigest ([ordered]@{schema_version=1;manifest_sha256=$hash;plan=$plan;destination=$destination}))
+    database_provisioned=$false;service_created=$false}
+$binding=Get-NativePrerequisiteBinding $plan $hash $operation $root $receipt
+if ($binding.database_readiness_verified -or $binding.verification_scope -cne 'protected_payload_only') { throw 'Runtime receipt falsely claims database readiness' }
+foreach ($change in @(
+    @{phase='staging'}, @{operation_id=[guid]::NewGuid().ToString()}, @{input_sha256=('b'*64)},
+    @{destination=(Join-Path $root 'unrelated-runtime')}, @{database_provisioned=$true}, @{service_created=$true}
+)) {
+    $bad=$receipt | ConvertTo-Json | ConvertFrom-Json
+    foreach ($key in $change.Keys) { $bad.$key=$change[$key] }
+    $rejected=$false
+    try { $null=Get-NativePrerequisiteBinding $plan $hash $operation $root $bad } catch { $rejected=$true }
+    if (-not $rejected) { throw 'Changed or incomplete runtime receipt accepted' }
+}
+$instanceSource=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'native-instance.ps1') -Raw
+if ($instanceSource.IndexOf('$runtimeLease=Open-NativePrerequisiteLease') -gt $instanceSource.IndexOf('Stop-Service -Name')) { throw 'Runtime must be revalidated before stopping service' }
+foreach ($file in @('native-prerequisites.ps1','native-prerequisites-functions.ps1','native-instance.ps1')) {
     $tokens=$null; $errors=$null
     $null=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot $file),[ref]$tokens,[ref]$errors)
     if ($errors.Count) { throw ($errors | Out-String) }
