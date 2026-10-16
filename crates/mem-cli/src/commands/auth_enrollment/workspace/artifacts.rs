@@ -273,42 +273,6 @@ pub(super) async fn apply(
     Ok(())
 }
 
-#[cfg(test)]
-mod version_tests {
-    use super::skill_version_matches;
-
-    #[test]
-    fn reviewed_build_label_can_be_absent_from_skill_frontmatter() {
-        for (actual, pinned) in [
-            ("2.1.0-rc.5", "2.1.0-rc.5+89d52aa8"),
-            ("2.1.0", "2.1.0+build.89d52aa8"),
-            ("2.1.0-rc.5+89d52aa8", "2.1.0-rc.5+89d52aa8"),
-            ("2.1.0-rc.5", "2.1.0-rc.5"),
-        ] {
-            assert!(skill_version_matches(actual, pinned), "{actual} / {pinned}");
-        }
-    }
-
-    #[test]
-    fn build_label_compatibility_never_relaxes_version_or_existing_build_identity() {
-        for (actual, pinned) in [
-            ("2.1.0-rc.4", "2.1.0-rc.5+89d52aa8"),
-            ("2.1.0", "2.1.0-rc.5+89d52aa8"),
-            ("2.1.1-rc.5", "2.1.0-rc.5+89d52aa8"),
-            ("2.1.0-rc.5+other", "2.1.0-rc.5+89d52aa8"),
-            ("2.1.0-rc.5+89d52aa8", "2.1.0-rc.5"),
-            ("2.1.0-rc.5", "^2.1.0-rc.5+89d52aa8"),
-            ("2.1.0-rc.5", "2.1.0-rc.5+"),
-            ("v2.1.0-rc.5", "v2.1.0-rc.5+89d52aa8"),
-        ] {
-            assert!(
-                !skill_version_matches(actual, pinned),
-                "{actual} / {pinned}"
-            );
-        }
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn publish_skill(
     path: &Path,
@@ -383,4 +347,40 @@ fn publish_skill(
     filesystem::publish_directory(&stage, &target, ".memory-onboarding-pin.json", &receipt)?;
     filesystem::save(path, journal)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::skill_version_matches;
+
+    #[test]
+    fn reviewed_build_label_can_be_absent_from_skill_frontmatter() {
+        for (actual, pinned) in [
+            ("2.1.0-rc.5", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0", "2.1.0+build.89d52aa8"),
+            ("2.1.0-rc.5+89d52aa8", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0-rc.5", "2.1.0-rc.5"),
+        ] {
+            assert!(skill_version_matches(actual, pinned), "{actual} / {pinned}");
+        }
+    }
+
+    #[test]
+    fn build_label_compatibility_never_relaxes_version_or_existing_build_identity() {
+        for (actual, pinned) in [
+            ("2.1.0-rc.4", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.1-rc.5", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0-rc.5+other", "2.1.0-rc.5+89d52aa8"),
+            ("2.1.0-rc.5+89d52aa8", "2.1.0-rc.5"),
+            ("2.1.0-rc.5", "^2.1.0-rc.5+89d52aa8"),
+            ("2.1.0-rc.5", "2.1.0-rc.5+"),
+            ("v2.1.0-rc.5", "v2.1.0-rc.5+89d52aa8"),
+        ] {
+            assert!(
+                !skill_version_matches(actual, pinned),
+                "{actual} / {pinned}"
+            );
+        }
+    }
 }
