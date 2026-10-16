@@ -7,6 +7,10 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_native_onboarding_compiles_the_settings_feature_it_tests(self):
+        script = (Path(__file__).resolve().parents[2] / 'packaging/windows/check-onboarding.ps1').read_text()
+        self.assertEqual(script.count('--features project-sync'), 2)
+
     def test_receipt_replacement_uses_native_replace_not_move_force(self):
         for name in ['guest-stage.ps1', 'guest-native-api.ps1', 'guest-build-tools.ps1']:
             script = (Path(__file__).parent / name).read_text()
