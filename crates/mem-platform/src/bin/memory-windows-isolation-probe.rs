@@ -216,6 +216,20 @@ mod native {
                 create_private_file(&result)?.write_all(
                     b"own=True;siblingDenied=True;immutable=True;protectedAncestors=True",
                 )?;
+                // Keep this one-shot fixture RUNNING until the operator has
+                // observed its result. Otherwise SCM can miss the transient
+                // state and Start-Service reports failure despite exit 0.
+                let finish = root.join(format!("instances/{index}/finish.txt"));
+                let deadline = Instant::now() + Duration::from_secs(60);
+                while !finish.exists() && Instant::now() < deadline {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                ensure!(
+                    std::fs::read(&finish)
+                        .context("operator did not acknowledge fixture readiness")?
+                        == b"observed",
+                    "invalid synthetic finish acknowledgement"
+                );
             }
             return Ok(());
         }

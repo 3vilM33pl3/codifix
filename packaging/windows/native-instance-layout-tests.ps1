@@ -52,6 +52,7 @@ try {
         $until = [DateTime]::UtcNow.AddSeconds(30)
         while (-not (Test-Path -LiteralPath $result) -and [DateTime]::UtcNow -lt $until) { Start-Sleep -Milliseconds 100 }
         if (-not (Test-Path -LiteralPath $result) -or [IO.File]::ReadAllText($result) -cne 'own=True;siblingDenied=True;immutable=True;protectedAncestors=True') { throw 'Exact service identity layout/read/write isolation failed' }
+        [IO.File]::WriteAllText((Join-Path $root "instances\$index\finish.txt"), 'observed')
         (Get-Service $names[$index]).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
         $null = & $probePath --operator-service-read $root $index.ToString() $names[$index]
         if ($LASTEXITCODE -ne 0) { throw 'Elevated exact-service protected reader failed' }
