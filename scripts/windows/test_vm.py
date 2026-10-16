@@ -88,6 +88,10 @@ class SeedTests(unittest.TestCase):
         modifications = document.findall('.//u:ModifyPartition', ns)
         self.assertEqual([p.find('u:Order', ns).text for p in modifications], ['1', '2'])
         self.assertEqual([p.find('u:PartitionID', ns).text for p in modifications], ['1', '3'])
+        oobe_locale = document.find("u:settings[@pass='oobeSystem']/u:component[@name='Microsoft-Windows-International-Core']", ns)
+        self.assertIsNotNone(oobe_locale)
+        self.assertEqual(oobe_locale.find('u:InputLocale', ns).text, '0809:00000809')
+        self.assertEqual(oobe_locale.find('u:UserLocale', ns).text, 'en-GB')
 
     def test_production_and_relative_roots_rejected(self):
         for root in ['/data', '/', '/home/olivier', 'lab']:

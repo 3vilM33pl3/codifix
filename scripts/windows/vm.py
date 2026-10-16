@@ -140,6 +140,11 @@ def unattended(password):
     specialize = node(root, "settings", **{"pass": "specialize"})
     node(component(specialize, "Microsoft-Windows-Shell-Setup"), "ComputerName", "MEMORY-WINLAB")
     oobe = node(root, "settings", **{"pass": "oobeSystem"})
+    # WinPE locale alone does not configure the installed user's OOBE locale.
+    locale = component(oobe, "Microsoft-Windows-International-Core")
+    for key, value in [("InputLocale", "0809:00000809"), ("SystemLocale", "en-GB"),
+                       ("UILanguage", "en-US"), ("UserLocale", "en-GB")]:
+        node(locale, key, value)
     shell = component(oobe, "Microsoft-Windows-Shell-Setup")
     node(shell, "TimeZone", "UTC")
     wizard = node(shell, "OOBE")
