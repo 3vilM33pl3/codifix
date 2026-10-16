@@ -7,6 +7,15 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_guest_observation_is_lab_scoped_and_metadata_only(self):
+        script = (Path(__file__).parent / 'guest-observe.ps1').read_text()
+        for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", 'Confirm-SecureBootUEFI',
+                         'Get-Tpm', 'grace_remaining_minutes', 'Get-TimeZone']:
+            self.assertIn(required, script)
+        for forbidden in ['Set-ItemProperty', 'Get-ChildItem Env:', 'DigitalProductId',
+                          'ConvertFrom-SecureString', 'Start-Process']:
+            self.assertNotIn(forbidden, script)
+
     def test_stage_runner_has_fixed_tasks_and_no_password_registration(self):
         script = (Path(__file__).parent / 'guest-stage.ps1').read_text()
         for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", '-LogonType Interactive',
