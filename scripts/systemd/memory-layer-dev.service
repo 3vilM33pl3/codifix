@@ -1,0 +1,19 @@
+[Unit]
+Description=Memory Layer development service
+After=network.target
+ConditionFileIsExecutable=%h/Projects/memory/target/debug/memory
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Projects/memory
+Environment=MEMORY_LAYER_PROFILE=dev
+UnsetEnvironment=MEMORY_LAYER_AREA MEMORY_LAYER_AREA_ROUTING MEMORY_LAYER_CONFIG MEMORY_LAYER_CLIENT_TOKEN
+ExecStart=%h/Projects/memory/target/debug/memory service run
+Restart=no
+KillMode=control-group
+TimeoutStopSec=30
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -112,8 +112,10 @@ the skill bundle.
 
 For a backend test, explicitly select the source CLI with
 `MEMCTL_BIN='cargo run --quiet --bin memory --'`. Source commands without an
-explicit `--area` run with the dev profile and omit inherited area-routing
-environment variables. Dev transport, authentication and degraded-database
+explicit `--area` run with the dev profile and omit inherited area-routing,
+config-path and client-token environment overrides. Explicit `--config` command
+arguments remain available for intentional dev test configurations.
+Dev transport, authentication and degraded-database
 failures include recovery instructions in both JSON and text output, retaining
 the original error and exit code. See [dev recovery](../dev-stack.md#project-memory-routing-and-recovery).
 

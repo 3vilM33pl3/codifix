@@ -362,10 +362,12 @@ func TestSourceDefaultEnvironmentUsesDevWithoutInheritedAreaRouting(t *testing.T
 	t.Setenv("MEMORY_LAYER_PROFILE", "prod")
 	t.Setenv("MEMORY_LAYER_AREA", "workshop")
 	t.Setenv("MEMORY_LAYER_AREA_ROUTING", "/operator/routes.json")
+	t.Setenv("MEMORY_LAYER_CONFIG", "/installed/client.toml")
+	t.Setenv("MEMORY_LAYER_CLIENT_TOKEN", "synthetic-installed-token")
 	t.Setenv("MEMORY_LAYER_PROJECT", "memory")
 	got := commandEnvironment(helperInvocation{devSourceRoot: t.TempDir()})
 	joined := "\n" + strings.Join(got, "\n") + "\n"
-	for _, unexpected := range []string{"MEMORY_LAYER_PROFILE=prod", "MEMORY_LAYER_AREA=", "MEMORY_LAYER_AREA_ROUTING="} {
+	for _, unexpected := range []string{"MEMORY_LAYER_PROFILE=prod", "MEMORY_LAYER_AREA=", "MEMORY_LAYER_AREA_ROUTING=", "MEMORY_LAYER_CONFIG=", "MEMORY_LAYER_CLIENT_TOKEN="} {
 		if strings.Contains(joined, unexpected) {
 			t.Fatalf("default dev inherited installed routing: %s", unexpected)
 		}
@@ -488,6 +490,17 @@ func TestUnrelatedAndExplicitOverrideFailuresKeepOriginalKind(t *testing.T) {
 		if envelope.Error.Kind != "command_failed" || envelope.Error.Message != tc.failure {
 			t.Fatalf("unrelated failure mislabeled as dev outage: %+v", envelope.Error)
 		}
+	}
+}
+
+func TestTextFailurePreservesPartialWriteEvidence(t *testing.T) {
+	partial := "Checkpoint file saved; inspect before retrying.\n"
+	failure := "error sending request for url (http://127.0.0.1:4250/v1/capture/task)"
+	code, stdout, stderr := captureHelperRun(t, func() int {
+		return emitCommandFailure(outputText, helperInvocation{devSourceRoot: t.TempDir()}, []string{"memory", "checkpoint", "start-task"}, "command_failed", 9, nil, partial, failure)
+	})
+	if code != 9 || stdout != partial || !strings.Contains(stderr, failure) || !strings.Contains(stderr, "partially completed") {
+		t.Fatalf("lost partial write evidence: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 

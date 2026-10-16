@@ -360,7 +360,7 @@ func commandEnvironment(invocation helperInvocation) []string {
 	for _, entry := range environment {
 		key, _, _ := strings.Cut(entry, "=")
 		switch key {
-		case "MEMORY_LAYER_PROFILE", "MEMORY_LAYER_AREA", "MEMORY_LAYER_AREA_ROUTING":
+		case "MEMORY_LAYER_PROFILE", "MEMORY_LAYER_AREA", "MEMORY_LAYER_AREA_ROUTING", "MEMORY_LAYER_CONFIG", "MEMORY_LAYER_CLIENT_TOKEN":
 			continue
 		}
 		filtered = append(filtered, entry)
@@ -392,8 +392,9 @@ func emitCommandFailure(mode outputMode, invocation helperInvocation, command []
 		}
 		if diagnosis != "" {
 			message = diagnosis + "\n" +
-				"In the recovery shell, first unset MEMORY_LAYER_AREA and MEMORY_LAYER_AREA_ROUTING if inherited from an installed-area session.\n" +
+				"In the recovery shell, first unset MEMORY_LAYER_AREA, MEMORY_LAYER_AREA_ROUTING, MEMORY_LAYER_CONFIG and MEMORY_LAYER_CLIENT_TOKEN if inherited from an installed-area session.\n" +
 				"From the Memory Layer checkout, diagnose: MEMORY_LAYER_PROFILE=dev cargo run --bin memory -- doctor\n" +
+				"On Linux with the repo dev unit installed, restart it after repairing configuration: systemctl --user restart memory-layer-dev.service; inspect journalctl --user -u memory-layer-dev.service.\n" +
 				"Start the dev backend in a separate terminal: MEMORY_LAYER_PROFILE=dev cargo run --bin memory -- service run\n" +
 				"Verify: MEMORY_LAYER_PROFILE=dev cargo run --bin memory -- health (require status=ok and database=up).\n" +
 				"See docs/developer/dev-stack.md for recovery. Do not use packaged service enable or silently fall back to Workshop.\n" +
@@ -405,6 +406,10 @@ func emitCommandFailure(mode outputMode, invocation helperInvocation, command []
 	// but avoid printing the same stderr twice in text mode.
 	rawStderr := stderr
 	if mode == outputText {
+		// Preserve partial checkpoint/write output as evidence for recovery.
+		if stdout != "" {
+			fmt.Fprint(os.Stdout, stdout)
+		}
 		rawStderr = ""
 	}
 	return emitHelperFailure(mode, invocation.helperCommand, invocation.project, kind, message, code, command, stdout, rawStderr)

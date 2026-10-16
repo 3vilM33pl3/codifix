@@ -23,18 +23,18 @@ Binaries detect their profile at startup:
   run as **prod**.
 - Override with `MEMORY_LAYER_PROFILE=dev|prod` when needed.
 
-The dev profile ignores the global config entirely and overlays
-`.mem/config.dev.toml` on top of the repo's `.mem/config.toml`. This
-keeps the dev service, watcher, and TUI on their own port, socket,
-runtime directory, and database — fully independent of the installed
-stack. The TUI header shows `[dev]` when it is on the dev profile.
+The dev profile ignores the global config entirely and overlays the user-local
+project `config.dev.toml` on `config.toml`. Legacy `.mem/` configuration is
+migrated to those user-local paths. The dev service has its own port, socket and
+runtime directory; data isolation requires its own database URL. This checkout
+uses a dedicated dev database. The TUI header shows `[dev]` on the dev profile.
 
 Bootstrap the overlay once, then run each piece via the single `memory`
 binary in a separate shell:
 
 ```bash
-cargo run --bin memory -- dev      # prompts to copy DB/LLM settings
-                                        # from the global config
+cargo run --bin memory -- dev --no-copy-from-global
+# Configure a dedicated development database in the dev overlay before startup.
 cargo run --bin memory --features embedded-service -- service run   # dev service
 cargo run --bin memory -- tui           # dev TUI
 ```

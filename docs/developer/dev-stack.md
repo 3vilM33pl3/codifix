@@ -12,6 +12,7 @@ This page is the canonical reference for that split: how the dev profile activat
 - [What Is Shared](#what-is-shared)
 - [Default Endpoints](#default-endpoints)
 - [Verifying Isolation](#verifying-isolation)
+- [Project Memory Routing And Recovery](#project-memory-routing-and-recovery)
 - [Common Pitfalls](#common-pitfalls)
 
 ## Quickstart
@@ -26,7 +27,10 @@ npm --prefix web ci && npm --prefix web run build
 
 # 2. Bootstrap the user-local project base config and the dev overlay.
 cargo run --bin memory -- init
-cargo run --bin memory -- dev --copy-from-global
+cargo run --bin memory -- dev --no-copy-from-global
+# Configure [database].url in the user-local project config.dev.toml with
+# a dedicated development database/login before starting the backend.
+# PostgreSQL must have the vector extension available.
 
 # 3. Run each piece in its own shell. All three target the dev stack.
 cargo run --bin memory -- service run            # backend (4250 HTTP)
@@ -39,7 +43,14 @@ command above works without feature flags. For an explicitly lean TUI build
 that cannot host the backend, use `cargo build -p mem-cli --no-default-features
 --features tui`.
 
-`memory dev --copy-from-global` lifts the database URL and LLM/embedding endpoints out of the installed config so the dev stack does not need its own credentials. Without `--copy-from-global` (and without a TTY) the overlay is left without shared credentials and you'll need to fill them in manually.
+Use a dedicated development database and login for backend tests. The doctor
+command reports the resolved user-local configuration paths. On this checkout,
+the existing isolated setup is described under [routing and recovery](#project-memory-routing-and-recovery).
+
+`memory dev --copy-from-global` remains an explicit opt-in that copies the
+installed database URL and model endpoints. It can give development code access
+to live installed data; it does not create an isolated database. Do not use it
+for this project's normal backend-test setup.
 
 If you skip `memory init`, `memory dev` will refuse with a clear message — the overlay layers on top of the user-local project `config.toml` and needs that file to exist first.
 
@@ -80,7 +91,12 @@ Dev binaries also **advertise themselves with a `-dev` version suffix**. `memory
 
 ## What Is Shared
 
-By default, only the **PostgreSQL database** is shared between dev and installed stacks — and only because `memory dev --copy-from-global` copies the URL into the overlay. If you want the dev stack on a separate database, edit the user-local project `config.dev.toml` to point `[database].url` somewhere else.
+The configured database URL determines whether storage is shared. This
+project's backend-test setup uses a separate database. If an operator explicitly
+copies the installed URL into the dev overlay, both services write the same live
+database; separate ports do not provide data isolation. There is no automatic
+synchronization between separate databases. Durable development notes instead
+go directly through the Workshop API, as described below.
 
 Tables that are willingly copied from the global config when you opt in:
 
@@ -129,6 +145,85 @@ cargo run --bin memory -- doctor
 ```
 
 `memory doctor` will surface the resolved config and overlay paths under the `config.*` checks.
+
+## Project Memory Routing And Recovery
+
+For development of Memory Layer itself, keep **durable project knowledge** in
+Workshop's `memory` project. This repository's shared Go helper explicitly reads
+`.agents/memory-layer-command.json` (`["memory", "--area", "workshop"]`). Task
+starts, plans, completed work and normal memory queries therefore use Workshop's
+API, including while a development backend is stopped or being restarted.
+
+```bash
+go run ./.agents/skills/memory-layer/scripts/main.go \
+  query-memory 'What changed in this project?' memory
+```
+
+The **dev service and database** are for backend tests. Test records do not
+automatically synchronize to Workshop. Select dev explicitly when testing the
+helper:
+
+```bash
+MEMCTL_BIN='cargo run --quiet --bin memory --' \
+  go run ./.agents/skills/memory-layer/scripts/main.go \
+  query-memory 'A synthetic test question' memory
+```
+
+Source CLI commands without an explicit area force the dev profile and omit
+inherited `MEMORY_LAYER_AREA`, `MEMORY_LAYER_AREA_ROUTING`, `MEMORY_LAYER_CONFIG`
+and `MEMORY_LAYER_CLIENT_TOKEN`. Explicit `--config` command arguments remain
+available for intentional test configurations. `MEMCTL_BIN` takes
+precedence over the project command file. Neither a dev failure nor a Workshop
+failure switches to another destination or retries a write automatically.
+
+If dev reports connection refused, an authentication failure, or a degraded
+database, recover from the checkout in a shell without installed-area routing:
+
+```bash
+unset MEMORY_LAYER_AREA MEMORY_LAYER_AREA_ROUTING
+unset MEMORY_LAYER_CONFIG MEMORY_LAYER_CLIENT_TOKEN
+export MEMORY_LAYER_PROFILE=dev
+cargo run --bin memory -- doctor
+# In a separate terminal with the same dev environment:
+cargo run --bin memory -- service run
+# Then check both HTTP and PostgreSQL health:
+cargo run --bin memory -- health
+```
+
+Require `status=ok` and `database=up`; a listening HTTP port may be serving only
+degraded offline responses. Check the configured endpoint rather than assuming
+4250 if the dev bind address was customized. For failed write requests, inspect
+the checkpoint and activities before replaying them: a local file or remote
+write may have completed before the failure was reported. For authentication
+errors, inspect the dev overlay and client identity rather than starting another
+service. Do not use packaged `memory service enable` to recover a source backend.
+
+The restored Monolith dev instance uses a dedicated local PostgreSQL database
+and login named `memory_project_dev`. Its protected user-local dev overlay holds
+the credentials; the previous overlay is preserved beside it. The retired
+shared `memory` login remains disabled. Cluster discovery, offline replay,
+automatic background work, embeddings and model curation are disabled for this
+test instance. Workshop credentials and database settings are unchanged.
+
+For a persistent user-managed dev process on Linux, the repo includes
+`scripts/systemd/memory-layer-dev.service`, with the checkout defaulting to
+`%h/Projects/memory`. Review its paths and build the source executable before
+installing it:
+
+```bash
+cargo build --bin memory
+install -m 0644 scripts/systemd/memory-layer-dev.service \
+  ~/.config/systemd/user/memory-layer-dev.service
+systemctl --user daemon-reload
+systemctl --user enable --now memory-layer-dev.service
+# After rebuilding the backend:
+systemctl --user restart memory-layer-dev.service
+journalctl --user -u memory-layer-dev.service -n 30 --no-pager
+```
+
+Stop any foreground or transient dev process on the same port before starting
+the persistent unit. This unit starts only the source backend, using the dev
+overlay; it does not alter packaged or area services.
 
 ## Common Pitfalls
 
