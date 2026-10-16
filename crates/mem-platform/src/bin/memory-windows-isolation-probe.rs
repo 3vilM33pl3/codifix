@@ -188,13 +188,18 @@ mod native {
             let own = root.join(format!("configurations/{index}/synthetic.txt"));
             use mem_platform::private_windows::{Input, ServiceInput, ServiceReader};
             if operator {
-                let reader = ServiceReader::for_named_service(&args[3])?;
+                let reader = ServiceReader::for_named_service(&args[3])
+                    .context("resolve synthetic SCM reader")?;
                 ensure!(
                     Input::open(&own, 9).is_err(),
                     "ordinary operator reader unexpectedly trusted service ACE"
                 );
                 ensure!(
-                    ServiceInput::open(&own, 9, &reader)?.read(9)? == b"synthetic",
+                    ServiceInput::open(&own, 9, &reader)
+                        .context("open synthetic service authority")?
+                        .read(9)
+                        .context("read synthetic service authority")?
+                        == b"synthetic",
                     "unexpected synthetic fixture bytes"
                 );
                 println!("{{\"exact_service_read\":true,\"ordinary_policy_unchanged\":true}}");
