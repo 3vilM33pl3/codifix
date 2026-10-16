@@ -58,6 +58,38 @@ struct Descriptor {
     max_output_bytes: usize,
     stdin_file: Option<BoundFile>,
     exports: Vec<PathBuf>,
+    #[serde(default)]
+    allow_missing_exports: bool,
+}
+
+#[derive(Serialize)]
+pub struct PreparedIo {
+    format: &'static str,
+    request_id: uuid::Uuid,
+    directory: PathBuf,
+    root_identity: (String, String),
+    directory_identity: (String, String),
+}
+/// Validate an existing operator-owned root before any caller writes payloads.
+/// All ancestors stay pinned until the exclusively created private child is
+/// validated. This never creates, changes or relaxes the existing root's ACL.
+pub fn prepare_io(root: &Path, request_id: uuid::Uuid) -> Result<PreparedIo> {
+    ensure!(!request_id.is_nil(), "nonzero request identity required");
+    let parent = Directory::open(root)?;
+    let path = root.join(request_id.to_string());
+    create_private_directory(&path)?;
+    let child = Directory::open(&path)?;
+    let identity = |directory: &Directory| -> Result<(String, String)> {
+        let (volume, index) = directory.identity()?.stable_key();
+        Ok((format!("{volume:x}"), format!("{index:x}")))
+    };
+    Ok(PreparedIo {
+        format: "memory-windows-evaluation-io-v1",
+        request_id,
+        directory: path,
+        root_identity: identity(&parent)?,
+        directory_identity: identity(&child)?,
+    })
 }
 
 #[derive(Serialize)]
@@ -358,9 +390,21 @@ fn execute(
     stdout_result?;
     stderr_result?;
     receipt.reason = "export_rejected";
+    let _scratch = Directory::open(&scratch)?;
     let mut exported_identities = std::collections::BTreeSet::new();
     for (index, path) in descriptor.exports.iter().enumerate() {
-        let collected = export::read(&scratch, path, budget.remaining.load(Ordering::SeqCst))?;
+        let collected = match export::read(&scratch, path, budget.remaining.load(Ordering::SeqCst))
+        {
+            Err(error)
+                if descriptor.allow_missing_exports
+                    && error
+                        .downcast_ref::<std::io::Error>()
+                        .is_some_and(|error| error.kind() == std::io::ErrorKind::NotFound) =>
+            {
+                continue;
+            }
+            result => result?,
+        };
         ensure!(
             exported_identities.insert(collected.identity),
             "aliased export selection"
@@ -401,8 +445,29 @@ mod tests {
             "search_path":[],"library_path":[],"deadline_ms":1000,"max_output_bytes":4096,"stdin_file":null,"exports":[]});
         let parsed: Descriptor = serde_json::from_value(value.clone()).unwrap();
         assert_eq!(parsed.arguments, ["with spaces", "Unicode café"]);
+        assert!(!parsed.allow_missing_exports);
         value["shell"] = serde_json::json!("never accepted");
         assert!(serde_json::from_value::<Descriptor>(value).is_err());
+    }
+    #[test]
+    fn native_prepare_io_requires_existing_private_root_and_unique_identity() {
+        let base = std::env::temp_dir().join(format!("memory-eval-io-{}", uuid::Uuid::new_v4()));
+        create_private_directory(&base).unwrap();
+        let id = uuid::Uuid::new_v4();
+        let prepared = prepare_io(&base, id).unwrap();
+        assert_eq!(prepared.directory, base.join(id.to_string()));
+        assert!(Directory::open(&prepared.directory).is_ok());
+        assert!(prepare_io(&base, id).is_err());
+        assert!(prepare_io(&base.join("missing"), uuid::Uuid::new_v4()).is_err());
+        assert!(prepare_io(&base, uuid::Uuid::nil()).is_err());
+        let status = std::process::Command::new("icacls.exe")
+            .arg(&base)
+            .args(["/grant", "*S-1-1-0:R"])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert!(prepare_io(&base, uuid::Uuid::new_v4()).is_err());
+        std::fs::remove_dir_all(base).unwrap();
     }
     #[test]
     fn native_preflight_failure_retains_private_metadata_without_payloads() {
