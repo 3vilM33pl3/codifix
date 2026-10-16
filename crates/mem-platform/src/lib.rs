@@ -5,6 +5,8 @@
 
 pub mod journal;
 #[cfg(windows)]
+pub mod windows_evaluation;
+#[cfg(windows)]
 pub mod windows_process;
 #[cfg(windows)]
 pub mod windows_trusted_process;

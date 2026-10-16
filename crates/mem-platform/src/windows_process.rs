@@ -92,19 +92,19 @@ pub struct ProcessSpec<'a> {
     pub broker: BorrowedHandle<'a>,
 }
 
-fn ok(value: i32, operation: &'static str) -> Result<()> {
+pub(super) fn ok(value: i32, operation: &'static str) -> Result<()> {
     if value == 0 {
         Err(std::io::Error::last_os_error()).context(operation)
     } else {
         Ok(())
     }
 }
-fn wide(value: &OsStr) -> Result<Vec<u16>> {
+pub(super) fn wide(value: &OsStr) -> Result<Vec<u16>> {
     let value: Vec<_> = value.encode_wide().collect();
     ensure!(!value.contains(&0), "NUL in sandbox argument");
     Ok(value.into_iter().chain(Some(0)).collect())
 }
-fn quote(value: &OsStr) -> Result<OsString> {
+pub(super) fn quote(value: &OsStr) -> Result<OsString> {
     let mut result = vec![b'"' as u16];
     let mut slashes = 0;
     for unit in value.encode_wide() {
@@ -129,13 +129,13 @@ fn quote(value: &OsStr) -> Result<OsString> {
     Ok(OsString::from_wide(&result))
 }
 
-struct Profile {
+pub(super) struct Profile {
     name: Vec<u16>,
-    sid: PSID,
+    pub(super) sid: PSID,
     deleted: bool,
 }
 impl Profile {
-    fn create() -> Result<Self> {
+    pub(super) fn create() -> Result<Self> {
         let name = wide(OsStr::new(&format!(
             "MemoryLayer.Sandbox.{}",
             uuid::Uuid::new_v4()
@@ -211,7 +211,7 @@ impl Drop for Allocation {
     }
 }
 
-struct Grant {
+pub(super) struct Grant {
     file: File,
     descriptor: Allocation,
     dacl: *mut windows_sys::Win32::Security::ACL,
@@ -219,7 +219,7 @@ struct Grant {
     label: Option<(Allocation, *mut windows_sys::Win32::Security::ACL)>,
 }
 impl Grant {
-    fn apply(
+    pub(super) fn apply(
         path: &Path,
         pinned: Option<&File>,
         sid: PSID,
@@ -309,7 +309,7 @@ impl Grant {
             label: None,
         })
     }
-    fn scratch_integrity(&mut self) -> Result<()> {
+    pub(super) fn scratch_integrity(&mut self) -> Result<()> {
         let mut sacl = null_mut();
         let mut descriptor = null_mut();
         ensure!(
@@ -414,12 +414,12 @@ impl Grant {
     }
 }
 
-struct Attributes {
+pub(super) struct Attributes {
     storage: Vec<usize>,
     initialized: bool,
 }
 impl Attributes {
-    fn new() -> Result<Self> {
+    pub(super) fn new() -> Result<Self> {
         let mut size = 0;
         unsafe {
             InitializeProcThreadAttributeList(null_mut(), 2, 0, &mut size);
@@ -439,10 +439,10 @@ impl Attributes {
         value.initialized = true;
         Ok(value)
     }
-    fn pointer(&mut self) -> *mut c_void {
+    pub(super) fn pointer(&mut self) -> *mut c_void {
         self.storage.as_mut_ptr().cast()
     }
-    fn set<T>(&mut self, attribute: u32, value: &T) -> Result<()> {
+    pub(super) fn set<T>(&mut self, attribute: u32, value: &T) -> Result<()> {
         ok(
             unsafe {
                 UpdateProcThreadAttribute(
@@ -493,7 +493,7 @@ fn token_information(token: &OwnedHandle, class: i32) -> Result<Vec<usize>> {
     )?;
     Ok(value)
 }
-fn verify_token(process: &OwnedHandle, expected_sid: PSID) -> Result<()> {
+pub(super) fn verify_token(process: &OwnedHandle, expected_sid: PSID) -> Result<()> {
     let mut raw = null_mut();
     ok(
         unsafe { OpenProcessToken(process.as_raw_handle(), TOKEN_QUERY, &mut raw) },
@@ -520,6 +520,10 @@ fn verify_token(process: &OwnedHandle, expected_sid: PSID) -> Result<()> {
 }
 
 fn job() -> Result<OwnedHandle> {
+    job_with_limits(2, JOB_MEMORY_BYTES)
+}
+
+pub(super) fn job_with_limits(processes: u32, memory_bytes: usize) -> Result<OwnedHandle> {
     let raw = unsafe { CreateJobObjectW(null(), null()) };
     ensure!(!raw.is_null(), "could not create sandbox job");
     let job = unsafe { OwnedHandle::from_raw_handle(raw) };
@@ -529,9 +533,9 @@ fn job() -> Result<OwnedHandle> {
         | JOB_OBJECT_LIMIT_JOB_MEMORY
         | JOB_OBJECT_LIMIT_PROCESS_MEMORY
         | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
-    limits.BasicLimitInformation.ActiveProcessLimit = 2;
-    limits.JobMemoryLimit = JOB_MEMORY_BYTES;
-    limits.ProcessMemoryLimit = JOB_MEMORY_BYTES;
+    limits.BasicLimitInformation.ActiveProcessLimit = processes;
+    limits.JobMemoryLimit = memory_bytes;
+    limits.ProcessMemoryLimit = memory_bytes;
     ok(
         unsafe {
             SetInformationJobObject(
@@ -570,13 +574,13 @@ fn job() -> Result<OwnedHandle> {
 /// Owning guard. Drop cancels the entire job and reaps it before reverting
 /// filesystem grants. It is deliberately not Clone or a detached process ID.
 pub struct SandboxProcess {
-    job: OwnedHandle,
-    process: OwnedHandle,
-    profile: Option<Profile>,
-    grants: Vec<Grant>,
-    inputs: Vec<Input>,
-    directories: Vec<Directory>,
-    pid: u32,
+    pub(super) job: OwnedHandle,
+    pub(super) process: OwnedHandle,
+    pub(super) profile: Option<Profile>,
+    pub(super) grants: Vec<Grant>,
+    pub(super) inputs: Vec<Input>,
+    pub(super) directories: Vec<Directory>,
+    pub(super) pid: u32,
 }
 impl SandboxProcess {
     pub fn id(&self) -> u32 {
@@ -1237,6 +1241,39 @@ pub fn spawn_inherited(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn default_and_evaluation_job_profiles_remain_distinct() {
+        for (job, processes, bytes) in [
+            (job().unwrap(), 2, JOB_MEMORY_BYTES),
+            (
+                job_with_limits(16, 2 * 1024 * 1024 * 1024).unwrap(),
+                16,
+                2 * 1024 * 1024 * 1024,
+            ),
+        ] {
+            let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+            ok(
+                unsafe {
+                    QueryInformationJobObject(
+                        job.as_raw_handle(),
+                        JobObjectExtendedLimitInformation,
+                        (&mut limits as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                        size_of_val(&limits) as u32,
+                        null_mut(),
+                    )
+                },
+                "query tested job limits",
+            )
+            .unwrap();
+            assert_eq!(limits.BasicLimitInformation.ActiveProcessLimit, processes);
+            assert_eq!(limits.JobMemoryLimit, bytes);
+            assert_eq!(limits.ProcessMemoryLimit, bytes);
+            assert_ne!(
+                limits.BasicLimitInformation.LimitFlags & JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+                0
+            );
+        }
+    }
     #[test]
     fn process_arguments_are_not_shell_commands() {
         assert_eq!(quote(OsStr::new("a b")).unwrap(), OsString::from("\"a b\""));
