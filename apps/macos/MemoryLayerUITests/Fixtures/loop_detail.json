@@ -1,0 +1,30 @@
+{
+  "definition": {
+    "id": "10000000-0000-4000-8000-000000000001",
+    "loop_id": "loop / one",
+    "version": 2,
+    "name": "Project digest",
+    "description": "Summarize work",
+    "risk_level": "low",
+    "default_mode": "suggest_only",
+    "trigger_spec": {},
+    "context_spec": {},
+    "policy_spec": {},
+    "output_spec": {},
+    "created_at": "2026-10-15T10:00:00Z"
+  },
+  "effective_settings": {
+    "loop_id": "loop / one",
+    "enabled": true,
+    "mode": "suggest_only",
+    "scope_type": "repo",
+    "scope_id": "/repo",
+    "global_kill_switch": false,
+    "blocked_reasons": [],
+    "budgets": {
+      "daily_runs": 4
+    },
+    "paused_until": null,
+    "snoozed_until": null
+  }
+}

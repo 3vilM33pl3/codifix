@@ -1,0 +1,43 @@
+{
+  "project": "synthetic-project",
+  "generated_at": "2026-10-15T12:00:00Z",
+  "briefing": "Continue review",
+  "checkpoint": {
+    "project": "synthetic-project",
+    "repo_root": "/repo",
+    "marked_at": "2026-10-15T12:00:00Z",
+    "git_branch": "main"
+  },
+  "current_thread": null,
+  "change_summary": [],
+  "attention_items": [],
+  "primary_next_step": null,
+  "secondary_next_steps": [
+    {
+      "title": "Review result",
+      "rationale": "The next action"
+    }
+  ],
+  "context_items": [
+    {
+      "id": "m-1",
+      "summary": "Memory one",
+      "memory_type": "decision"
+    }
+  ],
+  "timeline": [],
+  "commits": [
+    {
+      "hash": "abc123",
+      "short_hash": "abc123",
+      "subject": "Keep work state",
+      "committed_at": "2026-10-15T11:59:00Z"
+    }
+  ],
+  "changed_memories": [],
+  "durable_context": [],
+  "warnings": [
+    "One warning"
+  ],
+  "actions": []
+}
