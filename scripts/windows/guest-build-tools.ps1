@@ -57,7 +57,7 @@ foreach ($artifact in $artifacts) {
     $completed = [ordered]@{id=$artifact.id; algorithm=$algorithm; hash=$artifact.hash; status='verified'}
     switch ($artifact.id) {
         'node' {
-            $node = Join-Path $tools 'node-v24.21.0-win-x64'
+            $node = Join-Path $tools 'node-v24.18.1-win-x64'
             if (-not (Test-Path (Join-Path $node 'node.exe'))) { Expand-Archive -LiteralPath $path -DestinationPath $tools }
             $env:PATH = "$node;$env:PATH"
             Run-Checked (Join-Path $node 'node.exe') @('--version')
@@ -101,7 +101,7 @@ foreach ($artifact in $artifacts) {
 $env:DOTNET_ROOT = Join-Path $tools 'dotnet'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_ROLL_FORWARD = 'Major'
-$env:PATH = "$env:DOTNET_ROOT;$env:USERPROFILE\.dotnet\tools;$env:USERPROFILE\.cargo\bin;$(Join-Path $tools 'git\cmd');$(Join-Path $tools 'node-v24.21.0-win-x64');$env:PATH"
+$env:PATH = "$env:DOTNET_ROOT;$env:USERPROFILE\.dotnet\tools;$env:USERPROFILE\.cargo\bin;$(Join-Path $tools 'git\cmd');$(Join-Path $tools 'node-v24.18.1-win-x64');$env:PATH"
 if (-not (Test-Path "$env:USERPROFILE\.dotnet\tools\wix.exe")) {
     Run-Checked (Join-Path $env:DOTNET_ROOT 'dotnet.exe') @('tool','install','--global','wix','--version',$manifest.wix_version)
 }

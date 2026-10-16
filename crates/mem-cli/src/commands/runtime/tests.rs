@@ -44,8 +44,9 @@ use crate::commands::{
         repair_repo_bootstrap, root_gitignore_contains_mem,
     },
     watch_support::{
-        resolve_agent_repo_root, should_start_agent_watcher, watcher_command_requires_config_load,
-        watcher_manager_config_matches_repo, watcher_repo_needs_bootstrap, write_file_if_changed,
+        effective_watcher_manager_config_path, resolve_agent_repo_root, should_start_agent_watcher,
+        watcher_command_requires_config_load, watcher_manager_config_matches_repo,
+        watcher_repo_needs_bootstrap, write_file_if_changed,
     },
 };
 
@@ -65,9 +66,7 @@ use super::{
     Cli, DEV_API_TOKEN, RememberArgs, SERVICE_API_TOKEN_KEY, ServiceApiTokenAction, WatcherCommand,
     WatcherManagerArgs, WatcherManagerCommand, ensure_shared_service_api_token, shared_env_lookup,
 };
-use mem_config::AppConfig;
-#[cfg(unix)]
-use mem_config::Profile;
+use mem_config::{AppConfig, Profile};
 use mem_skills::{
     SkillSourceKind as SharedSkillSourceKind, SkillUpgradeAction as SharedSkillUpgradeAction,
     SkillVersionStatus as SharedSkillVersionStatus,
@@ -96,9 +95,9 @@ use crate::commands::service_support::parse_systemd_unit_names;
 
 #[cfg(all(unix, not(target_os = "macos")))]
 use crate::commands::watch_support::{
-    ManagedWatcherSession, effective_watcher_manager_config_path, managed_watch_service_name,
-    render_watch_manager_unit, render_watch_unit, resolve_managed_agent_sessions_by_repo,
-    select_managed_agent_session, watch_unit_name,
+    ManagedWatcherSession, managed_watch_service_name, render_watch_manager_unit,
+    render_watch_unit, resolve_managed_agent_sessions_by_repo, select_managed_agent_session,
+    watch_unit_name,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
