@@ -453,7 +453,7 @@ def guest_exec(root, executable, arguments, capture=False):
 
 def guest_stage_start(root, stage, operation_id, source_root=None):
     """Dispatch one fixed interactive lab stage, without changing machine policy."""
-    stages = {"BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "NativeApi"}
+    stages = {"BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "PiBuild", "NativeApi"}
     if stage not in stages:
         raise ValueError("unknown fixed guest stage")
     try:
@@ -463,8 +463,8 @@ def guest_stage_start(root, stage, operation_id, source_root=None):
     if operation.int == 0 or str(operation) != operation_id.lower():
         raise ValueError("canonical nonzero stage operation UUID required")
     if source_root is not None:
-        if stage != "PdsPrepare":
-            raise ValueError("SourceRoot applies only to PdsPrepare")
+        if stage not in {"PdsPrepare", "PiBuild"}:
+            raise ValueError("SourceRoot applies only to PDS/Pi source stages")
         # Reuse the strict native lab-component validator, then bind a fixed
         # source subtree rather than accepting script/command arguments.
         if not source_root.startswith("C:\\MemoryLab\\source") or '/' in source_root or str(PureWindowsPath(source_root)) != source_root:
@@ -473,10 +473,10 @@ def guest_stage_start(root, stage, operation_id, source_root=None):
         if suffix and not suffix.startswith('\\'):
             raise ValueError("PDS source must be within C:\\MemoryLab\\source")
         guest_input_target("C:\\MemoryLab\\inputs\\source" + suffix)
-    elif stage == "PdsPrepare":
-        raise ValueError("PdsPrepare requires an explicit copied source directory")
+    elif stage in {"PdsPrepare", "PiBuild"}:
+        raise ValueError("PDS/Pi stages require an explicit copied source directory")
     operation_id = str(operation)
-    run_level = "Limited" if stage == "NativeApi" else "Highest"
+    run_level = "Limited" if stage in {"NativeApi", "PiBuild"} else "Highest"
     runner = r"C:\MemoryLab\inputs\guest-stage.ps1"
     runner_hash = digest(SCRIPT_DIR / "guest-stage.ps1")
     log = rf"C:\MemoryLab\stage-start-{operation_id}.log"
@@ -939,7 +939,7 @@ def main():
     guest_copy_args.add_argument("source", type=Path)
     guest_copy_args.add_argument("--target", required=True)
     stage_args = sub.add_parser("guest-stage-start", help="start one hash-bound fixed stage as the interactive lab user")
-    stage_args.add_argument("stage", choices=["BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "NativeApi"])
+    stage_args.add_argument("stage", choices=["BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "PiBuild", "NativeApi"])
     stage_args.add_argument("--operation-id", required=True)
     stage_args.add_argument("--source-root")
     args = parser.parse_args()

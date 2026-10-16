@@ -87,6 +87,19 @@ class GuestAgentTests(unittest.TestCase):
                 self.assertNotIn('-RunLevel Limited',outer)
                 self.assertEqual(result['stage_execution_identity'],r'MEMORY-WINLAB\memorylab (Interactive, Highest)')
 
+    def test_pi_build_is_source_bound_limited_and_rejects_missing_source(self):
+        operation='11111111-1111-4111-8111-111111111111'
+        with patch.object(vm,'guest_exec',return_value={'pid':42}) as execute:
+            result=vm.guest_stage_start(Path('/unused'),'PiBuild',operation,r'C:\MemoryLab\source\reviewed-v1')
+            outer=base64.b64decode(execute.call_args.args[2][-1]).decode('utf-16-le')
+            inner=base64.b64decode(re.search(r"\$encoded='([A-Za-z0-9+/=]+)'",outer).group(1)).decode('utf-16-le')
+            self.assertIn('-LogonType Interactive -RunLevel Limited',outer)
+            self.assertIn("-SourceRoot 'C:\\MemoryLab\\source\\reviewed-v1'",inner)
+            self.assertEqual(result['stage'],'PiBuild')
+        with patch.object(vm,'guest_exec') as execute,self.assertRaises(ValueError):
+            vm.guest_stage_start(Path('/unused'),'PiBuild',operation)
+        execute.assert_not_called()
+
     def test_stage_start_rejects_unknown_stage_uuid_and_source_injection_before_rpc(self):
         operation='11111111-1111-4111-8111-111111111111'
         invalid=[('Unknown',operation,None),('NativeApi;whoami',operation,None),

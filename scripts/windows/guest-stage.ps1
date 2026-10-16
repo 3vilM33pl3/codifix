@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Start','Status','Execute')][string]$Action = 'Status',
-    [ValidateSet('BuildTools','PostgresPrepare','PostgresStart','PdsPrepare','NativeApi')][string]$Stage = 'BuildTools',
+    [ValidateSet('BuildTools','PostgresPrepare','PostgresStart','PdsPrepare','PiBuild','NativeApi')][string]$Stage = 'BuildTools',
     [Parameter(Mandatory=$true)][guid]$OperationId,
     [string]$SourceRoot
 )
@@ -21,6 +21,7 @@ function Get-BoundFiles([string]$SelectedStage) {
         'BuildTools' { @('guest-build-tools.ps1','build-tools.json') }
         { $_ -in @('PostgresPrepare','PostgresStart') } { @('guest-native-postgres.ps1','native-postgres.json') }
         'PdsPrepare' { @('guest-native-pds.ps1','native-pds.json') }
+        'PiBuild' { @('guest-native-pi.ps1','native-pi.json') }
         'NativeApi' {
             @('guest-native-api.ps1','native-api.json')
             $api = Get-Content -LiteralPath 'C:\MemoryLab\inputs\native-api.json' -Raw | ConvertFrom-Json
@@ -90,7 +91,7 @@ if ($Action -eq 'Start') {
     $actionSpec = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument $arguments
     # Product/API checks model an ordinary interactive user, not an elevated
     # installer. Only explicitly selected installer/dependency stages elevate.
-    $runLevel = if ($Stage -eq 'NativeApi') { 'Limited' } else { 'Highest' }
+    $runLevel = if ($Stage -in @('NativeApi','PiBuild')) { 'Limited' } else { 'Highest' }
     $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel $runLevel
     $limit = if ($Stage -eq 'NativeApi') { New-TimeSpan -Minutes 20 } else { New-TimeSpan -Hours 3 }
     $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit $limit -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
@@ -136,6 +137,12 @@ try {
                 & (Join-Path $inputs 'guest-native-pds.ps1') -ManifestPath (Join-Path $inputs 'native-pds.json') -SourceRoot $SourceRoot
             }
             'NativeApi' { & (Join-Path $inputs 'guest-native-api.ps1') -OperationId $OperationId }
+            'PiBuild' {
+                if (-not $SourceRoot) { throw 'Copied lab source is required' }
+                $piArguments = @{ManifestPath=(Join-Path $inputs 'native-pi.json');SourceRoot=$SourceRoot;OperationId=$OperationId}
+                & (Join-Path $inputs 'guest-native-pi.ps1') -Action Prepare @piArguments
+                & (Join-Path $inputs 'guest-native-pi.ps1') -Action Verify @piArguments
+            }
             default { throw 'Unknown native proof stage' }
         }
         Save-Status 'succeeded' 'stage_completed'

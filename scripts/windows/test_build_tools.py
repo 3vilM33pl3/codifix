@@ -44,7 +44,7 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn('Queued native proof file inventory changed', stage)
         self.assertIn('New-TimeSpan -Minutes 20', stage)
         self.assertIn('-LogonType Interactive', stage)
-        self.assertIn("$runLevel = if ($Stage -eq 'NativeApi') { 'Limited' } else { 'Highest' }",stage)
+        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild')) { 'Limited' } else { 'Highest' }",stage)
         self.assertIn('-LogonType Interactive -RunLevel $runLevel',stage)
         script = (root / 'guest-native-api.ps1').read_text()
         for required in ['memory-windows-native-api-v1', 'Get-FileHash',
