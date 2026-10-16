@@ -375,6 +375,10 @@ pub(super) async fn run(
     if exit != 0 {
         return Err(LaunchError::Child);
     }
+    // The sandbox guard deliberately pins its code and directories without
+    // delete sharing. Cleanup has been verified above; release those handles
+    // before removing this completed operation's private directory.
+    drop(child);
     if result.is_ok() {
         std::fs::remove_dir_all(&run_dir).map_err(|_| LaunchError::Cleanup)?;
     }

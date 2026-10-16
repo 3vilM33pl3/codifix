@@ -80,6 +80,9 @@ cargo build --locked -p mem-platform --features windows-native-tests --bin memor
 Repeat the isolation probe through the actual Windows service host to exercise
 nested Job constraints. The scratch execution test attempts DACL self-modification
 before execution; an inherited non-execute ACE is not by itself proof of denial.
+The full successful launcher test must also require the returned proposal digest
+and removal of the completed operation directory: protected code handles must be
+released only after verified cleanup, but before that directory is deleted.
 Build and run the pinned native Pi with a fake provider, then exercise the full
 durable supervisor workflow and revocation/cancellation/restart through the native
 launcher. Until those runs are observed, native supervisor parity remains open.
