@@ -12,6 +12,7 @@ class BuildToolsManifestTests(unittest.TestCase):
             script = (Path(__file__).parent / name).read_text()
             self.assertIn('[IO.File]::Replace(', script)
             self.assertIn('[IO.File]::Move(', script)
+            self.assertIn('[NullString]::Value', script)
 
     def test_icacls_receives_explicit_numeric_sid_syntax(self):
         for name in ['guest-stage.ps1', 'guest-native-api.ps1',

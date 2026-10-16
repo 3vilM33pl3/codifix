@@ -46,7 +46,7 @@ function Save-Status([string]$State, [string]$Reason) {
     $partial = Join-Path $root 'status.partial.json'
     @{format='memory-windows-lab-stage-status-v1';operation_id=$OperationId.ToString();stage=$Stage;state=$State;reason=$Reason;observed_at=[DateTime]::UtcNow.ToString('o')} |
         ConvertTo-Json | Set-Content $partial -Encoding UTF8
-    if ([IO.File]::Exists($statusPath)) { [IO.File]::Replace($partial, $statusPath, $null) }
+    if ([IO.File]::Exists($statusPath)) { [IO.File]::Replace($partial, $statusPath, [NullString]::Value) }
     else { [IO.File]::Move($partial, $statusPath) }
 }
 if ($Action -eq 'Status') {

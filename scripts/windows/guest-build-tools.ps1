@@ -25,7 +25,7 @@ function Save-Receipt {
     $temp = Join-Path $root 'result.partial.json'
     $receipt | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $temp -Encoding UTF8
     $target = Join-Path $root 'result.json'
-    if ([IO.File]::Exists($target)) { [IO.File]::Replace($temp, $target, $null) }
+    if ([IO.File]::Exists($target)) { [IO.File]::Replace($temp, $target, [NullString]::Value) }
     else { [IO.File]::Move($temp, $target) }
 }
 function Run-Checked([string]$Exe, [string[]]$Arguments) {

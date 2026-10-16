@@ -40,7 +40,7 @@ function Save-Result {
     $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $partial -Encoding UTF8
     # Windows PowerShell's Move-Item -Force is not a dependable replacement
     # primitive. ReplaceFile preserves the old receipt until the new one wins.
-    if ([IO.File]::Exists($target)) { [IO.File]::Replace($partial, $target, $null) }
+    if ([IO.File]::Exists($target)) { [IO.File]::Replace($partial, $target, [NullString]::Value) }
     else { [IO.File]::Move($partial, $target) }
 }
 function Invoke-Bounded([string]$Exe, [string[]]$Arguments, [string]$Label, [int]$Seconds) {
