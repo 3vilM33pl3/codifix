@@ -10,13 +10,23 @@ $os = Get-CimInstance Win32_OperatingSystem
 $version = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
 $tpm = Get-Tpm
 $boot = Confirm-SecureBootUEFI
+$observedAt = [DateTime]::UtcNow
 $licenses = @(Get-CimInstance SoftwareLicensingProduct | Where-Object {
     $_.Name -like 'Windows*' -and $_.PartialProductKey
 } | ForEach-Object {
     # PartialProductKey selects installed licences but is deliberately not exported.
+    # Some evaluation builds expose the FILETIME epoch, not an actual expiry.
+    # Preserve that distinction instead of reporting 1601 as a licence date.
+    $end = $_.EvaluationEndDate
+    $reportedEnd = if ($end -and ([DateTime]$end).Year -ge 2000) {
+        ([DateTime]$end).ToUniversalTime().ToString('o')
+    } else { $null }
+    $estimatedEnd = if ($_.GracePeriodRemaining -gt 0) {
+        $observedAt.AddMinutes($_.GracePeriodRemaining).ToString('o')
+    } else { $null }
     @{name=$_.Name;description=$_.Description;status=$_.LicenseStatus;
       grace_remaining_minutes=$_.GracePeriodRemaining;
-      evaluation_end_date=([string]$_.EvaluationEndDate)}
+      evaluation_end_date=$reportedEnd;estimated_grace_end_at=$estimatedEnd}
 })
 $services = @('sshd','QEMU-GA') | ForEach-Object {
     $service = Get-Service -Name $_ -ErrorAction SilentlyContinue
@@ -29,7 +39,7 @@ $drivers = @(Get-CimInstance Win32_PnPSignedDriver | Where-Object {
 })
 [ordered]@{
     format='memory-windows-lab-observation-v1'
-    observed_at=[DateTime]::UtcNow.ToString('o')
+    observed_at=$observedAt.ToString('o')
     computer_name=$env:COMPUTERNAME
     os=$os.Caption
     version=$os.Version
