@@ -27,6 +27,7 @@ if ($manifest.format -cne 'memory-windows-pi-proof-v1' -or $manifest.source_revi
     $manifest.source_git_url -cne 'https://github.com/Dicklesworthstone/pi_agent_rust.git' -or
     $manifest.source_archive_sha256 -cne '5408d25ab40e49ce42ea1622c3bdd0128f13dacc53e11e3548cacf48d8908bbc' -or
     $manifest.upstream_lock_sha256 -cne '1aea4e3fe13a86760317d9c3da80d7461bd5cd5c013508ab5446a391c7fa14e5' -or
+    $manifest.patched_lock_sha256 -cne '362e708ba62267ca061a7e8172f663a4994b78990141d383879198132c74dfd6' -or
     $manifest.rust_toolchain -cne 'nightly-2026-08-31' -or $manifest.rustc_commit -cne '90850177249efe0321573c569aec5d12b257f8d6' -or
     $manifest.target -cne 'x86_64-pc-windows-msvc') { throw 'Unreviewed native Pi baseline' }
 function Assert-Hash([string]$Path,[string]$Hash) {
@@ -39,7 +40,9 @@ function Run([string]$Program,[string[]]$Arguments) {
 }
 $expected=@('crates/mem-supervisor-pi/scripts/build-windows.ps1','crates/mem-supervisor-pi/patches/no-tools-1.patch',
     'crates/mem-supervisor-pi/patches/windows-broker-1.patch','crates/mem-supervisor-pi/patches/LICENSE.pi',
-    'packaging/ca-bookworm/pi_smoke.py','packaging/windows-pi/smoke.py')
+    'packaging/ca-bookworm/pi_smoke.py','packaging/windows-pi/smoke.py',
+    'crates/mem-supervisor-pi/patches/windows-broker-safe-handle-1.patch',
+    'crates/mem-supervisor-pi/windows-pipe-helper/Cargo.toml','crates/mem-supervisor-pi/windows-pipe-helper/src/lib.rs')
 if (@($manifest.inputs).Count -ne $expected.Count -or @(Compare-Object $expected @($manifest.inputs | ForEach-Object path) -CaseSensitive).Count) { throw 'Pi proof requires the exact existing builder, notices, patches and protocol adapters' }
 for ($index=0; $index -lt $expected.Count; $index++) {
     if ($manifest.inputs[$index].path -cne $expected[$index]) { throw 'Pi proof input order differs from reviewed manifest' }
@@ -60,6 +63,7 @@ $originalProfile=$env:USERPROFILE
 $rustBin=Join-Path $originalProfile '.cargo\bin'
 $system=[Environment]::GetFolderPath('Windows')
 $home=Join-Path $root 'home'; $temporary=Join-Path $root 'temp'
+foreach ($privatePath in @($home,$temporary,(Join-Path $root 'cargo'),(Join-Path $root 'rustup'))) { Assert-NoReparse $privatePath }
 New-Item -ItemType Directory -Path $home,$temporary -Force | Out-Null
 $previous=@{}; Get-ChildItem Env: | ForEach-Object { $previous[$_.Name]=$_.Value }
 try {
@@ -78,10 +82,12 @@ try {
     if ($Action -eq 'Prepare' -and -not (Test-Path -LiteralPath $receipt)) {
         if (Test-Path -LiteralPath $build) { throw 'Incomplete native build retained; inspect its failure and use a new explicit operation for another attempt' }
         $repository=Join-Path $root 'upstream.git'; $hooks=Join-Path $root 'empty-hooks'
+        Assert-NoReparse $repository; Assert-NoReparse $hooks
         New-Item -ItemType Directory -Path $hooks -Force | Out-Null
         if (-not (Test-Path -LiteralPath $repository)) { Run $git @('init','--bare',('--template='+$hooks),$repository) }
         Run $git @('-C',$repository,'-c','credential.helper=','-c',('core.hooksPath='+$hooks),'fetch','--depth=1','--no-tags',$manifest.source_git_url,$manifest.source_revision)
         $archive=Join-Path $root 'source-7c018475.tar'
+        Assert-NoReparse $archive
         if (-not (Test-Path -LiteralPath $archive)) { Run $git @('-C',$repository,'archive','--format=tar',('--output='+$archive),$manifest.source_revision) }
         Assert-Hash $archive $manifest.source_archive_sha256
         $vswhere=Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -97,11 +103,15 @@ try {
     $evidence=Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
     if ($evidence.target -cne $manifest.target -or $evidence.rust_toolchain -cne $manifest.rust_toolchain -or
         $evidence.source_archive_sha256 -cne $manifest.source_archive_sha256 -or $evidence.upstream_lock_sha256 -cne $manifest.upstream_lock_sha256 -or
+        $evidence.patched_lock_sha256 -cne $manifest.patched_lock_sha256 -or $evidence.artifact.patched_lock_sha256 -cne $manifest.patched_lock_sha256 -or
         $evidence.rustc -notmatch ('(?m)^commit-hash: '+[regex]::Escape($manifest.rustc_commit)+'\r?$') -or
         $evidence.rustc -notmatch '(?m)^host: x86_64-pc-windows-msvc\r?$' -or
         $evidence.artifact.source_revision -cne $manifest.source_revision -or
         $evidence.artifact.no_tools_patch_sha256 -cne $manifest.inputs[1].sha256 -or
-        $evidence.artifact.broker_patch_sha256 -cne $manifest.inputs[2].sha256) { throw 'Recorded build differs from source/compiler/patch contract' }
+        $evidence.artifact.broker_patch_sha256 -cne $manifest.inputs[2].sha256 -or
+        $evidence.artifact.portability_patch_sha256 -cne $manifest.inputs[6].sha256 -or
+        $evidence.artifact.helper_manifest_sha256 -cne $manifest.inputs[7].sha256 -or
+        $evidence.artifact.helper_source_sha256 -cne $manifest.inputs[8].sha256) { throw 'Recorded build differs from source/compiler/patch contract' }
     $binary=Join-Path $build 'target\release\pi.exe'
     Assert-Hash $binary $evidence.artifact.binary_sha256
     if (Test-Path -LiteralPath $prepared) {

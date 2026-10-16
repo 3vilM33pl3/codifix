@@ -5,14 +5,26 @@ The lab adapter reuses `crates/mem-supervisor-pi/scripts/build-windows.ps1`.
 compiler, existing no-tools correction, Windows broker patch and strict proof
 inputs. The original source and Linux artifacts are not modified.
 
-**Current blocker:** pinned upstream `src/lib.rs:20` forbids unsafe code, but
-`windows-broker-1.patch` introduces an unsafe `File::from_raw_handle` block.
-The minimal compiler reproduction rejects that block before linking. Native
-build and execution are not verified; preserve the unsafe prohibition when
-repairing the portability patch.
+The original Windows broker patch introduces unsafe handle adoption, which
+conflicts with pinned Pi's `forbid(unsafe_code)`. A separate compatibility patch
+replaces it with a dependency-free local helper. Only a successful non-inheritable
+`DuplicateHandle` result becomes owned; `GetFileType` and `GetNamedPipeInfo`
+require an actual pipe. The original handle is never closed. Parent-whitelisted
+inheritance remains the authority check; this helper is not broker authentication.
+Pi's unsafe prohibition, source pin and all registry versions remain unchanged.
+The original and patched lock hashes, helper bytes and compatibility patch are
+recorded separately. **Native build and execution remain unverified.**
+The Windows-only artifact descriptor now requires these additional provenance
+fields; old Windows candidates missing them fail closed. Existing Linux artifact
+descriptors and binaries are unchanged.
 
-After the portability repair is reviewed and manifest hashes are refreshed,
-run from the disposable `MEMORY-WINLAB` VM only:
+The ownership/type checks follow Microsoft's
+[DuplicateHandle](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-duplicatehandle)
+and [GetNamedPipeInfo](https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipeinfo)
+contracts. This is a trusted-launcher input boundary, not a general socket or
+arbitrary external-handle import API.
+
+After reviewing the input manifest, run from the disposable `MEMORY-WINLAB` VM only:
 
 ```powershell
 & C:\MemoryLab\source\scripts\windows\guest-native-pi.ps1 `
@@ -28,6 +40,10 @@ they do not execute Pi:
 ```sh
 python3 -m unittest discover -s packaging/windows-pi -p 'test_*.py'
 ```
+
+The builder first runs four native ownership-helper tests (null/pseudo/closed
+handles, disk rejection, pipe exchange, duplicate noninheritance and preservation
+of the original). Host Windows-target compilation is not their execution result.
 
 The three fake-provider cases cover HTTP 200 with default and disabled tool
 tiers, then HTTP 429 without retry. They validate the original no-tools/RPC

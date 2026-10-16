@@ -1,0 +1,55 @@
+diff --git a/Cargo.toml b/Cargo.toml
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -451,6 +451,7 @@
+ # crate unsafe-free while encapsulating the Win32 FFI.
+ [target.'cfg(windows)'.dependencies]
+ win32job = "2.0.3"
++memory-windows-pipe = { path = "memory-windows-pipe" }
+ # `GetFileInformationByHandle` without `unsafe`: std's own accessors for the
+ # volume serial number and file index are behind the unstable
+ # `windows_by_handle` feature, which this crate cannot use because it also has
+diff --git a/Cargo.lock b/Cargo.lock
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -4761,6 +4761,10 @@ dependencies = [
+  "autocfg",
+ ]
+ 
++[[package]]
++name = "memory-windows-pipe"
++version = "0.1.0"
++
+ [[package]]
+ name = "minimal-lexical"
+ version = "0.2.1"
+@@ -5500,6 +5504,7 @@ dependencies = [
+  "loom",
+  "md-5 0.11.0",
+  "memchr",
++ "memory-windows-pipe",
+  "pbkdf2",
+  "pdf-extract",
+  "portable-pty",
+diff --git a/src/http/client.rs b/src/http/client.rs
+--- a/src/http/client.rs
++++ b/src/http/client.rs
+@@ -693,6 +693,5 @@ fn memory_windows_broker(
+ ) -> Result<Response> {
+     use std::io::{Read, Write};
+-    use std::os::windows::io::FromRawHandle;
+     use std::sync::atomic::{AtomicBool, Ordering};
+     static USED: AtomicBool = AtomicBool::new(false);
+     let failed = || Error::api("Memory broker exchange failed; inspect durable attempt state");
+@@ -729,8 +728,8 @@ fn memory_windows_broker(
+         return Err(failed());
+     }
+-    // SAFETY: only the trusted Memory driver sets this inherited handle. Pi
+-    // owns its duplicate; it never opens a pipe name or host-provided socket.
+-    let mut pipe = unsafe { std::fs::File::from_raw_handle(handle as _) };
++    // The trusted launcher supplies its explicit inherited-handle whitelist.
++    // This helper owns only a new validated duplicate, never the original.
++    let mut pipe = memory_windows_pipe::duplicate_pipe(handle).map_err(|_| failed())?;
+     pipe.write_all(&(payload.len() as u32).to_be_bytes()).map_err(|_| failed())?;
+     pipe.write_all(&payload).map_err(|_| failed())?;
+     pipe.flush().map_err(|_| failed())?;
