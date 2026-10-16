@@ -7,6 +7,18 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_pds_stdio_proof_keeps_native_startup_separate_from_repository_acceptance(self):
+        script = (Path(__file__).parent / 'guest-pds-stdio.ps1').read_text()
+        for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'",'Native PDS runtime inventory changed',
+                         'Native PDS runtime bytes changed','EnvironmentVariables.Clear()',
+                         "PDS_DEV_MODE='false'", "PDS_DISABLE_SSRF_PROTECTION='false'",
+                         'WaitForExit(90000)','signed_repository_verified=$false','pipe_acl_verified=$false',
+                         'tcp_listener_created=$false','probe-stdio.mjs']:
+            self.assertIn(required,script)
+        self.assertNotIn('PDS_PORT',script)
+        self.assertNotIn('Invoke-WebRequest',script)
+        self.assertNotIn('Write-Output $stderr',script)
+
     def test_pi_stage_does_not_reassign_powershell_read_only_home(self):
         script = (Path(__file__).parent / 'guest-native-pi.ps1').read_text()
         self.assertNotRegex(script, r'(?i)\$home\s*=')
@@ -61,7 +73,7 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn('Queued native proof file inventory changed', stage)
         self.assertIn('New-TimeSpan -Minutes 20', stage)
         self.assertIn('-LogonType Interactive', stage)
-        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck')) { 'Limited' } else { 'Highest' }",stage)
+        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','PdsVerify')) { 'Limited' } else { 'Highest' }",stage)
         self.assertIn('-LogonType Interactive -RunLevel $runLevel',stage)
         script = (root / 'guest-native-api.ps1').read_text()
         for required in ['memory-windows-native-api-v1', 'Get-FileHash',

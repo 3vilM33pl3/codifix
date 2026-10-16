@@ -453,7 +453,7 @@ def guest_exec(root, executable, arguments, capture=False):
 
 def guest_stage_start(root, stage, operation_id, source_root=None):
     """Dispatch one fixed interactive lab stage, without changing machine policy."""
-    stages = {"BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "PiBuild", "ProductCheck", "NativeApi"}
+    stages = {"BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "PdsVerify", "PiBuild", "ProductCheck", "NativeApi"}
     if stage not in stages:
         raise ValueError("unknown fixed guest stage")
     try:
@@ -476,7 +476,7 @@ def guest_stage_start(root, stage, operation_id, source_root=None):
     elif stage in {"PdsPrepare", "PiBuild", "ProductCheck"}:
         raise ValueError("PDS/Pi stages require an explicit copied source directory")
     operation_id = str(operation)
-    run_level = "Limited" if stage in {"NativeApi", "PiBuild", "ProductCheck"} else "Highest"
+    run_level = "Limited" if stage in {"NativeApi", "PiBuild", "ProductCheck", "PdsVerify"} else "Highest"
     runner = r"C:\MemoryLab\inputs\guest-stage.ps1"
     runner_hash = digest(SCRIPT_DIR / "guest-stage.ps1")
     log = rf"C:\MemoryLab\stage-start-{operation_id}.log"
@@ -939,7 +939,7 @@ def main():
     guest_copy_args.add_argument("source", type=Path)
     guest_copy_args.add_argument("--target", required=True)
     stage_args = sub.add_parser("guest-stage-start", help="start one hash-bound fixed stage as the interactive lab user")
-    stage_args.add_argument("stage", choices=["BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "PiBuild", "ProductCheck", "NativeApi"])
+    stage_args.add_argument("stage", choices=["BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "PdsVerify", "PiBuild", "ProductCheck", "NativeApi"])
     stage_args.add_argument("--operation-id", required=True)
     stage_args.add_argument("--source-root")
     args = parser.parse_args()

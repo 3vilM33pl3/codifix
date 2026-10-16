@@ -101,6 +101,15 @@ class GuestAgentTests(unittest.TestCase):
                 vm.guest_stage_start(Path('/unused'),stage,operation)
             execute.assert_not_called()
 
+    def test_pds_stdio_proof_is_limited_and_does_not_accept_source_arguments(self):
+        operation='11111111-1111-4111-8111-111111111111'
+        with patch.object(vm,'guest_exec',return_value={'pid':42}) as execute:
+            vm.guest_stage_start(Path('/unused'),'PdsVerify',operation)
+            outer=base64.b64decode(execute.call_args.args[2][-1]).decode('utf-16-le')
+            self.assertIn('-LogonType Interactive -RunLevel Limited',outer)
+        with self.assertRaises(ValueError):
+            vm.guest_stage_start(Path('/unused'),'PdsVerify',operation,r'C:\MemoryLab\source')
+
     def test_stage_start_rejects_unknown_stage_uuid_and_source_injection_before_rpc(self):
         operation='11111111-1111-4111-8111-111111111111'
         invalid=[('Unknown',operation,None),('NativeApi;whoami',operation,None),

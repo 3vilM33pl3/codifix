@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Start','Status','Execute')][string]$Action = 'Status',
-    [ValidateSet('BuildTools','PostgresPrepare','PostgresStart','PdsPrepare','PiBuild','ProductCheck','NativeApi')][string]$Stage = 'BuildTools',
+    [ValidateSet('BuildTools','PostgresPrepare','PostgresStart','PdsPrepare','PdsVerify','PiBuild','ProductCheck','NativeApi')][string]$Stage = 'BuildTools',
     [Parameter(Mandatory=$true)][guid]$OperationId,
     [string]$SourceRoot
 )
@@ -21,6 +21,7 @@ function Get-BoundFiles([string]$SelectedStage) {
         'BuildTools' { @('guest-build-tools.ps1','build-tools.json') }
         { $_ -in @('PostgresPrepare','PostgresStart') } { @('guest-native-postgres.ps1','native-postgres.json') }
         'PdsPrepare' { @('guest-native-pds.ps1','native-pds.json') }
+        'PdsVerify' { @('guest-pds-stdio.ps1') }
         'PiBuild' { @('guest-native-pi.ps1','native-pi.json') }
         'ProductCheck' { @('guest-native-product.ps1') }
         'NativeApi' {
@@ -92,7 +93,7 @@ if ($Action -eq 'Start') {
     $actionSpec = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument $arguments
     # Product/API checks model an ordinary interactive user, not an elevated
     # installer. Only explicitly selected installer/dependency stages elevate.
-    $runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck')) { 'Limited' } else { 'Highest' }
+    $runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','PdsVerify')) { 'Limited' } else { 'Highest' }
     $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel $runLevel
     $limit = if ($Stage -eq 'NativeApi') { New-TimeSpan -Minutes 20 } else { New-TimeSpan -Hours 3 }
     $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit $limit -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
@@ -148,6 +149,7 @@ try {
                 if (-not $SourceRoot) { throw 'Copied lab source is required' }
                 & (Join-Path $inputs 'guest-native-product.ps1') -SourceRoot $SourceRoot -OperationId $OperationId
             }
+            'PdsVerify' { & (Join-Path $inputs 'guest-pds-stdio.ps1') -OperationId $OperationId }
             default { throw 'Unknown native proof stage' }
         }
         Save-Status 'succeeded' 'stage_completed'
