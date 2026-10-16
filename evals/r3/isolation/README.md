@@ -30,8 +30,8 @@ probe compiles and runs in fresh bounded scratch; only probe arguments/stdin,
 not expected output, enter the grader. Readiness and per-probe receipts remain
 in diagnostics. The Linux harness and image-labelled artifacts stay unchanged.
 
-Model-command execution, knowledge adjudication and full campaign orchestration
-remain separate work. Their entrypoints still reject explicit native requests
+Model-command execution and full campaign orchestration remain separate work.
+Their entrypoints still reject explicit native requests
 before execution rather than silently falling back to Linux. Native support is **not** full Windows R3
 completion. Paid R3 remains paused; real Windows launch, compilation, denial and
 recovery evidence is still required.
@@ -97,6 +97,42 @@ isolated synthetic answering, no-memory refusal and Rust adjudication. The
 required snapshot test additionally runs real sealed Memory HTTP retrieval,
 source binding and isolated answering, then rechecks the database fingerprint.
 Both CI gates use disposable data and the pinned Node image described below.
+
+### Native Windows deterministic knowledge smoke
+
+Supply an explicit `execution: { kind: 'windows-native-v1', profile,
+profile_sha256 }`, native command `argv`, and
+`scoreExecutable: { path: 'C:\\reviewed\\r3_score.exe', sha256 }` instead of
+`image`/`scoreBinary`. The scorer must match an exact executable entry in the
+reviewed native toolchain inventory. `createKnowledgeRunner` uses the same
+`execution.mjs` backend as the native coding smoke; it validates the answer's
+profile/descriptor/receipt identity before supplying private scoring inputs.
+Only question and selected context enter `input.json`; only bounded `answer.json`
+returns from the answering workspace. Unselected sources and rubric instructions
+remain on the trusted host.
+
+The trusted scorer's new `r3_score assess-stdin` operation accepts at most 2 MiB
+of JSON through stdin and returns existing `KnowledgeEvidence::prepare` /
+`assess` output with empty ballots. It writes no private temporary files. The
+host hashes the scorer through one open file, then launches the exact reviewed
+`.exe` without a shell or ambient provider/configuration environment. A 10-second
+deadline and combined 4-MiB stdout/stderr ceiling bound the process; failures are
+sanitized and the root process is reaped. Execution trust depends on the protected,
+immutable toolchain already checked by the native helper—not an atomic
+same-handle `CreateProcess` claim. This trusted scorer creates no descendants.
+
+Results retain the native answer receipt and scorer identity, report
+`officialEvidence: false`, and keep human semantic decisions pending. Native
+`runAnswer` model callbacks and mixed Linux/native inputs fail closed. Fake
+adapter tests prove wiring and disclosure contracts, **not** observed Windows
+isolation or official campaign quality. Native launch/recovery acceptance,
+model-command integration and campaign orchestration remain separate work; paid
+R3 remains paused.
+
+```sh
+node --test evals/r3/isolation/knowledge-native.test.mjs
+cargo test -p mem-eval --example r3_score --locked
+```
 
 ## Container contract
 

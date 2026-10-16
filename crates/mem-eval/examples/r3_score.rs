@@ -72,7 +72,9 @@ fn write<T: Serialize>(path: &Path, value: &T) -> Result<()> {
 }
 
 fn directory(path: &Path) -> Result<()> {
-    let mut builder = fs::DirBuilder::new();
+    let builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    let mut builder = builder;
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
