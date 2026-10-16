@@ -255,6 +255,8 @@ def require_stopped(root):
 
 def start(root, data, install):
     require_stopped(root)
+    if (root / "secure-boot-nvram.partial").exists():
+        raise ValueError("interrupted firmware update must be reconciled before boot")
     if any(not (path / "complete.json").exists() for path in root.glob("restore-*") if path.is_dir()):
         raise ValueError("interrupted restore must be reconciled with recover-restore before boot")
     kvm()
@@ -263,8 +265,9 @@ def start(root, data, install):
     run("swtpm", "socket", "--tpm2", "--tpmstate", f"dir={root / 'tpm'}",
         "--ctrl", f"type=unixio,path={root / 'tpm.sock'},mode=0600,terminate",
         "--flags", "not-need-init", "--daemon", "--pid", f"file={root / 'swtpm.pid'}")
+    machine = "q35,smm=on" if data.get("secure_boot") else "q35"
     command = ["qemu-system-x86_64", "-name", "memory-windows-native", "-accel", "kvm",
-               "-machine", "q35", "-cpu", "host", "-smp", str(data["cpus"]),
+               "-machine", machine, "-cpu", "host", "-smp", str(data["cpus"]),
                "-m", str(data["memory_mib"]), "-rtc", "base=localtime",
                "-drive", f"if=pflash,format=raw,readonly=on,file={data['firmware']}",
                "-drive", f"if=pflash,format=raw,file={root / 'nvram.fd'}",
@@ -279,6 +282,8 @@ def start(root, data, install):
                "-qmp", f"unix:{root / 'qmp.sock'},server=on,wait=off", "-display", "none",
                "-vnc", f"unix:{root / 'vnc.sock'}", "-daemonize", "-pidfile", str(root / "qemu.pid"),
                "-D", str(root / "qemu.log")]
+    if data.get("secure_boot"):
+        command += ["-global", "driver=cfi.pflash01,property=secure,value=on"]
     if install:
         command += ["-drive", f"file={data['iso']},media=cdrom,readonly=on,if=none,id=installiso",
                     "-device", "ide-cd,drive=installiso,bus=ide.1,bootindex=1"]
@@ -290,6 +295,33 @@ def start(root, data, install):
     run(*command)
     print(json.dumps({"status": running(root), "ssh_port": data["ssh_port"],
                       "console": str(root / "vnc.sock"), "acceleration": "kvm"}))
+
+
+def enable_secure_boot(root, data):
+    """Enroll the packaged Microsoft public keys, retaining the previous VM state."""
+    require_stopped(root)
+    if data.get("secure_boot"):
+        print("Secure Boot is already configured")
+        return
+    firmware = Path("/usr/share/OVMF/OVMF_CODE_4M.secboot.fd")
+    variables = Path("/usr/share/OVMF/OVMF_VARS_4M.ms.fd")
+    if not firmware.is_file() or not variables.is_file():
+        raise ValueError("Microsoft-enrolled OVMF firmware is unavailable")
+    name = f"before-secure-boot-{time.time_ns()}"
+    snapshot(root, name)
+    shutil.copy2(root / "lab.json", root / "snapshots" / name / "lab.json")
+    # An interrupted update retains both the original variables and manifest.
+    temporary = root / "secure-boot-nvram.partial"
+    if temporary.exists():
+        raise ValueError("an interrupted firmware update requires inspection")
+    shutil.copy2(variables, temporary)
+    data = dict(data, firmware=str(firmware), firmware_sha256=digest(firmware),
+                secure_boot=True, enrolled_variables_sha256=digest(variables),
+                firmware_backup=name)
+    write_json(root / "lab.json", data)
+    temporary.replace(root / "nvram.fd")
+    print(json.dumps({"secure_boot": True, "previous_state": name,
+                      "firmware_sha256": data["firmware_sha256"]}))
 
 
 def ssh(root, data, command, capture=False):
@@ -307,6 +339,8 @@ def snapshot(root, name):
     target.mkdir(mode=0o700)  # Immutable; fail if already present.
     for entry in ["disk.qcow2", "nvram.fd", "tpm"]:
         run("cp", "--reflink=auto", "--sparse=always", "-a", root / entry, target / entry)
+    if (root / "lab.json").exists():
+        shutil.copy2(root / "lab.json", target / "lab.json")
     write_json(target / "snapshot.json", {"format": FORMAT, "name": name, "root": str(root),
                                          "created_at": int(time.time()), "complete": True})
     print(str(target))
@@ -323,8 +357,15 @@ def restore(root, name):
     # Retain current state in full; interrupted restoration is recoverable locally.
     operation = root / f"restore-{time.time_ns()}"
     operation.mkdir(mode=0o700)
-    write_json(operation / "intent.json", {"format": FORMAT, "snapshot": name, "root": str(root)})
-    for entry in ["disk.qcow2", "nvram.fd", "tpm"]:
+    entries = ["disk.qcow2", "nvram.fd", "tpm"]
+    if (source / "lab.json").exists():
+        saved = json.loads((source / "lab.json").read_text())
+        if saved.get("format") != FORMAT or saved.get("root") != str(root):
+            raise ValueError("foreign snapshot firmware configuration")
+        entries.append("lab.json")
+    write_json(operation / "intent.json", {"format": FORMAT, "snapshot": name,
+                                         "root": str(root), "entries": entries})
+    for entry in entries:
         run("cp", "--reflink=auto", "--sparse=always", "-a", source / entry, operation / f"new-{entry}")
     write_json(operation / "prepared.json", {"complete_copy": True})
     recover_restore(root, operation.name)
@@ -343,7 +384,11 @@ def recover_restore(root, name):
         return
     if not (operation / "prepared.json").exists():
         raise ValueError("copy preparation was interrupted; originals are unchanged; inspect the operation before retry")
-    for entry in ["disk.qcow2", "nvram.fd", "tpm"]:
+    entries = intent.get("entries", ["disk.qcow2", "nvram.fd", "tpm"])
+    if entries not in (["disk.qcow2", "nvram.fd", "tpm"],
+                       ["disk.qcow2", "nvram.fd", "tpm", "lab.json"]):
+        raise ValueError("unknown restore components")
+    for entry in entries:
         previous = operation / f"previous-{entry}"
         replacement = operation / f"new-{entry}"
         target = root / entry
@@ -376,6 +421,7 @@ def main():
     start_args.add_argument("--install", action="store_true")
     sub.add_parser("status")
     sub.add_parser("shutdown")
+    sub.add_parser("enable-secure-boot")
     snap = sub.add_parser("snapshot")
     snap.add_argument("name")
     restore_args = sub.add_parser("restore")
@@ -399,6 +445,8 @@ def main():
             print(json.dumps({"qemu": running(root), "lab": data}))
         elif args.command == "shutdown":
             qmp(root, "system_powerdown")
+        elif args.command == "enable-secure-boot":
+            enable_secure_boot(root, data)
         elif args.command == "snapshot":
             snapshot(root, args.name)
         elif args.command == "restore":

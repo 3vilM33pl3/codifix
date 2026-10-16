@@ -8,7 +8,7 @@ on:
       - 'Cargo.lock'
       - 'crates/mem-platform/**'
       - 'crates/mem-platform-files/**'
-      - 'packaging/windows/check-platform.ps1'
+      - 'packaging/windows/**'
       - '.github/workflows/windows-native.yml'
 
 permissions:
@@ -25,7 +25,9 @@ jobs:
           components: clippy
       - name: Native protected files, journals and platform smoke
         shell: pwsh
-        run: ./packaging/windows/check-platform.ps1
+        run: |
+          ./packaging/windows/test-release-identity.ps1
+          ./packaging/windows/check-platform.ps1
 
 # Complete required-database, PDS, Pi/AppContainer and installer acceptance runs
 # remain on the disposable VM. This job is not a native-release certification.

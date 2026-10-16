@@ -12,13 +12,26 @@ Media is downloaded over verified HTTPS from Microsoft's Enterprise Evaluation
 Center. Check and record the actual edition/build before accepting the guest.
 The current media is evaluation software, not a purchased Windows licence.
 
-## Current host prerequisite
+## Host prerequisite and recovery
 
 On 2026-10-04, loading `kvm_amd` failed with `Operation not supported`.
 Kernel message: `kvm_amd: SVM not supported by CPU 4`. None of the 32 logical
 CPUs exposes the `svm` flag. The Ryzen 5950X supports AMD virtualization, so
 firmware SVM/AMD-V must be enabled and verified after an operator-managed reboot.
 Do not reboot Monolith automatically or substitute software emulation.
+
+On 2026-10-16 Olivier enabled SVM; exact `svm` appeared on all 32 threads,
+`/dev/kvm` became accessible and QMP confirmed KVM acceleration. The default
+lab also needs the narrow `swtpm.apparmor.example` include if the installed
+AppArmor profile does not permit its `/data` paths. Preserve existing local
+rules and reload only the swtpm profile; do not disable AppArmor.
+
+Windows 11 Setup requires Secure Boot. For the existing uninstalled lab, stop
+the guest and run `python3 scripts/windows/vm.py enable-secure-boot` once. This
+retains a complete pre-change snapshot and selects packaged Microsoft-enrolled
+OVMF variables, secure firmware and SMM. Cold snapshots now include `lab.json`
+so restoration also restores the matching firmware descriptor. An interrupted
+firmware switch blocks boot until its retained state is inspected.
 
 ## Resume installation after KVM is available
 
