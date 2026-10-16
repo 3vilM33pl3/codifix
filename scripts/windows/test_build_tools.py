@@ -40,6 +40,7 @@ class BuildToolsManifestTests(unittest.TestCase):
             self.assertIn(required, script)
         self.assertNotIn('Invoke-Expression', script)
         self.assertNotIn('[string]$Command', script)
+        self.assertIn("'zz-isolation'", script)
 
     def test_bootstrap_prepares_ssh_state_before_writing_keys(self):
         script = (Path(__file__).parent / 'guest-bootstrap.ps1').read_text()

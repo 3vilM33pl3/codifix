@@ -65,7 +65,10 @@ function Invoke-Bounded([string]$Exe, [string[]]$Arguments, [string]$Label, [int
 }
 Save-Result
 try {
-    foreach ($artifact in ($manifest.artifacts | Sort-Object kind)) {
+    # Keep the mandatory adversarial probe last so a sandbox setup failure does
+    # not hide independent filesystem/credential/routing diagnostics. It still
+    # must pass before execution_verified can become true.
+    foreach ($artifact in ($manifest.artifacts | Sort-Object { if ($_.kind -eq 'isolation-probe') { 'zz-isolation' } else { $_.kind } })) {
         $exe = Join-Path $inputs $artifact.file
         if ($artifact.kind -eq 'isolation-probe') {
             # Synthetic loopback denial probe only; no provider/service traffic.
