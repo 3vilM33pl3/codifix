@@ -11,8 +11,8 @@ use std::{collections::HashSet, ffi::c_void, mem::size_of, ptr::addr_of_mut};
 use uuid::Uuid;
 use windows_sys::Win32::{
     Foundation::{
-        CloseHandle, ERROR_NO_TOKEN, ERROR_NOT_FOUND, GetLastError, HANDLE, LocalFree,
-        WAIT_ABANDONED, WAIT_OBJECT_0,
+        CloseHandle, ERROR_NO_SUCH_LOGON_SESSION, ERROR_NO_TOKEN, ERROR_NOT_FOUND, GetLastError,
+        HANDLE, LocalFree, WAIT_ABANDONED, WAIT_OBJECT_0,
     },
     Security::Credentials::{
         CRED_MAX_CREDENTIAL_BLOB_SIZE, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW,
@@ -321,6 +321,11 @@ fn write(name: &str, bytes: &[u8]) -> Result<()> {
     if unsafe { CredWriteW(&credential, 0) } == 0 {
         // Capture immediately, without logging target names or credential bytes.
         let code = unsafe { GetLastError() };
+        if code == ERROR_NO_SUCH_LOGON_SESSION {
+            bail!(
+                "Windows Credential Manager has no usable user logon session (Windows error {code}); run Memory in your signed-in, non-elevated desktop session; no plaintext fallback is available"
+            );
+        }
         bail!(
             "Windows Credential Manager write failed (Windows error {code}); no plaintext fallback is available"
         );
