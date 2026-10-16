@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 import json
+import os
+import socket
 import unittest
 import xml.etree.ElementTree as ET
 import tempfile
@@ -9,6 +11,25 @@ import vm
 
 
 class SeedTests(unittest.TestCase):
+    def test_start_protects_qga_socket_even_if_qemu_resets_umask(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data = {'cpus': 8, 'memory_mib': 16384, 'firmware': 'synthetic',
+                    'ssh_port': 22290, 'virtio_iso': None}
+            listener = socket.socket(socket.AF_UNIX)
+            try:
+                def fake_run(*args, **kwargs):
+                    if args[0] == 'qemu-system-x86_64':
+                        self.assertEqual(kwargs['umask'], 0o077)
+                        listener.bind(str(root / 'guest-agent.sock'))
+                        os.chmod(root / 'guest-agent.sock', 0o755)
+                with patch.object(vm, 'require_stopped'), patch.object(vm, 'kvm'), \
+                        patch.object(vm, 'run', side_effect=fake_run), patch.object(vm, 'running', return_value=True):
+                    vm.start(root, data, False)
+                self.assertEqual((root / 'guest-agent.sock').stat().st_mode & 0o777, 0o600)
+            finally:
+                listener.close()
+
     def test_seed_refresh_preserves_account_key_and_disk(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

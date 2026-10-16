@@ -535,7 +535,28 @@ def start(root, data, install):
     if data["virtio_iso"]:
         command += ["-drive", f"file={data['virtio_iso']},media=cdrom,readonly=on,if=none,id=driveriso",
                     "-device", "ide-cd,drive=driveriso,bus=ide.3"]
-    run(*command)
+    # QEMU's daemonization can reset its umask, so a private child umask alone
+    # does not guarantee private UNIX sockets. Protect the exact QGA endpoint
+    # before reporting startup success; the operator-owned 0700 lab directory
+    # prevents another user from substituting it during this bounded wait.
+    run(*command, umask=0o077)
+    guest_socket = root / "guest-agent.sock"
+    deadline = time.monotonic() + 5
+    while True:
+        try:
+            observed = guest_socket.lstat()
+        except FileNotFoundError:
+            if time.monotonic() >= deadline:
+                raise ValueError("QEMU started without its private guest-agent socket; inspect the running lab before retrying") from None
+            time.sleep(0.05)
+            continue
+        if not stat.S_ISSOCK(observed.st_mode) or observed.st_uid != os.geteuid():
+            raise ValueError("QEMU guest-agent socket has an unexpected type/owner; inspect the running lab")
+        guest_socket.chmod(0o600, follow_symlinks=False)
+        verified = guest_socket.lstat()
+        if (verified.st_dev, verified.st_ino) != (observed.st_dev, observed.st_ino) or verified.st_mode & 0o077:
+            raise ValueError("QEMU guest-agent socket changed while protecting it; inspect the running lab")
+        break
     print(json.dumps({"status": running(root), "ssh_port": data["ssh_port"],
                       "console": str(root / "vnc.sock"), "acceleration": "kvm"}))
 
