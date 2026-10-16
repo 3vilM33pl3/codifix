@@ -318,10 +318,13 @@ fn write(name: &str, bytes: &[u8]) -> Result<()> {
         ..Default::default()
     };
     // SAFETY: all backing buffers outlive the call; API copies the input blob.
-    ensure!(
-        unsafe { CredWriteW(&credential, 0) } != 0,
-        "Windows Credential Manager write failed; no plaintext fallback is available"
-    );
+    if unsafe { CredWriteW(&credential, 0) } == 0 {
+        // Capture immediately, without logging target names or credential bytes.
+        let code = unsafe { GetLastError() };
+        bail!(
+            "Windows Credential Manager write failed (Windows error {code}); no plaintext fallback is available"
+        );
+    }
     Ok(())
 }
 fn remove(name: &str) -> Result<()> {
