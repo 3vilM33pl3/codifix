@@ -6,6 +6,8 @@
 pub mod journal;
 #[cfg(windows)]
 pub mod windows_evaluation;
+#[cfg(all(windows, feature = "windows-evaluation-helper"))]
+pub mod windows_evaluation_helper;
 #[cfg(windows)]
 pub mod windows_process;
 #[cfg(windows)]

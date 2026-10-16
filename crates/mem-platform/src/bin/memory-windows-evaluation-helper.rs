@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Explicit private descriptor, never a shell command or provider client.
+#[cfg(not(windows))]
+fn main() {
+    eprintln!("native Windows evaluation only");
+    std::process::exit(1);
+}
+
+#[cfg(windows)]
+fn main() {
+    use std::path::Path;
+    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.len() != 6
+        || args[0] != "--descriptor"
+        || args[2] != "--sha256"
+        || args[4] != "--output"
+    {
+        eprintln!(
+            "expected --descriptor PRIVATE_JSON --sha256 DIGEST --output NEW_PRIVATE_DIRECTORY"
+        );
+        std::process::exit(1);
+    }
+    let hash = args[3].to_str().unwrap_or_default();
+    match mem_platform::windows_evaluation_helper::run(
+        Path::new(&args[1]),
+        hash,
+        Path::new(&args[5]),
+    ) {
+        Ok(receipt) => {
+            match serde_json::to_string(&receipt) {
+                Ok(json) => println!("{json}"),
+                Err(_) => {
+                    eprintln!("could not serialize native evaluation receipt");
+                    std::process::exit(1);
+                }
+            }
+            if receipt.state != "succeeded" {
+                std::process::exit(1);
+            }
+        }
+        Err(_) => {
+            eprintln!("native evaluation helper failed; inspect the private output directory");
+            std::process::exit(1);
+        }
+    }
+}

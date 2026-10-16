@@ -7,6 +7,12 @@ authors.workspace = true
 
 [features]
 windows-native-tests = []
+windows-evaluation-helper = []
+
+[[bin]]
+name = "memory-windows-evaluation-helper"
+path = "src/bin/memory-windows-evaluation-helper.rs"
+required-features = ["windows-evaluation-helper"]
 
 [[bin]]
 name = "memory-windows-isolation-probe"
