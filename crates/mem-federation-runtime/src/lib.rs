@@ -17,6 +17,8 @@ mod http;
 mod pds;
 mod pds_pipe;
 pub use pds_pipe::PdsNamedPipe;
+#[cfg(windows)]
+pub use pds_pipe::serve as serve_native_pds_pipe;
 mod private_files;
 mod project_delivery;
 pub use credentials::{CredentialMode, CredentialState, GatewayCredentialStatus, MaintenanceState};

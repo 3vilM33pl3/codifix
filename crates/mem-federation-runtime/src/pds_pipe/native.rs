@@ -7,19 +7,25 @@ use hyper_util::rt::TokioIo;
 use std::{
     ffi::c_void,
     mem::size_of,
-    os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
+    os::windows::{
+        ffi::OsStrExt,
+        io::{AsRawHandle, FromRawHandle, OwnedHandle},
+    },
     ptr::{addr_of_mut, null_mut},
     time::Duration,
 };
 use windows_sys::Win32::{
-    Foundation::LocalFree,
+    Foundation::{INVALID_HANDLE_VALUE, LocalFree},
     Security::{
         ACCESS_ALLOWED_ACE, ACE_HEADER,
         Authorization::{ConvertSidToStringSidW, GetSecurityInfo, SE_FILE_OBJECT},
         DACL_SECURITY_INFORMATION, GetAce, GetTokenInformation, INHERIT_ONLY_ACE,
         OWNER_SECURITY_INFORMATION, TOKEN_QUERY, TOKEN_USER, TokenUser,
     },
-    Storage::FileSystem::SECURITY_IDENTIFICATION,
+    Storage::FileSystem::{
+        CreateFileW, FILE_FLAG_OVERLAPPED, FILE_GENERIC_READ, FILE_WRITE_DATA, OPEN_EXISTING,
+        SECURITY_IDENTIFICATION, SECURITY_SQOS_PRESENT,
+    },
     System::{
         Pipes::GetNamedPipeServerProcessId,
         Threading::{OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION},
@@ -56,7 +62,7 @@ fn sid(value: *mut c_void) -> Result<String> {
     }
 }
 
-fn token_sid(process: &OwnedHandle) -> Result<String> {
+pub(super) fn token_sid(process: &OwnedHandle) -> Result<String> {
     let mut raw = null_mut();
     // SAFETY: process handle lives through call; successful call transfers token.
     if unsafe { OpenProcessToken(process.as_raw_handle(), TOKEN_QUERY, &mut raw) } == 0 {
@@ -170,10 +176,31 @@ pub(crate) async fn send(
     request: reqwest::Request,
 ) -> Result<reqwest::Response> {
     tokio::time::timeout(Duration::from_secs(20), async {
-        let pipe = tokio::net::windows::named_pipe::ClientOptions::new()
-            .security_qos_flags(SECURITY_IDENTIFICATION)
-            .open(&policy.name)
-            .map_err(|_| RuntimeError::Unavailable)?;
+        let name: Vec<u16> = std::ffi::OsStr::new(&policy.name)
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        // GENERIC_WRITE includes FILE_CREATE_PIPE_INSTANCE. Ask only for data
+        // write access so the gateway cannot create competing server instances.
+        let raw = unsafe {
+            CreateFileW(
+                name.as_ptr(),
+                FILE_GENERIC_READ | FILE_WRITE_DATA,
+                0,
+                null_mut(),
+                OPEN_EXISTING,
+                FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION,
+                null_mut(),
+            )
+        };
+        if raw == INVALID_HANDLE_VALUE {
+            return Err(RuntimeError::Unavailable);
+        }
+        // SAFETY: CreateFile transferred a fresh overlapped handle; Tokio owns
+        // and closes it from this point, including registration failure.
+        let pipe =
+            unsafe { tokio::net::windows::named_pipe::NamedPipeClient::from_raw_handle(raw) }
+                .map_err(|_| RuntimeError::Unavailable)?;
         // No authentication bytes are written until peer identity and DACL pass.
         validate_pipe(&pipe, policy)?;
         let mut path = request.url().path().to_owned();

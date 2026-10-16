@@ -53,6 +53,12 @@ impl PdsNamedPipe {
 #[cfg(windows)]
 mod native;
 #[cfg(windows)]
+mod server;
+#[cfg(windows)]
+pub use server::serve;
+#[cfg(any(windows, test))]
+mod wire;
+#[cfg(windows)]
 pub(crate) use native::send;
 
 #[cfg(test)]

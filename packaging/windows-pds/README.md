@@ -42,10 +42,49 @@ Unknown access-control ACE forms and broad principals are rejected. It disables
 impersonation beyond identification, rejects remote/ambiguous pipe paths, bounds
 the entire exchange to 20 seconds and caps bodies at the signed-CAR limit.
 
-The server listener/installer is **not delivered by this directory yet**. The
-client alone is not evidence that native PDS deployment or access isolation is
-complete. Native upstream Node/PDS startup, storage and pipe ACL installation
-must be proven before the candidate can ship.
+`memory-pds-pipe.exe` supplies the native listener. It creates the protected ACL
+before the first connection, grants the gateway data-write rather than
+pipe-instance-creation rights, and launches Node using private length-framed
+stdin/stdout. It never opens a PDS TCP listener. Requests execute serially, with
+bounded frames and deadlines. Ambiguous child failure stops the broker rather
+than replaying a write. Existing signed read-back reconciles publication outcomes.
+
+The Node entry point calls pinned `PDS.fromEnv()` and starts its sequencer, then
+passes unmodified HTTP bodies through Node's real HTTP parser into `pds.app` via
+an in-memory duplex connection. It does not call `PDS.start()` or `listen()`.
+This matches the inspected initialization preceding the pinned upstream listen;
+the same 90-second keep-alive setting is applied and `pds.destroy()` runs on EOF.
+
+Supply a private operator JSON file to `memory-pds-pipe.exe`:
+
+```json
+{
+  "schema_version": 1,
+  "pipe": {
+    "name": "\\\\.\\pipe\\memory-pds-company",
+    "server_sid": "S-1-5-21-100-200-300-1001",
+    "client_sid": "S-1-5-21-100-200-300-1002"
+  },
+  "node": "C:\\MemoryPrivate\\runtime\\node.exe",
+  "node_sha256": "EXACT_VERIFIED_NATIVE_NODE_SHA256",
+  "entry": "C:\\MemoryPrivate\\pds\\pds-server.mjs",
+  "entry_sha256": "EXACT_REVIEWED_ENTRY_SHA256",
+  "helper_sha256": "EXACT_REVIEWED_HTTP_STDIO_SHA256"
+}
+```
+
+These example paths/SIDs/hashes are not ready-to-run credentials or installers.
+The PDS service identity must own and be allowed to read the protected inputs.
+The broker verifies its own identity and hashes of Node, entry and helper before
+spawning. It forwards only `PDS_*`, essential Windows process variables,
+`NODE_EXTRA_CA_CERTS` and `LOG_LEVEL`, not provider credentials or `NODE_OPTIONS`.
+Keep `PDS_DEV_MODE=false`, SSRF protection enabled and the existing private-PDS
+configuration. Startup requires exact Node 24.18.1 and PDS 0.5.27.
+
+The **native dependency tree/installer and Windows runtime validation remain
+undelivered**. The complete dependency tree still needs an immutable native
+manifest and appropriate private ACLs. Do not claim complete PDS deployment or
+access isolation merely because its broker cross-compiles.
 
 ## Pins and validation
 
@@ -64,7 +103,7 @@ cargo check --locked -p mem-federation-runtime --tests --target x86_64-pc-window
 cargo clippy --locked -p mem-federation-runtime --lib --bins --target x86_64-pc-windows-gnu -- -D warnings
 ```
 
-The first two passed 35 and 7 tests respectively. Cross-check and library/binary
+The first two passed 37 and 7 tests respectively. Cross-check and library/binary
 Clippy passed. All-targets Clippy is not a pass: older unrelated test modules
 have existing `unwrap_used`/test-layout findings. No native runtime claim follows
 from cross-compilation.
@@ -79,3 +118,13 @@ The native tests create isolated random-name pipes, preserve non-UTF-8 binary
 HTTP response bytes and reject broad ACLs before any bearer bytes are sent.
 Follow with the existing signed-repository, credential renewal, duplicate,
 reconnect and addressed-expertise regressions against the actual native PDS.
+
+`node --test packaging/windows-pds/http-stdio.test.mjs` passed three fake-app
+tests for binary request/response preservation, oversized/interrupted frames,
+oversized outputs and execution deadlines. A separate smoke invoked this exact
+entry/helper against the pinned Linux OCI image, with network disabled, tmpfs
+state and synthetic credentials: READY, `describeServer` HTTP 200 and clean EOF
+shutdown passed. This tests the actual upstream adapter without a TCP listener;
+it is **not** native Windows database/SQLite, pipe ACL or signed-repository proof.
+`probe-stdio.mjs` accepts an explicit disposable command for repeating that smoke
+and prints metadata only. Never point it at live deployments.
