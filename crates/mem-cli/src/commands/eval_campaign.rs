@@ -69,7 +69,9 @@ pub(super) async fn handle(command: EvalCampaignCommand) -> Result<()> {
                     c::review::apply(&manifest, &artifact, &batch)
                 })
                 .transpose()?;
-            let mut builder = std::fs::DirBuilder::new();
+            let builder = std::fs::DirBuilder::new();
+            #[cfg(unix)]
+            let mut builder = builder;
             #[cfg(unix)]
             {
                 use std::os::unix::fs::DirBuilderExt;

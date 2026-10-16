@@ -5,7 +5,10 @@ package for synchronization; lean builds report the missing capability explicitl
 The complete native Mac installation still requires real-Mac acceptance.
 
 First enroll with `memory auth login --company https://company.example --name laptop`.
-Browser approval and a macOS Keychain credential are separate from Git credentials.
+Browser approval and the OS credential store (macOS Keychain or Windows
+Credential Manager) are separate from Git credentials. The Windows candidate
+still requires its native onboarding acceptance; a compiled credential adapter
+alone does not establish the complete installation journey.
 
 | Command | Purpose |
 | --- | --- |

@@ -141,11 +141,19 @@ memory projects available --company https://YOUR-COMPANY-MEMORY-ORIGIN
 memory auth logout --company https://YOUR-COMPANY-MEMORY-ORIGIN
 ```
 
-The device secret remains in macOS Keychain; it is not a general service-token
+The device secret remains in macOS Keychain or the current Windows user's
+Credential Manager; it is not a general service-token
 replacement and grants only explicitly approved onboarding scope. Separate
 Codex/Claude disclosure grants remain required. Production releases without
 these commands should retain service-token automation. See [Mac onboarding](../mac-onboarding.md)
 for the guided first-run candidate and its outstanding native acceptance.
+
+The Windows candidate uses non-roaming, current-user generic credentials, never
+a plaintext fallback. Large private onboarding journals use bounded encrypted
+chunks with a commit pointer and retry cleanup; the original value survives an
+interrupted replacement. Native Windows round-trip and interruption tests are
+part of candidate acceptance, not established by cross-compilation. Device
+synchronization runs in that user's context, not the machine service account.
 
 ## OpenBao Pattern
 

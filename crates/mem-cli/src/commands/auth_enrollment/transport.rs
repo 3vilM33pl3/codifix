@@ -233,8 +233,14 @@ pub(super) fn open_browser(url: &str) -> Result<()> {
         // SAFETY: validated company approval URL; no shell interpolation,
         // credentials, executable selection or inherited application handles.
         let result = unsafe {
-            ShellExecuteW(std::ptr::null_mut(), open.as_ptr(), url.as_ptr(),
-                std::ptr::null(), std::ptr::null(), 1)
+            ShellExecuteW(
+                std::ptr::null_mut(),
+                open.as_ptr(),
+                url.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                1,
+            )
         };
         if result as isize <= 32 {
             bail!("browser could not open; use the printed public approval URL");

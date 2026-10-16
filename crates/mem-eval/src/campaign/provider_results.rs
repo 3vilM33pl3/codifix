@@ -48,7 +48,9 @@ pub enum DispatchDecision {
 
 impl ProviderResults {
     pub fn create(directory: &Path) -> Result<Self> {
-        let mut builder = fs::DirBuilder::new();
+        let builder = fs::DirBuilder::new();
+        #[cfg(unix)]
+        let mut builder = builder;
         #[cfg(unix)]
         {
             use std::os::unix::fs::DirBuilderExt;

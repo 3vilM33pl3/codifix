@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+#[cfg(unix)]
+use std::process::Stdio;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     env, fs,
     io::{self, Write},
     path::{Path, PathBuf},
-    process::{Command as ProcessCommand, Stdio},
+    process::Command as ProcessCommand,
     time::Instant,
 };
 
