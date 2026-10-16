@@ -14,7 +14,7 @@ if ($manifest.rust_toolchain -notmatch '^\d+\.\d+\.\d+$' -or $manifest.wix_versi
 }
 $artifacts = @($manifest.artifacts)
 $ids = @($artifacts | ForEach-Object { $_.id } | Sort-Object)
-if (($ids -join ',') -ne 'dotnet,git,msvc,node,rustup') { throw 'Incomplete or duplicate tool set' }
+if (($ids -join ',') -ne 'dotnet,git,msvc,node,python,rustup') { throw 'Incomplete or duplicate tool set' }
 $root = 'C:\MemoryLab\BuildCache'
 $tools = 'C:\MemoryLab\Tools'
 New-Item -ItemType Directory -Force $root,$tools | Out-Null
@@ -68,6 +68,11 @@ foreach ($artifact in $artifacts) {
             $env:PATH = "$(Join-Path $git 'cmd');$env:PATH"
             Run-Checked (Join-Path $git 'cmd\git.exe') @('--version')
         }
+        'python' {
+            $python = Join-Path $tools 'python-3.13.9'
+            if (-not (Test-Path (Join-Path $python 'python.exe'))) { Expand-Archive -LiteralPath $path -DestinationPath $python }
+            Run-Checked (Join-Path $python 'python.exe') @('--version')
+        }
         'dotnet' {
             $dotnet = Join-Path $tools 'dotnet'
             if (-not (Test-Path (Join-Path $dotnet 'dotnet.exe'))) { Expand-Archive -LiteralPath $path -DestinationPath $dotnet }
@@ -109,6 +114,7 @@ $receipt.rust = (& rustc.exe --version)
 $receipt.cargo = (& cargo.exe --version)
 $receipt.node = (& node.exe --version)
 $receipt.git = (& git.exe --version)
+$receipt.python = (& (Join-Path $tools 'python-3.13.9\python.exe') --version)
 $receipt.dotnet = (& dotnet.exe --version)
 $receipt.wix = (& wix.exe --version)
 $receipt.completed_at = [DateTime]::UtcNow.ToString('o')

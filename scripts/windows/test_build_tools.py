@@ -1,11 +1,30 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 import json
+import hashlib
 from pathlib import Path
 import unittest
 from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_native_pds_retains_upstream_lock_and_separates_evidence(self):
+        root = Path(__file__).parent
+        manifest = json.loads((root / 'native-pds.json').read_text())
+        upstream = root.parents[1] / 'packaging/windows-pds/upstream'
+        self.assertEqual(manifest['format'], 'memory-windows-pds-proof-v1')
+        self.assertEqual(manifest['node_version'], '24.18.1')
+        self.assertEqual(manifest['pds_version'], '0.5.27')
+        for name, key in [('package.json', 'package_sha256'), ('pnpm-lock.yaml', 'lock_sha256')]:
+            self.assertEqual(hashlib.sha256((upstream / name).read_bytes()).hexdigest(), manifest[key])
+        package = json.loads((upstream / 'package.json').read_text())
+        self.assertEqual(package['packageManager'], 'pnpm@' + manifest['pnpm']['version'])
+        self.assertEqual(package['pnpm']['onlyBuiltDependencies'], ['better-sqlite3'])
+        self.assertEqual(len(manifest['pnpm']['sha512']), 128)
+        script = (root / 'guest-native-pds.ps1').read_text()
+        for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", '--frozen-lockfile',
+                         '--ignore-scripts', "'rebuild','better-sqlite3'", 'pds_protocol_verified=$false']:
+            self.assertIn(required, script)
+
     def test_native_postgres_inputs_and_lab_boundary(self):
         root = Path(__file__).parent
         manifest = json.loads((root / 'native-postgres.json').read_text())
@@ -37,7 +56,7 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertEqual(manifest['wix_version'], '4.0.5')
         artifacts = manifest['artifacts']
         self.assertEqual(sorted(a['id'] for a in artifacts),
-                         ['dotnet', 'git', 'msvc', 'node', 'rustup'])
+                         ['dotnet', 'git', 'msvc', 'node', 'python', 'rustup'])
         for artifact in artifacts:
             location = urlsplit(artifact['url'])
             self.assertEqual(location.scheme, 'https')

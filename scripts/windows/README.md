@@ -118,3 +118,19 @@ pgcrypto and pg_trgm must load in native PostgreSQL. A local DPAPI-protected
 synthetic password authenticates the loopback-only port 55471; no production
 credential is copied. Preparation and SQL execution have separate receipts.
 This is dependency evidence tooling, not the finished server installer.
+
+## Native PDS dependency proof
+
+`guest-native-pds.ps1 -ManifestPath <native-pds.json> -SourceRoot <copied-source>`
+prepares only a disposable runtime. It reuses the exact package and dependency
+lock extracted from the pinned PDS image, not newly resolved upstream versions.
+The package manager tarball has a reviewed SHA-512; Node is the pinned 24.18.1.
+It builds only better-sqlite3 with native MSVC and the manifest-pinned embeddable
+Python, tests in-memory SQLite, rejects runtime reparse points and inventories
+the resulting native tree. All state stays below `C:\MemoryLab\NativePds`.
+
+That receipt explicitly leaves PDS protocol verification false. Follow it with
+the stdio probe and actual Rust named-pipe/signed-repository tests before claiming
+native PDS support. No accounts, public identities, PDS service or production
+credentials are provisioned by dependency preparation. See
+[upstream provenance](../../packaging/windows-pds/upstream/PROVENANCE.md).

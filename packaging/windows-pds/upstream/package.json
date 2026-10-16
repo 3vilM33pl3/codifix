@@ -1,0 +1,22 @@
+{
+  "name": "pds",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Service entrypoint for atproto personal data server",
+  "packageManager": "pnpm@10.34.1",
+  "main": "index.ts",
+  "license": "MIT",
+  "dependencies": {
+    "@atproto/lex": "^0.3.5",
+    "@atproto/pds": "0.5.27"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.25"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  }
+}

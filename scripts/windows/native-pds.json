@@ -1,0 +1,13 @@
+{
+  "format": "memory-windows-pds-proof-v1",
+  "node_version": "24.18.1",
+  "pds_version": "0.5.27",
+  "source_revision": "374cf1d4ba782d4391bbb73e4e2d3f320d4846d6",
+  "package_sha256": "c0e7740808e0d6bc26a9fd773162f780a45665b0cff2137a256157f3cff77fd5",
+  "lock_sha256": "23a8c97e01dff561266a6dcf67a4b74b25e98ebc695e6fa17c60ddf964160f73",
+  "pnpm": {
+    "version": "10.34.1",
+    "url": "https://registry.npmjs.org/pnpm/-/pnpm-10.34.1.tgz",
+    "sha512": "b58fbde6dca66a929538021581f648b4570b6ca19b18e7cbd7f2c07a7b24454155388dacdf08f2af3678e88a6d1fe04f9d609df24bf51735a060ea041b374ab7"
+  }
+}
