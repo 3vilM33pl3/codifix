@@ -84,9 +84,9 @@ try {
         $filters = switch ($artifact.kind) {
             'protected-files' { @('tests::') }
             'platform' { @('tests::') }
-            'routing' { @('area::tests','manual_') }
+            'routing' { @('area::tests') }
             'desktop' { @('collector::codex::windows::native::tests') }
-            'onboarding' { @('credentials::windows::tests','workspace::filesystem::windows::tests','agents::settings::filesystem::tests','runtime_env_windows::tests') }
+            'onboarding' { @('credentials::windows::tests','workspace::filesystem::windows::tests','agents::settings::filesystem::tests','runtime_env_windows::tests','manual_') }
         }
         $index = 0
         foreach ($filter in $filters) {

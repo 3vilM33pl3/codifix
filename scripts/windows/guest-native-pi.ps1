@@ -62,9 +62,9 @@ $python=Join-Path $tools 'python-3.13.9\python.exe'
 $originalProfile=$env:USERPROFILE
 $rustBin=Join-Path $originalProfile '.cargo\bin'
 $system=[Environment]::GetFolderPath('Windows')
-$home=Join-Path $root 'home'; $temporary=Join-Path $root 'temp'
-foreach ($privatePath in @($home,$temporary,(Join-Path $root 'cargo'),(Join-Path $root 'rustup'))) { Assert-NoReparse $privatePath }
-New-Item -ItemType Directory -Path $home,$temporary -Force | Out-Null
+$privateProfile=Join-Path $root 'home'; $temporary=Join-Path $root 'temp'
+foreach ($privatePath in @($privateProfile,$temporary,(Join-Path $root 'cargo'),(Join-Path $root 'rustup'))) { Assert-NoReparse $privatePath }
+New-Item -ItemType Directory -Path $privateProfile,$temporary -Force | Out-Null
 $previous=@{}; Get-ChildItem Env: | ForEach-Object { $previous[$_.Name]=$_.Value }
 try {
     # No caller/provider credentials or user Cargo/Git configuration enter
@@ -73,7 +73,7 @@ try {
     foreach ($entry in @{
         SystemRoot=$system; WINDIR=$system; SystemDrive=([IO.Path]::GetPathRoot($system).TrimEnd('\'))
         COMSPEC=(Join-Path $system 'System32\cmd.exe'); OS='Windows_NT'; COMPUTERNAME='MEMORY-WINLAB'
-        PROCESSOR_ARCHITECTURE='AMD64'; USERPROFILE=$home; HOME=$home; TEMP=$temporary; TMP=$temporary
+        PROCESSOR_ARCHITECTURE='AMD64'; USERPROFILE=$privateProfile; HOME=$privateProfile; TEMP=$temporary; TMP=$temporary
         PATH=($rustBin+';'+(Split-Path -Parent $git)+';'+(Split-Path -Parent $python)+';'+(Join-Path $system 'System32'))
         CARGO_HOME=(Join-Path $root 'cargo'); RUSTUP_HOME=(Join-Path $root 'rustup'); CARGO_BUILD_JOBS='4'
         GIT_TERMINAL_PROMPT='0'; GIT_CONFIG_NOSYSTEM='1'; GIT_CONFIG_GLOBAL='NUL'

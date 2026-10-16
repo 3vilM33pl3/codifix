@@ -7,6 +7,11 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_pi_stage_does_not_reassign_powershell_read_only_home(self):
+        script = (Path(__file__).parent / 'guest-native-pi.ps1').read_text()
+        self.assertNotRegex(script, r'(?i)\$home\s*=')
+        self.assertIn('USERPROFILE=$privateProfile; HOME=$privateProfile',script)
+
     def test_product_compilation_is_bounded_native_and_not_workflow_evidence(self):
         script = (Path(__file__).parent / 'guest-native-product.ps1').read_text()
         for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'",'x86_64-pc-windows-msvc',
