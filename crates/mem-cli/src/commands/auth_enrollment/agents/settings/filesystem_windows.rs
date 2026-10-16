@@ -391,7 +391,10 @@ mod tests {
             source_identity,
             &Directory::open(&f.workspace).unwrap(),
             ".mcp.json",
-            Some((&Input::open(&path, 2).unwrap(), b"{}")),
+            Some((
+                &Input::open_for_reviewed_replacement(&path, 2).unwrap(),
+                b"{}",
+            )),
             b"{}",
         )
         .unwrap();
