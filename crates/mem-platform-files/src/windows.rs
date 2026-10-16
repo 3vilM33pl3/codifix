@@ -167,6 +167,10 @@ fn trusted(sid: &str, current: &str, ancestor: bool) -> bool {
 }
 
 fn acl(file: &File, private: bool) -> io::Result<()> {
+    acl_reader(file, private, None)
+}
+
+fn acl_reader(file: &File, private: bool, reader: Option<&ServiceReader>) -> io::Result<()> {
     let mut owner = null_mut();
     let mut dacl = null_mut();
     let mut descriptor = null_mut();
@@ -215,6 +219,18 @@ fn acl(file: &File, private: bool) -> io::Result<()> {
         // SAFETY: size/type validated, SID is inline at SidStart in the live ACE.
         let ace = unsafe { &mut *raw.cast::<ACCESS_ALLOWED_ACE>() };
         let sid = sid_string(addr_of_mut!(ace.SidStart).cast())?;
+        if reader.is_some_and(|reader| reader.sid == sid) {
+            // One SCM-derived extra principal may READ, never own/control or
+            // mutate this object. No service wildcard enters normal policy.
+            let allowed = GENERIC_READ
+                | windows_sys::Win32::Foundation::GENERIC_EXECUTE
+                | windows_sys::Win32::Storage::FileSystem::FILE_GENERIC_READ
+                | windows_sys::Win32::Storage::FileSystem::FILE_GENERIC_EXECUTE;
+            if ace.Mask & !allowed != 0 {
+                return Err(denied());
+            }
+            continue;
+        }
         if !trusted(&sid, &current, !private) {
             // Ancestors may allow creating unrelated children. Their open handles
             // deny replacement; no untrusted identity may delete/control this chain.
@@ -226,6 +242,218 @@ fn acl(file: &File, private: bool) -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+/// An elevated operator's explicit read-only exception for ONE exact virtual
+/// service account resolved from SCM, never an identity from configuration.
+pub struct ServiceReader {
+    sid: String,
+}
+impl ServiceReader {
+    pub fn for_named_service(name: &str) -> io::Result<Self> {
+        use windows_sys::Win32::{
+            Security::{
+                Authorization::ConvertStringSidToSidW, CheckTokenMembership, LookupAccountNameW,
+            },
+            System::Services::{
+                CloseServiceHandle, OpenSCManagerW, OpenServiceW, QUERY_SERVICE_CONFIGW,
+                QueryServiceConfigW, SC_MANAGER_CONNECT, SERVICE_QUERY_CONFIG,
+            },
+        };
+        if !name.starts_with("MemoryLayer-")
+            || name.len() > 60
+            || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        {
+            return Err(denied());
+        }
+        let mut admin = null_mut();
+        if unsafe { ConvertStringSidToSidW(wide(OsStr::new("S-1-5-32-544")).as_ptr(), &mut admin) }
+            == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        let _admin = LocalAllocation(admin);
+        let mut member = 0;
+        if unsafe { CheckTokenMembership(null_mut(), admin, &mut member) } == 0
+            || (member == 0 && current_sid()? != "S-1-5-18")
+        {
+            return Err(denied());
+        }
+        struct Sc(*mut c_void);
+        impl Drop for Sc {
+            fn drop(&mut self) {
+                unsafe {
+                    CloseServiceHandle(self.0);
+                }
+            }
+        }
+        let raw = unsafe { OpenSCManagerW(std::ptr::null(), std::ptr::null(), SC_MANAGER_CONNECT) };
+        if raw.is_null() {
+            return Err(io::Error::last_os_error());
+        }
+        let manager = Sc(raw);
+        let raw = unsafe {
+            OpenServiceW(
+                manager.0,
+                wide(OsStr::new(name)).as_ptr(),
+                SERVICE_QUERY_CONFIG,
+            )
+        };
+        if raw.is_null() {
+            return Err(io::Error::last_os_error());
+        }
+        let service = Sc(raw);
+        let mut needed = 0;
+        unsafe {
+            QueryServiceConfigW(service.0, null_mut(), 0, &mut needed);
+        }
+        if needed < size_of::<QUERY_SERVICE_CONFIGW>() as u32 || needed > 65536 {
+            return Err(denied());
+        }
+        let mut buffer = vec![0usize; (needed as usize).div_ceil(size_of::<usize>())];
+        if unsafe {
+            QueryServiceConfigW(service.0, buffer.as_mut_ptr().cast(), needed, &mut needed)
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        let config = unsafe { &*buffer.as_ptr().cast::<QUERY_SERVICE_CONFIGW>() };
+        let account = format!("NT SERVICE\\{name}");
+        let expected = wide(OsStr::new(&account));
+        let pointer = config.lpServiceStartName as usize;
+        let begin = buffer.as_ptr() as usize;
+        if pointer < begin
+            || pointer
+                .checked_add(expected.len() * 2)
+                .is_none_or(|end| end > begin + buffer.len() * size_of::<usize>())
+        {
+            return Err(denied());
+        }
+        let actual =
+            unsafe { std::slice::from_raw_parts(config.lpServiceStartName, expected.len()) };
+        if actual.last() != Some(&0)
+            || !String::from_utf16(&actual[..actual.len() - 1])
+                .map_err(|_| denied())?
+                .eq_ignore_ascii_case(&account)
+        {
+            return Err(denied());
+        }
+        let (mut sid_len, mut domain_len, mut kind) = (0, 0, 0);
+        unsafe {
+            LookupAccountNameW(
+                std::ptr::null(),
+                expected.as_ptr(),
+                null_mut(),
+                &mut sid_len,
+                null_mut(),
+                &mut domain_len,
+                &mut kind,
+            );
+        }
+        if sid_len == 0 || sid_len > 256 || domain_len > 1024 {
+            return Err(denied());
+        }
+        let mut sid = vec![0usize; (sid_len as usize).div_ceil(size_of::<usize>())];
+        let mut domain = vec![0u16; domain_len as usize];
+        if unsafe {
+            LookupAccountNameW(
+                std::ptr::null(),
+                expected.as_ptr(),
+                sid.as_mut_ptr().cast(),
+                &mut sid_len,
+                domain.as_mut_ptr(),
+                &mut domain_len,
+                &mut kind,
+            )
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        let sid = sid_string(sid.as_mut_ptr().cast())?;
+        if !sid.starts_with("S-1-5-80-") {
+            return Err(denied());
+        }
+        Ok(Self { sid })
+    }
+}
+
+/// Read-only input with an explicit reader exception. Normal Input/Directory
+/// remain unchanged. Every ancestor and final entry retains its usual checks.
+pub struct ServiceInput {
+    file: File,
+    before: Identity,
+    ancestors: Vec<File>,
+    path: PathBuf,
+    reader: ServiceReader,
+}
+impl ServiceInput {
+    pub fn open(path: &Path, limit: u64, reader: &ServiceReader) -> io::Result<Self> {
+        validate_path(path)?;
+        let mut current = PathBuf::new();
+        let mut ancestors = Vec::new();
+        let parent = path.parent().ok_or_else(denied)?;
+        for (index, component) in parent.components().enumerate() {
+            current.push(component.as_os_str());
+            if index == 0 {
+                continue;
+            }
+            let file = OpenOptions::new()
+                .read(true)
+                .access_mode(GENERIC_READ | READ_CONTROL)
+                .share_mode(FILE_SHARE_READ)
+                .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
+                .open(&current)?;
+            information(&file, true)?;
+            acl_reader(&file, current == parent, Some(reader))?;
+            ancestors.push(file);
+        }
+        if ancestors.is_empty() {
+            return Err(denied());
+        }
+        let file = OpenOptions::new()
+            .read(true)
+            .access_mode(GENERIC_READ | READ_CONTROL)
+            .share_mode(FILE_SHARE_READ)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+            .open(path)?;
+        let before = information(&file, false)?;
+        acl_reader(&file, true, Some(reader))?;
+        if before.size > limit {
+            return Err(denied());
+        }
+        Ok(Self {
+            file,
+            before,
+            ancestors,
+            path: path.to_owned(),
+            reader: ServiceReader {
+                sid: reader.sid.clone(),
+            },
+        })
+    }
+    pub fn read(mut self, limit: u64) -> io::Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        self.file
+            .by_ref()
+            .take(limit.checked_add(1).ok_or_else(denied)?)
+            .read_to_end(&mut bytes)?;
+        let entry = OpenOptions::new()
+            .read(true)
+            .access_mode(READ_CONTROL | FILE_READ_ATTRIBUTES)
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+            .open(&self.path)?;
+        acl_reader(&self.file, true, Some(&self.reader))?;
+        acl_reader(&entry, true, Some(&self.reader))?;
+        if bytes.len() as u64 > limit
+            || self.before != information(&self.file, false)?
+            || self.before != information(&entry, false)?
+        {
+            return Err(denied());
+        }
+        let _ = self.ancestors;
+        Ok(bytes)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -661,6 +889,54 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         create_private_directory(&root.path().join("private")).unwrap();
         root
+    }
+
+    #[test]
+    fn explicit_service_reader_is_read_only_exact_and_does_not_relax_normal_inputs() {
+        let root = private_root();
+        let parent = root.path().join("private");
+        let path = parent.join("synthetic.json");
+        let mut file = create_private_file(&path).unwrap();
+        file.write_all(b"synthetic").unwrap();
+        drop(file);
+        let sid = "S-1-5-80-1-2-3-4-5";
+        let reader = ServiceReader { sid: sid.into() };
+        for target in [&parent, &path] {
+            assert!(
+                std::process::Command::new("icacls.exe")
+                    .arg(target)
+                    .args(["/grant", &format!("*{sid}:(RX)")])
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        assert!(Input::open(&path, 9).is_err());
+        assert_eq!(
+            ServiceInput::open(&path, 9, &reader)
+                .unwrap()
+                .read(9)
+                .unwrap(),
+            b"synthetic"
+        );
+        let other = ServiceReader {
+            sid: "S-1-5-80-5-4-3-2-1".into(),
+        };
+        assert!(ServiceInput::open(&path, 9, &other).is_err());
+        let held = ServiceInput::open(&path, 9, &reader).unwrap();
+        assert!(OpenOptions::new().write(true).open(&path).is_err());
+        drop(held);
+        assert!(
+            std::process::Command::new("icacls.exe")
+                .arg(&path)
+                .args(["/grant", &format!("*{sid}:(W)")])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(ServiceInput::open(&path, 9, &reader).is_err());
+        assert!(ServiceReader::for_named_service("OtherService").is_err());
+        assert!(ServiceReader::for_named_service("MemoryLayer-../bad").is_err());
     }
 
     #[test]
