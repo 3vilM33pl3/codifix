@@ -613,14 +613,23 @@ mod tests {
     #[test]
     fn native_toolchain_rejects_junction_inventory() {
         let fixture = Fixture::new();
-        let junction = fixture.0.join("tool/alias");
-        let status = std::process::Command::new("cmd.exe")
-            .args(["/d", "/c", "mklink", "/J"])
-            .arg(&junction)
-            .arg(fixture.0.join("scratch"))
-            .status()
-            .unwrap();
-        assert!(status.success());
+        // cmd's built-ins interpret embedded forward slashes as switches.
+        let junction = fixture.0.join("tool").join("alias");
+        let output = std::process::Command::new(
+            PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+                .join("System32")
+                .join("cmd.exe"),
+        )
+        .args(["/d", "/c", "mklink", "/J"])
+        .arg(&junction)
+        .arg(fixture.0.join("scratch"))
+        .output()
+        .unwrap();
+        assert!(
+            output.status.success(),
+            "junction fixture: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         let rejected = fixture.pin(fixture.tree()).is_err();
         std::fs::remove_dir(junction).unwrap();
         assert!(rejected);

@@ -255,6 +255,7 @@ mod tests {
     #[test]
     fn native_process_helper() {
         match std::env::var("MEMORY_TRUSTED_HELPER").as_deref() {
+            Ok("exit-seven") => std::process::exit(7),
             Ok("root") => {
                 // PATH is present in the test host but deliberately absent
                 // from the explicit launch environment.
@@ -368,13 +369,15 @@ mod tests {
         std::fs::create_dir(&root).unwrap();
         let output = File::create(root.join("out")).unwrap();
         let error = File::create(root.join("err")).unwrap();
-        let system = std::env::var_os("SystemRoot").unwrap();
-        let cmd = std::path::PathBuf::from(&system).join("System32/cmd.exe");
         let process = spawn(
-            &cmd,
-            &["/D".into(), "/C".into(), "exit /b 7".into()],
+            &std::env::current_exe().unwrap(),
+            &[
+                "--exact".into(),
+                "windows_trusted_process::tests::native_process_helper".into(),
+                "--nocapture".into(),
+            ],
             &root,
-            &[("SystemRoot".into(), system)],
+            &[("MEMORY_TRUSTED_HELPER".into(), "exit-seven".into())],
             &output,
             &error,
         )
