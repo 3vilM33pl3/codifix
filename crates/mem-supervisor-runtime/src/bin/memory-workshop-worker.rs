@@ -11,6 +11,9 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{path::Path, str::FromStr, sync::Arc, time::Duration};
 use uuid::Uuid;
 
+#[path = "memory-workshop-worker/serve_next.rs"]
+mod serve_next;
+
 #[tokio::main]
 async fn main() -> std::process::ExitCode {
     match execute().await {
@@ -30,9 +33,15 @@ async fn main() -> std::process::ExitCode {
 
 async fn execute() -> Result<bool, &'static str> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|mode| mode == "serve-next") {
+        return serve_next::execute(&args).await;
+    }
     if args.len() == 1 && matches!(args[0].as_str(), "--help" | "-h") {
         println!(
             "memory-workshop-worker <observe|run> MANIFEST SHA256 INSTANCE_UUID\nmemory-workshop-worker run-next MANIFEST SHA256 INSTANCE_UUID SERVICE_CONFIG CONFIG_SHA256\n\nOperator-only one-work commands. DATABASE_URL must address an explicit local\nWorkshop database. run or run-next may make ONE approved paid generation with\nthe normal OPENAI_API_KEY. run-next reads one immutable human question using\nthe pinned collection and private service config. It does not poll or retry.\nobserve only journals/reconciles existing metadata. No command provisions,\nmigrates, enables policy, prints private content or retries a previous\ngeneration. Never supply R3 credentials. No HTTP listener."
+        );
+        println!(
+            "\nOpt-in persistent mode: serve-next MANIFEST SHA256 INSTANCE_UUID SERVICE_CONFIG CONFIG_SHA256\nPolls existing explicitly confirmed questions every two seconds; revalidates\npinned inputs each poll. Stops on missing authority/credentials/storage or\nuncertain work. Creates no questions, expands no grants and never retries a\nprovider call. Metadata-only stdout is not proof of successful generation."
         );
         return Ok(true);
     }
