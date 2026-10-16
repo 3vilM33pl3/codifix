@@ -407,7 +407,10 @@ impl ServiceInput {
             acl_reader(&file, current == parent, Some(reader)).map_err(|error| {
                 io::Error::new(
                     error.kind(),
-                    format!("service authority ancestor policy: {error}"),
+                    format!(
+                        "service authority ancestor policy (depth {index}, private {}): {error}",
+                        current == parent
+                    ),
                 )
             })?;
             ancestors.push(file);
