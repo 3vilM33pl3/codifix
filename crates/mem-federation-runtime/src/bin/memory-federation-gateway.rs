@@ -2,18 +2,37 @@
 //! Intentionally has no general Memory service routes or user database access.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut args = std::env::args_os().skip(1);
+    let all: Vec<_> = std::env::args_os().skip(1).collect();
+    if all.first().is_some_and(|arg| arg == "check-status") {
+        if all.len() != 5 {
+            return Err("expected check-status CONFIG SPACE AUTHORITY AUDIENCE".into());
+        }
+        let config = mem_federation_runtime::load_gateway_config(std::path::Path::new(&all[1]))
+            .map_err(|_| "private gateway configuration unavailable")?;
+        let identity = |index: usize| -> Result<uuid::Uuid, &'static str> {
+            all[index]
+                .to_str()
+                .and_then(|value| uuid::Uuid::parse_str(value).ok())
+                .filter(|id| !id.is_nil())
+                .ok_or("invalid readiness identity")
+        };
+        let ready = mem_federation_runtime::operator_status::check(&config,
+            mem_federation::publication::SpaceId::new(identity(2)?)?,
+            mem_federation::publication::InstanceId::new(identity(3)?)?,
+            mem_federation::publication::InstanceId::new(identity(4)?)?).await
+            .map_err(|_| "gateway readiness not verified; inspect private configuration and current membership")?;
+        println!("{}", serde_json::to_string(&ready)?);
+        return Ok(());
+    }
+    let mut args = all.into_iter();
     let path = args
         .next()
         .ok_or("expected private gateway configuration file")?;
     if args.next().is_some() {
         return Err("expected exactly one configuration file".into());
     }
-    if std::fs::metadata(&path)?.len() > 1024 * 1024 {
-        return Err("configuration too large".into());
-    }
-    let config: mem_federation_runtime::GatewayConfig =
-        serde_json::from_slice(&std::fs::read(path)?)?;
+    let config = mem_federation_runtime::load_gateway_config(std::path::Path::new(&path))
+        .map_err(|_| "private gateway configuration unavailable")?;
     // Only sanitized errors leave the process: driver errors can contain URLs.
     config
         .serve()

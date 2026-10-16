@@ -7,6 +7,7 @@ pub mod enrollment;
 mod expertise_answer;
 mod expertise_delivery;
 mod expertise_transport;
+pub mod operator_status;
 pub use expertise_answer::*;
 mod gateway;
 pub use config::*;
