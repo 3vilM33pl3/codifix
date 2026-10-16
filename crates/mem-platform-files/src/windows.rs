@@ -6,8 +6,8 @@
 use std::{
     ffi::{OsStr, c_void},
     fs::{File, OpenOptions},
-    io::{self, Read},
-    mem::{size_of, zeroed},
+    io::{self, Read, Seek, SeekFrom},
+    mem::{offset_of, size_of, zeroed},
     os::windows::{
         ffi::OsStrExt,
         fs::OpenOptionsExt,
@@ -31,9 +31,10 @@ use windows_sys::Win32::{
         BY_HANDLE_FILE_INFORMATION, CREATE_NEW, CreateDirectoryW, CreateFileW, DELETE,
         FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT,
         FILE_DELETE_CHILD, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
-        FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
-        GetFileInformationByHandle, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
-        OPEN_ALWAYS, OPEN_EXISTING, READ_CONTROL, WRITE_DAC, WRITE_OWNER,
+        FILE_READ_ATTRIBUTES, FILE_RENAME_INFO, FILE_SHARE_DELETE, FILE_SHARE_READ,
+        FILE_SHARE_WRITE, FileRenameInfoEx, GetFileInformationByHandle, MOVEFILE_REPLACE_EXISTING,
+        MOVEFILE_WRITE_THROUGH, MoveFileExW, OPEN_ALWAYS, OPEN_EXISTING, READ_CONTROL,
+        SetFileInformationByHandle, WRITE_DAC, WRITE_OWNER,
     },
     System::Threading::{GetCurrentProcess, OpenProcessToken},
 };
@@ -235,6 +236,12 @@ pub struct Identity {
     written: u64,
     links: u32,
 }
+impl Identity {
+    /// Stable filesystem object identity, excluding mutable length/timestamps.
+    pub fn stable_key(self) -> (u64, u64) {
+        (u64::from(self.volume), self.index)
+    }
+}
 
 fn information(file: &File, directory: bool) -> io::Result<Identity> {
     // SAFETY: zero is a valid initial value for this plain Win32 output struct.
@@ -303,6 +310,30 @@ impl Directory {
         create_private_file(&self.path.join(name))
     }
 
+    pub fn identity(&self) -> io::Result<Identity> {
+        information(self._ancestors.last().ok_or_else(denied)?, true)
+    }
+
+    /// Physical ancestry, including self, independent of path casing/8.3 names.
+    pub fn is_beneath(&self, other: &Self) -> io::Result<bool> {
+        let wanted = other.identity()?.stable_key();
+        for file in &self._ancestors {
+            if information(file, true)?.stable_key() == wanted {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Resume an existing, private operation-owned staging file without
+    /// truncation. Ordinary competing content writers are denied by sharing.
+    pub fn resume_private_file(&self, name: &str) -> io::Result<File> {
+        valid_name(OsStr::new(name))?;
+        let file = create_file(&self.path.join(name), false, true)?;
+        self.check_entry(name, &file)?;
+        Ok(file)
+    }
+
     pub fn check_entry(&self, name: &str, file: &File) -> io::Result<()> {
         valid_name(OsStr::new(name))?;
         // Metadata-only lookup must coexist with the creator's writable handle.
@@ -354,6 +385,9 @@ pub struct Input {
     name: String,
 }
 impl Input {
+    pub fn identity(&self) -> Identity {
+        self.before
+    }
     pub fn open(path: &Path, limit: u64) -> io::Result<Self> {
         validate_path(path)?;
         let directory = Directory::open(path.parent().ok_or_else(denied)?)?;
@@ -520,6 +554,104 @@ pub fn replace_file(source: &Path, target: &Path) -> io::Result<()> {
     )
 }
 
+/// Publish only reviewed settings from private outside-workspace staging.
+/// Unlike the generic rename helper this intentionally supports cross-directory
+/// moves on the same volume. Retained handles fence ordinary content writers
+/// and path replacement. Windows 11 POSIX rename is required to replace a target
+/// while its reviewed read handle stays open; no weaker fallback is attempted.
+/// As on Unix, a malicious same-user POSIX renamer is not an OS compare-and-swap.
+pub fn publish_reviewed_settings(
+    source: &Directory,
+    source_name: &str,
+    source_identity: Identity,
+    target: &Directory,
+    target_name: &str,
+    reviewed_target: Option<(&Input, &[u8])>,
+    expected: &[u8],
+) -> io::Result<()> {
+    if expected.len() > 256 * 1024 || source.identity()?.volume != target.identity()?.volume {
+        return Err(denied());
+    }
+    valid_name(OsStr::new(source_name))?;
+    valid_name(OsStr::new(target_name))?;
+    let mut file = OpenOptions::new()
+        .access_mode(GENERIC_READ | GENERIC_WRITE | DELETE | READ_CONTROL)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_DELETE)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(source.path.join(source_name))?;
+    acl(&file, true)?;
+    if information(&file, false)? != source_identity {
+        return Err(denied());
+    }
+    source.check_entry(source_name, &file)?;
+    let mut bytes = Vec::new();
+    Read::by_ref(&mut file)
+        .take(256 * 1024 + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes != expected {
+        return Err(denied());
+    }
+    match reviewed_target {
+        Some((input, before)) => {
+            if before.len() > 256 * 1024 {
+                return Err(denied());
+            }
+            input.unchanged()?;
+            target.check_entry(target_name, &input.file)?;
+            let mut reader = &input.file;
+            reader.seek(SeekFrom::Start(0))?;
+            let mut actual = Vec::new();
+            Read::by_ref(&mut reader)
+                .take(256 * 1024 + 1)
+                .read_to_end(&mut actual)?;
+            if actual != before {
+                return Err(denied());
+            }
+            input.unchanged()?;
+        }
+        None => target.ensure_absent(&[target_name])?,
+    }
+    source.check_entry(source_name, &file)?;
+    file.sync_all()?;
+    let filename: Vec<u16> = target
+        .path
+        .join(target_name)
+        .as_os_str()
+        .encode_wide()
+        .collect();
+    let offset = offset_of!(FILE_RENAME_INFO, FileName);
+    let length = offset
+        .checked_add(filename.len().checked_mul(2).ok_or_else(denied)?)
+        .ok_or_else(denied)?;
+    let length_u32 = u32::try_from(length).map_err(|_| denied())?;
+    let mut buffer = vec![0usize; length.div_ceil(size_of::<usize>())];
+    let header = buffer.as_mut_ptr().cast::<FILE_RENAME_INFO>();
+    // SAFETY: aligned storage spans the variable-length FILE_RENAME_INFO; the
+    // entire UTF-16 destination is copied into its trailing filename member.
+    unsafe {
+        (*header).Anonymous.Flags = 2 | u32::from(reviewed_target.is_some());
+        (*header).RootDirectory = null_mut();
+        (*header).FileNameLength = (filename.len() * 2) as u32;
+        std::ptr::copy_nonoverlapping(
+            filename.as_ptr(),
+            buffer.as_mut_ptr().cast::<u8>().add(offset).cast::<u16>(),
+            filename.len(),
+        );
+        if SetFileInformationByHandle(
+            file.as_raw_handle(),
+            FileRenameInfoEx,
+            buffer.as_ptr().cast(),
+            length_u32,
+        ) == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    target.check_entry(target_name, &file)?;
+    file.sync_all()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -529,6 +661,72 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         create_private_directory(&root.path().join("private")).unwrap();
         root
+    }
+
+    #[test]
+    fn reviewed_cross_directory_settings_publish_retains_old_reader_and_rejects_stale_inputs() {
+        let root = private_root();
+        let private = root.path().join("private");
+        create_private_directory(&private.join("stage")).unwrap();
+        create_private_directory(&private.join("target")).unwrap();
+        let source = Directory::open(&private.join("stage")).unwrap();
+        let target = Directory::open(&private.join("target")).unwrap();
+        let mut file = source.create("after").unwrap();
+        file.write_all(b"after").unwrap();
+        file.sync_all().unwrap();
+        drop(file);
+        let source_identity = {
+            let file = Input::open(&private.join("stage/after"), 5).unwrap();
+            file.identity()
+        };
+        let mut file = target.create("settings").unwrap();
+        file.write_all(b"before").unwrap();
+        file.sync_all().unwrap();
+        drop(file);
+        let before = Input::open(&private.join("target/settings"), 6).unwrap();
+        assert!(
+            publish_reviewed_settings(
+                &source,
+                "after",
+                source_identity,
+                &target,
+                "settings",
+                Some((&before, b"different")),
+                b"after"
+            )
+            .is_err()
+        );
+        assert!(private.join("stage/after").is_file());
+        publish_reviewed_settings(
+            &source,
+            "after",
+            source_identity,
+            &target,
+            "settings",
+            Some((&before, b"before")),
+            b"after",
+        )
+        .unwrap();
+        // The reviewed prior file stays available to an existing reader even
+        // though the new settings pathname is atomically published.
+        let mut old = &before.file;
+        old.seek(SeekFrom::Start(0)).unwrap();
+        let mut bytes = Vec::new();
+        old.read_to_end(&mut bytes).unwrap();
+        assert_eq!(bytes, b"before");
+        assert_eq!(
+            Input::open(&private.join("target/settings"), 5)
+                .unwrap()
+                .read(5)
+                .unwrap(),
+            b"after"
+        );
+        assert!(
+            source
+                .is_beneath(&Directory::open(&private).unwrap())
+                .unwrap()
+        );
+        assert!(!source.is_beneath(&target).unwrap());
     }
 
     #[test]
