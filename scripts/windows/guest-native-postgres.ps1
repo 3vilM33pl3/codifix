@@ -49,7 +49,9 @@ if ($Action -eq 'Prepare') {
     $postgres = Input-Artifact $manifest.postgres
     $vector = Input-Artifact $manifest.pgvector
     if (-not (Test-Path (Join-Path $bin 'postgres.exe'))) {
-        Expand-Archive -LiteralPath $postgres -DestinationPath $runtime
+        # This exact upstream ZIP is digest-verified above. Native bsdtar avoids
+        # PowerShell 5.1's per-entry archive overhead on the disposable guest.
+        Run-Checked "$env:SystemRoot\System32\tar.exe" @('-xf',$postgres,'-C',$runtime)
     }
     $source = Join-Path $root 'source'
     New-Item -ItemType Directory -Force $source | Out-Null
