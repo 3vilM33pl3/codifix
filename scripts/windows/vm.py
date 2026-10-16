@@ -20,6 +20,7 @@ import socket
 import stat
 import subprocess
 import time
+import uuid
 from urllib.parse import urlparse
 import xml.etree.ElementTree as ET
 
@@ -450,6 +451,71 @@ def guest_exec(root, executable, arguments, capture=False):
     return {"pid": pid, "capture_output": capture, "execution_identity": "guest-agent service (normally SYSTEM), not an interactive user"}
 
 
+def guest_stage_start(root, stage, operation_id, source_root=None):
+    """Dispatch one fixed interactive lab stage, without changing machine policy."""
+    stages = {"BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "NativeApi"}
+    if stage not in stages:
+        raise ValueError("unknown fixed guest stage")
+    try:
+        operation = uuid.UUID(operation_id)
+    except (ValueError, AttributeError, TypeError):
+        raise ValueError("canonical nonzero stage operation UUID required") from None
+    if operation.int == 0 or str(operation) != operation_id.lower():
+        raise ValueError("canonical nonzero stage operation UUID required")
+    if source_root is not None:
+        if stage != "PdsPrepare":
+            raise ValueError("SourceRoot applies only to PdsPrepare")
+        # Reuse the strict native lab-component validator, then bind a fixed
+        # source subtree rather than accepting script/command arguments.
+        if not source_root.startswith("C:\\MemoryLab\\source") or '/' in source_root or str(PureWindowsPath(source_root)) != source_root:
+            raise ValueError("PDS source must be within C:\\MemoryLab\\source")
+        suffix = source_root[len("C:\\MemoryLab\\source"):]
+        if suffix and not suffix.startswith('\\'):
+            raise ValueError("PDS source must be within C:\\MemoryLab\\source")
+        guest_input_target("C:\\MemoryLab\\inputs\\source" + suffix)
+    elif stage == "PdsPrepare":
+        raise ValueError("PdsPrepare requires an explicit copied source directory")
+    operation_id = str(operation)
+    runner = r"C:\MemoryLab\inputs\guest-stage.ps1"
+    runner_hash = digest(SCRIPT_DIR / "guest-stage.ps1")
+    log = rf"C:\MemoryLab\stage-start-{operation_id}.log"
+    task = f"MemoryLab-Start-{operation_id}"
+    guard = ("if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB') { throw 'Disposable lab required' }; "
+             f"$runner='{runner}'; if ((Get-FileHash -LiteralPath $runner -Algorithm SHA256).Hash.ToLowerInvariant() -cne '{runner_hash}') "
+             "{ throw 'Guest stage runner differs from host source; no execution' }; ")
+    command = f"& $runner -Action Start -Stage {stage} -OperationId '{operation_id}'"
+    if source_root is not None:
+        command += f" -SourceRoot '{source_root}'"
+    inner = ("$ErrorActionPreference='Stop'; try { " + guard + command + f" *> '{log}'"
+             " } catch { $_ | Out-String | Add-Content -LiteralPath '" + log + "'; exit 1 }")
+    encoded = base64.b64encode(inner.encode('utf-16-le')).decode('ascii')
+    outer = ("$ErrorActionPreference='Stop'; " + guard +
+             f"$task='{task}'; $log='{log}'; "
+             "if (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue) { throw 'Launch task exists; inspect status rather than replaying' }; "
+             "foreach ($path in @('C:\\MemoryLab','C:\\MemoryLab\\inputs')) { "
+             "if ((Get-Item -LiteralPath $path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparse lab path denied' } }; "
+             "$file=[IO.File]::Open($log,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None); $file.Dispose(); "
+             "$sid=([Security.Principal.NTAccount]::new('MEMORY-WINLAB\\memorylab')).Translate([Security.Principal.SecurityIdentifier]); "
+             "$acl=[Security.AccessControl.FileSecurity]::new(); $acl.SetAccessRuleProtection($true,$false); "
+             "$acl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')); "
+             "foreach($id in @($sid.Value,'S-1-5-18','S-1-5-32-544')) { "
+             "$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($id),'FullControl','Allow')) }; "
+             "Set-Acl -LiteralPath $log -AclObject $acl; "
+             f"$encoded='{encoded}'; $arguments='-NoProfile -ExecutionPolicy Bypass -EncodedCommand '+$encoded; "
+             "$action=New-ScheduledTaskAction -Execute 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' -Argument $arguments; "
+             "$principal=New-ScheduledTaskPrincipal -UserId 'MEMORY-WINLAB\\memorylab' -LogonType Interactive -RunLevel Highest; "
+             "$settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -MultipleInstances IgnoreNew; "
+             "Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Settings $settings | Out-Null; "
+             "Start-ScheduledTask -TaskName $task")
+    arguments = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand",
+                 base64.b64encode(outer.encode('utf-16-le')).decode('ascii')]
+    dispatched = guest_exec(root, r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", arguments, capture=True)
+    return {"pid": dispatched["pid"], "status": "dispatch_requested", "stage": stage,
+            "operation_id": operation_id, "task_name": task, "log": log,
+            "runner_sha256": runner_hash, "stage_execution_identity": r"MEMORY-WINLAB\memorylab (Interactive, Highest)",
+            "machine_execution_policy_changed": False}
+
+
 def status_summary(result, show_output=False):
     if not isinstance(result, dict) or type(result.get("exited")) is not bool:
         raise ValueError("invalid guest execution status")
@@ -871,6 +937,10 @@ def main():
     guest_copy_args = sub.add_parser("guest-copy-in", help="QGA create-new bounded input with read-back hash")
     guest_copy_args.add_argument("source", type=Path)
     guest_copy_args.add_argument("--target", required=True)
+    stage_args = sub.add_parser("guest-stage-start", help="start one hash-bound fixed stage as the interactive lab user")
+    stage_args.add_argument("stage", choices=["BuildTools", "PostgresPrepare", "PostgresStart", "PdsPrepare", "NativeApi"])
+    stage_args.add_argument("--operation-id", required=True)
+    stage_args.add_argument("--source-root")
     args = parser.parse_args()
     os.umask(0o077)
     root = private_root(args.root)
@@ -914,6 +984,8 @@ def main():
             print(json.dumps(guest_status(root, args.pid, args.show_output, args.saved_status)))
         elif args.command == "guest-copy-in":
             print(json.dumps(guest_copy_in(root, args.source, args.target)))
+        elif args.command == "guest-stage-start":
+            print(json.dumps(guest_stage_start(root, args.stage, args.operation_id, args.source_root)))
 
 
 if __name__ == "__main__":

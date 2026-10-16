@@ -5,6 +5,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import socket
 import tempfile
@@ -46,6 +47,58 @@ def fake_agent(root, result):
 
 
 class GuestAgentTests(unittest.TestCase):
+    def test_stage_start_is_hash_bound_interactive_and_process_policy_only(self):
+        operation='11111111-1111-4111-8111-111111111111'
+        with patch.object(vm,'guest_exec',return_value={'pid':42}) as execute:
+            result=vm.guest_stage_start(Path('/unused'),'NativeApi',operation)
+        self.assertEqual(result['status'],'dispatch_requested')
+        self.assertEqual(result['pid'],42)
+        self.assertFalse(result['machine_execution_policy_changed'])
+        self.assertEqual(execute.call_args.args[1],r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe')
+        arguments=execute.call_args.args[2]
+        self.assertEqual(arguments[:4],['-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand'])
+        outer=base64.b64decode(arguments[4]).decode('utf-16-le')
+        inner_encoded=re.search(r"\$encoded='([A-Za-z0-9+/=]+)'",outer).group(1)
+        inner=base64.b64decode(inner_encoded).decode('utf-16-le')
+        for script in (outer,inner):
+            self.assertIn(result['runner_sha256'],script)
+            self.assertIn("$env:COMPUTERNAME -ne 'MEMORY-WINLAB'",script)
+            self.assertNotIn('Set-ExecutionPolicy',script)
+            self.assertNotIn('Password',script)
+        self.assertIn("-LogonType Interactive -RunLevel Highest",outer)
+        self.assertIn("'MEMORY-WINLAB\\memorylab'",outer)
+        self.assertIn("-NoProfile -ExecutionPolicy Bypass -EncodedCommand",outer)
+        self.assertIn('CreateNew',outer)
+        self.assertIn('SetAccessRuleProtection($true,$false)',outer)
+        self.assertIn('Launch task exists; inspect status',outer)
+        self.assertNotIn(' -Force',outer.replace('Get-Item -LiteralPath $path -Force',''))
+        self.assertLess(inner.index('Get-FileHash'),inner.index('& $runner'))
+        self.assertIn(f"-Action Start -Stage NativeApi -OperationId '{operation}'",inner)
+        self.assertIn(f"C:\\MemoryLab\\stage-start-{operation}.log",inner)
+
+    def test_stage_start_rejects_unknown_stage_uuid_and_source_injection_before_rpc(self):
+        operation='11111111-1111-4111-8111-111111111111'
+        invalid=[('Unknown',operation,None),('NativeApi;whoami',operation,None),
+                 ('NativeApi','00000000-0000-0000-0000-000000000000',None),
+                 ('NativeApi',operation+';whoami',None),('NativeApi','not-uuid',None),
+                 ('NativeApi',operation,r'C:\MemoryLab\source'),('PdsPrepare',operation,None)]
+        invalid.extend(('PdsPrepare',operation,path) for path in
+                       [r'C:\Windows',r'C:\MemoryLab\source-other',r'C:\MemoryLab\source\..\other',
+                        r'C:\MemoryLab\source\CON',r'C:\MemoryLab\source\a:stream',
+                        "C:\\MemoryLab\\source\\x';whoami",r'C:\MemoryLab\source\.',
+                        r'C:/MemoryLab/source',r'\\host\share\source'])
+        with patch.object(vm,'guest_exec') as execute:
+            for stage,identity,source in invalid:
+                with self.subTest(stage=stage,identity=identity,source=source),self.assertRaises(ValueError):
+                    vm.guest_stage_start(Path('/unused'),stage,identity,source)
+            execute.assert_not_called()
+        with patch.object(vm,'guest_exec',return_value={'pid':42}) as execute:
+            result=vm.guest_stage_start(Path('/unused'),'PdsPrepare',operation,r'C:\MemoryLab\source\reviewed-v1')
+            self.assertEqual(result['stage'],'PdsPrepare')
+            outer=base64.b64decode(execute.call_args.args[2][-1]).decode('utf-16-le')
+            inner=base64.b64decode(re.search(r"\$encoded='([A-Za-z0-9+/=]+)'",outer).group(1)).decode('utf-16-le')
+            self.assertIn("-SourceRoot 'C:\\MemoryLab\\source\\reviewed-v1'",inner)
+
     def test_transport_timeout_is_not_retried_or_reported_as_rollback(self):
         with patch.object(vm, '_qga_once', side_effect=TimeoutError('untrusted secret detail')) as once:
             with self.assertRaisesRegex(ValueError, 'may be uncertain') as caught:
