@@ -7,6 +7,16 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_product_compilation_is_bounded_native_and_not_workflow_evidence(self):
+        script = (Path(__file__).parent / 'guest-native-product.ps1').read_text()
+        for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'",'x86_64-pc-windows-msvc',
+                         'rev-parse HEAD','--untracked-files=no','WaitForExit(7200000)',
+                         "'check','--workspace','--all-targets','--locked'",'workflow_verified=$false',
+                         'RedirectStandardOutput','RedirectStandardError','Build changed the frozen Cargo.lock']:
+            self.assertIn(required,script)
+        self.assertNotIn('publish',script)
+        self.assertNotIn('Invoke-Expression',script)
+
     def test_optional_lab_ssh_is_pinned_key_only_and_never_replaces_service(self):
         script = (Path(__file__).parent / 'guest-ssh.ps1').read_text()
         for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", 'Get-FileHash',
@@ -44,7 +54,7 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn('Queued native proof file inventory changed', stage)
         self.assertIn('New-TimeSpan -Minutes 20', stage)
         self.assertIn('-LogonType Interactive', stage)
-        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild')) { 'Limited' } else { 'Highest' }",stage)
+        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck')) { 'Limited' } else { 'Highest' }",stage)
         self.assertIn('-LogonType Interactive -RunLevel $runLevel',stage)
         script = (root / 'guest-native-api.ps1').read_text()
         for required in ['memory-windows-native-api-v1', 'Get-FileHash',

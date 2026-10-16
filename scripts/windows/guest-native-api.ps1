@@ -84,7 +84,7 @@ try {
         $filters = switch ($artifact.kind) {
             'protected-files' { @('tests::') }
             'platform' { @('tests::') }
-            'routing' { @('area::tests') }
+            'routing' { @('area::tests','manual_') }
             'desktop' { @('collector::codex::windows::native::tests') }
             'onboarding' { @('credentials::windows::tests','workspace::filesystem::windows::tests','agents::settings::filesystem::tests','runtime_env_windows::tests') }
         }
