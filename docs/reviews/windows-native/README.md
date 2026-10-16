@@ -1,7 +1,9 @@
 # Native Windows execution evidence
 
 Target: **2.1.0-rc.5**, Windows 11 x64, no WSL or Linux containers.
-The approved [execution contract](execution.md) is the completion checklist.
+The current approved [parity contract](parity-20261016.md) is the completion
+checklist. The [original execution contract](execution.md) and dated evidence
+below are historical starting points, not the current VM or release status.
 
 ## Starting point — 2026-10-04
 

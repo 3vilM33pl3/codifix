@@ -1,8 +1,9 @@
 # Native AppContainer process primitive
 
 `windows_process::spawn` is a Windows-only credential-free process primitive.
-It is not yet the Pi driver or evaluation adapter. Existing SCM service hosting
-is unchanged.
+The Windows Pi driver and supervisor launcher use this primitive; their native
+execution remains unverified. The evaluation adapter needs a distinct profile
+and is not provided by this primitive. Existing SCM service hosting is unchanged.
 
 The caller prepares a dedicated flat execution copy containing only the reviewed
 executable and individually SHA-256-pinned runtime files, plus an initially empty
