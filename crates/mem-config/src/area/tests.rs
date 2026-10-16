@@ -8,7 +8,10 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         let root = std::env::temp_dir().join(format!("memory-area-routing-{}", Uuid::new_v4()));
+        #[cfg(not(windows))]
         std::fs::create_dir(&root).unwrap();
+        #[cfg(windows)]
+        mem_platform::private_windows::create_private_directory(&root).unwrap();
         let mut areas = BTreeMap::new();
         for name in ["general", "workshop", "homelab"] {
             let instance_id = Uuid::new_v4();
@@ -238,6 +241,61 @@ fn malformed_routing_and_unsafe_permissions_are_errors() {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     }
     std::fs::write(&path, b"{ malformed").unwrap();
+    assert!(AreaRouting::read(&path).is_err());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_routing_rejects_public_acl_hard_links_and_reparse_ancestry() {
+    let fixture = Fixture::new();
+    let path = fixture.root.join("routes.json");
+    std::fs::write(&path, serde_json::to_vec(&fixture.routing).unwrap()).unwrap();
+    assert!(AreaRouting::read(&path).is_ok());
+
+    let alias = fixture.root.join("alias.json");
+    std::fs::hard_link(&path, &alias).unwrap();
+    assert!(AreaRouting::read(&path).is_err());
+    assert!(AreaRouting::read(&alias).is_err());
+    std::fs::remove_file(alias).unwrap();
+    assert!(AreaRouting::read(&path).is_ok());
+
+    let junction = fixture.root.with_extension("junction");
+    let status = std::process::Command::new("cmd.exe")
+        .args(["/d", "/c", "mklink", "/J"])
+        .arg(&junction)
+        .arg(&fixture.root)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let rejected = AreaRouting::read(&junction.join("routes.json")).is_err();
+    // Remove only the junction, never its target, even when the assertion fails.
+    std::fs::remove_dir(junction).unwrap();
+    assert!(rejected);
+
+    let status = std::process::Command::new("icacls.exe")
+        .arg(&path)
+        .args(["/grant", "*S-1-1-0:M"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    assert!(AreaRouting::read(&path).is_err());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_routing_rejects_oversized_input_and_pins_reviewed_bytes() {
+    use std::io::Write;
+    let fixture = Fixture::new();
+    let path = fixture.root.join("routes.json");
+    let bytes = serde_json::to_vec(&fixture.routing).unwrap();
+    std::fs::write(&path, &bytes).unwrap();
+    let input = mem_platform::private_windows::Input::open(&path, 1024 * 1024).unwrap();
+    assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
+    assert!(std::fs::rename(&path, fixture.root.join("replaced.json")).is_err());
+    assert_eq!(input.read(1024 * 1024).unwrap(), bytes);
+    let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+    file.write_all(&vec![b' '; 1024 * 1024 + 1]).unwrap();
+    drop(file);
     assert!(AreaRouting::read(&path).is_err());
 }
 

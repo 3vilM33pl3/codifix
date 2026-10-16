@@ -101,30 +101,45 @@ fn error(message: impl Into<String>) -> ConfigError {
 
 impl AreaRouting {
     pub fn read(path: &Path) -> Result<Self, ConfigError> {
-        let metadata = std::fs::metadata(path)
-            .map_err(|e| error(format!("read area routing {}: {e}", path.display())))?;
-        if !metadata.is_file() {
-            return Err(error("area routing must be a regular file"));
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::{MetadataExt, PermissionsExt};
-            if metadata.permissions().mode() & 0o022 != 0 {
-                return Err(error("area routing must not be group/world writable"));
+        #[cfg(not(windows))]
+        let bytes = {
+            let metadata = std::fs::metadata(path)
+                .map_err(|e| error(format!("read area routing {}: {e}", path.display())))?;
+            if !metadata.is_file() {
+                return Err(error("area routing must be a regular file"));
             }
-            let output = std::process::Command::new("id")
-                .arg("-u")
-                .output()
-                .map_err(|e| error(format!("resolve routing owner: {e}")))?;
-            let uid = String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .parse::<u32>()
-                .map_err(|_| error("cannot determine routing owner"))?;
-            if !output.status.success() || (metadata.uid() != 0 && metadata.uid() != uid) {
-                return Err(error("area routing must belong to this user or root"));
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::{MetadataExt, PermissionsExt};
+                if metadata.permissions().mode() & 0o022 != 0 {
+                    return Err(error("area routing must not be group/world writable"));
+                }
+                let output = std::process::Command::new("id")
+                    .arg("-u")
+                    .output()
+                    .map_err(|e| error(format!("resolve routing owner: {e}")))?;
+                let uid = String::from_utf8_lossy(&output.stdout)
+                    .trim()
+                    .parse::<u32>()
+                    .map_err(|_| error("cannot determine routing owner"))?;
+                if !output.status.success() || (metadata.uid() != 0 && metadata.uid() != uid) {
+                    return Err(error("area routing must belong to this user or root"));
+                }
             }
-        }
-        let bytes = std::fs::read(path).map_err(|e| error(format!("read area routing: {e}")))?;
+            std::fs::read(path).map_err(|e| error(format!("read area routing: {e}")))?
+        };
+        #[cfg(windows)]
+        let bytes = {
+            // Retain handles to the file and every ancestor through the read:
+            // ACL/reparse validation of a pathname followed by fs::read would
+            // reopen a different object if the path were replaced in between.
+            // Routing is operator authority, so require a private ACL, not just
+            // a JSON file which happens to be readable by this process.
+            const LIMIT: u64 = 1024 * 1024;
+            mem_platform::private_windows::Input::open(path, LIMIT)
+                .and_then(|input| input.read(LIMIT))
+                .map_err(|_| error("area routing must be a bounded protected Windows file with private ACLs and no reparse points or hard links"))?
+        };
         let routing: Self = serde_json::from_slice(&bytes)
             .map_err(|e| error(format!("parse area routing: {e}")))?;
         routing.validate()?;
