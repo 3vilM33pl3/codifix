@@ -331,6 +331,21 @@ def ssh(root, data, command, capture=False):
                "memorylab@127.0.0.1", *command, capture_output=capture, timeout=600)
 
 
+def copy_in(root, data, source, name):
+    if source.is_symlink() or not source.is_file():
+        raise ValueError("copy source must be a regular non-symlink file")
+    if not name or len(name) > 120 or not name[0].isascii() or not name[0].isalnum() or not all(
+            c.isascii() and (c.isalnum() or c in "-_.") for c in name):
+        raise ValueError("guest input name must be a simple ASCII filename")
+    source = source.resolve(strict=True)
+    ssh(root, data, ["New-Item -ItemType Directory -Force C:\\MemoryLab\\inputs | Out-Null"])
+    run("scp", "-i", root / "ssh-key", "-P", data["ssh_port"],
+        "-o", f"UserKnownHostsFile={root / 'known_hosts'}", "-o", "StrictHostKeyChecking=yes",
+        "-o", "PasswordAuthentication=no", "-o", "ConnectTimeout=5",
+        source, f"memorylab@127.0.0.1:C:/MemoryLab/inputs/{name}", timeout=600)
+    print(json.dumps({"input": name, "bytes": source.stat().st_size, "sha256": digest(source)}))
+
+
 def snapshot(root, name):
     require_stopped(root)
     if not name or not all(c.isascii() and (c.isalnum() or c == '-') for c in name):
@@ -431,6 +446,9 @@ def main():
     sub.add_parser("boot-key")
     cmd = sub.add_parser("ssh")
     cmd.add_argument("guest_command", nargs=argparse.REMAINDER)
+    copy_args = sub.add_parser("copy-in")
+    copy_args.add_argument("source", type=Path)
+    copy_args.add_argument("--name", required=True)
     args = parser.parse_args()
     os.umask(0o077)
     root = private_root(args.root)
@@ -457,6 +475,8 @@ def main():
             qmp(root, "send-key", {"keys": [{"type": "qcode", "data": "ret"}]})
         elif args.command == "ssh":
             ssh(root, data, args.guest_command)
+        elif args.command == "copy-in":
+            copy_in(root, data, args.source, args.name)
 
 
 if __name__ == "__main__":

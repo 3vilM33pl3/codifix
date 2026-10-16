@@ -9,6 +9,18 @@ import vm
 
 
 class SeedTests(unittest.TestCase):
+    def test_copy_input_names_cannot_be_commands_or_remote_paths(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / 'source.zip'
+            source.write_bytes(b'synthetic')
+            for name in ['../source', 'a/b', 'x:y', 'a;whoami', '-option', '.hidden', 'a b', '']:
+                with self.assertRaises(ValueError):
+                    vm.copy_in(Path(temporary), {}, source, name)
+            with patch.object(vm, 'ssh'), patch.object(vm, 'run') as run:
+                vm.copy_in(Path(temporary), {'ssh_port': 22290}, source, 'source.zip')
+                self.assertEqual(run.call_args.args[-1],
+                    'memorylab@127.0.0.1:C:/MemoryLab/inputs/source.zip')
+
     def test_secure_boot_preserves_prior_disk_and_firmware(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

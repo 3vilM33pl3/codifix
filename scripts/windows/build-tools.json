@@ -1,0 +1,12 @@
+{
+  "format": "memory-windows-build-tools-v1",
+  "rust_toolchain": "1.99.1",
+  "wix_version": "4.0.5",
+  "artifacts": [
+    {"id":"msvc","file":"vs_buildtools.exe","url":"https://aka.ms/vs/17/release/vs_buildtools.exe","algorithm":"SHA256","hash":"2a6aa7d94e38d457a4eb3930fc60056ecab06865b2eb925e5275b8473a017583","microsoft_signature":true},
+    {"id":"rustup","file":"rustup-init.exe","url":"https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe","algorithm":"SHA256","hash":"6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e"},
+    {"id":"node","file":"node-v24.21.0-win-x64.zip","url":"https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip","algorithm":"SHA256","hash":"158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541"},
+    {"id":"git","file":"MinGit-2.56.0.2-64-bit.zip","url":"https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/MinGit-2.56.0.2-64-bit.zip","algorithm":"SHA256","hash":"da35e72aa21c005a5a0d298cfbae110bc1609a815730ea0dde84b01a1b3cd3be"},
+    {"id":"dotnet","file":"dotnet-sdk-10.0.402-win-x64.zip","url":"https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.402/dotnet-sdk-10.0.402-win-x64.zip","algorithm":"SHA512","hash":"ae4fd528cb7e9f6af6aaf7de36715a69f761f183744f1bb3025d19f5a92447090ec561410e46266c1d10a63781ed6f3de771760bc76c876d87daabc367b898cd"}
+  ]
+}

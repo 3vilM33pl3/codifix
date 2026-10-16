@@ -77,3 +77,18 @@ python3 -m unittest discover -s scripts/windows -p 'test_*.py'
 
 Native dependency, application, sandbox and installer acceptance remain pending
 in [the execution ledger](../../docs/reviews/windows-native/README.md).
+
+## Native build tooling
+
+After the clean guest/bootstrap snapshot, copy `build-tools.json` and
+`guest-build-tools.ps1` with `vm.py copy-in <file> --name <filename>`. Invoke
+the latter through `vm.py ssh`, passing the copied manifest. It refuses non-lab
+hosts, verifies every artifact before execution/extraction, checks Microsoft's
+bootstrapper signature and retains a resumable result under
+`C:\MemoryLab\BuildCache`. The manifest pins compiler, Node, Git, .NET and WiX;
+mutable upstream URLs must still match their reviewed hashes.
+
+This provisions the disposable developer snapshot only, not the customer native
+stack. Native PostgreSQL/PDS/Pi and clean-install runtime dependency acceptance
+are separate checklist items. PowerShell parsing and host manifest tests do not
+constitute native installation evidence.
