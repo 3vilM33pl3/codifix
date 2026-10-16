@@ -30,6 +30,13 @@ function Run-Checked([string]$Exe, [string[]]$Arguments) {
     & $Exe @Arguments
     if ($LASTEXITCODE -ne 0) { throw "Native command failed: $([IO.Path]::GetFileName($Exe)) ($LASTEXITCODE)" }
 }
+function Read-Version([string]$Exe, [string[]]$Arguments) {
+    $output = @(& $Exe @Arguments)
+    if ($LASTEXITCODE -ne 0 -or $output.Count -ne 1 -or -not $output[0]) {
+        throw "Tool version verification failed: $([IO.Path]::GetFileName($Exe))"
+    }
+    return ([string]$output[0]).Trim()
+}
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 foreach ($artifact in $artifacts) {
     if ($artifact.file -notmatch '^[a-zA-Z0-9_.-]+$' -or ([uri]$artifact.url).Scheme -ne 'https') {
@@ -89,6 +96,13 @@ foreach ($artifact in $artifacts) {
                 if ($process.ExitCode -notin @(0,3010)) { throw "MSVC installation failed ($($process.ExitCode))" }
                 $receipt.restart_required = ($process.ExitCode -eq 3010)
             }
+            $installed = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($LASTEXITCODE -ne 0 -or -not $installed -or
+                -not (Test-Path -LiteralPath (Join-Path $installed 'VC\Auxiliary\Build\vcvars64.bat'))) {
+                throw 'MSVC installation did not provide the required native toolchain'
+            }
+            $completed.installation_path = $installed
+            $completed.installation_version = Read-Version $vswhere @('-latest','-products','*','-requires','Microsoft.VisualStudio.Component.VC.Tools.x86.x64','-property','installationVersion')
         }
         'rustup' {
             if (-not (Test-Path "$env:USERPROFILE\.cargo\bin\rustup.exe")) {
@@ -110,13 +124,18 @@ $env:PATH = "$env:DOTNET_ROOT;$env:USERPROFILE\.dotnet\tools;$env:USERPROFILE\.c
 if (-not (Test-Path "$env:USERPROFILE\.dotnet\tools\wix.exe")) {
     Run-Checked (Join-Path $env:DOTNET_ROOT 'dotnet.exe') @('tool','install','--global','wix','--version',$manifest.wix_version)
 }
-$receipt.rust = (& rustc.exe --version)
-$receipt.cargo = (& cargo.exe --version)
-$receipt.node = (& node.exe --version)
-$receipt.git = (& git.exe --version)
-$receipt.python = (& (Join-Path $tools 'python-3.13.9\python.exe') --version)
-$receipt.dotnet = (& dotnet.exe --version)
-$receipt.wix = (& wix.exe --version)
+$receipt.rust = Read-Version 'rustc.exe' @('--version')
+$receipt.cargo = Read-Version 'cargo.exe' @('--version')
+$receipt.node = Read-Version 'node.exe' @('--version')
+$receipt.git = Read-Version 'git.exe' @('--version')
+$receipt.python = Read-Version (Join-Path $tools 'python-3.13.9\python.exe') @('--version')
+$receipt.dotnet = Read-Version 'dotnet.exe' @('--version')
+$receipt.wix = Read-Version 'wix.exe' @('--version')
+if ($receipt.rust -notmatch ('^rustc ' + [regex]::Escape($manifest.rust_toolchain) + ' ') -or
+    $receipt.node -ne 'v24.18.1' -or $receipt.python -ne 'Python 3.13.9' -or
+    $receipt.dotnet -ne '10.0.402' -or $receipt.wix -notmatch '^4\.0\.5(?:[.+-]|$)') {
+    throw 'Installed tool version differs from the reviewed build baseline'
+}
 $receipt.completed_at = [DateTime]::UtcNow.ToString('o')
 Save-Receipt
 $receipt | ConvertTo-Json -Depth 12

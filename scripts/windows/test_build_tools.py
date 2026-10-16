@@ -65,6 +65,12 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn("-h 127.0.0.1 -p 55471", script)
         self.assertIn("--auth-host=scram-sha-256", script)
         self.assertIn("Prepared native runtime does not match", script)
+        for required in ['VCToolsRedistDir', 'Microsoft.VC143.CRT', 'runtime_support=$support',
+                         'clean_runtime_verified=$false', 'Prepared native extension inventory is incomplete',
+                         'Prepared native support DLL changed after verification']:
+            self.assertIn(required, script)
+        self.assertLess(script.index("Copy-Item -LiteralPath $file.FullName"),
+                        script.index("Run-Checked (Join-Path $bin 'postgres.exe')"))
         self.assertNotIn('--trust', script)
 
     def test_exact_tool_set_has_bounded_verified_inputs(self):
@@ -86,6 +92,15 @@ class BuildToolsManifestTests(unittest.TestCase):
             self.assertEqual(len(artifact['hash']), size)
             self.assertTrue(all(c in '0123456789abcdef' for c in artifact['hash']))
         self.assertTrue(next(a for a in artifacts if a['id'] == 'msvc')['microsoft_signature'])
+
+    def test_tool_receipts_require_successful_version_checks(self):
+        script = (Path(__file__).parent / 'guest-build-tools.ps1').read_text()
+        self.assertIn('function Read-Version', script)
+        self.assertIn('$LASTEXITCODE -ne 0 -or $output.Count -ne 1', script)
+        self.assertIn('MSVC installation did not provide the required native toolchain', script)
+        self.assertIn('Installed tool version differs from the reviewed build baseline', script)
+        for tool in ['rust', 'cargo', 'node', 'git', 'python', 'dotnet', 'wix']:
+            self.assertIn('$receipt.' + tool + ' = Read-Version', script)
 
 
 if __name__ == '__main__':

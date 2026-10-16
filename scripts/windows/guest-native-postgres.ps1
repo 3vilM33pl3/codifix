@@ -51,7 +51,6 @@ if ($Action -eq 'Prepare') {
     if (-not (Test-Path (Join-Path $bin 'postgres.exe'))) {
         Expand-Archive -LiteralPath $postgres -DestinationPath $runtime
     }
-    Run-Checked (Join-Path $bin 'postgres.exe') @('--version')
     $source = Join-Path $root 'source'
     New-Item -ItemType Directory -Force $source | Out-Null
     if (-not (Test-Path (Join-Path $source 'pgvector-0.8.7\Makefile.win'))) {
@@ -64,10 +63,25 @@ if ($Action -eq 'Prepare') {
     $environment = & "$env:SystemRoot\System32\cmd.exe" /d /s /c "`"`"$vcvars`" >nul && set`""
     if ($LASTEXITCODE -ne 0) { throw 'Could not initialize native MSVC environment' }
     foreach ($line in $environment) {
-        if ($line -match '^(PATH|INCLUDE|LIB|LIBPATH|VCINSTALLDIR|VCToolsInstallDir|WindowsSdkDir|WindowsSDKVersion)=(.*)$') {
+        if ($line -match '^(PATH|INCLUDE|LIB|LIBPATH|VCINSTALLDIR|VCToolsInstallDir|VCToolsRedistDir|WindowsSdkDir|WindowsSDKVersion)=(.*)$') {
             [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
         }
     }
+    # Do not let the developer machine's system-wide CRT hide a missing runtime
+    # dependency. Retain the exact redistributable DLLs beside PostgreSQL, where
+    # the clean-runtime candidate will need them too. This is not evidence that
+    # the candidate has run without Visual Studio; that remains a separate test.
+    if (-not $env:VCToolsRedistDir) { throw 'MSVC did not identify its redistributable runtime' }
+    $crt = Join-Path $env:VCToolsRedistDir 'x64\Microsoft.VC143.CRT'
+    $crtFiles = @(Get-ChildItem -LiteralPath $crt -Filter '*.dll' -File)
+    if (-not ($crtFiles | Where-Object Name -eq 'vcruntime140.dll') -or
+        -not ($crtFiles | Where-Object Name -eq 'msvcp140.dll')) {
+        throw 'MSVC x64 redistributable runtime is incomplete'
+    }
+    foreach ($file in $crtFiles) {
+        Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $bin $file.Name) -Force
+    }
+    Run-Checked (Join-Path $bin 'postgres.exe') @('--version')
     $env:PGROOT = $pg
     Push-Location (Join-Path $source 'pgvector-0.8.7')
     try {
@@ -78,7 +92,10 @@ if ($Action -eq 'Prepare') {
     foreach ($name in $libraries) {
         if (-not (Test-Path (Join-Path $pg "lib\$name"))) { throw "Required native extension is missing: $name" }
     }
-    $receipt = [ordered]@{format='memory-windows-postgres-proof-result-v1'; manifest_sha256=(Get-FileHash $ManifestPath).Hash.ToLowerInvariant(); postgres_version=(& (Join-Path $bin 'postgres.exe') --version); postgres_sha256=(Get-FileHash (Join-Path $bin 'postgres.exe')).Hash.ToLowerInvariant(); extensions=@($libraries | ForEach-Object { @{name=$_;sha256=(Get-FileHash (Join-Path $pg "lib\$_")).Hash.ToLowerInvariant()} }); native_execution_verified=$false}
+    $support = @(Get-ChildItem -LiteralPath $bin -Filter '*.dll' -File | Sort-Object Name | ForEach-Object {
+        @{name=$_.Name;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();version=$_.VersionInfo.FileVersion}
+    })
+    $receipt = [ordered]@{format='memory-windows-postgres-proof-result-v1'; manifest_sha256=(Get-FileHash $ManifestPath).Hash.ToLowerInvariant(); postgres_version=(& (Join-Path $bin 'postgres.exe') --version); postgres_sha256=(Get-FileHash (Join-Path $bin 'postgres.exe')).Hash.ToLowerInvariant(); extensions=@($libraries | ForEach-Object { @{name=$_;sha256=(Get-FileHash (Join-Path $pg "lib\$_")).Hash.ToLowerInvariant()} }); runtime_support=$support; crt_source=$crt; clean_runtime_verified=$false; native_execution_verified=$false}
     $receipt | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $root 'prepared.json') -Encoding UTF8
     $receipt | ConvertTo-Json -Depth 8
     return
@@ -90,10 +107,25 @@ if ($prepared.format -ne 'memory-windows-postgres-proof-result-v1' -or
     $prepared.postgres_sha256 -ne (Get-FileHash (Join-Path $bin 'postgres.exe')).Hash.ToLowerInvariant()) {
     throw 'Prepared native runtime does not match its retained manifest and receipt'
 }
+if ((@($prepared.extensions | ForEach-Object { $_.name } | Sort-Object) -join ',') -ne 'pg_trgm.dll,pgcrypto.dll,vector.dll') {
+    throw 'Prepared native extension inventory is incomplete'
+}
 foreach ($extension in $prepared.extensions) {
     if ($extension.name -notin @('vector.dll','pgcrypto.dll','pg_trgm.dll') -or
         $extension.sha256 -ne (Get-FileHash (Join-Path $pg "lib\$($extension.name)")).Hash.ToLowerInvariant()) {
         throw 'Prepared native extension changed after verification'
+    }
+}
+$supportNames = @($prepared.runtime_support | ForEach-Object { $_.name } | Sort-Object)
+$actualSupportNames = @(Get-ChildItem -LiteralPath $bin -Filter '*.dll' -File | ForEach-Object { $_.Name } | Sort-Object)
+if (-not $supportNames.Count -or ($supportNames -join ',') -ne ($actualSupportNames -join ',') -or
+    'vcruntime140.dll' -notin $supportNames -or 'msvcp140.dll' -notin $supportNames) {
+    throw 'Prepared native support DLL inventory is incomplete or changed'
+}
+foreach ($library in $prepared.runtime_support) {
+    if ($library.name -notmatch '^[A-Za-z0-9_.-]+\.dll$' -or
+        $library.sha256 -ne (Get-FileHash -LiteralPath (Join-Path $bin $library.name)).Hash.ToLowerInvariant()) {
+        throw 'Prepared native support DLL changed after verification'
     }
 }
 if ($Action -eq 'Stop') {
