@@ -4,6 +4,12 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'native-instance-functions.ps1')
 $instance = [guid]'11111111-1111-4111-8111-111111111111'
 $plan = Get-NativeInstancePlan 'homelab' 'windows-v2.1.0-rc.5-build.1' 'memory.exe' 'http://127.0.0.1:55440/healthz' $instance
+$legacyPlan = [ordered]@{
+    service_name = 'MemoryLayer-homelab'; account = 'NT SERVICE\MemoryLayer-homelab'; name = 'homelab'
+    release_identity = 'windows-v2.1.0-rc.5-build.1'; executable_name = 'memory.exe'
+    health_uri = 'http://127.0.0.1:55440/healthz'; expected_instance_id = $instance.ToString()
+}
+if ((Get-NativeInputDigest $plan) -ne (Get-NativeInputDigest $legacyPlan)) { throw 'Existing Memory plan hash compatibility changed' }
 $first = Get-NativeInputDigest ([ordered]@{ action = 'Install'; recovery_reference = 'synthetic-backup-one'; plan = $plan })
 foreach ($changed in @(
     ([ordered]@{ action = 'Upgrade'; recovery_reference = 'synthetic-backup-one'; plan = $plan }),
@@ -15,6 +21,38 @@ foreach ($changed in @(
 }
 if (-not (Test-NativeReadinessHealth ([pscustomobject]@{ status = 'ok'; instance_id = [guid]::NewGuid().ToString(); area_instance_id = $instance.ToString() }) $instance)) { throw 'Configured area readiness rejected' }
 if (Test-NativeReadinessHealth ([pscustomobject]@{ status = 'ok'; instance_id = $instance.ToString() }) $instance) { throw 'Ephemeral runtime identity accepted as configured area identity' }
+$space = [guid]'22222222-2222-4222-8222-222222222222'
+$audience = [guid]'33333333-3333-4333-8333-333333333333'
+$gateway = Get-NativeInstancePlan 'gateway' 'windows-v2.1.0-rc.5-build.1' 'memory-federation-gateway.exe' '' $instance $space $audience
+if ($gateway.expected_space_id -ne $space.ToString() -or $gateway.status_audience_id -ne $audience.ToString() -or $gateway.health_uri) { throw 'Gateway bindings lost or bogus health URL added' }
+$argsMemory = @(Get-NativeServiceArguments 'memory.exe' 'C:\private path\memory.toml')
+$argsGateway = @(Get-NativeServiceArguments 'memory-federation-gateway.exe' 'C:\private path\gateway.json')
+if (($argsMemory -join '|') -cne '--config|C:\private path\memory.toml|service|run') { throw 'Memory service arguments changed' }
+if ($argsGateway.Count -ne 1 -or $argsGateway[0] -cne 'C:\private path\gateway.json') { throw 'Gateway must receive exactly one positional configuration' }
+foreach ($bad in @(
+    @('http://127.0.0.1:9999/healthz', $space, $audience),
+    @('', [guid]::Empty, $audience), @('', $space, [guid]::Empty)
+)) {
+    $rejected = $false
+    try { $null = Get-NativeInstancePlan 'gateway' 'windows-v2.1.0-rc.5-build.1' 'memory-federation-gateway.exe' $bad[0] $instance $bad[1] $bad[2] } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Incomplete or false gateway readiness accepted' }
+}
+$config = [pscustomobject]@{ space = $space.ToString(); authority = $instance.ToString(); credentials = @([pscustomobject]@{ instance = $audience.ToString() }) }
+Assert-NativeGatewayConfig $config $space $instance $audience
+$rejected = $false
+try { Assert-NativeGatewayConfig $config $space $instance ([guid]::NewGuid()) } catch { $rejected = $true }
+if (-not $rejected) { throw 'Unenrolled probe audience accepted' }
+$ready = [pscustomobject]@{ schema_version = 1; space = $space.ToString(); authority = $instance.ToString(); audience = $audience.ToString(); observed_at = [DateTimeOffset]::UtcNow.ToString('o'); readiness_scope = 'signed_identity_current_pull_and_writer_fence_only' }
+if (-not (Test-NativeGatewayReadiness $ready $space $instance $audience)) { throw 'Verified gateway probe bindings rejected' }
+foreach ($change in @(
+    @{ space = [guid]::NewGuid().ToString() }, @{ authority = [guid]::NewGuid().ToString() },
+    @{ audience = [guid]::NewGuid().ToString() }, @{ readiness_scope = 'scm_running' },
+    @{ observed_at = [DateTimeOffset]::UtcNow.AddMinutes(-2).ToString('o') }
+)) {
+    $bad = $ready | ConvertTo-Json | ConvertFrom-Json
+    foreach ($key in $change.Keys) { $bad.$key = $change[$key] }
+    if (Test-NativeGatewayReadiness $bad $space $instance $audience) { throw 'Wrong or stale gateway status binding accepted' }
+}
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('memory-native-staging-test-' + [guid]::NewGuid())
 $null = New-Item -ItemType Directory -Path $temporary
 try {

@@ -57,11 +57,11 @@ native VM acceptance test; Linux cross-compilation is not that evidence.
 
 ## Journaled named-instance operator (native acceptance pending)
 
-`native-instance.ps1` installs or upgrades one **Memory service**. It is bundled
+`native-instance.ps1` installs or upgrades one **Memory or federation gateway service**. It is bundled
 with the helper scripts in `share/memory-layer/operators`. It is not an all-stack
 installer: provision native PostgreSQL/pgvector and a private exact-instance
-configuration separately. Gateway/PDS/supervisor service installation remains a
-separate native acceptance item.
+configuration separately. PDS/supervisor installation remains separate. Both
+supported service paths still require native VM acceptance.
 
 1. Allocate one stable operation UUID. Run `-Action Preview` with `-Name`,
    `-OperationId`, `-PackagePath` (candidate ZIP), `-ManifestPath`,
@@ -78,6 +78,26 @@ separate native acceptance item.
 3. Reuse the exact operation ID and inputs after interruption. Changed inputs
    fail closed; completed retries do not restart a service. Journals and observed
    phase history live under `%ProgramData%\MemoryLayer\operations\<operation-id>`.
+
+For a gateway, additionally select `-ExecutableName memory-federation-gateway.exe`.
+Use `-ExpectedInstanceId` for the configured **authority**, add `-ExpectedSpaceId`
+and `-StatusAudienceId` for an existing enrolled instance with current Pull
+membership, and omit `-HealthUri`. Supply the private gateway **JSON** configuration
+with its existing protected credential paths; do not put tokens on the command
+line. The virtual service account must already have the required narrow access
+to those secrets and database resources. The adapter does not enroll a probe
+identity or confer new permissions.
+
+The gateway receives exactly one positional config path. Readiness invokes its
+operator-only `check-status CONFIG SPACE AUTHORITY AUDIENCE` command against the
+configured numeric loopback listener (wildcard listeners map to loopback).
+Nonloopback-specific binds cannot use this probe. It verifies the existing
+signed nonce-bound `/v1/status` reply, trusted receipt keys, freshness, space,
+authority and audience. The endpoint independently enforces current Pull access
+and the database writer fence. Only matched identities, observation time and a
+readiness-scope label leave the probe. This is **not** a PDS publication,
+repository-integrity or model/supervisor health check; a running SCM service
+alone is insufficient. No public readiness endpoint is added.
 
 Releases are hash-verified against the reviewed ZIP and full payload manifest,
 then retained under `%ProgramFiles%\Memory Layer\releases\<release-identity>`.

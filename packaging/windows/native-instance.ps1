@@ -9,10 +9,12 @@ param(
     [Parameter(Mandatory = $true)][string]$ManifestPath,
     [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-f]{64}$')][string]$ManifestSha256,
     [Parameter(Mandatory = $true)][string]$ConfigPath,
-    [Parameter(Mandatory = $true)][string]$HealthUri,
+    [string]$HealthUri,
     [Parameter(Mandatory = $true)][guid]$ExpectedInstanceId,
     [ValidatePattern('^[0-9a-f]{64}$')][string]$ExpectedInputSha256,
-    [ValidateSet('memory.exe')][string]$ExecutableName = 'memory.exe',
+    [ValidateSet('memory.exe', 'memory-federation-gateway.exe')][string]$ExecutableName = 'memory.exe',
+    [guid]$ExpectedSpaceId = [guid]::Empty,
+    [guid]$StatusAudienceId = [guid]::Empty,
     [Parameter(Mandatory = $true)][ValidateLength(1, 1024)][string]$RecoveryReference,
     [switch]$DatabaseCompatibilityConfirmed
 )
@@ -92,7 +94,7 @@ foreach ($entry in $manifest.payload_files) {
     Assert-NativeArchiveName $entry.name
     if (-not $manifestNames.Add($entry.name) -or $entry.sha256 -notmatch '^[0-9a-f]{64}$') { throw 'Duplicate or malformed payload entry' }
 }
-$plan = Get-NativeInstancePlan $Name $manifest.release_identity $ExecutableName $HealthUri $ExpectedInstanceId
+$plan = Get-NativeInstancePlan $Name $manifest.release_identity $ExecutableName $HealthUri $ExpectedInstanceId $ExpectedSpaceId $StatusAudienceId
 $zipName = Split-Path -Leaf $PackagePath
 $zipEntry = @($manifest.artifacts | Where-Object { $_.name -ceq $zipName -and $_.name.EndsWith('.zip') })
 if ($zipEntry.Count -ne 1) { throw 'ZIP must match exactly one reviewed manifest artifact' }
@@ -106,12 +108,16 @@ try {
     try { $configFile.CopyTo($buffer); $configBytes = $buffer.ToArray() } finally { $buffer.Dispose() }
 } finally { $configFile.Dispose() }
 $configHash = Get-NativeInputDigest ([Convert]::ToBase64String($configBytes))
+if ($ExecutableName -eq 'memory-federation-gateway.exe') {
+    $gatewayConfig = [Text.Encoding]::UTF8.GetString($configBytes) | ConvertFrom-Json
+    Assert-NativeGatewayConfig $gatewayConfig $ExpectedSpaceId $ExpectedInstanceId $StatusAudienceId
+}
 $root = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'MemoryLayer'
 $releasesRoot = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Memory Layer\releases'
 $release = Join-Path $releasesRoot $plan.release_identity
 $state = Join-Path (Join-Path $root 'instances') $Name
-$installedConfig = Join-Path $state 'memory-layer.toml'
-$command = @((Join-Path $release 'bin\memory-windows-service.exe'), '--name', $plan.service_name, '--directory', $state, '--', (Join-Path $release "bin\$ExecutableName"), '--config', $installedConfig, 'service', 'run')
+$installedConfig = Join-Path $state $(if ($ExecutableName -eq 'memory.exe') { 'memory-layer.toml' } else { 'gateway.json' })
+$command = @((Join-Path $release 'bin\memory-windows-service.exe'), '--name', $plan.service_name, '--directory', $state, '--', (Join-Path $release "bin\$ExecutableName")) + @(Get-NativeServiceArguments $ExecutableName $installedConfig)
 $binaryPath = ($command | ForEach-Object { ConvertTo-NativeCommandArgument $_ }) -join ' '
 $operationAction = if ($Action -eq 'Preview') { $PreviewAction } else { $Action }
 $binding = [ordered]@{ action = $operationAction; recovery_reference = $RecoveryReference; plan = $plan; manifest_sha256 = $ManifestSha256; package_sha256 = $zipEntry[0].sha256; config_fingerprint = $configHash; binary_path = $binaryPath }
@@ -239,6 +245,20 @@ try {
     (Get-Service -Name $plan.service_name).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
     Save-Phase 'process_running'
     $ready = $false
+    if ($ExecutableName -eq 'memory-federation-gateway.exe') {
+        $probe = Join-Path $release 'bin\memory-federation-gateway.exe'
+        for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            try {
+                # Reuse Rust's existing signed nonce/key/freshness verifier.
+                # Never place the enrolled bearer on argv or operational output.
+                $output = @(& $probe check-status $installedConfig $ExpectedSpaceId.ToString() $ExpectedInstanceId.ToString() $StatusAudienceId.ToString() 2>$null)
+                $probeExit = $LASTEXITCODE
+                $status = ($output -join "`n") | ConvertFrom-Json
+                if ($probeExit -eq 0 -and (Test-NativeGatewayReadiness $status $ExpectedSpaceId $ExpectedInstanceId $StatusAudienceId) -and (Get-Service -Name $plan.service_name).Status -eq 'Running') { $ready = $true; break }
+            } catch { }
+            Start-Sleep -Seconds 1
+        }
+    } else {
     Add-Type -AssemblyName System.Net.Http
     $handler = [Net.Http.HttpClientHandler]::new()
     $handler.UseProxy = $false
@@ -257,9 +277,11 @@ try {
             Start-Sleep -Seconds 1
         }
     } finally { $client.Dispose(); $handler.Dispose() }
+    }
     if (-not $ready) { throw 'Exact-instance readiness failed; no old database or executable was automatically restored' }
     Invoke-Sc @('config', $plan.service_name, 'start=', 'delayed-auto')
     Write-NativeJournal $registrationPath ([ordered]@{ schema_version = 1; operation_id = $OperationId.ToString(); expected_instance_id = $plan.expected_instance_id; installer_version = $manifest.installer_version; release_identity = $plan.release_identity; manifest_sha256 = $ManifestSha256; binary_path = $binaryPath; config_fingerprint = $configHash })
     Save-Phase 'completed'
-    Write-Output "Completed: $OperationId ($($plan.service_name)); exact-instance readiness verified; data preserved"
+    $readiness = if ($ExecutableName -eq 'memory.exe') { 'exact-instance readiness verified' } else { 'signed gateway space/authority/current Pull and writer fence verified; PDS publication health is separate' }
+    Write-Output "Completed: $OperationId ($($plan.service_name)); $readiness; data preserved"
 } finally { if ($releaseGuard) { $releaseGuard.Dispose() }; $lock.Dispose() }

@@ -2,10 +2,22 @@
 # Pure validation helpers are loaded by tests without SCM/admin side effects.
 function Get-NativeInstancePlan {
     param([string]$Name, [string]$ReleaseIdentity, [string]$ExecutableName,
-        [string]$HealthUri, [guid]$ExpectedInstanceId)
+        [string]$HealthUri, [guid]$ExpectedInstanceId,
+        [guid]$ExpectedSpaceId = [guid]::Empty, [guid]$StatusAudienceId = [guid]::Empty)
     if ($Name -cnotmatch '^[a-z][a-z0-9-]{0,47}$') { throw 'Use a lowercase instance name, maximum 48 characters' }
     if ($ReleaseIdentity -notmatch '^windows-v\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?-build\.\d+$') { throw 'Invalid Windows release identity' }
     if ($ExecutableName -notin @('memory.exe', 'memory-federation-gateway.exe')) { throw 'Unsupported service executable' }
+    if ($ExpectedInstanceId -eq [guid]::Empty) { throw 'An exact expected instance UUID is required' }
+    if ($ExecutableName -eq 'memory-federation-gateway.exe') {
+        if ($HealthUri -or $ExpectedSpaceId -eq [guid]::Empty -or $StatusAudienceId -eq [guid]::Empty) { throw 'Gateway needs exact space/authority/audience, not a Memory health URL' }
+        return [pscustomobject][ordered]@{
+            service_name = "MemoryLayer-$Name"; account = "NT SERVICE\MemoryLayer-$Name"; name = $Name
+            release_identity = $ReleaseIdentity; executable_name = $ExecutableName; health_uri = $null
+            expected_instance_id = $ExpectedInstanceId.ToString(); expected_space_id = $ExpectedSpaceId.ToString()
+            status_audience_id = $StatusAudienceId.ToString(); readiness_mode = 'signed_loopback_status_v1'
+        }
+    }
+    if ($ExpectedSpaceId -ne [guid]::Empty -or $StatusAudienceId -ne [guid]::Empty) { throw 'Gateway bindings do not apply to a Memory service' }
     $uri = [uri]$HealthUri
     if (-not $uri.IsAbsoluteUri -or $uri.Scheme -ne 'http' -or -not $uri.IsLoopback -or
         $uri.UserInfo -or $uri.Query -or $uri.Fragment -or $uri.AbsolutePath -cne '/healthz') {
@@ -21,6 +33,29 @@ function Get-NativeInstancePlan {
         health_uri = $uri.AbsoluteUri
         expected_instance_id = $ExpectedInstanceId.ToString()
     }
+}
+
+function Get-NativeServiceArguments([string]$ExecutableName, [string]$ConfigPath) {
+    if ($ExecutableName -eq 'memory.exe') { return @('--config', $ConfigPath, 'service', 'run') }
+    if ($ExecutableName -eq 'memory-federation-gateway.exe') { return @($ConfigPath) }
+    throw 'Unsupported service executable'
+}
+
+function Assert-NativeGatewayConfig($Config, [guid]$Space, [guid]$Authority, [guid]$Audience) {
+    if ([guid]$Config.space -ne $Space -or [guid]$Config.authority -ne $Authority -or
+        @($Config.credentials | Where-Object { [guid]$_.instance -eq $Audience }).Count -ne 1) {
+        throw 'Gateway configuration differs from the reviewed space, authority or enrolled status audience'
+    }
+}
+
+function Test-NativeGatewayReadiness($Ready, [guid]$Space, [guid]$Authority, [guid]$Audience) {
+    try {
+        $now = [DateTimeOffset]::UtcNow; $observed = [DateTimeOffset]::Parse($Ready.observed_at)
+        return $Ready.schema_version -eq 1 -and [guid]$Ready.space -eq $Space -and
+            [guid]$Ready.authority -eq $Authority -and [guid]$Ready.audience -eq $Audience -and
+            $Ready.readiness_scope -ceq 'signed_identity_current_pull_and_writer_fence_only' -and
+            $observed -le $now.AddSeconds(1) -and $observed -ge $now.AddSeconds(-30)
+    } catch { return $false }
 }
 
 function ConvertTo-NativeCommandArgument([string]$Value) {
