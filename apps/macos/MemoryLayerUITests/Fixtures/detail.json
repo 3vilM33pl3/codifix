@@ -1,0 +1,64 @@
+{
+  "id": "10000000-0000-4000-8000-000000000001",
+  "project": "synthetic-project",
+  "canonical_text": "Use the operating system's user cache directory for disposable application data.",
+  "summary": "Cache location",
+  "memory_type": "fact",
+  "importance": 3,
+  "confidence": 0.92,
+  "status": "active",
+  "tags": [
+    "storage",
+    "desktop"
+  ],
+  "sources": [
+    {
+      "id": "20000000-0000-4000-8000-000000000001",
+      "task_id": "30000000-0000-4000-8000-000000000001",
+      "file_path": "Sources/CacheStore.swift",
+      "git_commit": "0123456789abcdef",
+      "symbol_name": "CacheStore",
+      "symbol_kind": "struct",
+      "source_kind": "file",
+      "excerpt": "Caches are disposable and isolated per user.",
+      "provenance": {
+        "status": "verified",
+        "checked_at": "2026-10-14T10:00:00Z",
+        "reason": null,
+        "resolved_path": "/synthetic/Sources/CacheStore.swift"
+      }
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002",
+      "task_id": "30000000-0000-4000-8000-000000000001",
+      "file_path": null,
+      "git_commit": null,
+      "source_kind": "task_prompt",
+      "excerpt": "Keep cache data outside the repository.",
+      "provenance": null
+    }
+  ],
+  "related_memories": [
+    {
+      "memory_id": "10000000-0000-4000-8000-000000000009",
+      "relation_type": "supports",
+      "summary": "Keep generated files out of source control.",
+      "memory_type": "decision",
+      "confidence": 0.88
+    }
+  ],
+  "embedding_spaces": [
+    {
+      "provider": "local",
+      "model": "test-embedding-v1",
+      "base_url": "http://127.0.0.1:8080",
+      "chunk_count": 3,
+      "last_updated": "2026-10-14T10:30:00Z"
+    }
+  ],
+  "created_at": "2026-10-10T08:00:00Z",
+  "updated_at": "2026-10-14T11:10:00Z",
+  "canonical_id": "10000000-0000-4000-8000-000000000011",
+  "version_no": 2,
+  "is_tombstone": false
+}

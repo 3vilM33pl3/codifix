@@ -1,0 +1,17 @@
+{
+  "backends": [
+    {
+      "name": "local",
+      "provider": "local",
+      "base_url": "http://127.0.0.1:8080",
+      "model": "test-v1",
+      "active": true,
+      "ready": true,
+      "create_enabled": true,
+      "project_chunk_count": 10,
+      "project_memory_count": 2
+    }
+  ],
+  "active": "local",
+  "create_enabled": true
+}

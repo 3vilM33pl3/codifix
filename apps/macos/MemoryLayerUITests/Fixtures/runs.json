@@ -1,0 +1,19 @@
+{
+  "total_returned": 1,
+  "runs": [
+    {
+      "id": "20000000-0000-4000-8000-000000000001",
+      "loop_id": "loop / one",
+      "definition_version": 2,
+      "project": "synthetic-project",
+      "repo_root": "/repo",
+      "mode": "suggest_only",
+      "status": "succeeded",
+      "started_at": "2026-10-15T10:30:00Z",
+      "finished_at": "2026-10-15T10:30:02Z",
+      "output_summary": "Preview completed",
+      "trace_count": 2,
+      "blocked_reasons": []
+    }
+  ]
+}

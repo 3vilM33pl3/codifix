@@ -1,0 +1,9 @@
+{
+  "target_project": "synthetic-project",
+  "bundle_id": "bundle-1",
+  "bundle_hash": "hash-1",
+  "imported_count": 2,
+  "replaced_count": 0,
+  "skipped_count": 1,
+  "relation_count": 1
+}

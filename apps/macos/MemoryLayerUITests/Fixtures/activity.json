@@ -1,0 +1,19 @@
+{
+  "project": "synthetic-project",
+  "total_returned": 1,
+  "items": [
+    {
+      "id": "event-1",
+      "project": "synthetic-project",
+      "kind": "plan",
+      "summary": "Plan updated",
+      "details": {
+        "type": "plan",
+        "remaining_items": [
+          "Review"
+        ]
+      },
+      "recorded_at": "2026-10-15T12:00:00Z"
+    }
+  ]
+}

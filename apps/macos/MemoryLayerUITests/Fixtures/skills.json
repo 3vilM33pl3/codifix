@@ -1,0 +1,21 @@
+{
+  "project_root": "/repo space",
+  "project_skill_root": "/repo space/.agents/skills",
+  "template_root": "/templates",
+  "bundle_version": "1.2.0",
+  "status": "ok",
+  "summary": "One current skill",
+  "filter": "memory-layer",
+  "skills": [
+    {
+      "name": "memory-query-resume",
+      "project_path": "/repo/memory-query-resume/SKILL.md",
+      "template_path": "/templates/memory-query-resume/SKILL.md",
+      "project_version": "0.9.5",
+      "template_version": "0.9.5",
+      "status": "up_to_date",
+      "action": "skip",
+      "detail": null
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "bundle_id": "bundle-1",
+  "bundle_hash": "hash-1",
+  "source_project": "source",
+  "target_project": "synthetic-project",
+  "exported_at": "2026-10-15T10:00:00Z",
+  "summary_markdown": "# Import",
+  "memory_count": 3,
+  "relation_count": 1,
+  "new_count": 2,
+  "unchanged_count": 1,
+  "replacing_count": 0,
+  "warning_count": 1,
+  "warnings": [
+    "Review source"
+  ],
+  "options": {
+    "include_archived": false,
+    "include_tags": true,
+    "include_relations": true,
+    "include_source_file_paths": false,
+    "include_git_commits": false,
+    "include_source_excerpts": false
+  }
+}

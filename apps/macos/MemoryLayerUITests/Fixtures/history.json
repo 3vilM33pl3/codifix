@@ -1,0 +1,48 @@
+{
+  "canonical_id": "10000000-0000-4000-8000-000000000011",
+  "project": "synthetic-project",
+  "versions": [
+    {
+      "id": "10000000-0000-4000-8000-000000000003",
+      "project": "synthetic-project",
+      "canonical_text": "Use a cache directory.",
+      "summary": "Cache location",
+      "memory_type": "fact",
+      "importance": 2,
+      "confidence": 0.75,
+      "status": "archived",
+      "tags": [
+        "storage"
+      ],
+      "sources": [],
+      "related_memories": [],
+      "embedding_spaces": [],
+      "created_at": "2026-10-10T08:00:00Z",
+      "updated_at": "2026-10-11T08:00:00Z",
+      "canonical_id": "10000000-0000-4000-8000-000000000011",
+      "version_no": 1,
+      "is_tombstone": false
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "project": "synthetic-project",
+      "canonical_text": "Use the operating system's user cache directory.",
+      "summary": "Cache location",
+      "memory_type": "fact",
+      "importance": 3,
+      "confidence": 0.92,
+      "status": "active",
+      "tags": [
+        "storage"
+      ],
+      "sources": [],
+      "related_memories": [],
+      "embedding_spaces": [],
+      "created_at": "2026-10-10T08:00:00Z",
+      "updated_at": "2026-10-14T11:10:00Z",
+      "canonical_id": "10000000-0000-4000-8000-000000000011",
+      "version_no": 2,
+      "is_tombstone": false
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "skill": {
+    "name": "memory-query-resume",
+    "project_path": "/repo/memory-query-resume/SKILL.md",
+    "template_path": "/templates/memory-query-resume/SKILL.md",
+    "project_version": "0.9.5",
+    "template_version": "0.9.5",
+    "status": "up_to_date",
+    "action": "skip",
+    "detail": null
+  },
+  "content": "Skill content",
+  "content_truncated": false
+}
