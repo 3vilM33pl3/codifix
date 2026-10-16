@@ -1,6 +1,9 @@
 # Disposable native Windows lab
 
 Host state lives under `/data/VMs/memory-windows-native`, outside the repository.
+The lab control directory, firmware, TPM, journals and recovery copies stay there;
+an explicitly selected active disk may use the dedicated private NVMe directory
+described below. No other VM or installation is relocated.
 `vm.py` pins installation media by hash, creates a 200 GiB thin qcow2, prepares
 unattended installation with a private one-time password and SSH key, and starts
 QEMU with KVM, UEFI, TPM, 8 CPUs and 16 GiB RAM. No host project directory or
@@ -61,6 +64,16 @@ agent and native Windows OpenSSH. Password authentication is disabled. A first
 SSH host key is retained in this lab's private `known_hosts`, never the user's
 global SSH configuration. Bootstrap execution has not yet been observed.
 
+The installed lab reached the desktop and its guest agent works. Its optional
+OpenSSH Windows capability download timed out. `guest-ssh.ps1` offers an explicit
+lab-only recovery path using the official, hash-pinned Microsoft OpenSSH archive;
+it additionally requires valid Microsoft signatures, reuses the existing public
+key and refuses to replace an existing SSH service or race active servicing.
+It does not enable password authentication. This preview OpenSSH package is VM
+administration tooling, not a Memory customer runtime dependency. Its native
+installation remains unverified until `ssh-result.json` and a key-only connection
+are observed. Use QGA meanwhile; do not repeatedly start optional-feature installs.
+
 Use a local VNC client with `/data/VMs/memory-windows-native/lab/vnc.sock` for
 the installation console. Do not expose VNC or SSH to a public interface.
 
@@ -111,6 +124,35 @@ blocks boot; `recover-restore restore-<id>` completes an already prepared switch
 An interrupted preparation requires inspecting the retained state first; no
 automatic deletion or replay of uncertain work occurs. These are cold storage
 operations, not evidence that Memory's database restore has passed.
+
+### Optional cold disk relocation
+
+If the rotating `/data` disk is saturated, preserve the existing installed VM
+while moving only its active disk to the dedicated user-owned NVMe directory:
+
+```bash
+python3 scripts/windows/vm.py shutdown
+python3 scripts/windows/vm.py status  # QEMU and swtpm must have exited
+python3 scripts/windows/vm.py relocate-disk --destination-directory /home/olivier/.local/share/memory-windows-lab/NEW-PRIVATE-NAME
+python3 scripts/windows/vm.py start
+```
+
+Choose a new direct child directory; relocation never adopts or overwrites an
+existing destination. It refuses pending restore/firmware recovery, copies the
+existing standalone 200 GiB qcow2 sparsely, verifies exact source/copy SHA-256
+and geometry, and retains the inactive original with matching firmware/TPM
+recovery metadata under the lab. No conversion, reinstall, credential reset,
+live mirroring, symlink or mount trick is involved.
+
+An atomic `active-disk.json`, separate from guest `lab.json`, selects storage.
+Missing/invalid configured storage stops startup; it never falls back to the
+inactive HDD disk. Its initial hash records the cold copy, not a claim that the
+disk remains unchanged after guest writes. Snapshots use the selected disk.
+Restore stages and retains replacement/previous disks beside the active disk
+on NVMe, while journaling under `/data`, so interrupted cross-filesystem recovery
+does not rely on a cross-device rename. Restoring an older guest configuration
+cannot silently switch storage back to the old disk. Never manually boot both
+copies; inspect incomplete relocation/restore evidence before taking new actions.
 
 Host-only checks:
 
