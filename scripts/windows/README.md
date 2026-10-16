@@ -64,6 +64,37 @@ global SSH configuration. Bootstrap execution has not yet been observed.
 Use a local VNC client with `/data/VMs/memory-windows-native/lab/vnc.sock` for
 the installation console. Do not expose VNC or SSH to a public interface.
 
+### Guest-agent automation when SSH is unavailable
+
+Use the existing private `guest-agent.sock`, without modifying the VM disk,
+credentials, SSH configuration or seed:
+
+```bash
+python3 scripts/windows/vm.py guest-info
+python3 scripts/windows/vm.py guest-copy-in scripts/windows/guest-build-tools.ps1 --target 'C:\MemoryLab\inputs\build-tools-qga.ps1'
+python3 scripts/windows/vm.py guest-exec --capture-output 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -- -NoProfile -NonInteractive -Command '[Environment]::OSVersion.VersionString'
+python3 scripts/windows/vm.py guest-exec-status 1234
+python3 scripts/windows/vm.py guest-exec-status 1234 --show-output --saved-status qga-status-1234-RECEIPT.json
+```
+
+Use the PID/receipt actually returned, not the example placeholders. Execution
+is asynchronous and uses literal executable/argument arrays, never implicit
+shell parsing. It runs as the guest-agent service (normally SYSTEM), **not** the
+interactive user; this does not validate user-context Keychain/Credential Manager
+or watcher workflows. Capture requires `--capture-output`; status prints only
+exit/stream metadata until `--show-output`. Completed replies are consumed by
+QGA, so they are retained as private host receipts for explicit later display.
+Output is JSON-escaped, including terminal controls and invalid UTF-8.
+
+Copies are limited to regular files up to 512 MiB and create-new paths beneath
+`C:\MemoryLab\inputs`. Existing targets are refused. Transfers use bounded
+base64 chunks, flush/close, then byte-count/SHA-256 read-back verification.
+Interrupted or failed copies remain for inspection; use a new filename, not
+blind overwrite/retry. This is a trusted synthetic guest transfer helper, not
+a hostile-guest filesystem sandbox. Never pass secrets on argv: QGA itself can
+log command arguments. No command retries an uncertain process launch or write.
+Protocol framing follows the [official QGA reference](https://www.qemu.org/docs/master/interop/qemu-ga-ref).
+
 ## Cold snapshots and recovery
 
 ```bash

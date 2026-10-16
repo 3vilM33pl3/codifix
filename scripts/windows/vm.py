@@ -7,15 +7,17 @@ Cold snapshots include the disk, UEFI variables and TPM state together.
 Never fall back to software emulation or touch a VM not created by this tool.
 """
 import argparse
+import base64
 import contextlib
 import fcntl
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import secrets
 import shutil
 import socket
+import stat
 import subprocess
 import time
 from urllib.parse import urlparse
@@ -24,6 +26,9 @@ import xml.etree.ElementTree as ET
 FORMAT = "memory-windows-lab-v1"
 DEFAULT_ROOT = Path("/data/VMs/memory-windows-native/lab")
 SCRIPT_DIR = Path(__file__).resolve().parent
+QGA_MAX_RESPONSE = 48 * 1024 * 1024  # Two bounded 16 MiB captured streams + base64.
+QGA_COPY_LIMIT = 512 * 1024 * 1024
+QGA_CHUNK = 256 * 1024
 
 
 def run(*args, **kwargs):
@@ -271,6 +276,210 @@ def running(root):
         return None
 
 
+def qga(root, execute, arguments=None):
+    """One non-retrying RPC on a newly synchronized private QGA connection."""
+    try:
+        return _qga_once(root, execute, arguments)
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError(f"guest-agent transport failed ({type(error).__name__}); a dispatched command may be uncertain, do not resend automatically") from None
+
+
+def _qga_once(root, execute, arguments=None):
+    target = root / "guest-agent.sock"
+    info = target.lstat()
+    if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+        raise ValueError("guest-agent socket must be operator-owned and private")
+    with socket.socket(socket.AF_UNIX) as connection:
+        connection.settimeout(15)
+        connection.connect(str(target))
+        with connection.makefile("rwb") as stream:
+            nonce = secrets.randbits(63)
+            stream.write(b'\xff' + json.dumps({"execute": "guest-sync-delimited", "arguments": {"id": nonce}}).encode() + b'\n')
+            stream.flush()
+            scanned = 0
+            while True:
+                line = stream.readline(QGA_MAX_RESPONSE + 1)
+                scanned += len(line)
+                if not line or scanned > QGA_MAX_RESPONSE:
+                    raise ValueError("guest-agent synchronization failed")
+                if b'\xff' in line:
+                    response = json.loads(line.rsplit(b'\xff', 1)[1])
+                    if response.get("return") != nonce:
+                        raise ValueError("guest-agent synchronization identity mismatch")
+                    break
+            message = {"execute": execute}
+            if arguments is not None:
+                message["arguments"] = arguments
+            stream.write(json.dumps(message).encode() + b'\n')
+            stream.flush()
+            line = stream.readline(QGA_MAX_RESPONSE + 1)
+            if not line or len(line) > QGA_MAX_RESPONSE:
+                raise ValueError("guest-agent response unavailable/oversized; outcome may be uncertain, do not resend automatically")
+            response = json.loads(line)
+            if "error" in response:
+                # Agent error descriptions can contain paths or command output.
+                raise ValueError(f"guest agent rejected {execute}; inspect the operation without blind retry")
+            if "return" not in response:
+                raise ValueError("invalid guest-agent response")
+            return response["return"]
+
+
+def guest_exec(root, executable, arguments, capture=False):
+    path = PureWindowsPath(executable)
+    if not path.is_absolute() or len(path.drive) != 2 or path.drive[1] != ':' or path.suffix.lower() != '.exe':
+        raise ValueError("guest-exec requires an explicit absolute native executable, not PATH lookup or a script")
+    if len(arguments) > 128 or any(not isinstance(arg, str) or '\0' in arg for arg in [executable, *arguments]):
+        raise ValueError("invalid guest execution arguments")
+    if sum(len(arg.encode('utf-16-le')) // 2 + 3 for arg in [executable, *arguments]) > 32760:
+        raise ValueError("guest command exceeds Windows argument limit")
+    result = qga(root, "guest-exec", {"path": str(path), "arg": arguments, "capture-output": capture})
+    pid = result.get("pid")
+    if type(pid) is not int or pid <= 0:
+        raise ValueError("invalid guest execution PID; inspect uncertain launch, do not resend")
+    return {"pid": pid, "capture_output": capture, "execution_identity": "guest-agent service (normally SYSTEM), not an interactive user"}
+
+
+def status_summary(result, show_output=False):
+    if not isinstance(result, dict) or type(result.get("exited")) is not bool:
+        raise ValueError("invalid guest execution status")
+    summary = {key: result[key] for key in ["exited", "exitcode", "signal", "out-truncated", "err-truncated"] if key in result}
+    for wire, label in [("out-data", "stdout"), ("err-data", "stderr")]:
+        if wire not in result:
+            continue
+        raw = base64.b64decode(result[wire], validate=True)
+        if len(raw) > 16 * 1024 * 1024:
+            raise ValueError("oversized guest output")
+        summary[label] = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        if show_output:
+            # The caller prints JSON, never raw control codes or shell output.
+            summary[label]["text"] = raw.decode('utf-8', errors='replace')
+    return summary
+
+
+def guest_status(root, pid, show_output=False, saved_status=None):
+    if pid <= 0:
+        raise ValueError("positive guest-exec PID required")
+    if saved_status is not None:
+        name = Path(saved_status).name
+        if name != saved_status or not name.startswith(f"qga-status-{pid}-") or not name.endswith('.json'):
+            raise ValueError("saved status must be this PID's lab receipt filename")
+        path = root / name
+        info = path.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_size > QGA_MAX_RESPONSE:
+            raise ValueError("saved status must be a bounded private operator-owned receipt")
+        result = json.loads(path.read_bytes())
+    else:
+        result = qga(root, "guest-exec-status", {"pid": pid})
+        if result.get("exited"):
+            # QGA consumes a completed result. Preserve it privately so an
+            # initial metadata-only read does not lose later requested output.
+            name = f"qga-status-{pid}-{secrets.token_hex(8)}.json"
+            path = root / name
+            with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'w', encoding='utf-8') as output:
+                json.dump(result, output)
+                output.flush()
+                os.fsync(output.fileno())
+    summary = status_summary(result, show_output)
+    if result.get("exited"):
+        summary["saved_status"] = name
+    return summary
+
+
+def guest_input_target(value):
+    if '/' in value or '\0' in value:
+        raise ValueError("guest input requires an unambiguous Windows lab path")
+    path = PureWindowsPath(value)
+    if len(path.parts) < 4 or tuple(part.casefold() for part in path.parts[:3]) != ('c:\\', 'memorylab', 'inputs'):
+        raise ValueError("guest-copy-in is restricted to C:\\MemoryLab\\inputs\\...")
+    for part in path.parts[3:]:
+        stem = part.split('.', 1)[0].upper()
+        if not part or len(part) > 120 or not part[0].isascii() or not part[0].isalnum() or part.endswith(('.', ' ')) or not all(c.isascii() and (c.isalnum() or c in '-_. ') for c in part):
+            raise ValueError("unsafe guest input component")
+        if stem in {'CON', 'PRN', 'AUX', 'NUL'} or any(stem == f'{prefix}{number}' for prefix in ['COM', 'LPT'] for number in range(1, 10)):
+            raise ValueError("guest input cannot name a Windows device")
+    if len(str(path)) > 240:
+        raise ValueError("guest input path too long")
+    return str(path)
+
+
+def guest_copy_in(root, source, target):
+    target = guest_input_target(target)
+    # O_NOFOLLOW + one retained source handle: no source re-open between hash
+    # and upload. A changed input is rejected before reporting a complete copy.
+    with os.fdopen(os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as input_file:
+        before = os.fstat(input_file.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_size > QGA_COPY_LIMIT:
+            raise ValueError("source must be a regular file of at most 512 MiB")
+        initial = hashlib.sha256(); hashed = 0
+        while chunk := input_file.read(QGA_CHUNK):
+            hashed += len(chunk)
+            if hashed > QGA_COPY_LIMIT:
+                raise ValueError("source grew beyond copy limit")
+            initial.update(chunk)
+        if hashed != before.st_size:
+            raise ValueError("source changed before copy")
+        expected = initial.hexdigest()
+        input_file.seek(0)
+        # QGA Windows file-open does not offer CREATE_NEW. Use a fixed,
+        # path-validated preparation command, then open EXISTING via r+b.
+        # No user script/source contents are inserted into this command.
+        script = "$ErrorActionPreference='Stop'; $p='" + target + "'; $d=[IO.Path]::GetDirectoryName($p); " \
+            "if (-not (Test-Path -LiteralPath 'C:\\MemoryLab' -PathType Container)) { throw 'Missing lab root' }; " \
+            "$parts=$d.Substring(3).Split('\\'); $cur='C:\\'; foreach($part in $parts) { $cur=[IO.Path]::Combine($cur,$part); " \
+            "if (-not (Test-Path -LiteralPath $cur)) { [IO.Directory]::CreateDirectory($cur) | Out-Null }; " \
+            "if ((Get-Item -LiteralPath $cur -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparse path denied' } }; " \
+            "$f=[IO.File]::Open($p,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None); $f.Dispose()"
+        started = guest_exec(root, r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], capture=False)
+        deadline = time.monotonic() + 30
+        while True:
+            prepared = qga(root, 'guest-exec-status', {'pid': started['pid']})
+            if prepared.get('exited'):
+                if prepared.get('exitcode') != 0:
+                    raise ValueError("guest destination preparation failed; existing files are never overwritten")
+                break
+            if time.monotonic() >= deadline:
+                raise ValueError("destination preparation uncertain; inspect before retry")
+            time.sleep(0.1)
+        handle = qga(root, 'guest-file-open', {'path': target, 'mode': 'r+b'})
+        if type(handle) is not int or handle < 0:
+            raise ValueError("invalid guest file handle; inspect retained input")
+        total = 0
+        try:
+            while chunk := input_file.read(QGA_CHUNK):
+                if total + len(chunk) > before.st_size:
+                    raise ValueError("source grew during copy; partial input retained")
+                result = qga(root, 'guest-file-write', {'handle': handle, 'buf-b64': base64.b64encode(chunk).decode('ascii'), 'count': len(chunk)})
+                if type(result.get('count')) is not int or result.get('count') != len(chunk):
+                    raise ValueError("incomplete guest write; partial input retained, no automatic retry")
+                total += len(chunk)
+            qga(root, 'guest-file-flush', {'handle': handle})
+        finally:
+            qga(root, 'guest-file-close', {'handle': handle})
+        after = os.fstat(input_file.fileno())
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns) or total != before.st_size:
+            raise ValueError("source changed during copy; partial guest input retained")
+        handle = qga(root, 'guest-file-open', {'path': target, 'mode': 'rb'})
+        if type(handle) is not int or handle < 0:
+            raise ValueError("invalid guest read-back handle")
+        actual = hashlib.sha256(); received = 0
+        try:
+            while True:
+                result = qga(root, 'guest-file-read', {'handle': handle, 'count': QGA_CHUNK})
+                chunk = base64.b64decode(result.get('buf-b64', ''), validate=True)
+                if type(result.get('count')) is not int or type(result.get('eof')) is not bool or result.get('count') != len(chunk) or len(chunk) > QGA_CHUNK or received + len(chunk) > total:
+                    raise ValueError("invalid guest read-back; input not verified")
+                actual.update(chunk); received += len(chunk)
+                if result.get('eof'):
+                    break
+                if not chunk:
+                    raise ValueError("guest read-back made no progress")
+        finally:
+            qga(root, 'guest-file-close', {'handle': handle})
+        if received != total or actual.hexdigest() != expected:
+            raise ValueError("guest read-back digest mismatch; retain input for inspection")
+        return {"target": target, "bytes": total, "sha256": expected, "read_back_verified": True, "overwrite": False}
+
+
 def require_stopped(root):
     if running(root):
         raise ValueError("guest must be stopped")
@@ -488,6 +697,18 @@ def main():
     copy_args = sub.add_parser("copy-in")
     copy_args.add_argument("source", type=Path)
     copy_args.add_argument("--name", required=True)
+    sub.add_parser("guest-info", help="QGA version/enabled commands; no SSH required")
+    execute_args = sub.add_parser("guest-exec", help="QGA async native executable; no implicit shell")
+    execute_args.add_argument("--capture-output", action="store_true")
+    execute_args.add_argument("executable")
+    execute_args.add_argument("guest_arguments", nargs=argparse.REMAINDER)
+    status_args = sub.add_parser("guest-exec-status", help="QGA status; output text requires explicit --show-output")
+    status_args.add_argument("pid", type=int)
+    status_args.add_argument("--show-output", action="store_true")
+    status_args.add_argument("--saved-status", help="private lab receipt filename; does not contact guest")
+    guest_copy_args = sub.add_parser("guest-copy-in", help="QGA create-new bounded input with read-back hash")
+    guest_copy_args.add_argument("source", type=Path)
+    guest_copy_args.add_argument("--target", required=True)
     args = parser.parse_args()
     os.umask(0o077)
     root = private_root(args.root)
@@ -518,6 +739,17 @@ def main():
             ssh(root, data, args.guest_command)
         elif args.command == "copy-in":
             copy_in(root, data, args.source, args.name)
+        elif args.command == "guest-info":
+            print(json.dumps(qga(root, "guest-info")))
+        elif args.command == "guest-exec":
+            arguments = args.guest_arguments
+            if arguments[:1] == ['--']:
+                arguments = arguments[1:]
+            print(json.dumps(guest_exec(root, args.executable, arguments, args.capture_output)))
+        elif args.command == "guest-exec-status":
+            print(json.dumps(guest_status(root, args.pid, args.show_output, args.saved_status)))
+        elif args.command == "guest-copy-in":
+            print(json.dumps(guest_copy_in(root, args.source, args.target)))
 
 
 if __name__ == "__main__":
