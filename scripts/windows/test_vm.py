@@ -12,6 +12,30 @@ import vm
 
 
 class SeedTests(unittest.TestCase):
+    def test_relocation_rejects_pending_restore_or_firmware_before_any_change(self):
+        for pending in ('restore-123','secure-boot-nvram.partial'):
+            with self.subTest(pending=pending), tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary) / 'lab'; root.mkdir(mode=0o700)
+                original=root / 'disk.qcow2'; original.write_bytes(b'original')
+                marker=root / pending
+                if pending.startswith('restore-'):
+                    marker.mkdir(mode=0o700)
+                    vm.write_json(marker / 'intent.json',{'retained':'do not change'})
+                else:
+                    marker.write_bytes(b'pending firmware')
+                before={str(path.relative_to(root)):path.read_bytes()
+                        for path in root.rglob('*') if path.is_file()}
+                base=Path(temporary) / 'nvme'
+                with patch.object(vm,'ACTIVE_DISK_BASE',base),patch.object(vm,'require_stopped'), \
+                        patch.object(vm,'disk_information') as information:
+                    with self.assertRaisesRegex(ValueError,'interrupted'):
+                        vm.relocate_disk(root,base / 'active')
+                    information.assert_not_called()
+                self.assertFalse(base.exists())
+                after={str(path.relative_to(root)):path.read_bytes()
+                       for path in root.rglob('*') if path.is_file()}
+                self.assertEqual(before,after)
+
     def test_active_descriptor_never_falls_back_to_legacy_disk(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / 'lab'

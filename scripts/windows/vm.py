@@ -131,6 +131,7 @@ def active_disk(root, missing=False):
 def relocate_disk(root, directory):
     """Cold exact-copy relocation; original HDD state remains recoverable."""
     require_stopped(root)
+    require_no_pending_state(root)
     if (root / "active-disk.json").exists() or (root / "active-disk.json").is_symlink():
         raise ValueError("active disk already configured; no implicit relocation/adoption")
     source = root / "disk.qcow2"
@@ -606,13 +607,18 @@ def require_stopped(root):
             raise ValueError("lab process still exists; wait for clean shutdown")
 
 
+def require_no_pending_state(root):
+    """Do not boot or change disk ownership around incomplete state changes."""
+    if (root / "secure-boot-nvram.partial").exists():
+        raise ValueError("interrupted firmware update must be reconciled before boot or disk relocation")
+    if any(not (path / "complete.json").exists() for path in root.glob("restore-*") if path.is_dir()):
+        raise ValueError("interrupted restore must be reconciled with recover-restore before boot or disk relocation")
+
+
 def start(root, data, install):
     require_stopped(root)
+    require_no_pending_state(root)
     disk = active_disk(root)
-    if (root / "secure-boot-nvram.partial").exists():
-        raise ValueError("interrupted firmware update must be reconciled before boot")
-    if any(not (path / "complete.json").exists() for path in root.glob("restore-*") if path.is_dir()):
-        raise ValueError("interrupted restore must be reconciled with recover-restore before boot")
     kvm()
     for name in ["qmp.sock", "tpm.sock", "guest-agent.sock", "vnc.sock"]:
         (root / name).unlink(missing_ok=True)
