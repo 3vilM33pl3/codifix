@@ -65,12 +65,16 @@ separate native acceptance item.
 
 1. Allocate one stable operation UUID. Run `-Action Preview` with `-Name`,
    `-OperationId`, `-PackagePath` (candidate ZIP), `-ManifestPath`,
-   `-ManifestSha256`, `-ConfigPath`, `-HealthUri` and `-ExpectedInstanceId`.
-   `/healthz` must be loopback HTTP and report that exact instance UUID.
+   `-ManifestSha256`, `-ConfigPath`, `-HealthUri`, `-ExpectedInstanceId` and
+   `-RecoveryReference` pointing to actual operator recovery evidence. For an
+   upgrade preview, also pass `-PreviewAction Upgrade` (the default is Install).
+   `/healthz` must be loopback HTTP and report that exact configured UUID in
+   `area_instance_id`, not the process-local `instance_id`.
 2. Review the metadata-only preview. Execute the same inputs elevated using
    `-Action Install` or `Upgrade`, its `-ExpectedInputSha256`,
-   `-DatabaseCompatibilityConfirmed`, and `-RecoveryReference` pointing to actual
-   operator recovery evidence. The adapter performs **no database backup**.
+   `-DatabaseCompatibilityConfirmed`, and the same `-RecoveryReference`.
+   The action and recovery reference are bound to the preview and retries.
+   The adapter performs **no database backup**.
 3. Reuse the exact operation ID and inputs after interruption. Changed inputs
    fail closed; completed retries do not restart a service. Journals and observed
    phase history live under `%ProgramData%\MemoryLayer\operations\<operation-id>`.
@@ -97,6 +101,7 @@ Pure validators and atomic journal replacement can run without Windows/admin:
 
 ```powershell
 ./packaging/windows/test-native-instance.ps1
+./packaging/windows/native-instance-validation-tests.ps1
 ```
 
 ## Installer identity and upgrades

@@ -9,11 +9,37 @@ import vm
 
 
 class SeedTests(unittest.TestCase):
+    def test_seed_refresh_preserves_account_key_and_disk(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            seed = root / 'seed'
+            seed.mkdir()
+            original = vm.unattended('synthetic<&password')
+            (seed / 'Autounattend.xml').write_bytes(original)
+            (seed / 'authorized_keys').write_bytes(b'synthetic-public-key')
+            (seed / 'bootstrap.ps1').write_bytes(b'original-bootstrap')
+            (root / 'seed.iso').write_bytes(b'original-iso')
+            (root / 'disk.qcow2').write_bytes(b'original-disk')
+
+            def generate_iso(*args, **kwargs):
+                Path(args[args.index('-o') + 1]).write_bytes(b'new-iso')
+
+            with patch.object(vm, 'require_stopped'), patch.object(vm, 'run', side_effect=generate_iso):
+                vm.refresh_seed(root)
+            retained = next(root.glob('seed-refresh-*'))
+            self.assertEqual((retained / 'previous-seed/Autounattend.xml').read_bytes(), original)
+            self.assertEqual((retained / 'previous-seed.iso').read_bytes(), b'original-iso')
+            self.assertEqual((seed / 'Autounattend.xml').read_bytes(), original)
+            self.assertEqual((seed / 'authorized_keys').read_bytes(), b'synthetic-public-key')
+            self.assertEqual((root / 'disk.qcow2').read_bytes(), b'original-disk')
+            self.assertEqual((root / 'seed.iso').read_bytes(), b'new-iso')
+
     def test_copy_input_names_cannot_be_commands_or_remote_paths(self):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / 'source.zip'
             source.write_bytes(b'synthetic')
-            for name in ['../source', 'a/b', 'x:y', 'a;whoami', '-option', '.hidden', 'a b', '']:
+            for name in ['../source', 'a/b', 'x:y', 'a;whoami', '-option', '.hidden', 'a b', '',
+                         'NUL', 'con.txt', 'COM1.zip', 'lpt9', 'trailing.']:
                 with self.assertRaises(ValueError):
                     vm.copy_in(Path(temporary), {}, source, name)
             with patch.object(vm, 'ssh'), patch.object(vm, 'run') as run:

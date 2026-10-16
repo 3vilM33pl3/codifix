@@ -366,6 +366,10 @@ def copy_in(root, data, source, name):
     if not name or len(name) > 120 or not name[0].isascii() or not name[0].isalnum() or not all(
             c.isascii() and (c.isalnum() or c in "-_.") for c in name):
         raise ValueError("guest input name must be a simple ASCII filename")
+    stem = name.split('.', 1)[0].upper()
+    if name.endswith('.') or stem in {'CON', 'PRN', 'AUX', 'NUL'} or any(
+            stem == f'{prefix}{number}' for prefix in ['COM', 'LPT'] for number in range(1, 10)):
+        raise ValueError("guest input name cannot alias a Windows device or trailing dot")
     source = source.resolve(strict=True)
     ssh(root, data, ["New-Item -ItemType Directory -Force C:\\MemoryLab\\inputs | Out-Null"])
     run("scp", "-i", root / "ssh-key", "-P", data["ssh_port"],
