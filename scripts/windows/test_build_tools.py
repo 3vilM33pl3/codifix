@@ -99,6 +99,7 @@ class BuildToolsManifestTests(unittest.TestCase):
                          'execution_verified=$false', 'credentials::windows::tests',
                          'workspace::filesystem::windows::tests', 'agents::settings::filesystem::tests',
                          'runtime_env_windows::tests',
+                         'pds_pipe::native::tests',
                          'collector::codex::windows::native::tests']:
             self.assertIn(required, script)
         self.assertNotIn('Invoke-Expression', script)

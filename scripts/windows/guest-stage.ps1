@@ -28,8 +28,8 @@ function Get-BoundFiles([string]$SelectedStage) {
             @('guest-native-api.ps1','native-api.json')
             $api = Get-Content -LiteralPath 'C:\MemoryLab\inputs\native-api.json' -Raw | ConvertFrom-Json
             if ($api.format -ne 'memory-windows-native-api-v1' -or
-                (@($api.artifacts | ForEach-Object { $_.kind } | Sort-Object) -join ',') -ne 'desktop,isolation-probe,onboarding,platform,protected-files,routing') {
-                throw 'Native API manifest requires exactly six executable kinds'
+                (@($api.artifacts | ForEach-Object { $_.kind } | Sort-Object) -join ',') -ne 'desktop,federation-pipe,isolation-probe,onboarding,platform,protected-files,routing') {
+                throw 'Native API manifest requires exactly seven executable kinds'
             }
             $seen = @{}
             foreach ($artifact in ($api.artifacts | Sort-Object kind)) {

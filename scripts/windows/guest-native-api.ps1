@@ -22,10 +22,10 @@ foreach ($name in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY')) {
 }
 $manifestPath = Join-Path $inputs 'native-api.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-$kinds = 'desktop,isolation-probe,onboarding,platform,protected-files,routing'
+$kinds = 'desktop,federation-pipe,isolation-probe,onboarding,platform,protected-files,routing'
 if ($manifest.format -ne 'memory-windows-native-api-v1' -or
     (@($manifest.artifacts | ForEach-Object { $_.kind } | Sort-Object) -join ',') -ne $kinds) {
-    throw 'Native API manifest requires exactly the six reviewed executable kinds'
+    throw 'Native API manifest requires exactly the seven reviewed executable kinds'
 }
 $names = @{}
 foreach ($artifact in $manifest.artifacts) {
@@ -85,6 +85,7 @@ try {
             'protected-files' { @('tests::') }
             'platform' { @('tests::') }
             'routing' { @('area::tests') }
+            'federation-pipe' { @('pds_pipe::native::tests') }
             'desktop' { @('collector::codex::windows::native::tests') }
             'onboarding' { @('credentials::windows::tests','workspace::filesystem::windows::tests','agents::settings::filesystem::tests','runtime_env_windows::tests','manual_') }
         }
