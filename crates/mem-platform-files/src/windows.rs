@@ -497,15 +497,10 @@ fn information(file: &File, directory: bool) -> io::Result<Identity> {
 fn open(path: &Path, directory: bool, private: bool) -> io::Result<File> {
     let file = OpenOptions::new()
         .read(true)
-        // Directory pins need identity/security metadata, not directory data.
-        // Windows opens a rename destination directory for child insertion;
-        // allow that write open without allowing the pinned directory itself
-        // to be renamed/deleted. Protected file readers remain restrictive.
-        .access_mode(if directory {
-            READ_CONTROL | FILE_READ_ATTRIBUTES
-        } else {
-            GENERIC_READ | READ_CONTROL
-        })
+        // Directory data access makes deny-delete sharing an actual rename
+        // fence; metadata-only handles do not participate in that share check.
+        // Write sharing permits child insertion without sharing directory delete.
+        .access_mode(GENERIC_READ | READ_CONTROL)
         .share_mode(FILE_SHARE_READ | if directory { FILE_SHARE_WRITE } else { 0 })
         .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
         .open(path)?;
@@ -913,6 +908,41 @@ mod tests {
         root
     }
 
+    fn synthetic_service_acl(path: &Path, sid: &str, rights: &str) {
+        // A synthetic SID deliberately has no account mapping. Construct its
+        // ACE directly rather than making icacls resolve a nonexistent service.
+        let current = current_sid().unwrap();
+        let sddl = wide(OsStr::new(&format!(
+            "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;{current})(A;;{rights};;;{sid})"
+        )));
+        let mut descriptor = null_mut();
+        // SAFETY: trusted test-only SDDL and live output allocation.
+        assert_ne!(
+            unsafe {
+                ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                    sddl.as_ptr(),
+                    SDDL_REVISION_1,
+                    &mut descriptor,
+                    null_mut(),
+                )
+            },
+            0
+        );
+        let allocation = LocalAllocation(descriptor);
+        let path = wide(path.as_os_str());
+        // SAFETY: both NUL-terminated path and security descriptor live through call.
+        assert_ne!(
+            unsafe {
+                windows_sys::Win32::Security::SetFileSecurityW(
+                    path.as_ptr(),
+                    DACL_SECURITY_INFORMATION,
+                    allocation.0,
+                )
+            },
+            0
+        );
+    }
+
     #[test]
     fn explicit_service_reader_is_read_only_exact_and_does_not_relax_normal_inputs() {
         let root = private_root();
@@ -924,14 +954,7 @@ mod tests {
         let sid = "S-1-5-80-1-2-3-4-5";
         let reader = ServiceReader { sid: sid.into() };
         for target in [&parent, &path] {
-            assert!(
-                std::process::Command::new("icacls.exe")
-                    .arg(target)
-                    .args(["/grant", &format!("*{sid}:(RX)")])
-                    .status()
-                    .unwrap()
-                    .success()
-            );
+            synthetic_service_acl(target, sid, "GRGX");
         }
         assert!(Input::open(&path, 9).is_err());
         assert_eq!(
@@ -948,14 +971,7 @@ mod tests {
         let held = ServiceInput::open(&path, 9, &reader).unwrap();
         assert!(OpenOptions::new().write(true).open(&path).is_err());
         drop(held);
-        assert!(
-            std::process::Command::new("icacls.exe")
-                .arg(&path)
-                .args(["/grant", &format!("*{sid}:(W)")])
-                .status()
-                .unwrap()
-                .success()
-        );
+        synthetic_service_acl(&path, sid, "GRGXGW");
         assert!(ServiceInput::open(&path, 9, &reader).is_err());
         assert!(ServiceReader::for_named_service("OtherService").is_err());
         assert!(ServiceReader::for_named_service("MemoryLayer-../bad").is_err());
