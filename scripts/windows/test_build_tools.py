@@ -30,6 +30,9 @@ class BuildToolsManifestTests(unittest.TestCase):
         script = (Path(__file__).parent / 'guest-bootstrap.ps1').read_text()
         self.assertLess(script.index("New-Item -ItemType Directory -Force 'C:\\ProgramData\\ssh'"),
                         script.index('Copy-Item "$seed\\authorized_keys"'))
+        self.assertIn("Get-Service -Name 'QEMU-GA'", script)
+        self.assertIn('guest-agent-install.log', script)
+        self.assertIn('Write-Error -ErrorRecord $_ -ErrorAction Continue', script)
 
     def test_guest_observation_is_lab_scoped_and_metadata_only(self):
         script = (Path(__file__).parent / 'guest-observe.ps1').read_text()

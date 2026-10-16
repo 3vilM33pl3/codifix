@@ -20,8 +20,16 @@ try {
             if ($LASTEXITCODE -notin @(0, 3010)) { throw "Driver installation failed: $driver" }
         }
         $agent = Join-Path $root 'guest-agent\qemu-ga-x86_64.msi'
-        $process = Start-Process msiexec.exe -ArgumentList @('/i', "`"$agent`"", '/qn', '/norestart') -Wait -PassThru
-        if ($process.ExitCode -notin @(0, 3010)) { throw 'Guest agent installation failed' }
+        # Recovery must not reinstall/stop the agent through which it is running.
+        $installedAgent = Get-Service -Name 'QEMU-GA' -ErrorAction SilentlyContinue
+        if (-not $installedAgent) {
+            $installLog = Join-Path $Lab 'guest-agent-install.log'
+            $process = Start-Process msiexec.exe -ArgumentList @('/i', "`"$agent`"", '/qn', '/norestart', '/l*v', "`"$installLog`"") -Wait -PassThru
+            Write-Output "Guest agent installer exit code: $($process.ExitCode)"
+            if ($process.ExitCode -notin @(0, 3010)) { throw 'Guest agent installation failed; inspect guest-agent-install.log' }
+        }
+        Set-Service -Name 'QEMU-GA' -StartupType Automatic
+        if ((Get-Service -Name 'QEMU-GA').Status -ne 'Running') { Start-Service -Name 'QEMU-GA' }
     }
     $server = Get-WindowsCapability -Online | Where-Object Name -like 'OpenSSH.Server*'
     if ($server.State -ne 'Installed') { Add-WindowsCapability -Online -Name $server.Name | Out-Null }
@@ -57,6 +65,12 @@ Match Group administrators
         build = (Get-CimInstance Win32_OperatingSystem).BuildNumber
         architecture = $env:PROCESSOR_ARCHITECTURE
         ssh_password_authentication = $false
+        guest_agent_running = ((Get-Service -Name 'QEMU-GA').Status -eq 'Running')
         completed_at = [DateTime]::UtcNow.ToString('o')
     } | ConvertTo-Json | Set-Content "$Lab\bootstrap-result.json"
+} catch {
+    # Render before Stop-Transcript: otherwise a terminating error is printed
+    # after the finally block and the retained transcript omits its cause.
+    Write-Error -ErrorRecord $_ -ErrorAction Continue
+    throw
 } finally { Stop-Transcript }
