@@ -14,6 +14,7 @@ $root = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) "Memor
 $names = @("MemoryLayer-test-a-$suffix", "MemoryLayer-test-b-$suffix")
 $sc = Join-Path $env:SystemRoot 'System32\sc.exe'
 $created = @()
+$passed = $false
 function Invoke-TestSc([string[]]$Values) { $null = & $sc @Values; if ($LASTEXITCODE -ne 0) { throw 'Disposable test SCM operation failed' } }
 try {
     Set-NativePrivateDirectory $root -SharedAncestor
@@ -58,7 +59,19 @@ try {
         if ($LASTEXITCODE -eq 0) { throw 'Different service reader accepted sibling authority' }
     }
     Write-Output 'Observed two virtual service identities: own read/write, immutable authority, denied sibling, ancestor grants preserved'
+    $passed = $true
+} catch {
+    # Capture synthetic SCM diagnostics before cleanup removes the registration.
+    # Never retain real customer configuration or credentials in this fixture.
+    $failure = [ordered]@{message=$_.Exception.Message;inner_message=$_.Exception.InnerException.Message;services=@()}
+    foreach ($name in $created) {
+        $failure.services += Get-CimInstance Win32_Service -Filter ("Name='"+$name+"'") |
+            Select-Object Name,State,ExitCode,ServiceSpecificExitCode,ProcessId
+    }
+    $failure | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $root 'failure.json') -Encoding UTF8
+    throw
 } finally {
     foreach ($name in $created) { Stop-Service $name -ErrorAction SilentlyContinue; $null = & $sc delete $name }
-    if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
+    if ($passed) { Remove-Item -LiteralPath $root -Recurse -Force }
+    elseif (Test-Path -LiteralPath $root) { Write-Output ("Retained synthetic failure evidence: " + $root) }
 }
