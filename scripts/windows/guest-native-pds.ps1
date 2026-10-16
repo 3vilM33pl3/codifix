@@ -29,7 +29,7 @@ $tools = 'C:\MemoryLab\Tools'
 $runtime = Join-Path $root 'runtime'
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 New-Item -ItemType Directory -Force $root | Out-Null
-Run-Checked 'icacls.exe' @($root,'/inheritance:r','/grant:r',"${sid}:(OI)(CI)F",'*S-1-5-18:(OI)(CI)F','*S-1-5-32-544:(OI)(CI)F')
+Run-Checked 'icacls.exe' @($root,'/inheritance:r','/grant:r',"*${sid}:(OI)(CI)F",'*S-1-5-18:(OI)(CI)F','*S-1-5-32-544:(OI)(CI)F')
 $upstream = Join-Path $SourceRoot 'packaging\windows-pds\upstream'
 Assert-Hash (Join-Path $upstream 'package.json') $manifest.package_sha256
 Assert-Hash (Join-Path $upstream 'pnpm-lock.yaml') $manifest.lock_sha256

@@ -24,7 +24,7 @@ $secret = Join-Path $root 'test-password.dpapi'
 $bin = Join-Path $pg 'bin'
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 New-Item -ItemType Directory -Force $root | Out-Null
-& icacls.exe $root /inheritance:r /grant:r "${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+& icacls.exe $root /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Private database proof directory ACL failed' }
 function Run-Checked([string]$Exe, [string[]]$Arguments) {
     & $Exe @Arguments

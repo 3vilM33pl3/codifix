@@ -80,7 +80,7 @@ if ($Action -eq 'Start') {
     }
     New-Item -ItemType Directory -Force $root | Out-Null
     $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-    & icacls.exe $root /inheritance:r /grant:r "${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+    & icacls.exe $root /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Stage directory protection failed' }
     $inputRecord | ConvertTo-Json | Set-Content -LiteralPath $descriptor -Encoding UTF8
     Save-Status 'queued' 'local_scheduled_task'

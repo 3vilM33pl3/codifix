@@ -10,7 +10,7 @@ $inputs = 'C:\MemoryLab\inputs'
 $root = Join-Path (Join-Path 'C:\MemoryLab\runs' $OperationId.ToString()) 'native-api'
 New-Item -ItemType Directory -Path $root | Out-Null
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-& icacls.exe $root /inheritance:r /grant:r "${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+& icacls.exe $root /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Native API results ACL failed' }
 foreach ($name in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY')) {
     if ([Environment]::GetEnvironmentVariable($name)) { throw 'Native API tests require a provider-credential-free environment' }

@@ -7,6 +7,13 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_icacls_receives_explicit_numeric_sid_syntax(self):
+        for name in ['guest-stage.ps1', 'guest-native-api.ps1',
+                     'guest-native-postgres.ps1', 'guest-native-pds.ps1']:
+            script = (Path(__file__).parent / name).read_text()
+            self.assertIn('"*${sid}:(OI)(CI)F"', script)
+            self.assertNotIn('"${sid}:(OI)(CI)F"', script)
+
     def test_native_api_stage_is_hash_bound_interactive_and_bounded(self):
         root = Path(__file__).parent
         stage = (root / 'guest-stage.ps1').read_text()
