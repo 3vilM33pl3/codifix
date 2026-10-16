@@ -23,6 +23,13 @@ alone does not establish the complete installation journey.
 | `agents prepare/status/configure/mcp` | Separate, explicitly approved Codex or Claude cache access. |
 
 Use each command's `--help` for its required project, company and journal arguments.
+
+The Windows port accepts local drive paths, checks physical identities rather
+than trusting case-sensitive path spelling, and rejects junctions/reparse points,
+reserved device names and alternate data streams. Its setup journals and locks
+use protected Windows file handles. These paths have cross-compilation evidence;
+the native onboarding journey and project agent-settings merge remain separate
+acceptance items, not a completed Windows installation claim.
 The native setup operator supplies profiles; do not place credentials in JSON files.
 
 `shared_publications_v1` downloads approved publications only. The separately

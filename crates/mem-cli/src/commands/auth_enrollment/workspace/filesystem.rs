@@ -9,6 +9,9 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 use uuid::Uuid;
+#[cfg(windows)]
+#[path = "filesystem/windows.rs"]
+mod windows;
 
 pub(super) fn digest(value: &impl Serialize) -> Result<String> {
     Ok(bytes_digest(&serde_json::to_vec(value)?))
@@ -45,15 +48,40 @@ pub(super) fn exists(path: &Path) -> Result<bool> {
 }
 fn no_symlinks(path: &Path) -> Result<()> {
     let mut current = PathBuf::new();
-    for component in path.components() {
+    for (index, component) in path.components().enumerate() {
         match component {
-            Component::RootDir | Component::Normal(_) => current.push(component.as_os_str()),
+            Component::RootDir => current.push(component.as_os_str()),
+            Component::Normal(name) => {
+                #[cfg(windows)]
+                windows::validate_name(name)?;
+                current.push(name);
+            }
+            #[cfg(windows)]
+            Component::Prefix(prefix)
+                if index == 0
+                    && matches!(
+                        prefix.kind(),
+                        std::path::Prefix::Disk(_) | std::path::Prefix::VerbatimDisk(_)
+                    ) =>
+            {
+                current.push(component.as_os_str());
+                continue; // Inspect C:\ only after the RootDir component.
+            }
             _ => bail!("paths must be absolute without traversal"),
         }
-        if let Ok(metadata) = fs::symlink_metadata(&current)
-            && metadata.file_type().is_symlink()
-        {
-            bail!("symlinked workspace/journal paths are not supported; existing paths preserved");
+        let _ = index; // Prefix position is meaningful only on Windows.
+        match fs::symlink_metadata(&current) {
+            Ok(metadata) => {
+                #[cfg(windows)]
+                windows::reject_reparse(&metadata)?;
+                if metadata.file_type().is_symlink() {
+                    bail!(
+                        "symlinked workspace/journal paths are not supported; existing paths preserved"
+                    );
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => bail!("workspace/journal ancestor could not be inspected"),
         }
     }
     Ok(())
@@ -82,19 +110,20 @@ fn identity(path: &Path) -> Result<(u64, u64)> {
     let metadata = fs::metadata(path)?;
     Ok((metadata.dev(), metadata.ino()))
 }
+#[cfg(windows)]
+fn identity(path: &Path) -> Result<(u64, u64)> {
+    windows::identity(path)
+}
 
 /// Physical ancestor checks catch APFS case aliases, symlinks and mount aliases
 /// without assuming that canonical path spelling or ASCII case is authority.
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 pub(super) fn separate(journal: &Path, workspace: &Path) -> Result<()> {
     for path in [journal, workspace] {
-        if !path.is_absolute()
-            || path
-                .components()
-                .any(|part| !matches!(part, Component::RootDir | Component::Normal(_)))
-        {
+        if !path.is_absolute() {
             bail!("physical containment requires absolute paths without traversal");
         }
+        no_symlinks(path)?;
     }
     fn inside(child: &Path, root: &Path) -> Result<bool> {
         if !exists(root)? {
@@ -156,7 +185,7 @@ pub(super) fn separate(journal: &Path, workspace: &Path) -> Result<()> {
     }
     Ok(())
 }
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 pub(super) fn separate(_: &Path, _: &Path) -> Result<()> {
     bail!(
         "physical workspace containment validation is unsupported on this platform; no local writes performed"
@@ -179,6 +208,8 @@ pub(super) fn is_repository(path: &Path) -> Result<bool> {
 
 pub(super) struct Lock {
     _file: fs::File,
+    #[cfg(windows)]
+    _directory: mem_platform::private_windows::Directory,
 }
 fn lock_path(path: &Path) -> Result<PathBuf> {
     Ok(path.with_file_name(format!(
@@ -192,19 +223,33 @@ impl Lock {
     pub(super) fn take(path: &Path) -> Result<Self> {
         let lock = lock_path(path)?;
         no_symlinks(&lock)?;
+        #[cfg(windows)]
+        let directory = mem_platform::private_windows::Directory::open(
+            lock.parent()
+                .ok_or_else(|| anyhow::anyhow!("journal parent unavailable"))?,
+        )?;
+        #[cfg(not(windows))]
         let mut options = fs::OpenOptions::new();
+        #[cfg(not(windows))]
         options.write(true).create(true).truncate(false);
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600);
         }
+        #[cfg(not(windows))]
         let file = options.open(lock)?;
+        #[cfg(windows)]
+        let file = mem_platform::private_windows::open_private_lock(&lock)?;
         file.try_lock().map_err(|_| {
             anyhow::anyhow!("journal is in use by another process; no effects performed")
         })?;
         // OS lock releases on interruption; leave the same inode for all retries.
-        Ok(Self { _file: file })
+        Ok(Self {
+            _file: file,
+            #[cfg(windows)]
+            _directory: directory,
+        })
     }
 }
 impl Drop for Lock {
@@ -216,6 +261,7 @@ impl Drop for Lock {
     }
 }
 
+#[cfg(not(windows))]
 fn exclusive(path: &Path) -> Result<fs::File> {
     let mut options = fs::OpenOptions::new();
     options.write(true).create_new(true);
@@ -228,12 +274,20 @@ fn exclusive(path: &Path) -> Result<fs::File> {
         .open(path)
         .map_err(|_| anyhow::anyhow!("refusing to replace an existing local file"))
 }
+#[cfg(windows)]
+fn exclusive(path: &Path) -> Result<fs::File> {
+    Ok(mem_platform::private_windows::create_private_file(path)?)
+}
 pub(super) fn read(path: &Path) -> Result<Journal> {
     no_symlinks(path)?;
+    #[cfg(not(windows))]
     let mut bytes = Vec::new();
+    #[cfg(not(windows))]
     fs::File::open(path)?
         .take(512 * 1024 + 1)
         .read_to_end(&mut bytes)?;
+    #[cfg(windows)]
+    let bytes = mem_platform::private_windows::Input::open(path, 512 * 1024)?.read(512 * 1024)?;
     if bytes.len() > 512 * 1024 {
         bail!("journal exceeds metadata limit");
     }
@@ -259,6 +313,11 @@ pub(super) fn read(path: &Path) -> Result<Journal> {
 }
 pub(super) fn create_journal(path: &Path, journal: &Journal) -> Result<()> {
     separate(path, &journal.plan.workspace)?;
+    #[cfg(windows)]
+    let _parent = mem_platform::private_windows::Directory::open(
+        path.parent()
+            .ok_or_else(|| anyhow::anyhow!("journal parent unavailable"))?,
+    )?;
     let mut file = exclusive(path)?;
     file.write_all(&serde_json::to_vec_pretty(journal)?)?;
     file.sync_all()?;
@@ -269,9 +328,21 @@ pub(super) fn save(path: &Path, journal: &Journal) -> Result<()> {
     no_symlinks(path)?;
     let temporary = path.with_file_name(format!(".memory-journal-{}.tmp", Uuid::new_v4()));
     create_journal(&temporary, journal)?;
+    #[cfg(not(windows))]
     fs::rename(&temporary, path).map_err(|_| {
         anyhow::anyhow!("journal update unconfirmed; inspect saved metadata before retry")
     })?;
+    #[cfg(windows)]
+    {
+        let _parent = mem_platform::private_windows::Directory::open(
+            path.parent()
+                .ok_or_else(|| anyhow::anyhow!("journal parent unavailable"))?,
+        )?;
+        // Reject an unsafe existing destination before an atomic same-directory
+        // replacement. Metadata-only journal inputs never become credentials.
+        mem_platform::private_windows::Input::open(path, 512 * 1024)?.unchanged()?;
+        mem_platform::private_windows::replace_file(&temporary, path)?;
+    }
     Ok(())
 }
 
@@ -415,14 +486,13 @@ fn move_tree(source: &Path, target: &Path) -> Result<()> {
             fs::remove_dir(&src)?;
         } else if metadata.is_file() {
             if let Err(error) = fs::hard_link(&src, &dst) {
-                #[cfg(unix)]
+                #[cfg(any(unix, windows))]
                 {
-                    use std::os::unix::fs::MetadataExt;
                     // Recover an interruption between link and source unlink.
                     if let Ok(existing) = fs::symlink_metadata(&dst)
                         && existing.is_file()
-                        && metadata.dev() == existing.dev()
-                        && metadata.ino() == existing.ino()
+                        && let (Ok(source_id), Ok(target_id)) = (identity(&src), identity(&dst))
+                        && source_id == target_id
                     {
                         fs::remove_file(&src)?;
                         continue;

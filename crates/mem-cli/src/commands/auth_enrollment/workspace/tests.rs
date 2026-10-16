@@ -62,6 +62,29 @@ fn identity() -> (CompanyOrigin, Enrollment) {
     };
     (origin, record)
 }
+#[cfg(any(unix, windows))]
+#[test]
+fn interrupted_large_file_publication_recognizes_existing_hard_link() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("source");
+    let target = fixture.0.join("target");
+    fs::create_dir(&source).unwrap();
+    fs::create_dir(&target).unwrap();
+    let receipt = ".memory-receipt.json";
+    let receipt_bytes = b"synthetic reviewed operation";
+    fs::write(target.join(receipt), receipt_bytes).unwrap();
+    let mut large = fs::File::create(source.join("large.bin")).unwrap();
+    large.write_all(&vec![42; 2 * 1024 * 1024 + 1]).unwrap();
+    drop(large);
+    fs::hard_link(source.join("large.bin"), target.join("large.bin")).unwrap();
+    filesystem::publish_directory(&source, &target, receipt, receipt_bytes).unwrap();
+    assert!(!source.exists());
+    assert_eq!(
+        fs::metadata(target.join("large.bin")).unwrap().len(),
+        2 * 1024 * 1024 + 1
+    );
+    assert_eq!(fs::read(target.join(receipt)).unwrap(), receipt_bytes);
+}
 #[cfg(feature = "project-sync")]
 #[tokio::test]
 async fn agent_settings_require_completed_tools_templates_and_exact_clone_receipt() {
