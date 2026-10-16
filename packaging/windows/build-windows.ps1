@@ -291,7 +291,8 @@ Copy-Tree (Join-Path $RootDir '.agents\skills') (Join-Path $StageDir 'share\memo
 Copy-Tree (Join-Path $RootDir 'packaging\windows-pds') (Join-Path $StageDir 'share\memory-layer\windows-pds')
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\memory-layer\operators') | Out-Null
 foreach ($operator in @('native-instance.ps1', 'native-instance-functions.ps1', 'release-identity.ps1',
-    'native-prerequisites.ps1', 'native-prerequisites-functions.ps1')) {
+    'native-prerequisites.ps1', 'native-prerequisites-functions.ps1',
+    'native-postgres.ps1', 'native-postgres-preview.ps1', 'native-postgres-functions.ps1')) {
     Copy-Item -LiteralPath (Join-Path $ScriptDir $operator) -Destination (Join-Path $StageDir "share\memory-layer\operators\$operator")
 }
 

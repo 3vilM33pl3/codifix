@@ -231,7 +231,7 @@ readiness. Database provisioning/service operation remains separate, and normal
 Memory or signed-gateway readiness is still required. It does not grant a Memory
 participant access to database credentials or runtime files.
 
-### Native database provisioning preview (execution not yet available)
+### Fresh native database provisioning (native acceptance pending)
 
 The source-tree `native-postgres-preview.ps1` describes one fresh named cluster,
 its loopback-only port, exact virtual service account and pinned native runtime.
@@ -249,7 +249,18 @@ preview retains protected input/runtime handles and rejects unrelated secret
 readers, path aliases and mutable runtime input. SCRAM is mandatory; no trust
 authentication or wildcard listener is generated.
 
-This is a review contract, **not an executable provisioning operation** and is
-not bundled as a completed installer. Journaled `initdb`, SCM identity/access,
-extension readiness and interrupted recovery still require implementation and
-native acceptance. `test-native-postgres-plan.ps1` verifies portable policy only.
+After reviewing the preview, `native-postgres.ps1 -Action Provision` accepts the
+same inputs plus `-ExpectedInputSha256` from that preview. Exact retries retain
+their operation ID and journal; changed inputs fail closed. The operator records
+SCM creation, private initialization, configuration and start as separate external
+effects, checking cluster identity before resumed changes and authenticated SQL
+identity before extension creation. Partial initialization is retained for
+inspection rather than deleted or blindly restarted. Temporary password files
+and exact operator runtime access are cleaned up without changing the original
+password source.
+
+This source implementation still needs **native provisioning/recovery acceptance**.
+It is not a completed local-stack installer. PostgreSQL is registered for manual
+start; full-stack activation must own reboot policy. Application databases,
+non-superuser Memory credentials, PDS and Pi installation remain separate.
+`test-native-postgres-plan.ps1` verifies portable policy/recovery decisions only.
