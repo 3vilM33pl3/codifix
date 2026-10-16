@@ -1,6 +1,7 @@
 # Native Windows evaluation port
 
-Status: bounded Astra design review, **not implemented or verified**. Part of
+Status: bounded native process-launch seam implemented and independently
+reviewed; **campaign integration and native acceptance remain pending**. Part of
 the approved Windows parity contract. Paid R3 remains paused; datasets, labels,
 scoring, approval budgets and existing Linux artifact meanings do not change.
 
@@ -37,6 +38,16 @@ Native evaluation needs a distinct profile:
 
 Job Objects do not provide the Linux tmpfs disk limit. Record that difference or
 use a genuinely bounded scratch volume before claiming an equivalent hard limit.
+
+`mem-platform::windows_evaluation` now supplies the separate launch profile:
+recursive private toolchain inventories/digests, retained file identities,
+reparse/hard-link/alternate-stream rejection, fresh executable scratch, three
+explicit stdio pipes, no ambient credentials or network capabilities, a
+16-process/2-GiB Job and a host-enforced deadline. Pi retains its existing
+two-process/512-MiB profile. Seven Linux tests and Windows cross-target Clippy
+passed; Astra found no additional concrete defect in the bounded seam. These
+are not native execution results. The helper/backend, bounded output draining,
+safe export, disk-limit treatment and packaged toolchain remain to be integrated.
 
 ## Remaining host adapters
 
