@@ -104,6 +104,12 @@ Pure validators and atomic journal replacement can run without Windows/admin:
 ./packaging/windows/native-instance-validation-tests.ps1
 ```
 
+Hosted Windows CI and the disposable Windows VM use `check-platform.ps1` for
+native protected-file/platform tests and `check-onboarding.ps1` for synthetic
+Credential Manager and physical-path tests. The latter requires no company
+credentials or paid providers. These smoke checks do not certify project sync,
+SCM deployment, AppContainer isolation or the full onboarding journey.
+
 ## Installer identity and upgrades
 
 Keep `memory --version` at the application semver (for example `2.1.0-rc.5`).
