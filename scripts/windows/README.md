@@ -62,7 +62,7 @@ python3 scripts/windows/vm.py ssh 'Get-Content C:\MemoryLab\bootstrap-result.jso
 The bootstrap installs signed VirtIO network/serial drivers, the native guest
 agent and native Windows OpenSSH. Password authentication is disabled. A first
 SSH host key is retained in this lab's private `known_hosts`, never the user's
-global SSH configuration. Bootstrap execution has not yet been observed.
+global SSH configuration. Bootstrap completion has not yet been observed.
 
 The installed lab reached the desktop and its guest agent works. Its optional
 OpenSSH Windows capability download timed out. `guest-ssh.ps1` offers an explicit

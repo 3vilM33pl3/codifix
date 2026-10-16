@@ -10,6 +10,11 @@ $inputs = 'C:\MemoryLab\inputs'
 $root = Join-Path (Join-Path 'C:\MemoryLab\runs' $OperationId.ToString()) 'native-api'
 New-Item -ItemType Directory -Path $root | Out-Null
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+$sessionId = [Diagnostics.Process]::GetCurrentProcess().SessionId
+if ($identity -ine 'MEMORY-WINLAB\memorylab' -or $sessionId -eq 0) {
+    throw 'Native API tests require the interactive memorylab logon, not a service token'
+}
 & icacls.exe $root /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Native API results ACL failed' }
 foreach ($name in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY')) {
@@ -33,7 +38,7 @@ foreach ($artifact in $manifest.artifacts) {
         throw 'Native API executable differs from its reviewed digest'
     }
 }
-$receipt = [ordered]@{format='memory-windows-native-api-result-v1';operation_id=$OperationId.ToString();manifest_sha256=(Get-FileHash $manifestPath).Hash.ToLowerInvariant();state='running';tests=@();failed_filters=@();execution_verified=$false}
+$receipt = [ordered]@{format='memory-windows-native-api-result-v1';operation_id=$OperationId.ToString();manifest_sha256=(Get-FileHash $manifestPath).Hash.ToLowerInvariant();identity=$identity;sid=$sid;session_id=$sessionId;state='running';tests=@();failed_filters=@();execution_verified=$false}
 function Save-Result {
     $partial = Join-Path $root 'result.partial.json'
     $target = Join-Path $root 'result.json'
