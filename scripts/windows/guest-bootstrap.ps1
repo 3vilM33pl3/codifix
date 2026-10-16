@@ -25,6 +25,9 @@ try {
     }
     $server = Get-WindowsCapability -Online | Where-Object Name -like 'OpenSSH.Server*'
     if ($server.State -ne 'Installed') { Add-WindowsCapability -Online -Name $server.Name | Out-Null }
+    # The capability need not create this directory until sshd first starts.
+    # Prepare it before writing the reviewed key/configuration, not afterward.
+    New-Item -ItemType Directory -Force 'C:\ProgramData\ssh' | Out-Null
     Copy-Item "$seed\authorized_keys" 'C:\ProgramData\ssh\administrators_authorized_keys'
     & icacls.exe 'C:\ProgramData\ssh\administrators_authorized_keys' /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F'
     if ($LASTEXITCODE -ne 0) { throw 'SSH key ACL failed' }

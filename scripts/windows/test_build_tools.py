@@ -7,6 +7,11 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_bootstrap_prepares_ssh_state_before_writing_keys(self):
+        script = (Path(__file__).parent / 'guest-bootstrap.ps1').read_text()
+        self.assertLess(script.index("New-Item -ItemType Directory -Force 'C:\\ProgramData\\ssh'"),
+                        script.index('Copy-Item "$seed\\authorized_keys"'))
+
     def test_guest_observation_is_lab_scoped_and_metadata_only(self):
         script = (Path(__file__).parent / 'guest-observe.ps1').read_text()
         for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", 'Confirm-SecureBootUEFI',
