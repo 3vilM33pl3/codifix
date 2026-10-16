@@ -229,19 +229,14 @@ mod tests {
     use crate::{launcher::SandboxConfig, work::WorkManifest};
     use mem_supervisor_store::sources::{LocalCollectionGrant, ModelDestination, SourceBinding};
     use sha2::{Digest, Sha256};
-    use std::os::unix::fs::PermissionsExt;
 
     fn private(path: &Path, text: &str) -> String {
-        std::fs::write(path, text).expect("synthetic file");
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).expect("private");
+        crate::test_files::write(path, text.as_bytes());
         format!("{:x}", Sha256::digest(text.as_bytes()))
     }
 
     fn fixture() -> (tempfile::TempDir, PinnedWork, String) {
-        let dir = tempfile::Builder::new()
-            .permissions(std::fs::Permissions::from_mode(0o700))
-            .tempdir()
-            .expect("private directory");
+        let dir = crate::test_files::directory();
         let id = Uuid::new_v4();
         let manifest = WorkManifest {
             schema_version: 1,

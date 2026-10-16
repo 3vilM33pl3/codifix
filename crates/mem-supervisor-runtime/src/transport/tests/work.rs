@@ -4,6 +4,7 @@ use crate::{
     work::{PinnedWork, WorkManifest, WorkStep},
 };
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 pub(super) async fn manifest(
@@ -26,21 +27,18 @@ pub(super) async fn manifest(
             windows_artifacts: None,
         },
     };
-    let dir = tempfile::Builder::new()
-        .permissions(std::fs::Permissions::from_mode(0o700))
-        .tempdir()
-        .expect("private directory");
+    let dir = crate::test_files::directory();
     let hash = save(&dir, &manifest);
     (dir, manifest, hash)
 }
 pub(super) fn save(dir: &tempfile::TempDir, manifest: &WorkManifest) -> String {
     let bytes = serde_json::to_vec(manifest).expect("manifest");
     let path = dir.path().join("work.json");
-    std::fs::write(&path, &bytes).expect("synthetic manifest");
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).expect("private");
+    crate::test_files::write(&path, &bytes);
     format!("{:x}", Sha256::digest(&bytes))
 }
 
+#[cfg(unix)]
 #[tokio::test]
 #[ignore = "requires pinned patched Pi/driver and explicit disposable PostgreSQL"]
 async fn operator_executes_one_real_pi_proposal_and_restart_only_observes_it() {

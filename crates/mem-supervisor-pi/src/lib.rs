@@ -10,7 +10,9 @@
 //! network-disabled container; normal tests use fake processes. Missing local
 //! credential presence prevents a production control handshake.
 
+#[cfg(unix)]
 mod artifact;
+#[cfg(unix)]
 mod process;
 mod protocol;
 pub mod sandbox;
@@ -43,6 +45,7 @@ pub enum LinuxArchitecture {
 /// Only paths to an operator-supplied pinned binary and private scratch parent
 /// are accepted. Neither custom digests nor extra argv/environment are public.
 #[derive(Clone)]
+#[cfg_attr(windows, allow(dead_code))] // Legacy Linux-only probe configuration.
 pub struct ProbeConfig {
     executable: PathBuf,
     scratch_parent: PathBuf,
@@ -126,6 +129,7 @@ pub fn provider_execution_gate() -> Result<(), Failure> {
 /// Requires a Tokio runtime. The bounded driver owns the child in a separate
 /// task, so cancelling the caller's wait does not cancel cleanup. Runtime shutdown
 /// still relies on Tokio's kill-on-drop/reaper fallback and provides no report.
+#[cfg(unix)]
 pub async fn probe(config: &ProbeConfig) -> ProbeReport {
     match tokio::spawn(process::run(config.clone())).await {
         Ok(report) => report,
@@ -135,6 +139,14 @@ pub async fn probe(config: &ProbeConfig) -> ProbeReport {
             report
         }
     }
+}
+
+/// The legacy probe specifically pins Linux ELF artifacts. Windows execution
+/// uses the separately reviewed WindowsArtifact and AppContainer child driver;
+/// a Linux artifact cannot establish readiness on Windows.
+#[cfg(windows)]
+pub async fn probe(_config: &ProbeConfig) -> ProbeReport {
+    ProbeReport::failed(Failure::WrongArchitecture)
 }
 
 /// Every entry is a separate OS argument. No shell, API key, prompt, continuation,
@@ -167,8 +179,8 @@ pub fn control_arguments() -> &'static [&'static str] {
     ]
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod provider_probe;

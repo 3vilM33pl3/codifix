@@ -160,6 +160,7 @@ struct WireModel {
     id: String,
 }
 
+#[cfg(unix)]
 pub(crate) async fn handshake<W: tokio::io::AsyncWrite + Unpin, R: tokio::io::AsyncRead + Unpin>(
     mut stdin: W,
     stdout: R,

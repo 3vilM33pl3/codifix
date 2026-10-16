@@ -3,27 +3,35 @@
 //! only a fixed private Unix broker through a bounded loopback relay. The trusted
 //! parent MUST independently enforce the container, authorize the exact input,
 //! and compare this untrusted child report with its durable proposal ledger.
-use crate::{
-    Failure, LinuxArchitecture, ProbeConfig, ProcessDisposition, artifact, process, protocol,
-};
+use crate::{Failure, ProcessDisposition, protocol};
+#[cfg(unix)]
+use crate::{LinuxArchitecture, ProbeConfig, artifact, process};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::time::Duration;
+#[cfg(unix)]
 use std::{
     os::unix::fs::{FileTypeExt, MetadataExt},
     path::PathBuf,
-    time::Duration,
 };
+#[cfg(unix)]
+use tokio::net::{TcpListener, UnixStream};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
-    net::{TcpListener, UnixStream},
     time::timeout,
 };
+#[cfg(windows)]
+#[path = "sandbox_windows.rs"]
+mod windows;
+#[cfg(windows)]
+pub use windows::run_child;
 
 pub const PATCHED_AMD64_SHA256: &str =
     "912366d4178bd7c12ccf4401b6241b1dcb6f8cdbd66302bc1764a1cec9dfe88c";
 pub const PATCHED_ARM64_SHA256: &str =
     "c2d51cd7b0683c85477eed8c03be3562fc0d89a9915f085c0608740b8704363b";
+#[cfg(unix)]
 const SOCKET: &str = "/broker/job.sock";
 const MAX_INPUT: u64 = 256 * 1024;
 const DEADLINE: Duration = Duration::from_secs(110);
@@ -65,6 +73,7 @@ pub struct ChildReport {
 
 /// Defensive checks catch accidental host invocation. They are not a proof of
 /// independent isolation: the parent supplies network-none/read-only/mount rules.
+#[cfg(unix)]
 fn check_boundary() -> Result<(), Failure> {
     let uid = rustix::process::geteuid().as_raw();
     if uid == 0 || std::env::args_os().count() != 1 {
@@ -107,6 +116,7 @@ fn check_boundary() -> Result<(), Failure> {
     Ok(())
 }
 
+#[cfg(unix)]
 pub async fn run_child() -> ChildReport {
     let failure = |reason| ChildReport {
         proposal_sha256: None,
@@ -257,6 +267,7 @@ pub async fn run_child() -> ChildReport {
     }
 }
 
+#[cfg(unix)]
 async fn relay_one(listener: TcpListener) -> Result<(), Failure> {
     let (tcp, _) = listener.accept().await.map_err(|_| Failure::ProcessIo)?;
     drop(listener); // exactly one upstream connection; no retry/fallback channel
@@ -272,6 +283,7 @@ async fn relay_one(listener: TcpListener) -> Result<(), Failure> {
     Ok(())
 }
 
+#[cfg(any(unix, test))]
 async fn copy_bounded<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
     mut read: R,
     mut write: W,
@@ -313,9 +325,9 @@ struct Text {
     text: Option<String>,
 }
 
-async fn exchange(
-    mut stdin: tokio::process::ChildStdin,
-    stdout: tokio::process::ChildStdout,
+async fn exchange<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
+    mut stdin: W,
+    stdout: R,
     prompt: &str,
 ) -> Result<[u8; 32], Failure> {
     let mut stdout = BufReader::new(stdout);

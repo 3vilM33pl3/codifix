@@ -26,7 +26,13 @@ mod native {
     };
     use windows_sys::Win32::{
         Foundation::HANDLE,
-        Security::SECURITY_ATTRIBUTES,
+        Foundation::LocalFree,
+        Security::{
+            Authorization::{
+                ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+            },
+            DACL_SECURITY_INFORMATION, SECURITY_ATTRIBUTES, SetFileSecurityW,
+        },
         Storage::FileSystem::{BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle},
         System::Pipes::CreatePipe,
     };
@@ -93,6 +99,36 @@ mod native {
         // Create a new scratch file rather than CopyFile, which may copy source
         // security metadata and would test a different inheritance path.
         std::fs::write(&unreviewed, std::fs::read(std::env::current_exe()?)?)?;
+        // A creator may have implicit WRITE_DAC. Attempt to grant package/owner
+        // full control before execution: inherited non-execute ACEs alone are
+        // not evidence that an adversarial process cannot enable execution.
+        let sddl: Vec<u16> = "D:P(A;;FA;;;AC)(A;;FA;;;OW)"
+            .encode_utf16()
+            .chain(Some(0))
+            .collect();
+        let mut descriptor = null_mut();
+        ensure!(
+            unsafe {
+                ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                    sddl.as_ptr(),
+                    SDDL_REVISION_1,
+                    &mut descriptor,
+                    null_mut(),
+                )
+            } != 0,
+            "prepare synthetic adversarial ACL"
+        );
+        use std::os::windows::ffi::OsStrExt;
+        let path: Vec<u16> = unreviewed
+            .as_os_str()
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let _changed =
+            unsafe { SetFileSecurityW(path.as_ptr(), DACL_SECURITY_INFORMATION, descriptor) };
+        unsafe {
+            LocalFree(descriptor);
+        }
         ensure!(
             Command::new(&unreviewed)
                 .arg("--unexpected-third")

@@ -2,7 +2,9 @@ use super::*;
 use crate::pi_broker::{BrokerFailure, BrokerJob, BrokerReply, JobFuture, PiBroker};
 use std::sync::atomic::AtomicBool;
 
+#[cfg(unix)]
 mod launcher;
+#[cfg(unix)]
 mod sandbox;
 
 struct Work {

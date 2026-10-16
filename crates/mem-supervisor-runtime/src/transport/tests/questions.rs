@@ -6,6 +6,7 @@ use crate::{
 };
 use mem_supervisor::action::KnownOutcome;
 use mem_supervisor_store::questions::{self, QuestionActor, QuestionSubmission, QueuedQuestion};
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 fn config(dir: &tempfile::TempDir, profile: &PinnedWork) -> Arc<ServiceExecutionGuard> {
@@ -19,8 +20,7 @@ fn config(dir: &tempfile::TempDir, profile: &PinnedWork) -> Arc<ServiceExecution
             .collect::<String>()
     );
     let path = dir.path().join("service.toml");
-    std::fs::write(&path, &body).expect("synthetic config");
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("private");
+    crate::test_files::write(&path, body.as_bytes());
     let hash = format!("{:x}", Sha256::digest(body.as_bytes()));
     Arc::new(ServiceExecutionGuard::load(&path, &hash, profile).expect("service guard"))
 }
@@ -372,6 +372,7 @@ async fn operator_config_is_rechecked_after_waiting_for_source_locks() {
     db.cleanup().await.expect("cleanup");
 }
 
+#[cfg(unix)]
 #[tokio::test]
 #[ignore = "requires pinned patched Pi/driver and explicit disposable PostgreSQL"]
 async fn operator_run_next_uses_real_pi_with_fake_provider_and_restricted_database_role() {

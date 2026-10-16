@@ -3269,6 +3269,7 @@ dependencies = [
 name = "mem-supervisor-pi"
 version = "2.1.0-rc.5"
 dependencies = [
+ "mem-platform",
  "mem-supervisor",
  "mem-supervisor-runtime",
  "rustix 1.1.4",
@@ -3286,6 +3287,8 @@ version = "2.1.0-rc.5"
 dependencies = [
  "axum",
  "chrono",
+ "mem-platform",
+ "mem-platform-files",
  "mem-supervisor",
  "mem-supervisor-pi",
  "mem-supervisor-store",
@@ -3301,7 +3304,9 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "toml 0.8.23",
+ "tower",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

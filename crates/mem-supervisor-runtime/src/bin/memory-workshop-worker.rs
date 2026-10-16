@@ -40,6 +40,7 @@ async fn execute() -> Result<bool, &'static str> {
     if !next && (args.len() != 4 || !matches!(args[0].as_str(), "observe" | "run")) {
         return Err("Invalid arguments; use --help. No work started.");
     }
+    #[cfg(unix)]
     if rustix::process::geteuid().as_raw() == 0 {
         return Err("Run as the explicitly authorized non-root operator, never as root.");
     }
@@ -66,16 +67,31 @@ async fn execute() -> Result<bool, &'static str> {
     let control = RunControl::default();
     let cancelled = control.clone();
     let signals = tokio::spawn(async move {
-        use tokio::signal::unix::{SignalKind, signal};
-        let Ok(mut terminate) = signal(SignalKind::terminate()) else {
-            cancelled.stop();
-            return;
-        };
-        let Ok(mut interrupt) = signal(SignalKind::interrupt()) else {
-            cancelled.stop();
-            return;
-        };
-        tokio::select! { _=terminate.recv()=>{}, _=interrupt.recv()=>{} }
+        #[cfg(unix)]
+        {
+            use tokio::signal::unix::{SignalKind, signal};
+            let Ok(mut terminate) = signal(SignalKind::terminate()) else {
+                cancelled.stop();
+                return;
+            };
+            let Ok(mut interrupt) = signal(SignalKind::interrupt()) else {
+                cancelled.stop();
+                return;
+            };
+            tokio::select! { _=terminate.recv()=>{}, _=interrupt.recv()=>{} }
+        }
+        #[cfg(windows)]
+        {
+            use tokio::signal::windows::{ctrl_break, ctrl_c, ctrl_close, ctrl_shutdown};
+            let handlers = (ctrl_c(), ctrl_break(), ctrl_close(), ctrl_shutdown());
+            let (Ok(mut interrupt), Ok(mut break_signal), Ok(mut close), Ok(mut shutdown)) =
+                handlers
+            else {
+                cancelled.stop();
+                return;
+            };
+            tokio::select! { _=interrupt.recv()=>{}, _=break_signal.recv()=>{}, _=close.recv()=>{}, _=shutdown.recv()=>{} }
+        }
         cancelled.stop();
     });
     let (output, success) = if let Some(guard) = guard {
