@@ -34,6 +34,7 @@ class BuildToolsManifestTests(unittest.TestCase):
                          "'issues.jsonl'",'source_link_materialization=',"policy='git-core-symlinks-false'"]:
             self.assertIn(required,script)
         self.assertNotIn('New-Item -ItemType SymbolicLink',script)
+        self.assertIn("'--profile','minimal','--no-self-update'",script)
 
     def test_native_build_families_are_separate_but_each_is_serialized(self):
         script = (Path(__file__).parent / 'guest-stage.ps1').read_text()

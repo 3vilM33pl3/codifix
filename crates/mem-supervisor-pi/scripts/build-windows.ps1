@@ -62,7 +62,7 @@ New-Item -ItemType Directory -Path (Join-Path $CopiedHelper 'src') -Force | Out-
 Copy-Item -LiteralPath (Join-Path $Helper 'Cargo.toml') -Destination (Join-Path $CopiedHelper 'Cargo.toml')
 Copy-Item -LiteralPath (Join-Path $Helper 'src/lib.rs') -Destination (Join-Path $CopiedHelper 'src/lib.rs')
 if ((Hash (Join-Path $Source 'Cargo.lock')) -ne $PatchedLockHash) { throw 'Patched lock differs: only the exact local ownership helper is allowed' }
-if ($InstallToolchain) { Run 'rustup' @('toolchain','install',$Nightly,'--profile','minimal') }
+if ($InstallToolchain) { Run 'rustup' @('toolchain','install',$Nightly,'--profile','minimal','--no-self-update') }
 $PreviousTarget = $env:CARGO_TARGET_DIR
 $env:CARGO_TARGET_DIR = Join-Path $BuildRoot 'target'
 Push-Location $Source

@@ -9,7 +9,7 @@
   "rustc_commit": "90850177249efe0321573c569aec5d12b257f8d6",
   "target": "x86_64-pc-windows-msvc",
   "inputs": [
-    {"path": "crates/mem-supervisor-pi/scripts/build-windows.ps1", "sha256": "4cb15a44f853da6dfbb455d14b57f4516b84ea5bbca5d1899a1740ca03069715"},
+    {"path": "crates/mem-supervisor-pi/scripts/build-windows.ps1", "sha256": "5ca1d2ead447755118a3de17324526e90c4b3722fcee6f452fed0d54bf076697"},
     {"path": "crates/mem-supervisor-pi/patches/no-tools-1.patch", "sha256": "bec724b3d1cef1df4f4cddc50573ce6af1724c743496e7f5e900f4e4a6c815bc"},
     {"path": "crates/mem-supervisor-pi/patches/windows-broker-1.patch", "sha256": "61a620316d545b100cf17a83503aba4da46094346c7996c502508b9060aebdf4"},
     {"path": "crates/mem-supervisor-pi/patches/LICENSE.pi", "sha256": "32a82e0a5754e72e51fae44b65a936c831c07376f21c90f5fb9e76897fcc3509"},
