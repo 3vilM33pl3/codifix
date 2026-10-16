@@ -1,0 +1,250 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)][ValidateSet('Preview', 'Install', 'Upgrade')][string]$Action,
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)][guid]$OperationId,
+    [Parameter(Mandatory = $true)][string]$PackagePath,
+    [Parameter(Mandatory = $true)][string]$ManifestPath,
+    [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-f]{64}$')][string]$ManifestSha256,
+    [Parameter(Mandatory = $true)][string]$ConfigPath,
+    [Parameter(Mandatory = $true)][string]$HealthUri,
+    [Parameter(Mandatory = $true)][guid]$ExpectedInstanceId,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$ExpectedInputSha256,
+    [ValidateSet('memory.exe')][string]$ExecutableName = 'memory.exe',
+    [string]$RecoveryReference,
+    [switch]$DatabaseCompatibilityConfirmed
+)
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'native-instance-functions.ps1')
+. (Join-Path $PSScriptRoot 'release-identity.ps1')
+if ($env:OS -ne 'Windows_NT') { throw 'Native Windows is required; no Docker/WSL fallback exists' }
+
+function Get-Hash([string]$Path) { return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
+function Assert-NoReparse([string]$Path) {
+    $item = Get-Item -LiteralPath $Path -Force
+    while ($null -ne $item) {
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Reparse points are forbidden in operator paths' }
+        $parent = Split-Path -Parent $item.FullName
+        $item = if ($parent -and $parent -ne $item.FullName) { Get-Item -LiteralPath $parent -Force } else { $null }
+    }
+}
+function Set-PrivateDirectory([string]$Path, [string]$ServiceSid = '', [switch]$ReadOnly) {
+    if (Test-Path -LiteralPath $Path) {
+        Assert-NoReparse $Path
+        $existingAcl = Get-Acl -LiteralPath $Path
+        $operatorSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $allowedWriters = @('S-1-5-18', 'S-1-5-32-544', $operatorSid, $ServiceSid)
+        $owner = $existingAcl.GetOwner([Security.Principal.SecurityIdentifier]).Value
+        if ($owner -notin $allowedWriters) { throw 'Refusing an operator directory owned by another principal' }
+        $writeMask = [Security.AccessControl.FileSystemRights]::Write -bor [Security.AccessControl.FileSystemRights]::Delete -bor [Security.AccessControl.FileSystemRights]::ChangePermissions -bor [Security.AccessControl.FileSystemRights]::TakeOwnership
+        foreach ($rule in $existingAcl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
+            if ($rule.AccessControlType -eq 'Allow' -and ($rule.FileSystemRights -band $writeMask) -ne 0 -and $rule.IdentityReference.Value -notin $allowedWriters) {
+                throw 'Refusing an operator directory writable by another principal'
+            }
+        }
+    } else { New-Item -ItemType Directory -Path $Path | Out-Null }
+    $acl = [Security.AccessControl.DirectorySecurity]::new()
+    $acl.SetAccessRuleProtection($true, $false)
+    $admins = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+    $acl.SetOwner($admins)
+    foreach ($sid in @('S-1-5-18', 'S-1-5-32-544')) {
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($sid), 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    }
+    if ($ServiceSid) {
+        $rights = if ($ReadOnly) { 'ReadAndExecute' } else { 'Modify' }
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($ServiceSid), $rights, 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    }
+    Set-Acl -LiteralPath $Path -AclObject $acl
+}
+function Invoke-Sc([string[]]$Arguments) {
+    $null = & "$env:SystemRoot\System32\sc.exe" @Arguments 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "SCM operation failed with code $LASTEXITCODE; inspect the selected service locally" }
+}
+function Get-SelectedService { return Get-CimInstance Win32_Service -Filter "Name='$($plan.service_name)'" }
+function Save-Phase([string]$Phase) {
+    if (@($journal.history).Count -ge 1000) { throw 'Operation journal attempt limit reached; inspect retained evidence' }
+    $journal.phase = $Phase
+    $journal.history = @($journal.history) + @([ordered]@{ phase = $Phase; observed_at = [DateTime]::UtcNow.ToString('o') })
+    Write-NativeJournal $journalPath $journal
+}
+
+# Read a bounded exact file, holding a deny-write/delete handle until parsed.
+Assert-NoReparse $ManifestPath
+$manifestFile = [IO.File]::Open($ManifestPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+try {
+    if ($manifestFile.Length -gt 8MB) { throw 'Manifest too large' }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $actualManifestHash = ([BitConverter]::ToString($sha.ComputeHash($manifestFile))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
+    if ($actualManifestHash -ne $ManifestSha256) { throw 'Manifest digest differs from reviewed input' }
+    $manifestFile.Position = 0
+    $reader = [IO.StreamReader]::new($manifestFile, [Text.Encoding]::UTF8, $true, 4096, $true)
+    try { $manifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+} finally { $manifestFile.Dispose() }
+if ($manifest.schema_version -ne 1 -or $manifest.platform -ne 'windows-x86_64') { throw 'Unsupported candidate manifest' }
+$identity = Get-WindowsReleaseIdentity $manifest.application_version $manifest.installer_build
+if ($identity.release_identity -ne $manifest.release_identity -or $identity.installer_version -ne $manifest.installer_version) { throw 'Candidate identities disagree' }
+if (-not $manifest.payload_files -or @($manifest.payload_files).Count -gt 20000) { throw 'Manifest needs complete bounded payload hashes' }
+if ($OperationId -eq [guid]::Empty) { throw 'A nonzero operation UUID is required' }
+$manifestNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($entry in $manifest.payload_files) {
+    Assert-NativeArchiveName $entry.name
+    if (-not $manifestNames.Add($entry.name) -or $entry.sha256 -notmatch '^[0-9a-f]{64}$') { throw 'Duplicate or malformed payload entry' }
+}
+$plan = Get-NativeInstancePlan $Name $manifest.release_identity $ExecutableName $HealthUri $ExpectedInstanceId
+$zipName = Split-Path -Leaf $PackagePath
+$zipEntry = @($manifest.artifacts | Where-Object { $_.name -ceq $zipName -and $_.name.EndsWith('.zip') })
+if ($zipEntry.Count -ne 1) { throw 'ZIP must match exactly one reviewed manifest artifact' }
+Assert-NoReparse $PackagePath
+if ((Get-Hash $PackagePath) -ne $zipEntry[0].sha256) { throw 'ZIP hash differs from manifest' }
+Assert-NoReparse $ConfigPath
+$configFile = [IO.File]::Open($ConfigPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+try {
+    if ($configFile.Length -gt 1MB) { throw 'Configuration too large' }
+    $buffer = [IO.MemoryStream]::new()
+    try { $configFile.CopyTo($buffer); $configBytes = $buffer.ToArray() } finally { $buffer.Dispose() }
+} finally { $configFile.Dispose() }
+$configHash = Get-NativeInputDigest ([Convert]::ToBase64String($configBytes))
+$root = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'MemoryLayer'
+$releasesRoot = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Memory Layer\releases'
+$release = Join-Path $releasesRoot $plan.release_identity
+$state = Join-Path (Join-Path $root 'instances') $Name
+$installedConfig = Join-Path $state 'memory-layer.toml'
+$command = @((Join-Path $release 'bin\memory-windows-service.exe'), '--name', $plan.service_name, '--directory', $state, '--', (Join-Path $release "bin\$ExecutableName"), '--config', $installedConfig, 'service', 'run')
+$binaryPath = ($command | ForEach-Object { ConvertTo-NativeCommandArgument $_ }) -join ' '
+$binding = [ordered]@{ plan = $plan; manifest_sha256 = $ManifestSha256; package_sha256 = $zipEntry[0].sha256; config_fingerprint = $configHash; binary_path = $binaryPath }
+$inputDigest = Get-NativeInputDigest $binding
+if ($Action -eq 'Preview') {
+    [ordered]@{ plan = $plan; input_sha256 = $inputDigest; release_directory = $release; state_directory = $state; signing_status = $manifest.signing_status; native_stack_bundled = $manifest.native_stack_bundled; database_backup_performed = $false } | ConvertTo-Json -Depth 8
+    exit 0
+}
+if (-not $ExpectedInputSha256 -or $ExpectedInputSha256 -ne $inputDigest) { throw 'Execution inputs differ from the explicitly reviewed preview digest' }
+if (-not $DatabaseCompatibilityConfirmed -or -not $RecoveryReference -or $RecoveryReference.Length -gt 1024) {
+    throw 'Execution requires an operator recovery reference and confirmed database compatibility; this adapter neither backs up nor rolls back databases'
+}
+$principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run execution in an elevated PowerShell' }
+# Exact machine-owned roots only; never alter another installation or user data.
+foreach ($path in @($root, (Join-Path $root 'instances'), (Join-Path $root 'operations'), (Join-Path $root 'registrations'), (Split-Path -Parent $releasesRoot), $releasesRoot)) { Set-PrivateDirectory $path }
+$registrationPath = Join-Path (Join-Path $root 'registrations') "$Name.json"
+$operationRoot = Join-Path (Join-Path $root 'operations') $OperationId.ToString()
+Set-PrivateDirectory $operationRoot
+$lock = [IO.File]::Open((Join-Path $root 'operator.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+try {
+    $journalPath = Join-Path $operationRoot 'journal.json'
+    if (Test-Path -LiteralPath $journalPath) {
+        $journal = Get-Content -LiteralPath $journalPath -Raw | ConvertFrom-Json
+        Assert-NativeRetry $journal $inputDigest
+    } else {
+        $existing = Get-SelectedService
+        if ($Action -eq 'Install' -and $existing) { throw 'Existing named service requires Upgrade' }
+        if ($Action -eq 'Upgrade' -and -not $existing) { throw 'Named service does not exist; use Install' }
+        if ($Action -eq 'Install' -and (Test-Path -LiteralPath $registrationPath)) { throw 'Prior installation receipt exists; reconcile it before reinstalling' }
+        if ($Action -eq 'Upgrade') {
+            if (-not (Test-Path -LiteralPath $registrationPath)) { throw 'Existing service has no operator installation receipt; explicit legacy adoption is not implemented' }
+            $registration = Get-Content -LiteralPath $registrationPath -Raw | ConvertFrom-Json
+            if ($registration.binary_path -ne $existing.PathName -or $registration.expected_instance_id -ne $plan.expected_instance_id) { throw 'Existing service differs from its exact-instance installation receipt' }
+            if ([version]$manifest.installer_version -le [version]$registration.installer_version) { throw 'Upgrade requires a strictly newer installer build; stale executable recovery is forbidden' }
+        }
+        $journal = [ordered]@{ schema_version = 1; operation_id = $OperationId.ToString(); input_sha256 = $inputDigest; phase = 'prepared'; history = @(); retained_staging = @(); plan = $plan; previous_binary_path = $(if ($existing) { $existing.PathName } else { $null }); recovery_reference = $RecoveryReference; database_backup_performed = $false }
+        Write-NativeJournal $journalPath $journal
+    }
+    if ($journal.phase -eq 'completed') { Write-Output "Already completed: $OperationId ($($plan.service_name)); no service restarted"; exit 0 }
+    $existing = Get-SelectedService
+    if ($existing -and ($existing.StartName -ne $plan.account -or $existing.PathName -notin @($journal.previous_binary_path, $binaryPath))) { throw 'SCM configuration changed outside this operation' }
+    if (Test-Path -LiteralPath $installedConfig) {
+        Assert-NoReparse $installedConfig
+        $existingBytes = [IO.File]::ReadAllBytes($installedConfig)
+        if ((Get-NativeInputDigest ([Convert]::ToBase64String($existingBytes))) -ne $configHash) { throw 'Upgrade may not modify instance configuration; review a separate configuration change' }
+    }
+    if ($existing -and $existing.State -ne 'Stopped') {
+        Stop-Service -Name $plan.service_name
+        (Get-Service -Name $plan.service_name).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+    }
+    $existingSid = if ($existing) { ([Security.Principal.NTAccount]::new($plan.account)).Translate([Security.Principal.SecurityIdentifier]).Value } else { '' }
+    Set-PrivateDirectory $state $existingSid
+    Save-Phase 'service_stopped'
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    if (-not (Test-Path -LiteralPath $release)) {
+        $temporaryRelease = Join-Path $releasesRoot ($plan.release_identity + '.staging-' + $OperationId)
+        if (Test-Path -LiteralPath $temporaryRelease) {
+            Assert-NoReparse $temporaryRelease
+            $retained = $temporaryRelease + '.interrupted-' + [guid]::NewGuid().ToString()
+            [IO.Directory]::Move($temporaryRelease, $retained)
+            $journal.retained_staging = @($journal.retained_staging) + @($retained)
+            Save-Phase 'interrupted_staging_retained'
+        }
+        Set-PrivateDirectory $temporaryRelease
+        $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
+        try {
+            if ($archive.Entries.Count -gt 20000) { throw 'Too many ZIP entries' }
+            $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+            $total = [int64]0
+            foreach ($entry in $archive.Entries) {
+                Assert-NativeArchiveName $entry.FullName
+                if (-not $seen.Add($entry.FullName.TrimEnd('/'))) { throw 'Case-insensitive or duplicate archive path' }
+                $total += $entry.Length
+                if ($total -gt 2GB) { throw 'Expanded release exceeds 2GiB' }
+                $target = Join-Path $temporaryRelease $entry.FullName.Replace('/', '\')
+                if ($entry.FullName.EndsWith('/')) { New-Item -ItemType Directory -Path $target -Force | Out-Null; continue }
+                $null = New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force
+                $source = $entry.Open(); $output = [IO.File]::Open($target, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+                try { $source.CopyTo($output); $output.Flush($true) } finally { $output.Dispose(); $source.Dispose() }
+            }
+        } finally { $archive.Dispose() }
+        [IO.Directory]::Move($temporaryRelease, $release)
+    }
+    Assert-NoReparse $release
+    $actualFiles = @(Get-ChildItem -LiteralPath $release -Recurse -File)
+    if ($actualFiles.Count -ne @($manifest.payload_files).Count) { throw 'Release payload count differs from manifest' }
+    foreach ($entry in $manifest.payload_files) {
+        Assert-NativeArchiveName $entry.name
+        $target = Join-Path $release $entry.name.Replace('/', '\')
+        Assert-NoReparse $target
+        if ((Get-Hash $target) -ne $entry.sha256) { throw 'Immutable release payload differs from manifest' }
+    }
+    if (-not (Test-Path (Join-Path $release 'bin\memory-windows-service.exe')) -or -not (Test-Path (Join-Path $release "bin\$ExecutableName"))) { throw 'Required native executables missing' }
+    Save-Phase 'release_verified'
+    if (-not $existing) { Invoke-Sc @('create', $plan.service_name, 'binPath=', $binaryPath, 'start=', 'demand', 'obj=', $plan.account) }
+    else { Invoke-Sc @('config', $plan.service_name, 'binPath=', $binaryPath, 'start=', 'demand') }
+    Invoke-Sc @('sidtype', $plan.service_name, 'unrestricted')
+    $sid = ([Security.Principal.NTAccount]::new($plan.account)).Translate([Security.Principal.SecurityIdentifier]).Value
+    Set-PrivateDirectory $state $sid
+    # Shared release bytes are readable but not writable by virtual services.
+    $readRule = [Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($sid), 'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+    $releaseAcl = Get-Acl -LiteralPath $release; $releaseAcl.AddAccessRule($readRule); Set-Acl -LiteralPath $release -AclObject $releaseAcl
+    if (-not (Test-Path -LiteralPath $installedConfig)) {
+        $temporaryConfig = Join-Path $state ([guid]::NewGuid().ToString() + '.config.tmp')
+        $file = [IO.File]::Open($temporaryConfig, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try { $file.Write($configBytes, 0, $configBytes.Length); $file.Flush($true) } finally { $file.Dispose() }
+        [IO.File]::Move($temporaryConfig, $installedConfig)
+    }
+    Save-Phase 'service_configured'
+    Start-Service -Name $plan.service_name
+    (Get-Service -Name $plan.service_name).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+    Save-Phase 'process_running'
+    $ready = $false
+    Add-Type -AssemblyName System.Net.Http
+    $handler = [Net.Http.HttpClientHandler]::new()
+    $handler.UseProxy = $false
+    $handler.AllowAutoRedirect = $false
+    $client = [Net.Http.HttpClient]::new($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds(2)
+    $client.MaxResponseContentBufferSize = 65536
+    try {
+        for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            $response = $null
+            try {
+                $response = $client.GetAsync($plan.health_uri).GetAwaiter().GetResult()
+                $health = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+                if ([int]$response.StatusCode -eq 200 -and $health.instance_id -eq $plan.expected_instance_id -and $health.status -eq 'ok' -and (Get-Service -Name $plan.service_name).Status -eq 'Running') { $ready = $true; break }
+            } catch { } finally { if ($response) { $response.Dispose() } }
+            Start-Sleep -Seconds 1
+        }
+    } finally { $client.Dispose(); $handler.Dispose() }
+    if (-not $ready) { throw 'Exact-instance readiness failed; no old database or executable was automatically restored' }
+    Invoke-Sc @('config', $plan.service_name, 'start=', 'delayed-auto')
+    Write-NativeJournal $registrationPath ([ordered]@{ schema_version = 1; operation_id = $OperationId.ToString(); expected_instance_id = $plan.expected_instance_id; installer_version = $manifest.installer_version; release_identity = $plan.release_identity; manifest_sha256 = $ManifestSha256; binary_path = $binaryPath; config_fingerprint = $configHash })
+    Save-Phase 'completed'
+    Write-Output "Completed: $OperationId ($($plan.service_name)); exact-instance readiness verified; data preserved"
+} finally { $lock.Dispose() }

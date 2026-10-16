@@ -15,6 +15,9 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Resolve-Path (Join-Path $ScriptDir '..\..')
 $RootDir = $RootDir.Path
 $Target = 'x86_64-pc-windows-msvc'
+$Executables = @('memory.exe', 'memory-windows-service.exe', 'memory-area.exe',
+    'memory-area-import.exe', 'memory-gateway-schema.exe', 'memory-federation-gateway.exe',
+    'memory-federation-enroll.exe', 'memory-pds-pipe.exe', 'memory-workshop-worker.exe', 'memory-pi-sandbox.exe')
 $CargoTargetDir = if ($env:CARGO_TARGET_DIR) {
     [System.IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)
 } else {
@@ -37,6 +40,7 @@ $DistDir = Join-Path $BuildRoot "dist\$($Identity.release_identity)"
 $WxsPath = Join-Path $BuildRoot 'memory-layer.wxs'
 $ZipPath = Join-Path $DistDir "$($Identity.asset_prefix).zip"
 $MsiPath = Join-Path $DistDir "$($Identity.asset_prefix).msi"
+$ServerToolsMsiPath = Join-Path $DistDir "$($Identity.asset_prefix)-server-tools.msi"
 $WixPdbPath = [System.IO.Path]::ChangeExtension($MsiPath, '.wixpdb')
 
 function Assert-BuildPath([string]$Path) {
@@ -235,12 +239,13 @@ if (-not $SkipBuild) {
     Write-Host "Using Windows Cargo release overrides: LTO=$env:CARGO_PROFILE_RELEASE_LTO CODEGEN_UNITS=$env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS"
     cargo build --release --locked --features full --bin memory --target $Target --manifest-path (Join-Path $RootDir 'Cargo.toml')
     if ($LASTEXITCODE -ne 0) { throw 'Memory build failed' }
-    cargo build --release --locked -p mem-platform --bin memory-windows-service --target $Target --manifest-path (Join-Path $RootDir 'Cargo.toml')
-    if ($LASTEXITCODE -ne 0) { throw 'Native SCM adapter build failed' }
+    cargo build --release --locked -p mem-platform -p mem-area -p mem-area-ops -p mem-federation-runtime -p mem-supervisor-runtime -p mem-supervisor-pi --bins --target $Target --manifest-path (Join-Path $RootDir 'Cargo.toml')
+    if ($LASTEXITCODE -ne 0) { throw 'First-party native operators build failed' }
     New-Item -ItemType Directory -Force -Path $BuildRoot | Out-Null
     [ordered]@{
         source_commit = $SourceCommit
-        executables = @(@('memory.exe', 'memory-windows-service.exe') | ForEach-Object {
+        toolchains = [ordered]@{ rustc = ((& rustc --version) -join "`n"); cargo = ((& cargo --version) -join "`n"); node = ((& node --version) -join "`n"); npm = ((& npm --version) -join "`n"); powershell = $PSVersionTable.PSVersion.ToString() }
+        executables = @($Executables | ForEach-Object {
             [ordered]@{ name = $_; sha256 = (Get-FileHash -Algorithm SHA256 (Join-Path $CargoTargetDir "$Target\release\$_")).Hash.ToLowerInvariant() }
         })
         # Bind cached Web assets as well as the executables for -SkipBuild.
@@ -254,11 +259,11 @@ if (-not (Test-Path -LiteralPath $BuildReceiptPath)) { throw 'Missing successful
 $buildReceipt = Get-Content -LiteralPath $BuildReceiptPath -Raw | ConvertFrom-Json
 if ($buildReceipt.source_commit -ne $SourceCommit) { throw 'Cached binaries were built from another commit' }
 foreach ($exe in @($buildReceipt.executables)) {
-    if ($exe.name -notin @('memory.exe', 'memory-windows-service.exe')) { throw 'Invalid build receipt executable' }
+    if ($exe.name -notin $Executables) { throw 'Invalid build receipt executable' }
     $actual = (Get-FileHash -Algorithm SHA256 (Join-Path $CargoTargetDir "$Target\release\$($exe.name)")).Hash.ToLowerInvariant()
     if ($actual -ne $exe.sha256) { throw 'Cached executable changed since build' }
 }
-if (@($buildReceipt.executables).Count -ne 2) { throw 'Incomplete executable build receipt' }
+if (@($buildReceipt.executables).Count -ne $Executables.Count -or (Compare-Object -ReferenceObject $Executables -DifferenceObject @($buildReceipt.executables | ForEach-Object { $_.name }))) { throw 'Incomplete executable build receipt' }
 $actualWeb = @(Get-ChildItem -LiteralPath (Join-Path $RootDir 'web\dist') -File -Recurse | Sort-Object FullName | ForEach-Object {
     "$(Get-RelativePath (Join-Path $RootDir 'web\dist') $_.FullName)|$((Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant())"
 })
@@ -273,15 +278,21 @@ New-Item -ItemType Directory -Force -Path $StageDir, $DistDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'bin') | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\memory-layer') | Out-Null
 
-$ExePath = Join-Path $CargoTargetDir "$Target\release\memory.exe"
-if (-not (Test-Path $ExePath)) { throw "Missing Windows binary: $ExePath" }
-Copy-Item -Force $ExePath (Join-Path $StageDir 'bin\memory.exe')
-Copy-Item -Force (Join-Path $CargoTargetDir "$Target\release\memory-windows-service.exe") (Join-Path $StageDir 'bin\memory-windows-service.exe')
+foreach ($executable in $Executables) {
+    $ExePath = Join-Path $CargoTargetDir "$Target\release\$executable"
+    if (-not (Test-Path $ExePath)) { throw "Missing Windows binary: $ExePath" }
+    Copy-Item -Force $ExePath (Join-Path $StageDir "bin\$executable")
+}
 Copy-Item -Force (Join-Path $RootDir 'README.md') (Join-Path $StageDir 'README.md')
 Copy-Item -Force (Join-Path $RootDir 'memory-layer.toml.example') (Join-Path $StageDir 'memory-layer.toml.example')
 Copy-Item -Force (Join-Path $RootDir 'packaging\windows\postgres.compose.yaml') (Join-Path $StageDir 'share\memory-layer\postgres.compose.yaml')
 Copy-Tree (Join-Path $RootDir 'web\dist') (Join-Path $StageDir 'share\memory-layer\web')
 Copy-Tree (Join-Path $RootDir '.agents\skills') (Join-Path $StageDir 'share\memory-layer\skill-template')
+Copy-Tree (Join-Path $RootDir 'packaging\windows-pds') (Join-Path $StageDir 'share\memory-layer\windows-pds')
+New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\memory-layer\operators') | Out-Null
+foreach ($operator in @('native-instance.ps1', 'native-instance-functions.ps1', 'release-identity.ps1')) {
+    Copy-Item -LiteralPath (Join-Path $ScriptDir $operator) -Destination (Join-Path $StageDir "share\memory-layer\operators\$operator")
+}
 
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'completions') | Out-Null
 & (Join-Path $StageDir 'bin\memory.exe') completion powershell | Out-File -Encoding utf8 (Join-Path $StageDir 'completions\memory.ps1')
@@ -365,12 +376,47 @@ if ($LASTEXITCODE -ne 0) { throw "WiX build failed with exit code $LASTEXITCODE"
 Remove-Item -Force $WixPdbPath -ErrorAction SilentlyContinue
 Normalize-Msi -Path $MsiPath -PackageCode $packageCode
 
-foreach ($artifact in @($ZipPath, $MsiPath)) {
+# Separate machine-level tools scaffold. It neither provisions third-party
+# dependencies nor starts services/custom actions under an installer identity.
+# State and immutable service releases remain outside the MSI-owned directory.
+$serverUpgradeCode = 'B209C344-2641-4F0C-BEAF-37A9C827C243'
+$serverProductCode = Get-DeterministicGuid "Memory Layer|server-tools|$($Identity.release_identity)|x64"
+$serverPackageCode = Get-DeterministicGuid "Memory Layer|server-tools-package|$($Identity.release_identity)|$SourceCommit|x64"
+$serverDirectoryXml = ($directoryXml -join "`n").Replace('Root="HKCU"', 'Root="HKLM"').Replace('Software\Memory Layer\Components', 'Software\Memory Layer Native Server Tools\Components')
+$serverDirectoryXml = [regex]::Replace($serverDirectoryXml, 'Guid="\{([A-Fa-f0-9-]+)\}"', {
+    param($match)
+    'Guid="{' + (Get-DeterministicGuid "Memory Layer|server-tools-component|$($match.Groups[1].Value)") + '}"'
+})
+$serverFeatureRefs = $componentRefs | Where-Object { $_ -ne 'cmp_ProgramsFolderCleanup' } | Sort-Object | ForEach-Object { "      <ComponentRef Id=`"$_`" />" }
+$serverWxsPath = Join-Path $BuildRoot 'memory-layer-server-tools.wxs'
+$serverWxs = @"
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package ProductCode="{$serverProductCode}" Name="Memory Layer Native Server Tools" Manufacturer="Memory Layer" Version="$MsiVersion" UpgradeCode="{$serverUpgradeCode}" Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer Memory Layer server tools build is installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Memory Layer Native Server Tools">
+$serverDirectoryXml
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Main" Title="Native server tools (dependencies installed separately)" Level="1">
+$($serverFeatureRefs -join "`n")
+    </Feature>
+  </Package>
+</Wix>
+"@
+Set-Content -LiteralPath $serverWxsPath -Value $serverWxs -Encoding utf8
+& $wix.Source build $serverWxsPath -arch x64 -out $ServerToolsMsiPath
+if ($LASTEXITCODE -ne 0) { throw "Server tools WiX build failed with exit code $LASTEXITCODE" }
+Remove-Item -LiteralPath ([IO.Path]::ChangeExtension($ServerToolsMsiPath, '.wixpdb')) -ErrorAction SilentlyContinue
+Normalize-Msi -Path $ServerToolsMsiPath -PackageCode $serverPackageCode
+
+foreach ($artifact in @($ZipPath, $MsiPath, $ServerToolsMsiPath)) {
     $hash = Get-FileHash -Algorithm SHA256 $artifact
     "$($hash.Hash.ToLowerInvariant())  $(Split-Path -Leaf $artifact)" | Set-Content -Encoding ascii "$artifact.sha256"
 }
 
-$artifacts = @($ZipPath, $MsiPath) | ForEach-Object {
+$artifacts = @($ZipPath, $MsiPath, $ServerToolsMsiPath) | ForEach-Object {
     [ordered]@{ name = (Split-Path -Leaf $_); sha256 = (Get-FileHash -Algorithm SHA256 $_).Hash.ToLowerInvariant(); bytes = (Get-Item $_).Length }
 }
 $manifest = [ordered]@{
@@ -381,15 +427,27 @@ $manifest = [ordered]@{
     installer_build = $InstallerBuild
     installer_version = $MsiVersion
     source_commit = $SourceCommit
+    build_toolchains = $buildReceipt.toolchains
+    packaging_toolchains = [ordered]@{ wix = ((& $wix.Source --version) -join "`n"); powershell = $PSVersionTable.PSVersion.ToString() }
     upgrade_code = $upgradeCode
     product_code = $productCode
     package_code = $packageCode
+    machine_tools_installer = [ordered]@{ upgrade_code = $serverUpgradeCode; product_code = $serverProductCode; package_code = $serverPackageCode; provisions_dependencies = $false; starts_services = $false }
     signing_status = 'unsigned'
     capabilities = @('per-user-client')
+    first_party_executables = $Executables
     native_stack_bundled = $false
+    payload_files = @(Get-ChildItem -LiteralPath $StageDir -Recurse -File | Sort-Object FullName | ForEach-Object {
+        [ordered]@{ name = (Get-RelativePath $StageDir $_.FullName).Replace('\', '/'); sha256 = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant() }
+    })
     artifacts = @($artifacts)
 }
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $DistDir "$($Identity.asset_prefix).manifest.json")
+$manifestPath = Join-Path $DistDir "$($Identity.asset_prefix).manifest.json"
+$manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 $manifestPath
+$manifestHash = (Get-FileHash -Algorithm SHA256 $manifestPath).Hash.ToLowerInvariant()
+"$manifestHash  $(Split-Path -Leaf $manifestPath)" | Set-Content -Encoding ascii "$manifestPath.sha256"
+@($artifacts | ForEach-Object { "$($_.sha256)  $($_.name)" }) + @("$manifestHash  $(Split-Path -Leaf $manifestPath)") | Set-Content -Encoding ascii (Join-Path $DistDir 'SHA256SUMS')
 
 Write-Host "Built $ZipPath"
 Write-Host "Built $MsiPath"
+Write-Host "Built $ServerToolsMsiPath (native dependency installation/acceptance still required)"
