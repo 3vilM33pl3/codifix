@@ -22,8 +22,20 @@ mod native {
         path::{Path, PathBuf},
         process::Command,
         ptr::null_mut,
-        time::Duration,
+        sync::OnceLock,
+        time::{Duration, Instant},
     };
+
+    // Trusted host diagnostics only. Child stderr remains assertion evidence,
+    // and no payload, paths, arguments or inherited environment are logged.
+    fn stage(name: &'static str) {
+        static START: OnceLock<Instant> = OnceLock::new();
+        eprintln!(
+            "native_probe stage={name} elapsed_ms={}",
+            START.get_or_init(Instant::now).elapsed().as_millis()
+        );
+        let _ = std::io::stderr().flush();
+    }
     use windows_sys::Win32::{
         Foundation::HANDLE,
         Foundation::LocalFree,
@@ -224,6 +236,7 @@ mod native {
             args.is_empty(),
             "probe accepts no operator paths or credentials"
         );
+        stage("host_begin");
         let base =
             std::env::temp_dir().join(format!("memory-native-isolation-{}", uuid::Uuid::new_v4()));
         create_private_directory(&base)?;
@@ -233,6 +246,7 @@ mod native {
         for path in [&code, &scratch, &neighbor] {
             create_private_directory(path)?;
         }
+        stage("private_directories_created");
         let executable = code.join("probe.exe");
         let mut target = create_private_file(&executable)?;
         std::io::copy(&mut File::open(std::env::current_exe()?)?, &mut target)?;
@@ -242,6 +256,7 @@ mod native {
         create_private_file(&reviewed)?.write_all(b"reviewed synthetic data")?;
         let forbidden = neighbor.join("private.txt");
         create_private_file(&forbidden)?.write_all(b"must never be read by child")?;
+        stage("synthetic_files_created");
         let (stdin_child, stdin_parent) = pipe()?;
         let (stdout_parent, stdout_child) = pipe()?;
         let (stderr_parent, stderr_child) = pipe()?;
@@ -250,6 +265,7 @@ mod native {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         // Control demonstrates the sentinel is genuinely reachable outside AC.
         drop(TcpStream::connect(listener.local_addr()?)?);
+        stage("pipes_and_network_control_created");
         let extra = create_private_file(&base.join("unlisted.txt"))?;
         // Deliberately mark an unrelated authority handle inheritable; HANDLE_LIST
         // must still exclude it. It never contains a real secret.
@@ -280,6 +296,7 @@ mod native {
             )
             .into(),
         ];
+        stage("before_spawn");
         let mut process = spawn(ProcessSpec {
             executable: CodeFile {
                 sha256: digest(&executable)?,
@@ -297,6 +314,7 @@ mod native {
             broker: broker_child.as_handle(),
         })
         .with_context(|| format!("native probe state retained at {}", base.display()))?;
+        stage("after_spawn");
         drop(stdin_child);
         drop(stdout_child);
         drop(stderr_child);
@@ -317,18 +335,27 @@ mod native {
                 .read_to_string(&mut bytes)
                 .map(|_| bytes)
         });
+        stage("before_child_wait");
+        let exit_code = process.wait(Duration::from_secs(30))?;
+        stage("after_child_wait");
         ensure!(
-            process.wait(Duration::from_secs(30))? == 0,
+            exit_code == 0,
             "native adversarial child failed; state retained at {}",
             base.display()
         );
+        stage("before_process_cleanup");
         drop(process);
+        stage("after_process_cleanup");
+        stage("before_stdout_join");
         let text = output
             .join()
             .map_err(|_| anyhow::anyhow!("stdout reader panicked"))??;
+        stage("after_stdout_join");
+        stage("before_stderr_join");
         let stderr = errors
             .join()
             .map_err(|_| anyhow::anyhow!("stderr reader panicked"))??;
+        stage("after_stderr_join");
         ensure!(
             text.contains("\"loopback_denied\":true") && stderr.is_empty(),
             "missing native denial evidence"
@@ -337,6 +364,7 @@ mod native {
         // Do not recursively delete state: retain the synthetic evidence bundle
         // for ACL inspection and recovery tests. No credential lives there.
         println!("native probe evidence: {}", base.display());
+        stage("host_complete");
         Ok(())
     }
 }
