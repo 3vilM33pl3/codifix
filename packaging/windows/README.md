@@ -184,3 +184,35 @@ Its separate stable UpgradeCode is `B209C344-2641-4F0C-BEAF-37A9C827C243`; it do
 not replace the per-user installer identity. Removing this MSI removes only its
 tools directory. Named service releases, configuration and databases created
 through the explicit operator are retained and must be retired separately.
+
+## Offline native PostgreSQL runtime prerequisite
+
+`operators/native-prerequisites.ps1` is a separate, explicit `Preview`/`Install`
+operation. It installs **already built** PostgreSQL 17.11, pgvector 0.8.7 and
+app-local MSVC CRT bytes; it does not require Visual Studio, download software,
+initialize a database, create services or touch an existing database. PDS and Pi
+are not supplied by this operation. `native_stack_bundled` remains false.
+
+Supply a ZIP and a digest-pinned JSON manifest from an operator-protected input
+directory. Manifest fields are `schema_version: 1`,
+`kind: memory-native-postgres-runtime`, `platform: windows-x86_64`,
+`postgres_version`, `pgvector_version`, `crt_version`, `package_sha256`, complete
+`payload_files` (`name`, `sha256`) and exactly three `components`:
+`postgresql`, `pgvector`, `msvc-crt`. Each component has `version`,
+`source_sha256`, `license` and a `notice_path` included in the payload. The
+bundler must retain the actual upstream licence/redistribution terms; this
+operator does not grant redistribution rights or fabricate notices. Include the
+full prepared `pgsql` tree, extension SQL/control files and required native DLLs,
+not a selected set of executable files. Never bundle database state or secrets.
+
+Run `-Action Preview -OperationId UUID -PackagePath ZIP -ManifestPath JSON
+-ManifestSha256 SHA256`. Review its destination/input digest, then repeat with
+`-Action Install -ExpectedInputSha256 DIGEST` from an elevated operator shell.
+Installed runtimes are immutable, hash-identified directories under
+`%ProgramFiles%\Memory Layer\runtimes`; operation receipts and interrupted
+staging remain there for recovery. Repeating the same operation verifies rather
+than replacing the runtime; changed inputs require a new reviewed operation.
+Service-account access is a separate explicit service-installation concern.
+Successful file installation is **not native execution or clean-Windows
+acceptance evidence**. Run `test-native-prerequisites.ps1` for portable descriptor
+tests; the full clean Windows runtime still requires observed testing.
