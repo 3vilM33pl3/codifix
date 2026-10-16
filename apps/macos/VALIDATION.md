@@ -1,4 +1,4 @@
-# Native macOS acceptance — 2026-10-15
+# Native macOS acceptance — 2026-10-16
 
 Built with Xcode 27.0 (27A266a) on macOS 26.6. Deployment target is macOS 15.
 Debug and Release builds produce universal arm64/x86_64 applications. Native
@@ -83,16 +83,28 @@ were checked. Accessibility labels and native control
 roles were inspected through the automation surface. A complete VoiceOver audit
 was not performed.
 
-## Automated UI runner limitation
+## Automated UI tests
 
-Both unsigned and locally ad-hoc-signed UI-runner attempts failed before any UI
-test executed. Xcode reported: **“Timed out while enabling automation mode.”**
-Developer Tools mode on the host was disabled. UI-test sources compiled with
-`build-for-testing`; no automated UI-test pass is claimed. The native flow and
-layout results above come from the separate app-control acceptance pass.
+The signed `MemoryLayerUITests` suite passed **2 tests with 0 failures** on
+macOS 26.6 using Xcode 27.0. The tests cover the unconfigured connection prompt
+and a real UI connection to the isolated loopback fixture, including memory
+detail, provenance, and version history. This is navigation smoke coverage; the
+broader feature flows described above were verified manually in the native app.
 
-The checked-in UI suite includes connection prompt coverage and a self-contained
-fixture connection/memory-history regression. Its connection history is
-isolated from the user's saved profiles. See [README.md](README.md) for commands
-and [the fixture guide](MemoryLayerUITests/Fixtures/README.md) for reproducible
+The test runner uses an ad-hoc signature and a target-scoped entitlement that
+allows the test process to launch the fixture server. The production app target
+is unchanged. The UI-test profile store is in memory, so these tests do not
+read or modify saved service profiles, the development service, or its data.
+The fixture URL is entered via a temporary pasteboard item; the test restores
+the previous pasteboard items and formats afterward.
+
+The first run did not initialize automation because macOS Developer Tools
+Security was disabled. After enabling it through the standard administrator
+authorization prompt, Xcode ran the suite. That initial run then exposed two
+test issues: the runner sandbox blocked the system Python shim, and simulated
+typing dropped URL punctuation. The UI-test-only entitlement and pasteboard
+entry resolved these issues. The final result bundle is
+`target/macos-ui-signed/Logs/Test/Test-MemoryLayer-2026.10.16_06-38-44-+0100.xcresult`.
+See [README.md](README.md) for the command and
+[the fixture guide](MemoryLayerUITests/Fixtures/README.md) for reproducible
 manual checks.

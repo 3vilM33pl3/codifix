@@ -35,8 +35,10 @@ struct ConnectionSettingsView: View {
                     TextField("Name", text: $name)
                     TextField("Service URL", text: $baseURL)
                         .textContentType(.URL)
+                        .accessibilityIdentifier("connection.serviceURL")
                     TextField("Project slug", text: $project)
                         .help("Use an existing project slug from this service.")
+                        .accessibilityIdentifier("connection.projectSlug")
                     TextField("Repository root (optional)", text: $repositoryRoot)
                         .help("Local path used by repository-aware project screens.")
                     Picker("Authentication", selection: $kind) {

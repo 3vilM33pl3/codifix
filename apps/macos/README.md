@@ -9,8 +9,8 @@ xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
   -derivedDataPath /tmp/memory-layer-macos CODE_SIGNING_ALLOWED=NO build
 ```
 
-See [VALIDATION.md](VALIDATION.md) for the implementation acceptance results and
-the host's automated UI-runner limitation.
+See [VALIDATION.md](VALIDATION.md) for implementation acceptance results and
+the latest native UI-test run.
 
 The app does not start a service, create a project, or populate a demo database.
 Connection profiles are saved as metadata in UserDefaults; remote tokens are
@@ -82,7 +82,9 @@ xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
   CODE_SIGNING_ALLOWED=NO -only-testing:MemoryLayerTests test
 ```
 
-The UI suite uses a separate runner and requires macOS to enable UI automation:
+The UI suite uses a separate runner and requires Developer Tools Security to be
+enabled in macOS. Xcode may need standard administrator authorization the first
+time it enables UI automation on a host:
 
 ```sh
 xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
@@ -92,10 +94,14 @@ xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
 ```
 
 This uses local ad-hoc signing for the test runner, not distribution signing.
-UI tests isolate connection history in memory and launch their own loopback
-fixture server. If the runner reports that it timed out enabling automation
-mode, no UI tests have passed; resolve the host's automation permission before
-rerunning. Manual flow checks can use the [fixture service](MemoryLayerUITests/Fixtures/README.md).
+The UI-test target alone disables App Sandbox so it can launch its Python
+loopback fixture server; the production app target is unchanged. UI tests
+isolate connection history in memory and launch their own loopback fixture
+server. If Xcode reports that it timed out enabling automation mode, enable
+Developer Tools Security through the standard macOS authorization flow and
+rerun. The current suite covers connection prompt and fixture-backed memory,
+provenance, and history navigation. Manual flow checks can use the
+[fixture service](MemoryLayerUITests/Fixtures/README.md).
 
 Debug builds accept `--ui-window-size=1440x960` and
 `--ui-window-size=1024x768` for repeatable window-layout inspection. For example:
