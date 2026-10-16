@@ -60,13 +60,14 @@ $env:PATH = "$(Split-Path $node);$(Split-Path $python);$env:PATH"
 $env:npm_config_python = $python
 $env:npm_config_build_from_source = 'true'
 $env:CI = 'true'
+Copy-Item -LiteralPath (Join-Path $SourceRoot 'packaging\windows-pds\probe-native-sqlite.cjs') -Destination (Join-Path $runtime 'probe-native-sqlite.cjs') -Force
 Push-Location $runtime
 try {
     Run-Checked $node @($pnpm,'install','--prod','--frozen-lockfile','--ignore-scripts','--config.node-linker=hoisted')
     # Upstream explicitly allows this one native lifecycle build, never arbitrary
     # repository setup hooks. Node-gyp uses the prepared MSVC/Python toolchain.
     Run-Checked $node @($pnpm,'rebuild','better-sqlite3','--config.node-linker=hoisted')
-    Run-Checked $node @('-e', 'const Database=require("better-sqlite3");const db=new Database(":memory:");const version=db.prepare("select sqlite_version() as version").get().version;db.close();const p=require("@atproto/pds/package.json");if(p.version!=="0.5.27")throw Error("PDS mismatch");console.log(JSON.stringify({native_sqlite:version,pds:p.version,node:process.versions.node}));')
+    Run-Checked $node @((Join-Path $runtime 'probe-native-sqlite.cjs'))
 } finally { Pop-Location }
 Assert-Hash (Join-Path $runtime 'package.json') $manifest.package_sha256
 Assert-Hash (Join-Path $runtime 'pnpm-lock.yaml') $manifest.lock_sha256
