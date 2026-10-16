@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][ValidateSet('Preview', 'Install', 'Upgrade')][string]$Action,
+    [ValidateSet('Install', 'Upgrade')][string]$PreviewAction = 'Install',
     [Parameter(Mandatory = $true)][string]$Name,
     [Parameter(Mandatory = $true)][guid]$OperationId,
     [Parameter(Mandatory = $true)][string]$PackagePath,
@@ -12,7 +13,7 @@ param(
     [Parameter(Mandatory = $true)][guid]$ExpectedInstanceId,
     [ValidatePattern('^[0-9a-f]{64}$')][string]$ExpectedInputSha256,
     [ValidateSet('memory.exe')][string]$ExecutableName = 'memory.exe',
-    [string]$RecoveryReference,
+    [Parameter(Mandatory = $true)][ValidateLength(1, 1024)][string]$RecoveryReference,
     [switch]$DatabaseCompatibilityConfirmed
 )
 $ErrorActionPreference = 'Stop'
@@ -112,10 +113,11 @@ $state = Join-Path (Join-Path $root 'instances') $Name
 $installedConfig = Join-Path $state 'memory-layer.toml'
 $command = @((Join-Path $release 'bin\memory-windows-service.exe'), '--name', $plan.service_name, '--directory', $state, '--', (Join-Path $release "bin\$ExecutableName"), '--config', $installedConfig, 'service', 'run')
 $binaryPath = ($command | ForEach-Object { ConvertTo-NativeCommandArgument $_ }) -join ' '
-$binding = [ordered]@{ plan = $plan; manifest_sha256 = $ManifestSha256; package_sha256 = $zipEntry[0].sha256; config_fingerprint = $configHash; binary_path = $binaryPath }
+$operationAction = if ($Action -eq 'Preview') { $PreviewAction } else { $Action }
+$binding = [ordered]@{ action = $operationAction; recovery_reference = $RecoveryReference; plan = $plan; manifest_sha256 = $ManifestSha256; package_sha256 = $zipEntry[0].sha256; config_fingerprint = $configHash; binary_path = $binaryPath }
 $inputDigest = Get-NativeInputDigest $binding
 if ($Action -eq 'Preview') {
-    [ordered]@{ plan = $plan; input_sha256 = $inputDigest; release_directory = $release; state_directory = $state; signing_status = $manifest.signing_status; native_stack_bundled = $manifest.native_stack_bundled; database_backup_performed = $false } | ConvertTo-Json -Depth 8
+    [ordered]@{ action = $operationAction; recovery_reference = $RecoveryReference; plan = $plan; input_sha256 = $inputDigest; release_directory = $release; state_directory = $state; signing_status = $manifest.signing_status; native_stack_bundled = $manifest.native_stack_bundled; database_backup_performed = $false } | ConvertTo-Json -Depth 8
     exit 0
 }
 if (-not $ExpectedInputSha256 -or $ExpectedInputSha256 -ne $inputDigest) { throw 'Execution inputs differ from the explicitly reviewed preview digest' }
@@ -130,6 +132,7 @@ $registrationPath = Join-Path (Join-Path $root 'registrations') "$Name.json"
 $operationRoot = Join-Path (Join-Path $root 'operations') $OperationId.ToString()
 Set-PrivateDirectory $operationRoot
 $lock = [IO.File]::Open((Join-Path $root 'operator.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+$releaseGuard = $null
 try {
     $journalPath = Join-Path $operationRoot 'journal.json'
     if (Test-Path -LiteralPath $journalPath) {
@@ -146,12 +149,19 @@ try {
             if ($registration.binary_path -ne $existing.PathName -or $registration.expected_instance_id -ne $plan.expected_instance_id) { throw 'Existing service differs from its exact-instance installation receipt' }
             if ([version]$manifest.installer_version -le [version]$registration.installer_version) { throw 'Upgrade requires a strictly newer installer build; stale executable recovery is forbidden' }
         }
-        $journal = [ordered]@{ schema_version = 1; operation_id = $OperationId.ToString(); input_sha256 = $inputDigest; phase = 'prepared'; history = @(); retained_staging = @(); plan = $plan; previous_binary_path = $(if ($existing) { $existing.PathName } else { $null }); recovery_reference = $RecoveryReference; database_backup_performed = $false }
+        $journal = [ordered]@{ schema_version = 1; operation_id = $OperationId.ToString(); action = $operationAction; input_sha256 = $inputDigest; phase = 'prepared'; history = @(); retained_staging = @(); plan = $plan; previous_binary_path = $(if ($existing) { $existing.PathName } else { $null }); recovery_reference = $RecoveryReference; database_backup_performed = $false }
         Write-NativeJournal $journalPath $journal
     }
     if ($journal.phase -eq 'completed') { Write-Output "Already completed: $OperationId ($($plan.service_name)); no service restarted"; exit 0 }
     $existing = Get-SelectedService
     if ($existing -and ($existing.StartName -ne $plan.account -or $existing.PathName -notin @($journal.previous_binary_path, $binaryPath))) { throw 'SCM configuration changed outside this operation' }
+    Initialize-NativeReleaseGuard
+    if (Test-Path -LiteralPath $release) {
+        # Refuse even correctly hashed bytes if another identity can modify,
+        # replace or alias them. Retain validated handles until startup finishes.
+        $releaseGuard = [MemoryLayer.ProtectedRelease]::Open($release)
+        Assert-NativePayload $release $manifest.payload_files
+    }
     if (Test-Path -LiteralPath $installedConfig) {
         Assert-NoReparse $installedConfig
         $existingBytes = [IO.File]::ReadAllBytes($installedConfig)
@@ -175,6 +185,7 @@ try {
             Save-Phase 'interrupted_staging_retained'
         }
         Set-PrivateDirectory $temporaryRelease
+        Save-Phase 'staging_created'
         $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
         try {
             if ($archive.Entries.Count -gt 20000) { throw 'Too many ZIP entries' }
@@ -192,17 +203,21 @@ try {
                 try { $source.CopyTo($output); $output.Flush($true) } finally { $output.Dispose(); $source.Dispose() }
             }
         } finally { $archive.Dispose() }
+        $stagingGuard = $null
+        try {
+            $stagingGuard = [MemoryLayer.ProtectedRelease]::Open($temporaryRelease)
+            Assert-NativePayload $temporaryRelease $manifest.payload_files
+        } catch {
+            $journal.retained_staging = @($journal.retained_staging) + @($temporaryRelease)
+            Save-Phase 'staging_rejected'
+            throw
+        } finally { if ($stagingGuard) { $stagingGuard.Dispose() } }
+        # The private staging tree is fully verified before it becomes an
+        # immutable release. A failed validation leaves it recoverably staged.
         [IO.Directory]::Move($temporaryRelease, $release)
+        $releaseGuard = [MemoryLayer.ProtectedRelease]::Open($release)
     }
-    Assert-NoReparse $release
-    $actualFiles = @(Get-ChildItem -LiteralPath $release -Recurse -File)
-    if ($actualFiles.Count -ne @($manifest.payload_files).Count) { throw 'Release payload count differs from manifest' }
-    foreach ($entry in $manifest.payload_files) {
-        Assert-NativeArchiveName $entry.name
-        $target = Join-Path $release $entry.name.Replace('/', '\')
-        Assert-NoReparse $target
-        if ((Get-Hash $target) -ne $entry.sha256) { throw 'Immutable release payload differs from manifest' }
-    }
+    Assert-NativePayload $release $manifest.payload_files
     if (-not (Test-Path (Join-Path $release 'bin\memory-windows-service.exe')) -or -not (Test-Path (Join-Path $release "bin\$ExecutableName"))) { throw 'Required native executables missing' }
     Save-Phase 'release_verified'
     if (-not $existing) { Invoke-Sc @('create', $plan.service_name, 'binPath=', $binaryPath, 'start=', 'demand', 'obj=', $plan.account) }
@@ -237,7 +252,7 @@ try {
             try {
                 $response = $client.GetAsync($plan.health_uri).GetAwaiter().GetResult()
                 $health = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
-                if ([int]$response.StatusCode -eq 200 -and $health.instance_id -eq $plan.expected_instance_id -and $health.status -eq 'ok' -and (Get-Service -Name $plan.service_name).Status -eq 'Running') { $ready = $true; break }
+                if ([int]$response.StatusCode -eq 200 -and (Test-NativeReadinessHealth $health $ExpectedInstanceId) -and (Get-Service -Name $plan.service_name).Status -eq 'Running') { $ready = $true; break }
             } catch { } finally { if ($response) { $response.Dispose() } }
             Start-Sleep -Seconds 1
         }
@@ -247,4 +262,4 @@ try {
     Write-NativeJournal $registrationPath ([ordered]@{ schema_version = 1; operation_id = $OperationId.ToString(); expected_instance_id = $plan.expected_instance_id; installer_version = $manifest.installer_version; release_identity = $plan.release_identity; manifest_sha256 = $ManifestSha256; binary_path = $binaryPath; config_fingerprint = $configHash })
     Save-Phase 'completed'
     Write-Output "Completed: $OperationId ($($plan.service_name)); exact-instance readiness verified; data preserved"
-} finally { $lock.Dispose() }
+} finally { if ($releaseGuard) { $releaseGuard.Dispose() }; $lock.Dispose() }
