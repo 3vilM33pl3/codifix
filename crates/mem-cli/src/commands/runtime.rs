@@ -18,9 +18,9 @@ use reqwest::Client;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::commands::{
-    api::ApiClient, output::write_headers, skill_support::set_private_file_permissions,
-};
+#[cfg(not(windows))]
+use crate::commands::skill_support::set_private_file_permissions;
+use crate::commands::{api::ApiClient, output::write_headers};
 
 const ROOT_AFTER_HELP: &str = "\
 New here? Run `memory wizard` for guided setup or `memory init` in a repository,
@@ -3908,6 +3908,12 @@ pub(super) async fn run() -> Result<()> {
     Ok(())
 }
 
+#[cfg(windows)]
+pub(crate) fn write_shared_env_file(path: &Path, key: &str, value: &str) -> Result<()> {
+    crate::commands::runtime_env_windows::write(path, key, value)
+}
+
+#[cfg(not(windows))]
 pub(crate) fn write_shared_env_file(path: &Path, key: &str, value: &str) -> Result<()> {
     let parent = path
         .parent()

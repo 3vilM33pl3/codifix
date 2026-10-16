@@ -889,7 +889,7 @@ pub(crate) fn set_private_file_permissions(path: &Path) -> Result<()> {
         .with_context(|| format!("chmod {}", path.display()))
 }
 
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 pub(crate) fn set_private_file_permissions(_path: &Path) -> Result<()> {
     Ok(())
 }

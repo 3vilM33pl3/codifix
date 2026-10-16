@@ -21,6 +21,7 @@ class BuildToolsManifestTests(unittest.TestCase):
                          'WaitForExit($Seconds * 1000)', '/PID $process.Id /T /F',
                          'execution_verified=$false', 'credentials::windows::tests',
                          'workspace::filesystem::windows::tests', 'agents::settings::filesystem::tests',
+                         'runtime_env_windows::tests',
                          'collector::codex::windows::native::tests']:
             self.assertIn(required, script)
         self.assertNotIn('Invoke-Expression', script)

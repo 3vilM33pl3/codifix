@@ -72,7 +72,7 @@ try {
             'platform' { @('tests::') }
             'routing' { @('area::tests') }
             'desktop' { @('collector::codex::windows::native::tests') }
-            'onboarding' { @('credentials::windows::tests','workspace::filesystem::windows::tests','agents::settings::filesystem::tests') }
+            'onboarding' { @('credentials::windows::tests','workspace::filesystem::windows::tests','agents::settings::filesystem::tests','runtime_env_windows::tests') }
         }
         $index = 0
         foreach ($filter in $filters) {

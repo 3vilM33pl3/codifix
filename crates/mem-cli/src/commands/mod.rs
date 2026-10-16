@@ -43,6 +43,8 @@ mod remember;
 mod repo;
 mod resume;
 pub(crate) mod runtime;
+#[cfg(windows)]
+mod runtime_env_windows;
 mod scan;
 mod service;
 pub(crate) mod service_support;
