@@ -404,7 +404,12 @@ impl ServiceInput {
                 .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
                 .open(&current)?;
             information(&file, true)?;
-            acl_reader(&file, current == parent, Some(reader))?;
+            acl_reader(&file, current == parent, Some(reader)).map_err(|error| {
+                io::Error::new(
+                    error.kind(),
+                    format!("service authority ancestor policy: {error}"),
+                )
+            })?;
             ancestors.push(file);
         }
         if ancestors.is_empty() {
@@ -417,7 +422,12 @@ impl ServiceInput {
             .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
             .open(path)?;
         let before = information(&file, false)?;
-        acl_reader(&file, true, Some(reader))?;
+        acl_reader(&file, true, Some(reader)).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("service authority file policy: {error}"),
+            )
+        })?;
         if before.size > limit {
             return Err(denied());
         }
