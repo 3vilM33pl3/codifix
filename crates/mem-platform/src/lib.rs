@@ -7,6 +7,8 @@ pub mod journal;
 #[cfg(windows)]
 pub mod windows_process;
 #[cfg(windows)]
+pub mod windows_trusted_process;
+#[cfg(windows)]
 pub use mem_platform_files::windows as private_windows;
 
 use std::{
