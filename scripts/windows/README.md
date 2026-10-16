@@ -6,6 +6,8 @@ unattended installation with a private one-time password and SSH key, and starts
 QEMU with KVM, UEFI, TPM, 8 CPUs and 16 GiB RAM. No host project directory or
 credentials are mounted in the guest. SSH is forwarded only on `127.0.0.1:22290`;
 the graphical console and guest-agent transports use private Unix sockets.
+Guest timezone and virtual RTC both use UTC, independently of Monolith's
+daylight-saving timezone. Confirm guest/host UTC agreement before receipt tests.
 
 The VM is synthetic build/test infrastructure, not a production deployment.
 Media is downloaded over verified HTTPS from Microsoft's Enterprise Evaluation

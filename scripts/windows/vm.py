@@ -297,7 +297,7 @@ def start(root, data, install):
     machine = "q35,smm=on" if data.get("secure_boot") else "q35"
     command = ["qemu-system-x86_64", "-name", "memory-windows-native", "-accel", "kvm",
                "-machine", machine, "-cpu", "host", "-smp", str(data["cpus"]),
-               "-m", str(data["memory_mib"]), "-rtc", "base=localtime",
+               "-m", str(data["memory_mib"]), "-rtc", "base=utc",
                "-drive", f"if=pflash,format=raw,readonly=on,file={data['firmware']}",
                "-drive", f"if=pflash,format=raw,file={root / 'nvram.fd'}",
                "-drive", f"file={root / 'disk.qcow2'},format=qcow2,if=none,id=osdisk",
