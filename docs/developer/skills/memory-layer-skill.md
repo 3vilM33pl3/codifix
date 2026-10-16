@@ -95,6 +95,28 @@ The supported helper commands are:
 
 `go` must be available on `PATH` anywhere the repo-local skill bundle is expected to run. That requirement is specific to the skill helper runtime; the `memory` CLI itself is still the underlying command surface.
 
+Command resolution is explicit and stops after one selected destination:
+
+1. `MEMCTL_BIN`, when supplied, overrides the command for that invocation.
+2. `.agents/memory-layer-command.json`, when present, contains the project's
+   command as a JSON array of arguments. Invalid configuration fails closed.
+3. Without either selection, a Memory source checkout uses `cargo run`; other
+   repositories use the installed `memory` command.
+
+This repository selects `["memory", "--area", "workshop"]` for durable notes,
+including queries, task starts, plans and completed work. That selection uses
+the existing Workshop API and operator-owned credentials/routing. The helper
+does not read database credentials or automatically switch services on failure.
+Other repositories do not inherit this project's command file when installing
+the skill bundle.
+
+For a backend test, explicitly select the source CLI with
+`MEMCTL_BIN='cargo run --quiet --bin memory --'`. Source commands without an
+explicit `--area` run with the dev profile and omit inherited area-routing
+environment variables. Dev transport, authentication and degraded-database
+failures include recovery instructions in both JSON and text output, retaining
+the original error and exit code. See [dev recovery](../dev-stack.md#project-memory-routing-and-recovery).
+
 ## What Changed From The Older Flow
 
 Older documentation in this repo focused on:

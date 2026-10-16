@@ -28,6 +28,7 @@ type helperInvocation struct {
 	commandArgs     []string
 	expectJSON      bool
 	textPassthrough bool
+	devSourceRoot   string
 }
 
 type helperEnvelope struct {
@@ -78,6 +79,9 @@ func run(args []string) int {
 	if err != nil {
 		return emitHelperFailure(mode, invocation.helperCommand, invocation.project, "resolver_error", err.Error(), 1, nil, "", "")
 	}
+	if resolver.usesDevCommand(cmdArgs) {
+		invocation.devSourceRoot = resolver.sourceRoot
+	}
 	for _, prelude := range invocation.preludeArgs {
 		preludeArgs := append(append([]string{}, cmdArgs...), prelude...)
 		if code := runPreludeCommand(mode, invocation, preludeArgs); code != 0 {
@@ -92,7 +96,7 @@ func run(args []string) int {
 func runPreludeCommand(mode outputMode, invocation helperInvocation, cmdArgs []string) int {
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	cmd.Stdin = os.Stdin
-	cmd.Env = os.Environ()
+	cmd.Env = commandEnvironment(invocation)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -107,30 +111,13 @@ func runPreludeCommand(mode outputMode, invocation helperInvocation, cmdArgs []s
 	if errors.As(runErr, &exitErr) {
 		exitCode = exitErr.ExitCode()
 	}
-	message := strings.TrimSpace(stderr.String())
-	if message == "" {
-		message = strings.TrimSpace(stdout.String())
-	}
-	if message == "" {
-		message = runErr.Error()
-	}
-	return emitHelperFailure(
-		mode,
-		invocation.helperCommand,
-		invocation.project,
-		"prelude_failed",
-		message,
-		exitCode,
-		cmdArgs,
-		stdout.String(),
-		stderr.String(),
-	)
+	return emitCommandFailure(mode, invocation, cmdArgs, "prelude_failed", exitCode, runErr, stdout.String(), stderr.String())
 }
 
 func runWrappedCommand(mode outputMode, invocation helperInvocation, cmdArgs []string, expectJSON bool) int {
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	cmd.Stdin = os.Stdin
-	cmd.Env = os.Environ()
+	cmd.Env = commandEnvironment(invocation)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -157,29 +144,12 @@ func runWrappedCommand(mode outputMode, invocation helperInvocation, cmdArgs []s
 		}
 	}
 
-	if mode == outputText {
-		return emitTextResult(invocation, stdout.String(), stderr.String(), exitCode)
+	if runErr != nil {
+		return emitCommandFailure(mode, invocation, cmdArgs, "command_failed", exitCode, runErr, stdout.String(), stderr.String())
 	}
 
-	if runErr != nil {
-		message := strings.TrimSpace(stderr.String())
-		if message == "" {
-			message = strings.TrimSpace(stdout.String())
-		}
-		if message == "" {
-			message = "wrapped command failed"
-		}
-		return emitHelperFailure(
-			mode,
-			invocation.helperCommand,
-			invocation.project,
-			"command_failed",
-			message,
-			exitCode,
-			cmdArgs,
-			stdout.String(),
-			stderr.String(),
-		)
+	if mode == outputText {
+		return emitTextResult(invocation, stdout.String(), stderr.String(), exitCode)
 	}
 
 	var parsed any
@@ -322,10 +292,26 @@ func (r *memoryCommandResolver) Resolve() ([]string, error) {
 		}
 		return fields, nil
 	}
+	// This project-owned selection is explicit, not a fallback after a failed
+	// request. Most repositories have no command file and keep their usual route.
+	commandFile := filepath.Join(r.sourceRoot, ".agents", "memory-layer-command.json")
+	data, err := os.ReadFile(commandFile)
+	if err == nil {
+		var command []string
+		if err := json.Unmarshal(data, &command); err != nil {
+			return nil, fmt.Errorf("read %s: %w", commandFile, err)
+		}
+		if len(command) == 0 || strings.TrimSpace(command[0]) == "" {
+			return nil, fmt.Errorf("%s must contain a non-empty command array", commandFile)
+		}
+		return command, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("read %s: %w", commandFile, err)
+	}
 
 	manifestPath := filepath.Join(r.sourceRoot, "Cargo.toml")
-	memCliManifestPath := filepath.Join(r.sourceRoot, "crates", "mem-cli", "Cargo.toml")
-	if fileExists(manifestPath) && fileExists(memCliManifestPath) {
+	if r.hasSourceRepo() {
 		return []string{
 			"cargo", "run", "--quiet", "--bin", "memory", "--manifest-path", manifestPath, "--",
 		}, nil
@@ -336,6 +322,92 @@ func (r *memoryCommandResolver) Resolve() ([]string, error) {
 	}
 
 	return nil, errors.New("Memory Layer CLI not found. Install `memory`, or set MEMCTL_BIN to an explicit command.")
+}
+
+func (r *memoryCommandResolver) hasSourceRepo() bool {
+	return fileExists(filepath.Join(r.sourceRoot, "Cargo.toml")) &&
+		fileExists(filepath.Join(r.sourceRoot, "crates", "mem-cli", "Cargo.toml"))
+}
+
+func (r *memoryCommandResolver) usesDevCommand(command []string) bool {
+	if !r.hasSourceRepo() || len(command) == 0 {
+		return false
+	}
+	for _, arg := range command {
+		if arg == "--area" || strings.HasPrefix(arg, "--area=") {
+			return false
+		}
+	}
+	if filepath.Base(command[0]) == "cargo" {
+		return true
+	}
+	executable, _ := filepath.Abs(command[0])
+	for _, profile := range []string{"debug", "release"} {
+		if executable == filepath.Join(r.sourceRoot, "target", profile, "memory") {
+			return true
+		}
+	}
+	return false
+}
+
+// A selected source CLI always uses dev unless it explicitly selects an area.
+func commandEnvironment(invocation helperInvocation) []string {
+	environment := os.Environ()
+	if invocation.devSourceRoot == "" {
+		return environment
+	}
+	filtered := make([]string, 0, len(environment)+1)
+	for _, entry := range environment {
+		key, _, _ := strings.Cut(entry, "=")
+		switch key {
+		case "MEMORY_LAYER_PROFILE", "MEMORY_LAYER_AREA", "MEMORY_LAYER_AREA_ROUTING":
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return append(filtered, "MEMORY_LAYER_PROFILE=dev")
+}
+
+func emitCommandFailure(mode outputMode, invocation helperInvocation, command []string, kind string, code int, runErr error, stdout, stderr string) int {
+	message := strings.TrimSpace(stderr)
+	if message == "" {
+		message = strings.TrimSpace(stdout)
+	}
+	if message == "" {
+		message = runErr.Error()
+	}
+	if invocation.devSourceRoot != "" {
+		lower := strings.ToLower(message)
+		diagnosis := ""
+		switch {
+		case strings.Contains(lower, "offline degraded"), strings.Contains(lower, "relay has no local database"):
+			kind = "dev_service_degraded"
+			diagnosis = "The dev Memory Layer service is running without its PostgreSQL database. Check the dev database connection and login; a listening HTTP port is not sufficient."
+		case strings.Contains(lower, "401 unauthorized"), strings.Contains(lower, "403 forbidden"):
+			kind = "dev_service_auth_failed"
+			diagnosis = "The dev Memory Layer service rejected authentication or project permissions. Check the dev overlay and client credentials."
+		case strings.Contains(lower, "error sending request for url"), strings.Contains(lower, "service is not reachable"):
+			kind = "dev_service_unavailable"
+			diagnosis = "The dev Memory Layer service is unavailable (default http://127.0.0.1:4250; see the failed URL below for any configured override)."
+		}
+		if diagnosis != "" {
+			message = diagnosis + "\n" +
+				"In the recovery shell, first unset MEMORY_LAYER_AREA and MEMORY_LAYER_AREA_ROUTING if inherited from an installed-area session.\n" +
+				"From the Memory Layer checkout, diagnose: MEMORY_LAYER_PROFILE=dev cargo run --bin memory -- doctor\n" +
+				"Start the dev backend in a separate terminal: MEMORY_LAYER_PROFILE=dev cargo run --bin memory -- service run\n" +
+				"Verify: MEMORY_LAYER_PROFILE=dev cargo run --bin memory -- health (require status=ok and database=up).\n" +
+				"See docs/developer/dev-stack.md for recovery. Do not use packaged service enable or silently fall back to Workshop.\n" +
+				"Workshop requires an explicit project command selection or MEMCTL_BIN='memory --area workshop'; it is never a failure fallback.\n" +
+				"For failed writes, inspect the checkpoint/activity before retrying; the operation may have partially completed.\n\n" + message
+		}
+	}
+	// The message already includes the original error; retain raw streams in JSON
+	// but avoid printing the same stderr twice in text mode.
+	rawStderr := stderr
+	if mode == outputText {
+		rawStderr = ""
+	}
+	return emitHelperFailure(mode, invocation.helperCommand, invocation.project, kind, message, code, command, stdout, rawStderr)
 }
 
 func buildQueryMemoryInvocation(args []string, mode outputMode) (helperInvocation, error) {

@@ -47,7 +47,16 @@ existing overlay), `--dry-run` (preview only).
 ## Memory Layer workflows
 
 This project uses Memory Layer to persist durable project knowledge. The `memory` CLI
-must be on PATH (or use `cargo run --bin memory --` from the repo root).
+must be on PATH. Durable project knowledge belongs to Workshop's `memory` project;
+the shared Go helper explicitly selects `memory --area workshop` using
+`.agents/memory-layer-command.json`. Use that helper for queries, task starts,
+plans and completed work. Direct installed CLI examples below should likewise use
+`memory --area workshop` explicitly.
+
+The dev service/database is for backend tests, not a second durable knowledge
+store. To test a helper against dev, explicitly set
+`MEMCTL_BIN='cargo run --quiet --bin memory --'`. No request failure changes its
+destination. See [routing and recovery](docs/developer/dev-stack.md#project-memory-routing-and-recovery).
 
 ### Shared invariants
 1. Query memory before answering project-specific questions.

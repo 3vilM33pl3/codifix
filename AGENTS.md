@@ -6,8 +6,12 @@ when repeated instructions or project knowledge should survive future sessions.
 
 ## Start Here
 
-- Use the dev Memory Layer environment to store, retrieve, and search project
-  memory.
+- Use the Workshop API for durable project memory (queries, task starts, plans
+  and completed work). The shared helper explicitly selects it through
+  [.agents/memory-layer-command.json](.agents/memory-layer-command.json).
+- Use the dev service and its separate database for backend testing. Test
+  memories are disposable; they are not automatically synchronized to Workshop.
+  See [dev recovery and routing](docs/developer/dev-stack.md#project-memory-routing-and-recovery).
 - Before coding, read [CONTRIBUTING.md](CONTRIBUTING.md) and the code map at
   [docs/developer/architecture/code-map.md](docs/developer/architecture/code-map.md).
 - For architecture context, start with [docs/developer/architecture/overview.md](docs/developer/architecture/overview.md).

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -355,6 +356,162 @@ func TestResolverFallsBackToCargoWhenSourceRepoExists(t *testing.T) {
 			t.Fatalf("arg %d mismatch: got %q want %q", i, got[i], want[i])
 		}
 	}
+}
+
+func TestSourceDefaultEnvironmentUsesDevWithoutInheritedAreaRouting(t *testing.T) {
+	t.Setenv("MEMORY_LAYER_PROFILE", "prod")
+	t.Setenv("MEMORY_LAYER_AREA", "workshop")
+	t.Setenv("MEMORY_LAYER_AREA_ROUTING", "/operator/routes.json")
+	t.Setenv("MEMORY_LAYER_PROJECT", "memory")
+	got := commandEnvironment(helperInvocation{devSourceRoot: t.TempDir()})
+	joined := "\n" + strings.Join(got, "\n") + "\n"
+	for _, unexpected := range []string{"MEMORY_LAYER_PROFILE=prod", "MEMORY_LAYER_AREA=", "MEMORY_LAYER_AREA_ROUTING="} {
+		if strings.Contains(joined, unexpected) {
+			t.Fatalf("default dev inherited installed routing: %s", unexpected)
+		}
+	}
+	for _, expected := range []string{"MEMORY_LAYER_PROFILE=dev", "MEMORY_LAYER_PROJECT=memory"} {
+		if !strings.Contains(joined, "\n"+expected+"\n") {
+			t.Fatalf("missing environment entry: %s", expected)
+		}
+	}
+	// An explicit override retains the installed launcher's environment.
+	joined = strings.Join(commandEnvironment(helperInvocation{}), "\n")
+	if !strings.Contains(joined, "MEMORY_LAYER_AREA=workshop") || !strings.Contains(joined, "MEMORY_LAYER_PROFILE=prod") {
+		t.Fatal("explicit override lost its selected routing")
+	}
+}
+
+func TestResolverUsesExplicitProjectCommandBeforeSourceDefault(t *testing.T) {
+	t.Setenv("MEMCTL_BIN", "")
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "Cargo.toml"), []byte("[workspace]\n"))
+	mustWriteFile(t, filepath.Join(root, "crates", "mem-cli", "Cargo.toml"), []byte("[package]\n"))
+	path := filepath.Join(root, ".agents", "memory-layer-command.json")
+	mustWriteFile(t, path, []byte(`["memory","--area","workshop"]`))
+	resolver := &memoryCommandResolver{sourceRoot: root}
+	got, err := resolver.Resolve()
+	if err != nil || strings.Join(got, " ") != "memory --area workshop" || resolver.usesDevCommand(got) {
+		t.Fatalf("project command not selected: %v (%v)", got, err)
+	}
+	t.Setenv("MEMCTL_BIN", "cargo run --quiet --bin memory --")
+	got, err = resolver.Resolve()
+	if err != nil || !resolver.usesDevCommand(got) {
+		t.Fatalf("explicit dev test override not selected: %v (%v)", got, err)
+	}
+	t.Setenv("MEMCTL_BIN", "")
+	for _, invalid := range []string{`[]`, `null`, `[""]`, `["memory",`, `{ "command": "memory" }`} {
+		mustWriteFile(t, path, []byte(invalid))
+		if _, err := resolver.Resolve(); err == nil {
+			t.Fatalf("invalid project selection silently fell back: %s", invalid)
+		}
+	}
+}
+
+func TestDevServiceFailuresReportRecoveryWithoutFallback(t *testing.T) {
+	for _, tc := range []struct{ name, failure, kind string }{
+		{"connection", "Error: error sending request for url (http://127.0.0.1:4250/v1/query): Connection refused", "dev_service_unavailable"},
+		{"degraded", "503 Service Unavailable: PostgreSQL is unavailable; service is running in offline degraded mode", "dev_service_degraded"},
+		{"auth", "401 Unauthorized: invalid or expired service token", "dev_service_auth_failed"},
+	} {
+		for _, textMode := range []bool{false, true} {
+			t.Run(tc.name+map[bool]string{true: "-text", false: "-json"}[textMode], func(t *testing.T) {
+				t.Setenv("MEMCTL_BIN", "cargo run --quiet --bin memory --")
+				binDir := t.TempDir()
+				calls := filepath.Join(binDir, "calls")
+				cargo := filepath.Join(binDir, "cargo")
+				mustWriteFile(t, cargo, []byte("#!/bin/sh\necho dev >> '"+calls+"'\necho '"+tc.failure+"' >&2\nexit 7\n"))
+				if err := os.Chmod(cargo, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				installed := filepath.Join(binDir, "memory")
+				mustWriteFile(t, installed, []byte("#!/bin/sh\necho installed >> '"+calls+"'\nexit 0\n"))
+				if err := os.Chmod(installed, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				t.Setenv("PATH", binDir)
+				for _, args := range [][]string{
+					{"query-memory", "question", "memory"},
+					{"remember-task", "--project", "memory", "--title", "title", "--prompt", "prompt", "--summary", "summary"},
+				} {
+					if textMode {
+						args = append([]string{"--text"}, args...)
+					}
+					code, stdout, stderr := captureHelperRun(t, func() int { return run(args) })
+					if code != 7 {
+						t.Fatalf("exit code = %d, want 7", code)
+					}
+					message := stderr
+					if !textMode {
+						var envelope helperEnvelope
+						if err := json.Unmarshal([]byte(stdout), &envelope); err != nil {
+							t.Fatalf("invalid JSON: %v: %s", err, stdout)
+						}
+						if envelope.Error == nil || envelope.Error.Kind != tc.kind || envelope.Error.ExitCode == nil || *envelope.Error.ExitCode != 7 {
+							t.Fatalf("unexpected failure: %+v", envelope)
+						}
+						if envelope.Details == nil || !strings.Contains(envelope.Details.Stderr, tc.failure) {
+							t.Fatal("raw error was not preserved")
+						}
+						message = envelope.Error.Message
+					}
+					for _, expected := range []string{tc.failure, "dev Memory Layer service", "cargo run --bin memory -- doctor", "cargo run --bin memory -- service run", "database=up", "MEMCTL_BIN='memory --area workshop'", "never a failure fallback", "partially completed"} {
+						if !strings.Contains(message, expected) {
+							t.Fatalf("missing %q in %s", expected, message)
+						}
+					}
+				}
+				data, err := os.ReadFile(calls)
+				if err != nil || string(data) != "dev\ndev\n" {
+					t.Fatalf("expected one attempt per failure, no prelude continuation or installed fallback: %q (%v)", data, err)
+				}
+			})
+		}
+	}
+}
+
+func TestUnrelatedAndExplicitOverrideFailuresKeepOriginalKind(t *testing.T) {
+	for _, tc := range []struct {
+		invocation helperInvocation
+		failure    string
+	}{
+		{helperInvocation{devSourceRoot: t.TempDir()}, "error: could not compile mem-cli"},
+		{helperInvocation{}, "error sending request for url (http://127.0.0.1:4260/v1/query)"},
+	} {
+		_, stdout, _ := captureHelperRun(t, func() int {
+			return emitCommandFailure(outputJSON, tc.invocation, []string{"memory", "query"}, "command_failed", 1, nil, "", tc.failure)
+		})
+		var envelope helperEnvelope
+		if err := json.Unmarshal([]byte(stdout), &envelope); err != nil {
+			t.Fatal(err)
+		}
+		if envelope.Error.Kind != "command_failed" || envelope.Error.Message != tc.failure {
+			t.Fatalf("unrelated failure mislabeled as dev outage: %+v", envelope.Error)
+		}
+	}
+}
+
+func captureHelperRun(t *testing.T, f func() int) (int, string, string) {
+	t.Helper()
+	oldOut, oldErr := os.Stdout, os.Stderr
+	outReader, outWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	errReader, errWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer outReader.Close()
+	defer errReader.Close()
+	defer func() { os.Stdout, os.Stderr = oldOut, oldErr }()
+	os.Stdout, os.Stderr = outWriter, errWriter
+	code := f()
+	outWriter.Close()
+	errWriter.Close()
+	stdout, _ := io.ReadAll(outReader)
+	stderr, _ := io.ReadAll(errReader)
+	return code, string(stdout), string(stderr)
 }
 
 func mustWriteFile(t *testing.T, path string, content []byte) {

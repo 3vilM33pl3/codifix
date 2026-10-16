@@ -2,6 +2,10 @@
 
 This guide is written for someone who just wants Memory Layer working with as little setup friction as possible.
 
+When developing Memory Layer itself, use the repository's shared memory helper
+for durable project notes: it explicitly selects the Workshop API. The separate
+dev backend/database is for testing. See [project memory routing and dev recovery](../developer/dev-stack.md#project-memory-routing-and-recovery).
+
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)

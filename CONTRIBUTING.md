@@ -84,9 +84,11 @@ delete `target/`: it also holds non-cache artifacts. Moving the build directory
 with `CARGO_TARGET_DIR` can relieve a full filesystem, but does not reduce total
 storage usage.
 
-After cleanup, set `MEMCTL_BIN` to a preserved Memory executable when invoking
-the repository's Memory helpers; otherwise they default to `cargo run` and may
-trigger a full rebuild just to record the cleanup.
+The repository's Memory helpers explicitly use the installed Workshop API for
+durable project notes through `.agents/memory-layer-command.json`. Dev helper
+tests can set `MEMCTL_BIN` to a preserved source executable to avoid rebuilding;
+an explicit `cargo run` override may trigger a full rebuild. See
+[routing and recovery](docs/developer/dev-stack.md#project-memory-routing-and-recovery).
 
 ## Database Tests
 
