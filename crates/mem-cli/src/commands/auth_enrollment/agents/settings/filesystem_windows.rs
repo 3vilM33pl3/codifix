@@ -2,7 +2,7 @@
 //! Protected Windows settings merge. Handles and a physical-workspace lock
 //! fence normal writers; malicious same-user POSIX renames are not an OS CAS.
 use super::{MAX_BYTES, bytes_hash, changed};
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use mem_platform::private_windows::{self, Directory, Identity, Input};
 use mem_record::CompanyAgentCaller;
 use std::{
@@ -184,7 +184,9 @@ impl Settings {
             fresh_target.identity()?.stable_key() == target.identity()?.stable_key(),
             "settings directory identity changed"
         );
-        let (name, identity) = self.stage(id, result)?;
+        let (name, identity) = self
+            .stage(id, result)
+            .context("native settings prepare staging")?;
         private_windows::publish_reviewed_settings(
             &self.stage,
             &name,
@@ -193,11 +195,13 @@ impl Settings {
             self.leaf(),
             self.current.as_ref().zip(original.as_deref()),
             result,
-        )?;
+        )
+        .context("native settings publish reviewed bytes")?;
         let installed = Input::open(
             &self.workspace.join(super::relative(self.caller)),
             MAX_BYTES as u64,
-        )?;
+        )
+        .context("native settings reopen published bytes")?;
         ensure!(
             read(&installed)? == result,
             "published settings changed; inspect before retrying"

@@ -797,6 +797,11 @@ pub fn publish_reviewed_settings(
     reviewed_target: Option<(&Input, &[u8])>,
     expected: &[u8],
 ) -> io::Result<()> {
+    // Metadata-only diagnostic boundaries: preserve error kind and the native
+    // error text, without printing filenames, settings bytes or credentials.
+    fn at(stage: &'static str) -> impl FnOnce(io::Error) -> io::Error {
+        move |error| io::Error::new(error.kind(), format!("reviewed settings {stage}: {error}"))
+    }
     if expected.len() > 256 * 1024 || source.identity()?.volume != target.identity()?.volume {
         return Err(denied());
     }
@@ -806,12 +811,15 @@ pub fn publish_reviewed_settings(
         .access_mode(GENERIC_READ | GENERIC_WRITE | DELETE | READ_CONTROL)
         .share_mode(FILE_SHARE_READ | FILE_SHARE_DELETE)
         .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
-        .open(source.path.join(source_name))?;
-    acl(&file, true)?;
+        .open(source.path.join(source_name))
+        .map_err(at("source open"))?;
+    acl(&file, true).map_err(at("source ACL"))?;
     if information(&file, false)? != source_identity {
         return Err(denied());
     }
-    source.check_entry(source_name, &file)?;
+    source
+        .check_entry(source_name, &file)
+        .map_err(at("source entry before read"))?;
     let mut bytes = Vec::new();
     Read::by_ref(&mut file)
         .take(256 * 1024 + 1)
@@ -824,8 +832,10 @@ pub fn publish_reviewed_settings(
             if before.len() > 256 * 1024 {
                 return Err(denied());
             }
-            input.unchanged()?;
-            target.check_entry(target_name, &input.file)?;
+            input.unchanged().map_err(at("reviewed target unchanged"))?;
+            target
+                .check_entry(target_name, &input.file)
+                .map_err(at("reviewed target entry"))?;
             let mut reader = &input.file;
             reader.seek(SeekFrom::Start(0))?;
             let mut actual = Vec::new();
@@ -839,8 +849,10 @@ pub fn publish_reviewed_settings(
         }
         None => target.ensure_absent(&[target_name])?,
     }
-    source.check_entry(source_name, &file)?;
-    file.sync_all()?;
+    source
+        .check_entry(source_name, &file)
+        .map_err(at("source entry before rename"))?;
+    file.sync_all().map_err(at("source flush"))?;
     let filename: Vec<u16> = target
         .path
         .join(target_name)
@@ -872,11 +884,13 @@ pub fn publish_reviewed_settings(
             length_u32,
         ) == 0
         {
-            return Err(io::Error::last_os_error());
+            return Err(at("FileRenameInfoEx")(io::Error::last_os_error()));
         }
     }
-    target.check_entry(target_name, &file)?;
-    file.sync_all()?;
+    target
+        .check_entry(target_name, &file)
+        .map_err(at("published target entry"))?;
+    file.sync_all().map_err(at("published target flush"))?;
     Ok(())
 }
 
