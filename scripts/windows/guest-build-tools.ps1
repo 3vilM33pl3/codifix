@@ -24,7 +24,9 @@ $receipt = [ordered]@{format='memory-windows-build-tools-result-v1'; manifest_sh
 function Save-Receipt {
     $temp = Join-Path $root 'result.partial.json'
     $receipt | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $temp -Encoding UTF8
-    Move-Item -LiteralPath $temp -Destination (Join-Path $root 'result.json') -Force
+    $target = Join-Path $root 'result.json'
+    if ([IO.File]::Exists($target)) { [IO.File]::Replace($temp, $target, $null) }
+    else { [IO.File]::Move($temp, $target) }
 }
 function Run-Checked([string]$Exe, [string[]]$Arguments) {
     & $Exe @Arguments

@@ -35,8 +35,13 @@ foreach ($artifact in $manifest.artifacts) {
 }
 $receipt = [ordered]@{format='memory-windows-native-api-result-v1';operation_id=$OperationId.ToString();manifest_sha256=(Get-FileHash $manifestPath).Hash.ToLowerInvariant();state='running';tests=@();execution_verified=$false}
 function Save-Result {
-    $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $root 'result.partial.json') -Encoding UTF8
-    Move-Item -LiteralPath (Join-Path $root 'result.partial.json') -Destination (Join-Path $root 'result.json') -Force
+    $partial = Join-Path $root 'result.partial.json'
+    $target = Join-Path $root 'result.json'
+    $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $partial -Encoding UTF8
+    # Windows PowerShell's Move-Item -Force is not a dependable replacement
+    # primitive. ReplaceFile preserves the old receipt until the new one wins.
+    if ([IO.File]::Exists($target)) { [IO.File]::Replace($partial, $target, $null) }
+    else { [IO.File]::Move($partial, $target) }
 }
 function Invoke-Bounded([string]$Exe, [string[]]$Arguments, [string]$Label, [int]$Seconds) {
     $stdout = Join-Path $root ($Label + '.stdout.txt')

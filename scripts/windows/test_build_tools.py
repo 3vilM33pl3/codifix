@@ -7,6 +7,12 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_receipt_replacement_uses_native_replace_not_move_force(self):
+        for name in ['guest-stage.ps1', 'guest-native-api.ps1', 'guest-build-tools.ps1']:
+            script = (Path(__file__).parent / name).read_text()
+            self.assertIn('[IO.File]::Replace(', script)
+            self.assertIn('[IO.File]::Move(', script)
+
     def test_icacls_receives_explicit_numeric_sid_syntax(self):
         for name in ['guest-stage.ps1', 'guest-native-api.ps1',
                      'guest-native-postgres.ps1', 'guest-native-pds.ps1']:
