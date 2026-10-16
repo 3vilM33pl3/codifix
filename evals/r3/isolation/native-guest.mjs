@@ -34,11 +34,11 @@ const exitCode = await new Promise((resolve, reject) => {
     if (total > cap) reject(Error('native command output budget exceeded'));
     else destination.push(bytes);
   });
-  child.on('error', error => {
+  child.on('error', () => {
     clearTimeout(timer);
-    const code = error.code === 'ENOENT' ? 127 : error.code === 'EACCES' ? 126 : undefined;
-    if (code === undefined) reject(Error('native command startup failed'));
-    else { stderr.push(Buffer.from(code === 127 ? 'command executable not found\n' : 'command executable not permitted\n')); resolve(code); }
+    // Native commands are already pinned inventory members. Missing runtime
+    // DLLs or access failures invalidate execution, not the submitted answer.
+    reject(Error('native command startup failed'));
   });
   child.on('close', code => { clearTimeout(timer); Number.isInteger(code) ? resolve(code) : reject(Error('native command exit unavailable')); });
 });
