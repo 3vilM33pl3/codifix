@@ -1,0 +1,18 @@
+{
+  "format": "memory-windows-pi-proof-v1",
+  "source_revision": "7c018475d54d4e09c907691e47a520f1f09e3288",
+  "source_git_url": "https://github.com/Dicklesworthstone/pi_agent_rust.git",
+  "source_archive_sha256": "5408d25ab40e49ce42ea1622c3bdd0128f13dacc53e11e3548cacf48d8908bbc",
+  "upstream_lock_sha256": "1aea4e3fe13a86760317d9c3da80d7461bd5cd5c013508ab5446a391c7fa14e5",
+  "rust_toolchain": "nightly-2026-08-31",
+  "rustc_commit": "90850177249efe0321573c569aec5d12b257f8d6",
+  "target": "x86_64-pc-windows-msvc",
+  "inputs": [
+    {"path": "crates/mem-supervisor-pi/scripts/build-windows.ps1", "sha256": "6fdaa070bf85828825ed7bd95570f9d52a43ae94fe1452f7bac79b03cb65bb4b"},
+    {"path": "crates/mem-supervisor-pi/patches/no-tools-1.patch", "sha256": "bec724b3d1cef1df4f4cddc50573ce6af1724c743496e7f5e900f4e4a6c815bc"},
+    {"path": "crates/mem-supervisor-pi/patches/windows-broker-1.patch", "sha256": "61a620316d545b100cf17a83503aba4da46094346c7996c502508b9060aebdf4"},
+    {"path": "crates/mem-supervisor-pi/patches/LICENSE.pi", "sha256": "32a82e0a5754e72e51fae44b65a936c831c07376f21c90f5fb9e76897fcc3509"},
+    {"path": "packaging/ca-bookworm/pi_smoke.py", "sha256": "9112f649a61095c08f9a131f115470dfa1678f852e4806b74bdcb5ac30f2cc60"},
+    {"path": "packaging/windows-pi/smoke.py", "sha256": "e717571b7c127949e6915636f12f2e0b4517fb38d97d7dd783ccb015ba33392b"}
+  ]
+}
