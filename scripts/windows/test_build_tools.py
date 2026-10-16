@@ -7,6 +7,15 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_stage_runner_has_fixed_tasks_and_no_password_registration(self):
+        script = (Path(__file__).parent / 'guest-stage.ps1').read_text()
+        for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", '-LogonType Interactive',
+                         'runner_sha256', 'Queued native proof input changed',
+                         'task_ended_without_completion_receipt', 'previous_execution_interrupted']:
+            self.assertIn(required, script)
+        self.assertNotIn('-Password', script)
+        self.assertNotIn('Invoke-Expression', script)
+
     def test_native_pds_retains_upstream_lock_and_separates_evidence(self):
         root = Path(__file__).parent
         manifest = json.loads((root / 'native-pds.json').read_text())

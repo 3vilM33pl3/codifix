@@ -134,3 +134,14 @@ the stdio probe and actual Rust named-pipe/signed-repository tests before claimi
 native PDS support. No accounts, public identities, PDS service or production
 credentials are provisioned by dependency preparation. See
 [upstream provenance](../../packaging/windows-pds/upstream/PROVENANCE.md).
+
+Long provisioning stages can use the lab-only `guest-stage.ps1`: `Start` takes
+a stable `OperationId` and one of `BuildTools`, `PostgresPrepare`,
+`PostgresStart`, `PdsPrepare`. Copy the scripts/manifests into `C:\MemoryLab\inputs`
+first; PDS also needs its copied source root. The stage binds the runner and
+input hashes, runs as the logged-in synthetic user through a local scheduled
+task and survives SSH disconnects. `Status` returns metadata; execution logs
+remain in that private operation directory. A failed/interrupted operation is
+never silently rerun under the same ID. Inspect its receipts and use a fresh
+operation ID for a deliberate retry. Take the clean snapshot **before** starting
+BuildTools. This runner's native scheduling behavior still needs VM validation.
