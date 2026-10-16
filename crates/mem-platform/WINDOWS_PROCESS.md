@@ -30,8 +30,10 @@ execution inputs, not an invented empty Windows filesystem.
 Creation is suspended. Before any child code runs, the parent verifies the
 AppContainer token, exact SID and empty capability set, attaches the process to a
 kill-on-close Job Object, then resumes the initial thread. Limits are two active
-processes, 512 MiB total job/process memory, at most one logical CPU and restricted
-UI access. Breakaway is not enabled. The owning guard is not detachable.
+processes, 512 MiB total job/process memory and at most one logical CPU. Creation
+is headless; Job UI restrictions are intentionally absent because they prevent
+nesting below the SCM service host's Job. Breakaway is not enabled. The owning
+guard is not detachable.
 
 Termination waits for the entire job to become empty before restoring original
 ACLs/integrity and validating the pinned code again. Cleanup errors remain errors;

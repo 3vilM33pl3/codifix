@@ -33,9 +33,9 @@ use windows_sys::Win32::{
         INHERIT_ONLY_ACE,
         Isolation::{CreateAppContainerProfile, DeleteAppContainerProfile},
         LABEL_SECURITY_INFORMATION, OBJECT_INHERIT_ACE, PROTECTED_DACL_SECURITY_INFORMATION, PSID,
-        SE_DACL_PROTECTED, SECURITY_CAPABILITIES, TOKEN_APPCONTAINER_INFORMATION, TOKEN_QUERY,
-        TokenAppContainerSid, TokenCapabilities, TokenIsAppContainer,
-        UNPROTECTED_DACL_SECURITY_INFORMATION,
+        SE_DACL_PROTECTED, SECURITY_ATTRIBUTES, SECURITY_CAPABILITIES,
+        TOKEN_APPCONTAINER_INFORMATION, TOKEN_QUERY, TokenAppContainerSid, TokenCapabilities,
+        TokenIsAppContainer, UNPROTECTED_DACL_SECURITY_INFORMATION,
     },
     Storage::FileSystem::{
         BY_HANDLE_FILE_INFORMATION, DELETE, FILE_DELETE_CHILD, FILE_FLAG_BACKUP_SEMANTICS,
@@ -49,18 +49,18 @@ use windows_sys::Win32::{
             JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP, JOB_OBJECT_LIMIT_ACTIVE_PROCESS,
             JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION, JOB_OBJECT_LIMIT_JOB_MEMORY,
             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_PROCESS_MEMORY,
-            JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_BASIC_UI_RESTRICTIONS,
-            JOBOBJECT_CPU_RATE_CONTROL_INFORMATION, JOBOBJECT_CPU_RATE_CONTROL_INFORMATION_0,
-            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectBasicAccountingInformation,
-            JobObjectBasicUIRestrictions, JobObjectCpuRateControlInformation,
-            JobObjectExtendedLimitInformation, QueryInformationJobObject, SetInformationJobObject,
-            TerminateJobObject,
+            JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_CPU_RATE_CONTROL_INFORMATION,
+            JOBOBJECT_CPU_RATE_CONTROL_INFORMATION_0, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+            JobObjectBasicAccountingInformation, JobObjectBasicProcessIdList,
+            JobObjectCpuRateControlInformation, JobObjectExtendedLimitInformation,
+            QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
         },
+        Pipes::CreatePipe,
         SystemInformation::GetWindowsDirectoryW,
         Threading::{
             ALL_PROCESSOR_GROUPS, CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
             CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
-            GetActiveProcessorCount, GetCurrentProcess, GetExitCodeProcess,
+            GetActiveProcessorCount, GetCurrentProcess, GetCurrentProcessId, GetExitCodeProcess,
             InitializeProcThreadAttributeList, OpenProcessToken, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
             PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, PROCESS_INFORMATION, ResumeThread,
             STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute,
@@ -539,20 +539,8 @@ fn job() -> Result<OwnedHandle> {
         },
         "set sandbox CPU cap",
     )?;
-    let ui = JOBOBJECT_BASIC_UI_RESTRICTIONS {
-        UIRestrictionsClass: 0xff,
-    };
-    ok(
-        unsafe {
-            SetInformationJobObject(
-                job.as_raw_handle(),
-                JobObjectBasicUIRestrictions,
-                (&ui as *const JOBOBJECT_BASIC_UI_RESTRICTIONS).cast(),
-                size_of_val(&ui) as u32,
-            )
-        },
-        "set sandbox UI restrictions",
-    )?;
+    // UI-limited jobs cannot be nested beneath the SCM service host's job.
+    // AppContainer capabilities remain empty and creation is headless.
     Ok(job)
 }
 
@@ -929,6 +917,287 @@ pub fn spawn(spec: ProcessSpec<'_>) -> Result<SandboxProcess> {
     ensure!(
         unsafe { ResumeThread(thread.as_raw_handle()) } == 1,
         "could not resume fenced AppContainer"
+    );
+    Ok(child)
+}
+
+/// A Pi descendant of an already admitted driver. It inherits the existing
+/// AppContainer and Job; it cannot create a new profile or a breakaway process.
+pub struct InheritedProcess {
+    process: OwnedHandle,
+    pub stdin: Option<File>,
+    pub stdout: Option<File>,
+    pub stderr: Option<File>,
+}
+impl InheritedProcess {
+    pub fn try_wait(&self) -> Result<Option<u32>> {
+        let status = unsafe { WaitForSingleObject(self.process.as_raw_handle(), 0) };
+        if status == WAIT_TIMEOUT {
+            return Ok(None);
+        }
+        ensure!(status == WAIT_OBJECT_0, "could not poll inherited child");
+        let mut code = 0;
+        ok(
+            unsafe { GetExitCodeProcess(self.process.as_raw_handle(), &mut code) },
+            "read inherited child result",
+        )?;
+        Ok(Some(code))
+    }
+    pub fn terminate(&self) -> Result<()> {
+        if self.try_wait()?.is_none() {
+            ok(
+                unsafe { TerminateProcess(self.process.as_raw_handle(), 1) },
+                "terminate inherited child",
+            )?;
+        }
+        ensure!(
+            unsafe { WaitForSingleObject(self.process.as_raw_handle(), 5000) } == WAIT_OBJECT_0,
+            "inherited child reap unconfirmed"
+        );
+        Ok(())
+    }
+}
+impl Drop for InheritedProcess {
+    fn drop(&mut self) {
+        let _ = self.terminate();
+    }
+}
+
+fn anonymous_pipe() -> Result<(File, File)> {
+    let mut reader = null_mut();
+    let mut writer = null_mut();
+    let attrs = SECURITY_ATTRIBUTES {
+        nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: null_mut(),
+        bInheritHandle: 0,
+    };
+    ok(
+        unsafe { CreatePipe(&mut reader, &mut writer, &attrs, 4096) },
+        "create driver RPC pipe",
+    )?;
+    Ok(unsafe { (File::from_raw_handle(reader), File::from_raw_handle(writer)) })
+}
+
+/// Called only by the pinned driver inside its existing AppContainer. `broker`
+/// is its already inherited one-work channel. Overrides are restricted to Pi's
+/// private settings and a 64-hex one-work broker bearer, never provider keys.
+pub fn spawn_inherited(
+    executable: CodeFile,
+    arguments: &[OsString],
+    broker: BorrowedHandle<'_>,
+    overrides: &[(OsString, OsString)],
+) -> Result<InheritedProcess> {
+    let mut raw = null_mut();
+    ok(
+        unsafe {
+            DuplicateHandle(
+                GetCurrentProcess(),
+                GetCurrentProcess(),
+                GetCurrentProcess(),
+                &mut raw,
+                0,
+                0,
+                DUPLICATE_SAME_ACCESS,
+            )
+        },
+        "pin driver process",
+    )?;
+    let current = unsafe { OwnedHandle::from_raw_handle(raw) };
+    let mut token = null_mut();
+    ok(
+        unsafe { OpenProcessToken(current.as_raw_handle(), TOKEN_QUERY, &mut token) },
+        "inspect driver token",
+    )?;
+    let token = unsafe { OwnedHandle::from_raw_handle(token) };
+    let app_info = token_information(&token, TokenAppContainerSid)?;
+    let app_sid =
+        unsafe { (*app_info.as_ptr().cast::<TOKEN_APPCONTAINER_INFORMATION>()).TokenAppContainer };
+    ensure!(!app_sid.is_null(), "driver is not an AppContainer");
+    verify_token(&current, app_sid)?;
+    let code = std::env::current_exe()?
+        .parent()
+        .context("driver code directory unavailable")?
+        .to_owned();
+    ensure!(
+        executable.path.parent() == Some(code.as_path()),
+        "Pi must be in the pinned driver bundle"
+    );
+    let mut source = OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(&executable.path)?;
+    ensure!(
+        source.metadata()?.len() <= MAX_CODE_BYTES,
+        "Pi artifact too large"
+    );
+    let mut digest = Sha256::new();
+    let mut bytes = [0u8; 65536];
+    loop {
+        let count = source.read(&mut bytes)?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&bytes[..count]);
+    }
+    ensure!(
+        digest.finalize().as_slice() == executable.sha256,
+        "Pi artifact digest mismatch"
+    );
+    let (stdin_read, stdin_write) = anonymous_pipe()?;
+    let (stdout_read, stdout_write) = anonymous_pipe()?;
+    let (stderr_read, stderr_write) = anonymous_pipe()?;
+    let mut inherited = Vec::new();
+    for original in [
+        stdin_read.as_raw_handle(),
+        stdout_write.as_raw_handle(),
+        stderr_write.as_raw_handle(),
+        broker.as_raw_handle(),
+    ] {
+        ensure!(
+            unsafe { GetFileType(original) } == FILE_TYPE_PIPE,
+            "driver handles must be pipes"
+        );
+        let mut copy = null_mut();
+        ok(
+            unsafe {
+                DuplicateHandle(
+                    GetCurrentProcess(),
+                    original,
+                    GetCurrentProcess(),
+                    &mut copy,
+                    0,
+                    1,
+                    DUPLICATE_SAME_ACCESS,
+                )
+            },
+            "duplicate Pi broker/RPC handle",
+        )?;
+        inherited.push(unsafe { OwnedHandle::from_raw_handle(copy) });
+    }
+    let handles = [
+        inherited[0].as_raw_handle(),
+        inherited[1].as_raw_handle(),
+        inherited[2].as_raw_handle(),
+        inherited[3].as_raw_handle(),
+    ];
+    let mut attrs = Attributes::new()?;
+    attrs.set(PROC_THREAD_ATTRIBUTE_HANDLE_LIST, &handles)?;
+    let mut startup = STARTUPINFOEXW::default();
+    startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
+    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    startup.StartupInfo.hStdInput = handles[0];
+    startup.StartupInfo.hStdOutput = handles[1];
+    startup.StartupInfo.hStdError = handles[2];
+    startup.lpAttributeList = attrs.pointer();
+    let mut environment = std::collections::BTreeMap::<OsString, OsString>::new();
+    for key in ["HOME", "PATH", "SystemRoot", "TEMP", "TMP", "USERPROFILE"] {
+        environment.insert(
+            key.into(),
+            std::env::var_os(key).context("missing admitted driver environment")?,
+        );
+    }
+    environment.insert(
+        "MEMORY_BROKER_HANDLE".into(),
+        (handles[3] as usize).to_string().into(),
+    );
+    for (name, value) in overrides {
+        let name_text = name.to_str().context("invalid driver environment key")?;
+        ensure!(
+            matches!(
+                name_text,
+                "PI_CODING_AGENT_DIR"
+                    | "PI_PACKAGE_DIR"
+                    | "PI_SESSIONS_DIR"
+                    | "PI_CONFIG_PATH"
+                    | "PI_CACHE_RETENTION"
+                    | "OPENAI_API_KEY"
+            ),
+            "unapproved Pi environment override"
+        );
+        if name_text == "OPENAI_API_KEY" {
+            let value = value.to_str().context("invalid broker bearer")?;
+            ensure!(
+                value.len() == 64 && value.bytes().all(|c| c.is_ascii_hexdigit()),
+                "provider credentials cannot enter Pi"
+            );
+        }
+        environment.insert(name.clone(), value.clone());
+    }
+    let mut env = Vec::new();
+    for (name, value) in environment {
+        env.extend(wide(&name)?.into_iter().filter(|c| *c != 0));
+        env.push(b'=' as u16);
+        env.extend(wide(&value)?);
+    }
+    env.push(0);
+    let mut command = quote(executable.path.as_os_str())?;
+    for arg in arguments {
+        command.push(" ");
+        command.push(quote(arg)?);
+    }
+    let mut command = wide(&command)?;
+    ensure!(command.len() <= 32767, "Pi command too long");
+    let exe = wide(executable.path.as_os_str())?;
+    let cwd = wide(&std::env::var_os("HOME").context("missing driver scratch")?)?;
+    let mut info = PROCESS_INFORMATION::default();
+    ok(
+        unsafe {
+            CreateProcessW(
+                exe.as_ptr(),
+                command.as_mut_ptr(),
+                null(),
+                null(),
+                1,
+                CREATE_SUSPENDED
+                    | CREATE_UNICODE_ENVIRONMENT
+                    | CREATE_NO_WINDOW
+                    | EXTENDED_STARTUPINFO_PRESENT,
+                env.as_ptr().cast(),
+                cwd.as_ptr(),
+                &startup.StartupInfo,
+                &mut info,
+            )
+        },
+        "create inherited Pi process",
+    )?;
+    let child = InheritedProcess {
+        process: unsafe { OwnedHandle::from_raw_handle(info.hProcess) },
+        stdin: Some(stdin_write),
+        stdout: Some(stdout_read),
+        stderr: Some(stderr_read),
+    };
+    let thread = unsafe { OwnedHandle::from_raw_handle(info.hThread) };
+    verify_token(&child.process, app_sid)?;
+    // NULL denotes the driver's current inner job. Its exact process list must
+    // contain both driver and the newly created Pi; an unrelated job is not enough.
+    let mut ids = [0usize; 8];
+    ok(
+        unsafe {
+            QueryInformationJobObject(
+                null_mut(),
+                JobObjectBasicProcessIdList,
+                ids.as_mut_ptr().cast(),
+                size_of_val(&ids) as u32,
+                null_mut(),
+            )
+        },
+        "verify inherited Pi job",
+    )?;
+    let header = ids.as_ptr().cast::<u32>();
+    let count = unsafe { *header.add(1) } as usize;
+    ensure!(count <= 2, "unexpected inherited job process count");
+    let process_ids = unsafe {
+        std::slice::from_raw_parts((ids.as_ptr().cast::<u8>()).add(8).cast::<usize>(), count)
+    };
+    ensure!(
+        process_ids.contains(&(info.dwProcessId as usize))
+            && process_ids.contains(&(unsafe { GetCurrentProcessId() } as usize)),
+        "Pi did not inherit admitted driver job"
+    );
+    ensure!(
+        unsafe { ResumeThread(thread.as_raw_handle()) } == 1,
+        "could not resume admitted Pi"
     );
     Ok(child)
 }
