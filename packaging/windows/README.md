@@ -230,3 +230,26 @@ This proves only protected runtime bytes, not PostgreSQL process/database
 readiness. Database provisioning/service operation remains separate, and normal
 Memory or signed-gateway readiness is still required. It does not grant a Memory
 participant access to database credentials or runtime files.
+
+### Native database provisioning preview (execution not yet available)
+
+The source-tree `native-postgres-preview.ps1` describes one fresh named cluster,
+its loopback-only port, exact virtual service account and pinned native runtime.
+It accepts the verified runtime manifest/digest/operation, a new provisioning
+operation UUID, `-Name`, `-Port`, `-ClusterPath`, `-PasswordFile` and
+`-RecoveryReference`. The cluster must be exactly
+`%ProgramData%\MemoryLayer\databases\<name>` and must not exist. Existing services
+and databases are not adopted, upgraded or stopped.
+
+The initialization password is read from an operator-private file outside the
+cluster (32–4096 UTF-8 bytes, one line without a terminator), never from command
+arguments, environment variables or the preview output. Its fingerprint is
+bound into the overall preview digest but is not emitted separately. The
+preview retains protected input/runtime handles and rejects unrelated secret
+readers, path aliases and mutable runtime input. SCRAM is mandatory; no trust
+authentication or wildcard listener is generated.
+
+This is a review contract, **not an executable provisioning operation** and is
+not bundled as a completed installer. Journaled `initdb`, SCM identity/access,
+extension readiness and interrupted recovery still require implementation and
+native acceptance. `test-native-postgres-plan.ps1` verifies portable policy only.
