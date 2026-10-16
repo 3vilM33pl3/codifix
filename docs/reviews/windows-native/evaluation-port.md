@@ -46,8 +46,16 @@ explicit stdio pipes, no ambient credentials or network capabilities, a
 16-process/2-GiB Job and a host-enforced deadline. Pi retains its existing
 two-process/512-MiB profile. Seven Linux tests and Windows cross-target Clippy
 passed; Astra found no additional concrete defect in the bounded seam. These
-are not native execution results. The helper/backend, bounded output draining,
-safe export, disk-limit treatment and packaged toolchain remain to be integrated.
+are not native execution results. The feature-gated
+`memory-windows-evaluation-helper` now also supplies hash-bound structured
+requests, concurrent bounded I/O, private I/O preparation and allowlisted
+post-Job byte exports. The explicit JavaScript `execution.mjs` /
+`native-windows.mjs` seam binds a distinct Windows profile instead of reusing a
+Docker image identity; it never infers Windows or translates POSIX commands.
+Nine fake-helper protocol tests passed, including loader-failure rejection.
+Existing sequence/knowledge/Rust-grading consumers remain on their unchanged
+Linux paths. Native campaign wiring, protected host journals, disk-limit
+treatment, packaged toolchains and real Windows execution remain pending.
 
 ## Remaining host adapters
 
