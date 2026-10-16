@@ -192,8 +192,17 @@ fn acl_reader(file: &File, private: bool, reader: Option<&ServiceReader>) -> io:
     }
     let _allocation = LocalAllocation(descriptor);
     let current = current_sid()?;
-    if dacl.is_null() || !trusted(&sid_string(owner)?, &current, !private) {
-        return Err(denied());
+    if dacl.is_null() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "protected file has no DACL",
+        ));
+    }
+    if !trusted(&sid_string(owner)?, &current, !private) {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "protected file owner is untrusted",
+        ));
     }
     // SAFETY: GetSecurityInfo returned a valid ACL in the live descriptor.
     let count = unsafe { (*dacl).AceCount };
@@ -227,7 +236,10 @@ fn acl_reader(file: &File, private: bool, reader: Option<&ServiceReader>) -> io:
                 | windows_sys::Win32::Storage::FileSystem::FILE_GENERIC_READ
                 | windows_sys::Win32::Storage::FileSystem::FILE_GENERIC_EXECUTE;
             if ace.Mask & !allowed != 0 {
-                return Err(denied());
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "service reader ACL exceeds read-only access",
+                ));
             }
             continue;
         }
@@ -237,7 +249,10 @@ fn acl_reader(file: &File, private: bool, reader: Option<&ServiceReader>) -> io:
             let dangerous =
                 GENERIC_ALL | GENERIC_WRITE | WRITE_DAC | WRITE_OWNER | DELETE | FILE_DELETE_CHILD;
             if private && ace.Mask != 0 || !private && ace.Mask & dangerous != 0 {
-                return Err(denied());
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "protected file ACL includes an unapproved principal",
+                ));
             }
         }
     }
