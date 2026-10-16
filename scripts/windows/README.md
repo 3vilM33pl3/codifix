@@ -216,14 +216,17 @@ credentials are provisioned by dependency preparation. See
 Long provisioning stages can use the lab-only `guest-stage.ps1`: `Start` takes
 a stable `OperationId` and one of `BuildTools`, `PostgresPrepare`,
 `PostgresStart`, `PdsPrepare`. Copy the scripts/manifests into `C:\MemoryLab\inputs`
-first; PDS also needs its copied source root. The stage binds the runner and
+first; PDS also needs its copied source root. `PiBuild` additionally binds
+`guest-native-pi.ps1` and `native-pi.json` and requires a copied source root. It
+runs the pinned builder and fake-provider verification under the same operation
+ID, not inherited-broker/AppContainer supervision. The stage binds the runner and
 input hashes, runs as the logged-in synthetic user through a local scheduled
 task and survives SSH disconnects. `Status` returns metadata; execution logs
 remain in that private operation directory. A failed/interrupted operation is
 never silently rerun under the same ID. Inspect its receipts and use a fresh
 operation ID for a deliberate retry. Take the clean snapshot **before** starting
-BuildTools. Native scheduling was observed for API diagnostics and BuildTools;
-the latter's completion is still pending in the execution ledger.
+BuildTools. Observed results and remaining acceptance work are recorded in the
+Windows execution ledger; dispatch alone is never success evidence.
 
 The host helper avoids hand-written nested PowerShell quoting:
 
@@ -235,6 +238,6 @@ Use a real new UUID, not that placeholder. `dispatch_requested` is not success;
 inspect the operation's `status.json` and retained logs. The host and guest
 runner digests must agree before dispatch. Both launch layers use a
 process-scoped execution policy, never a machine-wide policy change. Native API
-checks run as the ordinary interactive user (`Limited`), while dependency
+checks and Pi compilation run as the ordinary interactive user (`Limited`), while dependency
 installers use `Highest`; elevated scheduled logons may lack a usable Credential
 Manager session even when their name/SID matches the desktop user.

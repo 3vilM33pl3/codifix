@@ -23,10 +23,16 @@ it. Native results carry the profile digest and per-invocation descriptor/receip
 digests, are marked `officialEvidence: false`, and explicitly report no hard disk
 quota. They are not interchangeable with Linux image evidence.
 
-Native Rust-blackbox grading, model-command execution, knowledge adjudication
-and full campaign orchestration remain separate work. Their current entrypoints
-reject explicit native requests before execution rather than silently falling
-back to Linux. Native sequence support is therefore **not** full Windows R3
+Native Rust-blackbox grading uses the same execution seam. Supply
+`compiler: { path, sha256 }` (or `step.grader.compiler` in a sequence), matching
+an exact `rustc.exe` entry in the reviewed native toolchain inventory. Each
+probe compiles and runs in fresh bounded scratch; only probe arguments/stdin,
+not expected output, enter the grader. Readiness and per-probe receipts remain
+in diagnostics. The Linux harness and image-labelled artifacts stay unchanged.
+
+Model-command execution, knowledge adjudication and full campaign orchestration
+remain separate work. Their entrypoints still reject explicit native requests
+before execution rather than silently falling back to Linux. Native support is **not** full Windows R3
 completion. Paid R3 remains paused; real Windows launch, compilation, denial and
 recovery evidence is still required.
 
@@ -35,6 +41,7 @@ Focused protocol/sequence checks (fake executors, no native-isolation claim):
 ```bash
 node --test evals/r3/isolation/native-windows.test.mjs \
   evals/r3/isolation/sequence-native.test.mjs \
+  evals/r3/isolation/rust-native.test.mjs \
   evals/r3/isolation/sequence.test.mjs
 ```
 

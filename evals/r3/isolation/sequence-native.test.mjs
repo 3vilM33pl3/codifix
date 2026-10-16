@@ -80,16 +80,16 @@ test('native no-op and deleted source remain negative results despite later reco
   assert.equal(deleted.success, false);
 });
 
-test('native identity mismatch and unintegrated native Rust/model/campaign paths fail closed', async () => {
+test('native identity mismatch, unpinned Rust and unintegrated model/campaign paths fail closed', async () => {
   await assert.rejects(executor({malformedIdentityAt:2}).run(fixture()), /native execution identity/);
   const value = fixture();
   value.steps[2].grader = {kind:'rust-blackbox', probes:[]};
   const exec = executor();
-  await assert.rejects(exec.run(value), /native Rust-blackbox/);
+  await assert.rejects(exec.run(value), /explicit pinned compiler/);
   assert.equal(exec.calls.length, 0);
   const model = fixture(); model.runAgent = async () => { throw Error('must not run'); };
   assert.throws(() => validateSequence(model), /native commands/);
-  assert.throws(() => validateRustCase({execution:fixture().execution}), /no Linux fallback/);
+  assert.throws(() => validateRustCase({execution:fixture().execution}), /explicit pinned compiler/);
   await assert.rejects(runOfflineKnowledge({execution:fixture().execution}), /no Linux fallback/);
   await assert.rejects(createRehearsalExecutor({configuration:{execution:fixture().execution}}), /native campaign orchestration/);
 });

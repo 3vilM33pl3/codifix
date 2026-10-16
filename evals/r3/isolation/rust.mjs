@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Dependency-free black-box Rust grading. Expected outputs never enter guests.
 import { createHash } from 'node:crypto';
-import { runOfflineContainer, validateInput } from './container.mjs';
+import path from 'node:path';
+import { runOfflineExecution, validateExecutionInput, validateExecutionOutput } from './execution.mjs';
 
 const harness = `
 const {spawnSync}=require('node:child_process');
@@ -23,9 +24,55 @@ process.stdout.write(run.stdout);
 `;
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
+function nativeHarness(compiler) {
+  // Compiler identity is checked against the operator's complete toolchain
+  // inventory before dispatch. Only public probe inputs enter this scratch.
+  return `
+const {spawnSync}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path');
+const probe=JSON.parse(fs.readFileSync('harness/probe.json','utf8'));
+const failed=r=>r.error||r.signal||[0xc0000135,0xc0000142].includes(r.status>>>0);
+const compiled=spawnSync(${JSON.stringify(compiler.path)},[
+  '--edition=2024','-C','debuginfo=0','submission/src/main.rs','-o','program.exe'
+],{encoding:'utf8',timeout:20000,maxBuffer:1048576,windowsHide:true});
+if(failed(compiled)) process.exit(70);
+if(compiled.status!==0) process.exit(65);
+const run=spawnSync(path.resolve('program.exe'),probe.argv,{
+  input:probe.stdin,encoding:'utf8',timeout:5000,maxBuffer:1048576,windowsHide:true
+});
+if(run.error?.code==='EPIPE') process.exit(66);
+if(failed(run)) process.exit(70);
+if(run.status!==0) process.exit(66);
+process.stdout.write(run.stdout);
+`;
+}
+
+function boundary({ image, execution, compiler }) {
+  if (execution?.kind === 'windows-native-v1') {
+    if (image !== undefined || !compiler || Object.keys(compiler).sort().join(',') !== 'path,sha256'
+        || typeof compiler.path !== 'string' || !path.win32.isAbsolute(compiler.path)
+        || path.win32.basename(compiler.path).toLowerCase() !== 'rustc.exe'
+        || !/^[a-f0-9]{64}$/.test(compiler.sha256)) throw Error('native Rust requires an explicit pinned compiler, not a Linux image');
+    const matches = execution.profile?.toolchains?.flatMap(tree => tree.files ?? []).filter(file =>
+      typeof file.path === 'string' && file.path.toLowerCase() === compiler.path.toLowerCase());
+    if (matches?.length !== 1 || matches[0].sha256 !== compiler.sha256) throw Error('native Rust compiler absent from reviewed toolchain');
+    return { execution };
+  }
+  if (compiler !== undefined) throw Error('native compiler cannot enter Linux grading');
+  return execution === undefined ? { image } : { image, execution };
+}
+
+function invocation(options, files, probe) {
+  const contract = boundary(options);
+  const native = options.execution?.kind === 'windows-native-v1';
+  return { ...contract, files: guestFiles(files, probe, native ? nativeHarness(options.compiler) : harness),
+    argv: native ? [options.execution.profile.node.path, 'harness/run.cjs'] : ['/usr/local/bin/node', '/work/harness/run.cjs'],
+    timeoutMs: options.timeoutMs ?? 30000, profile: 'rust', exportPaths: [] };
+}
+
 export function validateRustCase(options) {
-  if (options.execution !== undefined) throw Error('native Rust-blackbox grading is not integrated; no Linux fallback');
-  const { image, files, probes, timeoutMs = 30000 } = options;
+  boundary(options);
+  const { files, probes } = options;
   if (!files || !Object.hasOwn(files, 'src/main.rs')) throw Error('Rust binary entry point required');
   if (!Array.isArray(probes) || probes.length < 1 || probes.length > 32) throw Error('invalid Rust probes');
   const ids = new Set();
@@ -35,40 +82,55 @@ export function validateRustCase(options) {
     if (!Array.isArray(probe.argv) || probe.argv.length > 32 || probe.argv.some(a => typeof a !== 'string' || a.includes('\0') || a.length > 4096)) throw Error('invalid probe arguments');
     if (typeof probe.stdin !== 'string' || Buffer.byteLength(probe.stdin) > 65536
         || typeof probe.expectedStdout !== 'string' || Buffer.byteLength(probe.expectedStdout) > 65536) throw Error('invalid probe text');
-    validateInput({ image, files: guestFiles(files, probe), argv: ['/usr/local/bin/node', '/work/harness/run.cjs'], timeoutMs, profile: 'rust', exportPaths: [] });
+    validateExecutionInput(invocation(options, files, probe));
   }
 }
 
-function guestFiles(files, probe) {
+function guestFiles(files, probe, script) {
   return Object.fromEntries([
     ...Object.entries(files).map(([p, bytes]) => [`submission/${p}`, bytes]),
-    ['harness/run.cjs', harness],
+    ['harness/run.cjs', script],
     // Probe inputs are necessarily disclosed at execution; answers are not.
     ['harness/probe.json', JSON.stringify({ argv: probe.argv, stdin: probe.stdin })],
   ]);
 }
 
-export async function gradeRustCase(options) {
+async function grade(options, runExecution) {
   validateRustCase(options);
-  const { image, files, probes, timeoutMs = 30000 } = structuredClone(options);
+  const frozen = structuredClone(options);
+  const { image, execution, files, probes } = frozen;
+  const invoke = async (source, probe) => {
+    const input = invocation(frozen, source, probe);
+    const result = structuredClone(await runExecution(input));
+    validateExecutionOutput(input, result);
+    return result;
+  };
   const started = performance.now();
   // A missing compiler or non-executable mount is broken measurement, not a
   // failed answer. Verify the toolchain independently of submitted code.
-  const ready = await runOfflineContainer({ image, files: guestFiles({
+  const ready = await invoke({
     'src/main.rs': 'fn main() { println!("r3-toolchain-ready"); }',
-  }, { argv: [], stdin: '' }), argv: ['/usr/local/bin/node', '/work/harness/run.cjs'],
-  timeoutMs, profile: 'rust', exportPaths: [] });
+  }, { argv: [], stdin: '' });
   if (ready.exitCode !== 0 || ready.stdout !== 'r3-toolchain-ready\n') throw Error('Rust grading toolchain unavailable');
   const results = [];
   for (const probe of probes) {
-    const result = await runOfflineContainer({ image, files: guestFiles(files, probe),
-      argv: ['/usr/local/bin/node', '/work/harness/run.cjs'], timeoutMs, profile: 'rust', exportPaths: [] });
+    const result = await invoke(files, probe);
     if (result.exitCode === 70) throw Error('Rust grading execution unavailable');
     results.push({ id: probe.id, passed: result.exitCode === 0 && result.stdout === probe.expectedStdout,
-      exitCode: result.exitCode, elapsedMs: result.elapsedMs });
+      exitCode: result.exitCode, elapsedMs: result.elapsedMs,
+      ...(execution?.kind === 'windows-native-v1' ? { execution: result.execution } : {}) });
   }
-  return { version: 1, kind: 'offline-rust-blackbox', officialEvidence: false,
-    image, sourceSha256: hash(Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)),
+  return { version: 1, kind: execution?.kind === 'windows-native-v1' ? 'native-windows-rust-blackbox' : 'offline-rust-blackbox', officialEvidence: false,
+    ...(execution?.kind === 'windows-native-v1' ? { execution: { kind: execution.kind,
+      profile_sha256: execution.profile_sha256, disk_hard_limit_enforced: false }, compiler: frozen.compiler,
+      readinessExecution: ready.execution } : { image }),
+    sourceSha256: hash(Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)),
     probeSha256: hash(probes), success: results.every(p => p.passed),
     elapsedMs: performance.now() - started, probes: results };
 }
+
+export function createRustGrader({ runExecution = runOfflineExecution } = {}) {
+  if (typeof runExecution !== 'function') throw Error('invalid trusted Rust execution adapter');
+  return options => grade(options, runExecution);
+}
+export const gradeRustCase = createRustGrader();

@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import { runOfflineExecution, validateExecutionInput, validateExecutionOutput } from './execution.mjs';
-import { gradeRustCase, validateRustCase } from './rust.mjs';
+import { createRustGrader, validateRustCase } from './rust.mjs';
 
 const digest = files => createHash('sha256').update(JSON.stringify(
   Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0),
@@ -24,8 +24,7 @@ export function validateSequence({ image, execution, runAgent, initialFiles, sub
     if (Object.getPrototypeOf(inputs) !== Object.prototype || Object.keys(inputs).some(p => Object.hasOwn(initialFiles, p))) throw Error('step inputs cannot replace fixture or submission files');
     validateExecutionInput({ ...boundary, argv: step.argv, files: { ...initialFiles, ...inputs }, timeoutMs, exportPaths: submissionPaths });
     if (step.grader?.kind === 'rust-blackbox') {
-      if (native) throw Error('native Rust-blackbox grading is not integrated; no Linux fallback');
-      validateRustCase({ image, files: Object.fromEntries(submissionPaths.map(p => [p, initialFiles[p]])),
+      validateRustCase({ ...boundary, ...(native ? { compiler: step.grader.compiler } : {}), files: Object.fromEntries(submissionPaths.map(p => [p, initialFiles[p]])),
         probes: step.grader.probes, timeoutMs });
       continue;
     }
@@ -84,9 +83,10 @@ async function runSequence(options, runExecution) {
       // A deleted required file is a valid failed submission, not malformed
       // campaign configuration. Preserve the missing file for the next agent.
       const result = submissionPaths.every(p => Object.hasOwn(selected, p))
-        ? await gradeRustCase({ image, files: selected, probes: step.grader.probes, timeoutMs })
+        ? await createRustGrader({ runExecution })({ ...boundary, ...(native ? { compiler: step.grader.compiler } : {}), files: selected, probes: step.grader.probes, timeoutMs })
         : { success: false, elapsedMs: 0 };
-      grader = { exitCode: result.success ? 0 : 1, elapsedMs: result.elapsedMs };
+      grader = { exitCode: result.success ? 0 : 1, elapsedMs: result.elapsedMs,
+        ...(native ? { execution: result.execution, probes: result.probes, readinessExecution: result.readinessExecution } : {}) };
     } else {
       graderInputSha256 = digest(gradeFiles(selected, submissionPaths, step.grader.files));
       const graderInput = { ...boundary,
@@ -101,7 +101,8 @@ async function runSequence(options, runExecution) {
       agentInputSha256: digest(agentFiles), submissionSha256: digest(selected),
       graderInputSha256, graderKind: rust ? 'rust-blackbox' : 'command',
       agentElapsedMs: agent.elapsedMs, graderElapsedMs: grader.elapsedMs,
-      ...(native ? { agentExecution: agent.execution, graderExecution: grader.execution } : {}),
+      ...(native ? { agentExecution: agent.execution, graderExecution: grader.execution,
+        ...(rust ? { graderProbes: grader.probes, graderReadinessExecution: grader.readinessExecution } : {}) } : {}),
       ...(runAgent ? { providerUsage: structuredClone(agentUsage) } : {}) });
     submission = selected;
   }
