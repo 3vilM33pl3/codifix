@@ -123,7 +123,6 @@ impl PdsPublisher {
             .map_err(|_| PublishFailure::InvalidReceipt)?;
         let response = self
             .endpoint
-            .client
             .get(url)
             .bearer_auth(&self.token)
             .query(&[
@@ -177,7 +176,6 @@ impl PdsPublisher {
             .map_err(|_| PublishFailure::Unavailable)?;
         let response = self
             .endpoint
-            .client
             .get(
                 self.endpoint
                     .url("/xrpc/com.atproto.sync.getRepo")
@@ -255,7 +253,6 @@ impl PdsPublisher {
         // exact read-back AND signed repository inclusion permit success.
         let response = self
             .endpoint
-            .client
             .post(url)
             .bearer_auth(&self.token)
             .json(&body)
@@ -295,7 +292,6 @@ impl PdsPublisher {
             .map_err(|_| PublishFailure::InvalidReceipt)?;
         let response = snapshot
             .endpoint
-            .client
             .post(
                 snapshot
                     .endpoint
@@ -353,7 +349,6 @@ impl PdsPublisher {
                     .map_err(|_| PublishFailure::InvalidReceipt)?;
             let response = snapshot
                 .endpoint
-                .client
                 .post(
                     snapshot
                         .endpoint
@@ -394,7 +389,6 @@ impl PdsPublisher {
         let record = wire.record().map_err(|_| PublishFailure::InvalidReceipt)?;
         let response = self
             .endpoint
-            .client
             .get(
                 self.endpoint
                     .url("/xrpc/com.atproto.repo.getRecord")
@@ -451,7 +445,6 @@ impl PdsPublisher {
             .map_err(|_| PublishFailure::Unavailable)?;
         let response = self
             .endpoint
-            .client
             .get(
                 self.endpoint
                     .url("/xrpc/com.atproto.sync.getRepo")
@@ -504,7 +497,6 @@ impl PdsPublisher {
             .map_err(|_| PublishFailure::Unavailable)?;
         let response = self
             .endpoint
-            .client
             .get(
                 self.endpoint
                     .url("/xrpc/com.atproto.sync.getRepo")

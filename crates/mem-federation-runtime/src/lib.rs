@@ -15,6 +15,8 @@ pub use expertise_transport::*;
 mod credentials;
 mod http;
 mod pds;
+mod pds_pipe;
+pub use pds_pipe::PdsNamedPipe;
 mod private_files;
 mod project_delivery;
 pub use credentials::{CredentialMode, CredentialState, GatewayCredentialStatus, MaintenanceState};

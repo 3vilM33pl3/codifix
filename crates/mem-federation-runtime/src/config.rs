@@ -20,6 +20,9 @@ pub struct GatewayConfig {
     pub pds: String,
     #[serde(default)]
     pub pds_ca_file: Option<PathBuf>,
+    /// Windows-only local PDS channel; HTTPS remains its logical origin.
+    #[serde(default)]
+    pub pds_named_pipe: Option<crate::PdsNamedPipe>,
     pub repository: String,
     pub signing_key: String,
     #[serde(default)]
@@ -131,7 +134,7 @@ impl GatewayConfig {
         {
             return Err(RuntimeError::Configuration);
         }
-        let endpoint = Endpoint::with_ca(
+        let mut endpoint = Endpoint::with_ca(
             &self.pds,
             self.disposable_test_mode,
             self.pds_ca_file
@@ -140,6 +143,9 @@ impl GatewayConfig {
                 .transpose()?
                 .as_deref(),
         )?;
+        if let Some(pipe) = self.pds_named_pipe {
+            endpoint = endpoint.with_pds_named_pipe(pipe)?;
+        }
         let pds = match (
             self.token_file,
             self.rotating_session_file,
