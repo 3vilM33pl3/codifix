@@ -105,6 +105,9 @@ try {
     }
     if (-not (Test-Path -LiteralPath $receipt)) { throw 'A successfully recorded native Pi build is required before verification' }
     $evidence=Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
+    if ($evidence.source_link_materialization.path -cne '.beads/beads.jsonl' -or
+        $evidence.source_link_materialization.target -cne 'issues.jsonl' -or
+        $evidence.source_link_materialization.policy -cne 'git-core-symlinks-false') { throw 'Unreviewed native source-link materialization' }
     if ($evidence.target -cne $manifest.target -or $evidence.rust_toolchain -cne $manifest.rust_toolchain -or
         $evidence.source_archive_sha256 -cne $manifest.source_archive_sha256 -or $evidence.upstream_lock_sha256 -cne $manifest.upstream_lock_sha256 -or
         $evidence.patched_lock_sha256 -cne $manifest.patched_lock_sha256 -or $evidence.artifact.patched_lock_sha256 -cne $manifest.patched_lock_sha256 -or

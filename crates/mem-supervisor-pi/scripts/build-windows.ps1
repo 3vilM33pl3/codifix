@@ -39,7 +39,16 @@ New-Item -ItemType Directory -Path $Source | Out-Null
 $Archive = Join-Path $BuildRoot 'source.tar'
 Run 'git' @('-C',$SourceRepository,'cat-file','-e',"${Revision}^{commit}")
 Run 'git' @('-C',$SourceRepository,'archive','--format=tar',"--output=$Archive",$Revision)
-Run 'tar.exe' @('-xf',$Archive,'-C',$Source)
+# Windows Git's ordinary core.symlinks=false checkout materializes a symlink's
+# target text instead of requiring administrator/developer-mode link privileges.
+# Apply that behavior only to this exact pinned, non-build issue-tracker alias.
+# The original archive and source revision remain unchanged and recorded.
+$AliasMode = & git -C $SourceRepository ls-tree $Revision -- '.beads/beads.jsonl'
+if ($LASTEXITCODE -ne 0 -or $AliasMode -cnotmatch '^120000 blob [0-9a-f]{40}\t\.beads/beads\.jsonl$') { throw 'Pinned source alias mode changed' }
+$AliasTarget = & git -C $SourceRepository cat-file blob "${Revision}:.beads/beads.jsonl"
+if ($LASTEXITCODE -ne 0 -or $AliasTarget -cne 'issues.jsonl') { throw 'Pinned source alias target changed' }
+Run 'tar.exe' @('-xf',$Archive,'-C',$Source,'--exclude=.beads/beads.jsonl')
+[IO.File]::WriteAllText((Join-Path $Source '.beads/beads.jsonl'), $AliasTarget, [Text.UTF8Encoding]::new($false))
 $BeforeLock = Hash (Join-Path $Source 'Cargo.lock')
 if ($BeforeLock -ne '1aea4e3fe13a86760317d9c3da80d7461bd5cd5c013508ab5446a391c7fa14e5') { throw 'Pinned upstream Cargo.lock mismatch' }
 Run 'git' @('-C',$Source,'apply','--check',$NoTools)
@@ -87,6 +96,7 @@ $Evidence = [ordered]@{
     target='x86_64-pc-windows-msvc'
     source_archive_sha256=(Hash $Archive)
     upstream_lock_sha256=$BeforeLock
+    source_link_materialization=[ordered]@{path='.beads/beads.jsonl';target='issues.jsonl';policy='git-core-symlinks-false'}
     patched_lock_sha256=$PatchedLockHash
     rust_toolchain=$Nightly
     rustc=($RustVersion -join "`n")

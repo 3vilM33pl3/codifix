@@ -27,6 +27,14 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertNotIn('Set-ExecutionPolicy',script)
         self.assertIn("CARGO_BUILD_JOBS='2'",script)
 
+    def test_pi_source_alias_is_materialized_without_link_privilege_or_source_repin(self):
+        root=Path(__file__).resolve().parents[2]
+        script=(root/'crates/mem-supervisor-pi/scripts/build-windows.ps1').read_text()
+        for required in ["--exclude=.beads/beads.jsonl",'120000 blob',"${Revision}:.beads/beads.jsonl",
+                         "'issues.jsonl'",'source_link_materialization=',"policy='git-core-symlinks-false'"]:
+            self.assertIn(required,script)
+        self.assertNotIn('New-Item -ItemType SymbolicLink',script)
+
     def test_native_build_families_are_separate_but_each_is_serialized(self):
         script = (Path(__file__).parent / 'guest-stage.ps1').read_text()
         for required in ["'PiBuild' { 'Local\\MemoryLab-NativePiBuild' }",
