@@ -65,7 +65,7 @@ if ($LASTEXITCODE -ne 0) { throw 'SSH host-key initialization failed' }
 & (Join-Path $binaries 'sshd.exe') -t
 if ($LASTEXITCODE -ne 0) { throw 'SSH configuration validation failed' }
 # The VM has only QEMU user networking; the host forward is loopback-only.
-New-NetFirewallRule -Name 'MemoryLab-KeyOnlySSH' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 22 -RemoteAddress '10.77.0.2' | Out-Null
+New-NetFirewallRule -Name 'MemoryLab-KeyOnlySSH' -DisplayName 'Memory lab key-only SSH from private host' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 22 -RemoteAddress '10.77.0.2' | Out-Null
 Set-ItemProperty 'HKLM:\SOFTWARE\OpenSSH' DefaultShell 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
 Set-Service sshd -StartupType Automatic
 Start-Service sshd

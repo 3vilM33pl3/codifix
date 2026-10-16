@@ -14,6 +14,7 @@ class BuildToolsManifestTests(unittest.TestCase):
                          'PasswordAuthentication no', 'KbdInteractiveAuthentication no',
                          'Existing SSH key differs', "-RemoteAddress '10.77.0.2'"]:
             self.assertIn(required, script)
+        self.assertIn("-DisplayName 'Memory lab key-only SSH from private host'", script)
         self.assertNotIn('Invoke-WebRequest', script)
         self.assertNotIn('Add-WindowsCapability', script)
 
