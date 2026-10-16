@@ -421,6 +421,23 @@ pub(crate) async fn recent_activity_responses(
 }
 
 pub(crate) async fn health_payload(state: &AppState) -> Result<serde_json::Value> {
+    Ok(with_area_identity(
+        health_payload_core(state).await?,
+        state.config.area.as_ref().map(|area| area.instance_id),
+    ))
+}
+
+fn with_area_identity(
+    mut payload: serde_json::Value,
+    configured_area: Option<Uuid>,
+) -> serde_json::Value {
+    // instance_id remains the runtime/session identity used by watchers. Never
+    // reinterpret it as durable area ownership during installation readiness.
+    payload["area_instance_id"] = serde_json::json!(configured_area);
+    payload
+}
+
+async fn health_payload_core(state: &AppState) -> Result<serde_json::Value> {
     if state.is_primary() {
         let pending = offline_pending_count(state).await?;
         let Some(pool) = state
@@ -518,4 +535,28 @@ pub(crate) async fn relay_upstream_health(state: &AppState) -> Result<Option<ser
         }),
     };
     Ok(Some(status))
+}
+
+#[cfg(test)]
+mod health_identity_tests {
+    use super::*;
+
+    #[test]
+    fn configured_area_survives_runtime_restarts_without_redefining_instance_id() {
+        let area = Uuid::new_v4();
+        let runtime_one = Uuid::new_v4();
+        let runtime_two = Uuid::new_v4();
+        for runtime in [runtime_one, runtime_two] {
+            let health = with_area_identity(
+                serde_json::json!({"instance_id": runtime, "status": "ok"}),
+                Some(area),
+            );
+            assert_eq!(health["instance_id"], serde_json::json!(runtime));
+            assert_eq!(health["area_instance_id"], serde_json::json!(area));
+        }
+        let unconfigured =
+            with_area_identity(serde_json::json!({"instance_id": runtime_one}), None);
+        assert!(unconfigured["area_instance_id"].is_null());
+        assert_eq!(unconfigured["instance_id"], serde_json::json!(runtime_one));
+    }
 }
