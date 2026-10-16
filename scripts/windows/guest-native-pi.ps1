@@ -77,6 +77,10 @@ try {
         PATH=($rustBin+';'+(Split-Path -Parent $git)+';'+(Split-Path -Parent $python)+';'+(Join-Path $system 'System32'))
         CARGO_HOME=(Join-Path $root 'cargo'); RUSTUP_HOME=(Join-Path $root 'rustup'); CARGO_BUILD_JOBS='4'
         GIT_TERMINAL_PROMPT='0'; GIT_CONFIG_NOSYSTEM='1'; GIT_CONFIG_GLOBAL='NUL'
+        # PowerShell stores its process-only -ExecutionPolicy setting in this
+        # environment entry. Preserve the fixed lab policy after scrubbing;
+        # otherwise invoking the reviewed builder reverts to machine Restricted.
+        PSExecutionPolicyPreference='Bypass'
         'ProgramFiles'=[Environment]::GetFolderPath('ProgramFiles'); 'ProgramFiles(x86)'=[Environment]::GetFolderPath('ProgramFilesX86')
     }.GetEnumerator()) { [Environment]::SetEnvironmentVariable($entry.Key,$entry.Value,'Process') }
     if ($Action -eq 'Prepare' -and -not (Test-Path -LiteralPath $receipt)) {

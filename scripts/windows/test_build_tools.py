@@ -11,6 +11,8 @@ class BuildToolsManifestTests(unittest.TestCase):
         script = (Path(__file__).parent / 'guest-native-pi.ps1').read_text()
         self.assertNotRegex(script, r'(?i)\$home\s*=')
         self.assertIn('USERPROFILE=$privateProfile; HOME=$privateProfile',script)
+        self.assertIn("PSExecutionPolicyPreference='Bypass'",script)
+        self.assertNotIn('Set-ExecutionPolicy',script)
 
     def test_product_compilation_is_bounded_native_and_not_workflow_evidence(self):
         script = (Path(__file__).parent / 'guest-native-product.ps1').read_text()
