@@ -93,6 +93,8 @@ def executable_sites(name, text):
         text = text.replace('"memory"', '"codifix"').replace('`memory`', '`codifix`')
     elif name == 'crates/mem-cli/src/commands/eval_support.rs':
         text = text.replace('"memory".to_string()', '"codifix".to_string()')
+    elif name == 'crates/mem-cli/src/commands/runtime.rs':
+        text = text.replace('"memory {}"', '"codifix {}"')
     elif name == 'scripts/windows/test_native_eval_bootstrap.py':
         text = text.replace('"\'memory\'"', '"\'codifix\'"')
     return text

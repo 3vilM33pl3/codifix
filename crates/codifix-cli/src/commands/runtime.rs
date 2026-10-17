@@ -3654,7 +3654,7 @@ pub(super) async fn run() -> Result<()> {
         .is_some_and(|arg| arg == "--version" || arg == "-V")
     {
         println!(
-            "memory {}",
+            "codifix {}",
             Profile::detect().display_version(env!("CARGO_PKG_VERSION"))
         );
         return Ok(());
