@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 
 const audit = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 assert(Array.isArray(audit.vulnerabilities?.list), 'complete cargo-audit result required');
+assert.equal(audit.vulnerabilities.count, audit.vulnerabilities.list.length, 'inconsistent audit result');
 for (const finding of audit.vulnerabilities.list) {
   assert.equal(finding.advisory.id, 'RUSTSEC-2023-0071', 'new Rust vulnerability blocks publication');
   assert.equal(finding.package.name, 'rsa');

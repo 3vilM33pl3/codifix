@@ -12,7 +12,7 @@ capture `3acbd25f-7ad2-4354-81e3-d02912e611a7`, baseline `0f5fd703`.
 
 - [x] Checkpoint approved scope and inspect clean pushed main.
 - [x] Align application, workspace, Web, docs and bundled skill metadata to 2.1.0.
-- [ ] Stable Linux manifest acceptance and RC/stable ordering with signed-fixture tests.
+- [x] Stable Linux manifest acceptance and RC/stable ordering with signed-fixture tests.
 - [ ] Packaging/workflow preparation and actual test/Clippy repairs.
 - [ ] Freeze one clean source commit for all builds.
 - [ ] Consolidated required-database Rust and frontend verification.
@@ -40,3 +40,24 @@ capture `3acbd25f-7ad2-4354-81e3-d02912e611a7`, baseline `0f5fd703`.
 - No paid models, R3 campaign, customer data, live service or OS changes.
 
 Build/test results and publication hashes will be recorded below as observed.
+
+## Preparation evidence
+
+- Required-database `cargo test --workspace --all-targets --locked --quiet`
+  passed against the isolated `memory-release-210-postgres` container on loopback
+  port 55491; no production connections. Existing explicitly ignored tests remain
+  ignored; this is not Windows-native acceptance.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`, formatting,
+  boundary checks and the lean `tui,project-sync` CLI build pass. Test-only repairs
+  use meaningful expectations and move one test module; no lint was disabled.
+- Web 293 tests and production build pass; docs content, links, assets and
+  89-page production build pass after stable-version metadata alignment.
+- Linux operator tests include actual disposable signed RC-to-stable upgrade and
+  unchanged RC compatibility. The isolated console CLI rehearsal passes 10 tests.
+- Mac Python suite passes 147 tests, including 23 package contracts. These are
+  software-contract tests, not native installer acceptance. Its native preservation
+  rehearsal uses synthetic sentinel files, not a complete bundled-runtime restore.
+- Release inventory tests reject incomplete matrices, changed source metadata
+  and substituted package bytes; positive checksum generation passes.
+- Web/docs audits remain zero. The raw Rust audit retains only the documented
+  RSA advisory plus the known yanked-spin warning. Publication rejects new findings.
