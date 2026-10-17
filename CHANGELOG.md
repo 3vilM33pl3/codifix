@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.1.0 - 2026-10-17
+
+- Add the private ATProto federation profile, reviewed knowledge exchange and
+  explicit cited expertise questions, with independent project-area ownership.
+- Add company users/projects/devices administration, selective Mac onboarding,
+  approved offline project knowledge and recoverable curated contributions.
+- Add durable background jobs and transactional mutation events, operator job
+  inspection/retry and isolated evaluation tooling. Paid R3 results remain separate.
+- Show synchronized knowledge in the main Memories view, label desktop watcher
+  sessions and list configured entry points with `memory urls`.
+- Update vulnerable Web, documentation, Rust and native-PDS dependency trees.
+  The upstream RSA private-key timing advisory remains documented; Memory's
+  inspected OIDC path uses public-key verification.
+- Publish Linux amd64/arm64, macOS Intel/Apple Silicon and Windows x64 packages.
+  Windows is a preview: client/operator tools are included, not a completed
+  bundled PostgreSQL/PDS/Pi stack or proof of full native parity.
+- Include runtime-preserving Mac application-update packages. Publishing this
+  release does not upgrade existing installations or external PDS/Pi runtimes.
+
 ## 2.1.0-rc.5 - 2026-10-07 (internal candidate)
 
 - Add `memory urls`: read-only, UI-first configuration discovery, JSON output,

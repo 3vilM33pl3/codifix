@@ -1,7 +1,7 @@
 {
   "name": "memory-layer-web",
   "private": true,
-  "version": "2.1.0-rc.5",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
