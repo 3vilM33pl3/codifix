@@ -14,11 +14,11 @@ capture `3acbd25f-7ad2-4354-81e3-d02912e611a7`, baseline `0f5fd703`.
 - [x] Align application, workspace, Web, docs and bundled skill metadata to 2.1.0.
 - [x] Stable Linux manifest acceptance and RC/stable ordering with signed-fixture tests.
 - [x] Packaging/workflow preparation and actual test/Clippy repairs.
-- [ ] Freeze one clean source commit for all builds.
+- [x] Freeze one clean source commit for all builds.
 - [x] Consolidated local required-database Rust and frontend verification.
-- [ ] Linux Bookworm-compatible packages and ABI/install verification.
+- [x] Linux Bookworm-compatible packages and ABI/install verification.
 - [ ] Both Mac architectures, standard and runtime-preserving update packages.
-- [ ] Windows native ZIP/user MSI/server-tools MSI and disposable package checks.
+- [x] Windows native ZIP/user MSI/server-tools MSI and disposable package checks.
 - [ ] Astra final review, exact artifact inventory and checksums.
 - [ ] Publish stable/latest release and verify downloaded assets.
 - [ ] Update both Homebrew formulae to verified published source hash.
@@ -90,3 +90,31 @@ source `49be5bb58b000f7bf69278a0dc8ff180d848021c`. This is **not a release pass*
 A supplemental full-suite user-namespace run is not acceptance evidence: mapping
 root-owned ancestors to an unmapped UID correctly triggers protected-file checks.
 The successful full-suite result above uses the normal required-database runner.
+
+## Frozen candidate evidence
+
+Candidate run [39027168771](https://github.com/3vilM33pl3/memory/actions/runs/39027168771)
+builds every platform from `a500aa77709941385ead9c1c5e7407c957aabb71`.
+Subsequent formula/evidence commits do not change that artifact source commit.
+
+- Consolidated source/security job `117380577801` passes required-database Rust
+  tests, formatting, Clippy, boundaries, lean CLI, packaging/operator regressions,
+  Web/docs tests and builds, and the PDS security overlay. Raw Rust audit evidence
+  retains the documented RSA advisory and yanked-spin warning.
+- Linux build jobs `117380577739` (amd64) and `117380577756` (arm64) pass complete
+  Bookworm ABI checks and packaged launch probes. Native installation jobs
+  `117387529030` and `117387528876` pass fresh installation, synthetic 2.0.1 upgrade,
+  repair and data-preserving removal on disposable hosted Ubuntu runners.
+  No running application/database or production deployment is implied by those
+  installer checks. Downloaded package/build/ABI checksums independently pass.
+- Apple Silicon job `117380577723` passes both native package installations,
+  architecture/dependency checks and sentinel-only runtime preservation. Both
+  downloaded package checksums and source-bound metadata independently pass.
+- Windows job `117380577747` passes native PostgreSQL 17/pgvector preparation,
+  installer identity checks, packaged capture/curation/search/restart, and both
+  MSI install/repair/data-preserving removal checks. Downloaded ZIP/MSI/manifest
+  checksums independently pass. The manifest records build 1, MSI version 2.1.1,
+  ten executable DLL inventories, unsigned status and `native_stack_bundled: false`.
+
+Intel Mac verification, publication and Homebrew remain pending until recorded
+below; the successful lanes above alone do not complete this release.
