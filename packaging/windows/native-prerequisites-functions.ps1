@@ -66,7 +66,7 @@ function Open-NativePrerequisiteLease([string]$ManifestPath, [string]$ManifestSh
     Initialize-NativeReleaseGuard
     $guards=[Collections.Generic.List[IDisposable]]::new()
     try {
-        $guards.Add([MemoryLayer.ProtectedRelease]::Open((Split-Path -Parent ([IO.Path]::GetFullPath($ManifestPath)))))
+        $guards.Add([MemoryLayer.ProtectedRelease]::OpenFile($ManifestPath))
         $manifestLength=(Get-Item -LiteralPath $ManifestPath).Length
         if ($manifestLength -gt 32MB -or
             (Get-FileHash -LiteralPath $ManifestPath).Hash.ToLowerInvariant() -cne $ManifestSha256) { throw 'Prerequisite manifest differs from pinned input' }
@@ -79,8 +79,9 @@ function Open-NativePrerequisiteLease([string]$ManifestPath, [string]$ManifestSh
         if ((Get-Item -LiteralPath $receiptPath).Length -gt 1MB) { throw 'Prerequisite receipt too large' }
         $receipt=Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
         $binding=Get-NativePrerequisiteBinding $plan $ManifestSha256 $OperationId $root $receipt $ExpectedKind
-        $guards.Add([MemoryLayer.ProtectedRelease]::Open($binding.runtime_directory))
-        Assert-NativePayload $binding.runtime_directory $plan.payload_files
+        $treeEntryLimit=if($plan.kind -ceq 'memory-native-pds-runtime'){100000}else{40000}
+        $guards.Add([MemoryLayer.ProtectedRelease]::Open($binding.runtime_directory,$treeEntryLimit))
+        Assert-NativePayload $binding.runtime_directory $plan.payload_files -ExtendedPaths:($plan.kind -ceq 'memory-native-pds-runtime')
         return [pscustomobject]@{binding=$binding;guards=$guards;plan=$plan}
     } catch { foreach ($guard in $guards) { $guard.Dispose() }; throw }
 }

@@ -62,6 +62,28 @@ foreach ($change in @(
 }
 $instanceSource=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'native-instance.ps1') -Raw
 if ($instanceSource.IndexOf('$runtimeLease=Open-NativePrerequisiteLease') -gt $instanceSource.IndexOf('Stop-Service -Name')) { throw 'Runtime must be revalidated before stopping service' }
+$guardSource=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'native-instance-functions.ps1') -Raw
+foreach($required in @('Open(string root) { return Open(root, 40000); }',
+    'maxEntries == 40000 || maxEntries == 100000','Check(++count <= maxEntries',
+    'public static ProtectedRelease OpenFile(string path)',
+    'result.HoldAncestors(path)','Check(!result.Hold(path, false)',
+    'directory || info.Links == 1','Release path is a reparse point','Release owner is not trusted')){
+    if(-not $guardSource.Contains($required)){throw 'Protected input/tree guard policy changed'}
+}
+foreach($name in @('native-prerequisites.ps1','native-prerequisites-functions.ps1')){
+    $source=Get-Content -LiteralPath (Join-Path $PSScriptRoot $name) -Raw
+    foreach($required in @('::OpenFile($ManifestPath)',"`$treeEntryLimit=if(`$plan.kind -ceq 'memory-native-pds-runtime'){100000}else{40000}")){
+        if(-not $source.Contains($required)){throw 'Prerequisite guards must retain exact files and kind-scoped tree bounds'}
+    }
+}
+$operator=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'native-prerequisites.ps1') -Raw
+if(-not $operator.Contains('::OpenFile($PackagePath)')){throw 'Package guard must pin exact ZIP rather than unrelated sibling payloads'}
+if((Get-NativeExtendedPath 'C:\reviewed\runtime\file.js') -cne '\\?\C:\reviewed\runtime\file.js' -or
+    (Get-NativeExtendedPath '\\?\C:\reviewed\runtime\file.js') -cne '\\?\C:\reviewed\runtime\file.js'){throw 'Extended local path conversion differs'}
+foreach($bad in @('relative','C:relative','\\server\share\file','\\.\pipe\file','C:\x\..\file','C:\x\file:stream','C:\x\NUL')){
+    $rejected=$false;try{$null=Get-NativeExtendedPath $bad}catch{$rejected=$true}
+    if(-not $rejected){throw 'Invalid local namespace became accepted through extended paths'}
+}
 foreach ($file in @('native-prerequisites.ps1','native-prerequisites-functions.ps1','native-instance.ps1')) {
     $tokens=$null; $errors=$null
     $null=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot $file),[ref]$tokens,[ref]$errors)

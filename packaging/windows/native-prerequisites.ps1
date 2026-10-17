@@ -19,15 +19,16 @@ try {
     # Require operator-protected input directories, and retain their handles
     # through validation/copy. Existing runtime/instance directories are never
     # treated as download caches or overwritten.
-    $manifestGuard = [MemoryLayer.ProtectedRelease]::Open((Split-Path -Parent ([IO.Path]::GetFullPath($ManifestPath))))
+    $manifestGuard = [MemoryLayer.ProtectedRelease]::OpenFile($ManifestPath)
     $manifestLength=(Get-Item -LiteralPath $ManifestPath).Length
     if ($manifestLength -gt 32MB) { throw 'Prerequisite manifest too large' }
     if ((Get-FileHash -LiteralPath $ManifestPath).Hash.ToLowerInvariant() -cne $ManifestSha256) { throw 'Prerequisite manifest differs from reviewed digest' }
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
     $plan = Get-NativePrerequisitePlan $manifest
     Assert-NativeRuntimeManifestSize $manifestLength $plan.kind
-    $packageParent = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($PackagePath))
-    $packageGuard = [MemoryLayer.ProtectedRelease]::Open($packageParent)
+    $treeEntryLimit=if($plan.kind -ceq 'memory-native-pds-runtime'){100000}else{40000}
+    $extendedPaths=$plan.kind -ceq 'memory-native-pds-runtime'
+    $packageGuard = [MemoryLayer.ProtectedRelease]::OpenFile($PackagePath)
     try {
         $package = [IO.File]::Open($PackagePath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
         if ($package.Length -gt 2GB) { throw 'Prerequisite ZIP too large' }
@@ -62,7 +63,7 @@ try {
             $stage = Join-Path $root ($identity + '.staging-' + $OperationId)
             if (Test-Path -LiteralPath $stage) {
                 # Preserve partial/rejected input, never merge into an old tree.
-                $old = [MemoryLayer.ProtectedRelease]::Open($stage); $old.Dispose()
+                $old = [MemoryLayer.ProtectedRelease]::Open($stage,$treeEntryLimit); $old.Dispose()
                 [IO.Directory]::Move($stage,($stage + '.retained-' + [guid]::NewGuid()))
             }
             Set-NativePrivateDirectory $stage
@@ -73,6 +74,7 @@ try {
             Add-Type -AssemblyName System.IO.Compression.FileSystem
             $archive = [IO.Compression.ZipArchive]::new($package,[IO.Compression.ZipArchiveMode]::Read,$true)
             try {
+                $ioStage=if($extendedPaths){Get-NativeExtendedPath $stage}else{$stage}
                 $entryLimit=if($plan.kind -ceq 'memory-native-pds-runtime'){100000}else{30000}
                 if ($archive.Entries.Count -gt $entryLimit) { throw 'Prerequisite archive too many entries' }
                 $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase); $total=[int64]0
@@ -81,9 +83,9 @@ try {
                     if (-not $seen.Add($entry.FullName.TrimEnd('/'))) { throw 'Duplicate/colliding prerequisite path' }
                     $total += $entry.Length
                     if ($total -gt 2GB) { throw 'Expanded prerequisite exceeds 2GiB' }
-                    $target = Join-Path $stage $entry.FullName.Replace('/',[IO.Path]::DirectorySeparatorChar)
-                    if ($entry.FullName.EndsWith('/')) { $null=New-Item -ItemType Directory -Path $target -Force; continue }
-                    $null=New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force
+                    $target = [IO.Path]::Combine($ioStage,$entry.FullName.Replace('/',[IO.Path]::DirectorySeparatorChar))
+                    if ($entry.FullName.EndsWith('/')) { $null=[IO.Directory]::CreateDirectory($target); continue }
+                    $null=[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
                     $source=$entry.Open(); $output=[IO.File]::Open($target,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
                     try {
                         $buffer=[byte[]]::new(1MB); $copied=[int64]0
@@ -97,12 +99,12 @@ try {
                     } finally { $source.Dispose(); $output.Dispose() }
                 }
             } finally { $archive.Dispose() }
-            $guard=[MemoryLayer.ProtectedRelease]::Open($stage)
-            try { Assert-NativePayload $stage $plan.payload_files } finally { $guard.Dispose(); $guard=$null }
+            $guard=[MemoryLayer.ProtectedRelease]::Open($stage,$treeEntryLimit)
+            try { Assert-NativePayload $stage $plan.payload_files -ExtendedPaths:$extendedPaths } finally { $guard.Dispose(); $guard=$null }
             [IO.Directory]::Move($stage,$release)
         }
-        $guard=[MemoryLayer.ProtectedRelease]::Open($release)
-        Assert-NativePayload $release $plan.payload_files
+        $guard=[MemoryLayer.ProtectedRelease]::Open($release,$treeEntryLimit)
+        Assert-NativePayload $release $plan.payload_files -ExtendedPaths:$extendedPaths
         $journal.phase='verified'; Write-NativeJournal $receipt $journal
         [pscustomobject]@{ phase='verified'; runtime=$release; receipt=$receipt; input_sha256=$digest; native_execution_verified=$false; native_stack_bundled=$false } | ConvertTo-Json
     } finally { if ($package) { $package.Dispose() }; $packageGuard.Dispose() }

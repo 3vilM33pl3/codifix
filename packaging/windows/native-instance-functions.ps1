@@ -239,15 +239,30 @@ function Write-NativeJournal([string]$Path, $Value) {
     if (Test-Path -LiteralPath $Path) { [IO.File]::Replace($temporary, $Path, [System.Management.Automation.Language.NullString]::Value) } else { [IO.File]::Move($temporary, $Path) }
 }
 
-function Assert-NativePayload([string]$Root, $PayloadFiles) {
-    $files = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force)
+function Get-NativeExtendedPath([string]$Path) {
+    $local=$Path.Replace('/','\')
+    if($local.StartsWith('\\?\')){$local=$local.Substring(4)}
+    if($local -cnotmatch '^[A-Za-z]:\\' -or $local.Length -gt 32760){throw 'Exact bounded local drive path required'}
+    $tail=$local.Substring(3).TrimEnd('\')
+    if($tail){foreach($name in $tail.Split('\')){Assert-NativeArchiveName $name}}
+    return '\\?\'+$local
+}
+
+function Assert-NativePayload([string]$Root, $PayloadFiles, [switch]$ExtendedPaths) {
+    if($ExtendedPaths){$Root=Get-NativeExtendedPath $Root}
+    $files = if($ExtendedPaths){@([IO.Directory]::EnumerateFiles($Root,'*',[IO.SearchOption]::AllDirectories))}else{@(Get-ChildItem -LiteralPath $Root -Recurse -File -Force)}
     if ($files.Count -ne @($PayloadFiles).Count) { throw 'Release payload count differs from manifest' }
     $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in $PayloadFiles) {
         Assert-NativeArchiveName $entry.name
         if (-not $names.Add($entry.name) -or $entry.sha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'Duplicate or malformed payload digest' }
-        $target = Join-Path $Root $entry.name.Replace('/', [IO.Path]::DirectorySeparatorChar)
-        if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.sha256) { throw 'Release payload differs from manifest' }
+        $target = if($ExtendedPaths){[IO.Path]::Combine($Root,$entry.name.Replace('/',[IO.Path]::DirectorySeparatorChar))}else{Join-Path $Root $entry.name.Replace('/', [IO.Path]::DirectorySeparatorChar)}
+        if($ExtendedPaths){
+            $inputFile=[IO.File]::Open($target,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+            $sha=[Security.Cryptography.SHA256]::Create()
+            try{$hash=([BitConverter]::ToString($sha.ComputeHash($inputFile))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose();$inputFile.Dispose()}
+        }else{$hash=(Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()}
+        if ($hash -ne $entry.sha256) { throw 'Release payload differs from manifest' }
     }
 }
 
@@ -284,6 +299,18 @@ namespace MemoryLayer {
         [DllImport("advapi32.dll")] static extern uint GetSecurityDescriptorLength(IntPtr descriptor);
         [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr memory);
         static void Check(bool valid, string message) { if (!valid) throw new IOException(message); }
+        static string LocalPath(string path) {
+            Check(path != null && path.Length <= 32760, "Bounded local drive path required");
+            path = path.Replace('/', '\\');
+            if (path.StartsWith(@"\\?\", StringComparison.Ordinal)) path = path.Substring(4);
+            Check(path.Length >= 3 && Char.IsLetter(path[0]) && path[0] <= 127 && path[1] == ':' && path[2] == '\\', "Local drive path required");
+            string tail = path.Substring(3).TrimEnd('\\');
+            if (tail.Length > 0) foreach (string name in tail.Split('\\')) {
+                Check(name.Length > 0 && name != "." && name != ".." && !name.EndsWith(".") && !name.EndsWith(" "), "Ambiguous local path component");
+                foreach (char value in name) Check(!Char.IsControl(value) && "<>:\"|?*".IndexOf(value) < 0, "Invalid local path component");
+            }
+            return @"\\?\" + path;
+        }
         bool Trusted(string sid, bool ancestor) {
             return sid == caller || sid == "S-1-5-18" || sid == "S-1-5-32-544" ||
                 (ancestor && sid == "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464");
@@ -291,7 +318,7 @@ namespace MemoryLayer {
         bool Hold(string path, bool ancestor) {
             // Ancestors deny deletion but allow unrelated sibling operations.
             // Payload files/directories additionally deny write-sharing.
-            var handle = CreateFileW(path, GenericRead | ReadControl,
+            var handle = CreateFileW(LocalPath(path), GenericRead | ReadControl,
                 ancestor ? 3u : 1u, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
             if (handle.IsInvalid) { handle.Dispose(); throw new Win32Exception(Marshal.GetLastWin32Error(), "Protected release handle unavailable"); }
             handles.Add(handle);
@@ -323,25 +350,41 @@ namespace MemoryLayer {
             } finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
             return directory;
         }
-        public static ProtectedRelease Open(string root) {
+        void HoldAncestors(string path) {
+            var ancestors = new Stack<string>();
+            string parent = Path.GetDirectoryName(path);
+            while (!String.IsNullOrEmpty(parent)) {
+                ancestors.Push(parent);
+                string next = Path.GetDirectoryName(parent);
+                if (next == parent) break;
+                parent = next;
+            }
+            foreach (string ancestor in ancestors) Check(Hold(ancestor, true), "Release ancestor is not a directory");
+        }
+        // Input packages/manifests need exact held files, not an unrelated
+        // recursive scan of their staging parent's complete payload copy.
+        public static ProtectedRelease OpenFile(string path) {
             var result = new ProtectedRelease();
             try {
-                root = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
-                var ancestors = new Stack<string>();
-                string parent = Path.GetDirectoryName(root);
-                while (!String.IsNullOrEmpty(parent)) {
-                    ancestors.Push(parent);
-                    string next = Path.GetDirectoryName(parent);
-                    if (next == parent) break;
-                    parent = next;
-                }
-                foreach (string ancestor in ancestors) Check(result.Hold(ancestor, true), "Release ancestor is not a directory");
+                path = LocalPath(path);
+                result.HoldAncestors(path);
+                Check(!result.Hold(path, false), "Release input is not a regular file");
+                return result;
+            } catch { result.Dispose(); throw; }
+        }
+        public static ProtectedRelease Open(string root) { return Open(root, 40000); }
+        public static ProtectedRelease Open(string root, int maxEntries) {
+            Check(maxEntries == 40000 || maxEntries == 100000, "Unsupported release tree bound");
+            var result = new ProtectedRelease();
+            try {
+                root = LocalPath(root).TrimEnd(Path.DirectorySeparatorChar);
+                result.HoldAncestors(root);
                 Check(result.Hold(root, false), "Release root is not a directory");
                 var pending = new Queue<string>(); pending.Enqueue(root);
                 int count = 0;
                 while (pending.Count > 0) {
                     foreach (string entry in Directory.EnumerateFileSystemEntries(pending.Dequeue())) {
-                        Check(++count <= 40000, "Release tree exceeds entry bound");
+                        Check(++count <= maxEntries, "Release tree exceeds entry bound");
                         if (result.Hold(entry, false)) pending.Enqueue(entry);
                     }
                 }
