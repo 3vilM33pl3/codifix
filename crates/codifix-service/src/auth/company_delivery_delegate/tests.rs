@@ -150,7 +150,7 @@ async fn delivery_delegate_http_enforces_browser_csrf_and_one_time_receipt() {
     let (secret, csrf) = crate::auth::mint_web_session(&f.state, &f.db.pool, f.human.id)
         .await
         .unwrap();
-    let cookie = format!("memory_session={secret}; memory_csrf={csrf}");
+    let cookie = format!("codifix_session={secret}; codifix_csrf={csrf}");
     let app = crate::routes::build_http_app(f.state.clone());
     let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
     let client = reqwest::Client::new();

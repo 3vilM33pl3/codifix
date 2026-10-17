@@ -179,7 +179,7 @@ mod tests {
         let clone = api.clone();
         let server = tokio::spawn(serve(listener, vec![
             (200, String::new(), auth("internal", "single_user")),
-            (200, "Set-Cookie: memory_session=synthetic-session; Path=/; HttpOnly\r\nSet-Cookie: memory_csrf=synthetic-csrf; Path=/\r\n".into(), "{}".into()),
+            (200, "Set-Cookie: codifix_session=synthetic-session; Path=/; HttpOnly\r\nSet-Cookie: codifix_csrf=synthetic-csrf; Path=/\r\n".into(), "{}".into()),
             (200, String::new(), "{\"questions\":[],\"next_after\":null}".into()),
             (403, String::new(), "PRIVATE_DB_DETAILS".into()),
             (403, String::new(), "PRIVATE_DB_DETAILS".into()),
@@ -201,7 +201,7 @@ mod tests {
         assert!(requests[1].starts_with("POST /v1/auth/session/bootstrap "));
         for request in &requests[2..] {
             assert!(request.starts_with("GET /v1/projects/memory/supervisor/questions "));
-            assert!(request.contains("memory_session=synthetic-session"));
+            assert!(request.contains("codifix_session=synthetic-session"));
             assert!(request.contains("x-csrf-token: synthetic-csrf"));
             assert!(request.contains("origin: http://127.0.0.1:"));
             assert!(!request.contains("x-api-token"));

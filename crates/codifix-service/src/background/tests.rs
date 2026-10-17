@@ -962,7 +962,7 @@ async fn jobs_http_inspection_retry_and_project_policy_are_real_and_sanitized() 
     let (session, csrf) = crate::auth::mint_web_session(&f.state, &f.pool, principal)
         .await
         .unwrap();
-    let cookies = format!("memory_session={session}; memory_csrf={csrf}");
+    let cookies = format!("codifix_session={session}; codifix_csrf={csrf}");
     for (origin_header, token_header) in [
         (origin.as_str(), None),
         ("https://untrusted.invalid", Some(csrf.as_str())),

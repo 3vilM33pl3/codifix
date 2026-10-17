@@ -129,5 +129,5 @@ punctuation; the UI-test-only entitlement and pasteboard entry resolved these
 issues. A teardown probe confirmed a failed assertion terminates its fixture
 without leaving the test runner waiting on an asynchronous main-actor hop. See
 [README.md](README.md) for the command and
-[the fixture guide](MemoryLayerUITests/Fixtures/README.md) for reproducible
+[the fixture guide](CodifixUITests/Fixtures/README.md) for reproducible
 manual checks.

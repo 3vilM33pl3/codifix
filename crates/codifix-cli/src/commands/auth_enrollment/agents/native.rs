@@ -35,7 +35,7 @@ struct Record {
 }
 fn service(origin: &CompanyOrigin) -> String {
     format!(
-        "net.memory-layer.company-agent:{}",
+        "dev.codifix.company-agent:{}",
         credentials::sha256(&origin.0)
     )
 }
@@ -1013,7 +1013,7 @@ mod tests {
         parent.approved = true;
         credentials::save(store.as_ref(), &origin, &parent).unwrap();
         let parent_service = format!(
-            "net.memory-layer.company-device:{}",
+            "dev.codifix.company-device:{}",
             credentials::sha256(&origin.0)
         );
         store

@@ -117,7 +117,7 @@ export function CompanyDeviceApproval({ initialCode, onLock }: { initialCode: st
     } catch (e) { if (!controller.signal.aborted && version === generation.current) setError(e instanceof Error ? e.message : "Company approval unconfirmed; keep the exact request."); }
     finally { if (!controller.signal.aborted && version === generation.current) { setBusy(false); setConfirmed(false); } }
   }
-  return <div className="app-shell"><header className="topbar"><h1>Memory Layer company device approval</h1></header><main className="panel-stack">
+  return <div className="app-shell"><header className="topbar"><h1>Codifix company device approval</h1></header><main className="panel-stack">
     <section className="panel"><h2>Company project access</h2>
       <p>Select projects for offline knowledge and optionally permit this device to upload locally curated changes. Corrections remain subject to the owning project's review.</p>
       {auth && human(auth) ? <p>Approving as {auth.principal.display_name}.</p> : <><p>Company approval requires an OIDC human browser session, never local-owner or service credentials.</p><a href={authLoginUrl(`/?device_code=${CODE.test(code) ? encodeURIComponent(code) : ""}&company_device=1`)}>Sign in to review this device</a></>}
@@ -161,6 +161,6 @@ export function CompanyDeviceApproval({ initialCode, onLock }: { initialCode: st
       </section> : null}
     </> : null}
     {approved ? <section role="status" className="panel"><h2>Company device approval recorded</h2><p>Return to the requesting device to continue. This receipt is not installation, current owner authority or completed synchronization.</p></section> : null}
-    <a href="/">Return to Memory Layer</a>
+    <a href="/">Return to Codifix</a>
   </main></div>;
 }

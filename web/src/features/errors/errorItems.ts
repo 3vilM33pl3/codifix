@@ -20,7 +20,7 @@ export function collectErrorItems(
         component: "service",
         operation: "stream",
         severity: "error",
-        message: "Memory Layer backend live connection is unavailable.",
+        message: "Codifix backend live connection is unavailable.",
         raw_error: "WebSocket connection is offline.",
         explanation: "The browser can no longer receive live project updates from the backend stream.",
         fix_hint: "Check that the service is running, refresh the page, or run memory doctor.",

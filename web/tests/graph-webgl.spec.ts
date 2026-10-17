@@ -186,7 +186,7 @@ const runtimeStatusResponse = {
     bundle_version: "test",
     status: "ok",
     summary: "ok",
-    filter: "memory-layer",
+    filter: "codifix",
     details: [],
   },
   restart_notice: null,

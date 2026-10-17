@@ -14,9 +14,9 @@ const inventory: SkillInventoryReport = {
   filter: "all",
   skills: [
     {
-      name: "memory-layer",
-      project_path: "/repo/.agents/skills/memory-layer",
-      template_path: "/template/memory-layer",
+      name: "codifix",
+      project_path: "/repo/.agents/skills/codifix",
+      template_path: "/template/codifix",
       project_version: "0.9.4",
       template_version: "0.9.4",
       status: "up_to_date",
@@ -91,8 +91,8 @@ describe("SkillsTab", () => {
 
     const select = view.container.querySelector("select");
     expect(select).not.toBeNull();
-    fireEvent.change(select as HTMLSelectElement, { target: { value: "memory-layer" } });
+    fireEvent.change(select as HTMLSelectElement, { target: { value: "codifix" } });
 
-    expect(onFilterChange).toHaveBeenCalledWith("memory-layer");
+    expect(onFilterChange).toHaveBeenCalledWith("codifix");
   });
 });

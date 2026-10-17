@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const uuid = "00000000-0000-4000-8000-000000000001";
 const project = { subscription_id: uuid, device_id: uuid, company_id: uuid, owner_instance_id: uuid, project_id: uuid, space_id: uuid, area: "workshop", cursor: 0, initialized: true, observed_at: null, read_only: true };
-beforeEach(() => { vi.resetModules(); document.cookie = "memory_csrf=; max-age=0"; });
-afterEach(() => { vi.unstubAllGlobals(); document.cookie = "memory_csrf=; max-age=0"; });
+beforeEach(() => { vi.resetModules(); document.cookie = "codifix_csrf=; max-age=0"; });
+afterEach(() => { vi.unstubAllGlobals(); document.cookie = "codifix_csrf=; max-age=0"; });
 function mock(status = 200, body: unknown = { schema_version: 1, area: "workshop", instance_id: uuid, projects: [project] }) {
   const fetcher = vi.fn(async (url: RequestInfo | URL) => {
     if (url === "/v1/auth/me") return new Response(JSON.stringify({ mode: "single_user", read_only: true }), { status: 200 });
-    if (url === "/v1/auth/session/bootstrap") { document.cookie = "memory_csrf=synthetic-csrf"; return new Response("{}", { status: 200 }); }
+    if (url === "/v1/auth/session/bootstrap") { document.cookie = "codifix_csrf=synthetic-csrf"; return new Response("{}", { status: 200 }); }
     return new Response(JSON.stringify(body), { status });
   }); vi.stubGlobal("fetch", fetcher); return fetcher;
 }
@@ -30,7 +30,7 @@ it("requires current writable authentication and sends an exact CSRF-protected c
   fetcher.mockImplementation(async url=>url==="/v1/auth/me"?new Response(JSON.stringify({authenticated:true,mode:"single_user",read_only:true})):new Response("{}"));
   await expect(api.submitLaptopCorrection(uuid,request)).rejects.toThrow("write access");
   expect(fetcher.mock.calls.some(c=>String(c[0]).includes("/corrections"))).toBe(false);
-  document.cookie="memory_csrf=synthetic-csrf";
+  document.cookie="codifix_csrf=synthetic-csrf";
   fetcher.mockImplementation(async url=>url==="/v1/auth/me"?new Response(JSON.stringify({authenticated:true,mode:"single_user",read_only:false})):new Response(JSON.stringify({operation_id:uuid,subscription_id:uuid,local_memory_id:uuid,local_canonical_id:uuid,owner_canonical_id:uuid,expected_version:3,request_sha256:"b".repeat(64),staged_at:"2026-10-14T10:01:00Z"})));
   await api.submitLaptopCorrection(uuid,request);
   const [url,options]=fetcher.mock.calls.at(-1) as unknown as [string,RequestInit];

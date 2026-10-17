@@ -29,8 +29,8 @@ const LIST_PRINCIPALS_QUERY: &str = r#"
     ORDER BY display_name, id
 "#;
 
-pub(crate) const SESSION_COOKIE_NAME: &str = "memory_session";
-pub(crate) const CSRF_COOKIE_NAME: &str = "memory_csrf";
+pub(crate) const SESSION_COOKIE_NAME: &str = "codifix_session";
+pub(crate) const CSRF_COOKIE_NAME: &str = "codifix_csrf";
 
 /// One credential presented by a request, independent of the transport that
 /// carried it (HTTP headers, websocket message, future federation channel).
@@ -1325,7 +1325,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             header::COOKIE,
-            HeaderValue::from_static("memory_session=browser-secret"),
+            HeaderValue::from_static("codifix_session=browser-secret"),
         );
 
         let credential =
@@ -1376,7 +1376,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             header::COOKIE,
-            HeaderValue::from_static("other=1; memory_session=session-value; memory_csrf=csrf"),
+            HeaderValue::from_static("other=1; codifix_session=session-value; codifix_csrf=csrf"),
         );
         assert_eq!(
             cookie_value(&headers, SESSION_COOKIE_NAME).as_deref(),

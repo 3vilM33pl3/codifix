@@ -103,7 +103,7 @@ fn browser_post(client: &reqwest::Client, url: &str, path: &str) -> reqwest::Req
         .post(format!("{url}{path}"))
         .header(
             header::COOKIE,
-            "memory_session=private-test-session; memory_csrf=private-test-csrf",
+            "codifix_session=private-test-session; codifix_csrf=private-test-csrf",
         )
         .header("x-csrf-token", "private-test-csrf")
         .header(header::ORIGIN, url)
@@ -145,7 +145,7 @@ async fn question_intent_is_confirmed_private_idempotent_and_never_calls_a_provi
     assert_eq!(
         client
             .post(format!("{url}{prepare}"))
-            .header(header::COOKIE, "memory_session=private-test-session")
+            .header(header::COOKIE, "codifix_session=private-test-session")
             .json(&question)
             .send()
             .await

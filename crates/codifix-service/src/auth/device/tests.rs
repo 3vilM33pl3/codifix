@@ -563,7 +563,7 @@ async fn http_public_start_human_session_and_csrf_boundaries() {
             .status(),
         StatusCode::UNAUTHORIZED
     );
-    let cookie = format!("memory_session={}; memory_csrf={}", f.session, f.csrf);
+    let cookie = format!("codifix_session={}; codifix_csrf={}", f.session, f.csrf);
     assert_eq!(
         client
             .get(endpoint)

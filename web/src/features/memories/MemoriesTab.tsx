@@ -92,7 +92,7 @@ export function MemoriesTab({
                 then refresh this tab.
               </p>
               <p>
-                <a href="https://www.memory-layer.dev/docs/quickstart" target="_blank" rel="noreferrer">
+                <a href="https://codifix.dev/docs/quickstart" target="_blank" rel="noreferrer">
                   Five-minute quickstart
                 </a>
               </p>

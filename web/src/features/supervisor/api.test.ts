@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-beforeEach(() => { vi.resetModules(); document.cookie = "memory_csrf=synthetic-csrf; path=/"; });
-afterEach(() => { vi.unstubAllGlobals(); document.cookie = "memory_csrf=; max-age=0; path=/"; });
+beforeEach(() => { vi.resetModules(); document.cookie = "codifix_csrf=synthetic-csrf; path=/"; });
+afterEach(() => { vi.unstubAllGlobals(); document.cookie = "codifix_csrf=; max-age=0; path=/"; });
 const request = { request_id: "request", instance_id: "instance", policy_revision: "revision", expected_enabled: true, enabled: false };
 
 it("sends JSON with CSRF to the local policy endpoint and binds its receipt", async () => {

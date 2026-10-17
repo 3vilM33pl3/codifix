@@ -5,7 +5,7 @@ const bootstrap = "/v1/auth/session/bootstrap";
 const csrf = "synthetic-federation-csrf";
 
 function clearCookie() {
-  document.cookie = "memory_csrf=; max-age=0; path=/";
+  document.cookie = "codifix_csrf=; max-age=0; path=/";
 }
 
 beforeEach(() => { vi.resetModules(); clearCookie(); });
@@ -15,7 +15,7 @@ it("bootstraps a fresh single-user session before the first federation read", as
   const fetch = vi.fn(async (input: RequestInfo | URL) => {
     if (input === "/v1/auth/me") return Response.json({ mode: "single_user", read_only: false });
     if (input === bootstrap) {
-      document.cookie = `memory_csrf=${csrf}; path=/`;
+      document.cookie = `codifix_csrf=${csrf}; path=/`;
       return Response.json({ authenticated: true });
     }
     expect(input).toBe(discovery);
@@ -47,7 +47,7 @@ it("shares one bootstrap across concurrent federation reads and waits for its co
   const reads = Promise.all([federationRequest("homelab", null), federationRequest("memory", null)]);
   await vi.waitFor(() => expect(fetch.mock.calls.filter(([url]) => url === bootstrap)).toHaveLength(1));
   expect(fetch.mock.calls.some(([url]) => String(url).includes("/federation"))).toBe(false);
-  document.cookie = `memory_csrf=${csrf}; path=/`;
+  document.cookie = `codifix_csrf=${csrf}; path=/`;
   finishBootstrap(Response.json({ authenticated: true }));
   await reads;
   expect(fetch.mock.calls.filter(([url]) => url === bootstrap)).toHaveLength(1);
@@ -58,7 +58,7 @@ it("keeps session cookies and CSRF on confirmed federation mutations", async () 
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     if (input === "/v1/auth/me") return Response.json({ mode: "single_user", read_only: false });
     if (input === bootstrap) {
-      document.cookie = `memory_csrf=${csrf}; path=/`;
+      document.cookie = `codifix_csrf=${csrf}; path=/`;
       return Response.json({ authenticated: true });
     }
     expect(input).toBe(`${discovery}/company/questions/submit`);
@@ -75,7 +75,7 @@ it("keeps session cookies and CSRF on confirmed federation mutations", async () 
 });
 
 it.each([false, true])("never bootstraps or starts login for OIDC with a CSRF cookie: %s", async hasCookie => {
-  if (hasCookie) document.cookie = `memory_csrf=${csrf}; path=/`;
+  if (hasCookie) document.cookie = `codifix_csrf=${csrf}; path=/`;
   const fetch = vi.fn(async (input: RequestInfo | URL) => input === "/v1/auth/me"
     ? Response.json({ mode: "multi_user", read_only: false }) : Response.json({}));
   vi.stubGlobal("fetch", fetch);
@@ -88,7 +88,7 @@ it.each([false, true])("never bootstraps or starts login for OIDC with a CSRF co
 });
 
 it.each([401, 403])("does not replace an existing session or replay after federation denial %s", async status => {
-  document.cookie = `memory_csrf=${csrf}; path=/`;
+  document.cookie = `codifix_csrf=${csrf}; path=/`;
   const fetch = vi.fn(async (input: RequestInfo | URL) => input === "/v1/auth/me"
     ? Response.json({ mode: "single_user", read_only: false }) : new Response("Denied", { status }));
   vi.stubGlobal("fetch", fetch);
@@ -115,7 +115,7 @@ it("does not remint an already bootstrapped session after cookie loss and a deni
   const fetch = vi.fn(async (input: RequestInfo | URL) => {
     if (input === "/v1/auth/me") return Response.json({ mode: "single_user", read_only: false });
     if (input === bootstrap) {
-      document.cookie = `memory_csrf=${csrf}; path=/`;
+      document.cookie = `codifix_csrf=${csrf}; path=/`;
       return Response.json({ authenticated: true });
     }
     return denied ? new Response("Signed out", { status: 401 }) : Response.json({});

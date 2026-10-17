@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-beforeEach(() => { vi.resetModules(); document.cookie = "memory_csrf=device-csrf; path=/"; });
-afterEach(() => { vi.unstubAllGlobals(); document.cookie = "memory_csrf=; max-age=0; path=/"; });
+beforeEach(() => { vi.resetModules(); document.cookie = "codifix_csrf=device-csrf; path=/"; });
+afterEach(() => { vi.unstubAllGlobals(); document.cookie = "codifix_csrf=; max-age=0; path=/"; });
 
 it("sends only a public code in review and uses CSRF for exact revision-scoped approvals", async () => {
   const fetcher = vi.fn().mockImplementation(async (url: string) => new Response(JSON.stringify(url === "/v1/auth/me"

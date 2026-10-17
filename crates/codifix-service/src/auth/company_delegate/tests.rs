@@ -363,7 +363,7 @@ async fn delegate_http_requires_global_administrator_csrf_and_no_store() {
             .status(),
         StatusCode::UNAUTHORIZED
     );
-    let cookie = format!("memory_session={session}; memory_csrf={csrf}");
+    let cookie = format!("codifix_session={session}; codifix_csrf={csrf}");
     assert_eq!(
         client
             .post(&url)

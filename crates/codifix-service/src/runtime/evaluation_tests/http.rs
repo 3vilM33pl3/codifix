@@ -106,7 +106,7 @@ async fn sealed_http_queries_authenticate_without_mutating_credentials_or_crossi
         // Browser reads use the same sealed auth boundary. No mutation/CSRF bypass.
         let browser = client
             .get(format!("{url}/v1/auth/me"))
-            .header("Cookie", format!("memory_session={}", sessions[index]))
+            .header("Cookie", format!("codifix_session={}", sessions[index]))
             .send()
             .await
             .unwrap();

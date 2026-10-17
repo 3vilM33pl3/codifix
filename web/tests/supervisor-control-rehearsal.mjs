@@ -23,7 +23,7 @@ let browser;
 try {
   const config = join(privateDir,'synthetic.toml');
   await writeFile(config,`[service]\nbind_addr = "${url.host}"\napi_token = "${token}"\n[database]\nurl = "postgresql://unused/unused"\n`,{flag:'wx',mode:0o600});
-  const env = {PATH:process.env.PATH, LANG:'C.UTF-8', MEMORY_LAYER_PROFILE:'prod'};
+  const env = {PATH:process.env.PATH, LANG:'C.UTF-8', CODIFIX_PROFILE:'prod'};
   const cli = args => execFileSync(binary,['--config',config,'supervisor',...args],{env,timeout:15000,encoding:'utf8',cwd:privateDir});
   const inspect = () => JSON.parse(cli(['--json']));
   let state = inspect();
@@ -44,8 +44,8 @@ try {
   browser = await chromium.launch({headless:true});
   const context = await browser.newContext({viewport:{width:1280,height:1000},serviceWorkers:'block'});
   await context.addCookies([
-    {name:'memory_session',value:'synthetic-supervisor-session',url:url.href,httpOnly:true,sameSite:'Lax'},
-    {name:'memory_csrf',value:'synthetic-csrf',url:url.href,sameSite:'Lax'},
+    {name:'codifix_session',value:'synthetic-supervisor-session',url:url.href,httpOnly:true,sameSite:'Lax'},
+    {name:'codifix_csrf',value:'synthetic-csrf',url:url.href,sameSite:'Lax'},
   ]);
   await context.route('**/*',route => new URL(route.request().url()).origin === url.origin ? route.continue() : route.abort());
   const page = await context.newPage();

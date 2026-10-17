@@ -1,0 +1,91 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	objectVersion = 77;
+	classes = {};
+	objects = {
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A10000000000000000000001 /* Sources */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Codifix/Sources; sourceTree = "<group>"; };
+		A10000000000000000000002 /* CodifixTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = CodifixTests; sourceTree = "<group>"; };
+		A10000000000000000000003 /* CodifixUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = CodifixUITests; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXBuildFile section */
+		A20000000000000000000001 /* "Codifix.app" in Applications */ = {isa = PBXBuildFile; fileRef = A30000000000000000000001 /* "Codifix.app" */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A40000000000000000000001 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = A50000000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = A60000000000000000000001; remoteInfo = Codifix; };
+		A40000000000000000000002 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = A50000000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = A60000000000000000000001; remoteInfo = Codifix; };
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A70000000000000000000001 /* Embed Frameworks */ = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; dstSubfolderSpec = 10; files = (); name = "Embed Frameworks"; runOnlyForDeploymentPostprocessing = 0; };
+		A70000000000000000000002 /* Embed App Extensions */ = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; dstSubfolderSpec = 13; files = (A20000000000000000000001 /* "Codifix.app" in Applications */,); name = "Embed App Extensions"; runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		A30000000000000000000001 /* "Codifix.app" */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Codifix.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A30000000000000000000002 /* CodifixTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CodifixTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A30000000000000000000003 /* CodifixUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CodifixUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A80000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A80000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A80000000000000000000003 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A90000000000000000000001 = {isa = PBXGroup; children = (A10000000000000000000001 /* Sources */, A10000000000000000000002 /* CodifixTests */, A10000000000000000000003 /* CodifixUITests */, A90000000000000000000002 /* Products */,); sourceTree = "<group>"; };
+		A90000000000000000000002 /* Products */ = {isa = PBXGroup; children = (A30000000000000000000001 /* "Codifix.app" */, A30000000000000000000002 /* CodifixTests.xctest */, A30000000000000000000003 /* CodifixUITests.xctest */,); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A60000000000000000000001 /* Codifix */ = {isa = PBXNativeTarget; buildConfigurationList = AB0000000000000000000001 /* Build configuration list for PBXNativeTarget "Codifix" */; buildPhases = (AA0000000000000000000001 /* Sources */, A80000000000000000000001 /* Frameworks */, AB1000000000000000000001 /* Resources */, A70000000000000000000001 /* Embed Frameworks */,); buildRules = (); dependencies = (); fileSystemSynchronizedGroups = (A10000000000000000000001 /* Sources */,); name = Codifix; productName = Codifix; productReference = A30000000000000000000001 /* "Codifix.app" */; productType = "com.apple.product-type.application"; };
+		A60000000000000000000002 /* CodifixTests */ = {isa = PBXNativeTarget; buildConfigurationList = AB0000000000000000000002 /* Build configuration list for PBXNativeTarget "CodifixTests" */; buildPhases = (AA0000000000000000000002 /* Sources */, A80000000000000000000002 /* Frameworks */, AB1000000000000000000002 /* Resources */,); buildRules = (); dependencies = (AC0000000000000000000001 /* PBXTargetDependency */,); fileSystemSynchronizedGroups = (A10000000000000000000002 /* CodifixTests */,); name = CodifixTests; productName = CodifixTests; productReference = A30000000000000000000002 /* CodifixTests.xctest */; productType = "com.apple.product-type.bundle.unit-test"; };
+		A60000000000000000000003 /* CodifixUITests */ = {isa = PBXNativeTarget; buildConfigurationList = AB0000000000000000000003 /* Build configuration list for PBXNativeTarget "CodifixUITests" */; buildPhases = (AA0000000000000000000003 /* Sources */, A80000000000000000000003 /* Frameworks */, AB1000000000000000000003 /* Resources */,); buildRules = (); dependencies = (AC0000000000000000000002 /* PBXTargetDependency */,); fileSystemSynchronizedGroups = (A10000000000000000000003 /* CodifixUITests */,); name = CodifixUITests; productName = CodifixUITests; productReference = A30000000000000000000003 /* CodifixUITests.xctest */; productType = "com.apple.product-type.bundle.ui-testing"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A50000000000000000000001 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastUpgradeCheck = 2700; TargetAttributes = {A60000000000000000000001 = {CreatedOnToolsVersion = 27.0; }; A60000000000000000000002 = {CreatedOnToolsVersion = 27.0; TestTargetID = A60000000000000000000001; }; A60000000000000000000003 = {CreatedOnToolsVersion = 27.0; TestTargetID = A60000000000000000000001; }; }; }; buildConfigurationList = AB0000000000000000000004 /* Build configuration list for PBXProject "Codifix" */; compatibilityVersion = "Xcode 16.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base,); mainGroup = A90000000000000000000001; productRefGroup = A90000000000000000000002 /* Products */; projectDirPath = ""; projectRoot = ""; targets = (A60000000000000000000001 /* Codifix */, A60000000000000000000002 /* CodifixTests */, A60000000000000000000003 /* CodifixUITests */,); };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AB1000000000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		AB1000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		AB1000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AA0000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		AA0000000000000000000002 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		AA0000000000000000000003 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AC0000000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A60000000000000000000001 /* Codifix */; targetProxy = A40000000000000000000001 /* PBXContainerItemProxy */; };
+		AC0000000000000000000002 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A60000000000000000000001 /* Codifix */; targetProxy = A40000000000000000000002 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AD0000000000000000000001 /* Debug app */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGNING_ALLOWED = NO; ENABLE_TESTABILITY = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "Codifix"; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = dev.codifix.macos; PRODUCT_MODULE_NAME = Codifix; PRODUCT_NAME = "Codifix"; SDKROOT = macosx; SWIFT_VERSION = 5.0; }; name = Debug; };
+		AD0000000000000000000002 /* Release app */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGNING_ALLOWED = NO; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "Codifix"; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = dev.codifix.macos; PRODUCT_MODULE_NAME = Codifix; PRODUCT_NAME = "Codifix"; SDKROOT = macosx; SWIFT_VERSION = 5.0; }; name = Release; };
+		AD0000000000000000000003 /* Debug unit tests */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGNING_ALLOWED = NO; GENERATE_INFOPLIST_FILE = YES; BUNDLE_LOADER = "$(TEST_HOST)"; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = dev.codifix.macos.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Codifix.app/Contents/MacOS/Codifix"; }; name = Debug; };
+		AD0000000000000000000004 /* Release unit tests */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGNING_ALLOWED = NO; GENERATE_INFOPLIST_FILE = YES; BUNDLE_LOADER = "$(TEST_HOST)"; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = dev.codifix.macos.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Codifix.app/Contents/MacOS/Codifix"; }; name = Release; };
+		AD0000000000000000000005 /* Debug UI tests */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGNING_ALLOWED = NO; CODE_SIGN_ENTITLEMENTS = CodifixUITests/CodifixUITests.entitlements; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = dev.codifix.macos.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; TEST_TARGET_NAME = Codifix; }; name = Debug; };
+		AD0000000000000000000006 /* Release UI tests */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGNING_ALLOWED = NO; CODE_SIGN_ENTITLEMENTS = CodifixUITests/CodifixUITests.entitlements; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = dev.codifix.macos.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; TEST_TARGET_NAME = Codifix; }; name = Release; };
+		AD0000000000000000000007 /* Debug project */ = {isa = XCBuildConfiguration; buildSettings = {SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; ALWAYS_SEARCH_USER_PATHS = NO; MACOSX_DEPLOYMENT_TARGET = 15.0; SDKROOT = macosx; SWIFT_VERSION = 5.0; }; name = Debug; };
+		AD0000000000000000000008 /* Release project */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; MACOSX_DEPLOYMENT_TARGET = 15.0; SDKROOT = macosx; SWIFT_VERSION = 5.0; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AB0000000000000000000001 /* Build configuration list for PBXNativeTarget "Codifix" */ = {isa = XCConfigurationList; buildConfigurations = (AD0000000000000000000001 /* Debug app */, AD0000000000000000000002 /* Release app */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		AB0000000000000000000002 /* Build configuration list for PBXNativeTarget "CodifixTests" */ = {isa = XCConfigurationList; buildConfigurations = (AD0000000000000000000003 /* Debug unit tests */, AD0000000000000000000004 /* Release unit tests */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		AB0000000000000000000003 /* Build configuration list for PBXNativeTarget "CodifixUITests" */ = {isa = XCConfigurationList; buildConfigurations = (AD0000000000000000000005 /* Debug UI tests */, AD0000000000000000000006 /* Release UI tests */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		AB0000000000000000000004 /* Build configuration list for PBXProject "Codifix" */ = {isa = XCConfigurationList; buildConfigurations = (AD0000000000000000000007 /* Debug project */, AD0000000000000000000008 /* Release project */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = A50000000000000000000001 /* Project object */;
+}

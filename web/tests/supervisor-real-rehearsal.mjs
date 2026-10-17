@@ -21,7 +21,7 @@ try {
   const config=join(privateDir,'synthetic.toml');
   await writeFile(config,`[service]\nbind_addr = "${url.host}"\napi_token = "synthetic-supervisor-rehearsal"\n[database]\nurl = "postgresql://unused/unused"\n`,{flag:'wx',mode:0o600});
   // No inherited Memory overrides, provider keys or R3 allowances reach the CLI.
-  const env={PATH:process.env.PATH,LANG:'C.UTF-8',MEMORY_LAYER_PROFILE:'prod'};
+  const env={PATH:process.env.PATH,LANG:'C.UTF-8',CODIFIX_PROFILE:'prod'};
   const cli=JSON.parse(execFileSync(binary,['--config',config,'supervisor','--json'],{env,timeout:15000,encoding:'utf8',cwd:privateDir}));
   assert.equal(cli.snapshot.instance_id,instance);
   assert.equal(cli.execution,'not_integrated');

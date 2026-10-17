@@ -21,17 +21,17 @@ import { useProjectStream } from "./useProjectStream";
 
 export function useAppShell() {
   const [tab, setTab] = useState<Tab>("memories");
-  const [project, setProject] = useState(localStorage.getItem("memory-layer.project") ?? "memory");
+  const [project, setProject] = useState(localStorage.getItem("codifix.project") ?? "memory");
   const [projectInput, setProjectInput] = useState(project);
-  const [repoRootInput, setRepoRootInput] = useState(localStorage.getItem("memory-layer.repoRoot") ?? "");
+  const [repoRootInput, setRepoRootInput] = useState(localStorage.getItem("codifix.repoRoot") ?? "");
   const [health, setHealth] = useState<Record<string, unknown> | null>(null);
   const [overview, setOverview] = useState<ProjectOverviewResponse>({ ...EMPTY_OVERVIEW, project });
   const [projectMemories, setProjectMemories] = useState<ProjectMemoriesResponse>({ project, total: 0, items: [] });
   const [localDiagnostics, setLocalDiagnostics] = useState<DiagnosticInfo[]>([]);
-  const [statusMessage, setStatusMessage] = useState("Connecting to Memory Layer...");
+  const [statusMessage, setStatusMessage] = useState("Connecting to Codifix...");
   const [connectionState, setConnectionState] = useState<"connecting" | "live" | "offline">("connecting");
   const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatusResponse | null>(null);
-  const [skillFilter, setSkillFilter] = useState<SkillInventoryFilter>("memory-layer");
+  const [skillFilter, setSkillFilter] = useState<SkillInventoryFilter>("codifix");
   const [helpOpen, setHelpOpen] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -81,11 +81,11 @@ export function useAppShell() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("memory-layer.project", project);
+    localStorage.setItem("codifix.project", project);
   }, [project]);
 
   useEffect(() => {
-    localStorage.setItem("memory-layer.repoRoot", repoRootInput);
+    localStorage.setItem("codifix.repoRoot", repoRootInput);
   }, [repoRootInput]);
 
   useEffect(() => {

@@ -190,7 +190,7 @@ async fn supervisor_controls_are_global_csrf_protected_idempotent_and_revision_b
             }
         );
     }
-    let cookie = "memory_session=synthetic-supervisor-session; memory_csrf=synthetic-csrf";
+    let cookie = "codifix_session=synthetic-supervisor-session; codifix_csrf=synthetic-csrf";
     assert_eq!(
         client
             .post(&endpoint)

@@ -183,7 +183,7 @@ mod tests {
         };
         let server = tokio::spawn(serve(listener, vec![
             (200, String::new(), serde_json::json!({"authenticated":true,"mode":"single_user","read_only":false,"principal":{"id":owner,"kind":"internal","display_name":"synthetic","global_role":"admin"}}).to_string()),
-            (200,"Set-Cookie: memory_session=synthetic-session; HttpOnly\r\nSet-Cookie: memory_csrf=synthetic-csrf\r\n".into(),"{}".into()),
+            (200,"Set-Cookie: codifix_session=synthetic-session; HttpOnly\r\nSet-Cookie: codifix_csrf=synthetic-csrf\r\n".into(),"{}".into()),
             (200,String::new(),page(Uuid::new_v4(),"before")),
             (200,String::new(),page(Uuid::new_v4(),"after")),
         ]));
@@ -203,7 +203,7 @@ mod tests {
         assert!(requests[2].contains("include_synchronized=true&limit=100&offset=0"));
         for request in &requests[2..] {
             assert!(request.contains("cache-control: no-store"));
-            assert!(request.contains("memory_session=synthetic-session"));
+            assert!(request.contains("codifix_session=synthetic-session"));
             assert!(!request.contains("x-api-token"));
         }
     }
@@ -289,7 +289,7 @@ mod tests {
         let result = serde_json::json!({"schema_version":1,"project":p,"hits":[]}).to_string();
         let server = tokio::spawn(serve(listener, vec![
             (200, String::new(), serde_json::json!({"authenticated":true,"mode":"single_user","read_only":true,"principal":{"id":owner,"kind":"internal","display_name":"synthetic","global_role":"admin"}}).to_string()),
-            (200, "Set-Cookie: memory_session=synthetic-session; HttpOnly\r\nSet-Cookie: memory_csrf=synthetic-csrf\r\n".into(), "{}".into()),
+            (200, "Set-Cookie: codifix_session=synthetic-session; HttpOnly\r\nSet-Cookie: codifix_csrf=synthetic-csrf\r\n".into(), "{}".into()),
             (200, String::new(), list), (200, String::new(), result),
             (403, String::new(), "PRIVATE_STORAGE_DETAILS".into()),
         ]));
@@ -324,7 +324,7 @@ mod tests {
             serde_json::json!({"question":"Exact question","limit":8})
         );
         for request in &requests[2..] {
-            assert!(request.contains("memory_session=synthetic-session"));
+            assert!(request.contains("codifix_session=synthetic-session"));
             assert!(request.contains("x-csrf-token: synthetic-csrf"));
             assert!(!request.contains("x-api-token"));
             assert!(!request.contains("x-company-secret"));

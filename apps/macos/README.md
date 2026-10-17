@@ -1,12 +1,12 @@
-# Memory Layer for macOS
+# Codifix for macOS
 
-The Xcode project is `MemoryLayer.xcodeproj` and builds a native macOS 15+
-SwiftUI app. Open the shared `MemoryLayer` scheme in Xcode or build it with:
+The Xcode project is `Codifix.xcodeproj` and builds a native macOS 15+
+SwiftUI app. Open the shared `Codifix` scheme in Xcode or build it with:
 
 ```sh
-xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
+xcodebuild -project apps/macos/Codifix.xcodeproj -scheme Codifix \
   -configuration Debug -destination 'platform=macOS' \
-  -derivedDataPath /tmp/memory-layer-macos CODE_SIGNING_ALLOWED=NO build
+  -derivedDataPath /tmp/codifix-macos CODE_SIGNING_ALLOWED=NO build
 ```
 
 See [VALIDATION.md](VALIDATION.md) for implementation acceptance results and
@@ -20,8 +20,8 @@ but the user must review and connect a profile explicitly.
 
 ## Shared feature contract
 
-Feature sources live under `MemoryLayer/Sources/Features/<area>/`; unit tests
-live under `MemoryLayerTests/<area>/`. Each screen receives an immutable
+Feature sources live under `Codifix/Sources/Features/<area>/`; unit tests
+live under `CodifixTests/<area>/`. Each screen receives an immutable
 `FeatureContext`, which carries the active `MemoryServiceClient`, profile,
 `/v1/auth/me` snapshot, effective project permissions, and connection revision.
 Use the revision to cancel/reload screen work:
@@ -53,7 +53,7 @@ struct MemoriesView: View {
 
 Writes should use one `APIRoute<Response>` through `client.send`. For example,
 delete is `DELETE /v1/memory` with JSON `{ "memory_id": "…" }`. Encode its body
-with `JSONEncoder.memoryLayer`. Binary export endpoints use `client.sendData`
+with `JSONEncoder.codifix`. Binary export endpoints use `client.sendData`
 with method, path, query, headers, body, and the same `context.requestContext`.
 `HTTPTransport` is injectable for deterministic tests; it never retries a
 write. Dynamic path values must be escaped one segment at a time with
@@ -68,7 +68,7 @@ values decode safely and grant no capabilities.
 
 Local profiles use `/v1/auth/session/bootstrap` only after checking
 `/v1/auth/me` says `single_user`. The bootstrap call is restricted to loopback;
-the client stores its `memory_session` and `memory_csrf` cookies in a private,
+the client stores its `codifix_session` and `codifix_csrf` cookies in a private,
 per-profile memory jar. It sends the CSRF cookie as `x-csrf-token` on writes.
 Remote profiles attach their profile-scoped Keychain token as a bearer header.
 Redirects are rejected, credentials never cross the profile's configured
@@ -77,9 +77,9 @@ origin, and request or response errors do not include credentials.
 Run focused unit tests with:
 
 ```sh
-xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
-  -destination 'platform=macOS' -derivedDataPath /tmp/memory-layer-macos \
-  CODE_SIGNING_ALLOWED=NO -only-testing:MemoryLayerTests test
+xcodebuild -project apps/macos/Codifix.xcodeproj -scheme Codifix \
+  -destination 'platform=macOS' -derivedDataPath /tmp/codifix-macos \
+  CODE_SIGNING_ALLOWED=NO -only-testing:CodifixTests test
 ```
 
 The UI suite uses a separate runner and requires Developer Tools Security to be
@@ -87,10 +87,10 @@ enabled in macOS. Xcode may need standard administrator authorization the first
 time it enables UI automation on a host:
 
 ```sh
-xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
-  -destination 'platform=macOS' -derivedDataPath /tmp/memory-layer-macos-ui \
+xcodebuild -project apps/macos/Codifix.xcodeproj -scheme Codifix \
+  -destination 'platform=macOS' -derivedDataPath /tmp/codifix-macos-ui \
   CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
-  -only-testing:MemoryLayerUITests test
+  -only-testing:CodifixUITests test
 ```
 
 This uses local ad-hoc signing for the test runner, not distribution signing.
@@ -107,17 +107,17 @@ digests so preview and import use the same archive. UI-test fixtures are
 in-memory and loopback-only. If Xcode reports that it timed out enabling
 automation mode, enable Developer Tools Security through the standard macOS
 authorization flow and rerun. See [VALIDATION.md](VALIDATION.md) for the exact
-test mapping and latest results, or the [fixture service guide](MemoryLayerUITests/Fixtures/README.md)
+test mapping and latest results, or the [fixture service guide](CodifixUITests/Fixtures/README.md)
 for manual checks.
 
 Debug builds accept `--ui-window-size=1440x960` and
 `--ui-window-size=1024x768` for repeatable window-layout inspection. For example:
 
 ```sh
-open -n -a '/tmp/memory-layer-macos/Build/Products/Debug/Memory Layer.app' \
+open -n -a '/tmp/codifix-macos/Build/Products/Debug/Codifix.app' \
   --args --ui-window-size=1024x768
 ```
 
 Optional live read smoke tests use the existing development service and never
 perform feature mutations. Enable them with
-`TEST_RUNNER_MEMORY_LAYER_LIVE_READ_SMOKE=1` when running the unit suite.
+`TEST_RUNNER_CODIFIX_LIVE_READ_SMOKE=1` when running the unit suite.

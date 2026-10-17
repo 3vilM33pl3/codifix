@@ -207,7 +207,7 @@ function LegacyAccessControls({ project, readOnly, refreshVersion, onMembershipC
       <section className="panel access-form-row">
         <div>
           <h3>Create service token</h3>
-          <p>The raw token is never retained by Memory Layer.</p>
+          <p>The raw token is never retained by Codifix.</p>
         </div>
         <label>Name<input value={tokenName} onChange={(event) => setTokenName(event.target.value)} /></label>
         <label>Project<input value={tokenProject} onChange={(event) => setTokenProject(event.target.value)} /></label>

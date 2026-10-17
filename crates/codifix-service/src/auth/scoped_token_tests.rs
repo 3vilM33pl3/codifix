@@ -294,7 +294,7 @@ async fn single_user_scoped_tokens_http_mcp_and_browser() {
         .get_all("set-cookie")
         .iter()
         .filter_map(|h| h.to_str().ok())
-        .find(|h| h.starts_with("memory_session="))
+        .find(|h| h.starts_with("codifix_session="))
         .unwrap()
         .split(';')
         .next()

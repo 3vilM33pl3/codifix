@@ -50,7 +50,7 @@ export function SkillsTab({
             onChange={(event) => onFilterChange(event.target.value as SkillInventoryFilter)}
             disabled={busy}
           >
-            <option value="memory-layer">Memory Layer</option>
+            <option value="codifix">Codifix</option>
             <option value="all">All skills</option>
           </select>
         </label>

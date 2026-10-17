@@ -74,7 +74,7 @@ pub(super) fn sha256(value: &str) -> String {
     format!("{:x}", Sha256::digest(value.as_bytes()))
 }
 fn service(origin: &CompanyOrigin) -> String {
-    format!("net.memory-layer.company-device:{}", sha256(&origin.0))
+    format!("dev.codifix.company-device:{}", sha256(&origin.0))
 }
 fn account(enrollment: &Enrollment) -> String {
     enrollment.device_id.to_string()

@@ -1182,7 +1182,7 @@ export interface RuntimeSkillDetail {
   path: string;
 }
 
-export type SkillInventoryFilter = "memory-layer" | "all";
+export type SkillInventoryFilter = "codifix" | "all";
 
 export type SkillVersionStatus =
   | "up_to_date"

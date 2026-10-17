@@ -62,7 +62,7 @@ fn target(service: &str, account: &str) -> Result<String> {
     hash.update(service.as_bytes());
     hash.update([0]);
     hash.update(account.as_bytes());
-    Ok(format!("MemoryLayer/v1/{:x}", hash.finalize()))
+    Ok(format!("Codifix/v1/{:x}", hash.finalize()))
 }
 struct NativeHandle(HANDLE);
 impl Drop for NativeHandle {
@@ -144,7 +144,7 @@ fn current_user_sid() -> Result<String> {
 }
 fn mutex_name(target: &str, sid: &str) -> String {
     format!(
-        "Global\\MemoryLayer-Credentials-v1-{sid}-{}",
+        "Global\\Codifix-Credentials-v1-{sid}-{}",
         target.replace('/', "-")
     )
 }
@@ -307,7 +307,7 @@ fn write(name: &str, bytes: &[u8]) -> Result<()> {
         "Windows credential chunk exceeds bound"
     );
     let mut name = wide(name);
-    let mut user = wide("Memory Layer");
+    let mut user = wide("Codifix");
     let credential = CREDENTIALW {
         Type: CRED_TYPE_GENERIC,
         TargetName: name.as_mut_ptr(),

@@ -11,12 +11,12 @@ const skills: RuntimeSkillStatus = {
   filter: "all",
   details: [
     {
-      id: "memory-layer",
-      name: "memory-layer",
-      description: "Umbrella entrypoint for Memory Layer workflows.",
+      id: "codifix",
+      name: "codifix",
+      description: "Umbrella entrypoint for Codifix workflows.",
       version: "0.9.4-dev",
       status: "ok",
-      path: "/repo/.agents/skills/memory-layer/SKILL.md",
+      path: "/repo/.agents/skills/codifix/SKILL.md",
     },
     {
       id: "memory-remember",

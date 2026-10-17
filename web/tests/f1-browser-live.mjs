@@ -13,10 +13,10 @@ const browser = await chromium.launch({ headless: true });
 try {
   const context = await browser.newContext({ viewport: { width: 1360, height: 960 } });
   await context.addCookies([
-    { name: 'memory_session', value: f.session, url: f.url, httpOnly: true, sameSite: 'Lax' },
-    { name: 'memory_csrf', value: f.csrf, url: f.url, sameSite: 'Lax' },
+    { name: 'codifix_session', value: f.session, url: f.url, httpOnly: true, sameSite: 'Lax' },
+    { name: 'codifix_csrf', value: f.csrf, url: f.url, sameSite: 'Lax' },
   ]);
-  await context.addInitScript(project => localStorage.setItem('memory-layer.project', project), f.project);
+  await context.addInitScript(project => localStorage.setItem('codifix.project', project), f.project);
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));

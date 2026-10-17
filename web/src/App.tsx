@@ -249,14 +249,14 @@ function MemoryApp({ agentLink }: { agentLink: { request?: string; notice?: stri
       {agentLink.notice ? <div className="panel" role="status">{agentLink.notice}</div> : null}
       {serviceReadOnly && (
         <div className="read-only-banner" role="status">
-          Student mode — this Memory Layer is read-only. Explore and query freely; nothing you do
+          Student mode — this Codifix is read-only. Explore and query freely; nothing you do
           can change the memory set.
         </div>
       )}
       <header className="topbar">
         <div>
           <h1>
-            Memory Layer Web
+            Codifix Web
             {isDevelopmentMode ? <span className="dev-mode-badge">DEV MODE</span> : null}
           </h1>
         </div>

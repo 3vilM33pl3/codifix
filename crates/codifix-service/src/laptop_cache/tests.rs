@@ -824,7 +824,7 @@ async fn cache_http_requires_session_csrf_and_accepts_only_semantic_read_in_read
         .unwrap();
     let browser = client
         .post(&path)
-        .header("cookie", format!("memory_session={cookie}"))
+        .header("cookie", format!("codifix_session={cookie}"))
         .json(&json!({"question":"diagnosis"}))
         .send()
         .await

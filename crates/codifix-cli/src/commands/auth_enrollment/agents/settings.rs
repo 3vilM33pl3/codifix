@@ -291,7 +291,7 @@ fn account(inputs: &Inputs) -> Result<String> {
 }
 fn service(origin: &CompanyOrigin) -> String {
     format!(
-        "net.memory-layer.agent-settings:{}",
+        "dev.codifix.agent-settings:{}",
         credentials::sha256(&origin.0)
     )
 }

@@ -284,7 +284,7 @@ async fn private_results_require_current_project_access_and_reviews_are_atomic_i
             .post(&review)
             .header(
                 header::COOKIE,
-                "memory_session=private-test-session; memory_csrf=private-test-csrf"
+                "codifix_session=private-test-session; codifix_csrf=private-test-csrf"
             )
             .json(&request)
             .send()
@@ -298,7 +298,7 @@ async fn private_results_require_current_project_access_and_reviews_are_atomic_i
             .post(&review)
             .header(
                 header::COOKIE,
-                "memory_session=private-test-session; memory_csrf=private-test-csrf"
+                "codifix_session=private-test-session; codifix_csrf=private-test-csrf"
             )
             .header("x-csrf-token", "private-test-csrf")
             .header(header::ORIGIN, &url)

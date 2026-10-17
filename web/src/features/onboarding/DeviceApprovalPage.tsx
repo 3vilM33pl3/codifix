@@ -108,7 +108,7 @@ function LocalDeviceApprovalPage({ initialCode, onLock }: { initialCode: string;
     finally { setBusy(false); }
   }
 
-  return <div className="app-shell"><header className="topbar"><h1>Memory Layer device approval</h1></header>
+  return <div className="app-shell"><header className="topbar"><h1>Codifix device approval</h1></header>
     <main className="panel-stack device-approval-page">
       <section className="panel"><h2>Approve a requesting device</h2>
         <p>Verify the name and credential fingerprint shown by the device, then choose only the projects and roles you want to grant. This page approves reviewed local access; remote-instance grants, software installation and selective sync require separate steps.</p>
@@ -154,7 +154,7 @@ function LocalDeviceApprovalPage({ initialCode, onLock }: { initialCode: string;
         </section> : null}
       </> : null}
       {receipt ? <section className="panel" role="status"><h2>Device approval recorded</h2><p>Device {receipt.device_id}. Return to the requesting device to continue. This receipt does not establish installation, remote-instance access or selective sync.</p></section> : null}
-      <a className="button-link" href="/">Return to Memory Layer</a>
+      <a className="button-link" href="/">Return to Codifix</a>
     </main>
   </div>;
 }

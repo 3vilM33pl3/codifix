@@ -4,7 +4,7 @@ use clap::Parser;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 type Reply = (u16, String, String);
-const COOKIES: &str = "Set-Cookie: memory_session=mls_synthetic; Path=/; HttpOnly\r\nSet-Cookie: memory_csrf=mlc_synthetic; Path=/\r\n";
+const COOKIES: &str = "Set-Cookie: codifix_session=mls_synthetic; Path=/; HttpOnly\r\nSet-Cookie: codifix_csrf=mlc_synthetic; Path=/\r\n";
 
 fn config(address: std::net::SocketAddr) -> AppConfig {
     serde_json::from_value(json!({
@@ -98,7 +98,7 @@ async fn local_human_session_http_exact_confirmation_csrf_and_revocation_no_remi
     assert!(!requests[1].contains("synthetic-owner"));
     for request in &requests[2..] {
         assert!(
-            request.contains("cookie: memory_session=mls_synthetic; memory_csrf=mlc_synthetic")
+            request.contains("cookie: codifix_session=mls_synthetic; codifix_csrf=mlc_synthetic")
         );
         assert!(request.contains("x-csrf-token: mlc_synthetic"));
         assert!(request.contains(&format!("origin: http://{address}\r\n")));
@@ -183,8 +183,8 @@ async fn local_human_session_rejects_redirects_denials_and_malformed_cookies() {
     }
     for headers in [
         String::new(),
-        "Set-Cookie: memory_session=; Path=/\r\n".into(),
-        format!("{COOKIES}Set-Cookie: memory_session=second; Path=/\r\n"),
+        "Set-Cookie: codifix_session=; Path=/\r\n".into(),
+        format!("{COOKIES}Set-Cookie: codifix_session=second; Path=/\r\n"),
         COOKIES.replace("mlc_synthetic", "malformed cookie"),
     ] {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

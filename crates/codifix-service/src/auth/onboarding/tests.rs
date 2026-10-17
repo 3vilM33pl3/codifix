@@ -488,7 +488,7 @@ async fn http_admin_policy_csrf_and_read_only_are_shared() {
         .unwrap();
     assert_eq!(inspected.status(), StatusCode::OK);
     assert_eq!(inspected.headers()["cache-control"], "no-store");
-    let cookie = format!("memory_session={session}; memory_csrf={csrf}");
+    let cookie = format!("codifix_session={session}; codifix_csrf={csrf}");
     assert_eq!(
         client
             .post(&route)

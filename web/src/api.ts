@@ -156,7 +156,7 @@ async function parseJson<T>(response: Response): Promise<T> {
 
 /** Single-user installs mint a local-owner browser session over loopback. */
 async function ensureSession(): Promise<void> {
-  if (readCookie("memory_csrf")) return;
+  if (readCookie("codifix_csrf")) return;
   if (!sessionBootstrapPromise) {
     sessionBootstrapPromise = fetch("/v1/auth/session/bootstrap", {
       method: "POST",
@@ -219,7 +219,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promi
     init.method !== undefined && !["GET", "HEAD", "OPTIONS"].includes(init.method.toUpperCase());
   if (mutating) {
     if (auth.mode === "single_user") await ensureSession();
-    const csrf = readCookie("memory_csrf");
+    const csrf = readCookie("codifix_csrf");
     if (csrf) headers.set("x-csrf-token", csrf);
   }
   return fetch(input, { ...init, credentials: "same-origin", headers });
@@ -605,7 +605,7 @@ export async function getActivityPage(
 export async function getRuntimeStatus(
   project: string,
   repoRoot?: string | null,
-  skillFilter = "memory-layer",
+  skillFilter = "codifix",
 ): Promise<RuntimeStatusResponse> {
   const params = new URLSearchParams({ project });
   if (repoRoot) params.set("repo_root", repoRoot);

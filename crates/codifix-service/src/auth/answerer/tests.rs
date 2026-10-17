@@ -299,7 +299,7 @@ async fn answerer_http_requires_global_authority_confirmation_and_csrf() {
             .post(&url)
             .header(
                 "cookie",
-                format!("memory_session={session}; memory_csrf={csrf}")
+                format!("codifix_session={session}; codifix_csrf={csrf}")
             )
             .json(&request)
             .send()
@@ -338,7 +338,7 @@ async fn answerer_http_requires_global_authority_confirmation_and_csrf() {
         .post(&url)
         .header(
             "cookie",
-            format!("memory_session={session}; memory_csrf={csrf}"),
+            format!("codifix_session={session}; codifix_csrf={csrf}"),
         )
         .header("origin", &origin)
         .header("x-csrf-token", &csrf)
@@ -363,7 +363,7 @@ async fn answerer_http_requires_global_authority_confirmation_and_csrf() {
             .post(&url)
             .header(
                 "cookie",
-                format!("memory_session={limited}; memory_csrf={limited_csrf}")
+                format!("codifix_session={limited}; codifix_csrf={limited_csrf}")
             )
             .header("origin", &origin)
             .header("x-csrf-token", &limited_csrf)

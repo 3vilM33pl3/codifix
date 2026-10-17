@@ -25,7 +25,7 @@ async function until(test) {
   throw new Error('Timed out waiting for accepted/replicated workflow state');
 }
 async function clientProcess(program, args, stdin) {
-  const child = spawn(program, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, MEMORY_LAYER_PROFILE: 'prod' } });
+  const child = spawn(program, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CODIFIX_PROFILE: 'prod' } });
   let stdout = '', stderr = ''; child.stdout.on('data', b => stdout += b); child.stderr.on('data', b => stderr += b);
   if (stdin) child.stdin.end(JSON.stringify(stdin)); else child.stdin.end();
   const timer = setTimeout(() => child.kill('SIGTERM'), 45000);
@@ -38,10 +38,10 @@ async function cli(side, ...args) {
 async function pageFor(side) {
   const context = await browser.newContext({ viewport: { width: 1360, height: 960 } });
   await context.addCookies([
-    { name: 'memory_session', value: side.session, url: side.url, httpOnly: true, sameSite: 'Lax' },
-    { name: 'memory_csrf', value: side.csrf, url: side.url, sameSite: 'Lax' },
+    { name: 'codifix_session', value: side.session, url: side.url, httpOnly: true, sameSite: 'Lax' },
+    { name: 'codifix_csrf', value: side.csrf, url: side.url, sameSite: 'Lax' },
   ]);
-  await context.addInitScript(project => localStorage.setItem('memory-layer.project', project), side.project);
+  await context.addInitScript(project => localStorage.setItem('codifix.project', project), side.project);
   const page = await context.newPage(); page.on('pageerror', e => errors.push(String(e)));
   await page.goto(side.url);
   await page.getByLabel('More tabs').selectOption('federation');

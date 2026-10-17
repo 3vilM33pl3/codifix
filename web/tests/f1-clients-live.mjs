@@ -13,8 +13,8 @@ assert.equal(f.synthetic, true);
 for (const side of [f.left, f.right]) assert.equal(new URL(side.url).hostname, '127.0.0.1');
 const directory = await mkdtemp(join(tmpdir(), 'memory-f1-clients-'));
 const browser = await chromium.launch({ headless: true });
-const environment = { ...process.env, MEMORY_LAYER_PROFILE: 'prod' };
-delete environment.MEMORY_LAYER_CLIENT_TOKEN;
+const environment = { ...process.env, CODIFIX_PROFILE: 'prod' };
+delete environment.CODIFIX_CLIENT_TOKEN;
 const binary = resolve('target/debug/memory');
 let mcp;
 async function processResult(program, args, data) {
@@ -48,8 +48,8 @@ try {
   // Two real browsers: explicit review, submission, signed fresh-origin answer.
   for (const [side, remote] of [[f.left, f.right], [f.right, f.left]]) {
     const context = await browser.newContext({ viewport: { width: 1360, height: 960 } });
-    await context.addCookies([{ name: 'memory_session', value: side.session, url: side.url, httpOnly: true, sameSite: 'Lax' }, { name: 'memory_csrf', value: side.csrf, url: side.url, sameSite: 'Lax' }]);
-    await context.addInitScript(project => localStorage.setItem('memory-layer.project', project), side.project);
+    await context.addCookies([{ name: 'codifix_session', value: side.session, url: side.url, httpOnly: true, sameSite: 'Lax' }, { name: 'codifix_csrf', value: side.csrf, url: side.url, sameSite: 'Lax' }]);
+    await context.addInitScript(project => localStorage.setItem('codifix.project', project), side.project);
     const page = await context.newPage();
     const errors = []; page.on('pageerror', e => errors.push(String(e)));
     await page.goto(side.url);

@@ -114,8 +114,8 @@ impl ApiClient {
                 .map_err(|_| anyhow::anyhow!("Invalid local session response"))?;
             if let Some((name, value)) = value.split(';').next().and_then(|v| v.split_once('=')) {
                 let slot = match name {
-                    "memory_session" => &mut auth,
-                    "memory_csrf" => &mut csrf,
+                    "codifix_session" => &mut auth,
+                    "codifix_csrf" => &mut csrf,
                     _ => continue,
                 };
                 ensure!(slot.is_none(), "Duplicate local session cookie");
@@ -133,7 +133,7 @@ impl ApiClient {
             bail!("Incomplete local session response");
         };
         let mut cookie: reqwest::header::HeaderValue =
-            format!("memory_session={auth}; memory_csrf={csrf}")
+            format!("codifix_session={auth}; codifix_csrf={csrf}")
                 .parse()
                 .map_err(|_| anyhow::anyhow!("Invalid session cookie"))?;
         cookie.set_sensitive(true);
