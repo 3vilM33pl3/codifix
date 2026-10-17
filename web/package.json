@@ -24,7 +24,7 @@
     "@types/pngjs": "^6.0.5",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
-    "@vitejs/plugin-react": "^5.0.4",
+    "@vitejs/plugin-react": "^6.1.2",
     "jsdom": "^29.1.1",
     "pngjs": "^7.0.0",
     "typescript": "^5.9.3",
