@@ -75,7 +75,7 @@ const setDocument = key => { document = { '@context': ['https://www.w3.org/ns/di
   service: [{ id: `${did}#atproto_pds`, type: 'AtprotoPersonalDataServer', serviceEndpoint: origin }] }; };
 const admin = randomBytes(32).toString('hex');
 const environment = { SystemRoot: process.env.SystemRoot, PATH: path.dirname(node),
-  TEMP: path.join(root, 'temp'), TMP: path.join(root, 'temp'), LOG_LEVEL: 'warn',
+  TEMP: path.join(root, 'temp'), TMP: path.join(root, 'temp'), LOG_LEVEL: 'warn', LOG_ENABLED: 'true',
   PDS_HOSTNAME: 'pds.federation.example.com', PDS_SERVICE_HANDLE_DOMAINS: '.federation.example.com',
   PDS_DATA_DIRECTORY: path.join(root, 'data'), PDS_BLOBSTORE_DISK_LOCATION: path.join(root, 'data/blobs'),
   PDS_JWT_SECRET: randomBytes(32).toString('hex'), PDS_ADMIN_PASSWORD: admin,
