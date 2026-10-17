@@ -1,6 +1,8 @@
 # Codifix — Full technical rename and single-user cutover plan
 
 Approved for implementation. Sole user; breaking changes and downtime are acceptable.
+
+Execution direction updated 2026-10-17: deliver directly with one recoverable copy and a focused health/read/write smoke. Reuse completed validation; no new rehearsal campaigns, failover work or all-platform/CA gate for independent deployments. CA changes require explicit approval and SSH stays disabled. Current results and remaining work: [live cutover](live-cutover.md).
 Domain: codifix.dev, purchase verified in Namecheap. Candidate 3.0.0-rc.1; stable 3.0.0.
 Rename GitHub 3vilM33pl3/memory in place to 3vilM33pl3/codifix.
 Archive old federation evidence unchanged and re-enrol existing participating instances.
@@ -57,7 +59,7 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 ## D. Agents and project integration
 
 - [ ] Rename plugin/marketplace/MCP tools, prompts and resources; update skills, internal references and generated bootstrap copies.
-- [ ] Update explicit Workshop helper routing without a dev fallback.
+- [x] Update explicit Workshop helper routing without a dev fallback.
 - [ ] Update product-owned sections in consuming repos while preserving user custom configuration.
 - [ ] Migrate markers/path-hash state mappings, wrappers, schedules and saved application paths.
 - [ ] Validate real MCP clients and fresh sessions, including Workshop/dev separation.
@@ -78,7 +80,7 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 - [ ] Cover Linux amd64/arm64, Mac Intel/Apple silicon standard and update packages, Windows ZIP/user MSI/server tools. Windows remains preview.
 - [ ] Prepare website, redirects and installation URLs; freeze a single candidate source SHA.
 
-## G. Rehearsal and independent review
+## G. Prior validation evidence (no new rehearsal campaign)
 
 - [ ] Restore an isolated production snapshot and rehearse the complete cutover.
 - [ ] Compare IDs, versions, content digests, relationships, provenance, attachments and embeddings; exercise retrieval, history and imported-source resolution.
@@ -91,10 +93,10 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 - [ ] Stop watchers, capture, supervisors, federation and queued/inflight work; stop other writers and take final consistent recovery bundle.
 - [ ] Install prepared artifacts and apply rehearsed paths/configuration/scoped database transforms.
 - [ ] Start database/apps with background, paid-provider and federation execution OFF.
-- [ ] Bring Workshop up first, update the helper route and validate data/auth/clients.
+- [x] Bring Workshop up first, update the helper route and validate data/auth/clients.
 - [ ] Establish fresh federation enrolments and explicit sharing; selectively resume previously active services after queue inspection.
-- [ ] Rename GitHub repository and switch website/DNS late, after candidate gates.
-- [ ] Quiesce agents, integrate worktrees, then move checkout LAST; update saved paths and storage hash mappings.
+- [x] Rename GitHub repository and switch website/DNS under the revised direct-cutover direction.
+- [x] Move checkout after source workers finish; update main-project markers and storage hash mappings. Keep a temporary old-path link for already-running sessions.
 - [ ] Run final smoke tests from the new checkout and installed packages.
 
 Before new remote federation effects, a matched backup restore is available. After remote effects, a local restore cannot undo publications: stop federation and recover forward or coordinate restoration across affected peers.

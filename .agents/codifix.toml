@@ -2,8 +2,8 @@
 # Less technical users should customize Codifix here.
 
 [project]
-slug = "memory"
-repo_root = "/home/olivier/Projects/memory"
+slug = "codifix"
+repo_root = "/home/olivier/Projects/codifix"
 
 [capture]
 include_paths = ["README.md", "docs/", "src/", "crates/", "scripts/", "packaging/"]
