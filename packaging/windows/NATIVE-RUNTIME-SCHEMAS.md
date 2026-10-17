@@ -47,6 +47,27 @@ complete prepared tree, with a 32 MiB manifest bound. PostgreSQL/Pi retain their
 smaller file/entry limits and 8 MiB manifest bound.
 Runtime configuration and enrollment remain separate operations.
 
+### Explicit Windows path-patched PDS profile
+
+Baseline manifests remain byte-compatible. A patched manifest adds both
+`original_prepared_sha256` and `path_patch`; neither is inferred from a version
+number. The latter has exact `layout: windows-sha256-did-paths-v1`, the reviewed
+`windows-paths.mjs` digest, and exactly two `name`/`original_sha256`/
+`patched_sha256` entries (`actor-store/actor-store.js`, `disk-blobstore.js`).
+Original upstream version/source/image/lock pins remain unchanged. Both patched
+payload hashes must match the fixed reviewed outputs, and the patch script is
+retained as `pds/windows-paths.mjs` with a separate AGPL notice/component.
+No new wire identity, DID/CID format or upstream version is introduced.
+
+The lab-only `scripts/windows/guest-runtime-pack.ps1 -Kind Pds` accepts
+`-PdsProfilePath` plus `-PdsProfileSha256` to select the existing
+`memory-native-pds-profile-v1` descriptor. Its exact preparation digest, original
+preparation receipt, complete inventory and two-file delta are checked before
+packaging. Changed unrelated files, altered patch metadata or an invalid selected
+profile fail closed; they never fall back to the original runtime. No PDS is
+started. A runtime package/installer receipt still does not prove account or
+federation operation.
+
 ## Pi: `memory-native-pi-runtime`
 
 The descriptor requires `pi_version: 0.5.1`, the complete Windows `artifact`
@@ -92,3 +113,24 @@ installation evidence remain separate work.
 
 Portable checks: `test-native-prerequisites.ps1`,
 `test-native-runtime-kinds.ps1`, and `test-native-postgres-plan.ps1`.
+
+## CRT notice input and remaining distribution evidence
+
+The lab packer requires an existing `-CrtNoticePath` and exact
+`-CrtNoticeSha256`; it retains those bytes, without fetching or synthesizing
+terms. DLL paths/hashes and the version come from the retained native PostgreSQL
+`prepared.json` (`crt_source` and `runtime_support`), not a guessed VS version.
+The installed lab Build Tools root is `C:\MemoryLab\BuildTools`.
+`Licenses\1033\Redist.txt` there is the redistributable-file inventory, **not
+verified full licensing/redistribution terms**. The complete applicable terms
+have not yet been located/verified; the list alone must not be represented as
+that evidence. No unpinned substitute or automatic download is permitted.
+
+Node's retained notice is
+`C:\MemoryLab\Tools\node-v24.18.1-win-x64\LICENSE`. PDS/dependency notices stay in
+the complete prepared `node_modules` tree; the package adds a digest index of
+those original files. Pi includes its exact original licence with rider and
+the local helper's actual AGPL text. PostgreSQL's full notice remains an explicit
+`-PostgresNoticePath` input; pgvector uses the retained source `LICENSE`.
+Successful portable checks do not resolve distribution rights or establish a
+completed all-stack installer.

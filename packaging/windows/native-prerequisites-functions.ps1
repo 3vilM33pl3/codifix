@@ -109,6 +109,9 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
     if ($pds) { $extra=@('node_version','pds_version','pds_source_revision','pds_image_digest','pds_package_sha256','pds_lock_sha256','pnpm_version','better_sqlite3_version','sqlite_version','native_addons') }
     elseif ($Manifest.kind -ceq 'memory-native-pi-runtime') { $extra=@('pi_version','artifact','source_archive_sha256','upstream_lock_sha256','rust_toolchain','rustc_commit','target') }
     else { throw 'Unknown native prerequisite kind' }
+    $manifestFields=if($Manifest -is [Collections.IDictionary]){@($Manifest.Keys)}else{@($Manifest.PSObject.Properties.Name)}
+    $patched=$pds -and $manifestFields -contains 'path_patch'
+    if($patched){$extra+=@('original_prepared_sha256','path_patch')}
     Assert-NativeRuntimeFields $Manifest ($common+$extra)
     if ($Manifest.schema_version -ne 1 -or $Manifest.platform -cne 'windows-x86_64' -or
         $Manifest.crt_version -cnotmatch '^\d+(\.\d+){1,3}$' -or $Manifest.package_sha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'Unsupported native runtime schema or pins' }
@@ -142,8 +145,15 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
             'pds/http-stdio.mjs'='0dac0e7fe040be14398c2304ce4b70e8d65b74023d52d80b79e88113a5e4c467'
             'pds/node_modules/@atproto/pds/package.json'=$null;'pds/node_modules/@atproto/pds/dist/index.js'=$null
             'pds/node_modules/better-sqlite3/build/Release/better_sqlite3.node'=$null}
+        if($patched){
+            if($Manifest.original_prepared_sha256 -cnotmatch '^[0-9a-f]{64}$'){throw 'Exact original PDS preparation digest required'}
+            $patchPins=Assert-NativePdsPathPatch $Manifest.path_patch
+            foreach($name in $patchPins.Keys){$required['pds/node_modules/@atproto/pds/dist/'+$name]=$patchPins[$name].patched_sha256}
+            $required['pds/windows-paths.mjs']=$Manifest.path_patch.patch_sha256
+        }
         foreach ($name in $inventory.Keys) {
-            if ($name -cnotmatch '^(?:node/(?:node\.exe|vcruntime140(?:_1)?\.dll|msvcp140\.dll)|pds/(?:package\.json|pnpm-lock\.yaml|pds-server\.mjs|http-stdio\.mjs|node_modules/.+)|notices/[^/]+\.txt)$') { throw 'Unsupported PDS runtime path; do not package a working state directory' }
+            if ($name -cnotmatch '^(?:node/(?:node\.exe|vcruntime140(?:_1)?\.dll|msvcp140\.dll)|pds/(?:package\.json|pnpm-lock\.yaml|pds-server\.mjs|http-stdio\.mjs|node_modules/.+)|notices/[^/]+\.txt)$' -and
+                -not($patched -and $name -ceq 'pds/windows-paths.mjs')) { throw 'Unsupported PDS runtime path; do not package a working state directory' }
         }
         $addons=@($Manifest.native_addons);$addonNames=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         if ($addons.Count -lt 1 -or $addons.Count -gt 32) { throw 'Native addon inventory required' }
@@ -154,6 +164,7 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
         }
         if (@($inventory.Keys | Where-Object { $_ -match '\.node$' }).Count -ne $addons.Count) { throw 'Unrecorded native addon' }
         $versions=[ordered]@{node='24.18.1';pds='0.5.27';'locked-dependencies'=$Manifest.pds_lock_sha256;'memory-pds-adapter'='stdio-v1';'msvc-crt'=$Manifest.crt_version}
+        if($patched){$versions['memory-pds-path-patch']='windows-sha256-did-paths-v1'}
         $binaryRoot='node'
     } else {
         if ($Manifest.pi_version -cne '0.5.1' -or
@@ -198,6 +209,8 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
         if($pds -and (($name -ceq 'pds' -and $entry.source_sha256 -cne $Manifest.pds_image_digest.Substring(7)) -or
             ($name -ceq 'locked-dependencies' -and $entry.source_sha256 -cne $Manifest.pds_lock_sha256) -or
             ($name -ceq 'memory-pds-adapter' -and $entry.source_sha256 -cne $required['pds/pds-server.mjs']))){throw 'PDS component provenance contradicts fixed input pins'}
+        if($pds -and $patched -and $name -ceq 'memory-pds-path-patch' -and
+            ($entry.source_sha256 -cne $Manifest.path_patch.patch_sha256 -or $entry.license -cne 'AGPL-3.0-or-later')){throw 'PDS path patch provenance or licence differs'}
         if(-not $pds -and (($name -ceq 'pi' -and ($entry.source_sha256 -cne $Manifest.source_archive_sha256 -or
             $entry.notice_path -cne 'notices/pi.txt' -or $entry.license -cne 'MIT-with-OpenAI-Anthropic-Rider')) -or
             ($name -ceq 'memory-windows-pipe' -and ($entry.source_sha256 -cne $Manifest.artifact.helper_source_sha256 -or
@@ -207,4 +220,23 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
     foreach($field in ($common+$extra)){$plan[$field]=$Manifest.$field}
     $plan.native_stack_bundled=$false;$plan.database_provisioned=$false;$plan.service_created=$false
     return [pscustomobject]$plan
+}
+
+function Assert-NativePdsPathPatch($Patch){
+    Assert-NativeRuntimeFields $Patch @('layout','patch_sha256','files')
+    if($Patch.layout -cne 'windows-sha256-did-paths-v1' -or
+        $Patch.patch_sha256 -cne '4ba316f92a401d8a9854fe96595232bb845dfe14fa33aefe51837aacc5efcef0'){throw 'Unreviewed PDS filesystem patch'}
+    $pins=[ordered]@{
+        'actor-store/actor-store.js'=[ordered]@{original_sha256='33ba4bcf0b0afb06868b80a4cb0025388a2a7e8006338ce80a70785d2079af4f';patched_sha256='c192431cb2de642bbe5c8256fbe30f0de6fe5dc23f3b20b8baec71e969909965'}
+        'disk-blobstore.js'=[ordered]@{original_sha256='cc18ec422b23ba3bc06baea321146e512ce9cb14608ec90ccfe5e9bc71359811';patched_sha256='9da2aa49a53b58826ae1b24fd7ba8d4fbbe7c9aaf9c7ee8a24c91c792b736f5a'}
+    }
+    if(@($Patch.files).Count -ne 2){throw 'Exactly two reviewed PDS path transformations required'}
+    foreach($name in $pins.Keys){
+        $entries=@($Patch.files | Where-Object {$_.name -ceq $name})
+        if($entries.Count -ne 1){throw 'Missing or duplicate PDS path transformation'}
+        Assert-NativeRuntimeFields $entries[0] @('name','original_sha256','patched_sha256')
+        if($entries[0].original_sha256 -cne $pins[$name].original_sha256 -or
+            $entries[0].patched_sha256 -cne $pins[$name].patched_sha256){throw 'PDS transformation differs from exact reviewed source/output'}
+    }
+    return $pins
 }

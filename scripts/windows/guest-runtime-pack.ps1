@@ -6,6 +6,8 @@ param(
     [guid]$OperationId,
     [string]$SourceRoot,
     [guid]$PiBuildOperationId,
+    [string]$PdsProfilePath,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$PdsProfileSha256,
     [string]$CrtNoticePath,
     [ValidatePattern('^[0-9a-f]{64}$')][string]$CrtNoticeSha256,
     [string]$PostgresNoticePath,
@@ -56,6 +58,32 @@ function Assert-PackPostgresRuntime([string]$Bin,[string]$Lib,$Prepared){
     foreach($record in $extensions){Assert-PackHash (Join-Path $Lib $record.name) $record.sha256}
     Assert-PackHash (Join-Path $Bin 'postgres.exe') $Prepared.postgres_sha256
 }
+function Assert-PackPdsPatchDelta($Original,$Patched,[string]$OriginalSha256){
+    if($Patched.format -cne 'memory-windows-pds-patched-proof-v1' -or
+        $OriginalSha256 -cnotmatch '^[0-9a-f]{64}$' -or $Patched.original_prepared_sha256 -cne $OriginalSha256 -or
+        $Patched.manifest_sha256 -cne $Original.manifest_sha256 -or $Patched.node_sha256 -cne $Original.node_sha256 -or
+        $Patched.source_revision -cne $Original.source_revision -or $Patched.native_sqlite_verified -ne $Original.native_sqlite_verified){throw 'Patched PDS preparation is not bound to original proof'}
+    $pins=Assert-NativePdsPathPatch $Patched.path_patch
+    $expected=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
+    $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach($member in $Original.files){
+        Assert-NativeArchiveName $member.path
+        if(-not $seen.Add($member.path) -or $member.sha256 -cnotmatch '^[0-9a-f]{64}$'){throw 'Invalid original PDS member inventory'}
+        $expected[$member.path]=$member.sha256
+    }
+    foreach($name in $pins.Keys){
+        $relative='node_modules/@atproto/pds/dist/'+$name
+        if($expected[$relative] -cne $pins[$name].original_sha256){throw 'Original PDS path source differs from reviewed upstream'}
+        $expected[$relative]=$pins[$name].patched_sha256
+    }
+    if(@($Patched.files).Count -ne $expected.Count){throw 'Patched PDS inventory count differs'}
+    foreach($member in $Patched.files){
+        Assert-NativeArchiveName $member.path
+        if(-not $expected.ContainsKey($member.path) -or $member.sha256 -cne $expected[$member.path]){throw 'Unreviewed PDS runtime delta'}
+        $null=$expected.Remove($member.path)
+    }
+    if($expected.Count){throw 'Incomplete patched PDS runtime inventory'}
+}
 function Get-PackInventory([string]$Root){
     Assert-PackPath $Root
     $entries=@(Get-ChildItem -LiteralPath $Root -Recurse -Force)
@@ -71,6 +99,8 @@ if(-not $Kind -or $OperationId -eq [guid]::Empty -or
     $SourceRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)*$' -or $SourceRoot.Split('\') -contains '..'){
     throw 'Exact runtime kind, operation and copied lab source required'
 }
+if(($PdsProfilePath -and -not $PdsProfileSha256) -or ($PdsProfileSha256 -and -not $PdsProfilePath) -or
+    ($Kind -cne 'Pds' -and ($PdsProfilePath -or $PdsProfileSha256))){throw 'Exact PDS profile path/digest pair applies only to PDS packaging'}
 Assert-PackPath $SourceRoot
 . (Join-Path $SourceRoot 'packaging/windows/native-instance-functions.ps1')
 . (Join-Path $SourceRoot 'packaging/windows/native-prerequisites-functions.ps1')
@@ -135,6 +165,23 @@ switch($Kind){
         if($proof.format -cne 'memory-windows-pds-proof-result-v1' -or $proof.native_sqlite_verified -ne $true -or
             $baseline.format -cne 'memory-windows-pds-proof-v1' -or $baseline.node_version -cne '24.18.1' -or $baseline.pds_version -cne '0.5.27' -or
             $proof.manifest_sha256 -cne (Get-PackHash $baselinePath) -or $proof.source_revision -cne $baseline.source_revision){throw 'Actual pinned PDS preparation receipt required'}
+        $originalProofSha=Get-PackHash $proofPath
+        if($PdsProfilePath){
+            Assert-PackHash $PdsProfilePath $PdsProfileSha256
+            $selection=Read-PackJson $PdsProfilePath 1MB
+            Assert-NativeRuntimeFields $selection @('format','prepared','sha256')
+            if($selection.format -cne 'memory-native-pds-profile-v1' -or
+                $selection.prepared -cnotmatch '^C:\\MemoryLab\\NativePds\\patched-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\prepared\.json$'){throw 'Exact fresh patched PDS profile required'}
+            Assert-PackHash $selection.prepared $selection.sha256
+            $patchedProof=Read-PackJson $selection.prepared
+            Assert-PackPdsPatchDelta $proof $patchedProof $originalProofSha
+            $proof=$patchedProof;$proofPath=$selection.prepared;$runtime=Join-Path (Split-Path -Parent $proofPath) 'runtime'
+            $proofInputs.pds_profile_sha256=$PdsProfileSha256
+            $manifest.original_prepared_sha256=$originalProofSha;$manifest.path_patch=$proof.path_patch
+            $patchFile=Join-Path $SourceRoot 'packaging/windows-pds/windows-paths.mjs'
+            Copy-PackFile $patchFile 'pds/windows-paths.mjs' $proof.path_patch.patch_sha256
+            Copy-PackFile (Join-Path $SourceRoot 'LICENSE') 'notices/memory-pds-path-patch.txt' (Get-PackHash (Join-Path $SourceRoot 'LICENSE'))
+        }
         $proofInputs.pds_prepared_sha256=Get-PackHash $proofPath
         $proofInputs.pds_manifest_sha256=Get-PackHash $baselinePath
         $nodeRoot='C:\MemoryLab\Tools\node-v24.18.1-win-x64'
@@ -173,6 +220,7 @@ switch($Kind){
             (New-PackComponent 'pds' '0.5.27' $manifest.pds_image_digest.Substring(7) 'MIT' 'notices/pds.txt'),
             (New-PackComponent 'locked-dependencies' $baseline.lock_sha256 $baseline.lock_sha256 'Multiple; complete licence files retained in dependency tree' 'notices/locked-dependencies.txt'),
             (New-PackComponent 'memory-pds-adapter' 'stdio-v1' (Get-PackHash (Join-Path $runtime 'pds-server.mjs')) 'AGPL-3.0-or-later' 'notices/memory-pds-adapter.txt'),$crtComponent)
+        if($PdsProfilePath){$manifest.components+=New-PackComponent 'memory-pds-path-patch' 'windows-sha256-did-paths-v1' $proof.path_patch.patch_sha256 'AGPL-3.0-or-later' 'notices/memory-pds-path-patch.txt'}
     }
     'Pi' {
         if($PiBuildOperationId -eq [guid]::Empty){throw 'Exact retained Pi build operation required'}

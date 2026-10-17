@@ -3,6 +3,7 @@
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'guest-runtime-pack.ps1') -FunctionsOnly
 . (Join-Path $PSScriptRoot '../../packaging/windows/native-instance-functions.ps1')
+. (Join-Path $PSScriptRoot '../../packaging/windows/native-prerequisites-functions.ps1')
 function Reject-Pack([scriptblock]$Action){$failed=$false;try{&$Action}catch{$failed=$true};if(-not $failed){throw 'Unsafe packaging input accepted'}}
 $root=Join-Path ([IO.Path]::GetTempPath()) ('memory-runtime-pack-test-'+[guid]::NewGuid())
 $null=New-Item -ItemType Directory -Path $root
@@ -38,6 +39,22 @@ try{
     [IO.File]::WriteAllText((Join-Path $bin 'libssl-3-x64.dll'),'libssl-3-x64.dll')
     $prepared.extensions=$prepared.extensions[0..1]
     Reject-Pack {Assert-PackPostgresRuntime $bin $lib $prepared}
+    $patch=[pscustomobject]@{layout='windows-sha256-did-paths-v1';patch_sha256='4ba316f92a401d8a9854fe96595232bb845dfe14fa33aefe51837aacc5efcef0';files=@(
+        [pscustomobject]@{name='actor-store/actor-store.js';original_sha256='33ba4bcf0b0afb06868b80a4cb0025388a2a7e8006338ce80a70785d2079af4f';patched_sha256='c192431cb2de642bbe5c8256fbe30f0de6fe5dc23f3b20b8baec71e969909965'},
+        [pscustomobject]@{name='disk-blobstore.js';original_sha256='cc18ec422b23ba3bc06baea321146e512ce9cb14608ec90ccfe5e9bc71359811';patched_sha256='9da2aa49a53b58826ae1b24fd7ba8d4fbbe7c9aaf9c7ee8a24c91c792b736f5a'})}
+    $original=[pscustomobject]@{manifest_sha256=$hash;node_sha256=$hash;source_revision='pinned';native_sqlite_verified=$true
+        files=@([pscustomobject]@{path='package.json';sha256=$hash})+@($patch.files | ForEach-Object {[pscustomobject]@{path=('node_modules/@atproto/pds/dist/'+$_.name);sha256=$_.original_sha256}})}
+    $patched=[pscustomobject]@{format='memory-windows-pds-patched-proof-v1';original_prepared_sha256=$hash;manifest_sha256=$hash;node_sha256=$hash;source_revision='pinned';native_sqlite_verified=$true;path_patch=$patch
+        files=@([pscustomobject]@{path='package.json';sha256=$hash})+@($patch.files | ForEach-Object {[pscustomobject]@{path=('node_modules/@atproto/pds/dist/'+$_.name);sha256=$_.patched_sha256}})}
+    Assert-PackPdsPatchDelta $original $patched $hash
+    foreach($change in @({param($m)$m.files[0].sha256=('b'*64)},
+        {param($m)$m.files+=$m.files[0]},
+        {param($m)$m.original_prepared_sha256=('b'*64)},
+        {param($m)$m.node_sha256=('b'*64)},
+        {param($m)$m.path_patch.patch_sha256=('b'*64)})){
+        $copy=$patched | ConvertTo-Json -Depth 10 | ConvertFrom-Json;&$change $copy
+        Reject-Pack {Assert-PackPdsPatchDelta $original $copy $hash}
+    }
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}
 $text=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'guest-runtime-pack.ps1') -Raw
 foreach($forbidden in @('Invoke-WebRequest','Start-Service','New-Service','initdb.exe','npm install','pnpm install')){

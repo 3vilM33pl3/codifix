@@ -28,6 +28,26 @@ $pds=[pscustomobject]@{schema_version=1;kind='memory-native-pds-runtime';platfor
 $pdsNames=@('node/node.exe','node/vcruntime140.dll','node/vcruntime140_1.dll','node/msvcp140.dll',
     'pds/node_modules/@atproto/pds/package.json','pds/node_modules/@atproto/pds/dist/index.js',$addon)+@($pdsPins.Keys)+@($pds.components | ForEach-Object notice_path)
 $pds.payload_files=@($pdsNames | ForEach-Object {[pscustomobject]@{name=$_;sha256=$(if($pdsPins.ContainsKey($_)){$pdsPins[$_]}else{$hash})}})
+$pathPatch=[pscustomobject]@{layout='windows-sha256-did-paths-v1';patch_sha256='4ba316f92a401d8a9854fe96595232bb845dfe14fa33aefe51837aacc5efcef0';files=@(
+    [pscustomobject]@{name='actor-store/actor-store.js';original_sha256='33ba4bcf0b0afb06868b80a4cb0025388a2a7e8006338ce80a70785d2079af4f';patched_sha256='c192431cb2de642bbe5c8256fbe30f0de6fe5dc23f3b20b8baec71e969909965'},
+    [pscustomobject]@{name='disk-blobstore.js';original_sha256='cc18ec422b23ba3bc06baea321146e512ce9cb14608ec90ccfe5e9bc71359811';patched_sha256='9da2aa49a53b58826ae1b24fd7ba8d4fbbe7c9aaf9c7ee8a24c91c792b736f5a'})}
+$patched=Copy-Value $pds
+$patched | Add-Member -NotePropertyName original_prepared_sha256 -NotePropertyValue $hash
+$patched | Add-Member -NotePropertyName path_patch -NotePropertyValue $pathPatch
+$patched.payload_files+=@($pathPatch.files | ForEach-Object {[pscustomobject]@{name=('pds/node_modules/@atproto/pds/dist/'+$_.name);sha256=$_.patched_sha256}})
+$patched.payload_files+=@([pscustomobject]@{name='pds/windows-paths.mjs';sha256=$pathPatch.patch_sha256},[pscustomobject]@{name='notices/memory-pds-path-patch.txt';sha256=$hash})
+$patched.components+=Component 'memory-pds-path-patch' 'windows-sha256-did-paths-v1' $pathPatch.patch_sha256 'AGPL-3.0-or-later'
+$null=Get-NativePrerequisitePlan $patched
+foreach($change in @({param($m)$m.path_patch.patch_sha256=('0'*64)},
+    {param($m)$m.path_patch.files[0].patched_sha256=('b'*64)},
+    {param($m)$m.path_patch.files[0].original_sha256=('b'*64)},
+    {param($m)$m.path_patch.files+=$m.path_patch.files[0]},
+    {param($m)$m.payload_files=@($m.payload_files | Where-Object name -ne 'pds/windows-paths.mjs')},
+    {param($m)($m.payload_files | Where-Object name -ceq 'pds/node_modules/@atproto/pds/dist/disk-blobstore.js').sha256=('b'*64)},
+    {param($m)$m.PSObject.Properties.Remove('original_prepared_sha256')},
+    {param($m)$m.components=@($m.components | Where-Object name -cne 'memory-pds-path-patch')})){
+    $copy=Copy-Value $patched;&$change $copy;Reject {Get-NativePrerequisitePlan $copy}
+}
 $artifact=[pscustomobject]@{source_revision='7c018475d54d4e09c907691e47a520f1f09e3288'
     no_tools_patch_sha256='bec724b3d1cef1df4f4cddc50573ce6af1724c743496e7f5e900f4e4a6c815bc'
     broker_patch_sha256='61a620316d545b100cf17a83503aba4da46094346c7996c502508b9060aebdf4'
@@ -99,6 +119,7 @@ $repo=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 foreach($pair in @(@('packaging/windows-pds/pds-server.mjs',$pdsPins['pds/pds-server.mjs']),@('packaging/windows-pds/http-stdio.mjs',$pdsPins['pds/http-stdio.mjs']))){
     if((Get-FileHash -LiteralPath (Join-Path $repo $pair[0])).Hash.ToLowerInvariant() -cne $pair[1]){throw 'Reviewed adapter source changed without prerequisite pin review'}
 }
+if((Get-FileHash -LiteralPath (Join-Path $repo 'packaging/windows-pds/windows-paths.mjs')).Hash.ToLowerInvariant() -cne $pathPatch.patch_sha256){throw 'Reviewed PDS path patch source changed without prerequisite pin review'}
 foreach($pair in @(
     @('crates/mem-supervisor-pi/patches/no-tools-1.patch',$artifact.no_tools_patch_sha256),
     @('crates/mem-supervisor-pi/patches/windows-broker-1.patch',$artifact.broker_patch_sha256),
