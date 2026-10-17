@@ -70,6 +70,31 @@ must be active. The permanent receipt supports exact retries and rejects another
 mapping. Canonical origin mappings and old queued/accepted/proposed payloads are
 never moved or cleared, so corrections cannot silently become fresh publications.
 
+If normal company enrollment replaces the device as well as its retired space,
+use the separate fresh-device mode after human approval and authenticated
+subscription retrieval. It preserves the same company/area/owner/project and
+requires every old contribution to be accepted, receipted and drained. Retain
+the normal CLI subscription preview and independently reviewed company approval
+as bounded absolute evidence files; their hashes are sealed into the manifest.
+
+```sh
+python3 scripts/codifix-cutover/laptop-rebind.py inspect --fresh-device \
+  --schema-reference schema-reference.json --project PROJECT_UUID \
+  --new-binding new-binding.json \
+  --fresh-bootstrap /absolute/private/subscription-preview.json \
+  --fresh-approval /absolute/private/company-approval.jsonl > fresh-rebind.json
+python3 scripts/codifix-cutover/laptop-rebind.py apply --fresh-device \
+  --schema-reference schema-reference.json --manifest fresh-rebind.json \
+  --review-sha256 EXACT_SHA256 --writers-stopped
+```
+
+This operator records the transition in the existing immutable receipt table;
+it does not change the same-device SQL function or applied migrations. Old
+subscriptions, origin mappings and accepted receipts remain untouched. Enable
+normal operational area launchers before restarting after this transition:
+the retained cold-runtime helper deliberately rejects enabled contribution
+bindings. Preserve its sealed inputs as recovery evidence.
+
 
 ## Mac preserved-runtime handover (3.0 only)
 
