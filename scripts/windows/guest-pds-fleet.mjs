@@ -8,12 +8,15 @@ import { once } from 'node:events';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-const [source, root, sid] = process.argv.slice(2);
+await (async () => {
+const [source, root, sid, mode] = process.argv.slice(2);
+const accountOnly = mode === '--account-only';
 if (process.platform !== 'win32' || process.env.COMPUTERNAME !== 'MEMORY-WINLAB'
     || !/^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+$/.test(source ?? '')
     || !/^C:\\MemoryLab\\runs\\[0-9a-f-]{36}\\native-pds-fleet$/.test(root ?? '')
     || !/^S-1-5-21-(?:\d+-){3}\d+$/.test(sid ?? '')
-    || process.env.MEMORY_LAYER_TEST_REQUIRE_DB !== '1') throw Error('Explicit disposable native fleet required');
+    || (mode !== undefined && !accountOnly)
+    || (!accountOnly && process.env.MEMORY_LAYER_TEST_REQUIRE_DB !== '1')) throw Error('Explicit disposable native fleet required');
 const runtime = 'C:\\MemoryLab\\NativePds\\runtime';
 const node = 'C:\\MemoryLab\\Tools\\node-v24.18.1-win-x64\\node.exe';
 const binary = 'C:\\MemoryLab\\build\\product-msvc\\x86_64-pc-windows-msvc\\debug\\memory-pds-pipe.exe';
@@ -156,6 +159,14 @@ try {
   await rpc('com.atproto.server.activateAccount', { token: account.accessJwt, body: {} });
   const exited = once(child, 'exit'); child.stdin.end();
   assert.equal((await exited)[0], 0);
+  if (accountOnly) {
+    await fs.writeFile(path.join(root, 'account-proof.json'), JSON.stringify({
+      format: 'memory-native-pds-account-proof-v1', state: 'succeeded', repository: did,
+      signing_key: signingKey, key_handoff_verified: true, ssrf_disabled: false,
+      fleet_verified: false, native_pipe_verified: false,
+    }), { flag: 'wx' });
+    return;
+  }
   const pipe = { name: `\\\\.\\pipe\\memory-pds-${path.basename(path.dirname(root))}`, server_sid: sid, client_sid: sid };
   const config = { schema_version: 1, pipe, node, node_sha256: await digest(node),
     entry: path.join(runtime, 'pds-server.mjs'), entry_sha256: await digest(path.join(runtime, 'pds-server.mjs')),
@@ -201,3 +212,4 @@ try {
   }
   await new Promise(resolve => didServer.close(resolve));
 }
+})();
