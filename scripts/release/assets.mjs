@@ -37,7 +37,17 @@ export function prepareAssets(directory, version, commit) {
   assert.equal(manifest.source_commit, commit);
   assert.equal(manifest.native_stack_bundled, false);
   const hash = name => createHash('sha256').update(readFileSync(path.join(root, name))).digest('hex');
-  for (const artifact of manifest.artifacts) assert.equal(hash(artifact.name), artifact.sha256, artifact.name);
+  assert.deepEqual(manifest.artifacts.map(artifact => artifact.name).sort(), [`${win}.zip`, `${win}.msi`, `${win}-server-tools.msi`].sort());
+  for (const artifact of manifest.artifacts) {
+    assert.equal(path.basename(artifact.name), artifact.name, 'unsafe manifest artifact name');
+    assert.equal(hash(artifact.name), artifact.sha256, artifact.name);
+  }
+  for (const name of ['build-amd64.json', 'build-arm64.json', ...['x86_64', 'aarch64'].map(arch => `memory-layer-${version}-macos-${arch}-build.json`)]) {
+    assert(names.has(name), `missing source-bound metadata: ${name}`);
+    const build = JSON.parse(readFileSync(path.join(root, name), 'utf8'));
+    assert.equal(build.source_commit, commit, name);
+    assert.equal(build.application_version ?? build.version, version, name);
+  }
   const payloads = [...names].filter(name => !name.endsWith('.sha256') && !name.startsWith('SHA256SUMS')).sort();
   const artifacts = payloads.map(name => ({ name, size_bytes: lstatSync(path.join(root, name)).size, sha256: hash(name) }));
   for (const artifact of artifacts) assert(artifact.size_bytes > 0, `empty artifact ${artifact.name}`);
