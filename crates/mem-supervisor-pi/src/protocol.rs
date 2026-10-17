@@ -389,14 +389,16 @@ mod startup_tests {
                 "type":"error", "phase":"startup", "code":code,
                 "message":"DO_NOT_LEAK_PRIVATE_PATH_OR_CONTENT"
             }))
-            .unwrap();
-            let metadata = serde_json::to_string(&StartupDiagnostic::from_frame(&frame)).unwrap();
+            .expect("valid startup diagnostic fixture");
+            let metadata = serde_json::to_string(&StartupDiagnostic::from_frame(&frame))
+                .expect("serialize sanitized startup diagnostic");
             assert!(!metadata.contains("DO_NOT_LEAK"));
-            let failure = accept_response(ControlCommand::DisableRetry, frame).unwrap_err();
+            let failure = accept_response(ControlCommand::DisableRetry, frame)
+                .expect_err("startup error must reject the control response");
             assert_eq!(failure, Failure::Startup(expected));
             assert!(
                 !serde_json::to_string(&failure)
-                    .unwrap()
+                    .expect("serialize sanitized startup failure")
                     .contains("DO_NOT_LEAK")
             );
         }

@@ -39,83 +39,6 @@ fn bytes(v: &impl Serialize) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mem_federation::{publication::SpaceId, subscription::ProjectScope};
-    use uuid::Uuid;
-    #[test]
-    fn private_page_attestation_binds_device_scope_cursor_purpose_and_expiry() {
-        let security = GatewaySecurity::initial(&[73; 32], Default::default()).unwrap();
-        let authority = InstanceId::new(Uuid::new_v4()).unwrap();
-        let request = DeviceReplicaRequest {
-            schema_version: 1,
-            nonce: Uuid::new_v4(),
-            device: Uuid::new_v4(),
-            scope: ProjectScope {
-                company: Uuid::new_v4(),
-                area: "workshop".into(),
-                owner: authority,
-                space: SpaceId::new(Uuid::new_v4()).unwrap(),
-                project: Uuid::new_v4(),
-            },
-            catalog_revision: 1,
-            after: 0,
-            through: None,
-            limit: 8,
-        };
-        let signed = security
-            .sign_device_replica_page(
-                authority,
-                DeviceReplicaPage {
-                    request: request.clone(),
-                    through: 0,
-                    next: 0,
-                    entries: vec![],
-                },
-            )
-            .unwrap();
-        let trust = security.trust();
-        trust
-            .verify_device_replica_page(&signed, &request, authority)
-            .unwrap();
-        let mut another = request.clone();
-        another.device = Uuid::new_v4();
-        assert!(
-            trust
-                .verify_device_replica_page(&signed, &another, authority)
-                .is_err()
-        );
-        another = request.clone();
-        another.scope.project = Uuid::new_v4();
-        assert!(
-            trust
-                .verify_device_replica_page(&signed, &another, authority)
-                .is_err()
-        );
-        let mut altered = signed.clone();
-        altered.claims.purpose = "memory-project-page-v1".into();
-        assert!(
-            trust
-                .verify_device_replica_page(&altered, &request, authority)
-                .is_err()
-        );
-        altered = signed.clone();
-        altered.claims.expires_at = Utc::now() - Duration::seconds(1);
-        assert!(
-            trust
-                .verify_device_replica_page(&altered, &request, authority)
-                .is_err()
-        );
-        altered = signed;
-        altered.signature[0] ^= 1;
-        assert!(
-            trust
-                .verify_device_replica_page(&altered, &request, authority)
-                .is_err()
-        );
-    }
-}
 impl GatewaySecurity {
     pub fn sign_device_replica_page(
         &self,
@@ -225,4 +148,83 @@ pub(crate) async fn attest(
         .sign_device_replica_page(authority, page)
         .map(Json)
         .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mem_federation::{publication::SpaceId, subscription::ProjectScope};
+    use uuid::Uuid;
+    #[test]
+    fn private_page_attestation_binds_device_scope_cursor_purpose_and_expiry() {
+        let security = GatewaySecurity::initial(&[73; 32], Default::default())
+            .expect("valid attestation fixture");
+        let authority = InstanceId::new(Uuid::new_v4()).expect("valid attestation fixture");
+        let request = DeviceReplicaRequest {
+            schema_version: 1,
+            nonce: Uuid::new_v4(),
+            device: Uuid::new_v4(),
+            scope: ProjectScope {
+                company: Uuid::new_v4(),
+                area: "workshop".into(),
+                owner: authority,
+                space: SpaceId::new(Uuid::new_v4()).expect("valid attestation fixture"),
+                project: Uuid::new_v4(),
+            },
+            catalog_revision: 1,
+            after: 0,
+            through: None,
+            limit: 8,
+        };
+        let signed = security
+            .sign_device_replica_page(
+                authority,
+                DeviceReplicaPage {
+                    request: request.clone(),
+                    through: 0,
+                    next: 0,
+                    entries: vec![],
+                },
+            )
+            .expect("valid attestation fixture");
+        let trust = security.trust();
+        trust
+            .verify_device_replica_page(&signed, &request, authority)
+            .expect("valid attestation fixture");
+        let mut another = request.clone();
+        another.device = Uuid::new_v4();
+        assert!(
+            trust
+                .verify_device_replica_page(&signed, &another, authority)
+                .is_err()
+        );
+        another = request.clone();
+        another.scope.project = Uuid::new_v4();
+        assert!(
+            trust
+                .verify_device_replica_page(&signed, &another, authority)
+                .is_err()
+        );
+        let mut altered = signed.clone();
+        altered.claims.purpose = "memory-project-page-v1".into();
+        assert!(
+            trust
+                .verify_device_replica_page(&altered, &request, authority)
+                .is_err()
+        );
+        altered = signed.clone();
+        altered.claims.expires_at = Utc::now() - Duration::seconds(1);
+        assert!(
+            trust
+                .verify_device_replica_page(&altered, &request, authority)
+                .is_err()
+        );
+        altered = signed;
+        altered.signature[0] ^= 1;
+        assert!(
+            trust
+                .verify_device_replica_page(&altered, &request, authority)
+                .is_err()
+        );
+    }
 }

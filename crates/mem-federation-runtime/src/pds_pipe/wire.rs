@@ -120,14 +120,14 @@ mod tests {
     }
     #[tokio::test]
     async fn ambiguous_chunked_and_unbounded_messages_are_rejected() {
-        for bytes in [
+        for mut bytes in [
             b"POST /xrpc/fixture HTTP/1.1\r\nContent-Length: 0\r\nContent-Length: 0\r\n\r\n"
                 .as_slice(),
             b"POST /xrpc/fixture HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n".as_slice(),
             b"POST /xrpc/fixture HTTP/1.1\r\nContent-Length: 9999999999\r\n\r\n".as_slice(),
             b"GET /outside HTTP/1.1\r\n\r\n".as_slice(),
         ] {
-            assert!(read_request(&mut bytes.as_ref()).await.is_err());
+            assert!(read_request(&mut bytes).await.is_err());
         }
         assert!(read_frame(&mut [255u8; 4].as_slice()).await.is_err());
     }
