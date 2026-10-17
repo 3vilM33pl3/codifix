@@ -3,7 +3,8 @@
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][guid]$OperationId,
       [Parameter(Mandatory=$true)][guid]$BuildOperationId,
-      [Parameter(Mandatory=$true)][string]$SourceRoot)
+      [Parameter(Mandatory=$true)][string]$SourceRoot,
+      [string]$WebRoot)
 $ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'
 if($env:OS -cne 'Windows_NT' -or $env:COMPUTERNAME -cne 'MEMORY-WINLAB' -or
     $OperationId -eq [guid]::Empty -or $BuildOperationId -eq [guid]::Empty -or
@@ -38,7 +39,11 @@ $token=[guid]::NewGuid().ToString('N')+[guid]::NewGuid().ToString('N')
 $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0);$listener.Start();$port=$listener.LocalEndpoint.Port;$listener.Stop()
 $origin="http://127.0.0.1:$port";$config=Join-Path $root 'memory-layer.toml'
 $web=Join-Path $SourceRoot 'web\dist'
-# A Web build must be supplied separately; do not silently use another checkout.
+if($WebRoot){
+    if($WebRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+\\web\\dist$'){throw 'Explicit lab Web build required'}
+    $web=$WebRoot
+}
+# A separately built Web tree is explicit, never discovered from live installs.
 $hasWeb=Test-Path (Join-Path $web 'index.html')
 $webLine=if($hasWeb){"web_root = '"+$web+"'"}else{''}
 $text=@"
@@ -154,7 +159,7 @@ try{
         if(@($answer.results).Count -lt 1 -or ($answer.results | ConvertTo-Json -Depth 16) -notmatch '43117'){throw 'Real lexical search omitted curated fact'}
         $null=Request ('/v1/memory/'+$memoryId+'/history')
         if($generation -eq 1){
-            $cli=Finish-Owned (Invoke-Owned $binary @('--config',$config,'query','synthetic backup port','--project','native-smoke') 'cli-query')
+            $cli=Finish-Owned (Invoke-Owned $binary @('--config',$config,'query','--question','synthetic backup port','--project','native-smoke') 'cli-query')
             if($cli -notmatch '43117'){throw 'CLI search omitted curated fact'}
             $receipt.checks+=@('main-memories-list','lexical-search','history','cli-query')
             if($hasWeb){$page=Request '/';if($page -notmatch '<html|<!doctype'){throw 'Web root did not serve HTML'};$receipt.checks+='web-root'}
