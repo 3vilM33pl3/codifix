@@ -779,9 +779,9 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
     let args = fixture.prepare(&catalog.project.manifest);
     fs::create_dir(&args.workspace).unwrap();
     fs::create_dir(args.workspace.join(".git")).unwrap();
-    fs::create_dir_all(args.workspace.join(".agents/skills/memory-layer")).unwrap();
+    fs::create_dir_all(args.workspace.join(".agents/skills/codifix")).unwrap();
     fs::write(
-        args.workspace.join(".agents/skills/memory-layer/SKILL.md"),
+        args.workspace.join(".agents/skills/codifix/SKILL.md"),
         "custom skill",
     )
     .unwrap();
@@ -818,7 +818,7 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
     );
     assert_eq!(done.plan_sha256, journal.plan_sha256);
     assert_eq!(
-        fs::read_to_string(args.workspace.join(".agents/skills/memory-layer/SKILL.md")).unwrap(),
+        fs::read_to_string(args.workspace.join(".agents/skills/codifix/SKILL.md")).unwrap(),
         "custom skill"
     );
     assert!(
@@ -828,7 +828,7 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
     );
     assert!(
         args.workspace
-            .join(".claude/skills/memory-layer/SKILL.md")
+            .join(".claude/skills/codifix/SKILL.md")
             .is_file()
     );
     assert_eq!(
@@ -897,10 +897,10 @@ async fn later_request_preserves_existing_managed_skills_and_their_original_rece
         .unwrap();
         let mut original = Vec::new();
         for root in [".agents", ".claude"] {
-            let skill = args.workspace.join(format!("{root}/skills/memory-layer"));
+            let skill = args.workspace.join(format!("{root}/skills/codifix"));
             let content = skill.join("SKILL.md");
             fs::write(&content, "user customization of earlier managed skill").unwrap();
-            for path in [content, skill.join(".memory-onboarding-pin.json")] {
+            for path in [content, skill.join(".codifix-onboarding-pin.json")] {
                 original.push((path.clone(), fs::read(path).unwrap()));
             }
         }
@@ -929,7 +929,7 @@ async fn later_request_preserves_existing_managed_skills_and_their_original_rece
             assert!(
                 later
                     .preserved_paths
-                    .contains(&format!("{root}/skills/memory-layer"))
+                    .contains(&format!("{root}/skills/codifix"))
             );
         }
     }
@@ -957,7 +957,7 @@ async fn same_request_conflicting_skill_receipt_remains_blocked_without_replacem
         .unwrap();
     let receipt = args
         .workspace
-        .join(".agents/skills/memory-layer/.memory-onboarding-pin.json");
+        .join(".agents/skills/codifix/.codifix-onboarding-pin.json");
     let changed = serde_json::to_vec(&serde_json::json!({"request_id":journal.request_id,"sha256":"0".repeat(64),"version":tool.version})).unwrap();
     fs::write(&receipt, &changed).unwrap();
     let error = artifacts::apply(&args.journal, &mut journal, &tool, &downloads)
@@ -1143,7 +1143,7 @@ async fn lost_skill_completion_reuses_pinned_cache_without_overwrite_or_download
     assert!(recovered.tools_done);
     assert_eq!(downloads.calls.get(), 1);
     assert_eq!(git.clones.get(), 1);
-    let skill = args.workspace.join(".agents/skills/memory-layer/SKILL.md");
+    let skill = args.workspace.join(".agents/skills/codifix/SKILL.md");
     fs::write(&skill, "custom change after installation").unwrap();
     let mut pending = recovered;
     pending.tools_done = false;

@@ -54,7 +54,7 @@ fn named_path(config: &Path, root: &Path) -> Result<Option<String>> {
     let Some(relative) = config.strip_prefix(&format!("{root}\\")) else {
         return Ok(None);
     };
-    let name = relative.strip_prefix("configurations\\").and_then(|value| value.strip_suffix("\\memory-layer.toml"))
+    let name = relative.strip_prefix("configurations\\").and_then(|value| value.strip_suffix("\\codifix.toml"))
         .context("selected native service needs its exact installed configuration; no fallback attempted")?;
     ensure!(
         !name.is_empty()
@@ -107,8 +107,8 @@ fn validate(
             && journal.phase == "completed"
             && ["Install", "Upgrade"].contains(&journal.action.as_str())
             && plan.name == name
-            && plan.service_name == format!("MemoryLayer-{name}")
-            && plan.account == format!("NT SERVICE\\MemoryLayer-{name}")
+            && plan.service_name == format!("Codifix-{name}")
+            && plan.account == format!("NT SERVICE\\Codifix-{name}")
             && plan.executable_name == "codifix.exe"
             && plan.release_identity == *release
             && digest(&registration.manifest_sha256)
@@ -144,7 +144,7 @@ fn validate(
         "--config".into(),
         root.join("configurations")
             .join(name)
-            .join("memory-layer.toml")
+            .join("codifix.toml")
             .display()
             .to_string(),
         "service".into(),
@@ -266,10 +266,10 @@ mod tests {
     use super::*;
     #[test]
     fn named_paths_use_exact_installed_locations_not_area_labels() {
-        let root = Path::new(r"C:\ProgramData\MemoryLayer");
+        let root = Path::new(r"C:\ProgramData\Codifix");
         assert_eq!(
             named_path(
-                Path::new(r"c:\programdata\MemoryLayer\configurations\homelab\memory-layer.toml"),
+                Path::new(r"c:\programdata\Codifix\configurations\homelab\codifix.toml"),
                 root
             )
             .unwrap()
@@ -282,15 +282,15 @@ mod tests {
                 .is_none()
         );
         for path in [
-            r"C:\ProgramData\MemoryLayer\configurations\..\memory-layer.toml",
-            r"C:\ProgramData\MemoryLayer\other.toml",
+            r"C:\ProgramData\Codifix\configurations\..\codifix.toml",
+            r"C:\ProgramData\Codifix\other.toml",
         ] {
             assert!(named_path(Path::new(path), root).is_err());
         }
     }
     #[test]
     fn native_receipts_require_completed_exact_instance_and_command() {
-        let root = Path::new("/private/MemoryLayer");
+        let root = Path::new("/private/Codifix");
         let releases = Path::new("/private/releases");
         let release = "windows-v2.1.0-rc.5-build.1";
         let command = [
@@ -301,7 +301,7 @@ mod tests {
                 .display()
                 .to_string(),
             "--name".into(),
-            "MemoryLayer-homelab".into(),
+            "Codifix-homelab".into(),
             "--directory".into(),
             root.join("instances").join("homelab").display().to_string(),
             "--".into(),
@@ -314,7 +314,7 @@ mod tests {
             "--config".into(),
             root.join("configurations")
                 .join("homelab")
-                .join("memory-layer.toml")
+                .join("codifix.toml")
                 .display()
                 .to_string(),
             "service".into(),
@@ -325,7 +325,7 @@ mod tests {
         .collect::<Vec<_>>()
         .join(" ");
         let registration = serde_json::json!({ "schema_version": 1, "operation_id": Uuid::from_u128(1), "expected_instance_id": Uuid::from_u128(2), "release_identity": release, "manifest_sha256": "a".repeat(64), "config_fingerprint": "b".repeat(64), "binary_path": command });
-        let journal = serde_json::json!({ "schema_version": 1, "operation_id": Uuid::from_u128(1), "action": "Install", "phase": "completed", "input_sha256": "c".repeat(64), "plan": { "name": "homelab", "service_name": "MemoryLayer-homelab", "account": "NT SERVICE\\MemoryLayer-homelab", "release_identity": release, "executable_name": "codifix.exe", "expected_instance_id": Uuid::from_u128(2) } });
+        let journal = serde_json::json!({ "schema_version": 1, "operation_id": Uuid::from_u128(1), "action": "Install", "phase": "completed", "input_sha256": "c".repeat(64), "plan": { "name": "homelab", "service_name": "Codifix-homelab", "account": "NT SERVICE\\Codifix-homelab", "release_identity": release, "executable_name": "codifix.exe", "expected_instance_id": Uuid::from_u128(2) } });
         let verify = |reg, journal| {
             validate(
                 "homelab",
@@ -350,7 +350,7 @@ mod tests {
         foreign["binary_path"] = "foreign service command".into();
         assert!(verify(foreign, journal.clone()).is_err());
         for (field, value) in [
-            ("service_name", "MemoryLayer-other"),
+            ("service_name", "Codifix-other"),
             ("account", "LocalSystem"),
             ("executable_name", "codifix-federation-gateway.exe"),
             ("name", "other"),
@@ -368,7 +368,7 @@ mod tests {
         let config = root
             .join("configurations")
             .join(format!("absent-{}", Uuid::new_v4().simple()))
-            .join("memory-layer.toml");
+            .join("codifix.toml");
         assert!(
             require_legacy_lifecycle(&config)
                 .unwrap_err()

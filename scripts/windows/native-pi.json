@@ -9,14 +9,41 @@
   "rustc_commit": "90850177249efe0321573c569aec5d12b257f8d6",
   "target": "x86_64-pc-windows-msvc",
   "inputs": [
-    {"path": "crates/mem-supervisor-pi/scripts/build-windows.ps1", "sha256": "5ca1d2ead447755118a3de17324526e90c4b3722fcee6f452fed0d54bf076697"},
-    {"path": "crates/mem-supervisor-pi/patches/no-tools-1.patch", "sha256": "bec724b3d1cef1df4f4cddc50573ce6af1724c743496e7f5e900f4e4a6c815bc"},
-    {"path": "crates/mem-supervisor-pi/patches/windows-broker-1.patch", "sha256": "61a620316d545b100cf17a83503aba4da46094346c7996c502508b9060aebdf4"},
-    {"path": "crates/mem-supervisor-pi/patches/LICENSE.pi", "sha256": "32a82e0a5754e72e51fae44b65a936c831c07376f21c90f5fb9e76897fcc3509"},
-    {"path": "packaging/ca-bookworm/pi_smoke.py", "sha256": "9112f649a61095c08f9a131f115470dfa1678f852e4806b74bdcb5ac30f2cc60"},
-    {"path": "packaging/windows-pi/smoke.py", "sha256": "e717571b7c127949e6915636f12f2e0b4517fb38d97d7dd783ccb015ba33392b"},
-    {"path": "crates/mem-supervisor-pi/patches/windows-broker-safe-handle-1.patch", "sha256": "241551af0ec017a63f31cf2aba93122f961998f7380a60abe162504d78cd70c6"},
-    {"path": "crates/mem-supervisor-pi/windows-pipe-helper/Cargo.toml", "sha256": "89c7d41c710c69122099b353177271a493ccfa5997918b5b8c62268714db0371"},
-    {"path": "crates/mem-supervisor-pi/windows-pipe-helper/src/lib.rs", "sha256": "3fd55c35ffb6418a8200ea221f96b9300f8bea90d9b9e1cab2f3ce68f9d859c3"}
+    {
+      "path": "crates/codifix-supervisor-pi/scripts/build-windows.ps1",
+      "sha256": "5ca1d2ead447755118a3de17324526e90c4b3722fcee6f452fed0d54bf076697"
+    },
+    {
+      "path": "crates/codifix-supervisor-pi/patches/no-tools-1.patch",
+      "sha256": "bec724b3d1cef1df4f4cddc50573ce6af1724c743496e7f5e900f4e4a6c815bc"
+    },
+    {
+      "path": "crates/codifix-supervisor-pi/patches/windows-broker-1.patch",
+      "sha256": "61a620316d545b100cf17a83503aba4da46094346c7996c502508b9060aebdf4"
+    },
+    {
+      "path": "crates/codifix-supervisor-pi/patches/LICENSE.pi",
+      "sha256": "32a82e0a5754e72e51fae44b65a936c831c07376f21c90f5fb9e76897fcc3509"
+    },
+    {
+      "path": "packaging/ca-bookworm/pi_smoke.py",
+      "sha256": "58f80c55499e55da9ff84d27ec65f9ab15d23d55b8d465450eb49e8bb1f4be7e"
+    },
+    {
+      "path": "packaging/windows-pi/smoke.py",
+      "sha256": "c769a90e119b5a32c87161d830fb5604f7c6aaa73121ccfbf5451518283d31c3"
+    },
+    {
+      "path": "crates/codifix-supervisor-pi/patches/windows-broker-safe-handle-1.patch",
+      "sha256": "241551af0ec017a63f31cf2aba93122f961998f7380a60abe162504d78cd70c6"
+    },
+    {
+      "path": "crates/codifix-supervisor-pi/windows-pipe-helper/Cargo.toml",
+      "sha256": "89c7d41c710c69122099b353177271a493ccfa5997918b5b8c62268714db0371"
+    },
+    {
+      "path": "crates/codifix-supervisor-pi/windows-pipe-helper/src/lib.rs",
+      "sha256": "3fd55c35ffb6418a8200ea221f96b9300f8bea90d9b9e1cab2f3ce68f9d859c3"
+    }
   ]
 }

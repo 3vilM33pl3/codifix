@@ -92,7 +92,7 @@ try{
     Reject-Pack {Get-PackPostgresInventory $pgTree}
     Remove-Item -LiteralPath (Join-Path $pgTree 'pgsql/share')
     Reject-Pack {Get-PackPostgresInventory $pgTree}
-    $patch=[pscustomobject]@{layout='windows-sha256-did-paths-v1';patch_sha256='4ba316f92a401d8a9854fe96595232bb845dfe14fa33aefe51837aacc5efcef0';files=@(
+    $patch=[pscustomobject]@{layout='windows-sha256-did-paths-v1';patch_sha256='79c8c8378fdab250457e663d2d48518cb28dbabf5a81b3ae832aa70a7b860441';files=@(
         [pscustomobject]@{name='actor-store/actor-store.js';original_sha256='33ba4bcf0b0afb06868b80a4cb0025388a2a7e8006338ce80a70785d2079af4f';patched_sha256='c192431cb2de642bbe5c8256fbe30f0de6fe5dc23f3b20b8baec71e969909965'},
         [pscustomobject]@{name='disk-blobstore.js';original_sha256='cc18ec422b23ba3bc06baea321146e512ce9cb14608ec90ccfe5e9bc71359811';patched_sha256='9da2aa49a53b58826ae1b24fd7ba8d4fbbe7c9aaf9c7ee8a24c91c792b736f5a'})}
     $original=[pscustomobject]@{manifest_sha256=$hash;node_sha256=$hash;source_revision='pinned';native_sqlite_verified=$true

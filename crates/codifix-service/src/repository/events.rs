@@ -1006,7 +1006,7 @@ async fn perform_watcher_restart(state: &AppState, request: &WatcherRestartReque
     }
 
     let peer = cluster_peer_by_service_id(state, &request.host_service_id)
-        .ok_or_else(|| anyhow::anyhow!("host-local memory service is unavailable"))?;
+        .ok_or_else(|| anyhow::anyhow!("host-local codifix service is unavailable"))?;
     let response = state
         .http_client
         .post(format!(

@@ -7,7 +7,7 @@ use reqwest::Url;
 use serde::Serialize;
 use std::{collections::BTreeSet, fs, net::SocketAddr, path::PathBuf};
 
-pub(super) const HELP: &str = "Agent notes:\nRead-only configuration inventory; no network requests or credentials are printed. Configured URLs do not prove reachability or authorization. UI links come first. Use --area to filter and --json for scripts.\n\nExamples:\n  memory urls\n  memory urls --area workshop --json\n\nSee also:\n  docs/user/cli/urls.md";
+pub(super) const HELP: &str = "Agent notes:\nRead-only configuration inventory; no network requests or credentials are printed. Configured URLs do not prove reachability or authorization. UI links come first. Use --area to filter and --json for scripts.\n\nExamples:\n  codifix urls\n  codifix urls --area workshop --json\n\nSee also:\n  docs/user/cli/urls.md";
 
 #[derive(Debug, Args)]
 pub(super) struct UrlsArgs {

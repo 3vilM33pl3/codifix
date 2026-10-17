@@ -291,7 +291,7 @@ async fn login(args: &LoginArgs, store: &impl CredentialStore) -> Result<()> {
 async fn available(args: &CompanyArgs, store: &impl CredentialStore) -> Result<()> {
     let origin = CompanyOrigin::parse(&args.company, args.allow_loopback)?;
     let enrollment = credentials::load(store, &origin)?
-        .ok_or_else(|| anyhow::anyhow!("no saved company device; run memory auth login first"))?;
+        .ok_or_else(|| anyhow::anyhow!("no saved company device; run codifix auth login first"))?;
     if !enrollment.approved || enrollment.pending_logout {
         bail!(
             "device credential is not locally usable; complete login or resolve pending logout first"
@@ -342,7 +342,7 @@ async fn logout(args: &LogoutArgs, store: &impl CredentialStore) -> Result<()> {
     };
     if acknowledged.is_err() {
         bail!(
-            "logout is pending: local use is disabled, server revocation is unconfirmed. Keychain credential retained; retry memory auth logout with the same --company when the server is available"
+            "logout is pending: local use is disabled, server revocation is unconfirmed. Keychain credential retained; retry codifix auth logout with the same --company when the server is available"
         );
     }
     credentials::remove(store, &origin, &enrollment)?;

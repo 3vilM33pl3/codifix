@@ -2140,12 +2140,12 @@ mod tests {
     #[test]
     fn relation_classifier_detects_duplicates() {
         let left = profile(
-            "Memory Layer stores canonical facts in PostgreSQL.",
+            "Codifix stores canonical facts in PostgreSQL.",
             &["db"],
             &["src/lib.rs"],
         );
         let right = profile(
-            "Memory Layer stores canonical facts in PostgreSQL.",
+            "Codifix stores canonical facts in PostgreSQL.",
             &["db"],
             &["src/lib.rs"],
         );

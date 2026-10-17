@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! `memory consolidate` — first-class convenience over the
+//! `codifix consolidate` — first-class convenience over the
 //! `memory_consolidation` loop: runs the deterministic cluster scan (and,
 //! unless `--dry-run`, the LLM synthesis into human-gated insight proposals)
 //! and renders the stored report.
@@ -59,7 +59,7 @@ pub(super) async fn handle(args: ConsolidateArgs, api: &ApiClient) -> Result<()>
         scope_type: None,
         scope_id: None,
         dry_run: args.dry_run,
-        reason: Some("memory consolidate".to_string()),
+        reason: Some("codifix consolidate".to_string()),
         trigger_payload: None,
     };
     request.validate().map_err(anyhow::Error::msg)?;
@@ -145,11 +145,11 @@ fn render(project: &str, dry_run: bool, detail: &LoopRunDetail) {
         .count();
     if pending > 0 {
         println!(
-            "\nQueued {pending} insight proposal(s) for review: memory loops memory-proposals --project {project} --status pending"
+            "\nQueued {pending} insight proposal(s) for review: codifix loops memory-proposals --project {project} --status pending"
         );
     } else if !report.accepted.is_empty() {
         println!(
-            "\nNo proposals were queued despite accepted clusters — consolidation may be disabled in the service config, or synthesis failed; check memory loops show memory_consolidation and the service log."
+            "\nNo proposals were queued despite accepted clusters — consolidation may be disabled in the service config, or synthesis failed; check codifix loops show memory_consolidation and the service log."
         );
     } else {
         println!("\nNothing to consolidate right now.");

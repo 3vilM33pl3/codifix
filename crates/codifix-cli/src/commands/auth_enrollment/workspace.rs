@@ -108,7 +108,7 @@ impl Catalog for transport::CompanyClient {
 
 pub(super) fn active(store: &impl CredentialStore, origin: &CompanyOrigin) -> Result<Enrollment> {
     let record = credentials::load(store, origin)?
-        .ok_or_else(|| anyhow::anyhow!("sign in with memory auth login for this company first"))?;
+        .ok_or_else(|| anyhow::anyhow!("sign in with codifix auth login for this company first"))?;
     if !record.approved || record.pending_logout {
         bail!("workspace preparation requires an approved device without pending logout");
     }

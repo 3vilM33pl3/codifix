@@ -267,7 +267,7 @@ pub(crate) fn enable_watch_service_routed(
         )?;
         bootstrap_launch_agent(&plist_path, &watch_launch_agent_label(project))?;
         Ok(format!(
-            "Installed and started watcher LaunchAgent {}.\nPlist: {}\nRepo: {}\nProject: {}\n\nManage it with:\n- memory watcher status --project {}\n- memory watcher disable --project {}\n- launchctl kickstart -k {}/{}",
+            "Installed and started watcher LaunchAgent {}.\nPlist: {}\nRepo: {}\nProject: {}\n\nManage it with:\n- codifix watcher status --project {}\n- codifix watcher disable --project {}\n- launchctl kickstart -k {}/{}",
             watch_launch_agent_label(project),
             plist_path.display(),
             repo_root.display(),
@@ -294,7 +294,7 @@ pub(crate) fn enable_watch_service_routed(
         })?;
         platform::run_windows_task(&task_name)?;
         Ok(format!(
-            "Installed and started Windows scheduled task {task_name}.\nRepo: {}\nProject: {}\n{}\n\nManage it with the same --area/--config selection:\n- memory watcher status --project {}\n- memory watcher disable --project {}\n- schtasks /Query /TN {task_name}",
+            "Installed and started Windows scheduled task {task_name}.\nRepo: {}\nProject: {}\n{}\n\nManage it with the same --area/--config selection:\n- codifix watcher status --project {}\n- codifix watcher disable --project {}\n- schtasks /Query /TN {task_name}",
             repo_root.display(),
             project,
             manual_watch_binding(target),
@@ -314,7 +314,7 @@ pub(crate) fn enable_watch_service_routed(
         run_systemctl_user(["daemon-reload"])?;
         run_systemctl_user(["enable", "--now", &unit_name])?;
         Ok(format!(
-            "Installed and started user service {}.\nUnit: {}\nRepo: {}\nProject: {}\n\nManage it with:\n- memory watcher status --project {}\n- memory watcher disable --project {}\n- systemctl --user restart {}",
+            "Installed and started user service {}.\nUnit: {}\nRepo: {}\nProject: {}\n\nManage it with:\n- codifix watcher status --project {}\n- codifix watcher disable --project {}\n- systemctl --user restart {}",
             unit_name,
             unit_path.display(),
             repo_root.display(),
@@ -839,7 +839,7 @@ pub(crate) async fn reconcile_watcher_manager(
             Profile::Prod => "prod",
             Profile::Dev => "dev",
         };
-        let prefix = format!("MemoryLayer-ManagedWatch-{profile_name}-");
+        let prefix = format!("Codifix-ManagedWatch-{profile_name}-");
         let expected = state
             .sessions
             .values()
@@ -1540,7 +1540,7 @@ pub(crate) fn enable_watch_manager_service_routed(
         )?;
         bootstrap_launch_agent(&plist_path, label)?;
         return Ok(format!(
-            "Installed and started watcher manager LaunchAgent {}.\nPlist: {}\nConfig: {}\n\nManage it with:\n- memory watcher manager status\n- memory watcher manager disable\n- launchctl kickstart -k {}/{}",
+            "Installed and started watcher manager LaunchAgent {}.\nPlist: {}\nConfig: {}\n\nManage it with:\n- codifix watcher manager status\n- codifix watcher manager disable\n- launchctl kickstart -k {}/{}",
             label,
             plist_path.display(),
             config_path.display(),
@@ -1579,7 +1579,7 @@ pub(crate) fn enable_watch_manager_service_routed(
         })?;
         platform::run_windows_task(task_name)?;
         Ok(format!(
-            "Installed and started Windows scheduled task {task_name}.\nConfig: {}\n\nManage it with:\n- memory watcher manager status\n- memory watcher manager disable\n- schtasks /Query /TN {task_name}",
+            "Installed and started Windows scheduled task {task_name}.\nConfig: {}\n\nManage it with:\n- codifix watcher manager status\n- codifix watcher manager disable\n- schtasks /Query /TN {task_name}",
             config_path.display()
         ))
     }
@@ -1597,7 +1597,7 @@ pub(crate) fn enable_watch_manager_service_routed(
         run_systemctl_user(["daemon-reload"])?;
         run_systemctl_user(["enable", "--now", WATCH_MANAGER_UNIT_NAME])?;
         Ok(format!(
-            "Installed and started user service {}.\nUnit: {}\nConfig: {}\n\nManage it with:\n- memory watcher manager status\n- memory watcher manager disable\n- systemctl --user restart {}",
+            "Installed and started user service {}.\nUnit: {}\nConfig: {}\n\nManage it with:\n- codifix watcher manager status\n- codifix watcher manager disable\n- systemctl --user restart {}",
             WATCH_MANAGER_UNIT_NAME,
             unit_path.display(),
             config_path.display(),
@@ -1771,7 +1771,7 @@ pub(crate) fn watch_manager_service_status(profile: Profile) -> Result<String> {
         let label = watch_manager_launch_agent_label();
         let status = launch_agent_status(label)?;
         return Ok(format!(
-            "Watcher manager service:\n- label: {}\n- plist: {}\n- installed: {}\n- loaded: {}\n- running: {}\n- tracked sessions: {}\n- last reconcile: {}\n{}\n{}\n\nInspect with:\n- launchctl print {}/{}\n- memory watcher manager status",
+            "Watcher manager service:\n- label: {}\n- plist: {}\n- installed: {}\n- loaded: {}\n- running: {}\n- tracked sessions: {}\n- last reconcile: {}\n{}\n{}\n\nInspect with:\n- launchctl print {}/{}\n- codifix watcher manager status",
             label,
             plist_path.display(),
             yes_no(plist_path.exists()),
@@ -1795,7 +1795,7 @@ pub(crate) fn watch_manager_service_status(profile: Profile) -> Result<String> {
         let is_running = state.lock_owner_pid.is_some_and(platform::process_is_alive)
             || platform::windows_task_is_running(task_name);
         Ok(format!(
-            "Watcher manager service:\n- task: {task_name}\n- installed: {}\n- running: {}\n- tracked sessions: {}\n- last reconcile: {}\n{}\n{}\n\nInspect with:\n- schtasks /Query /TN {task_name} /V /FO LIST\n- memory watcher manager status",
+            "Watcher manager service:\n- task: {task_name}\n- installed: {}\n- running: {}\n- tracked sessions: {}\n- last reconcile: {}\n{}\n{}\n\nInspect with:\n- schtasks /Query /TN {task_name} /V /FO LIST\n- codifix watcher manager status",
             yes_no(platform::windows_task_exists(task_name)),
             yes_no(is_running),
             state.sessions.len(),
@@ -1814,7 +1814,7 @@ pub(crate) fn watch_manager_service_status(profile: Profile) -> Result<String> {
         let is_enabled = run_systemctl_user(["is-enabled", WATCH_MANAGER_UNIT_NAME]).is_ok();
         let is_active = run_systemctl_user(["is-active", WATCH_MANAGER_UNIT_NAME]).is_ok();
         Ok(format!(
-            "Watcher manager service:\n- unit: {}\n- installed: {}\n- enabled: {}\n- active: {}\n- tracked sessions: {}\n- last reconcile: {}\n{}\n{}\n\nInspect with:\n- systemctl --user status {}\n- memory watcher manager status",
+            "Watcher manager service:\n- unit: {}\n- installed: {}\n- enabled: {}\n- active: {}\n- tracked sessions: {}\n- last reconcile: {}\n{}\n{}\n\nInspect with:\n- systemctl --user status {}\n- codifix watcher manager status",
             unit_path.display(),
             yes_no(unit_path.exists()),
             yes_no(is_enabled),

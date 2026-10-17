@@ -77,7 +77,7 @@ The 20,000-row reproduction accumulated about 497 MB of backend memory. Fix
 weakening checks. A 100,000-relation synthetic import and exact replay stayed near
 6.6 MiB with zero retained named statements. Workshop then imported successfully
 with the same snapshot, target UUID and operation ID. See the
-[reproduction and regression evidence](../../../crates/mem-area-store/README.md#large-partition-postgresql-memory-regression).
+[reproduction and regression evidence](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-area-store/README.md#large-partition-postgresql-memory-regression).
 
 Exact replay passed for all four targets (`already_applied=true`). A changed
 inventory binding was rejected without changing the selected target. At

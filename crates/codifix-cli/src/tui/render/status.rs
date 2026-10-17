@@ -41,7 +41,7 @@ pub(in crate::tui) fn llm_audit_status_lines(app: &App) -> Vec<Line<'static>> {
             Span::styled(format!("  {error}"), Style::default().fg(Theme::MUTED)),
         ]));
         lines.push(Line::from(Span::styled(
-            "Press A to retry toggling, or run memory doctor if status stays unavailable.",
+            "Press A to retry toggling, or run codifix doctor if status stays unavailable.",
             Style::default().fg(Theme::MUTED),
         )));
         return lines;
@@ -436,7 +436,7 @@ pub(in crate::tui) fn draw_backend_recovery(frame: &mut ratatui::Frame<'_>, app:
 
     let mut lines = vec![
         Line::from(Span::styled(
-            "Memory Layer backend is unavailable.",
+            "Codifix backend is unavailable.",
             Style::default()
                 .fg(Theme::DANGER)
                 .add_modifier(Modifier::BOLD),
@@ -449,7 +449,7 @@ pub(in crate::tui) fn draw_backend_recovery(frame: &mut ratatui::Frame<'_>, app:
             "Relay discovery fallback is already enabled in shared config.",
         ));
         lines.push(Line::from(
-            "If another Memory Layer backend is running on the local network, press r to retry.",
+            "If another Codifix backend is running on the local network, press r to retry.",
         ));
     } else {
         lines.push(Line::from(
@@ -467,7 +467,7 @@ pub(in crate::tui) fn draw_backend_recovery(frame: &mut ratatui::Frame<'_>, app:
 pub(in crate::tui) fn draw_backend_connecting(frame: &mut ratatui::Frame<'_>, area: Rect) {
     let lines = vec![
         Line::from(Span::styled(
-            "Connecting to Memory Layer backend...",
+            "Connecting to Codifix backend...",
             Style::default()
                 .fg(Theme::ACCENT_STRONG)
                 .add_modifier(Modifier::BOLD),

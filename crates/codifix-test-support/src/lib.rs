@@ -48,7 +48,7 @@ pub async fn run_migrations(pool: &PgPool) -> Result<()> {
     compatible_migrator()
         .run(pool)
         .await
-        .context("run Memory Layer migrations")
+        .context("run Codifix migrations")
 }
 
 /// Database-wide claimers must not consume another test's queued work. Requires

@@ -87,7 +87,7 @@ pub(crate) async fn verify_project_provenance_as(
                         "Create or initialize the project before verifying provenance.".to_string(),
                     ),
                     doctor_hint: None,
-                    command_hint: Some(format!("memory init --project {}", request.project)),
+                    command_hint: Some(format!("codifix init --project {}", request.project)),
                 }],
                 items: Vec::new(),
             },
@@ -197,7 +197,7 @@ pub(crate) async fn verify_project_provenance_as(
             fix_hint: Some("Review the cited path and update or replace the memory.".to_string()),
             doctor_hint: None,
             command_hint: Some(format!(
-                "memory verify-provenance --project {} --repo-root {}",
+                "codifix verify-provenance --project {} --repo-root {}",
                 request.project, repo_root
             )),
         })

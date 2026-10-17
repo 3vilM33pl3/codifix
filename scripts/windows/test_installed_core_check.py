@@ -48,7 +48,7 @@ class InstalledCoreCheckTests(unittest.TestCase):
 
     def test_recovery_appends_separate_evidence_and_restarts_only_exact_service(self):
         source = SCRIPT.read_text()
-        for required in ["'MemoryLayer-lab-core-'+$InstallOperationId.ToString('N').Substring(0,16)",
+        for required in ["'Codifix-lab-core-'+$InstallOperationId.ToString('N').Substring(0,16)",
                          "$old.service_name -cne $name", "$preview.plan.service_name -cne $name",
                          "Restart-Service -Name $name", "$scm.StartName -ine $account",
                          "$owner.Sid -cne $sid", "$children.Count -ne 1",

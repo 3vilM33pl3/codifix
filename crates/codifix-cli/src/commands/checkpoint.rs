@@ -159,7 +159,7 @@ pub(super) async fn handle(
                     eprintln!(
                         "warning: plan captured, but curation did not confirm ({error}). \
                          It may still complete server-side; if the plan memory does not \
-                         appear, run `memory curate --project {project}`."
+                         appear, run `codifix curate --project {project}`."
                     );
                     serde_json::json!({ "deferred": error.to_string() })
                 }

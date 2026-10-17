@@ -194,7 +194,7 @@ pub(crate) async fn handle(args: SupervisorArgs, api: &ApiClient) -> Result<()> 
             serde_json::to_string_pretty(&api.supervisor_policy(&request).await?)?
         );
         println!(
-            "Receipt confirms this request, not current worker health. Run memory supervisor to inspect fresh state."
+            "Receipt confirms this request, not current worker health. Run codifix supervisor to inspect fresh state."
         );
         return Ok(());
     }
@@ -344,7 +344,7 @@ pub(crate) fn lines(response: &SupervisorResponse) -> Vec<String> {
         lines.push("No newer history entries on this page.".into());
     }
     if s.has_more {
-        lines.push(format!("Next: memory supervisor --after {}", s.next_after));
+        lines.push(format!("Next: codifix supervisor --after {}", s.next_after));
     }
     lines
 }

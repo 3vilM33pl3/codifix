@@ -2289,7 +2289,7 @@ pub(crate) async fn proxy_relay_request(
     request: Request,
 ) -> Result<Response, ApiError> {
     let peer = crate::selected_primary_peer(state).ok_or_else(|| {
-        ApiError::service_unavailable("no primary memory service available on the local network")
+        ApiError::service_unavailable("no primary codifix service available on the local network")
     })?;
     let (parts, body) = request.into_parts();
     let path_and_query = parts
@@ -2547,7 +2547,7 @@ pub(crate) async fn read_only_guard(
     {
         return ApiError::status_message(
             axum::http::StatusCode::FORBIDDEN,
-            "this Memory Layer runs in read-only (student) mode; writes are disabled",
+            "this Codifix runs in read-only (student) mode; writes are disabled",
         )
         .into_response();
     }

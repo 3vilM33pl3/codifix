@@ -177,27 +177,26 @@ pub(crate) struct RestartMarker {
 
 pub(crate) const TUI_RESTART_MARKER_FILE: &str = "tui-restart-required.json";
 #[cfg(all(unix, not(target_os = "macos")))]
-pub(crate) const GLOBAL_TUI_RESTART_MARKER: &str =
-    "/var/lib/memory-layer/tui-restart-required.json";
+pub(crate) const GLOBAL_TUI_RESTART_MARKER: &str = "/var/lib/codifix/tui-restart-required.json";
 #[cfg(target_os = "macos")]
 pub(crate) const GLOBAL_TUI_RESTART_MARKER: &str =
-    "/usr/local/var/memory-layer/tui-restart-required.json";
+    "/usr/local/var/codifix/tui-restart-required.json";
 
 pub(crate) const CODIFIX_SKILL_NAMES: &[&str] = &[
     "memory-direct-task-start",
     "memory-github-init",
-    "memory-layer",
+    "codifix",
     "memory-plan-execution",
     "memory-project-init",
     "memory-review-proposals",
     "memory-query-resume",
     "memory-remember",
 ];
-const DEFAULT_RUNTIME_SKILL_FILTER: &[&str] = &["memory-layer"];
+const DEFAULT_RUNTIME_SKILL_FILTER: &[&str] = &["codifix"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RuntimeSkillFilter {
-    MemoryLayer,
+    Codifix,
     All,
 }
 
@@ -205,20 +204,20 @@ impl RuntimeSkillFilter {
     fn from_query(value: Option<&str>) -> Self {
         match value.map(str::trim).filter(|value| !value.is_empty()) {
             Some("all") => Self::All,
-            _ => Self::MemoryLayer,
+            _ => Self::Codifix,
         }
     }
 
     fn label(self) -> &'static str {
         match self {
-            Self::MemoryLayer => "memory-layer",
+            Self::Codifix => "codifix",
             Self::All => "all",
         }
     }
 
     fn skills(self) -> &'static [&'static str] {
         match self {
-            Self::MemoryLayer => DEFAULT_RUNTIME_SKILL_FILTER,
+            Self::Codifix => DEFAULT_RUNTIME_SKILL_FILTER,
             Self::All => CODIFIX_SKILL_NAMES,
         }
     }
@@ -925,9 +924,9 @@ pub(crate) fn runtime_skill_status(
         "warn"
     };
     let summary = match (filter, status) {
-        (RuntimeSkillFilter::MemoryLayer, "ok") => "memory-layer skill current".to_string(),
-        (RuntimeSkillFilter::MemoryLayer, _) => {
-            format!("memory-layer skill: {missing} missing, {outdated} outdated")
+        (RuntimeSkillFilter::Codifix, "ok") => "codifix skill current".to_string(),
+        (RuntimeSkillFilter::Codifix, _) => {
+            format!("codifix skill: {missing} missing, {outdated} outdated")
         }
         (RuntimeSkillFilter::All, "ok") => format!("{} skills current", skills.len()),
         (RuntimeSkillFilter::All, _) => format!("{missing} missing, {outdated} outdated"),

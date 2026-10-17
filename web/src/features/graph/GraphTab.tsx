@@ -317,7 +317,7 @@ export function GraphTab({
         ) : null}
         {memoryGraph ? (
           <span>
-            memory graph {memoryGraph.returned_memories} memories / {memoryGraph.nodes.length} nodes /{" "}
+            codifix graph {memoryGraph.returned_memories} memories / {memoryGraph.nodes.length} nodes /{" "}
             {memoryGraph.edges.length} edges
           </span>
         ) : null}
@@ -333,9 +333,9 @@ export function GraphTab({
       {graph && !graph.status.has_graph && !(memoryGraph?.nodes.length ?? 0) ? (
         <div className="graph-empty">
           <h2>No graph data yet</h2>
-          <p>Run <code>memory graph extract --project {project}</code> and refresh this tab.</p>
+          <p>Run <code>codifix graph extract --project {project}</code> and refresh this tab.</p>
           <p>
-            No memories at all yet? <code>memory demo</code> loads a showcase project whose memory
+            No memories at all yet? <code>codifix demo</code> loads a showcase project whose memory
             graph renders here.
           </p>
         </div>

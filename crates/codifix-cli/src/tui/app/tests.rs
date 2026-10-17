@@ -1025,9 +1025,9 @@ fn dev_manager_status_ignores_installed_service_probe() {
 
 #[test]
 fn manager_process_detection_is_profile_scoped() {
-    let prod = "/home/user/.local/bin/memory --config /home/user/.config/memory-layer/memory-layer.toml watcher manager run";
-    let dev = "/home/user/project/target/debug/memory watcher manager run";
-    let explicit_dev = "CODIFIX_PROFILE=dev /home/user/.local/bin/memory watcher manager run";
+    let prod = "/home/user/.local/bin/memory --config /home/user/.config/codifix/codifix.toml watcher manager run";
+    let dev = "/home/user/project/target/debug/codifix watcher manager run";
+    let explicit_dev = "CODIFIX_PROFILE=dev /home/user/.local/bin/codifix watcher manager run";
 
     assert!(super::command_is_manager_for_profile(prod, Profile::Prod));
     assert!(!super::command_is_manager_for_profile(prod, Profile::Dev));
@@ -1662,7 +1662,7 @@ fn llm_audit_toggle_event_updates_status_message() {
             max_message_chars: 8000,
             max_total_chars: 32000,
             profile: "prod".to_string(),
-            config_path: Some("/config/memory-layer.toml".to_string()),
+            config_path: Some("/config/codifix.toml".to_string()),
         }),
     });
 
@@ -1711,8 +1711,8 @@ fn errors_tab_collects_persisted_diagnostics() {
                 raw_error: Some("429 insufficient_quota".to_string()),
                 explanation: Some("provider quota was exhausted".to_string()),
                 fix_hint: Some("restore quota or disable automatic creation".to_string()),
-                doctor_hint: Some("memory doctor".to_string()),
-                command_hint: Some("memory embeddings list".to_string()),
+                doctor_hint: Some("codifix doctor".to_string()),
+                command_hint: Some("codifix embeddings list".to_string()),
             },
         }),
         actor_id: None,
@@ -2229,7 +2229,7 @@ fn test_skill_inventory() -> SkillInventoryReport {
         filter: "visible".to_string(),
         skills: vec![
             test_skill(
-                "memory-layer",
+                "codifix",
                 SkillSourceKind::RepoMemory,
                 true,
                 SkillUpgradeAction::Skip,

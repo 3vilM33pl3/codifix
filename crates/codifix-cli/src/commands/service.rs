@@ -29,7 +29,7 @@ pub(super) async fn handle(args: &ServiceArgs, cli_config: Option<PathBuf>) -> R
         #[cfg(not(feature = "embedded-service-postgres"))]
         ServiceCommand::Run => {
             anyhow::bail!(
-                "`memory service run` requires a build with the embedded-service or embedded-service-postgres feature \
+                "`codifix service run` requires a build with the embedded-service or embedded-service-postgres feature \
                  (default source and packaged builds include it; explicitly lean builds do not); \
                  enable/disable/status/restart-all still manage the installed service"
             );

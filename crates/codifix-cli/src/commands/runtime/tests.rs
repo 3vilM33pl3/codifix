@@ -150,14 +150,14 @@ fn redirect_test_local_app_data(root: &Path) -> Option<String> {
 #[test]
 fn windows_service_dry_runs_describe_task_scheduler_actions() {
     let config = Path::new(r"C:\Users\tester\AppData\Local\codifix\codifix.toml");
-    assert!(preview_enable_backend_service(config).contains("MemoryLayer-Backend"));
+    assert!(preview_enable_backend_service(config).contains("Codifix-Backend"));
     assert!(preview_disable_backend_service(config).contains("stop and delete"));
 
     let repo = Path::new(r"C:\src\memory");
     assert!(
         preview_enable_watch_service(repo, "memory")
             .unwrap()
-            .contains("MemoryLayer-Watch-memory")
+            .contains("Codifix-Watch-memory")
     );
     assert!(
         preview_disable_watch_service("memory")
@@ -279,7 +279,7 @@ fn urls_supports_global_area_json_and_completion_metadata() {
     assert!(args.json);
     let mut command = Cli::command();
     let urls = command.find_subcommand_mut("urls").unwrap();
-    assert_command_metadata(urls, "memory urls");
+    assert_command_metadata(urls, "codifix urls");
 }
 
 fn assert_command_metadata(cmd: &Command, path: &str) {
@@ -586,13 +586,13 @@ fn root_help_includes_examples_and_docs_hint() {
     assert!(output.contains("checkpoint start-execution"));
     assert!(output.contains("checkpoint start-task"));
     assert!(output.contains("checkpoint finish-execution"));
-    assert!(output.contains("memory status --project memory"));
-    assert!(output.contains("memory wizard"));
-    assert!(output.contains("memory init"));
+    assert!(output.contains("codifix status --project memory"));
+    assert!(output.contains("codifix wizard"));
+    assert!(output.contains("codifix init"));
     assert!(output.contains("ingest"));
     assert!(output.contains("auth"));
-    assert!(!output.contains("memory setup"));
-    assert!(!output.contains("memory stats"));
+    assert!(!output.contains("codifix setup"));
+    assert!(!output.contains("codifix stats"));
     assert!(!output.contains(", automation,"));
     assert!(output.contains("Examples:"));
     assert!(output.contains("docs/user/README.md"));
@@ -602,11 +602,11 @@ fn root_help_includes_examples_and_docs_hint() {
 #[test]
 fn health_and_watcher_flush_help_name_current_commands() {
     let health = rendered_help(&["memory", "health", "--help"]);
-    assert!(health.contains("memory doctor --project memory"));
-    assert!(!health.contains("memory stats"));
+    assert!(health.contains("codifix doctor --project memory"));
+    assert!(!health.contains("codifix stats"));
 
     let flush = rendered_help(&["memory", "watcher", "flush", "--help"]);
-    assert!(flush.contains("memory watcher flush --project memory --dry-run"));
+    assert!(flush.contains("codifix watcher flush --project memory --dry-run"));
     assert!(flush.contains("Older documentation called this `codifix automation flush`"));
     assert!(!flush.contains("docs/user/cli/automation.md"));
 }
@@ -1164,7 +1164,7 @@ fn agent_critical_help_mentions_current_surfaces() {
 
     let embeddings_activate = rendered_help(&["memory", "embeddings", "activate", "--help"]);
     assert!(embeddings_activate.contains("does not recompute embeddings"));
-    assert!(embeddings_activate.contains("memory embeddings list"));
+    assert!(embeddings_activate.contains("codifix embeddings list"));
 
     let history = rendered_help(&["memory", "prune-history", "--help"]);
     assert!(history.contains("Always use --dry-run and --json first"));
@@ -1902,11 +1902,11 @@ fn init_print_describes_repo_layout() {
     assert!(normalized_summary.contains(".agents/skills"));
     assert!(normalized_summary.contains("bundled memory skills"));
     if cfg!(target_os = "macos") {
-        assert!(summary.contains("memory watcher enable --project memory"));
+        assert!(summary.contains("codifix watcher enable --project memory"));
     } else {
-        assert!(summary.contains("memory watcher manager enable"));
+        assert!(summary.contains("codifix watcher manager enable"));
     }
-    assert!(summary.contains("memory service run"));
+    assert!(summary.contains("codifix service run"));
 }
 
 #[test]
@@ -2262,7 +2262,7 @@ fn claude_memory_section_mentions_code_explanation_memory() {
 
     assert!(content.contains("Remember distilled code and codebase explanations"));
     assert!(content.contains("### Store code explanations"));
-    assert!(content.contains("memory remember --project memory --type project"));
+    assert!(content.contains("codifix remember --project memory --type project"));
     assert!(content.contains("Do not store the full chat answer"));
     assert!(content.contains("Do not use `--file-changed` unless files actually changed"));
 }

@@ -408,7 +408,7 @@ async fn repository_memory_graph_returns_provenance_and_relationship_layers() {
         30.0 * 24.0 * 3600.0,
     )
     .await
-    .expect("fetch memory graph");
+    .expect("fetch codifix graph");
 
     assert_eq!(graph.project, project);
     assert_eq!(graph.total_memories, 2);
@@ -483,7 +483,7 @@ async fn repository_memory_graph_returns_empty_graph_for_empty_project() {
         30.0 * 24.0 * 3600.0,
     )
     .await
-    .expect("fetch memory graph");
+    .expect("fetch codifix graph");
 
     assert_eq!(graph.project, project);
     assert_eq!(graph.total_memories, 0);
@@ -641,7 +641,7 @@ async fn loop_repository_routes_trigger_events_and_dedupes() {
     .expect("read routed loop run");
     assert!(
         loaded_run.memory_proposals.len() >= 4,
-        "context_pack_refresh should emit pending memory proposals"
+        "context_pack_refresh should emit pending codifix proposals"
     );
     assert!(
         loaded_run
@@ -786,7 +786,7 @@ async fn loop_repository_approves_memory_proposal_and_writes_provenance() {
         run_id: None,
         target_memory_id: None,
         candidate: serde_json::json!({
-            "canonical_text": "Loop memory proposals store reviewed durable memory text.",
+            "canonical_text": "Loop codifix proposals store reviewed durable memory text.",
             "summary": "Loop proposal approval writes memory",
             "memory_type": "implementation",
             "tags": ["loop-engineering", "proposal"]
@@ -837,7 +837,7 @@ async fn loop_repository_approves_memory_proposal_and_writes_provenance() {
     assert_eq!(memory.summary, "Loop proposal approval writes memory");
     assert_eq!(
         memory.canonical_text,
-        "Loop memory proposals store reviewed durable memory text."
+        "Loop codifix proposals store reviewed durable memory text."
     );
     assert_eq!(memory.sources.len(), 2);
     assert!(
@@ -1821,7 +1821,7 @@ async fn loop_repository_memory_eval_reports_quality_metrics() {
             scope_type: None,
             scope_id: None,
             dry_run: true,
-            reason: Some("memory eval repository test".to_string()),
+            reason: Some("codifix eval repository test".to_string()),
             trigger_payload: Some(serde_json::json!({
                 "golden_scenarios": [{
                     "id": "golden-reference",
@@ -1833,7 +1833,7 @@ async fn loop_repository_memory_eval_reports_quality_metrics() {
         },
     )
     .await
-    .expect("run memory eval loop")
+    .expect("run codifix eval loop")
     .run;
 
     assert_eq!(run.summary.status, LoopRunStatus::Succeeded);

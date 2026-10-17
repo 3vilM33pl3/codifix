@@ -123,7 +123,7 @@ pub(in crate::tui) fn draw_embeddings_tab(
 
     if backends.is_empty() {
         let body = if app.embeddings.embedding_backends_snapshot.is_some() {
-            "No embedding backends configured. Declare them under [[embeddings.backends]] in your memory-layer.toml."
+            "No embedding backends configured. Declare them under [[embeddings.backends]] in your codifix.toml."
         } else {
             "Loading embedding backends..."
         };

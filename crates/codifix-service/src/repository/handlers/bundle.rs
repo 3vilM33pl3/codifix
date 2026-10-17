@@ -348,7 +348,7 @@ pub(crate) fn load_bundle_archive(bytes: &[u8]) -> Result<LoadedBundle, ApiError
         || manifest.schema_version > MEMORY_BUNDLE_SCHEMA_VERSION
     {
         return Err(ApiError::validation(ValidationError::new(
-            "unsupported memory bundle schema version",
+            "unsupported codifix bundle schema version",
         )));
     }
     let recalculated = if manifest.schema_version >= 2 {
@@ -362,7 +362,7 @@ pub(crate) fn load_bundle_archive(bytes: &[u8]) -> Result<LoadedBundle, ApiError
     };
     if manifest.bundle_hash != recalculated {
         return Err(ApiError::validation(ValidationError::new(
-            "memory bundle hash verification failed",
+            "codifix bundle hash verification failed",
         )));
     }
     let warnings = detect_bundle_warnings(&manifest.entries, &manifest.options);
@@ -576,7 +576,10 @@ async fn confirm_export_prepared_tx(
             .project_id
             .ok_or_else(|| ApiError::internal("export missing project"))?,
         ActivityKind::BundleExport,
-        format!("Prepared memory bundle {} for download", manifest.bundle_id),
+        format!(
+            "Prepared codifix bundle {} for download",
+            manifest.bundle_id
+        ),
     );
     event.id = Uuid::new_v5(&effect.id, b"event");
     event.operation_id = Some(effect.id.to_string());

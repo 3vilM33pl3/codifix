@@ -37,7 +37,7 @@ try{$password=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)}final
 $database='lab_core_'+$OperationId.ToString('N');$instance=[guid]::NewGuid().ToString()
 $token=[guid]::NewGuid().ToString('N')+[guid]::NewGuid().ToString('N')
 $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0);$listener.Start();$port=$listener.LocalEndpoint.Port;$listener.Stop()
-$origin="http://127.0.0.1:$port";$config=Join-Path $root 'memory-layer.toml'
+$origin="http://127.0.0.1:$port";$config=Join-Path $root 'codifix.toml'
 $web=Join-Path $SourceRoot 'web\dist'
 if($WebRoot){
     if($WebRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+\\web\\dist$'){throw 'Explicit lab Web build required'}

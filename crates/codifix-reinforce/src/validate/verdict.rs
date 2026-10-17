@@ -308,19 +308,18 @@ mod tests {
 
     #[test]
     fn normalizes_fallback_suffix_on_line_reference() {
-        let context = minimal_context(&[".agents/memory-layer/references/architecture.md:L1-L2"]);
+        let context = minimal_context(&[".agents/codifix/references/architecture.md:L1-L2"]);
         let mut verdict = raw(Verdict::Valid, 0.9);
         verdict.evidence.push(RawEvidence {
             kind: EvidenceKind::File,
-            evidence_ref: ".agents/memory-layer/references/architecture.md:L1-L2 fallback"
-                .to_string(),
+            evidence_ref: ".agents/codifix/references/architecture.md:L1-L2 fallback".to_string(),
             stance: EvidenceStance::Supports,
             excerpt: None,
         });
         let validated = validate_verdict(verdict, &context).expect("fallback suffix accepted");
         assert_eq!(
             validated.evidence[0].evidence_ref,
-            ".agents/memory-layer/references/architecture.md:L1-L2"
+            ".agents/codifix/references/architecture.md:L1-L2"
         );
     }
 
@@ -328,17 +327,17 @@ mod tests {
     fn normalizes_overlapping_proof_line_reference() {
         let mut context = minimal_context(&[]);
         context.proof_snippets.push(ProofSnippet {
-            file_path: ".agents/memory-layer/references/architecture.md".to_string(),
+            file_path: ".agents/codifix/references/architecture.md".to_string(),
             line_start: 1,
             line_end: 2,
             text: "Memory consolidation\nInsight meta-memories".to_string(),
             fallback: true,
         });
-        context.insert_allowed_reference(".agents/memory-layer/references/architecture.md:L1-L2");
+        context.insert_allowed_reference(".agents/codifix/references/architecture.md:L1-L2");
         let mut verdict = raw(Verdict::Valid, 0.9);
         verdict.evidence.push(RawEvidence {
             kind: EvidenceKind::File,
-            evidence_ref: ".agents/memory-layer/references/architecture.md:L2-L3".to_string(),
+            evidence_ref: ".agents/codifix/references/architecture.md:L2-L3".to_string(),
             stance: EvidenceStance::Supports,
             excerpt: None,
         });
@@ -347,7 +346,7 @@ mod tests {
 
         assert_eq!(
             validated.evidence[0].evidence_ref,
-            ".agents/memory-layer/references/architecture.md:L1-L2"
+            ".agents/codifix/references/architecture.md:L1-L2"
         );
     }
 
@@ -355,17 +354,17 @@ mod tests {
     fn rejects_non_overlapping_proof_line_reference() {
         let mut context = minimal_context(&[]);
         context.proof_snippets.push(ProofSnippet {
-            file_path: ".agents/memory-layer/references/architecture.md".to_string(),
+            file_path: ".agents/codifix/references/architecture.md".to_string(),
             line_start: 1,
             line_end: 2,
             text: "Memory consolidation\nInsight meta-memories".to_string(),
             fallback: true,
         });
-        context.insert_allowed_reference(".agents/memory-layer/references/architecture.md:L1-L2");
+        context.insert_allowed_reference(".agents/codifix/references/architecture.md:L1-L2");
         let mut verdict = raw(Verdict::Valid, 0.9);
         verdict.evidence.push(RawEvidence {
             kind: EvidenceKind::File,
-            evidence_ref: ".agents/memory-layer/references/architecture.md:L5-L6".to_string(),
+            evidence_ref: ".agents/codifix/references/architecture.md:L5-L6".to_string(),
             stance: EvidenceStance::Supports,
             excerpt: None,
         });

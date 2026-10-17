@@ -856,7 +856,7 @@ pub(crate) fn resume_actions(
                         overview.pending_replacement_proposals
                     )
                 }),
-            command_hint: Some(format!("memory tui --project {project}")),
+            command_hint: Some(format!("codifix tui --project {project}")),
         });
     }
     if overview.uncurated_raw_captures > 0 {
@@ -866,7 +866,7 @@ pub(crate) fn resume_actions(
                 "{} raw capture(s) are waiting to be curated into canonical memory.",
                 overview.uncurated_raw_captures
             ),
-            command_hint: Some(format!("memory curate --project {project}")),
+            command_hint: Some(format!("codifix curate --project {project}")),
         });
     }
     if overview
@@ -877,7 +877,7 @@ pub(crate) fn resume_actions(
         actions.push(ResumeAction {
             title: "Inspect watcher health".to_string(),
             rationale: "At least one watcher is unhealthy or restarting.".to_string(),
-            command_hint: Some(format!("memory watcher status --project {project}")),
+            command_hint: Some(format!("codifix watcher status --project {project}")),
         });
     }
     if timeline
@@ -887,7 +887,7 @@ pub(crate) fn resume_actions(
         actions.push(ResumeAction {
             title: "Review recent failed queries".to_string(),
             rationale: "Recent agent or user queries failed and may indicate blockers.".to_string(),
-            command_hint: Some(format!("memory tui --project {project}")),
+            command_hint: Some(format!("codifix tui --project {project}")),
         });
     }
     if !changed_memories.is_empty() {
@@ -897,21 +897,21 @@ pub(crate) fn resume_actions(
                 "{} memory entry/entries changed since the last checkpoint.",
                 changed_memories.len()
             ),
-            command_hint: Some(format!("memory resume --project {project}")),
+            command_hint: Some(format!("codifix resume --project {project}")),
         });
     }
     if let Some(note) = checkpoint.and_then(|checkpoint| checkpoint.note.as_deref()) {
         actions.push(ResumeAction {
             title: "Resume the last approved thread".to_string(),
             rationale: format!("Your last checkpoint note was: {note}"),
-            command_hint: Some(format!("memory resume --project {project}")),
+            command_hint: Some(format!("codifix resume --project {project}")),
         });
     }
     if actions.is_empty() {
         actions.push(ResumeAction {
             title: "Ask the next scoped question".to_string(),
             rationale: "The project looks stable; use the resume pack as the launch point for your next task.".to_string(),
-            command_hint: Some(format!("memory query --project {project} --question \"What should I work on next?\"")),
+            command_hint: Some(format!("codifix query --project {project} --question \"What should I work on next?\"")),
         });
     }
     actions
@@ -1481,7 +1481,7 @@ pub(crate) fn build_up_to_speed_briefing(
     }
     if lines.len() == 1 {
         lines.push(
-            "No recent activity was found. Start with `memory query` or inspect the TUI."
+            "No recent activity was found. Start with `codifix query` or inspect the TUI."
                 .to_string(),
         );
     }

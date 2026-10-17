@@ -301,7 +301,7 @@ impl ServiceReader {
                 QueryServiceConfigW, SC_MANAGER_CONNECT, SERVICE_QUERY_CONFIG,
             },
         };
-        if !name.starts_with("MemoryLayer-")
+        if !name.starts_with("Codifix-")
             || name.len() > 60
             || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
         {
@@ -1100,7 +1100,7 @@ mod tests {
         synthetic_service_acl(&path, sid, "GRGXGW");
         assert!(ServiceInput::open(&path, 9, &reader).is_err());
         assert!(ServiceReader::for_named_service("OtherService").is_err());
-        assert!(ServiceReader::for_named_service("MemoryLayer-../bad").is_err());
+        assert!(ServiceReader::for_named_service("Codifix-../bad").is_err());
     }
 
     #[test]

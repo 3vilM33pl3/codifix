@@ -161,12 +161,12 @@ pub(crate) fn classify_diagnostic(
         severity,
         message: raw_error.to_string(),
         raw_error: Some(raw_error.to_string()),
-        explanation: Some("Memory Layer hit an internal operation failure.".to_string()),
+        explanation: Some("Codifix hit an internal operation failure.".to_string()),
         fix_hint: Some(
-            "Run `memory doctor` and inspect the service log for the recorded diagnostic."
+            "Run `codifix doctor` and inspect the service log for the recorded diagnostic."
                 .to_string(),
         ),
-        doctor_hint: Some("memory doctor".to_string()),
+        doctor_hint: Some("codifix doctor".to_string()),
         command_hint: None,
     };
 
@@ -191,7 +191,7 @@ pub(crate) fn classify_diagnostic(
             "Restore provider quota/billing or disable automatic creation for the failing backend until quota is available."
                 .to_string(),
         );
-        diagnostic.command_hint = Some("memory embeddings list".to_string());
+        diagnostic.command_hint = Some("codifix embeddings list".to_string());
         return diagnostic;
     }
 
@@ -208,10 +208,10 @@ pub(crate) fn classify_diagnostic(
                 .to_string(),
         );
         diagnostic.fix_hint = Some(
-            "Refresh the Memory Layer token/configuration and restart the affected component."
+            "Refresh the Codifix token/configuration and restart the affected component."
                 .to_string(),
         );
-        diagnostic.command_hint = Some("memory doctor".to_string());
+        diagnostic.command_hint = Some("codifix doctor".to_string());
         return diagnostic;
     }
 
@@ -232,7 +232,7 @@ pub(crate) fn classify_diagnostic(
             "Install pgvector for PostgreSQL and run `CREATE EXTENSION IF NOT EXISTS vector;` in the memory database."
                 .to_string(),
         );
-        diagnostic.command_hint = Some("memory doctor".to_string());
+        diagnostic.command_hint = Some("codifix doctor".to_string());
         return diagnostic;
     }
 
@@ -246,7 +246,7 @@ pub(crate) fn classify_diagnostic(
                 .to_string(),
         );
         diagnostic.fix_hint = Some(
-            "Run `memory doctor`, verify the configured database URL, and inspect migrations."
+            "Run `codifix doctor`, verify the configured database URL, and inspect migrations."
                 .to_string(),
         );
     }

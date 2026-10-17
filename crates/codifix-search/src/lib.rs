@@ -163,7 +163,7 @@ struct EmbeddingRegistryEntry {
 impl EmbeddingRegistry {
     /// Build a registry from a full `EmbeddingsConfig`, silently skipping
     /// any backend that fails to resolve (missing model, missing API key).
-    /// Those are surfaced by `memory doctor`; the service should still
+    /// Those are surfaced by `codifix doctor`; the service should still
     /// start.
     pub fn from_config(config: &EmbeddingsConfig) -> Self {
         let mut entries = Vec::new();
@@ -800,11 +800,11 @@ fn provenance_warnings_for_results(results: &[QueryResult]) -> Vec<DiagnosticInf
                     raw_error: None,
                     explanation: None,
                     fix_hint: Some(
-                        "Run `memory verify-provenance --project <slug>` to verify source citations."
+                        "Run `codifix verify-provenance --project <slug>` to verify source citations."
                             .to_string(),
                     ),
                     doctor_hint: None,
-                    command_hint: Some("memory verify-provenance --project <slug>".to_string()),
+                    command_hint: Some("codifix verify-provenance --project <slug>".to_string()),
                 });
                 continue;
             };
@@ -835,11 +835,11 @@ fn provenance_warnings_for_results(results: &[QueryResult]) -> Vec<DiagnosticInf
                 raw_error: None,
                 explanation: provenance.reason.clone(),
                 fix_hint: Some(
-                    "Run `memory verify-provenance --project <slug>` and review stale citations."
+                    "Run `codifix verify-provenance --project <slug>` and review stale citations."
                         .to_string(),
                 ),
                 doctor_hint: None,
-                command_hint: Some("memory verify-provenance --project <slug>".to_string()),
+                command_hint: Some("codifix verify-provenance --project <slug>".to_string()),
             });
         }
     }

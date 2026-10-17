@@ -20,15 +20,15 @@ $corePath="C:\MemoryLab\runs\$($old.core_operation_id)\core-workflow\result.json
 if((Get-CoreInstallHash $corePath) -cne $old.core_receipt_sha256){throw 'Completed core receipt changed'}
 $core=Get-Content -LiteralPath $corePath -Raw | ConvertFrom-Json
 $preview=Get-Content -LiteralPath (Join-Path $root 'preview.stdout.log') -Raw | ConvertFrom-Json
-$journalPath="C:\ProgramData\MemoryLayer\operations\$InstallOperationId\journal.json"
+$journalPath="C:\ProgramData\Codifix\operations\$InstallOperationId\journal.json"
 Assert-CoreInstallPath $journalPath
 $journal=Get-Content -LiteralPath $journalPath -Raw | ConvertFrom-Json
 if($journal.phase -cne 'completed' -or $journal.input_sha256 -cne $old.preview_input_sha256 -or
     $journal.operation_id -cne $InstallOperationId.ToString()){throw 'Exact completed installation journal required'}
-$name='MemoryLayer-lab-core-'+$InstallOperationId.ToString('N').Substring(0,16)
+$name='Codifix-lab-core-'+$InstallOperationId.ToString('N').Substring(0,16)
 if($old.service_name -cne $name -or $preview.plan.service_name -cne $name){throw 'Exact selected lab service required'}
-$release='C:\Program Files\Memory Layer\releases\windows-v2.1.0-rc.5-build.'+$old.installer_build
-$config='C:\ProgramData\MemoryLayer\configurations\'+$preview.plan.name+'\memory-layer.toml'
+$release='C:\Program Files\Codifix\releases\windows-v2.1.0-rc.5-build.'+$old.installer_build
+$config='C:\ProgramData\Codifix\configurations\'+$preview.plan.name+'\codifix.toml'
 if((Get-CoreInstallHash $config) -cne $old.config_sha256 -or
     (Get-CoreInstallHash "$release\bin\codifix.exe") -cne $core.binary_sha256){throw 'Installed configuration or executable differs'}
 $binding=Get-CoreInstallBinding ([IO.File]::ReadAllText($config)) ([guid]$old.core_operation_id) ([guid]$old.instance)

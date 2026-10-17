@@ -376,7 +376,7 @@ pub(crate) fn print_index_report(report: &scan::RepoIndexReport) {
 pub(crate) fn print_index_status(status: &Option<scan::RepoIndexStatus>, project: &str) {
     let Some(status) = status else {
         println!("No repository index found for {project}.");
-        println!("Build one with: memory repo index --project {project}");
+        println!("Build one with: codifix repo index --project {project}");
         return;
     };
     println!("Repository index status for {}\n", status.project);
@@ -491,7 +491,7 @@ pub(crate) fn print_graph_status(status: &CodeGraphStatusResponse) {
     if !status.has_graph {
         println!("No code graph extraction found for {}.", status.project);
         println!(
-            "Build one with: memory graph extract --project {}",
+            "Build one with: codifix graph extract --project {}",
             status.project
         );
         return;
@@ -688,7 +688,7 @@ pub(crate) fn print_embedding_backends(payload: &codifix_record::EmbeddingBacken
     if let Some(name) = active {
         println!("Active: {name}");
     } else {
-        println!("Active: (none) — run `memory embeddings activate <name>` to pick one.");
+        println!("Active: (none) — run `codifix embeddings activate <name>` to pick one.");
     }
     let not_ready: Vec<&str> = payload
         .backends

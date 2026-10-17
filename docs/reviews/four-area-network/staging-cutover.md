@@ -87,7 +87,7 @@ node scripts/areas/review-ledger.mjs validate-ledger \
 `ready: false`/exit 2 is a stop, not permission to fill decisions heuristically.
 Only after review is complete create and verify a new manifest, materialize its
 exact payloads and prepare fresh inactive targets using the existing
-[import operator](../../../crates/mem-area-ops/README.md). Prove exact replay
+[import operator](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-area-ops/README.md). Prove exact replay
 and changed-input rejection again. A successful delta does not stop writers or
 capture writes that occurred after its snapshot.
 

@@ -61,7 +61,7 @@ otherwise misleading headline.
 
 **Decision: 10 September 2026; re-read 17 September.**
 [ADR 0011](../../developer/adr/0011-atproto-federation-adapter.md), lines 28–63,
-67–91 and 114–133; [repository verifier](../../../crates/mem-atproto-verify/src/lib.rs),
+67–91 and 114–133; [repository verifier](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-atproto-verify/src/lib.rs),
 lines 56–65 and 105–155.
 
 ATProto is an external record/repository adapter behind a neutral Memory domain.
@@ -94,7 +94,7 @@ the origin's ordinary local memory.
 
 **Completion evidence: 11 September 2026; re-read 17 September.**
 [F1 contract and execution](f1-execution.md), lines 15–103 and 658–756;
-[independent-instance executable fixture](../../../crates/mem-service/src/federation/workflow/tests/f1_instances.rs),
+[independent-instance executable fixture](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-service/src/federation/workflow/tests/f1_instances.rs),
 lines 177–204 and 290–348.
 
 Capability advertisements use the ordered publication/ATProto path. Addressed
@@ -193,7 +193,7 @@ not close these broader gates.
 implementation: `0436b17`, 12:45 BST.**
 [Four-area execution ledger](../four-area-network/README.md), lines 3–8,
 33–49, 121–165 and 190–245; [current code map](../../developer/architecture/code-map.md),
-lines 8–14; [import boundaries](../../../crates/mem-area-store/README.md).
+lines 8–14; [import boundaries](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-area-store/README.md).
 
 The latest committed increment adds strict payload materialization and a trusted
 in-process fresh-target importer. Source rows, immutable import/provenance

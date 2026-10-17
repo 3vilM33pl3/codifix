@@ -10,7 +10,7 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile);
 const hashBytes = bytes => createHash('sha256').update(bytes).digest('hex');
-export const patchSha256 = '4ba316f92a401d8a9854fe96595232bb845dfe14fa33aefe51837aacc5efcef0';
+export const patchSha256 = '79c8c8378fdab250457e663d2d48518cb28dbabf5a81b3ae832aa70a7b860441';
 const hashPattern = /^[0-9a-f]{64}$/;
 const maxFiles = 65536;
 export async function assertPlainPath(target) {

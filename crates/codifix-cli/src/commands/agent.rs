@@ -154,7 +154,7 @@ async fn resolve_current_workspace(
     match matches.as_slice() {
         [workspace] => Ok(workspace.id),
         [] => Err(anyhow!(
-            "no active agent workspace matches repo {} on branch {}; run memory agent status --project {}",
+            "no active agent workspace matches repo {} on branch {}; run codifix agent status --project {}",
             git.repo_root,
             git.branch,
             project

@@ -10,7 +10,7 @@ use std::path::PathBuf;
 async fn main() -> Result<()> {
     if std::env::args().any(|arg| arg == "--version" || arg == "-V") {
         println!(
-            "memory service {}",
+            "codifix service {}",
             codifix_config::Profile::detect().display_version(env!("CARGO_PKG_VERSION"))
         );
         return Ok(());

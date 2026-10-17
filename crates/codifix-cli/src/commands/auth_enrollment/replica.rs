@@ -289,7 +289,7 @@ mod native {
         let profile = LocalProjectReplicaProfile::read(&args.profile)?;
         let origin = CompanyOrigin::parse(&profile.company, profile.allow_loopback_development)?;
         let enrollment = credentials::load(store, &origin)?
-            .ok_or_else(|| anyhow::anyhow!("run memory auth login for this company first"))?;
+            .ok_or_else(|| anyhow::anyhow!("run codifix auth login for this company first"))?;
         // Reject a wrong/unapproved local device before even inventory/bootstrap.
         if enrollment.device_id != profile.bootstrap.device
             || !enrollment.approved

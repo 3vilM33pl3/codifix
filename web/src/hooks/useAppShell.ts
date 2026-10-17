@@ -21,7 +21,7 @@ import { useProjectStream } from "./useProjectStream";
 
 export function useAppShell() {
   const [tab, setTab] = useState<Tab>("memories");
-  const [project, setProject] = useState(localStorage.getItem("codifix.project") ?? "memory");
+  const [project, setProject] = useState(localStorage.getItem("codifix.project") ?? "codifix");
   const [projectInput, setProjectInput] = useState(project);
   const [repoRootInput, setRepoRootInput] = useState(localStorage.getItem("codifix.repoRoot") ?? "");
   const [health, setHealth] = useState<Record<string, unknown> | null>(null);
@@ -52,9 +52,9 @@ export function useAppShell() {
       message,
       raw_error: message,
       explanation: "This error was observed by the browser UI during the current session.",
-      fix_hint: "Refresh the tab or run memory doctor if the problem persists.",
-      doctor_hint: "memory doctor",
-      command_hint: "memory doctor",
+      fix_hint: "Refresh the tab or run codifix doctor if the problem persists.",
+      doctor_hint: "codifix doctor",
+      command_hint: "codifix doctor",
     };
     setLocalDiagnostics((current) => {
       if (current[0]?.code === diagnostic.code && current[0]?.message === diagnostic.message) {

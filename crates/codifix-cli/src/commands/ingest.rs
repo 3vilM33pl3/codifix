@@ -185,7 +185,7 @@ pub(super) async fn handle(
         println!("Skipped {skipped_large} file(s) over 256 KB.");
     }
     println!(
-        "Try: memory query --project {} --question \"...\"",
+        "Try: codifix query --project {} --question \"...\"",
         args.project
     );
     Ok(())

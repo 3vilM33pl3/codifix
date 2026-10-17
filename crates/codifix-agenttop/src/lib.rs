@@ -9,7 +9,7 @@ mod model;
 use chrono::{DateTime, Utc};
 
 // Adapted from graykode/abtop (MIT) to provide structured agent/session data
-// for Memory Layer's native TUI.
+// for Codifix's native TUI.
 pub use model::{
     AgentSession, ChildProcess, LightweightAgentSession, OrphanPort, RateLimitInfo, SessionStatus,
     SubAgent,

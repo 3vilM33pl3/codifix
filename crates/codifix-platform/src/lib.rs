@@ -708,23 +708,23 @@ pub fn packaged_system_service_available() -> bool {
 
 #[cfg(target_os = "windows")]
 pub fn windows_backend_task_name() -> &'static str {
-    "MemoryLayer-Backend"
+    "Codifix-Backend"
 }
 
 #[cfg(target_os = "windows")]
 pub fn windows_watch_manager_task_name() -> &'static str {
-    "MemoryLayer-WatcherManager"
+    "Codifix-WatcherManager"
 }
 
 #[cfg(target_os = "windows")]
 pub fn windows_watch_task_name(project: &str) -> String {
-    format!("MemoryLayer-Watch-{}", sanitize_service_fragment(project))
+    format!("Codifix-Watch-{}", sanitize_service_fragment(project))
 }
 
 #[cfg(target_os = "windows")]
 pub fn windows_managed_watch_task_name(profile: &str, session_id: &str) -> String {
     format!(
-        "MemoryLayer-ManagedWatch-{}-{}",
+        "Codifix-ManagedWatch-{}-{}",
         sanitize_service_fragment(profile),
         sanitize_service_fragment(session_id)
     )
@@ -796,7 +796,7 @@ pub fn windows_memory_task_names() -> Vec<String> {
         .lines()
         .filter_map(|line| line.split("\",\"").next())
         .map(|value| value.trim().trim_matches('"').trim_start_matches('\\'))
-        .filter(|value| value.starts_with("MemoryLayer-"))
+        .filter(|value| value.starts_with("Codifix-"))
         .map(ToOwned::to_owned)
         .collect::<Vec<_>>();
     names.sort();
@@ -1235,11 +1235,11 @@ mod tests {
         {
             assert_eq!(
                 watch_service_unit_name("customer portal"),
-                "MemoryLayer-Watch-customer-portal"
+                "Codifix-Watch-customer-portal"
             );
             assert_eq!(
                 managed_watch_service_name("session 123"),
-                "MemoryLayer-ManagedWatch-prod-session-123"
+                "Codifix-ManagedWatch-prod-session-123"
             );
         }
     }
@@ -1297,22 +1297,19 @@ mod tests {
         assert!(
             xml.contains("&quot;C:\\Users\\Test User\\AppData\\Local\\codifix\\codifix.toml&quot;")
         );
-        assert_eq!(
-            windows_watch_manager_task_name(),
-            "MemoryLayer-WatcherManager"
-        );
+        assert_eq!(windows_watch_manager_task_name(), "Codifix-WatcherManager");
     }
 
     #[cfg(target_os = "windows")]
     #[test]
     fn scheduled_task_csv_status_parser_handles_verbose_and_compact_rows() {
         assert_eq!(
-            super::parse_schtasks_csv_status(r#""BUNNY","\MemoryLayer-Backend","Running","N/A""#)
+            super::parse_schtasks_csv_status(r#""BUNNY","\Codifix-Backend","Running","N/A""#)
                 .as_deref(),
             Some("Running")
         );
         assert_eq!(
-            super::parse_schtasks_csv_status(r#""\MemoryLayer-Backend","Ready""#).as_deref(),
+            super::parse_schtasks_csv_status(r#""\Codifix-Backend","Ready""#).as_deref(),
             Some("Ready")
         );
     }

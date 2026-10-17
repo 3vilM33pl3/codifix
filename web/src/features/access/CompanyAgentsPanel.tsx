@@ -140,7 +140,7 @@ export function CompanyAgentsPanel({ readOnly, initialRequest }: { readOnly: boo
     finally { finish(ctx); }
   }
   return <section className="panel-stack" aria-label="Own device company agent approval">
-    <section className="panel"><h3>Separate company agent identities</h3><p>Paste/import the public envelope from <code>memory projects agents prepare</code>. Only the enrolled device's exact parent human may approve or inspect agents; administration is not an override. Device/agent credentials stay in native Keychain, never this browser.</p>
+    <section className="panel"><h3>Separate company agent identities</h3><p>Paste/import the public envelope from <code>codifix projects agents prepare</code>. Only the enrolled device's exact parent human may approve or inspect agents; administration is not an override. Device/agent credentials stay in native Keychain, never this browser.</p>
       {!allowed ? <a className="button-link" href={authLoginUrl("/")}>Sign in as the device's parent human</a> : <p>Reviewing as {auth.principal.display_name} · {auth.principal.id}</p>}
       {readOnly || auth?.read_only ? <p role="status">Read-only service: agent approval and revocation are disabled.</p> : null}
       <label>Public agent envelope (JSON, at most 64 KiB)<textarea value={input} disabled={busy || attempted || revokeAttempted} onChange={e => setInput(e.target.value)} /></label>

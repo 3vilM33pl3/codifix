@@ -126,7 +126,7 @@ describe("useGraphController", () => {
     await waitFor(() => expect(result.current.graphConnectionView).toBeNull());
   });
 
-  it("loads the memory graph separately from the code graph", async () => {
+  it("loads the codifix graph separately from the code graph", async () => {
     const { result } = renderGraphController();
 
     await waitFor(() => expect(result.current.memoryGraph?.returned_memories).toBe(1));

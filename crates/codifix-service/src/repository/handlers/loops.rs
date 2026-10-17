@@ -2952,7 +2952,7 @@ fn context_instruction_refs(repo_root: Option<&str>) -> Vec<LoopContextInstructi
     };
     let candidates = [
         ("AGENTS.md", "repo agent instructions"),
-        (".agents/memory-layer.toml", "repo memory configuration"),
+        (".agents/codifix.toml", "repo memory configuration"),
         ("CONTRIBUTING.md", "contribution and validation guidance"),
         (
             "docs/developer/architecture/code-map.md",

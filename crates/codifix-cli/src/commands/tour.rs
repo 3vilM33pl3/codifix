@@ -19,7 +19,7 @@ pub(super) async fn handle(
 ) -> Result<()> {
     let project = args.project.clone();
 
-    println!("Welcome to Memory Layer. Three commands cover day-to-day use:");
+    println!("Welcome to Codifix. Three commands cover day-to-day use:");
     println!("  remember  - capture completed work into durable memory");
     println!("  query     - ask a project-specific question against that memory");
     println!("  resume    - get a briefing to pick up where you left off");
@@ -33,14 +33,14 @@ pub(super) async fn handle(
     println!("{count} memories loaded.");
 
     pause(&format!(
-        "Step 1/3 — remember. We record that you took this tour:\n  memory remember --project {project} --title \"Completed the Memory Layer tour\" ..."
+        "Step 1/3 — remember. We record that you took this tour:\n  codifix remember --project {project} --title \"Completed the Codifix tour\" ..."
     ));
     crate::commands::remember::handle(
         RememberArgs {
             project: Some(project.clone()),
-            title: Some("Completed the Memory Layer tour".to_string()),
+            title: Some("Completed the Codifix tour".to_string()),
             memory_type: Some("project".to_string()),
-            prompt: Some("Run the guided Memory Layer tour.".to_string()),
+            prompt: Some("Run the guided Codifix tour.".to_string()),
             summary: Some(
                 "Walked through remember, query, and resume against the demo corpus.".to_string(),
             ),
@@ -61,7 +61,7 @@ pub(super) async fn handle(
     .await?;
 
     pause(&format!(
-        "Step 2/3 — query. Ask a question only project memory can answer:\n  memory query --project {project} --question \"How does reinforcement work?\""
+        "Step 2/3 — query. Ask a question only project memory can answer:\n  codifix query --project {project} --question \"How does reinforcement work?\""
     ));
     crate::commands::query::handle(
         QueryArgs {
@@ -81,7 +81,7 @@ pub(super) async fn handle(
     .await?;
 
     pause(&format!(
-        "Step 3/3 — resume. Get a re-entry briefing for the project:\n  memory resume --project {project}"
+        "Step 3/3 — resume. Get a re-entry briefing for the project:\n  codifix resume --project {project}"
     ));
     crate::commands::resume::handle(
         ResumeArgs {
@@ -97,8 +97,8 @@ pub(super) async fn handle(
     crate::telemetry::record_event(&config, "tour_completed").await;
     println!();
     println!("That is the whole daily loop. Where to go next:");
-    println!("  memory tui   # browse every memory, its provenance, and the graph");
-    println!("  https://www.memory-layer.dev/docs/quickstart");
+    println!("  codifix tui   # browse every memory, its provenance, and the graph");
+    println!("  https://codifix.dev/docs/quickstart");
     Ok(())
 }
 

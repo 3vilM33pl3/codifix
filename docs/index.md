@@ -1,14 +1,14 @@
-# Memory Layer Docs
+# Codifix Docs
 
-Memory Layer is a local-first project memory system for coding agents and developers. It captures durable project knowledge, stores it in PostgreSQL with pgvector, and makes it available through a TUI, browser UI, and agent-friendly CLI.
+Codifix is a local-first project memory system for coding agents and developers. It captures durable project knowledge, stores it in PostgreSQL with pgvector, and makes it available through a TUI, browser UI, and agent-friendly CLI.
 
 It is designed for the real workflow: several agents, several projects, multiple embedding models, and a human who needs to understand exactly why an answer was produced.
 
 The documentation website source lives in [`../docs-site`](../docs-site/README.md). It provides a Fumadocs / Next.js onboarding, concepts, agent integration, MCP, evaluation, operations, and reference structure while this `docs/` directory remains the detailed in-repo manual.
 
-![Memory Layer cited query answer](img/tui/query-tab.png)
+![Codifix cited query answer](img/tui/query-tab.png)
 
-![How Memory Layer turns project work into cited context](img/memory-layer-flow.png)
+![How Codifix turns project work into cited context](img/codifix-flow.png)
 
 ## Highlights
 
@@ -20,11 +20,11 @@ The documentation website source lives in [`../docs-site`](../docs-site/README.m
 - **Repeatable evaluation:** run paired no-memory vs full-memory ablations with artifacted results, gates, token accounting, and retrieval-quality metrics.
 - **Curated knowledge base:** browse canonical memories, inspect provenance, and review proposed replacements before old knowledge is superseded.
 
-![Memory Layer agents dashboard](img/tui/agents-tab.png)
+![Codifix agents dashboard](img/tui/agents-tab.png)
 
 ## Start Here
 
-- [Install Memory Layer and configure your first project](user/getting-started.md)
+- [Install Codifix and configure your first project](user/getting-started.md)
 - [Open the terminal UI](user/tui/README.md)
 - [Use the browser UI](user/web-ui.md)
 - [Ask cited questions from project memory](user/tui/query.md)
@@ -67,5 +67,5 @@ The documentation website source lives in [`../docs-site`](../docs-site/README.m
 - [Architecture Overview](developer/architecture/overview.md)
 - [Code Map](developer/architecture/code-map.md)
 - [Memory Types Reference](developer/architecture/memory-types.md)
-- [How Memory Layer Works](developer/architecture/how-it-works.md)
+- [How Codifix Works](developer/architecture/how-it-works.md)
 - [Embeddings and Search](developer/architecture/embeddings-and-search.md)

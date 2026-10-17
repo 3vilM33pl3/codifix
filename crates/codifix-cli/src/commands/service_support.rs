@@ -77,7 +77,7 @@ pub(crate) async fn enable_backend_service(config_path: &Path) -> Result<String>
                     ));
                 }
                 anyhow::bail!(
-                    "Backend did not become healthy after startup.\nLikely cause: {database_error}\nRecovery: enable relay discovery by setting [cluster].enabled = true in {} and rerun `memory service enable`.",
+                    "Backend did not become healthy after startup.\nLikely cause: {database_error}\nRecovery: enable relay discovery by setting [cluster].enabled = true in {} and rerun `codifix service enable`.",
                     config_path.display()
                 );
             }
@@ -104,7 +104,7 @@ pub(crate) fn start_backend_service_once(config_path: &Path) -> Result<String> {
         )?;
         bootstrap_launch_agent(&plist_path, label)?;
         Ok(format!(
-            "Installed and started backend LaunchAgent {}.\nPlist: {}\nConfig: {}\nLogs:\n- {}\n- {}\n\nManage it with:\n- memory service status\n- memory service disable\n- launchctl kickstart -k {}/{}",
+            "Installed and started backend LaunchAgent {}.\nPlist: {}\nConfig: {}\nLogs:\n- {}\n- {}\n\nManage it with:\n- codifix service status\n- codifix service disable\n- launchctl kickstart -k {}/{}",
             label,
             plist_path.display(),
             config_path.display(),
@@ -139,7 +139,7 @@ pub(crate) fn start_backend_service_once(config_path: &Path) -> Result<String> {
         })?;
         platform::run_windows_task(task_name)?;
         Ok(format!(
-            "Installed and started Windows scheduled task {task_name}.\nConfig: {}\n\nManage it with:\n- memory service status\n- memory service disable\n- schtasks /Query /TN {task_name}",
+            "Installed and started Windows scheduled task {task_name}.\nConfig: {}\n\nManage it with:\n- codifix service status\n- codifix service disable\n- schtasks /Query /TN {task_name}",
             config_path.display()
         ))
     }

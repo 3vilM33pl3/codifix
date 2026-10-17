@@ -21,10 +21,10 @@ pub(crate) fn error_hint(error: &anyhow::Error) -> Option<String> {
 
     if is_connect || message.contains("connection refused") {
         return Some(
-            "The Memory Layer service is not reachable.\n  \
+            "The Codifix service is not reachable.\n  \
              Start it:  docker compose up      (bundled stack)\n  \
-             or:        memory service run     (native install)\n  \
-             Diagnose:  memory doctor"
+             or:        codifix service run     (native install)\n  \
+             Diagnose:  codifix doctor"
                 .to_string(),
         );
     }
@@ -32,8 +32,8 @@ pub(crate) fn error_hint(error: &anyhow::Error) -> Option<String> {
         return Some(
             "The service did not respond within the client timeout. Long-running \
              work (curation, reindexing) may still complete server-side.\n  \
-             Check:     memory health\n  \
-             Diagnose:  memory doctor"
+             Check:     codifix health\n  \
+             Diagnose:  codifix doctor"
                 .to_string(),
         );
     }
@@ -41,7 +41,7 @@ pub(crate) fn error_hint(error: &anyhow::Error) -> Option<String> {
         return Some(
             "The client's API token does not match the service. If both a dev and \
              an installed service are running, you may be talking to the wrong one.\n  \
-             Check the effective endpoint and token: memory doctor\n  \
+             Check the effective endpoint and token: codifix doctor\n  \
              The token lives in the global config under [service].api_token."
                 .to_string(),
         );
@@ -49,7 +49,7 @@ pub(crate) fn error_hint(error: &anyhow::Error) -> Option<String> {
     if message.contains("extension \"vector\"") || message.contains("pgvector") {
         return Some(
             "PostgreSQL is reachable but the pgvector extension is missing.\n  \
-             Fix automatically:  memory doctor --fix\n  \
+             Fix automatically:  codifix doctor --fix\n  \
              or manually:        install the pgvector package for your PostgreSQL \
              version, then run CREATE EXTENSION vector; in the target database."
                 .to_string(),
@@ -61,8 +61,8 @@ pub(crate) fn error_hint(error: &anyhow::Error) -> Option<String> {
     {
         return Some(
             "No project is configured here.\n  \
-             Inside a repository:  memory init    (scriptable project setup)\n  \
-             Or guided setup:      memory wizard\n  \
+             Inside a repository:  codifix init    (scriptable project setup)\n  \
+             Or guided setup:      codifix wizard\n  \
              or pass an explicit:  --project <slug>"
                 .to_string(),
         );
@@ -79,7 +79,7 @@ mod tests {
         let error = anyhow::anyhow!("error sending request: connection refused");
         let hint = error_hint(&error).expect("hint");
         assert!(hint.contains("docker compose up"));
-        assert!(hint.contains("memory doctor"));
+        assert!(hint.contains("codifix doctor"));
     }
 
     #[test]
@@ -92,9 +92,9 @@ mod tests {
     fn unconfigured_project_names_current_setup_commands() {
         let error = anyhow::anyhow!("project not configured");
         let hint = error_hint(&error).expect("hint");
-        assert!(hint.contains("memory init"));
-        assert!(hint.contains("memory wizard"));
-        assert!(!hint.contains("memory setup"));
+        assert!(hint.contains("codifix init"));
+        assert!(hint.contains("codifix wizard"));
+        assert!(!hint.contains("codifix setup"));
     }
 
     #[test]

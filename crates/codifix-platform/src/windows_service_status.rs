@@ -61,7 +61,7 @@ pub fn installation_roots() -> Result<(PathBuf, PathBuf)> {
         Ok(value)
     }
     Ok((
-        folder(&FOLDERID_ProgramData)?.join("MemoryLayer"),
+        folder(&FOLDERID_ProgramData)?.join("Codifix"),
         folder(&FOLDERID_ProgramFiles)?
             .join("Codifix")
             .join("releases"),
@@ -88,7 +88,7 @@ fn string_in_buffer(pointer: *const u16, buffer: &[usize]) -> Result<String> {
 
 pub fn observe(name: &str) -> Result<Observation> {
     ensure!(
-        name.starts_with("MemoryLayer-")
+        name.starts_with("Codifix-")
             && name.len() <= 60
             && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'),
         "invalid Memory service name"

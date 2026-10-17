@@ -342,7 +342,7 @@ fn ensure_llm_config(config: &AppConfig) -> Result<()> {
             .map(|path| {
                 path.parent()
                     .unwrap_or_else(|| Path::new("."))
-                    .join("memory-layer.env")
+                    .join("codifix.env")
                     .display()
                     .to_string()
             })
@@ -1256,7 +1256,7 @@ mod tests {
     fn validate_candidates_dedupes_and_requires_provenance() {
         let candidates = validate_candidates(vec![
             ScanLlmCandidate {
-                canonical_text: "Memory Layer uses PostgreSQL".to_string(),
+                canonical_text: "Codifix uses PostgreSQL".to_string(),
                 summary: "Storage backend".to_string(),
                 memory_type: MemoryType::Architecture,
                 confidence: Some(0.9),
@@ -1267,7 +1267,7 @@ mod tests {
                 rationale: "Mentioned in the overview.".to_string(),
             },
             ScanLlmCandidate {
-                canonical_text: "Memory Layer uses PostgreSQL".to_string(),
+                canonical_text: "Codifix uses PostgreSQL".to_string(),
                 summary: "Duplicate".to_string(),
                 memory_type: MemoryType::Architecture,
                 confidence: None,
@@ -1315,7 +1315,7 @@ mod tests {
             "web/src/App.tsx".to_string(),
             "scripts/tool.py".to_string(),
             "docs/guide.md".to_string(),
-            "memory-layer.toml".to_string(),
+            "codifix.toml".to_string(),
             "Makefile".to_string(),
         ]);
 
@@ -1365,7 +1365,7 @@ mod tests {
                 index_path.starts_with(
                     home.join("Library")
                         .join("Caches")
-                        .join("memory-layer")
+                        .join("codifix")
                         .join("projects")
                 )
             );
@@ -1373,7 +1373,7 @@ mod tests {
                 report_dir.starts_with(
                     home.join("Library")
                         .join("Application Support")
-                        .join("memory-layer")
+                        .join("codifix")
                         .join("projects")
                 )
             );
@@ -1381,12 +1381,12 @@ mod tests {
 
         #[cfg(all(unix, not(target_os = "macos")))]
         {
-            assert!(index_path.starts_with(cache_home.join("memory-layer").join("projects")));
-            assert!(report_dir.starts_with(state_home.join("memory-layer").join("projects")));
+            assert!(index_path.starts_with(cache_home.join("codifix").join("projects")));
+            assert!(report_dir.starts_with(state_home.join("codifix").join("projects")));
         }
         #[cfg(target_os = "windows")]
         {
-            let local_root = temp_dir.join("local-app-data").join("memory-layer");
+            let local_root = temp_dir.join("local-app-data").join("codifix");
             assert!(index_path.starts_with(local_root.join("cache").join("projects")));
             assert!(report_dir.starts_with(local_root.join("projects")));
         }

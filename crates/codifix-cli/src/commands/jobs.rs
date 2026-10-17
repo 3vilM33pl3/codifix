@@ -80,7 +80,7 @@ pub(crate) async fn handle(args: JobsArgs, api: &ApiClient) -> Result<()> {
             }
             if let Some(after) = response.page.next_after {
                 println!(
-                    "Next page: memory jobs --project {} list --after {after}",
+                    "Next page: codifix jobs --project {} list --after {after}",
                     args.project
                 );
             }

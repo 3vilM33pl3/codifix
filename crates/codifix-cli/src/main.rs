@@ -56,7 +56,7 @@ fn main() -> std::process::ExitCode {
         }) {
         Ok(thread) => thread,
         Err(error) => {
-            eprintln!("Error: could not start the Memory Layer main thread: {error}");
+            eprintln!("Error: could not start the Codifix main thread: {error}");
             return std::process::ExitCode::FAILURE;
         }
     };
@@ -64,7 +64,7 @@ fn main() -> std::process::ExitCode {
     match thread.join() {
         Ok(exit_code) => exit_code,
         Err(_) => {
-            eprintln!("Error: the Memory Layer main thread terminated unexpectedly");
+            eprintln!("Error: the Codifix main thread terminated unexpectedly");
             std::process::ExitCode::FAILURE
         }
     }

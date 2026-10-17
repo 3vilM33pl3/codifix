@@ -29,7 +29,7 @@ pub(crate) async fn web_unavailable() -> impl IntoResponse {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Memory Layer Web UI unavailable</title>
+    <title>Codifix Web UI unavailable</title>
     <style>
       body { font-family: ui-sans-serif, system-ui, sans-serif; background: #0f1722; color: #e6edf5; margin: 0; }
       main { max-width: 760px; margin: 8rem auto; padding: 2rem; background: #182233; border: 1px solid #42506a; border-radius: 18px; }
@@ -40,9 +40,9 @@ pub(crate) async fn web_unavailable() -> impl IntoResponse {
   </head>
   <body>
     <main>
-      <h1>Memory Layer Web UI is not installed</h1>
+      <h1>Codifix Web UI is not installed</h1>
       <p><code>mem-service</code> is running, but it could not find built web assets.</p>
-      <p>Build the frontend under <code>web/</code> or install a package that ships <code>share/memory-layer/web</code>.</p>
+      <p>Build the frontend under <code>web/</code> or install a package that ships <code>share/codifix/web</code>.</p>
     </main>
   </body>
 </html>"#,

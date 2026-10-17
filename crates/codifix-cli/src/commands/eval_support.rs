@@ -39,7 +39,7 @@ use crate::commands::{
 /// Package a suite plus a set of run artifacts as a citeable, tamper-evident
 /// archive: suite definition + runs + a manifest carrying the git commit, CLI
 /// version, suite checksum, and per-file sha256 digests. A reviewer verifies
-/// with the manifest and re-runs with `memory eval reproduce`.
+/// with the manifest and re-runs with `codifix eval reproduce`.
 fn archive_experiment(args: EvalArchiveArgs) -> Result<()> {
     use sha2::{Digest, Sha256};
 
@@ -106,14 +106,14 @@ fn archive_experiment(args: EvalArchiveArgs) -> Result<()> {
         .and_then(|output| String::from_utf8(output.stdout).ok())
         .map(|value| value.trim().to_string());
     let manifest = serde_json::json!({
-        "kind": "memory-layer-experiment",
+        "kind": "codifix-experiment",
         "suite_name": suite_name,
         "suite_checksum": suite_checksum,
         "item_count": suite.items.len(),
         "cli_version": env!("CARGO_PKG_VERSION"),
         "git_commit": git_commit,
         "created_at": chrono::Utc::now().to_rfc3339(),
-        "reproduce_with": "memory eval reproduce --suite suite/".to_string(),
+        "reproduce_with": "codifix eval reproduce --suite suite/".to_string(),
         "files": file_entries,
     });
     std::fs::write(
@@ -1397,7 +1397,7 @@ pub(crate) fn offline_no_memory_grounded_answer_eval_item(
     codifix_eval::score_plain_llm_grounded_answer(
         item,
         condition,
-        "Offline no-memory baseline: no Memory Layer context was supplied.".to_string(),
+        "Offline no-memory baseline: no Codifix context was supplied.".to_string(),
         Some(0.0),
         Some(0),
         None,
@@ -1552,7 +1552,7 @@ pub(crate) async fn run_no_memory_grounded_answer_eval_item(
 ) -> Result<codifix_eval::EvalItemResult> {
     let response = run_direct_llm_eval(
         api,
-        "You answer evaluation questions without Memory Layer context. Return strict JSON with keys: answer (string), confidence (0..1). If you do not know, say so in the answer and use low confidence.",
+        "You answer evaluation questions without Codifix context. Return strict JSON with keys: answer (string), confidence (0..1). If you do not know, say so in the answer and use low confidence.",
         &format!("Question: {}", item.question),
         api.config.llm.max_output_tokens.min(800),
     )
@@ -1576,13 +1576,13 @@ pub(crate) async fn run_no_memory_resume_quality_eval_item(
     condition: codifix_eval::EvalCondition,
 ) -> Result<codifix_eval::EvalItemResult> {
     let prompt = if item.prompt.trim().is_empty() {
-        "Get me up to speed on this project. You do not have access to Memory Layer context, repository history, or persisted project timeline data.".to_string()
+        "Get me up to speed on this project. You do not have access to Codifix context, repository history, or persisted project timeline data.".to_string()
     } else {
         item.prompt.clone()
     };
     let response = run_direct_llm_eval(
         api,
-        "You write concise project resume briefings without Memory Layer context. Be explicit when the prompt lacks enough project evidence.",
+        "You write concise project resume briefings without Codifix context. Be explicit when the prompt lacks enough project evidence.",
         &prompt,
         api.config.llm.max_output_tokens.min(800),
     )
@@ -2888,11 +2888,11 @@ pub(crate) fn agent_build_prompt(
     prompt.push_str("\n\n");
     match condition {
         codifix_eval::EvalCondition::NoMemory => prompt.push_str(
-            "Evaluation condition: no-memory. Do not query, read, or use Memory Layer context. Do not create memory-evidence.md, memory-evidence.json, or .memory-eval artifacts. Work only from the repository files and this prompt.\n",
+            "Evaluation condition: no-memory. Do not query, read, or use Codifix context. Do not create memory-evidence.md, memory-evidence.json, or .memory-eval artifacts. Work only from the repository files and this prompt.\n",
         ),
         _ => {
             prompt.push_str(
-                "Evaluation condition: memory-enabled. Use Memory Layer context before implementing, then make the requested code changes in the workspace.\n",
+                "Evaluation condition: memory-enabled. Use Codifix context before implementing, then make the requested code changes in the workspace.\n",
             );
             prompt.push_str("\nUse this Memory CLI command from the shell:\n\n```bash\n");
             prompt.push_str(&context.memory_command);

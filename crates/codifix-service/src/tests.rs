@@ -532,20 +532,20 @@ fn runtime_skill_status_reports_memory_layer_skill_by_default() {
         .expect("write skill");
     }
 
-    let status = runtime_skill_status(root.to_str(), "0.8.6-dev", RuntimeSkillFilter::MemoryLayer);
+    let status = runtime_skill_status(root.to_str(), "0.8.6-dev", RuntimeSkillFilter::Codifix);
 
     assert_eq!(status.status, "ok");
     assert_eq!(status.bundle_version, "0.8.6-dev");
-    assert_eq!(status.summary, "memory-layer skill current");
-    assert_eq!(status.filter, "memory-layer");
+    assert_eq!(status.summary, "codifix skill current");
+    assert_eq!(status.filter, "codifix");
     assert_eq!(status.details.len(), 1);
-    assert_eq!(status.details[0].id, "memory-layer");
+    assert_eq!(status.details[0].id, "codifix");
     assert_eq!(status.details[0].name, "test");
     assert_eq!(status.details[0].version.as_deref(), Some("0.8.6"));
     assert_eq!(status.details[0].status, "ok");
     assert!(
         std::path::Path::new(&status.details[0].path)
-            .ends_with(std::path::Path::new("memory-layer").join("SKILL.md"))
+            .ends_with(std::path::Path::new("codifix").join("SKILL.md"))
     );
 
     fs::remove_dir_all(root).expect("cleanup");
@@ -554,16 +554,16 @@ fn runtime_skill_status_reports_memory_layer_skill_by_default() {
 #[test]
 fn runtime_skill_status_warns_on_outdated_or_missing_memory_layer_skill() {
     let root = std::env::temp_dir().join(format!("memory-skill-status-{}", Uuid::new_v4()));
-    let dir = root.join(".agents").join("skills").join("memory-layer");
+    let dir = root.join(".agents").join("skills").join("codifix");
     fs::create_dir_all(&dir).expect("create skill dir");
     fs::write(dir.join("SKILL.md"), "---\nversion: 0.1.0\n---\n").expect("write skill");
 
-    let status = runtime_skill_status(root.to_str(), "0.8.6-dev", RuntimeSkillFilter::MemoryLayer);
+    let status = runtime_skill_status(root.to_str(), "0.8.6-dev", RuntimeSkillFilter::Codifix);
 
     assert_eq!(status.status, "warn");
-    assert_eq!(status.summary, "memory-layer skill: 0 missing, 1 outdated");
+    assert_eq!(status.summary, "codifix skill: 0 missing, 1 outdated");
     assert!(status.summary.contains("outdated"));
-    assert_eq!(status.filter, "memory-layer");
+    assert_eq!(status.filter, "codifix");
     assert_eq!(status.details.len(), 1);
     assert_eq!(status.details[0].status, "outdated");
     assert_eq!(status.details[0].version.as_deref(), Some("0.1.0"));
@@ -577,7 +577,7 @@ fn runtime_skill_status_ignores_focused_skill_versions_by_default() {
     for skill in CODIFIX_SKILL_NAMES {
         let dir = root.join(".agents").join("skills").join(skill);
         fs::create_dir_all(&dir).expect("create skill dir");
-        let version = if *skill == "memory-layer" {
+        let version = if *skill == "codifix" {
             "0.8.6"
         } else {
             "0.1.0"
@@ -589,10 +589,10 @@ fn runtime_skill_status_ignores_focused_skill_versions_by_default() {
         .expect("write skill");
     }
 
-    let status = runtime_skill_status(root.to_str(), "0.8.6-dev", RuntimeSkillFilter::MemoryLayer);
+    let status = runtime_skill_status(root.to_str(), "0.8.6-dev", RuntimeSkillFilter::Codifix);
 
     assert_eq!(status.status, "ok");
-    assert_eq!(status.summary, "memory-layer skill current");
+    assert_eq!(status.summary, "codifix skill current");
 
     fs::remove_dir_all(root).expect("cleanup");
 }
@@ -640,18 +640,18 @@ fn runtime_skill_status_reports_missing_skill_detail_path() {
     let root = std::env::temp_dir().join(format!("memory-skill-status-{}", Uuid::new_v4()));
     fs::create_dir_all(root.join(".agents").join("skills")).expect("create skill root");
 
-    let status = runtime_skill_status(root.to_str(), "0.8.6-dev", RuntimeSkillFilter::MemoryLayer);
+    let status = runtime_skill_status(root.to_str(), "0.8.6-dev", RuntimeSkillFilter::Codifix);
 
     assert_eq!(status.status, "warn");
-    assert_eq!(status.summary, "memory-layer skill: 1 missing, 0 outdated");
+    assert_eq!(status.summary, "codifix skill: 1 missing, 0 outdated");
     assert_eq!(status.details.len(), 1);
-    assert_eq!(status.details[0].id, "memory-layer");
-    assert_eq!(status.details[0].name, "memory-layer");
+    assert_eq!(status.details[0].id, "codifix");
+    assert_eq!(status.details[0].name, "codifix");
     assert_eq!(status.details[0].status, "missing");
     assert_eq!(status.details[0].version, None);
     assert!(
         std::path::Path::new(&status.details[0].path)
-            .ends_with(std::path::Path::new("memory-layer").join("SKILL.md"))
+            .ends_with(std::path::Path::new("codifix").join("SKILL.md"))
     );
 
     fs::remove_dir_all(root).expect("cleanup");
@@ -1015,7 +1015,7 @@ fn skills_repo_root_validation_rejects_missing_and_unknown_paths() {
 
 #[test]
 fn skills_allowlist_rejects_unknown_skill_names() {
-    validate_known_skill_name("memory-layer").expect("known skill");
+    validate_known_skill_name("codifix").expect("known skill");
     assert_eq!(
         validate_known_skill_name("../secret")
             .expect_err("path traversal skill should fail")

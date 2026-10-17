@@ -287,7 +287,7 @@ if bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null 2>&1; then
     fail "builder overwrote an existing release artifact"
 fi
 [[ ! -s "$PACKAGING_TEST_LOG" ]] || fail "existing artifact triggered a build"
-[[ "$(< "$fixture/target/debian/codifix_3.0.0-rc.1_amd64.deb")" == 'fixture deb' ]] ||
+[[ "$(< "$fixture/target/debian/codifix_3.0.0~rc.1_amd64.deb")" == 'fixture deb' ]] ||
     fail "existing artifact contents changed"
 
 # Model a non-executable ARM64 target: running it for completions fails the test.
@@ -300,7 +300,7 @@ for operator in codifix codifix-area codifix-area-import codifix-federation-gate
 done
 : > "$PACKAGING_TEST_LOG"
 (umask 077; bash "$fixture/packaging/build-deb.sh" --arch arm64 --output-dir "$test_root/release output" >/dev/null)
-[[ -s "$test_root/release output/codifix_3.0.0-rc.1_arm64.deb" ]] || fail "cross package missing from explicit output directory"
+[[ -s "$test_root/release output/codifix_3.0.0~rc.1_arm64.deb" ]] || fail "cross package missing from explicit output directory"
 grep -q '^cargo build --locked -p codifix-cli --no-default-features --features tui .*--bin codifix --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross completions did not build the host-native lean CLI"
 grep -q '^cargo build --release --locked -p codifix-federation-runtime .*--target aarch64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross gateway targeted the wrong architecture"
 dpkg --compare-versions 3.0.0~rc.1 lt 3.0.0 || fail "Debian candidate does not sort before stable"

@@ -563,7 +563,7 @@ pub(crate) async fn verify_task_start_memory(
         })
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "task start capture was written, but no active `task` memory with tag `{thread_tag}` exists. Run `memory curate --project {project}` or review queued replacement proposals, then retry."
+                "task start capture was written, but no active `task` memory with tag `{thread_tag}` exists. Run `codifix curate --project {project}` or review queued replacement proposals, then retry."
             )
         })
 }

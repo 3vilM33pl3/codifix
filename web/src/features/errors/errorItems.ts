@@ -23,9 +23,9 @@ export function collectErrorItems(
         message: "Codifix backend live connection is unavailable.",
         raw_error: "WebSocket connection is offline.",
         explanation: "The browser can no longer receive live project updates from the backend stream.",
-        fix_hint: "Check that the service is running, refresh the page, or run memory doctor.",
-        doctor_hint: "memory doctor",
-        command_hint: "memory service status",
+        fix_hint: "Check that the service is running, refresh the page, or run codifix doctor.",
+        doctor_hint: "codifix doctor",
+        command_hint: "codifix service status",
       },
     });
   }
@@ -45,9 +45,9 @@ export function collectErrorItems(
           message: details.error,
           raw_error: details.error,
           explanation: "A persisted project query failed.",
-          fix_hint: "Open Query or Activity detail and run memory doctor if this repeats.",
-          doctor_hint: "memory doctor",
-          command_hint: "memory doctor",
+          fix_hint: "Open Query or Activity detail and run codifix doctor if this repeats.",
+          doctor_hint: "codifix doctor",
+          command_hint: "codifix doctor",
         },
       });
     } else if (
@@ -65,9 +65,9 @@ export function collectErrorItems(
           message: details.message ?? event.summary,
           raw_error: details.message ?? event.summary,
           explanation: "A watcher reported unhealthy or restarting state.",
-          fix_hint: `Inspect watcher ${details.watcher_id} or run memory doctor.`,
-          doctor_hint: "memory doctor",
-          command_hint: "memory watcher status",
+          fix_hint: `Inspect watcher ${details.watcher_id} or run codifix doctor.`,
+          doctor_hint: "codifix doctor",
+          command_hint: "codifix watcher status",
         },
       });
     } else if (event.kind === "query_error") {
@@ -82,9 +82,9 @@ export function collectErrorItems(
           message: event.summary,
           raw_error: event.summary,
           explanation: "A persisted project query failed.",
-          fix_hint: "Open the activity detail and run memory doctor if this repeats.",
-          doctor_hint: "memory doctor",
-          command_hint: "memory doctor",
+          fix_hint: "Open the activity detail and run codifix doctor if this repeats.",
+          doctor_hint: "codifix doctor",
+          command_hint: "codifix doctor",
         },
       });
     }

@@ -195,7 +195,7 @@ describe("GraphTab", () => {
     render(<GraphTab {...baseProps} status={emptyStatus} graph={emptyGraph} />);
 
     expect(await screen.findByRole("heading", { name: "No graph data yet" })).toBeInTheDocument();
-    expect(screen.getByText("memory graph extract --project memory")).toBeInTheDocument();
+    expect(screen.getByText("codifix graph extract --project memory")).toBeInTheDocument();
   });
 
   it("emits a local filter change when isolate connected graph is toggled", async () => {
@@ -328,7 +328,7 @@ describe("GraphTab", () => {
     expect(screen.getAllByText("1 edges")).toHaveLength(2);
   });
 
-  it("toggles memory graph layers independently from code filters", async () => {
+  it("toggles codifix graph layers independently from code filters", async () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as RenderingContext);
 
     render(
@@ -600,7 +600,7 @@ describe("graphRenderTopologySignature", () => {
 });
 
 describe("buildLayeredRenderData", () => {
-  it("keeps memory graph layers hidden until toggled on", () => {
+  it("keeps codifix graph layers hidden until toggled on", () => {
     const renderData = buildLayeredRenderData({
       codeGraph: connectedGraph,
       memoryGraph,

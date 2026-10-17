@@ -474,7 +474,7 @@ mod tests {
     fn sample_request() -> CaptureTaskRequest {
         CaptureTaskRequest {
             project: "memory".to_string(),
-            task_title: "Add memory service".to_string(),
+            task_title: "Add codifix service".to_string(),
             user_prompt: "Implement the backend service".to_string(),
             writer_id: "codex-writer".to_string(),
             writer_name: Some("Codex".to_string()),

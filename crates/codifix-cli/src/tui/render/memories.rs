@@ -329,20 +329,20 @@ pub(in crate::tui) fn build_memory_detail_lines(app: &App) -> Vec<Line<'static>>
                     Style::default().fg(Theme::TEXT),
                 )),
                 Line::from(Span::styled(
-                    "  memory demo   # load a showcase project",
+                    "  codifix demo   # load a showcase project",
                     Style::default().fg(Theme::MUTED),
                 )),
                 Line::from(Span::styled(
-                    "  memory tour   # guided remember -> query -> resume walkthrough",
+                    "  codifix tour   # guided remember -> query -> resume walkthrough",
                     Style::default().fg(Theme::MUTED),
                 )),
                 Line::from(Span::styled(
-                    "  memory remember --project <slug> ...   # capture real work",
+                    "  codifix remember --project <slug> ...   # capture real work",
                     Style::default().fg(Theme::MUTED),
                 )),
                 Line::from(Span::raw("")),
                 Line::from(Span::styled(
-                    "Quickstart: https://www.memory-layer.dev/docs/quickstart",
+                    "Quickstart: https://codifix.dev/docs/quickstart",
                     Style::default().fg(Theme::MUTED),
                 )),
             ]
@@ -578,13 +578,13 @@ pub(in crate::tui) fn write_replacement_policy(
     let mut value = if path.exists() {
         fs::read_to_string(&path)?
             .parse::<toml::Value>()
-            .context("parse .agents/memory-layer.toml")?
+            .context("parse .agents/codifix.toml")?
     } else {
         toml::Value::Table(toml::map::Map::new())
     };
     let table = value
         .as_table_mut()
-        .context(".agents/memory-layer.toml must be a top-level table")?;
+        .context(".agents/codifix.toml must be a top-level table")?;
     let curation = table
         .entry("curation".to_string())
         .or_insert_with(|| toml::Value::Table(toml::map::Map::new()));

@@ -38,16 +38,16 @@ jobs:
 
       - name: Offline evaluation smoke
         run: |
-          cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
+          cp codifix.toml.example "$RUNNER_TEMP/codifix.toml"
           cargo run --locked --bin codifix -- \
-            --config "$RUNNER_TEMP/memory-layer.toml" \
+            --config "$RUNNER_TEMP/codifix.toml" \
             eval run \
             --suite evals/examples/memory-smoke \
             --condition full-memory \
             --profile offline \
             --dry-run
         env:
-          MEMORY_LAYER_PROFILE: prod
+          CODIFIX_PROFILE: prod
 
       - name: Web dependency audit
         continue-on-error: true

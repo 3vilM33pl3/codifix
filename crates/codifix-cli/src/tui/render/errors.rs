@@ -32,9 +32,9 @@ pub(in crate::tui) fn collect_error_items(app: &App) -> Vec<ErrorItem> {
                 "tui",
                 "service",
                 "health",
-                "Memory Layer backend is unavailable.",
+                "Codifix backend is unavailable.",
                 Some("The TUI cannot reach the service yet or the service health check is failing."),
-                Some("Start the service or run `memory doctor` to inspect configuration and database connectivity."),
+                Some("Start the service or run `codifix doctor` to inspect configuration and database connectivity."),
             ),
         });
     }
@@ -86,7 +86,7 @@ pub(in crate::tui) fn collect_error_items(app: &App) -> Vec<ErrorItem> {
                     operation,
                     message,
                     Some("This error was observed locally by the current TUI session."),
-                    Some("Refresh the tab, then run `memory doctor` if the problem persists."),
+                    Some("Refresh the tab, then run `codifix doctor` if the problem persists."),
                 ),
             });
         }
@@ -110,7 +110,7 @@ pub(in crate::tui) fn collect_error_items(app: &App) -> Vec<ErrorItem> {
                             "query",
                             error,
                             Some("A persisted project query failed."),
-                            Some("Open the query/activity detail and run `memory doctor` if this repeats."),
+                            Some("Open the query/activity detail and run `codifix doctor` if this repeats."),
                         ),
                     });
                 }
@@ -130,7 +130,7 @@ pub(in crate::tui) fn collect_error_items(app: &App) -> Vec<ErrorItem> {
                             message.as_deref().unwrap_or(&event.summary),
                             Some("A watcher reported unhealthy or restarting state."),
                             Some(&format!(
-                                "Inspect watcher `{watcher_id}` with `memory watcher list` or run `memory doctor`."
+                                "Inspect watcher `{watcher_id}` with `codifix watcher list` or run `codifix doctor`."
                             )),
                         ),
                     });
@@ -144,7 +144,7 @@ pub(in crate::tui) fn collect_error_items(app: &App) -> Vec<ErrorItem> {
                         "query",
                         &event.summary,
                         Some("A persisted project query failed."),
-                        Some("Open the activity detail and run `memory doctor` if this repeats."),
+                        Some("Open the activity detail and run `codifix doctor` if this repeats."),
                     ),
                 }),
                 _ => {}
@@ -174,8 +174,8 @@ pub(in crate::tui) fn session_diagnostic(
         raw_error: Some(message.to_string()),
         explanation: explanation.map(str::to_string),
         fix_hint: fix_hint.map(str::to_string),
-        doctor_hint: Some("memory doctor".to_string()),
-        command_hint: Some("memory doctor".to_string()),
+        doctor_hint: Some("codifix doctor".to_string()),
+        command_hint: Some("codifix doctor".to_string()),
     }
 }
 

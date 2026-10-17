@@ -173,7 +173,7 @@ pub(super) fn bundle(bytes: &[u8]) -> Result<Bundle> {
         }
         if selected
             .iter()
-            .any(|part| part.eq_ignore_ascii_case(".memory-onboarding-pin.json"))
+            .any(|part| part.eq_ignore_ascii_case(".codifix-onboarding-pin.json"))
         {
             bail!("archive collides with Memory install receipt");
         }
@@ -306,14 +306,14 @@ fn publish_skill(
             }
         }
     }
-    filesystem::install_missing(&stage, ".memory-onboarding-pin.json", &receipt)?;
+    filesystem::install_missing(&stage, ".codifix-onboarding-pin.json", &receipt)?;
     if filesystem::exists(&target)? {
-        if let Some(prior) = filesystem::receipt_bytes(&target, ".memory-onboarding-pin.json")? {
+        if let Some(prior) = filesystem::receipt_bytes(&target, ".codifix-onboarding-pin.json")? {
             if prior == receipt {
                 filesystem::publish_directory(
                     &stage,
                     &target,
-                    ".memory-onboarding-pin.json",
+                    ".codifix-onboarding-pin.json",
                     &receipt,
                 )?;
                 return Ok(());
@@ -344,7 +344,7 @@ fn publish_skill(
     if filesystem::exists(&target)? {
         bail!("skill destination appeared during apply; staging retained");
     }
-    filesystem::publish_directory(&stage, &target, ".memory-onboarding-pin.json", &receipt)?;
+    filesystem::publish_directory(&stage, &target, ".codifix-onboarding-pin.json", &receipt)?;
     filesystem::save(path, journal)?;
     Ok(())
 }

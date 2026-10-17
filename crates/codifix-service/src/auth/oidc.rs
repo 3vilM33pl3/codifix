@@ -323,7 +323,7 @@ async fn discover_client(state: &AppState) -> Result<DiscoveredCoreClient, ApiEr
         .credential_env_value(&oidc.client_secret_env)
         .ok_or_else(|| {
             ApiError::service_unavailable(
-                "Authentik OIDC client secret is missing from the process environment or adjacent memory-layer.env",
+                "Authentik OIDC client secret is missing from the process environment or adjacent codifix.env",
             )
         })?;
     Ok(CoreClient::from_provider_metadata(

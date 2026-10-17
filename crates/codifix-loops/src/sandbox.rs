@@ -607,14 +607,14 @@ mod tests {
         let repo = init_repo("capture");
         let manager = WorktreeSandboxManager::default();
         let spec = SandboxWorkspaceSpec {
-            project: "Memory Layer".to_string(),
+            project: "Codifix".to_string(),
             repo_root: repo.clone(),
             run_id: Uuid::new_v4(),
             base_ref: None,
         };
         let workspace = manager.create_workspace(&spec).unwrap();
         assert!(workspace.worktree_path.exists());
-        assert!(workspace.branch.starts_with("memory/loops/memory-layer/"));
+        assert!(workspace.branch.starts_with("memory/loops/codifix/"));
         assert_ne!(workspace.branch, "main");
 
         let limits = SandboxLimits {

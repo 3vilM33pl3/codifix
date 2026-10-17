@@ -200,7 +200,7 @@ describe("AutomationsTab", () => {
     expect(screen.getAllByText("Context Pack Refresh")[0]).toBeInTheDocument();
     expect(screen.getAllByText("repo override")[0]).toBeInTheDocument();
     expect(screen.getByText("budget 3 runs/day")).toBeInTheDocument();
-    expect(screen.getByText("context pack diff, memory proposals")).toBeInTheDocument();
+    expect(screen.getByText("context pack diff, codifix proposals")).toBeInTheDocument();
     expect(screen.getAllByText("succeeded", { exact: false })[0]).toBeInTheDocument();
   });
 

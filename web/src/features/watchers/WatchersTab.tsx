@@ -55,8 +55,8 @@ export function WatchersTab({ overview, project }: WatchersTabProps) {
         ) : (
           <p className="muted">
             No watcher presence reported. Start one with{" "}
-            <code>memory watcher run --project {project}</code> or enable the watcher manager with{" "}
-            <code>memory watcher manager enable</code>.
+            <code>codifix watcher run --project {project}</code> or enable the watcher manager with{" "}
+            <code>codifix watcher manager enable</code>.
           </p>
         )}
       </div>

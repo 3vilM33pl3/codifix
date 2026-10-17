@@ -38,7 +38,7 @@ reviewed release cutover and reconciliation procedure, never by installer hooks.
    the old configuration and state are part of the recovery set. Remove old
    source-installed commands/aliases only after recording their exact paths and
    recoverable copies. Never delete directories by a name wildcard.
-3. Install the reviewed architecture-specific `codifix_3.0.0-rc.1_ARCH.deb`
+3. Install the reviewed architecture-specific `codifix_3.0.0~rc.1_ARCH.deb`
    (stable: `codifix_3.0.0_ARCH.deb`). The maintainer scripts do not start or
    restart services, provision databases or run migrations.
 4. Stage the reviewed Codifix configuration/state and area release bindings.

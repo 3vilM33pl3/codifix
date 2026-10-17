@@ -1683,7 +1683,7 @@ fn write_global_config(draft: &WizardDraft) -> Result<()> {
 
 fn render_global_config(draft: &WizardDraft) -> String {
     format!(
-        "# Shared Codifix defaults and secrets.\n# Per-project overrides are written by `memory init` to the user-local project\n# config directory. `.codifix/config.toml` is only read as a legacy fallback.\n\n[service]\nbind_addr = \"127.0.0.1:4040\"\n# service API token is provisioned automatically into codifix.env\nrequest_timeout = \"30s\"\n\n[database]\nurl = \"{}\"\n\n[cluster]\nenabled = {}\n# advertise_addr = \"192.168.1.50:4040\"\n# discovery_multicast_addr = \"239.255.42.99:4042\"\n# announce_interval = \"5s\"\n# peer_ttl = \"15s\"\n# priority = 100\n\n# Optional shared writer label. If omitted, Codifix derives a writer id automatically.\n# [writer]\n# id = \"codex-cli-main\"\n# name = \"Codex CLI\"\n\n[features]\nllm_curation = false\n\n[llm]\nprovider = \"{}\"\nbase_url = \"{}\"\napi_key_env = \"{}\"\nmodel = \"{}\"\ntemperature = 0.0\nmax_input_bytes = 120000\nmax_output_tokens = 3000\n\n# Opt-in debug trail for service-side LLM calls. Prompt messages are redacted before persistence.\n[llm_audit]\nenabled = false\nredact = true\nmax_message_chars = 8000\nmax_total_chars = 32000\n\n[embeddings]\nprovider = \"openai\"\nbase_url = \"https://api.openai.com/v1\"\napi_key_env = \"{}\"\nmodel = \"\"\nbatch_size = 16\n\n[automation]\nenabled = false\nmode = \"suggest\"\nfile_events = true\npoll_interval = \"60s\"\ncapture_idle_threshold = \"10m\"\nmin_changed_files = 2\nrequire_passing_test = false\ncurate_after_captures = 3\ncurate_on_explicit_flush = true\nignored_paths = [\".git/\", \"target/\", \".codifix/\"]\n# repo_root = \"/path/to/repo\"\n# audit_log_path = \"/path/to/repo/.codifix/automation.log\"\n# state_file_path = \"/path/to/repo/.codifix/automation-state.json\"\n",
+        "# Shared Codifix defaults and secrets.\n# Per-project overrides are written by `codifix init` to the user-local project\n# config directory. `.codifix/config.toml` is only read as a legacy fallback.\n\n[service]\nbind_addr = \"127.0.0.1:4040\"\n# service API token is provisioned automatically into codifix.env\nrequest_timeout = \"30s\"\n\n[database]\nurl = \"{}\"\n\n[cluster]\nenabled = {}\n# advertise_addr = \"192.168.1.50:4040\"\n# discovery_multicast_addr = \"239.255.42.99:4042\"\n# announce_interval = \"5s\"\n# peer_ttl = \"15s\"\n# priority = 100\n\n# Optional shared writer label. If omitted, Codifix derives a writer id automatically.\n# [writer]\n# id = \"codex-cli-main\"\n# name = \"Codex CLI\"\n\n[features]\nllm_curation = false\n\n[llm]\nprovider = \"{}\"\nbase_url = \"{}\"\napi_key_env = \"{}\"\nmodel = \"{}\"\ntemperature = 0.0\nmax_input_bytes = 120000\nmax_output_tokens = 3000\n\n# Opt-in debug trail for service-side LLM calls. Prompt messages are redacted before persistence.\n[llm_audit]\nenabled = false\nredact = true\nmax_message_chars = 8000\nmax_total_chars = 32000\n\n[embeddings]\nprovider = \"openai\"\nbase_url = \"https://api.openai.com/v1\"\napi_key_env = \"{}\"\nmodel = \"\"\nbatch_size = 16\n\n[automation]\nenabled = false\nmode = \"suggest\"\nfile_events = true\npoll_interval = \"60s\"\ncapture_idle_threshold = \"10m\"\nmin_changed_files = 2\nrequire_passing_test = false\ncurate_after_captures = 3\ncurate_on_explicit_flush = true\nignored_paths = [\".git/\", \"target/\", \".codifix/\"]\n# repo_root = \"/path/to/repo\"\n# audit_log_path = \"/path/to/repo/.codifix/automation.log\"\n# state_file_path = \"/path/to/repo/.codifix/automation-state.json\"\n",
         draft.database_url,
         draft.relay_discovery_enabled.is_yes(),
         draft.llm_provider,
@@ -1846,7 +1846,7 @@ fn ensure_runnable_profile(profile: Profile) -> Result<()> {
     match profile {
         Profile::Prod => Ok(()),
         Profile::Dev => anyhow::bail!(
-            "memory wizard edits the installed config, but this binary is running in the \
+            "codifix wizard edits the installed config, but this binary is running in the \
              dev profile (current_exe is inside a cargo target/ directory). Rerun with the \
              installed binary, or set CODIFIX_PROFILE=prod to bypass if you know what \
              you're doing."
@@ -1962,7 +1962,7 @@ fn field_description(field: FieldKey) -> &'static str {
         }
         FieldKey::AutomationRequirePassingTest => {
             "When Yes, the watcher skips captures \
-            whose accompanying `memory remember --tests` invocation reports a failing test. \
+            whose accompanying `codifix remember --tests` invocation reports a failing test. \
             Useful to keep broken snapshots out of durable memory."
         }
         FieldKey::AutomationCurateAfterCaptures => {
@@ -1995,7 +1995,7 @@ fn field_description(field: FieldKey) -> &'static str {
             writes captures to the memory DB."
         }
         FieldKey::RunDoctor => {
-            "When Yes, the apply step runs `memory doctor` at the end so \
+            "When Yes, the apply step runs `codifix doctor` at the end so \
             you see health of the install (service reachable, DB up, paths resolved) before \
             the wizard exits."
         }

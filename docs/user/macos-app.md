@@ -9,7 +9,7 @@ create a database.
 With Xcode installed, run from the repository root:
 
 ```sh
-xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
+xcodebuild -project apps/macos/Codifix.xcodeproj -scheme Codifix \
   -configuration Debug -derivedDataPath target/macos \
   CODE_SIGNING_ALLOWED=NO build
 open 'target/macos/Build/Products/Debug/Codifix.app'
@@ -87,9 +87,9 @@ remain available.
 Run the macOS unit tests with:
 
 ```sh
-xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
+xcodebuild -project apps/macos/Codifix.xcodeproj -scheme Codifix \
   -destination 'platform=macOS' -derivedDataPath target/macos-tests \
-  CODE_SIGNING_ALLOWED=NO -only-testing:MemoryLayerTests test
+  CODE_SIGNING_ALLOWED=NO -only-testing:CodifixTests test
 ```
 
 Use injectable transport fixtures for destructive and administrative test

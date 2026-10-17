@@ -302,7 +302,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
 
         let version = config.profile.display_version(env!("CARGO_PKG_VERSION"));
         eprintln!(
-            "memory-layer v{version} listening on {addr} (profile={profile}, role={role}, service_id={service_id}, cluster={cluster})",
+            "codifix v{version} listening on {addr} (profile={profile}, role={role}, service_id={service_id}, cluster={cluster})",
             profile = config.profile,
             role = state.role_name(),
             service_id = config.cluster.service_id,
@@ -337,7 +337,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         tracing::info!(
             %addr,
             role = %state.role_name(),
-            "memory-layer listening"
+            "codifix listening"
         );
 
         if let Some(path) = config_path.as_deref() {
@@ -660,11 +660,8 @@ fn offline_database_path(config: &AppConfig) -> Option<PathBuf> {
         .resolved_dev_overlay_path
         .as_deref()
         .or(config.resolved_config_path.as_deref())
-        .and_then(|path| {
-            path.parent()
-                .map(|parent| parent.join("memory-layer.duckdb"))
-        })
-        .or_else(|| preferred_user_state_dir().map(|dir| dir.join("memory-layer.duckdb")))
+        .and_then(|path| path.parent().map(|parent| parent.join("codifix.duckdb")))
+        .or_else(|| preferred_user_state_dir().map(|dir| dir.join("codifix.duckdb")))
 }
 
 fn start_offline_sync_task(state: AppState) {
@@ -719,8 +716,8 @@ pub(crate) fn discover_web_root(config: &AppConfig) -> Option<PathBuf> {
         codifix_platform::preferred_user_state_dir().map(|dir| dir.join("web")),
         std::env::var("HOME")
             .ok()
-            .map(|home| PathBuf::from(home).join(".local/share/memory-layer/web")),
-        Some(PathBuf::from("/usr/share/memory-layer/web")),
+            .map(|home| PathBuf::from(home).join(".local/share/codifix/web")),
+        Some(PathBuf::from("/usr/share/codifix/web")),
     ];
 
     candidates

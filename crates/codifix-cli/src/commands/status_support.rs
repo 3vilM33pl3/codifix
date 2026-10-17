@@ -401,7 +401,7 @@ pub(crate) fn print_cli_status_report(report: &CliStatusReport) {
         "Output contract: parsed output stays on stdout; warnings/progress go to stderr; category-specific exit codes are deferred."
     );
     if report.summary.overall != DoctorStatus::Ok {
-        println!("Next: memory doctor --project {}", report.project);
+        println!("Next: codifix doctor --project {}", report.project);
     }
 }
 
@@ -604,15 +604,15 @@ fn repo_bootstrap_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<(
             DoctorStatus::Fail
         },
         if mem_dir.exists() || init_fix_applied {
-            "Repo-local .mem directory is present."
+            "Repo-local .codifix directory is present."
         } else {
-            "Repo-local .mem directory is missing."
+            "Repo-local .codifix directory is missing."
         },
         Some(mem_dir.display().to_string()),
         if mem_dir.exists() || init_fix_applied {
             None
         } else {
-            Some("memory init".to_string())
+            Some("codifix init".to_string())
         },
         init_fix_applied,
     ));
@@ -633,11 +633,11 @@ fn repo_bootstrap_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<(
             DoctorStatus::Ok
         },
         if legacy_config_path.exists() && config_path.exists() {
-            "Legacy .mem config has a user-local project config counterpart."
+            "Legacy .codifix config has a user-local project config counterpart."
         } else if legacy_config_path.exists() {
-            "Legacy .mem config is present but has not been migrated to the user-local project config directory."
+            "Legacy .codifix config is present but has not been migrated to the user-local project config directory."
         } else {
-            "No legacy .mem config migration is needed."
+            "No legacy .codifix config migration is needed."
         },
         Some(format!(
             "legacy={}, current={}",
@@ -645,7 +645,7 @@ fn repo_bootstrap_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<(
             config_path.display()
         )),
         if legacy_config_path.exists() && !config_path.exists() {
-            Some("memory doctor --fix".to_string())
+            Some("codifix doctor --fix".to_string())
         } else {
             None
         },
@@ -678,9 +678,9 @@ fn repo_bootstrap_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<(
         if config_path.exists() || config_fix_applied {
             None
         } else if legacy_config_path.exists() {
-            Some("memory doctor --fix".to_string())
+            Some("codifix doctor --fix".to_string())
         } else {
-            Some("memory init".to_string())
+            Some("codifix init".to_string())
         },
         config_fix_applied,
     ));
@@ -707,7 +707,7 @@ fn repo_bootstrap_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<(
         if project_path.exists() || project_fix_applied {
             None
         } else {
-            Some("memory init".to_string())
+            Some("codifix init".to_string())
         },
         project_fix_applied,
     ));
@@ -748,7 +748,7 @@ fn repo_bootstrap_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<(
         if root_gitignore_contains_mem(repo_root)? {
             "Root .gitignore ignores .mem, which may hide the repo-local project marker."
         } else {
-            "Root .gitignore does not hide the repo-local .mem marker directory."
+            "Root .gitignore does not hide the repo-local .codifix marker directory."
         },
         Some(root_gitignore_path.display().to_string()),
         if root_gitignore_contains_mem(repo_root)? {
@@ -1387,7 +1387,7 @@ fn llm_report_checks(report: &mut DoctorReport, runtime_facts: Option<&serde_jso
                         .and_then(serde_json::Value::as_str)
                         .unwrap_or("<default>")
                 )),
-                (!healthy).then(|| "memory embeddings add".to_string()),
+                (!healthy).then(|| "codifix embeddings add".to_string()),
                 false,
             ));
         }
@@ -1435,7 +1435,7 @@ fn automation_checks(
         if runtime_dir.exists() {
             None
         } else {
-            Some("memory doctor --fix".to_string())
+            Some("codifix doctor --fix".to_string())
         },
         runtime_fix_applied,
     ));
@@ -1503,7 +1503,7 @@ fn watcher_manager_checks(report: &mut DoctorReport) -> Result<()> {
             if manager_status.running {
                 None
             } else {
-                Some("memory watcher manager enable".to_string())
+                Some("codifix watcher manager enable".to_string())
             },
             false,
         ));
@@ -1536,7 +1536,7 @@ fn watcher_manager_checks(report: &mut DoctorReport) -> Result<()> {
             if manager_active {
                 None
             } else {
-                Some("memory watcher manager enable".to_string())
+                Some("codifix watcher manager enable".to_string())
             },
             false,
         ));
@@ -1572,7 +1572,7 @@ fn watcher_manager_checks(report: &mut DoctorReport) -> Result<()> {
             if manager_active {
                 None
             } else {
-                Some("memory watcher manager enable".to_string())
+                Some("codifix watcher manager enable".to_string())
             },
             false,
         ));
@@ -1685,9 +1685,9 @@ async fn backend_checks(
                                 None
                             } else {
                                 Some(if cfg!(target_os = "macos") {
-                                    format!("memory watcher enable --project {}", project)
+                                    format!("codifix watcher enable --project {}", project)
                                 } else {
-                                    "memory watcher manager enable".to_string()
+                                    "codifix watcher manager enable".to_string()
                                 })
                             },
                             false,
@@ -1712,7 +1712,7 @@ async fn backend_checks(
                                 if commits.total > 0 {
                                     None
                                 } else {
-                                    Some(format!("memory commits sync --project {}", project))
+                                    Some(format!("codifix commits sync --project {}", project))
                                 },
                                 false,
                             )),
@@ -1721,7 +1721,7 @@ async fn backend_checks(
                                 DoctorStatus::Warn,
                                 "Could not load project commit history.",
                                 Some(error.to_string()),
-                                Some(format!("memory commits sync --project {}", project)),
+                                Some(format!("codifix commits sync --project {}", project)),
                                 false,
                             )),
                         }
@@ -1732,7 +1732,7 @@ async fn backend_checks(
                     DoctorStatus::Warn,
                     "Project overview endpoint did not return data.",
                     Some(error.to_string()),
-                    Some(format!("memory init --project {}", project)),
+                    Some(format!("codifix init --project {}", project)),
                     false,
                 )),
             }
@@ -1849,7 +1849,7 @@ async fn automation_state_check(
                 "Skipped automation state because automation is disabled."
             },
             Some(error.to_string()),
-            Some("memory doctor --fix".to_string()),
+            Some("codifix doctor --fix".to_string()),
             false,
         )),
     }

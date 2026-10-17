@@ -61,7 +61,7 @@ const WEB_HELP: Record<Tab, { title: string; purpose: string; layout: string[]; 
     purpose: "Explore the extracted code graph as a bounded 3D WebGL neighborhood.",
     layout: ["Filter toolbar controls the graph slice.", "WebGL scene shows nodes and resolved edges.", "Inspector shows selected node or edge metadata."],
     controls: ["Apply reloads the graph slice.", "Refresh reloads current filters.", ...SHARED_CONTROLS],
-    workflows: ["Start with a file or symbol filter.", "Open graph links from query results or graph extraction activities.", "Run memory graph extract when no graph is available."],
+    workflows: ["Start with a file or symbol filter.", "Open graph links from query results or graph extraction activities.", "Run codifix graph extract when no graph is available."],
   },
   activity: {
     title: "Activity Help",
@@ -75,7 +75,7 @@ const WEB_HELP: Record<Tab, { title: string; purpose: string; layout: string[]; 
     purpose: "Inspect persisted diagnostics and browser-session errors with explanations and suggested fixes.",
     layout: ["Left list shows time, severity, source, component, and summary.", "Right pane shows explanation, fix hints, doctor hints, commands, and raw error."],
     controls: ["Click an error row to inspect it.", ...SHARED_CONTROLS],
-    workflows: ["Open this tab when the footer shows errors or an operation fails.", "Prefer memory doctor hints when shown.", "Use source/component to route fixes to service, watcher, manager, provider, database, or browser."],
+    workflows: ["Open this tab when the footer shows errors or an operation fails.", "Prefer codifix doctor hints when shown.", "Use source/component to route fixes to service, watcher, manager, provider, database, or browser."],
   },
   project: {
     title: "Project Help",
@@ -103,7 +103,7 @@ const WEB_HELP: Record<Tab, { title: string; purpose: string; layout: string[]; 
     purpose: "Inspect and repair repo-local Codifix skills used by coding agents.",
     layout: ["Toolbar filters Codifix versus all focused skills and runs refresh or repair.", "Left list shows status, local/template versions, and repair action for each skill.", "Right pane shows path, template source, status detail, and SKILL.md content."],
     controls: ["Use Repair skills to install missing skills or replace stale Memory-owned skills.", ...SHARED_CONTROLS],
-    workflows: ["Open this tab when the status strip reports stale or missing skills.", "Review a skill path and instructions before asking an agent to use it.", "Repair skills here or use memory doctor --fix / memory upgrade from a terminal."],
+    workflows: ["Open this tab when the status strip reports stale or missing skills.", "Review a skill path and instructions before asking an agent to use it.", "Repair skills here or use codifix doctor --fix / codifix upgrade from a terminal."],
   },
   embeddings: {
     title: "Embeddings Help",
@@ -122,7 +122,7 @@ const WEB_HELP: Record<Tab, { title: string; purpose: string; layout: string[]; 
   automations: {
     title: "Automations Help",
     purpose: "Review and control loop-engineering automations from the same backend control plane used by the CLI and MCP tools.",
-    layout: ["Toolbar shows refresh and global stop.", "Approval queue shows pending risky actions, proposed JSON, run metadata, requester/reviewer, and linked memory proposals.", "Left side lists automation cards with mode, scope, risk, budget, trigger, and last run.", "Right side shows selected automation policy, context pack, outputs, blocked reasons, run ledger, traces, approvals, and proposals."],
+    layout: ["Toolbar shows refresh and global stop.", "Approval queue shows pending risky actions, proposed JSON, run metadata, requester/reviewer, and linked codifix proposals.", "Left side lists automation cards with mode, scope, risk, budget, trigger, and last run.", "Right side shows selected automation policy, context pack, outputs, blocked reasons, run ledger, traces, approvals, and proposals."],
     controls: ["Use Approve, Reject, or Save edit in the approval queue after reviewing the proposed action.", "Use mode menus to enable or reconfigure a loop.", "Use Load run to inspect the latest run ledger and context pack diff.", "Use Disable, Pause, Snooze, and Run now from the detail pane.", ...SHARED_CONTROLS],
     workflows: ["Review memory proposal candidates and evidence before approving durable memory changes.", "Inspect context pack warnings for stale or contradictory memory before trusting a loop run.", "Keep high-risk loops in suggest-only or draft-output modes until reviewed.", "Use global stop before investigating unexpected loop activity.", "Check scope text before changing inherited settings."],
   },

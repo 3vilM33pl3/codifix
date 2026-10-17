@@ -89,7 +89,7 @@ esac
 # predictable path: it might contain another build or be an operator symlink.
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd -P)"
-DEB_PATH="$OUTPUT_DIR/codifix_${VERSION}_${DEB_ARCH}.deb"
+DEB_PATH="$OUTPUT_DIR/codifix_${DEB_VERSION}_${DEB_ARCH}.deb"
 if [[ -e "$DEB_PATH" || -L "$DEB_PATH" ]]; then
   echo "Refusing to overwrite an existing release artifact: $DEB_PATH" >&2
   echo "Preserve or explicitly remove that exact artifact before rebuilding." >&2

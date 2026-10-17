@@ -44,7 +44,7 @@ Preparation is on Monolith, with synthetic fixtures and no provider credentials.
 It does not authorize installing on the CA, stopping original writers, activating
 Trust/Pi, changing DNS/credentials, using an operator signing key or paid models.
 Any Pi redistribution requires the separate license review already documented in
-the [patch evidence](../../../crates/mem-supervisor-pi/patches/README.md).
+the [patch evidence](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-supervisor-pi/patches/README.md).
 
 Before actual cutover, reconcile offline work, take and independently restore a
 fresh shared snapshot, review its delta, fence every identified original writer

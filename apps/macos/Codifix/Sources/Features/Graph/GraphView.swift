@@ -133,7 +133,7 @@ struct GraphView: View {
             ContentUnavailableView {
                 Label("No graph data for \(snapshot.status.project)", systemImage: "point.3.connected.trianglepath.dotted")
             } description: {
-                Text("This service has no extracted code graph or active memory graph for this project. If you expected existing data, review the selected connection and project.")
+                Text("This service has no extracted code graph or active codifix graph for this project. If you expected existing data, review the selected connection and project.")
             } actions: {
                 Button("Review connection settings", systemImage: "gearshape") {
                     NotificationCenter.default.post(name: .showConnectionSettings, object: nil)
@@ -305,7 +305,7 @@ struct GraphView: View {
                     Label(snapshot.codeGraph.truncationReason ?? "The service limited the returned code graph.", systemImage: "exclamationmark.triangle")
                 }
                 if snapshot.memoryGraph.totalMemories > snapshot.memoryGraph.returnedMemories {
-                    Label("Showing \(snapshot.memoryGraph.returnedMemories) of \(snapshot.memoryGraph.totalMemories) active memories; the memory graph endpoint is limited to 250.", systemImage: "exclamationmark.triangle")
+                    Label("Showing \(snapshot.memoryGraph.returnedMemories) of \(snapshot.memoryGraph.totalMemories) active memories; the codifix graph endpoint is limited to 250.", systemImage: "exclamationmark.triangle")
                 }
             }
             .font(.caption)

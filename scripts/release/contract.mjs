@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { releaseIdentity } from './identity.mjs';
 
 const version = process.argv[2];
-assert.match(version ?? '', /^\d+\.\d+\.\d+$/, 'stable release version required');
+releaseIdentity(version);
 const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--no-deps', '--locked', '--format-version', '1']));
 for (const pkg of metadata.packages) assert.equal(pkg.version, version, pkg.name);
 for (const dir of ['web', 'docs-site']) {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! `memory structure` — the meta-memory structure view: the committed insight
+//! `codifix structure` — the meta-memory structure view: the committed insight
 //! tree (`summarizes` relations, recursive across tiers) plus the clusters the
 //! deterministic consolidation scan discovers right now.
 
@@ -90,7 +90,7 @@ fn render(response: &ProjectStructureResponse) -> String {
     if !response.groups.is_empty() {
         push(
             &mut out,
-            "\nRun memory consolidate to synthesize these groups into insight proposals."
+            "\nRun codifix consolidate to synthesize these groups into insight proposals."
                 .to_string(),
         );
     }
@@ -188,7 +188,7 @@ mod tests {
         assert!(text.contains("    · [reference] 00000000-0000-0000-0000-000000000000 leaf fact"));
         assert!(text.contains("1 of 3 candidate cluster(s)"));
         assert!(text.contains("[decision]"));
-        assert!(text.contains("Run memory consolidate"));
+        assert!(text.contains("Run codifix consolidate"));
     }
 
     #[test]
@@ -204,6 +204,6 @@ mod tests {
         let text = render(&response);
         assert!(text.contains("none yet"));
         assert!(text.contains("0 of 0 candidate cluster(s)"));
-        assert!(!text.contains("Run memory consolidate"));
+        assert!(!text.contains("Run codifix consolidate"));
     }
 }

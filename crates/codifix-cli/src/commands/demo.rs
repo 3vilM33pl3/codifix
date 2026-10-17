@@ -13,12 +13,12 @@ use crate::{
     writer_identity::resolve_writer_identity,
 };
 
-/// A self-referential showcase corpus (memories about Memory Layer itself),
-/// embedded so `memory demo` works from a fresh install with no files on disk.
+/// A self-referential showcase corpus (memories about Codifix itself),
+/// embedded so `codifix demo` works from a fresh install with no files on disk.
 const DEMO_CORPUS: &str = include_str!("../assets/demo-corpus.json");
 
 /// Seed and curate the embedded showcase corpus into `project`. Returns the
-/// number of loaded candidates. Shared by `memory demo` and `memory tour`.
+/// number of loaded candidates. Shared by `codifix demo` and `codifix tour`.
 pub(super) async fn seed_demo_corpus(
     project: &str,
     client: &Client,
@@ -87,19 +87,19 @@ pub(super) async fn handle(
     let project = &args.project;
     println!("Loaded {candidate_count} demo memories into project '{project}'.\n");
     println!("Try one of these:");
-    println!("  memory query --project {project} --question \"How does reinforcement work?\"");
+    println!("  codifix query --project {project} --question \"How does reinforcement work?\"");
     println!(
-        "  memory query --project {project} --question \"What does the service need to run?\""
+        "  codifix query --project {project} --question \"What does the service need to run?\""
     );
-    println!("  memory tour  # a guided three-command walkthrough");
-    println!("  memory tui   # browse and search everything, including the memory graph");
+    println!("  codifix tour  # a guided three-command walkthrough");
+    println!("  codifix tui   # browse and search everything, including the codifix graph");
     Ok(())
 }
 
 /// Map a transport-level failure (service not running) to an actionable hint.
 fn unreachable_service_hint(err: reqwest::Error) -> anyhow::Error {
     anyhow::anyhow!(
-        "could not reach the Memory Layer service: {err}\n\
-         Start it first — `docker compose up` (bundled stack) or `memory service run` — then rerun `memory demo`."
+        "could not reach the Codifix service: {err}\n\
+         Start it first — `docker compose up` (bundled stack) or `codifix service run` — then rerun `codifix demo`."
     )
 }

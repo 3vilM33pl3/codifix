@@ -148,7 +148,7 @@ if($core.format -cne 'memory-native-core-workflow-v1' -or $core.state -cne 'succ
     $build.compilation_verified -ne $true -or $build.release_candidate -ne $false -or
     $build.source_commit -cnotmatch '^[0-9a-f]{40}$'){throw 'Completed matching core workflow and native ProductBuild required'}
 $instance=[guid]$core.instance;if($instance -eq [guid]::Empty){throw 'Exact core instance identity required'}
-$name='lab-core-'+$InstallOperationId.ToString('N').Substring(0,16);$serviceName='MemoryLayer-'+$name
+$name='lab-core-'+$InstallOperationId.ToString('N').Substring(0,16);$serviceName='Codifix-'+$name
 if(Get-Service -Name $serviceName -ErrorAction SilentlyContinue){throw 'Existing lab service retained; no automatic adoption or reinstall'}
 $root="C:\MemoryLab\runs\$InstallOperationId\core-install"
 Assert-CoreInstallPath $root
@@ -158,7 +158,7 @@ $sid=$identity.User.Value
 & "$env:SystemRoot\System32\icacls.exe" $root /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 if($LASTEXITCODE){throw 'Private installation rehearsal directory required'}
 $releaseIdentity=Get-WindowsReleaseIdentity '2.1.0-rc.5' $InstallerBuild
-$release=Join-Path ([Environment]::GetFolderPath('ProgramFiles')) ('Memory Layer\releases\'+$releaseIdentity.release_identity)
+$release=Join-Path ([Environment]::GetFolderPath('ProgramFiles')) ('Codifix\releases\'+$releaseIdentity.release_identity)
 if(Test-Path -LiteralPath $release){throw 'Selected LAB-ONLY build already exists; preserve it and select a fresh build identity'}
 $receipt=[ordered]@{format='memory-native-core-install-v1';state='running';operation_id=$InstallOperationId.ToString();core_operation_id=$OperationId.ToString();lab_only=$true;release_candidate=$false
     installer_build=$InstallerBuild;installer_source_commit=$head;binary_source_commit=$build.source_commit;core_source_commit=$core.source_commit
@@ -227,11 +227,11 @@ try{
     $manifestPath=Join-Path $root 'LAB-ONLY-manifest.json'
     Write-CoreInstallNew $manifestPath ([Text.UTF8Encoding]::new($false).GetBytes(($manifest | ConvertTo-Json -Depth 10)))
     $receipt.package_sha256=Get-CoreInstallHash $package;$receipt.manifest_sha256=Get-CoreInstallHash $manifestPath;$receipt.web_index_sha256=Get-CoreInstallHash (Join-Path $payload 'web\index.html')
-    $coreConfig=Join-Path $coreRoot 'memory-layer.toml';Assert-CoreInstallPath $coreConfig;$text=[IO.File]::ReadAllText($coreConfig)
+    $coreConfig=Join-Path $coreRoot 'codifix.toml';Assert-CoreInstallPath $coreConfig;$text=[IO.File]::ReadAllText($coreConfig)
     $binding=Get-CoreInstallBinding $text $OperationId $instance;$token=$binding.token
     $origin='http://127.0.0.1:'+$binding.port
     if(Get-NetTCPConnection -LocalPort $binding.port -State Listen -ErrorAction SilentlyContinue){throw 'Completed foreground core listener must be stopped before installation'}
-    $config=Join-Path $root 'memory-layer.toml'
+    $config=Join-Path $root 'codifix.toml'
     $text=Set-CoreInstalledWeb $text (Join-Path $release 'web')
     Write-CoreInstallNew $config ([Text.UTF8Encoding]::new($false).GetBytes($text));$text=$null
     $receipt.config_sha256=Get-CoreInstallHash $config

@@ -22,5 +22,5 @@ async fn migrations_apply_to_configured_database() {
         .await
         .expect("query sqlx migration ledger");
     let count: i64 = row.try_get("count").expect("decode migration count");
-    assert!(count >= 17, "expected all Memory Layer migrations to run");
+    assert!(count >= 17, "expected all Codifix migrations to run");
 }

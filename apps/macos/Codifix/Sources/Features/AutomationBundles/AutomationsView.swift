@@ -247,7 +247,7 @@ public struct AutomationsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Loop approvals and memory proposals from \(context.profile.projectSlug) are shown here. Knowledge replacement proposals have their own Review screen.").font(.callout).foregroundStyle(.secondary)
+                    Text("Loop approvals and codifix proposals from \(context.profile.projectSlug) are shown here. Knowledge replacement proposals have their own Review screen.").font(.callout).foregroundStyle(.secondary)
                     if let invalidJSON { ProjectBanner(title: "Invalid JSON", message: invalidJSON, tone: .failure) }
                     if let queueError { ProjectBanner(title: "Approval queue refresh failed", message: "Showing the last items loaded. \(queueError)", tone: .failure) }
                     if queueLoading { ProgressView("Loading automation approvals…").frame(maxWidth: .infinity, alignment: .leading) }
@@ -260,7 +260,7 @@ public struct AutomationsView: View {
                         }
                     }
                     if !memoryProposals.isEmpty {
-                        ProjectCard(title: "Loop memory proposals · \(memoryProposals.count)") {
+                        ProjectCard(title: "Loop codifix proposals · \(memoryProposals.count)") {
                             ForEach(memoryProposals) { proposal in proposalRow(proposal) }
                         }
                     }

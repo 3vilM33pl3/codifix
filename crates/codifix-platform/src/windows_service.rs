@@ -74,17 +74,17 @@ fn parse(arguments: Vec<OsString>) -> Result<Spec> {
         || arguments[4] != "--"
     {
         bail!(
-            "usage: codifix-windows-service --name MemoryLayer-<instance> --directory <absolute-state-dir> -- <absolute-executable> [arguments]"
+            "usage: codifix-windows-service --name Codifix-<instance> --directory <absolute-state-dir> -- <absolute-executable> [arguments]"
         );
     }
     let name = arguments[1]
         .to_str()
         .context("service name must be ASCII")?;
-    if !name.starts_with("MemoryLayer-")
+    if !name.starts_with("Codifix-")
         || name.len() > 128
         || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
     {
-        bail!("service name must be MemoryLayer- followed by letters, numbers or hyphens");
+        bail!("service name must be Codifix- followed by letters, numbers or hyphens");
     }
     for value in [&arguments[3], &arguments[5]] {
         if !Path::new(value).is_absolute() {
@@ -302,7 +302,7 @@ mod tests {
         let spec = parse(
             [
                 "--name",
-                "MemoryLayer-test",
+                "Codifix-test",
                 "--directory",
                 r"C:\state",
                 "--",
@@ -320,8 +320,8 @@ mod tests {
     fn rejects_unscoped_names_relative_paths_and_nul() {
         for (name, path) in [
             ("OtherService", r"C:\codifix.exe"),
-            ("MemoryLayer-test", "codifix.exe"),
-            ("MemoryLayer-test", "C:\\x\0.exe"),
+            ("Codifix-test", "codifix.exe"),
+            ("Codifix-test", "C:\\x\0.exe"),
         ] {
             assert!(
                 parse(

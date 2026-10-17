@@ -30,7 +30,7 @@ $action=New-ScheduledTaskAction -Execute $powershell -Argument $arguments -Worki
 $principal=New-ScheduledTaskPrincipal -UserId $sid -LogonType Interactive -RunLevel Limited
 $trigger=New-ScheduledTaskTrigger -AtLogOn -User $sid
 $settings=New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval ([TimeSpan]::FromMinutes(1)) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-$task=New-ScheduledTask -Action $action -Principal $principal -Trigger $trigger -Settings $settings -Description ('Memory Layer reviewed device sync '+$digest)
+$task=New-ScheduledTask -Action $action -Principal $principal -Trigger $trigger -Settings $settings -Description ('Codifix reviewed device sync '+$digest)
 if (Get-ScheduledTask -TaskPath '\' -TaskName $plan.task.name -ErrorAction SilentlyContinue) { throw 'Foreign task exists; no adoption' }
 $registered=$false
 try {
@@ -49,7 +49,7 @@ try {
 } finally {
     if ($registered) {
         $current=Get-ScheduledTask -TaskPath '\' -TaskName $plan.task.name
-        if ($current.Description -cne ('Memory Layer reviewed device sync '+$digest) -or
+        if ($current.Description -cne ('Codifix reviewed device sync '+$digest) -or
             @($current.Actions).Count -ne 1 -or $current.Actions[0].Arguments -cne $arguments) { throw 'Task changed; retain for explicit inspection' }
         Unregister-ScheduledTask -TaskPath '\' -TaskName $plan.task.name -Confirm:$false
     }

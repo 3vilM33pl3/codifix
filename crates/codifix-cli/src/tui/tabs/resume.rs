@@ -46,7 +46,7 @@ pub(in crate::tui) fn draw_resume_tab(
             }
         } else {
             lines.push(Line::from(Span::styled(
-                "No checkpoint stored yet. Use `memory checkpoint save --project <slug>` when you leave a project.",
+                "No checkpoint stored yet. Use `codifix checkpoint save --project <slug>` when you leave a project.",
                 Style::default().fg(Theme::MUTED),
             )));
         }

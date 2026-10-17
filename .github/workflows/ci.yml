@@ -39,7 +39,7 @@ jobs:
               - "crates/**"
               - "fixtures/federation/**"
               - "migrations/**"
-              - "memory-layer.toml.example"
+              - "codifix.toml.example"
             db:
               - "Cargo.toml"
               - "Cargo.lock"
@@ -86,9 +86,9 @@ jobs:
               - ".codex/config.toml"
               - ".codex/agents/astra_adviser.toml"
               - "README.md"
-              - "memory-layer.toml.example"
+              - "codifix.toml.example"
             plugin:
-              - "plugins/memory-layer/**"
+              - "plugins/codifix/**"
               - ".agents/plugins/marketplace.json"
               - "scripts/check-codex-plugin.py"
               - "docs/user/codex-desktop-plugin.md"
@@ -349,7 +349,7 @@ jobs:
           cargo run --locked --bin codifix -- eval campaign plan \
             --manifest "$r3_review_root/pack/campaign.json" --split held-out
         env:
-          MEMORY_LAYER_PROFILE: prod
+          CODIFIX_PROFILE: prod
       - name: Verify R3 offline container boundary with synthetic commands
         run: |
           r3_fixture_image=ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
@@ -388,16 +388,16 @@ jobs:
           MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" MEMORY_R3_REQUIRE_RUNNER=1 \
             node --test evals/r3/runner.test.mjs
       - run: |
-          cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
+          cp codifix.toml.example "$RUNNER_TEMP/codifix.toml"
           cargo run --locked --bin codifix -- \
-            --config "$RUNNER_TEMP/memory-layer.toml" \
+            --config "$RUNNER_TEMP/codifix.toml" \
             eval run \
             --suite evals/examples/memory-smoke \
             --condition full-memory \
             --profile offline \
             --dry-run
         env:
-          MEMORY_LAYER_PROFILE: prod
+          CODIFIX_PROFILE: prod
 
   web-build:
     name: Web Build
@@ -482,6 +482,6 @@ jobs:
       - run: ./packaging/build-deb.sh --arch amd64 --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@v4
         with:
-          name: memory-layer-deb-amd64
+          name: codifix-deb-amd64
           path: target/debian/*_amd64.deb
           if-no-files-found: error

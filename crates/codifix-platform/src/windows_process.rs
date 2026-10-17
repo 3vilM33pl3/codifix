@@ -188,7 +188,7 @@ pub(super) struct Profile {
 impl Profile {
     pub(super) fn create() -> Result<Self> {
         let name = wide(OsStr::new(&format!(
-            "MemoryLayer.Sandbox.{}",
+            "Codifix.Sandbox.{}",
             uuid::Uuid::new_v4()
         )))?;
         let mut sid = null_mut();

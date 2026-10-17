@@ -196,13 +196,13 @@ of the internal patch, checkpointed at 20:06 UTC. Preserve the complete notice
 without claiming standard MIT terms or legal clearance. Original pins remain
 unchanged; separately identified local patch/testing may proceed, with no Pi
 publication, paid calls or live activation. No real key or paid call was used.
-See [reproduction and evidence](../../../crates/mem-supervisor-pi/README.md#real-fake-provider-diagnostic-tool-isolation-blocked).
+See [reproduction and evidence](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-supervisor-pi/README.md#real-fake-provider-diagnostic-tool-isolation-blocked).
 The narrow internal `0.5.1+memory.no-tools.1` patch subsequently built on AMD64
 and passed the network-none synthetic diagnostic: both settings profiles
 advertise no tools; success/HTTP 429 each make exactly one local request. The
 original production pin rejects this separately hashed artifact. Source, patch,
 licence, compiler and binary identity are in the
-[patch evidence](../../../crates/mem-supervisor-pi/patches/README.md).
+[patch evidence](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-supervisor-pi/patches/README.md).
 Thirteen ordinary tests, strict adapter Clippy, formatting and boundaries pass.
 ARM64 also compiled successfully and has its own preserved binary hash and
 static ELF evidence; neither that platform nor the CA has a patched runtime
@@ -217,7 +217,7 @@ unknown or duplicate fields, storage and model overrides are rejected before
 counter calls or journal mutation. The immutable Memory request is sent upstream,
 never Pi's original bytes; its date/session metadata cannot leak into that request.
 The fixed profile translation and remaining caller-consent obligations are in the
-[runtime contract](../../../crates/mem-supervisor-runtime/README.md#pi-request-admission-not-a-running-proxy).
+[runtime contract](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-supervisor-runtime/README.md#pi-request-admission-not-a-running-proxy).
 All **37 runtime tests** pass with required disposable PostgreSQL, including
 concurrent replay yielding one generation, durable private recovery, revocation
 and uncertain billing. Thirteen ordinary Pi tests pass, with five environment-only
@@ -439,7 +439,7 @@ Monolith, each with independent application/database boundaries. Supervisors use
   `openai/gpt-5.6-sol`, disabled retries/compaction and empty session state, then
   reaped the process. Provider execution stayed disabled. This is local control
   compatibility, not authenticated model availability or agent activation.
-  [Reproduction and limitations](../../../crates/mem-supervisor-pi/README.md).
+  [Reproduction and limitations](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-supervisor-pi/README.md).
 - The upstream AMD64 and ARM64 Pi artifacts require **glibc 2.43**. Bookworm/Ubuntu 24.04
   could not run AMD64; Ubuntu 26.04 did. The checksum-matched ARM64 binary's
   AArch64 ELF and glibc requirement were inspected statically, not executed.
@@ -485,7 +485,7 @@ Monolith, each with independent application/database boundaries. Supervisors use
   target, and insertion/verification/deferred-commit rollback. Independent review
   found and closed missing replay-inactivity and payload/receipt-ID checks;
   payload FK/logical/ownership checks were strengthened alongside them.
-  See [import boundaries](../../../crates/mem-area-store/README.md).
+  See [import boundaries](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-area-store/README.md).
   This original slice did not cover populated relationships or an operator CLI;
   the later evidence below closes those software gaps. No real-data partition
   has been approved, materialized or imported. Operator review, archive durability,

@@ -244,7 +244,8 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          package="$(realpath "target/linux-package/codifix_${VERSION}_${ARCH}.deb")"
+          debian_version="${VERSION/-/\~}"
+          package="$(realpath "target/linux-package/codifix_${debian_version}_${ARCH}.deb")"
           sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env CODIFIX_HOSTED_INSTALL_TEST=yes bash packaging/ca-bookworm/install-test.sh "$package"
 
   macos-release:
@@ -474,4 +475,8 @@ jobs:
           gh release download "$tag" --dir "$download"
           cmp target/release-assets/SHA256SUMS "$download/SHA256SUMS"
           (cd "$download" && sha256sum -c SHA256SUMS)
-          gh release edit "$tag" --draft=false --prerelease=false --latest
+          if [[ "$VERSION" == *-rc.* ]]; then
+            gh release edit "$tag" --draft=false --prerelease=true --latest=false
+          else
+            gh release edit "$tag" --draft=false --prerelease=false --latest
+          fi

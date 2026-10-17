@@ -180,7 +180,7 @@ mod native {
                     && root
                         .file_name()
                         .and_then(|name| name.to_str())
-                        .is_some_and(|name| name.starts_with("MemoryLayer-layout-test-")),
+                        .is_some_and(|name| name.starts_with("Codifix-layout-test-")),
                 "synthetic service fixture root required"
             );
             let index: usize = args[2].parse()?;

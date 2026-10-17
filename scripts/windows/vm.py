@@ -252,7 +252,7 @@ def unattended(password):
     user = node(setup, "UserData")
     node(user, "AcceptEula", "true")
     node(user, "FullName", "Memory disposable test lab")
-    node(user, "Organization", "Memory Layer")
+    node(user, "Organization", "Codifix")
 
     specialize = node(root, "settings", **{"pass": "specialize"})
     node(component(specialize, "Microsoft-Windows-Shell-Setup"), "ComputerName", "MEMORY-WINLAB")

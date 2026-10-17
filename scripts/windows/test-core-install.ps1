@@ -57,7 +57,7 @@ Reject-CoreInstall {Get-CoreInstallBinding ($config.Replace('127.0.0.1:54321','0
 Reject-CoreInstall {Get-CoreInstallBinding ($config.Replace('llm_curation = false','llm_curation = true')) $operation $instance}
 Reject-CoreInstall {Get-CoreInstallBinding ($config+"`n[provider]`napi_key = 'fake'") $operation $instance}
 Reject-CoreInstall {Get-CoreInstallBinding ($config+"`nweb_root = 'extra'") $operation $instance}
-$web='C:\Program Files\Memory Layer\releases\windows-v2.1.0-rc.5-build.60000\web'
+$web='C:\Program Files\Codifix\releases\windows-v2.1.0-rc.5-build.60000\web'
 $changed=Set-CoreInstalledWeb $config $web
 $null=Get-CoreInstallBinding $changed $operation $instance
 if(-not $changed.Contains("web_root = '"+$web+"'")){throw 'Installed Web path was not used literally'}

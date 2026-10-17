@@ -1124,10 +1124,10 @@ pub(crate) fn render_init_summary(
         "Prepared"
     };
     let watcher_step =
-        "7. Optional: enable the Codex-linked watcher manager:\n   memory watcher manager enable\n   Legacy per-repo watcher service: memory watcher enable --project ".to_string()
+        "7. Optional: enable the Codex-linked watcher manager:\n   codifix watcher manager enable\n   Legacy per-repo watcher service: codifix watcher enable --project ".to_string()
             + project;
     format!(
-        "{action} memory bootstrap for project `{project}` at {}.\n\nFiles:\n- {} (user-local project config)\n- {} (repo-local project marker)\n- {} (agent-visible project behavior)\n- {} (bundled memory skills)\n\nNext steps:\n1. Set shared values like `database.url`, `service.api_token`, and `[llm]` config in {}\n2. Use {} for project runtime overrides\n3. Use {} to customize agent-visible project memory behavior\n4. Start the shared backend if it is not already running:\n   memory service run --config {}\n5. Optional: configure project-local [service] overrides if you want a parallel dev backend for this project\n6. Optional: run a project scan:\n   memory scan --project {}\n{}\n8. Open the TUI:\n   memory tui --project {}\n9. Use the repo-local memory skill bundle from {} (umbrella skill at {}/codifix)",
+        "{action} memory bootstrap for project `{project}` at {}.\n\nFiles:\n- {} (user-local project config)\n- {} (repo-local project marker)\n- {} (agent-visible project behavior)\n- {} (bundled memory skills)\n\nNext steps:\n1. Set shared values like `database.url`, `service.api_token`, and `[llm]` config in {}\n2. Use {} for project runtime overrides\n3. Use {} to customize agent-visible project memory behavior\n4. Start the shared backend if it is not already running:\n   codifix service run --config {}\n5. Optional: configure project-local [service] overrides if you want a parallel dev backend for this project\n6. Optional: run a project scan:\n   codifix scan --project {}\n{}\n8. Open the TUI:\n   codifix tui --project {}\n9. Use the repo-local memory skill bundle from {} (umbrella skill at {}/codifix)",
         repo_root.display(),
         config_path.display(),
         project_path.display(),

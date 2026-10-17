@@ -23,10 +23,10 @@ use crate::commands::skill_support::set_private_file_permissions;
 use crate::commands::{api::ApiClient, output::write_headers};
 
 const ROOT_AFTER_HELP: &str = "\
-New here? Run `memory wizard` for guided setup or `memory init` in a repository,
-then load a demo project with `memory demo` (or take the guided `memory tour`).
-Use `memory query` to ask a question, `memory resume` after an interruption, and
-`memory tui` when you want an interactive view.
+New here? Run `codifix wizard` for guided setup or `codifix init` in a repository,
+then load a demo project with `codifix demo` (or take the guided `codifix tour`).
+Use `codifix query` to ask a question, `codifix resume` after an interruption, and
+`codifix tui` when you want an interactive view.
 
 Command groups:
   Onboarding     wizard, init, demo, tour
@@ -52,12 +52,12 @@ Agent contract:
   After meaningful completed work, run remember with concrete notes and changed files.
 
 Examples:
-  memory wizard --global
-  memory status --project memory
-  memory query --project memory --question \"What changed recently?\" --json
-  memory resume --project memory --json
-  memory checkpoint start-task --project memory --title \"Task title\" --prompt \"Original user request\"
-  memory remember --project memory --title \"Task title\" --summary \"What changed\" --note \"Durable fact\"
+  codifix wizard --global
+  codifix status --project memory
+  codifix query --project memory --question \"What changed recently?\" --json
+  codifix resume --project memory --json
+  codifix checkpoint start-task --project memory --title \"Task title\" --prompt \"Original user request\"
+  codifix remember --project memory --title \"Task title\" --summary \"What changed\" --note \"Durable fact\"
 
 See also:
   docs/user/README.md";
@@ -68,9 +68,9 @@ Agent notes:
   Mutates config/service files unless --dry-run is passed.
 
 Examples:
-  memory wizard --global
-  memory wizard
-  memory wizard --project memory --dry-run
+  codifix wizard --global
+  codifix wizard
+  codifix wizard --project memory --dry-run
 
 See also:
   docs/user/cli/wizard.md";
@@ -78,12 +78,12 @@ See also:
 const INIT_AFTER_HELP: &str = "\
 Agent notes:
   Use in a repository before dev init, TUI, web UI, watcher, scan, query, or remember workflows.
-  Mutates user-local project config plus the repo-local .mem marker and agent skill files unless --dry-run is passed.
+  Mutates user-local project config plus the repo-local .codifix marker and agent skill files unless --dry-run is passed.
 
 Examples:
-  memory init
-  memory init --project memory --dry-run
-  memory init --force
+  codifix init
+  codifix init --project memory --dry-run
+  codifix init --force
 
 See also:
   docs/user/cli/init.md";
@@ -95,23 +95,23 @@ Agent notes:
   Prefer --dry-run --json before applying from automation.
 
 Examples:
-  memory upgrade --dry-run
-  memory upgrade --dry-run --json
-  memory upgrade
-  memory upgrade --force
+  codifix upgrade --dry-run
+  codifix upgrade --dry-run --json
+  codifix upgrade
+  codifix upgrade --force
 
 See also:
   docs/user/cli/upgrade.md";
 
 const DEV_GROUP_AFTER_HELP: &str = "\
 Agent notes:
-  Use from a cargo checkout to manage the isolated dev profile; run after memory init.
+  Use from a cargo checkout to manage the isolated dev profile; run after codifix init.
   Dev binaries use 127.0.0.1:4250 HTTP by default.
   Use --copy-from-global to copy database, LLM, embedding, feature, and writer settings into the dev overlay.
   Mutates the user-local project dev overlay and dev runtime directory unless --dry-run is passed.
 
 Examples:
-  memory init
+  codifix init
   memory dev --copy-from-global
   memory dev --dry-run
 
@@ -125,9 +125,9 @@ Agent notes:
   Dev cargo runs use 127.0.0.1:4250; packaged installs normally use 127.0.0.1:4040.
 
 Examples:
-  memory service run
-  memory service enable --dry-run
-  memory service status
+  codifix service run
+  codifix service enable --dry-run
+  codifix service status
 
 See also:
   docs/user/cli/service.md";
@@ -138,7 +138,7 @@ Agent notes:
   This process keeps running until interrupted; use it when a TUI, web UI, or CLI call needs a backend.
 
 Examples:
-  memory service run
+  codifix service run
 
 See also:
   docs/user/cli/service.md";
@@ -149,8 +149,8 @@ Agent notes:
   Prefer service run for foreground dev work from a cargo checkout.
 
 Examples:
-  memory service enable
-  memory service enable --dry-run
+  codifix service enable
+  codifix service enable --dry-run
 
 See also:
   docs/user/cli/service.md";
@@ -161,8 +161,8 @@ Agent notes:
   Use --dry-run first from an agent.
 
 Examples:
-  memory service disable
-  memory service disable --dry-run
+  codifix service disable
+  codifix service disable --dry-run
 
 See also:
   docs/user/cli/service.md";
@@ -172,7 +172,7 @@ Agent notes:
   Read-only packaged service inspection. Use doctor for broader config and connectivity checks.
 
 Examples:
-  memory service status
+  codifix service status
 
 See also:
   docs/user/cli/service.md";
@@ -184,8 +184,8 @@ Agent notes:
   Use --mark-tui-restart from installers so running TUIs can show a red restart status.
 
 Examples:
-  memory service restart-all --dry-run --json
-  memory service restart-all --mark-tui-restart --json
+  codifix service restart-all --dry-run --json
+  codifix service restart-all --mark-tui-restart --json
 
 See also:
   docs/user/cli/service.md";
@@ -196,8 +196,8 @@ Agent notes:
   Mutates env files unless --dry-run is passed.
 
 Examples:
-  memory service ensure-api-token --shared
-  memory service ensure-api-token --rotate-placeholder --dry-run --json
+  codifix service ensure-api-token --shared
+  codifix service ensure-api-token --rotate-placeholder --dry-run --json
 
 See also:
   docs/user/cli/service.md";
@@ -206,12 +206,12 @@ const MCP_GROUP_AFTER_HELP: &str = "\
 Agent notes:
   Use mcp run from stdio MCP clients. It writes only MCP JSON-RPC frames to stdout.
   Use mcp status for a read-only check of service reachability and exposed MCP surface.
-  HTTP MCP is mounted by memory service when [mcp].enabled and [mcp].http_enabled are true.
+  HTTP MCP is mounted by codifix service when [mcp].enabled and [mcp].http_enabled are true.
 
 Examples:
-  memory mcp run --project memory
-  memory mcp status --project memory
-  memory mcp status --project memory --json
+  codifix mcp run --project memory
+  codifix mcp status --project memory
+  codifix mcp status --project memory --json
 
 See also:
   docs/user/cli/mcp.md";
@@ -225,13 +225,13 @@ Agent notes:
   Newly created token secrets are printed once and are never stored in Codifix config.
 
 Examples:
-  memory auth login --company https://memory.example.com --name Work-Mac --no-browser
-  memory projects available --company https://memory.example.com
-  memory auth logout --company https://memory.example.com
-  memory auth whoami --json
-  memory auth token create --name hermes --project memory --role writer --ttl 30d
-  memory auth token list
-  memory auth membership grant --principal <uuid> --project memory --role reader
+  codifix auth login --company https://memory.example.com --name Work-Mac --no-browser
+  codifix projects available --company https://memory.example.com
+  codifix auth logout --company https://memory.example.com
+  codifix auth whoami --json
+  codifix auth token create --name hermes --project memory --role writer --ttl 30d
+  codifix auth token list
+  codifix auth membership grant --principal <uuid> --project memory --role reader
 
 See also:
   docs/user/cli/auth.md";
@@ -241,8 +241,8 @@ Agent notes:
   Resolves the active client credential without changing access. Use --json for automation.
 
 Examples:
-  memory auth whoami
-  memory auth whoami --json
+  codifix auth whoami
+  codifix auth whoami --json
 
 See also:
   docs/user/cli/auth.md";
@@ -253,8 +253,8 @@ Agent notes:
   Token secrets are displayed only when created; list never returns a secret or hash.
 
 Examples:
-  memory auth token create --name hermes --project memory --role writer --ttl 30d
-  memory auth token list --json
+  codifix auth token create --name hermes --project memory --role writer --ttl 30d
+  codifix auth token list --json
 
 See also:
   docs/user/cli/auth.md";
@@ -264,7 +264,7 @@ Agent notes:
   Creates a service principal with an initial project role. Capture the returned secret immediately.
 
 Examples:
-  memory auth token create --name hermes --project memory --role writer --ttl 30d
+  codifix auth token create --name hermes --project memory --role writer --ttl 30d
 
 See also:
   docs/user/cli/auth.md";
@@ -274,8 +274,8 @@ Agent notes:
   Read-only token metadata listing. Secrets and stored hashes are never returned.
 
 Examples:
-  memory auth token list
-  memory auth token list --json
+  codifix auth token list
+  codifix auth token list --json
 
 See also:
   docs/user/cli/auth.md";
@@ -285,7 +285,7 @@ Agent notes:
   Revokes a token by UUID or unambiguous displayed prefix. Revocation takes effect on the next request.
 
 Examples:
-  memory auth token revoke <token-uuid>
+  codifix auth token revoke <token-uuid>
 
 See also:
   docs/user/cli/auth.md";
@@ -296,8 +296,8 @@ Agent notes:
   Authentik group-derived access is configured on the service and is not removed with these commands.
 
 Examples:
-  memory auth membership grant --principal <uuid> --project memory --role reader
-  memory auth membership list --json
+  codifix auth membership grant --principal <uuid> --project memory --role reader
+  codifix auth membership list --json
 
 See also:
   docs/user/cli/auth.md";
@@ -307,7 +307,7 @@ Agent notes:
   Adds or updates a direct project role for an existing principal.
 
 Examples:
-  memory auth membership grant --principal <uuid> --project memory --role reader
+  codifix auth membership grant --principal <uuid> --project memory --role reader
 
 See also:
   docs/user/cli/auth.md";
@@ -317,8 +317,8 @@ Agent notes:
   Read-only listing of direct and bootstrap project memberships.
 
 Examples:
-  memory auth membership list
-  memory auth membership list --json
+  codifix auth membership list
+  codifix auth membership list --json
 
 See also:
   docs/user/cli/auth.md";
@@ -328,7 +328,7 @@ Agent notes:
   Removes one direct project membership by UUID. Other direct or group-derived access is unchanged.
 
 Examples:
-  memory auth membership revoke <membership-uuid>
+  codifix auth membership revoke <membership-uuid>
 
 See also:
   docs/user/cli/auth.md";
@@ -340,14 +340,14 @@ Agent notes:
   JSON is the default output for automation; use --text for human summaries.
 
 Examples:
-  memory eval scaffold --project memory --out evals/suites/memory-smoke
-  memory eval doctor --suite evals/examples/memory-smoke
-  memory eval run --suite evals/examples/app-build-smoke --condition no-memory --condition full-memory --profile offline --allow-shell --text
-  memory eval run --suite evals/examples/memory-smoke --condition full-memory --repeat 5
-  memory eval compare --baseline target/memory-evals/run-a.json --candidate target/memory-evals/run-b.json --text
-  memory eval compare --baseline 'target/memory-evals/*no-memory*.json' --candidate 'target/memory-evals/*full-memory*.json' --out target/memory-evals/comparison.json
-  memory eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml
-  memory eval report --comparison target/memory-evals/comparison.json --text
+  codifix eval scaffold --project memory --out evals/suites/memory-smoke
+  codifix eval doctor --suite evals/examples/memory-smoke
+  codifix eval run --suite evals/examples/app-build-smoke --condition no-memory --condition full-memory --profile offline --allow-shell --text
+  codifix eval run --suite evals/examples/memory-smoke --condition full-memory --repeat 5
+  codifix eval compare --baseline target/memory-evals/run-a.json --candidate target/memory-evals/run-b.json --text
+  codifix eval compare --baseline 'target/memory-evals/*no-memory*.json' --candidate 'target/memory-evals/*full-memory*.json' --out target/memory-evals/comparison.json
+  codifix eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml
+  codifix eval report --comparison target/memory-evals/comparison.json --text
 
 See also:
   docs/user/cli/eval.md";
@@ -358,8 +358,8 @@ Agent notes:
   Mutates the output directory unless --dry-run is passed.
 
 Examples:
-  memory eval scaffold --project memory --out evals/suites/memory-smoke
-  memory eval scaffold --project memory --out /tmp/eval --limit 5 --dry-run
+  codifix eval scaffold --project memory --out evals/suites/memory-smoke
+  codifix eval scaffold --project memory --out /tmp/eval --limit 5 --dry-run
 
 See also:
   docs/user/cli/eval.md";
@@ -369,14 +369,14 @@ What it does:
   Packages the suite definition (items, config, scripts) together with a set
   of run/comparison artifacts and a signed manifest — git commit, CLI version,
   suite checksum, and a sha256 for every file — into one .tar.gz a reviewer
-  can verify and re-run with `memory eval reproduce`.
+  can verify and re-run with `codifix eval reproduce`.
 
 Agent notes:
-  Archive the artifacts produced by `memory eval reproduce` so results cited
+  Archive the artifacts produced by `codifix eval reproduce` so results cited
   in reports stay reproducible and tamper-evident.
 
 Examples:
-  memory eval archive --suite evals/suites/memory-quality-v1 \\
+  codifix eval archive --suite evals/suites/memory-quality-v1 \\
     --runs target/memory-evals/reproduce/memory-quality-v1 \\
     --out memory-quality-v1-run.tar.gz";
 
@@ -392,8 +392,8 @@ Agent notes:
   Requires a running service; artifacts land under --out for inspection.
 
 Examples:
-  memory eval reproduce --suite evals/suites/memory-quality-v1
-  memory eval reproduce --suite evals/suites/research-v1 --skip-seed";
+  codifix eval reproduce --suite evals/suites/memory-quality-v1
+  codifix eval reproduce --suite evals/suites/research-v1 --skip-seed";
 
 const EVAL_RUN_AFTER_HELP: &str = "\
 Agent notes:
@@ -405,11 +405,11 @@ Agent notes:
   agent_build_task items copy fixtures to target/memory-evals/build-runs and capture prompts, stdout, stderr, and scoring summaries.
 
 Examples:
-  memory eval run --suite evals/examples/memory-smoke --condition full-memory --dry-run
-  memory eval run --suite evals/examples/app-build-smoke --condition no-memory --condition full-memory --profile offline --allow-shell --text
-  memory eval run --suite evals/examples/memory-smoke --condition no-memory --condition full-memory --repeat 5
-  memory eval run --suite evals/suites/memory-improvement-v1 --condition full-memory --retriever-cmd './my-retriever' --allow-shell
-  memory eval run --suite evals/suites/memory-improvement-v1 --condition no-memory --condition full-memory --allow-shell --llm-judge --repeat 5
+  codifix eval run --suite evals/examples/memory-smoke --condition full-memory --dry-run
+  codifix eval run --suite evals/examples/app-build-smoke --condition no-memory --condition full-memory --profile offline --allow-shell --text
+  codifix eval run --suite evals/examples/memory-smoke --condition no-memory --condition full-memory --repeat 5
+  codifix eval run --suite evals/suites/memory-improvement-v1 --condition full-memory --retriever-cmd './my-retriever' --allow-shell
+  codifix eval run --suite evals/suites/memory-improvement-v1 --condition no-memory --condition full-memory --allow-shell --llm-judge --repeat 5
 
 See also:
   docs/user/cli/eval.md";
@@ -420,8 +420,8 @@ Agent notes:
   Use --out to preserve comparison JSON for reports or releases.
 
 Examples:
-  memory eval compare --baseline target/memory-evals/no-memory.json --candidate target/memory-evals/full-memory.json --text
-  memory eval compare --baseline 'target/memory-evals/*no-memory*.json' --candidate 'target/memory-evals/*full-memory*.json' --out target/memory-evals/comparison.json
+  codifix eval compare --baseline target/memory-evals/no-memory.json --candidate target/memory-evals/full-memory.json --text
+  codifix eval compare --baseline 'target/memory-evals/*no-memory*.json' --candidate 'target/memory-evals/*full-memory*.json' --out target/memory-evals/comparison.json
 
 See also:
   docs/user/cli/eval.md";
@@ -431,9 +431,9 @@ Agent notes:
   Renders an existing comparison artifact. This is read-only and suitable for release notes.
 
 Examples:
-  memory eval report --comparison target/memory-evals/comparison.json --text
-  memory eval report --comparison target/memory-evals/comparison.json --markdown --out target/memory-evals/report.md
-  memory eval report --comparison target/memory-evals/comparison.json
+  codifix eval report --comparison target/memory-evals/comparison.json --text
+  codifix eval report --comparison target/memory-evals/comparison.json --markdown --out target/memory-evals/report.md
+  codifix eval report --comparison target/memory-evals/comparison.json
 
 See also:
   docs/user/cli/eval.md";
@@ -443,8 +443,8 @@ Agent notes:
   Read-only eval prerequisite check. Use before expensive LLM-backed research runs.
 
 Examples:
-  memory eval doctor --suite evals/examples/memory-smoke
-  memory eval doctor --suite evals/suites/research-v1 --text
+  codifix eval doctor --suite evals/examples/memory-smoke
+  codifix eval doctor --suite evals/suites/research-v1 --text
 
 See also:
   docs/user/cli/eval.md";
@@ -454,8 +454,8 @@ Agent notes:
   Read-only comparison policy check. Exits with a failure when the gate does not pass.
 
 Examples:
-  memory eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml
-  memory eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml --text
+  codifix eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml
+  codifix eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml --text
 
 See also:
   docs/user/cli/eval.md";
@@ -466,9 +466,9 @@ Agent notes:
   Read-only unless --fix is passed. Prefer --json for automated diagnosis.
 
 Examples:
-  memory doctor
-  memory doctor --project memory
-  memory doctor --json
+  codifix doctor
+  codifix doctor --project memory
+  codifix doctor --json
 
 See also:
   docs/user/cli/doctor.md";
@@ -480,10 +480,10 @@ Agent notes:
   Enable/disable commands mutate service state; use --dry-run where supported.
 
 Examples:
-  memory watcher manager enable
-  memory watcher run --project memory
-  memory watcher enable --project memory
-  memory watcher status --project memory
+  codifix watcher manager enable
+  codifix watcher run --project memory
+  codifix watcher enable --project memory
+  codifix watcher status --project memory
 
 See also:
   docs/user/cli/watchers.md";
@@ -494,8 +494,8 @@ Agent notes:
   Agent ownership flags are for watcher-manager handoff; avoid inventing them manually unless integrating another agent runtime.
 
 Examples:
-  memory watcher run --project memory
-  memory watcher run --repo-root /path/to/repo
+  codifix watcher run --project memory
+  codifix watcher run --repo-root /path/to/repo
 
 See also:
   docs/user/cli/watchers.md";
@@ -506,8 +506,8 @@ Agent notes:
   Mutates service state unless --dry-run is passed.
 
 Examples:
-  memory watcher enable --project memory
-  memory watcher enable --project memory --dry-run
+  codifix watcher enable --project memory
+  codifix watcher enable --project memory --dry-run
 
 See also:
   docs/user/cli/watchers.md";
@@ -518,8 +518,8 @@ Agent notes:
   Mutates service state unless --dry-run is passed.
 
 Examples:
-  memory watcher disable --project memory
-  memory watcher disable --project memory --dry-run
+  codifix watcher disable --project memory
+  codifix watcher disable --project memory --dry-run
 
 See also:
   docs/user/cli/watchers.md";
@@ -529,7 +529,7 @@ Agent notes:
   Read-only watcher health check. Use manager status for Codex-linked watcher-manager state.
 
 Examples:
-  memory watcher status --project memory
+  codifix watcher status --project memory
 
 See also:
   docs/user/cli/watchers.md";
@@ -542,9 +542,9 @@ Agent notes:
   Finish marks the active workspace completed or abandoned after the branch has been pushed or merged.
 
 Examples:
-  memory agent start --project memory --task \"Graph UI follow-up\"
-  memory agent status --project memory
-  memory agent finish --project memory --summary \"Implemented graph controls\"
+  codifix agent start --project memory --task \"Graph UI follow-up\"
+  codifix agent status --project memory
+  codifix agent finish --project memory --summary \"Implemented graph controls\"
 
 See also:
   docs/user/cli/agents.md";
@@ -555,8 +555,8 @@ Agent notes:
   The command reads local Git metadata and writes only the coordination record to Codifix.
 
 Examples:
-  memory agent start --project memory
-  memory agent start --project memory --agent-cli opencode --agent-session-id session-123 --task \"Docs refresh\"
+  codifix agent start --project memory
+  codifix agent start --project memory --agent-cli opencode --agent-session-id session-123 --task \"Docs refresh\"
 
 See also:
   docs/user/cli/agents.md";
@@ -567,8 +567,8 @@ Agent notes:
   Use --include-finished to audit completed or abandoned entries.
 
 Examples:
-  memory agent status --project memory
-  memory agent status --project memory --include-finished --json
+  codifix agent status --project memory
+  codifix agent status --project memory --include-finished --json
 
 See also:
   docs/user/cli/agents.md";
@@ -579,8 +579,8 @@ Agent notes:
   If multiple active workspaces match the current repo and branch, pass --workspace-id.
 
 Examples:
-  memory agent finish --project memory --summary \"Pushed branch with CLI docs\"
-  memory agent finish --project memory --workspace-id 00000000-0000-0000-0000-000000000000 --abandoned
+  codifix agent finish --project memory --summary \"Pushed branch with CLI docs\"
+  codifix agent finish --project memory --workspace-id 00000000-0000-0000-0000-000000000000 --abandoned
 
 See also:
   docs/user/cli/agents.md";
@@ -591,9 +591,9 @@ Agent notes:
   Enable/disable commands mutate the user service. Run/status are foreground/read-only service checks.
 
 Examples:
-  memory watcher manager status
-  memory watcher manager enable --dry-run
-  memory watcher manager run
+  codifix watcher manager status
+  codifix watcher manager enable --dry-run
+  codifix watcher manager run
 
 See also:
   docs/user/cli/watchers.md";
@@ -604,7 +604,7 @@ Agent notes:
   The process keeps running until interrupted and may start watcher processes for detected sessions.
 
 Examples:
-  memory watcher manager run
+  codifix watcher manager run
 
 See also:
   docs/user/cli/watchers.md";
@@ -615,8 +615,8 @@ Agent notes:
   Prefer this over legacy per-project watcher services for normal Codex automation.
 
 Examples:
-  memory watcher manager enable
-  memory watcher manager enable --dry-run
+  codifix watcher manager enable
+  codifix watcher manager enable --dry-run
 
 See also:
   docs/user/cli/watchers.md";
@@ -627,8 +627,8 @@ Agent notes:
   Use --dry-run first from an agent.
 
 Examples:
-  memory watcher manager disable
-  memory watcher manager disable --dry-run
+  codifix watcher manager disable
+  codifix watcher manager disable --dry-run
 
 See also:
   docs/user/cli/watchers.md";
@@ -638,7 +638,7 @@ Agent notes:
   Read-only status for the Codex-linked watcher manager and its user service.
 
 Examples:
-  memory watcher manager status
+  codifix watcher manager status
 
 See also:
   docs/user/cli/watchers.md";
@@ -650,8 +650,8 @@ Agent notes:
   Do not treat low-confidence or insufficient-evidence answers as facts.
 
 Examples:
-  memory query --project memory --question \"How does resume work?\" --json
-  memory query --project memory --question \"What changed?\" --type plan --tag plan --json
+  codifix query --project memory --question \"How does resume work?\" --json
+  codifix query --project memory --question \"What changed?\" --type plan --tag plan --json
 
 See also:
   docs/user/cli/query.md";
@@ -673,8 +673,8 @@ Agent notes:
   Re-ingesting the same unchanged documents re-observes rather than duplicates.
 
 Examples:
-  memory ingest ~/notes --project notes --dry-run
-  memory ingest ./papers --project research --type documentation --tag corpus-2026";
+  codifix ingest ~/notes --project notes --dry-run
+  codifix ingest ./papers --project research --type documentation --tag corpus-2026";
 
 const TOUR_AFTER_HELP: &str = "\
 What it does:
@@ -682,15 +682,15 @@ What it does:
   against it — with their real output — pausing between steps so you can read
   each one. The honest message: those three commands are the whole daily loop.
 
-Requires a running service — `docker compose up` or `memory service run` first.
+Requires a running service — `docker compose up` or `codifix service run` first.
 
 Agent notes:
   Built for humans exploring interactively; agents should call remember,
   query, and resume directly instead. Non-interactive runs skip the pauses.
 
 Examples:
-  memory tour
-  memory tour --project playground";
+  codifix tour
+  codifix tour --project playground";
 
 const DEMO_AFTER_HELP: &str = "\
 What it does:
@@ -698,7 +698,7 @@ What it does:
   so query, resume, and the graph show real results on a fresh install. Works keyless
   (no LLM or embedding provider required). Safe to rerun or delete and reseed.
 
-Requires a running service — `docker compose up` or `memory service run` first.
+Requires a running service — `docker compose up` or `codifix service run` first.
 
 Agent notes:
   Safe to run for a user who asks to try Codifix: it only writes into
@@ -706,8 +706,8 @@ Agent notes:
   real project slug.
 
 Examples:
-  memory demo
-  memory demo --project playground";
+  codifix demo
+  codifix demo --project playground";
 
 const VERIFY_PROVENANCE_AFTER_HELP: &str = "\
 Agent notes:
@@ -715,9 +715,9 @@ Agent notes:
   Prefer --dry-run --json first; omit --dry-run only when you want the verification results stored.
 
 Examples:
-  memory verify-provenance --project memory --dry-run --json
-  memory verify-provenance --project memory --repo-root . --json
-  memory verify-provenance --project memory
+  codifix verify-provenance --project memory --dry-run --json
+  codifix verify-provenance --project memory --repo-root . --json
+  codifix verify-provenance --project memory
 
 See also:
   docs/user/cli/verify-provenance.md";
@@ -728,7 +728,7 @@ Agent notes:
   Use --json when comparing canonical history programmatically.
 
 Examples:
-  memory history 00000000-0000-0000-0000-000000000000 --json
+  codifix history 00000000-0000-0000-0000-000000000000 --json
 
 See also:
   docs/developer/architecture/embeddings-and-search.md";
@@ -739,8 +739,8 @@ Agent notes:
   Always use --dry-run and --json first from an agent. Limit with --project unless a global sweep is intended.
 
 Examples:
-  memory prune-history --project memory --dry-run --json
-  memory prune-history --project memory --tombstone-after 90d --superseded-after 180d --dry-run
+  codifix prune-history --project memory --dry-run --json
+  codifix prune-history --project memory --tombstone-after 90d --superseded-after 180d --dry-run
 
 See also:
   docs/developer/architecture/memory-types.md";
@@ -751,9 +751,9 @@ Agent notes:
   Sync mutates backend commit history unless --dry-run is passed.
 
 Examples:
-  memory commits sync --project memory
-  memory commits list --project memory
-  memory commits show <commit> --project memory
+  codifix commits sync --project memory
+  codifix commits list --project memory
+  codifix commits show <commit> --project memory
 
 See also:
   docs/user/cli/commits.md";
@@ -763,8 +763,8 @@ Agent notes:
   Imports local git commits into backend evidence. Use --dry-run and --json before a large sync.
 
 Examples:
-  memory commits sync --project memory --dry-run --json
-  memory commits sync --project memory --since 2026-04-01 --dry-run --json
+  codifix commits sync --project memory --dry-run --json
+  codifix commits sync --project memory --since 2026-04-01 --dry-run --json
 
 See also:
   docs/user/cli/commits.md";
@@ -774,8 +774,8 @@ Agent notes:
   Read-only commit evidence listing. Prefer --json for scripts.
 
 Examples:
-  memory commits list --project memory
-  memory commits list --project memory --limit 50 --json
+  codifix commits list --project memory
+  codifix commits list --project memory --limit 50 --json
 
 See also:
   docs/user/cli/commits.md";
@@ -785,7 +785,7 @@ Agent notes:
   Read-only detail for one imported commit. Use --json when extracting evidence.
 
 Examples:
-  memory commits show abc123 --project memory --json
+  codifix commits show abc123 --project memory --json
 
 See also:
   docs/user/cli/commits.md";
@@ -795,8 +795,8 @@ Agent notes:
   The repository index feeds scan and analysis flows. Status is read-only; index mutates local index state unless --dry-run is passed.
 
 Examples:
-  memory repo index --project memory
-  memory repo status --project memory
+  codifix repo index --project memory
+  codifix repo status --project memory
 
 See also:
   docs/user/cli/repo.md";
@@ -806,8 +806,8 @@ Agent notes:
   Builds or refreshes the local repository index. Use --dry-run and --json before broad indexing from an agent.
 
 Examples:
-  memory repo index --project memory --dry-run --json
-  memory repo index --project memory --since 2026-04-01 --dry-run --json
+  codifix repo index --project memory --dry-run --json
+  codifix repo index --project memory --since 2026-04-01 --dry-run --json
 
 See also:
   docs/user/cli/repo.md";
@@ -817,8 +817,8 @@ Agent notes:
   Read-only repository index status and analyzer coverage. Prefer --json for scripts.
 
 Examples:
-  memory repo status --project memory
-  memory repo status --project memory --json
+  codifix repo status --project memory
+  codifix repo status --project memory --json
 
 See also:
   docs/user/cli/repo.md";
@@ -830,9 +830,9 @@ Agent notes:
   JSON is the default output; use --text only for human-readable summaries.
 
 Examples:
-  memory graph extract --project memory --dry-run
-  memory graph extract --project memory --force --text
-  memory graph status --project memory
+  codifix graph extract --project memory --dry-run
+  codifix graph extract --project memory --force --text
+  codifix graph status --project memory
 
 See also:
   docs/user/cli/graph.md";
@@ -844,9 +844,9 @@ Agent notes:
   JSON is the default output; use --text only for human-readable summaries.
 
 Examples:
-  memory graph extract --project memory
-  memory graph extract --project memory --rebuild-index --dry-run
-  memory graph extract --project memory --force --text
+  codifix graph extract --project memory
+  codifix graph extract --project memory --rebuild-index --dry-run
+  codifix graph extract --project memory --force --text
 
 See also:
   docs/user/cli/graph.md";
@@ -857,8 +857,8 @@ Agent notes:
   JSON is the default output; use --text only for human-readable summaries.
 
 Examples:
-  memory graph status --project memory
-  memory graph status --project memory --text
+  codifix graph status --project memory
+  codifix graph status --project memory --text
 
 See also:
   docs/user/cli/graph.md";
@@ -868,8 +868,8 @@ Agent notes:
   Export/import portable project memory bundles. Import mutates memory state unless --dry-run is passed.
 
 Examples:
-  memory bundle export --project memory --out /tmp/memory.mlbundle.zip
-  memory bundle import --project memory /tmp/memory.mlbundle.zip --dry-run
+  codifix bundle export --project memory --out /tmp/memory.mlbundle.zip
+  codifix bundle import --project memory /tmp/memory.mlbundle.zip --dry-run
 
 See also:
   docs/user/cli/bundles.md";
@@ -879,8 +879,8 @@ Agent notes:
   Writes a portable bundle file unless --dry-run is passed. Include provenance flags intentionally.
 
 Examples:
-  memory bundle export --project memory --out /tmp/memory.mlbundle.zip
-  memory bundle export --project memory --out /tmp/memory.mlbundle.zip --dry-run
+  codifix bundle export --project memory --out /tmp/memory.mlbundle.zip
+  codifix bundle export --project memory --out /tmp/memory.mlbundle.zip --dry-run
 
 See also:
   docs/user/cli/bundles.md";
@@ -890,8 +890,8 @@ Agent notes:
   Imports memories from a bundle. Always run --dry-run --json first from an agent.
 
 Examples:
-  memory bundle import --project memory /tmp/memory.mlbundle.zip
-  memory bundle import --project memory /tmp/memory.mlbundle.zip --dry-run --json
+  codifix bundle import --project memory /tmp/memory.mlbundle.zip
+  codifix bundle import --project memory /tmp/memory.mlbundle.zip --dry-run --json
 
 See also:
   docs/user/cli/bundles.md";
@@ -902,8 +902,8 @@ Agent notes:
   Prefer --json for tools; include_llm_summary defaults on and falls back to deterministic output when unavailable.
 
 Examples:
-  memory resume --project memory
-  memory resume --project memory --json
+  codifix resume --project memory
+  codifix resume --project memory --json
 
 See also:
   docs/user/cli/resume.md";
@@ -915,9 +915,9 @@ Agent notes:
   Use kind filters when an agent needs specific operational evidence.
 
 Examples:
-  memory activities --project memory
-  memory activities --project memory --limit 50 --text
-  memory activities --project memory --kind query
+  codifix activities --project memory
+  codifix activities --project memory --limit 50 --text
+  codifix activities --project memory --kind query
 
 See also:
   docs/user/cli/activities.md";
@@ -929,9 +929,9 @@ Agent notes:
   Use --llm when configured synthesis is desired; deterministic evidence remains available without it.
 
 Examples:
-  memory up-to-speed --project memory
-  memory up-to-speed --project memory --text
-  memory up-to-speed --project memory --llm
+  codifix up-to-speed --project memory
+  codifix up-to-speed --project memory --text
+  codifix up-to-speed --project memory --llm
 
 See also:
   docs/user/cli/up-to-speed.md";
@@ -942,10 +942,10 @@ Agent notes:
   finish-execution verifies plan completion before the final response. Prefer --dry-run for previews.
 
 Examples:
-  memory checkpoint save --project memory
-  memory checkpoint start-execution --project memory --plan-file /tmp/plan.md
-  memory checkpoint start-task --project memory --title \"Fix query input\" --prompt \"Improve query input UX\"
-  memory checkpoint finish-execution --project memory
+  codifix checkpoint save --project memory
+  codifix checkpoint start-execution --project memory --plan-file /tmp/plan.md
+  codifix checkpoint start-task --project memory --title \"Fix query input\" --prompt \"Improve query input UX\"
+  codifix checkpoint finish-execution --project memory
 
 See also:
   docs/user/cli/checkpoint.md";
@@ -957,8 +957,8 @@ Agent notes:
   Prefer --dry-run --json before wiring this into an agent workflow.
 
 Examples:
-  memory checkpoint start-task --project memory --title \"Fix query input\" --prompt \"Improve query input UX\"
-  memory checkpoint start-task --project memory --title \"Update README\" --prompt \"Highlight the benchmark\" --dry-run --json
+  codifix checkpoint start-task --project memory --title \"Fix query input\" --prompt \"Improve query input UX\"
+  codifix checkpoint start-task --project memory --title \"Update README\" --prompt \"Highlight the benchmark\" --dry-run --json
 
 See also:
   docs/user/cli/checkpoint.md";
@@ -968,8 +968,8 @@ Agent notes:
   Saves a resumable project checkpoint. Use --dry-run for previews and --json for scripts.
 
 Examples:
-  memory checkpoint save --project memory
-  memory checkpoint save --project memory --note \"Waiting on review\" --dry-run
+  codifix checkpoint save --project memory
+  codifix checkpoint save --project memory --note \"Waiting on review\" --dry-run
 
 See also:
   docs/user/cli/checkpoint.md";
@@ -979,7 +979,7 @@ Agent notes:
   Read-only inspection of the current saved checkpoint for resume workflows.
 
 Examples:
-  memory checkpoint show --project memory
+  codifix checkpoint show --project memory
 
 See also:
   docs/user/cli/checkpoint.md";
@@ -990,8 +990,8 @@ Agent notes:
   Use --plan-file for saved plans or --plan-stdin when piping generated markdown.
 
 Examples:
-  memory checkpoint start-execution --project memory --plan-file /tmp/plan.md
-  memory checkpoint start-execution --project memory --plan-stdin --thread-key task-123
+  codifix checkpoint start-execution --project memory --plan-file /tmp/plan.md
+  codifix checkpoint start-execution --project memory --plan-stdin --thread-key task-123
 
 See also:
   docs/user/cli/checkpoint.md";
@@ -1002,8 +1002,8 @@ Agent notes:
   Use --dry-run --json to inspect failures without recording implementation memory.
 
 Examples:
-  memory checkpoint finish-execution --project memory --dry-run --json
-  memory checkpoint finish-execution --project memory --plan-file /tmp/plan.md --json
+  codifix checkpoint finish-execution --project memory --dry-run --json
+  codifix checkpoint finish-execution --project memory --plan-file /tmp/plan.md --json
 
 See also:
   docs/user/cli/checkpoint.md";
@@ -1014,8 +1014,8 @@ Agent notes:
   Sends one JSON task payload to the backend; --dry-run validates without writing.
 
 Examples:
-  memory capture --file /tmp/task.json
-  memory capture --file /tmp/task.json --dry-run
+  codifix capture --file /tmp/task.json
+  codifix capture --file /tmp/task.json --dry-run
 
 See also:
   docs/user/cli/capture.md";
@@ -1026,8 +1026,8 @@ Agent notes:
   Requires LLM configuration for extraction. Use --dry-run and --json before writing candidates.
 
 Examples:
-  memory scan --project memory --dry-run --json
-  memory scan --project memory --rebuild-index
+  codifix scan --project memory --dry-run --json
+  codifix scan --project memory --rebuild-index
 
 See also:
   docs/user/cli/scan.md";
@@ -1039,8 +1039,8 @@ Agent notes:
   Use --type user, feedback, project, reference, implementation, or refactor when classification should be explicit.
 
 Examples:
-  memory remember --project memory --note \"Durable fact\"
-  memory remember --project memory --title \"Task title\" --summary \"What changed\" --file-changed crates/codifix-cli/src/main.rs
+  codifix remember --project memory --note \"Durable fact\"
+  codifix remember --project memory --title \"Task title\" --summary \"What changed\" --file-changed crates/codifix-cli/src/main.rs
 
 See also:
   docs/user/cli/remember.md";
@@ -1050,8 +1050,8 @@ Agent notes:
   Converts raw captures into canonical memory. Use --dry-run before accepting curation decisions.
 
 Examples:
-  memory curate --project memory
-  memory curate --project memory --batch-size 10 --dry-run
+  codifix curate --project memory
+  codifix curate --project memory --batch-size 10 --dry-run
 
 See also:
   docs/user/cli/curate.md";
@@ -1063,9 +1063,9 @@ Agent notes:
   Nothing is written to memory until a proposal is approved.
 
 Examples:
-  memory consolidate --project memory --dry-run
-  memory consolidate --project memory
-  memory loops memory-proposals --project memory --status pending
+  codifix consolidate --project memory --dry-run
+  codifix consolidate --project memory
+  codifix loops memory-proposals --project memory --status pending
 
 See also:
   docs/user/cli/consolidate.md";
@@ -1077,8 +1077,8 @@ Agent notes:
   deterministic consolidation scan would propose right now. No LLM calls.
 
 Examples:
-  memory structure --project memory
-  memory structure --project memory --json
+  codifix structure --project memory
+  codifix structure --project memory --json
 
 See also:
   docs/user/cli/structure.md";
@@ -1090,8 +1090,8 @@ Agent notes:
   Prefer --json when another tool parses the output.
 
 Examples:
-  memory scores --project memory
-  memory scores --project memory --needs-review --json
+  codifix scores --project memory
+  codifix scores --project memory --needs-review --json
 
 See also:
   docs/user/cli/scores.md";
@@ -1100,11 +1100,11 @@ const VALIDATE_AFTER_HELP: &str = "\
 Agent notes:
   Triggers an evidence-backed validation run for one memory (LLM call; respects the daily budget).
   Defaults to the configured reinforcement.validation_dry_run; --dry-run and --execute override it.
-  Corrections are never applied directly; review them with memory review.
+  Corrections are never applied directly; review them with codifix review.
 
 Examples:
-  memory validate <memory-id> --dry-run
-  memory validate <memory-id> --execute --json
+  codifix validate <memory-id> --dry-run
+  codifix validate <memory-id> --execute --json
 
 See also:
   docs/user/cli/validate.md";
@@ -1116,9 +1116,9 @@ Agent notes:
   Prefer --json when another tool parses the output.
 
 Examples:
-  memory review list --project memory
-  memory review apply <run-id> --json
-  memory review reject <run-id>
+  codifix review list --project memory
+  codifix review apply <run-id> --json
+  codifix review reject <run-id>
 
 See also:
   docs/user/cli/review.md";
@@ -1129,9 +1129,9 @@ Agent notes:
   List/show are read-only. Approve/reject mutate memory state and require an explicit review decision.
 
 Examples:
-  memory proposals list --project memory --json
-  memory proposals show --project memory --id 00000000-0000-0000-0000-000000000000
-  memory proposals approve --project memory --id 00000000-0000-0000-0000-000000000000 --json
+  codifix proposals list --project memory --json
+  codifix proposals show --project memory --id 00000000-0000-0000-0000-000000000000
+  codifix proposals approve --project memory --id 00000000-0000-0000-0000-000000000000 --json
 
 See also:
   docs/user/cli/proposals.md";
@@ -1142,11 +1142,11 @@ Agent notes:
   Reindex/reembed/prune mutate embedding rows unless --dry-run is passed.
 
 Examples:
-  memory embeddings list
-  memory embeddings activate voyage-code
-  memory embeddings reindex --project memory
-  memory embeddings reembed --project memory
-  memory embeddings prune --project memory --dry-run
+  codifix embeddings list
+  codifix embeddings activate voyage-code
+  codifix embeddings reindex --project memory
+  codifix embeddings reembed --project memory
+  codifix embeddings prune --project memory --dry-run
 
 See also:
   docs/user/cli/embeddings.md";
@@ -1157,7 +1157,7 @@ Agent notes:
   Use before activate, reindex, or reembed to avoid guessing backend names.
 
 Examples:
-  memory embeddings list
+  codifix embeddings list
 
 See also:
   docs/user/cli/embeddings.md";
@@ -1168,8 +1168,8 @@ Agent notes:
   Run embeddings list first and backfill the target space with reembed or reindex if needed.
 
 Examples:
-  memory embeddings list
-  memory embeddings activate voyage-code
+  codifix embeddings list
+  codifix embeddings activate voyage-code
 
 See also:
   docs/user/cli/embeddings.md";
@@ -1180,9 +1180,9 @@ Agent notes:
   Use --backend to restrict and --dry-run before writing.
 
 Examples:
-  memory embeddings reindex --project memory
-  memory embeddings reindex --project memory --dry-run
-  memory embeddings reindex --project memory --backend voyage-code
+  codifix embeddings reindex --project memory
+  codifix embeddings reindex --project memory --dry-run
+  codifix embeddings reindex --project memory --backend voyage-code
 
 See also:
   docs/user/cli/embeddings.md";
@@ -1193,9 +1193,9 @@ Agent notes:
   Use after adding a backend or when coverage is partial. Use --dry-run before writing.
 
 Examples:
-  memory embeddings reembed --project memory
-  memory embeddings reembed --project memory --dry-run
-  memory embeddings reembed --project memory --backend voyage-code
+  codifix embeddings reembed --project memory
+  codifix embeddings reembed --project memory --dry-run
+  codifix embeddings reembed --project memory --backend voyage-code
 
 See also:
   docs/user/cli/embeddings.md";
@@ -1206,8 +1206,8 @@ Agent notes:
   Always run --dry-run first from an agent.
 
 Examples:
-  memory embeddings prune --project memory
-  memory embeddings prune --project memory --dry-run
+  codifix embeddings prune --project memory
+  codifix embeddings prune --project memory --dry-run
 
 See also:
   docs/user/cli/embeddings.md";
@@ -1219,8 +1219,8 @@ Agent notes:
   JSON mode keeps the aggregate payload on stdout; any future progress or warnings must go to stderr.
 
 Examples:
-  memory status --project memory
-  memory status --project memory --json
+  codifix status --project memory
+  codifix status --project memory --json
 
 See also:
   docs/user/cli/status.md";
@@ -1230,9 +1230,9 @@ Agent notes:
   Compatibility read-only backend health check. Prefer status for first diagnosis and doctor for full environment repair guidance.
 
 Examples:
-  memory health
-  memory status --project memory
-  memory doctor --project memory
+  codifix health
+  codifix status --project memory
+  codifix doctor --project memory
 
 See also:
   docs/user/cli/health.md";
@@ -1242,8 +1242,8 @@ Agent notes:
   Archives low-signal memories by confidence and importance. Always use --dry-run first from an agent.
 
 Examples:
-  memory archive --project memory
-  memory archive --project memory --max-confidence 0.2 --dry-run
+  codifix archive --project memory
+  codifix archive --project memory --max-confidence 0.2 --dry-run
 
 See also:
   docs/user/cli/archive.md";
@@ -1254,11 +1254,11 @@ Agent notes:
   Use --dry-run before writing; add --curate only when canonical memory should be produced immediately.
 
 Migration note:
-  Older documentation called this `memory automation flush`. Use `memory watcher flush`.
+  Older documentation called this `codifix automation flush`. Use `codifix watcher flush`.
 
 Examples:
-  memory watcher flush --project memory --dry-run
-  memory watcher flush --project memory --curate
+  codifix watcher flush --project memory --dry-run
+  codifix watcher flush --project memory --curate
 
 See also:
   docs/user/cli/watchers.md";
@@ -1270,11 +1270,11 @@ Agent notes:
   The current CLI records policy-checked control-plane runs; runner adapters are introduced separately.
 
 Examples:
-  memory loops list
-  memory loops enable context_pack_refresh --project memory --mode suggest_only --explicit-user-approval
-  memory loops run context_pack_refresh --project memory --dry-run --reason \"manual smoke test\"
-  memory loops runs --project memory
-  memory loops approvals --project memory
+  codifix loops list
+  codifix loops enable context_pack_refresh --project memory --mode suggest_only --explicit-user-approval
+  codifix loops run context_pack_refresh --project memory --dry-run --reason \"manual smoke test\"
+  codifix loops runs --project memory
+  codifix loops approvals --project memory
 
 See also:
   docs/user/cli/loops.md";
@@ -1285,8 +1285,8 @@ Agent notes:
   Use CLI commands with --json for agent automation; use the TUI for human inspection.
 
 Examples:
-  memory tui
-  memory tui --project memory
+  codifix tui
+  codifix tui --project memory
 
 See also:
   docs/user/tui/README.md";
@@ -1297,9 +1297,9 @@ Agent notes:
   Package installers normally install completions automatically; use this for manual setup or debugging.
 
 Examples:
-  memory completion bash > ~/.local/share/bash-completion/completions/memory
-  memory completion zsh > ~/.zfunc/_memory
-  memory completion fish > ~/.config/fish/completions/memory.fish
+  codifix completion bash > ~/.local/share/bash-completion/completions/memory
+  codifix completion zsh > ~/.zfunc/_memory
+  codifix completion fish > ~/.config/fish/completions/memory.fish
 
 See also:
   docs/user/cli/completion.md";
@@ -1423,7 +1423,7 @@ pub(in crate::commands) enum Command {
     Projects(crate::commands::auth_enrollment::ProjectsArgs),
     #[command(
         about = "Review and exchange selected knowledge through a private federation space.",
-        after_help = "Examples:\n  memory federation --project example discover\n  memory federation --project example status\n  memory federation --project example tui\n\nAgent notes:\nDocs: docs/user/cli/federation.md\nPublication is explicit. Queued is not accepted. Delivered copies cannot be recalled."
+        after_help = "Examples:\n  codifix federation --project example discover\n  codifix federation --project example status\n  codifix federation --project example tui\n\nAgent notes:\nDocs: docs/user/cli/federation.md\nPublication is explicit. Queued is not accepted. Delivered copies cannot be recalled."
     )]
     Federation(crate::commands::federation::FederationArgs),
     #[command(about = "Manage project watchers and watcher daemons.", after_help = WATCHER_GROUP_AFTER_HELP)]
@@ -2296,9 +2296,9 @@ pub(in crate::commands) struct BundleArgs {
 
 #[derive(Debug, Subcommand)]
 pub(in crate::commands) enum BundleCommand {
-    #[command(about = "Export a project memory bundle to a zip archive.", after_help = BUNDLE_EXPORT_AFTER_HELP)]
+    #[command(about = "Export a project codifix bundle to a zip archive.", after_help = BUNDLE_EXPORT_AFTER_HELP)]
     Export(ExportArgs),
-    #[command(about = "Import a project memory bundle from a zip archive.", after_help = BUNDLE_IMPORT_AFTER_HELP)]
+    #[command(about = "Import a project codifix bundle from a zip archive.", after_help = BUNDLE_IMPORT_AFTER_HELP)]
     Import(ImportArgs),
 }
 
@@ -2410,7 +2410,7 @@ pub(in crate::commands) struct EvalArgs {
 pub(in crate::commands) enum EvalCommand {
     #[command(
         about = "Measure experimental capture classification locally.",
-        after_help = "Agent notes:\n  Rules are offline; Jev sends fixture text to Typesafe. No canonical memory writes.\n\nExamples:\n  memory eval capture-quality --suite suite.json --dry-run --out /tmp/capture-preview\n  memory eval capture-quality --suite suite.json --backend both --out /tmp/capture-run\n\nRules are offline. Jev sends fixture text to Typesafe; live runs require TYPESAFE_API_KEY. No memory writes.\n\nSee also:\n  docs/user/cli/eval.md"
+        after_help = "Agent notes:\n  Rules are offline; Jev sends fixture text to Typesafe. No canonical memory writes.\n\nExamples:\n  codifix eval capture-quality --suite suite.json --dry-run --out /tmp/capture-preview\n  codifix eval capture-quality --suite suite.json --backend both --out /tmp/capture-run\n\nRules are offline. Jev sends fixture text to Typesafe; live runs require TYPESAFE_API_KEY. No memory writes.\n\nSee also:\n  docs/user/cli/eval.md"
     )]
     CaptureQuality(EvalCaptureQualityArgs),
     #[command(about = "Plan, execute or report an isolated R3 campaign.", after_help = EVAL_CAMPAIGN_AFTER_HELP)]
@@ -2489,8 +2489,8 @@ const EVAL_CAMPAIGN_AFTER_HELP: &str = "Agent notes:
   Never expose private benchmark labels or graders to execution agents.
 
 Examples:
-  memory eval campaign plan --manifest target/memory-evals/r3-review/campaign.json
-  memory eval campaign report --manifest campaign.json --artifact artifact.json
+  codifix eval campaign plan --manifest target/memory-evals/r3-review/campaign.json
+  codifix eval campaign report --manifest campaign.json --artifact artifact.json
 
 See also:
   evals/r3/README.md";
@@ -2696,7 +2696,7 @@ pub(in crate::commands) struct EvalCompareArgs {
 
 #[derive(Debug, Args)]
 pub(in crate::commands) struct EvalReportArgs {
-    /// Comparison JSON file from memory eval compare.
+    /// Comparison JSON file from codifix eval compare.
     #[arg(long)]
     pub(crate) comparison: PathBuf,
     /// Optional file to write the rendered report.
@@ -2712,7 +2712,7 @@ pub(in crate::commands) struct EvalReportArgs {
 
 #[derive(Debug, Args)]
 pub(in crate::commands) struct EvalGateArgs {
-    /// Comparison JSON file from memory eval compare.
+    /// Comparison JSON file from codifix eval compare.
     #[arg(long)]
     pub(crate) comparison: PathBuf,
     /// Gate policy TOML file.
@@ -3144,7 +3144,7 @@ pub(in crate::commands) enum LoopsCommand {
     Reject(LoopApprovalDecisionArgs),
     #[command(about = "Edit a loop approval request proposed action.", after_help = LOOPS_GROUP_AFTER_HELP)]
     EditApproval(LoopApprovalEditArgs),
-    #[command(about = "List loop memory proposals.", after_help = LOOPS_GROUP_AFTER_HELP)]
+    #[command(about = "List loop codifix proposals.", after_help = LOOPS_GROUP_AFTER_HELP)]
     MemoryProposals(LoopMemoryProposalsArgs),
     #[command(about = "Create a pending loop memory proposal.", after_help = LOOPS_GROUP_AFTER_HELP)]
     CreateMemoryProposal(LoopMemoryProposalCreateArgs),
@@ -4094,7 +4094,7 @@ pub(crate) fn default_global_config_path() -> PathBuf {
 
 pub(in crate::commands) fn backend_start_hint(config_path: &Path) -> String {
     if backend_service_available() {
-        "memory service enable".to_string()
+        "codifix service enable".to_string()
     } else {
         format!("memory --config {} service run", config_path.display())
     }

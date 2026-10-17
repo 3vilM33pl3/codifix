@@ -205,7 +205,7 @@ private func projectErrors(overview: ProjectOverviewResponse, activities: [Proje
                 source: event.source ?? "service", component: "query", operation: "query",
                 detail: "A persisted project query failed.", rawError: error,
                 fixHint: "Inspect Query or the activity detail if this repeats.",
-                doctorHint: "memory doctor", commandHint: "memory doctor"
+                doctorHint: "codifix doctor", commandHint: "codifix doctor"
             ))
         } else if type == "watcher_health",
                   let health = details["health"]?.stringValue,
@@ -215,8 +215,8 @@ private func projectErrors(overview: ProjectOverviewResponse, activities: [Proje
                 title: details["message"]?.stringValue ?? event.summary,
                 source: event.source ?? "watcher", component: "watcher", operation: "heartbeat",
                 detail: "Watcher reported \(health) health.", rawError: details["message"]?.stringValue,
-                fixHint: "Inspect the read-only watcher presence and run memory doctor if the issue persists.",
-                doctorHint: "memory doctor", commandHint: "memory watcher status"
+                fixHint: "Inspect the read-only watcher presence and run codifix doctor if the issue persists.",
+                doctorHint: "codifix doctor", commandHint: "codifix watcher status"
             ))
         }
     }

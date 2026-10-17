@@ -87,8 +87,8 @@ export function MemoriesTab({
                 <strong>No memories here yet.</strong>
               </p>
               <p>
-                Load a showcase project with <code>memory demo</code>, take the guided{" "}
-                <code>memory tour</code>, or capture real work with <code>memory remember</code> —
+                Load a showcase project with <code>codifix demo</code>, take the guided{" "}
+                <code>codifix tour</code>, or capture real work with <code>codifix remember</code> —
                 then refresh this tab.
               </p>
               <p>

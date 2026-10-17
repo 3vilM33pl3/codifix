@@ -10,7 +10,7 @@ It is a developer reference, not a user tutorial. It focuses on:
 - how the type is stored in PostgreSQL
 - how type-specific behavior affects query, curation, and the TUI
 
-The live source of truth for the type list is [`MemoryType` in `mem-record`](../../../crates/mem-record/src/memory.rs).
+The live source of truth for the type list is [`MemoryType` in `mem-record`](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-record/src/memory.rs).
 
 ## Table of Contents
 

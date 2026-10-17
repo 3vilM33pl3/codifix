@@ -63,8 +63,8 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         .map(|tab| Line::from(Span::styled(tab.label(), Style::default().fg(Theme::TEXT))))
         .collect::<Vec<_>>();
     let mut title = match app.meta.profile {
-        Profile::Dev => format!("Memory Layer TUI [dev] - project {}", app.project),
-        Profile::Prod => format!("Memory Layer TUI - project {}", app.project),
+        Profile::Dev => format!("Codifix TUI [dev] - project {}", app.project),
+        Profile::Prod => format!("Codifix TUI - project {}", app.project),
     };
     if let Some(area) = &app.meta.area {
         title.push_str(&format!(

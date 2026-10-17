@@ -887,7 +887,7 @@ impl App {
                 had_error = true;
                 self.mark_service_unavailable();
                 self.chrome.status_message = if self.service.relay_discovery_enabled {
-                    "Backend unavailable. Relay discovery is enabled; press r to retry after another Memory Layer backend becomes reachable.".to_string()
+                    "Backend unavailable. Relay discovery is enabled; press r to retry after another Codifix backend becomes reachable.".to_string()
                 } else {
                     "Backend unavailable. Press b to enable relay discovery fallback or r to retry."
                         .to_string()
@@ -1192,7 +1192,7 @@ impl App {
                 if let Some(notice) = &self.service.restart_notice {
                     self.chrome.ui_status = UiStatus::Restart;
                     self.chrome.status_message = format!(
-                        "Memory Layer was updated to v{}; restart the TUI to load the installed binary. Marker: {}",
+                        "Codifix was updated to v{}; restart the TUI to load the installed binary. Marker: {}",
                         notice.version,
                         notice.marker_path.display()
                     );
