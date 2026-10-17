@@ -21,10 +21,29 @@ const digest = async file => createHash('sha256').update(await fs.readFile(file)
 const prepared = JSON.parse((await fs.readFile('C:\\MemoryLab\\NativePds\\prepared.json', 'utf8')).replace(/^\uFEFF/, ''));
 assert.equal(prepared.native_sqlite_verified, true);
 assert.equal(await digest(node), prepared.node_sha256);
+const actualFiles = new Set();
+const inventoryTree = async directory => {
+  const metadata = await fs.lstat(directory);
+  assert(metadata.isDirectory() && !metadata.isSymbolicLink(), 'runtime reparse directory');
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name), info = await fs.lstat(file);
+    assert(!info.isSymbolicLink(), 'runtime reparse entry');
+    if (info.isDirectory()) await inventoryTree(file);
+    else {
+      assert(info.isFile(), 'runtime special entry');
+      assert(actualFiles.size < 65536, 'runtime inventory limit');
+      actualFiles.add(path.relative(runtime, file).replaceAll('\\', '/'));
+    }
+  }
+};
+await inventoryTree(runtime);
+assert.equal(actualFiles.size, prepared.files.length, 'runtime file inventory changed');
 for (const item of prepared.files) {
   assert(!path.win32.isAbsolute(item.path) && !item.path.includes('..') && !item.path.includes(':'));
+  assert(actualFiles.delete(item.path), 'missing or duplicate prepared runtime file');
   assert.equal(await digest(path.join(runtime, item.path)), item.sha256);
 }
+assert.equal(actualFiles.size, 0);
 const build = JSON.parse((await fs.readFile('C:\\MemoryLab\\runs\\79a6444a-a60b-4494-a8e3-de90d1b4c807\\product-build\\result.json', 'utf8')).replace(/^\uFEFF/, ''));
 assert.equal(build.state, 'succeeded');
 assert.equal(await digest(binary), build.artifacts.find(a => a.file === 'memory-pds-pipe.exe').sha256);
