@@ -80,14 +80,28 @@ assert.equal(negative.assessment.success, false);
 assert.equal(negative.assessment.critical_failure, true);
 assert.equal(positive.providerRequests + negative.providerRequests, 0);
 let fakeCalls = 0;
+const assertPrivatePayload = value => {
+  if (typeof value === 'string') {
+    assert(!value.includes(root), 'private host path entered model payload');
+    assert(!value.includes('PRIVATE_RUBRIC_SYNTHETIC_ONLY'), 'hidden rubric entered model payload');
+  } else if (value && typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) {
+      assertPrivatePayload(key);
+      assertPrivatePayload(child);
+    }
+  }
+};
+// A Windows path must be checked as a string, not against JSON text whose
+// escaped backslashes could hide a real leak from the assertion.
+assert.throws(() => assertPrivatePayload({ nested: [{ path: root }] }), /private host path/);
+assert.throws(() => assertPrivatePayload({ nested: ['PRIVATE_RUBRIC_SYNTHETIC_ONLY'] }), /hidden rubric/);
 const agent = createModelAgent({ taskId: 'native-model-proof', nativeExecution: execution, runNative: run,
   model: { provider: 'synthetic', resolved_id: 'fake-native-proof', reasoning: 'none' },
   allowance: { input_tokens: 100, output_tokens: 100, microusd: 0 }, maxCalls: 2, taskTimeoutMs: 60000,
   invoke() { throw Error('A provider must never be invoked by this proof'); },
   mediator: { async dispatch(request) {
     fakeCalls++;
-    assert(!JSON.stringify(request.payload).includes(root));
-    assert(!JSON.stringify(request.payload).includes('PRIVATE_RUBRIC_SYNTHETIC_ONLY'));
+    assertPrivatePayload(request.payload);
     return { output: request.payload.previous ? { kind: 'finish' } : { kind: 'command', tool: 'node',
       args: ['-e', 'const fs=require("node:fs");const p="source.json";const v=JSON.parse(fs.readFileSync(p));v.count++;fs.writeFileSync(p,JSON.stringify(v));'] },
       usage: { input_tokens: 10, output_tokens: 5, microusd: 0 }, invoked: true };
