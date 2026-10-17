@@ -92,25 +92,30 @@ migration or an automatic adoption path.
    the old application, sync, watcher and onboarding LaunchAgents so nothing can
    reconnect. Run only the PostgreSQL maintenance server for the exact reviewed
    local cluster and port; keep application and background services stopped.
-2. Connect to its `postgres` maintenance database using a **separate, already
-   existing, reviewed superuser**, not any role being renamed. Use the existing
-   private password file and `psql -X -w`, the explicit loopback host/port,
-   `-U` for that maintenance login and `-d postgres`. No credentials belong in
-   command arguments or output. If no separate maintenance superuser exists,
-   stop here for a separately reviewed recovery procedure: do not create a new
-   privileged login, weaken authentication or edit PostgreSQL catalogs.
+2. Verify the exact reviewed PostgreSQL executable/major, local data directory,
+   cluster system identifier and loopback port against the recovery inventory.
+   Connect to its `postgres` maintenance database as the original
+   `memory_onboarding_admin` bootstrap superuser using the existing private
+   password file, `psql -X -w -v ON_ERROR_STOP=1`, and explicit loopback host/port.
+   Do not put credentials in command arguments or output. Confirm its recorded
+   bootstrap OID is `10`, its login/superuser attributes and SCRAM credential
+   match the reviewed source, and no other client sessions remain. A mismatched
+   cluster, OID or login is a stop condition; do not discover another target or
+   weaken authentication. No second persistent administrator is required.
 3. Record a private metadata-only before snapshot of the exact database and
    role OIDs, database-owner OIDs, attributes, grants, area/project IDs and
    content/attachment counts. Match the actual selected areas to the exact
    names below; omit both statements for an area that was never installed.
    Refuse a partial role/database pair, any target-name collision, an unexpected
    owner, or another active connection. Preserve the metadata with the matched
-   recovery set, not in Git.
-4. Check that every old login below uses SCRAM. As the reviewed maintenance
-   superuser, the following returns only names and booleans, never a verifier:
+   recovery set, not in Git. The exact temporary role
+   `codifix_cutover_admin_20261017_01` must also be absent: a collision is a stop
+   condition, never an existing role to adopt or delete.
+4. Check that every old login below uses SCRAM. As the verified original
+   bootstrap administrator, this returns only names, OIDs and booleans:
 
    ```sql
-   SELECT rolname, rolpassword LIKE 'SCRAM-SHA-256$%' AS scram_password
+   SELECT oid, rolname, rolpassword LIKE 'SCRAM-SHA-256$%' AS scram_password
    FROM pg_authid
    WHERE rolname IN ('memory_onboarding_admin', 'memory_laptop_workshop',
                      'memory_laptop_homelab', 'memory_laptop_general')
@@ -120,23 +125,80 @@ migration or an automatic adoption path.
    Require `true` for every expected row and the exact expected row count.
    An MD5 or missing verifier is a stop condition: a role rename clears an MD5
    password, so it cannot meet this password-preserving procedure. PostgreSQL
-   also forbids renaming the current session user. See
-   [ALTER ROLE](https://www.postgresql.org/docs/17/sql-alterrole.html).
-5. In that same separate-maintenance session, run `\set ON_ERROR_STOP on`,
-   then the reviewed exact SQL below. Retain only the area pairs proven present
-   in step 3. The maintenance database is `postgres`, so it is not a database
-   being renamed. No other database sessions may remain; inspect and resolve
-   an unexpected session instead of terminating it automatically.
+   forbids renaming the current session user. Its supported
+   [SET SESSION AUTHORIZATION](https://www.postgresql.org/docs/17/sql-set-session-authorization.html)
+   lets the authenticated superuser temporarily change that session identity;
+   `RESET` restores the original authenticated role by OID, including its new
+   name. See also [ALTER ROLE](https://www.postgresql.org/docs/17/sql-alterrole.html).
+5. In the verified original-administrator session, run the exact transaction
+   below with `ON_ERROR_STOP=1`. Retain only the area pairs proven present in
+   step 3. The maintenance database is `postgres`, so it is not being renamed.
+   The temporary superuser is `NOLOGIN`, has no password, receives no grants or
+   objects, and is created and removed within this single transaction. Do not
+   commit an intermediate state, reconnect as it, or add any other operations
+   while it is the session identity. The assertion must pass before its removal
+   and commit. The [disposable PG17 evidence](../docs/reviews/codifix-rename/evidence/macos-admin-rename.md)
+   describes the tested identity/reset, rollback and credential behavior.
 
    ```sql
+   \set ON_ERROR_STOP 1
    BEGIN;
+   DO $cutover$
+   BEGIN
+     IF current_database() <> 'postgres'
+        OR session_user <> 'memory_onboarding_admin'
+        OR current_user <> 'memory_onboarding_admin'
+        OR NOT EXISTS (
+          SELECT FROM pg_authid WHERE oid = 10
+          AND rolname = 'memory_onboarding_admin' AND rolsuper AND rolcanlogin
+          AND rolpassword LIKE 'SCRAM-SHA-256$%'
+        ) THEN
+       RAISE EXCEPTION 'reviewed bootstrap identity/SCRAM required';
+     END IF;
+     IF EXISTS (SELECT FROM pg_stat_activity
+                WHERE backend_type = 'client backend' AND pid <> pg_backend_pid()) THEN
+       RAISE EXCEPTION 'other client sessions remain';
+     END IF;
+     IF EXISTS (SELECT FROM pg_roles WHERE rolname IN (
+          'codifix_onboarding_admin', 'codifix_laptop_workshop',
+          'codifix_laptop_homelab', 'codifix_laptop_general',
+          'codifix_cutover_admin_20261017_01'))
+        OR EXISTS (SELECT FROM pg_database WHERE datname IN (
+          'codifix_laptop_workshop', 'codifix_laptop_homelab',
+          'codifix_laptop_general')) THEN
+       RAISE EXCEPTION 'rename target/temporary role collision';
+     END IF;
+     IF EXISTS (SELECT FROM pg_authid WHERE rolname IN (
+          'memory_onboarding_admin', 'memory_laptop_workshop',
+          'memory_laptop_homelab', 'memory_laptop_general')
+          AND (rolpassword IS NULL OR rolpassword NOT LIKE 'SCRAM-SHA-256$%')) THEN
+       RAISE EXCEPTION 'SCRAM required for every renamed login';
+     END IF;
+     PERFORM set_config('codifix.cutover_admin_oid',
+                        (SELECT oid::text FROM pg_roles WHERE rolname = current_user), true);
+   END
+   $cutover$;
    ALTER DATABASE memory_laptop_workshop RENAME TO codifix_laptop_workshop;
    ALTER ROLE memory_laptop_workshop RENAME TO codifix_laptop_workshop;
    ALTER DATABASE memory_laptop_homelab RENAME TO codifix_laptop_homelab;
    ALTER ROLE memory_laptop_homelab RENAME TO codifix_laptop_homelab;
    ALTER DATABASE memory_laptop_general RENAME TO codifix_laptop_general;
    ALTER ROLE memory_laptop_general RENAME TO codifix_laptop_general;
+   CREATE ROLE codifix_cutover_admin_20261017_01 NOLOGIN SUPERUSER;
+   SET SESSION AUTHORIZATION codifix_cutover_admin_20261017_01;
    ALTER ROLE memory_onboarding_admin RENAME TO codifix_onboarding_admin;
+   RESET SESSION AUTHORIZATION;
+   DO $cutover$
+   BEGIN
+     IF session_user <> 'codifix_onboarding_admin'
+        OR current_user <> 'codifix_onboarding_admin'
+        OR (SELECT oid FROM pg_roles WHERE rolname = current_user)
+           IS DISTINCT FROM current_setting('codifix.cutover_admin_oid')::oid THEN
+       RAISE EXCEPTION 'renamed original administrator/OID not restored';
+     END IF;
+   END
+   $cutover$;
+   DROP ROLE codifix_cutover_admin_20261017_01;
    COMMIT;
    ```
 
@@ -166,9 +228,16 @@ migration or an automatic adoption path.
    reviewed new runtime bindings after the configuration/state cutover gates
    pass; leave retired wrappers and previously inactive jobs disabled.
 
-A failure before commit requires `ROLLBACK` and inspection. A failure after
-commit keeps all clients stopped until configuration/credential reconciliation
-or matched restoration has completed; do not alternate old and new clients.
+A failure before commit requires `ROLLBACK` and inspection; the rename and
+transaction-created temporary role must both disappear. If the connection is
+lost or the commit acknowledgement is uncertain, inspect old/new names, the
+original role OID, temporary-role absence and database OIDs before doing anything
+else. Do not blindly rerun: a committed rename makes the old login invalid, and
+a conflicting role must never be adopted or removed. A confirmed commit keeps
+all clients stopped until configuration/credential reconciliation or matched
+restoration has completed; do not alternate old and new clients. This rehearsed
+procedure is preparation only; live application still requires all approved
+cutover gates.
 
 ## Windows preview
 
