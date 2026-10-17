@@ -514,7 +514,7 @@ pub(crate) fn upgrade_project_skills_with_template(
 
 pub(crate) fn print_skill_upgrade_report(report: &SkillUpgradeReport) {
     println!(
-        "{} repo-local Memory skills at {}",
+        "{} repo-local Codifix skills at {}",
         if report.dry_run {
             "Would inspect"
         } else {

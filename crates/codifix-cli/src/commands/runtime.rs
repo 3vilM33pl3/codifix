@@ -90,7 +90,7 @@ See also:
 
 const UPGRADE_AFTER_HELP: &str = "\
 Agent notes:
-  Use after installing a newer Codifix package to refresh repo-local Memory skills.
+  Use after installing a newer Codifix package to refresh repo-local Codifix skills.
   Backs up replaced skill directories under the user-local project runtime directory before writing.
   Prefer --dry-run --json before applying from automation.
 
@@ -1682,7 +1682,7 @@ pub(in crate::commands) struct InitArgs {
     after_help = UPGRADE_AFTER_HELP
 )]
 pub(in crate::commands) struct UpgradeArgs {
-    /// Replace all known Memory skills, including newer or same-version local copies.
+    /// Replace all known Codifix skills, including newer or same-version local copies.
     #[arg(long)]
     pub(crate) force: bool,
     /// Preview skill changes without touching the filesystem.

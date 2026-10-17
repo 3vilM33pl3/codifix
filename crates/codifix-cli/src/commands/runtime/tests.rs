@@ -2284,7 +2284,7 @@ fn init_copies_code_explanation_memory_rule_to_skills() {
 
     assert!(umbrella.contains("Code explanation memory rule"));
     assert!(umbrella.contains("codifix-github-init"));
-    assert!(github_init.contains("Memory GitHub Init Skill"));
+    assert!(github_init.contains("Codifix GitHub Init Skill"));
     assert!(github_init.contains("dry-run"));
     assert!(umbrella.contains("Store a distilled memory, not the whole chat answer"));
     assert!(query_resume.contains("explain code, a file, a module"));

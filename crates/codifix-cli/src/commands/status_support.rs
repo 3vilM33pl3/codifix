@@ -821,10 +821,10 @@ fn skill_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<()> {
                 },
                 match github_inventory.status {
                     SkillBundleStatus::Ok => {
-                        "Repo-local Memory skills match the GitHub skill bundle."
+                        "Repo-local Codifix skills match the GitHub skill bundle."
                     }
                     SkillBundleStatus::Warn => {
-                        "Repo-local Memory skills differ from the GitHub skill bundle."
+                        "Repo-local Codifix skills differ from the GitHub skill bundle."
                     }
                     SkillBundleStatus::Error => {
                         "GitHub Memory skill bundle could not be evaluated."
