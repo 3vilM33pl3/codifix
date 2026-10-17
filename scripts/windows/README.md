@@ -17,6 +17,16 @@ Media is downloaded over verified HTTPS from Microsoft's Enterprise Evaluation
 Center. Check and record the actual edition/build before accepting the guest.
 The current media is evaluation software, not a purchased Windows licence.
 
+`NativeEval` is a separate, Limited interactive proof stage requiring an explicit
+clean copied source directory. Its bound inputs are `guest-native-eval.ps1`,
+`guest-evaluation-proof.mjs`, `evaluation-helper.exe` and `r3_score.exe` in the
+private guest inputs directory. It runs deterministic knowledge answers through
+the actual AppContainer helper, checks excluded-project/hidden-grader denials,
+and requires fabricated citations to fail while human judgments stay unresolved.
+Receipts retain exact source/tool hashes and private operation paths. This is not
+an official R3 campaign, a Rust grading pass or a hard disk-limit claim; it makes
+no model calls.
+
 ## Host prerequisite and recovery
 
 On 2026-10-04, loading `kvm_amd` failed with `Operation not supported`.

@@ -261,7 +261,13 @@ Do **not** start Memory merely to apply migrations: normal service startup also
 creates administration and loop definitions, which correctly makes a target
 ineligible for fresh import. For a newly provisioned **empty** dedicated database,
 use the reviewed executable's `memory-area-import schema-plan` first. It makes
-no connection and prints the exact compiled schema digest and fixed head 0060.
+no connection and prints the exact compiled schema digest and fixed reviewed
+head (currently 0084). That current profile prepares a normal empty runtime
+schema; it is **not** an assertion that the historical area importer supports it.
+The historical importer accepts only its reviewed 0056–0065 catalog. For that
+separate route, request `schema-plan --profile area-import-65` and use the same
+profile with `initialize-schema`. Its digest covers exactly migrations 1–65 and
+differs from the current profile. Never relabel an existing database's head.
 Review that digest against the selected release, then explicitly run:
 
 ```sh
@@ -279,7 +285,7 @@ extensions. The PostgreSQL server must already support pgcrypto, pgvector and
 pg_trgm; installing server extensions or creating database roles is a separate
 operator step. Standard `plpgsql` in an otherwise empty database is allowed.
 
-All 60 migrations and their history run in one transaction with bounded waits;
+All selected migrations and their history run in one transaction with bounded waits;
 the established migration-4 pgvector compatibility rule retains its original
 checksum. Required-DB tests inject a failure at migration 55 and confirm that
 earlier tables, history and extension creation roll back. No credentials, loop
@@ -290,7 +296,11 @@ This is not a target identity binding or permission to start the service. After
 an interrupted/ambiguous result, inspect the target: an initialized database is
 deliberately refused on replay. Never drop/reinitialize it to force a retry. A
 confirmed pristine supported schema may proceed to the separately reviewed
-import below. No existing database is upgraded by this command.
+import below. No existing database is upgraded by this command. After an import
+and verification at 0065, ordinary runtime migrations may upgrade to 0084 while
+preserving knowledge and import receipts. Import/replay/reconciliation into that
+upgraded schema remains unsupported and fails closed; this profile is not a
+current-schema snapshot migration solution.
 
 ### Reviewed import
 
