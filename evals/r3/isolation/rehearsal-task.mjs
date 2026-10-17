@@ -114,22 +114,40 @@ async function createExecutor(options, providerOnly, runners) {
   }
   if (!!manifest.provider_budget !== !!budgetBinary || (budgetBinary && !path.isAbsolute(budgetBinary))) throw Error('mediated rehearsal binary/profile mismatch');
   if (wireProvider && (!budgetBinary || typeof wireProvider.bind !== 'function')) throw Error('wire provider requires mediated execution');
-  const readAsset = async relative => {
+  // Configuration assets include locked native executables. Verify those as
+  // bounded opaque bytes; only an explicit expected text kind may be consumed
+  // as family metadata, rubric, fixture source or retrieved evidence.
+  const readAsset = async (relative, textKind) => {
     const asset = manifest.assets.find(asset => asset.path === relative);
     if (!asset || !relative.split('/').every(part => /^[a-zA-Z0-9_.-]+$/.test(part) && part !== '.' && part !== '..')) throw Error('unlocked rehearsal input');
+    if (!['source', 'labels', 'fixture', 'configuration'].includes(asset.kind)
+        || (textKind !== undefined && asset.kind !== textKind)) throw Error('unexpected rehearsal asset kind');
+    const maximum = textKind === undefined && asset.kind === 'configuration' ? 512 * 1024 * 1024 : 2 * 1024 * 1024;
     const file = path.join(root, relative);
     const stat = await fs.lstat(file);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 2 * 1024 * 1024) throw Error('invalid rehearsal asset');
-    const bytes = await fs.readFile(file);
-    if (hash(bytes) !== asset.sha256) throw Error('changed rehearsal input');
-    return bytes.toString('utf8');
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maximum) throw Error('invalid rehearsal asset');
+    const handle = await fs.open(file, 'r');
+    try {
+      const opened = await handle.stat();
+      if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino || opened.size !== stat.size) throw Error('changed rehearsal input');
+      const digest = createHash('sha256'), chunks = [];
+      let size = 0;
+      for await (const bytes of handle.createReadStream({ autoClose: false })) {
+        size += bytes.length;
+        if (size > maximum) throw Error('invalid rehearsal asset');
+        digest.update(bytes);
+        if (textKind !== undefined) chunks.push(bytes);
+      }
+      if (size !== stat.size || digest.digest('hex') !== asset.sha256) throw Error('changed rehearsal input');
+      if (textKind !== undefined) return Buffer.concat(chunks).toString('utf8');
+    } finally { await handle.close(); }
   };
   const verify = async () => {
     if (!(await fs.readFile(path.join(root, 'campaign.json'))).equals(manifestBytes)) throw Error('changed rehearsal manifest');
     for (const asset of manifest.assets) await readAsset(asset.path);
   };
   await verify();
-  const families = JSON.parse(await readAsset('private/families.json'));
+  const families = JSON.parse(await readAsset('private/families.json', 'configuration'));
   let busy = false;
   return async (work, providerContract) => {
     if (busy) throw Error('rehearsal executor busy');
@@ -174,7 +192,7 @@ async function createExecutor(options, providerOnly, runners) {
       };
       const family = families.find(family => family.id === item.cluster);
       if (!family || family.track !== item.track) throw Error('missing rehearsal family');
-      const sources = await Promise.all(item.sources.map(async id => ({ id, text: await readAsset(id) })));
+      const sources = await Promise.all(item.sources.map(async id => ({ id, text: await readAsset(id, 'source') })));
       const project = `r3-${item.cluster}`;
       const executed = await session.withInstance(project, async instance => {
         let retrievalMs = 0;
@@ -211,7 +229,7 @@ async function createExecutor(options, providerOnly, runners) {
           return context;
         };
         if (item.track === 'knowledge') {
-          const rubric = JSON.parse(await readAsset(`private/rubrics/${item.id}.json`));
+          const rubric = JSON.parse(await readAsset(`private/rubrics/${item.id}.json`, 'labels'));
           const context = await contextFor(rubric.question);
           const answerOptions = { ...(native ? { execution, scoreExecutable: nativeScorer } : { image: nodeImage, scoreBinary }),
             sources, context, question: rubric.question, rubric, manifestSha256, work: selected, argv: answerArgv };
@@ -230,10 +248,10 @@ async function createExecutor(options, providerOnly, runners) {
             timing: { retrieval_ms: Math.ceil(retrievalMs), answer_or_agent_ms: Math.max(1,Math.ceil(answer.answerDurationMs)),
               grading_ms: Math.ceil(answer.adjudicationPreparationMs) } };
         }
-        const stages = JSON.parse(await readAsset(family.stages));
+        const stages = JSON.parse(await readAsset(family.stages, 'labels'));
         const initialFiles = {};
         for (const asset of manifest.assets.filter(asset => asset.path.startsWith(family.fixture + '/'))) {
-          initialFiles[asset.path.slice(family.fixture.length + 1)] = await readAsset(asset.path);
+          initialFiles[asset.path.slice(family.fixture.length + 1)] = await readAsset(asset.path, 'fixture');
         }
         const context = await contextFor(`What is the documented ${family.id} maintenance contract?`);
         // Each stage's prompt is selected in its own invocation; the sequence

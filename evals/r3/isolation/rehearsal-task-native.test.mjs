@@ -42,7 +42,9 @@ async function fixture(t) {
   }
   const manifest = { smoke_only: true, label_status: 'draft', limits: { microusd: 0, task_seconds: 60 },
     semantic_time: '2026-10-17T00:00:00Z', model: { provider: 'synthetic', resolved_id: 'fake', reasoning: 'none', embedding_id: syntheticEmbeddingModel },
-    assets: Object.entries(assets).map(([name, bytes]) => ({ path: name, sha256: hash(bytes) })),
+    assets: Object.entries(assets).map(([name, bytes]) => ({ path: name, sha256: hash(bytes),
+      kind: name.startsWith('public/') ? 'source' : name.startsWith('fixtures/') ? 'fixture'
+        : name === 'private/families.json' ? 'configuration' : 'labels' })),
     cases: [{ id: 'question', cluster: 'knowledge', track: 'knowledge', sources: [sourceId, 'public/unselected.md'] },
       { id: 'sequence', cluster: 'coding', track: 'coding', sources: [sourceId] }] };
   const saveManifest = () => fs.writeFile(path.join(root, 'campaign.json'), JSON.stringify(manifest));
@@ -221,4 +223,37 @@ test('Linux rehearsal keeps explicit image commands and existing result metadata
   assert.equal(observation.result.success, false);
   assert.equal(observation.result.metadata.native_execution, undefined);
   assert(observation.result.sub_results.every(step => step.metadata.native_execution === undefined));
+});
+
+test('native pack hashes locked executables above 2 MiB without exposing their bytes as text', async t => {
+  const f = await fixture(t), relative = 'private/executables/memory.exe';
+  const bytes = Buffer.alloc(2 * 1024 * 1024 + 17, 0xff);
+  bytes.write('BINARY_CONFIGURATION_ONLY');
+  const file = path.join(f.options.configuration.root, relative);
+  await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, bytes);
+  f.manifest.assets.push({ path: relative, sha256: hash(bytes), kind: 'configuration' }); await f.saveManifest();
+  const run = await f.build(f.options);
+  const observation = await run({ case_id: 'question', condition: 'full-memory', repeat: 0 });
+  zeroUsage(observation);
+  assert.equal(f.calls.length, 1);
+  assert(!JSON.stringify(f.calls).includes('BINARY_CONFIGURATION_ONLY'));
+  assert.deepEqual(JSON.parse(f.calls[0].files['input.json']).context, [{ id: sourceId, text: source }]);
+  bytes[bytes.length - 1] = 0; await fs.writeFile(file, bytes);
+  await assert.rejects(run({ case_id: 'question', condition: 'full-memory', repeat: 1 }), /changed rehearsal input/);
+  assert.equal(f.calls.length, 1);
+});
+
+test('oversized text and configuration assets selected as source fail before execution', async t => {
+  for (const relative of [sourceId, 'private/families.json']) {
+    const f = await fixture(t), bytes = Buffer.alloc(2 * 1024 * 1024 + 1, 32);
+    await fs.writeFile(path.join(f.options.configuration.root, relative), bytes);
+    f.manifest.assets.find(asset => asset.path === relative).sha256 = hash(bytes); await f.saveManifest();
+    await assert.rejects(f.build(f.options), /invalid rehearsal asset/);
+    assert.equal(f.calls.length, 0); assert.equal(f.sessions.length, 0);
+  }
+  const f = await fixture(t);
+  f.manifest.cases[0].sources = ['private/families.json']; await f.saveManifest();
+  const run = await f.build(f.options);
+  await assert.rejects(run({ case_id: 'question', condition: 'full-memory', repeat: 0 }), /unexpected rehearsal asset kind/);
+  assert.equal(f.calls.length, 0); assert.equal(f.sessions.length, 0);
 });
