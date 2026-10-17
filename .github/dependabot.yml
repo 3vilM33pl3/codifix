@@ -9,6 +9,24 @@ updates:
       timezone: "Europe/London"
     open-pull-requests-limit: 5
 
+  - package-ecosystem: "npm"
+    directory: "/docs-site"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:45"
+      timezone: "Europe/London"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/packaging/windows-pds/upstream"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/London"
+    open-pull-requests-limit: 5
+
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:

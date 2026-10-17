@@ -49,10 +49,22 @@ jobs:
         env:
           MEMORY_LAYER_PROFILE: prod
 
-      - name: Dependency audit reports
+      - name: Web dependency audit
+        continue-on-error: true
+        run: npm --prefix web audit --audit-level=low
+
+      - name: Documentation dependency audit
+        continue-on-error: true
+        run: npm --prefix docs-site audit --audit-level=low
+
+      - name: Pinned PDS dependency audit
+        continue-on-error: true
+        working-directory: packaging/windows-pds/upstream
+        run: npx --yes pnpm@10.34.1 audit --audit-level=low
+
+      - name: Rust dependency audit
         continue-on-error: true
         run: |
-          npm --prefix web audit --audit-level=high
           cargo install cargo-audit --locked
           cargo audit
 
