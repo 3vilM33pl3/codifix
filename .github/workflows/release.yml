@@ -357,7 +357,12 @@ jobs:
             ~/.cargo/git
             target/x86_64-pc-windows-msvc
           key: release-windows-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
-          restore-keys: release-windows-${{ hashFiles('Cargo.lock') }}-
+          # The workspace rename changes Cargo.lock without changing dependency
+          # versions. Reuse the last 2.1.0 dependency cache; Cargo still validates
+          # fingerprints and every package is rebuilt/checked from this source.
+          restore-keys: |
+            release-windows-${{ hashFiles('Cargo.lock') }}-
+            release-windows-9cdd6f09ce6eebdad4cf71c3a669985225229e6c90754c82f593c16fe7f263e3-
       - name: Install WiX
         shell: pwsh
         run: |
