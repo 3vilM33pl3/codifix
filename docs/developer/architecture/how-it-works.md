@@ -104,7 +104,7 @@ Effective config is resolved in this order:
 1. explicit `--config <path>` if provided
 2. shared/global config
 3. user-local project `config.toml`
-4. legacy repo-local `.mem/config.toml` if no user-local project config exists
+4. legacy repo-local `.codifix/config.toml` if no user-local project config exists
 5. `CODIFIX__...` environment overrides
 
 Shared/global config normally lives in:
@@ -123,9 +123,9 @@ Secrets can come from:
 - `/etc/codifix/codifix.env`
 - `~/.config/codifix/codifix.env`
 - user-local project `codifix.env`
-- legacy `.mem/codifix.env`
+- legacy `.codifix/codifix.env`
 
-The loader in `mem-api` also normalizes some legacy config keys during deserialization so older shared configs can coexist with newer repo-local overrides.
+The loader in `codifix-config` also normalizes some legacy config keys during deserialization so older shared configs can coexist with newer repo-local overrides.
 
 ## Repository Bootstrap
 
@@ -133,24 +133,24 @@ The loader in `mem-api` also normalizes some legacy config keys during deseriali
 
 The repo-local bootstrap creates:
 
-- `.mem/project.toml`
+- `.codifix/project.toml`
 - `.agents/codifix.toml`
 - `.agents/skills/`
 
-Operational config, runtime state, caches, sockets, and secrets live in user-local project directories. The repo keeps only the small `.mem/project.toml` marker and agent-visible `.agents/` files. The same backend and database may serve many repos, but each repo still needs its own slug and skill installation.
+Operational config, runtime state, caches, sockets, and secrets live in user-local project directories. The repo keeps only the small `.codifix/project.toml` marker and agent-visible `.agents/` files. The same backend and database may serve many repos, but each repo still needs its own slug and skill installation.
 
 ## Runtime Topology
 
 In the normal multi-project setup there is:
 
-- one shared `mem-service`
+- one shared `codifix-service`
 - one shared PostgreSQL database
 - zero or more watcher processes, usually started by the agent-linked watcher manager
-- many repos, each with its own `.mem/` configuration and project slug
+- many repos, each with its own `.codifix/` configuration and project slug
 
 In the local development setup for this repository there can also be a parallel repo-local backend with alternate ports so it does not clash with the installed shared service.
 
-`mem-service` now has two runtime roles:
+`codifix-service` now has two runtime roles:
 
 - `primary`
   The service can connect to PostgreSQL, runs migrations, owns direct query/capture/curate/reindex work, and serves as the system of record.
@@ -178,7 +178,7 @@ Curated memory remains project-scoped. The system does not create separate canon
 
 ## Core Service Boundaries
 
-`mem-service` is the system boundary for persistent state.
+`codifix-service` is the system boundary for persistent state.
 
 It owns:
 
@@ -216,7 +216,7 @@ The live UI split is now:
 - TUI over the existing Cap'n Proto-framed stream
 - web UI over a JSON WebSocket on `/ws`
 
-Both consume the same logical stream message model from `mem-api`, which keeps project snapshot, memory snapshot, and activity update behavior aligned across terminal and browser clients.
+Both consume the same logical stream message model from `codifix-record`, which keeps project snapshot, memory snapshot, and activity update behavior aligned across terminal and browser clients.
 
 ## Database Model
 
@@ -267,8 +267,8 @@ flowchart TD
     Payload["Capture payload<br/>task, notes, files, tests, candidates"]
     CaptureAPI["POST /v1/capture/task"]
     Raw["raw_captures<br/>sessions and tasks"]
-    Ingest["mem-ingest<br/>normalize candidate facts"]
-    Curate["mem-curate<br/>classify, dedupe, replace, reject"]
+    Ingest["codifix-curate::ingest<br/>normalize candidate facts"]
+    Curate["codifix-curate<br/>classify, dedupe, replace, reject"]
 
     subgraph Canonical["Canonical memory materialization"]
         Entries["memory_entries<br/>versioned canonical memories"]
@@ -354,7 +354,7 @@ That means the system stores more evidence than before, but remains conservative
 
 The capture endpoint stores the original payload, but the payload is only the start of the pipeline.
 
-`mem-ingest` is responsible for turning that payload into candidate facts. Its job is not to produce perfect memory entries; its job is to normalize input into a stable intermediate form that curation can reason about.
+`codifix-curate::ingest` is responsible for turning that payload into candidate facts. Its job is not to produce perfect memory entries; its job is to normalize input into a stable intermediate form that curation can reason about.
 
 Inputs that can contribute include:
 
@@ -369,7 +369,7 @@ The ingestion stage is intentionally permissive. The curation stage is where the
 
 ## Curation Pipeline
 
-`mem-curate` is where raw evidence becomes durable memory.
+`codifix-curate` is where raw evidence becomes durable memory.
 
 The broad pipeline is:
 
@@ -401,7 +401,7 @@ The relation classifier is deterministic. It uses canonical-text overlap, shared
 
 ## Search And Query Pipeline
 
-The query path is handled by `mem-search`.
+The query path is handled by `codifix-search`.
 
 ### Query Retrieval Flow
 

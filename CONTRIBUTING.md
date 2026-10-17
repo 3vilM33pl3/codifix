@@ -27,7 +27,7 @@ Start with the code map: [docs/developer/architecture/code-map.md](docs/develope
 Pick the smallest PR shape that proves the change:
 
 - CLI command or output: `crates/codifix-cli`, focused command tests, and the matching page under `docs/user/cli/`
-- service route or API behavior: `crates/codifix-service`, `crates/codifix-api`, route tests, and API/client docs
+- service route or API behavior: `crates/codifix-service`, `crates/codifix-record`, route tests, and API/client docs
 - search or retrieval behavior: `crates/codifix-search`, query diagnostics tests, and query docs
 - curation behavior: `crates/codifix-curate`, replacement-proposal tests, and memory type docs
 - TUI tab: `crates/codifix-cli/src/tui.rs` or the `crates/codifix-cli/src/tui/` helpers, with TUI tests

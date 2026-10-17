@@ -60,7 +60,7 @@ when repeated instructions or project knowledge should survive future sessions.
 | Need | Source of truth |
 | --- | --- |
 | CLI behavior or output contracts | [docs/user/cli/](docs/user/cli/) and `crates/codifix-cli` |
-| Service routes, API behavior, or persistence | [docs/developer/architecture/](docs/developer/architecture/) and `crates/codifix-service` / `crates/codifix-api` |
+| Service routes, API behavior, or persistence | [docs/developer/architecture/](docs/developer/architecture/) and `crates/codifix-service` / `crates/codifix-record` |
 | Search, retrieval, or embeddings | [docs/developer/architecture/embeddings-and-search.md](docs/developer/architecture/embeddings-and-search.md) and `crates/codifix-search` |
 | Curation, provenance, or memory types | [docs/developer/architecture/memory-types.md](docs/developer/architecture/memory-types.md) |
 | TUI behavior | [docs/user/tui/](docs/user/tui/) and `crates/codifix-cli/src/tui/` |

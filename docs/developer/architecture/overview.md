@@ -43,7 +43,7 @@ This diagram shows the main runtime boundaries. For deeper write and query pipel
 flowchart LR
     subgraph ProjectRepo["Project repository"]
         Skills["Repo-local skills<br/>.agents/skills"]
-        ProjectConfig["Project marker and config<br/>.mem/project.toml<br/>.agents/codifix.toml"]
+        ProjectConfig["Project marker and config<br/>.codifix/project.toml<br/>.agents/codifix.toml"]
         CLI["Codifix CLI"]
         TUI["Terminal UI"]
         WebUI["Web UI"]
@@ -55,9 +55,9 @@ flowchart LR
     end
 
     subgraph ServiceHost["Local Codifix runtime"]
-        Service["mem-service<br/>HTTP, WebSocket, Cap'n Proto"]
-        Search["mem-search<br/>lexical, semantic, graph, rerank"]
-        Curate["mem-curate and mem-ingest<br/>capture, normalize, curate"]
+        Service["codifix-service<br/>HTTP, WebSocket, Cap'n Proto"]
+        Search["codifix-search<br/>lexical, semantic, graph, rerank"]
+        Curate["codifix-curate<br/>capture, normalize, curate"]
     end
 
     subgraph Storage["Durable storage"]
@@ -134,7 +134,7 @@ The CLI currently uses two transports:
 - a localhost HTTP API kept as the compatibility and fallback surface
 - a persistent Cap'n Proto connection for live TUI subscriptions
 
-Initialized repositories keep a tiny project marker under `.mem/project.toml`, agent-visible behavior under `.agents/`, and operational project config/state/cache under user-local Codifix directories. Shared defaults live in the global config and project-local values can override them when needed.
+Initialized repositories keep a tiny project marker under `.codifix/project.toml`, agent-visible behavior under `.agents/`, and operational project config/state/cache under user-local Codifix directories. Shared defaults live in the global config and project-local values can override them when needed.
 
 ### Backend Service (`codifix service`)
 

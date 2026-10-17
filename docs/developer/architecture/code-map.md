@@ -84,7 +84,7 @@ audit. The real-client, independent-database fake-model/game rehearsal is
 
 - Add a CLI command: update `crates/codifix-cli/src/main.rs` or `crates/codifix-cli/src/commands/`, add help metadata, add a `docs/user/cli/*.md` page, and extend command-help tests.
 - Add a service endpoint: add shared types in `codifix-record`, route/service logic in `codifix-service`, tests in the touched crate, and client wiring where needed.
-- Change authentication: update shared contracts in `codifix-api`, central policy and stores under `codifix-service/src/auth/`, the OpenAPI spec, and transport-specific credential propagation. Never authorize independently in a leaf handler.
+- Change authentication: update shared contracts in `codifix-record`, central policy and stores under `codifix-service/src/auth/`, the OpenAPI spec, and transport-specific credential propagation. Never authorize independently in a leaf handler.
 - Change query ranking: update `codifix-search`, preserve diagnostics, and add tests for result ordering or explanation fields.
 - Change memory curation: update `codifix-curate`, replacement proposal behavior, memory type docs, and database tests when persistence changes.
 - Change the TUI: keep tab behavior localized; extract pure rendering helpers before moving state.
