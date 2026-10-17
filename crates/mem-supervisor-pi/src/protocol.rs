@@ -74,6 +74,11 @@ pub enum StartupFailure {
     InvalidCredential,
     ModelUnavailable,
     Configuration,
+    Session,
+    Io,
+    StateStore,
+    Usage,
+    Provider,
     Other,
 }
 
@@ -278,6 +283,11 @@ fn accept_response(command: ControlCommand, frame: WireFrame) -> Result<(), Fail
                 Some("auth.invalid_api_key") => StartupFailure::InvalidCredential,
                 Some("auth.no_models_available") => StartupFailure::ModelUnavailable,
                 Some("config") => StartupFailure::Configuration,
+                Some("session") => StartupFailure::Session,
+                Some("io") => StartupFailure::Io,
+                Some("state_store") => StartupFailure::StateStore,
+                Some("usage") => StartupFailure::Usage,
+                Some("provider") => StartupFailure::Provider,
                 _ => StartupFailure::Other,
             };
             return Err(Failure::Startup(class));
@@ -313,4 +323,34 @@ fn accept_response(command: ControlCommand, frame: WireFrame) -> Result<(), Fail
         return Err(Failure::UnexpectedFrame);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod startup_tests {
+    use super::*;
+
+    #[test]
+    fn startup_diagnostics_preserve_only_known_error_families() {
+        for (code, expected) in [
+            ("session", StartupFailure::Session),
+            ("io", StartupFailure::Io),
+            ("state_store", StartupFailure::StateStore),
+            ("usage", StartupFailure::Usage),
+            ("provider", StartupFailure::Provider),
+            ("DO_NOT_LEAK_UNKNOWN_CODE", StartupFailure::Other),
+        ] {
+            let frame: WireFrame = serde_json::from_value(json!({
+                "type":"error", "phase":"startup", "code":code,
+                "message":"DO_NOT_LEAK_PRIVATE_PATH_OR_CONTENT"
+            }))
+            .unwrap();
+            let failure = accept_response(ControlCommand::DisableRetry, frame).unwrap_err();
+            assert_eq!(failure, Failure::Startup(expected));
+            assert!(
+                !serde_json::to_string(&failure)
+                    .unwrap()
+                    .contains("DO_NOT_LEAK")
+            );
+        }
+    }
 }
