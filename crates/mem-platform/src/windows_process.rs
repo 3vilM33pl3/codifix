@@ -60,8 +60,8 @@ use windows_sys::Win32::{
         Pipes::{CreatePipe, GetNamedPipeInfo},
         SystemInformation::GetWindowsDirectoryW,
         Threading::{
-            ALL_PROCESSOR_GROUPS, CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
-            CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
+            ALL_PROCESSOR_GROUPS, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
+            DETACHED_PROCESS, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
             GetActiveProcessorCount, GetCurrentProcess, GetCurrentProcessId, GetExitCodeProcess,
             InitializeProcThreadAttributeList, OpenProcess, OpenProcessToken,
             PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
@@ -75,6 +75,12 @@ use windows_sys::Win32::{
 
 const MAX_CODE_BYTES: u64 = 512 * 1024 * 1024;
 const JOB_MEMORY_BYTES: usize = 512 * 1024 * 1024;
+// Do not allocate even a hidden console host: its process consumes a job slot.
+// Stdio remains the explicit inherited pipes selected by STARTF_USESTDHANDLES.
+// https://learn.microsoft.com/windows/console/creation-of-a-console
+const HEADLESS_PROCESS_FLAGS: u32 =
+    CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT | DETACHED_PROCESS | EXTENDED_STARTUPINFO_PRESENT;
+const PIPE_STARTUP_FLAGS: u32 = STARTF_USESTDHANDLES;
 const JOB_POLICY_FLAGS: u32 = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
     | JOB_OBJECT_LIMIT_ACTIVE_PROCESS
     | JOB_OBJECT_LIMIT_JOB_MEMORY
@@ -912,7 +918,7 @@ pub fn spawn(spec: ProcessSpec<'_>) -> Result<SandboxProcess> {
     attributes.set(PROC_THREAD_ATTRIBUTE_HANDLE_LIST, &handles)?;
     let mut startup = STARTUPINFOEXW::default();
     startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
-    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    startup.StartupInfo.dwFlags = PIPE_STARTUP_FLAGS;
     startup.StartupInfo.hStdInput = handles[0];
     startup.StartupInfo.hStdOutput = handles[1];
     startup.StartupInfo.hStdError = handles[2];
@@ -963,10 +969,7 @@ pub fn spawn(spec: ProcessSpec<'_>) -> Result<SandboxProcess> {
                 null(),
                 null(),
                 1,
-                CREATE_SUSPENDED
-                    | CREATE_UNICODE_ENVIRONMENT
-                    | CREATE_NO_WINDOW
-                    | EXTENDED_STARTUPINFO_PRESENT,
+                HEADLESS_PROCESS_FLAGS,
                 env.as_ptr().cast(),
                 directory.as_ptr(),
                 &startup.StartupInfo,
@@ -1485,7 +1488,7 @@ pub fn spawn_inherited(
     attrs.set(PROC_THREAD_ATTRIBUTE_HANDLE_LIST, &handles)?;
     let mut startup = STARTUPINFOEXW::default();
     startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
-    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    startup.StartupInfo.dwFlags = PIPE_STARTUP_FLAGS;
     startup.StartupInfo.hStdInput = handles[0];
     startup.StartupInfo.hStdOutput = handles[1];
     startup.StartupInfo.hStdError = handles[2];
@@ -1557,10 +1560,7 @@ pub fn spawn_inherited(
                 null(),
                 null(),
                 1,
-                CREATE_SUSPENDED
-                    | CREATE_UNICODE_ENVIRONMENT
-                    | CREATE_NO_WINDOW
-                    | EXTENDED_STARTUPINFO_PRESENT,
+                HEADLESS_PROCESS_FLAGS,
                 env.as_ptr().cast(),
                 cwd.as_ptr(),
                 &startup.StartupInfo,
@@ -1656,6 +1656,29 @@ pub fn spawn_inherited(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn headless_driver_and_pi_preserve_explicit_pipes_without_console_or_breakaway() {
+        use windows_sys::Win32::System::Threading::{
+            CREATE_BREAKAWAY_FROM_JOB, CREATE_NEW_CONSOLE, CREATE_NO_WINDOW,
+        };
+        assert_eq!(
+            HEADLESS_PROCESS_FLAGS,
+            CREATE_SUSPENDED
+                | CREATE_UNICODE_ENVIRONMENT
+                | EXTENDED_STARTUPINFO_PRESENT
+                | DETACHED_PROCESS
+        );
+        assert_eq!(
+            HEADLESS_PROCESS_FLAGS
+                & (CREATE_NO_WINDOW | CREATE_NEW_CONSOLE | CREATE_BREAKAWAY_FROM_JOB),
+            0
+        );
+        assert_eq!(PIPE_STARTUP_FLAGS, STARTF_USESTDHANDLES);
+        assert_eq!(
+            JOB_POLICY_FLAGS & JOB_OBJECT_LIMIT_ACTIVE_PROCESS,
+            JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+        );
+    }
     #[test]
     fn job_image_classification_is_allowlisted_without_paths_or_pid_metadata() {
         assert_eq!(
