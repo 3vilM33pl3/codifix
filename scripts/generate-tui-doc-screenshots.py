@@ -15,11 +15,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 TMUX = os.environ.get("TMUX_BIN", "tmux")
-PROJECT = os.environ.get("CODIFIX_SCREENSHOT_PROJECT", "memory")
-TUI_BIN = os.environ.get("CODIFIX_TUI_BIN", str(ROOT / "target" / "debug" / "memory"))
+PROJECT = os.environ.get("CODIFIX_SCREENSHOT_PROJECT", "codifix")
+TUI_BIN = os.environ.get("CODIFIX_TUI_BIN", str(ROOT / "target" / "debug" / "codifix"))
 WATCH_CMD = os.environ.get(
     "CODIFIX_WATCH_CMD",
-    f"{ROOT / 'target' / 'debug' / 'memory'} watcher run --project {PROJECT}",
+    f"{ROOT / 'target' / 'debug' / 'codifix'} watcher run --project {PROJECT}",
 )
 WIDTH = 204
 HEIGHT = 48
@@ -31,7 +31,7 @@ FONT_NAME = os.environ.get("CODIFIX_SCREENSHOT_FONT", "DejaVuSansMono.ttf")
 FONT_SIZE = 14
 PADDING_X = 20
 PADDING_Y = 18
-QUERY_TEXT = "What is the main driver for coding agent interaction with Memory Layer?"
+QUERY_TEXT = "What is the main driver for coding agent interaction with Codifix?"
 BOX_DRAWING_CHARS = set("│─┌┐└┘├┤┬┴┼")
 TAB_NAMES = [
     "Memories",
@@ -278,10 +278,10 @@ def render_screen(payload: bytes, output_path: Path) -> None:
 
 
 def main() -> int:
-    run("cargo", "build", "--bin", "memory", capture=False)
+    run("cargo", "build", "--bin", "codifix", capture=False)
 
-    tui_session = f"memory-docs-{uuid.uuid4().hex[:8]}"
-    watcher_session = f"memory-watch-docs-{uuid.uuid4().hex[:8]}"
+    tui_session = f"codifix-docs-{uuid.uuid4().hex[:8]}"
+    watcher_session = f"codifix-watch-docs-{uuid.uuid4().hex[:8]}"
 
     screenshots: dict[str, bytes] = {}
 
