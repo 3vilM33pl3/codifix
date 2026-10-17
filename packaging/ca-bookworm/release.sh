@@ -31,13 +31,13 @@ docker run "${common[@]}" "$release_image" bash -euc '
   npm --prefix web ci --ignore-scripts --no-audit --no-fund
 ' 2>&1 | tee "$release_work/dependency-preparation.log"
 bash "$release_work/memory/packaging/ca-bookworm/build.sh" package "$release_work" "$release_image" "$release_arch"
-docker run "${common[@]}" --network none "$release_image" bash -euc '
+docker run "${common[@]}" --network none --tmpfs /candidate:rw,nosuid,nodev,exec,size=1g "$release_image" bash -euc '
   arch=$1
   package=$(find /work/output -maxdepth 1 -name "*_${arch}.deb" -print)
   test -n "$package"
-  mkdir /tmp/package
-  dpkg-deb -x "$package" /tmp/package
-  binaries=(/tmp/package/usr/bin/memory /tmp/package/usr/bin/memory-area /tmp/package/usr/bin/memory-area-import /tmp/package/usr/bin/memory-federation-gateway)
+  mkdir /candidate/package
+  dpkg-deb -x "$package" /candidate/package
+  binaries=(/candidate/package/usr/bin/memory /candidate/package/usr/bin/memory-area /candidate/package/usr/bin/memory-area-import /candidate/package/usr/bin/memory-federation-gateway)
   if [[ "$arch" == amd64 ]]; then
     mkdir -p /tmp/sysroot/lib/x86_64-linux-gnu /tmp/sysroot/lib64
     for library in libc.so.6 libm.so.6 libgcc_s.so.1 libstdc++.so.6 libpthread.so.0 libdl.so.2 librt.so.1 libresolv.so.2; do
@@ -53,8 +53,8 @@ docker run "${common[@]}" --network none "$release_image" bash -euc '
   python3 packaging/ca-bookworm/abi.py --architecture "$arch" --sysroot "$sysroot" "${binaries[@]}" > "/work/output/abi-${arch}.json"
   "${runner[@]}" "${binaries[0]}" --version
   for executable in "${binaries[@]}"; do "${runner[@]}" "$executable" --help > /dev/null; done
-  test -s /tmp/package/usr/share/memory-layer/web/index.html
-  test -s /tmp/package/usr/libexec/memory-layer/releases/release.py
+  test -s /candidate/package/usr/share/memory-layer/web/index.html
+  test -s /candidate/package/usr/libexec/memory-layer/releases/release.py
   dpkg-deb -f "$package" Package Version Architecture Depends
   rustc -vV
   node --version
