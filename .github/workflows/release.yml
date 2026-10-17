@@ -343,7 +343,7 @@ jobs:
         env:
           VERSION: ${{ needs.contract.outputs.version }}
         run: |
-          ./packaging/windows/check-release.ps1 -DistDir "target/windows/dist/windows-v$env:VERSION-build.1" -ExpectedVersion $env:VERSION -ExpectedCommit $env:GITHUB_SHA -TestDatabaseUrl $env:MEMORY_RELEASE_TEST_DATABASE_URL
+          ./packaging/windows/check-release.ps1 -DistDir "target/windows/dist/windows-v$($env:VERSION)-build.1" -ExpectedVersion $env:VERSION -ExpectedCommit $env:GITHUB_SHA -TestDatabaseUrl $env:MEMORY_RELEASE_TEST_DATABASE_URL
       - name: Stop only the disposable test cluster
         if: always()
         shell: pwsh
