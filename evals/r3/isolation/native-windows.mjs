@@ -134,7 +134,11 @@ export function createNativeWindowsExecutor({ fileSystem = fs, invoke = invokeHe
     await fileSystem.writeFile(stdinPath, stdin, { flag: 'wx' }); // inherits native-validated private ACL
     const descriptor = {
       schema_version: 1, profile: 'windows-appcontainer-evaluation-v1', executable: profile.node.path,
-      toolchains: profile.toolchains, arguments: [profile.guest.path], search_path: profile.search_path,
+      // Node otherwise realpath-walks the drive root before loading its main
+      // script. A zero-capability token cannot lstat C:\\, and we must not grant
+      // drive-wide access to make the interpreter start. Toolchain/scratch
+      // identities and reparse rejection remain enforced by the native helper.
+      toolchains: profile.toolchains, arguments: ['--preserve-symlinks','--preserve-symlinks-main',profile.guest.path], search_path: profile.search_path,
       library_path: profile.library_path, deadline_ms: Math.min(300000, timeoutMs + 5000),
       max_output_bytes: 4 * cap, stdin_file: { path: stdinPath, sha256: hash(stdin) }, exports: exportPaths,
       allow_missing_exports: true,

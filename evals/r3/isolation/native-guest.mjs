@@ -26,7 +26,12 @@ for (const [relative, content] of Object.entries(request.files)) {
 const stdout = [], stderr = [];
 let total = 0;
 const exitCode = await new Promise((resolve, reject) => {
-  const child = spawn(request.argv[0], request.argv.slice(1), { shell: false, windowsHide: true,
+  // The reviewed Node interpreter must not realpath-walk the drive root for
+  // relative harness scripts either. This is not a new tool or ACL grant;
+  // non-Node tools retain their literal argument vectors unchanged.
+  const args = path.resolve(request.argv[0]).toLowerCase() === path.resolve(process.execPath).toLowerCase()
+    ? ['--preserve-symlinks','--preserve-symlinks-main',...request.argv.slice(1)] : request.argv.slice(1);
+  const child = spawn(request.argv[0], args, { shell: false, windowsHide: true,
     cwd: process.cwd(), env: { ...process.env }, stdio: ['ignore','pipe','pipe'] });
   const timer = setTimeout(() => reject(Error('native command deadline expired')), request.timeoutMs);
   for (const [stream, destination] of [[child.stdout, stdout], [child.stderr, stderr]]) stream.on('data', bytes => {

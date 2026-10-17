@@ -45,6 +45,8 @@ function fixture({ prepare, receipt: mutateReceipt, artifact: mutateArtifact, co
     const descriptorBytes = storage.get(args[1]); assert.equal(sha(descriptorBytes), args[3]);
     const descriptor = JSON.parse(descriptorBytes);
     assert.equal(descriptor.allow_missing_exports, true);
+    assert.deepEqual(descriptor.arguments,
+      ['--preserve-symlinks','--preserve-symlinks-main',profile.guest.path]);
     const stdin = storage.get(descriptor.stdin_file.path);
     assert.equal(sha(stdin), descriptor.stdin_file.sha256);
     const request = JSON.parse(stdin);
