@@ -74,6 +74,11 @@ use windows_sys::Win32::{
 
 const MAX_CODE_BYTES: u64 = 512 * 1024 * 1024;
 const JOB_MEMORY_BYTES: usize = 512 * 1024 * 1024;
+const JOB_POLICY_FLAGS: u32 = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    | JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+    | JOB_OBJECT_LIMIT_JOB_MEMORY
+    | JOB_OBJECT_LIMIT_PROCESS_MEMORY
+    | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
 
 /// The OS uses LOCALAPPDATA while constructing an AppContainer's redirected
 /// profile environment. Resolve that one launch input from the current Windows
@@ -567,11 +572,7 @@ pub(super) fn job_with_limits(processes: u32, memory_bytes: usize) -> Result<Own
     ensure!(!raw.is_null(), "could not create sandbox job");
     let job = unsafe { OwnedHandle::from_raw_handle(raw) };
     let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-        | JOB_OBJECT_LIMIT_ACTIVE_PROCESS
-        | JOB_OBJECT_LIMIT_JOB_MEMORY
-        | JOB_OBJECT_LIMIT_PROCESS_MEMORY
-        | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
+    limits.BasicLimitInformation.LimitFlags = JOB_POLICY_FLAGS;
     limits.BasicLimitInformation.ActiveProcessLimit = processes;
     limits.JobMemoryLimit = memory_bytes;
     limits.ProcessMemoryLimit = memory_bytes;
@@ -1133,6 +1134,8 @@ pub struct InheritedSpawnDiagnostic {
 pub enum InheritedJobAssertion {
     Count,
     Membership,
+    Limits,
+    ActiveProcesses,
 }
 
 /// Advisory metadata only: no process identifiers or handles are disclosed.
@@ -1147,6 +1150,10 @@ pub struct InheritedJobObservation {
     pub driver_in_any_job: Option<bool>,
     pub child_in_any_job: Option<bool>,
     pub current_job_process_limit: Option<u32>,
+    pub active_processes: Option<u32>,
+    pub total_processes: Option<u32>,
+    pub total_terminated_processes: Option<u32>,
+    pub current_job_policy_matches: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -1166,14 +1173,31 @@ struct JobProcessIds {
     ids: [usize; 7],
 }
 
-fn job_mismatch(ids: &JobProcessIds, driver: u32, child: u32) -> Option<InheritedJobObservation> {
+fn job_mismatch(
+    ids: &JobProcessIds,
+    driver: u32,
+    child: u32,
+    accounting: &JOBOBJECT_BASIC_ACCOUNTING_INFORMATION,
+    limits: &JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+) -> Option<InheritedJobObservation> {
     let present = &ids.ids[..(ids.returned as usize).min(ids.ids.len())];
     let driver_present = present.contains(&(driver as usize));
     let child_present = present.contains(&(child as usize));
-    let assertion = if ids.assigned != 2 || ids.returned != 2 {
+    let policy_matches = limits.BasicLimitInformation.ActiveProcessLimit == 2
+        && limits.BasicLimitInformation.LimitFlags == JOB_POLICY_FLAGS
+        && limits.JobMemoryLimit == JOB_MEMORY_BYTES
+        && limits.ProcessMemoryLimit == JOB_MEMORY_BYTES;
+    let assertion = if ids.returned < 2
+        || ids.returned as usize > ids.ids.len()
+        || ids.assigned != ids.returned
+    {
         InheritedJobAssertion::Count
     } else if !driver_present || !child_present || driver == child {
         InheritedJobAssertion::Membership
+    } else if !policy_matches {
+        InheritedJobAssertion::Limits
+    } else if accounting.ActiveProcesses != 2 {
+        InheritedJobAssertion::ActiveProcesses
     } else {
         return None;
     };
@@ -1185,7 +1209,11 @@ fn job_mismatch(ids: &JobProcessIds, driver: u32, child: u32) -> Option<Inherite
         child_present,
         driver_in_any_job: None,
         child_in_any_job: None,
-        current_job_process_limit: None,
+        current_job_process_limit: Some(limits.BasicLimitInformation.ActiveProcessLimit),
+        active_processes: Some(accounting.ActiveProcesses),
+        total_processes: Some(accounting.TotalProcesses),
+        total_terminated_processes: Some(accounting.TotalTerminatedProcesses),
+        current_job_policy_matches: Some(policy_matches),
     })
 }
 
@@ -1466,40 +1494,72 @@ pub fn spawn_inherited(
     };
     let thread = unsafe { OwnedHandle::from_raw_handle(info.hThread) };
     verify_token(&child.process, app_sid)?;
-    // NULL denotes the driver's current inner job. Its exact process list must
-    // contain both driver and the newly created Pi; an unrelated job is not enough.
-    let mut ids = JobProcessIds::default();
-    ok(
-        unsafe {
-            QueryInformationJobObject(
-                null_mut(),
-                JobObjectBasicProcessIdList,
-                (&mut ids as *mut JobProcessIds).cast(),
-                size_of_val(&ids) as u32,
-                null_mut(),
-            )
-        },
-        "verify inherited Pi job",
-    )?;
-    if let Some(mut observation) =
-        job_mismatch(&ids, unsafe { GetCurrentProcessId() }, info.dwProcessId)
-    {
+    // NULL queries the current driver's immediate job, including under nesting:
+    // https://learn.microsoft.com/windows/win32/api/jobapi2/nf-jobapi2-queryinformationjobobject
+    // A complete list can contain more IDs than the active execution budget.
+    // Membership, exact admitted limits and independently queried active count
+    // are the gate; list length alone is not an active-process measurement.
+    // Accounting can transiently include rejected/terminated associations:
+    // https://learn.microsoft.com/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information
+    let settle_until = Instant::now() + Duration::from_secs(1);
+    loop {
+        let mut ids = JobProcessIds::default();
+        ok(
+            unsafe {
+                QueryInformationJobObject(
+                    null_mut(),
+                    JobObjectBasicProcessIdList,
+                    (&mut ids as *mut JobProcessIds).cast(),
+                    size_of_val(&ids) as u32,
+                    null_mut(),
+                )
+            },
+            "verify inherited Pi job",
+        )?;
+        let mut accounting = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
+        ok(
+            unsafe {
+                QueryInformationJobObject(
+                    null_mut(),
+                    JobObjectBasicAccountingInformation,
+                    (&mut accounting as *mut JOBOBJECT_BASIC_ACCOUNTING_INFORMATION).cast(),
+                    size_of_val(&accounting) as u32,
+                    null_mut(),
+                )
+            },
+            "verify inherited Pi job",
+        )?;
+        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        ok(
+            unsafe {
+                QueryInformationJobObject(
+                    null_mut(),
+                    JobObjectExtendedLimitInformation,
+                    (&mut limits as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                    size_of_val(&limits) as u32,
+                    null_mut(),
+                )
+            },
+            "verify inherited Pi job",
+        )?;
+        let Some(mut observation) = job_mismatch(
+            &ids,
+            unsafe { GetCurrentProcessId() },
+            info.dwProcessId,
+            &accounting,
+            &limits,
+        ) else {
+            break;
+        };
+        if observation.assertion == InheritedJobAssertion::ActiveProcesses
+            && accounting.ActiveProcesses > 2
+            && Instant::now() < settle_until
+        {
+            std::thread::sleep(Duration::from_millis(10));
+            continue;
+        }
         observation.driver_in_any_job = process_in_any_job(unsafe { GetCurrentProcess() });
         observation.child_in_any_job = process_in_any_job(child.process.as_raw_handle());
-        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-        if unsafe {
-            QueryInformationJobObject(
-                null_mut(),
-                JobObjectExtendedLimitInformation,
-                (&mut limits as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
-                size_of_val(&limits) as u32,
-                null_mut(),
-            )
-        } != 0
-        {
-            observation.current_job_process_limit =
-                Some(limits.BasicLimitInformation.ActiveProcessLimit);
-        }
         return Err(InheritedJobMismatch(observation).into());
     }
     ensure!(
@@ -1547,8 +1607,20 @@ mod tests {
             returned: 2,
             ids: [111, 222, 0, 0, 0, 0, 0],
         };
-        assert!(job_mismatch(&ids, 111, 222).is_none());
-        let missing = job_mismatch(&ids, 111, 333).expect("foreign child rejected");
+        let mut accounting = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION {
+            ActiveProcesses: 2,
+            ..Default::default()
+        };
+        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+            JobMemoryLimit: JOB_MEMORY_BYTES,
+            ProcessMemoryLimit: JOB_MEMORY_BYTES,
+            ..Default::default()
+        };
+        limits.BasicLimitInformation.ActiveProcessLimit = 2;
+        limits.BasicLimitInformation.LimitFlags = JOB_POLICY_FLAGS;
+        assert!(job_mismatch(&ids, 111, 222, &accounting, &limits).is_none());
+        let missing =
+            job_mismatch(&ids, 111, 333, &accounting, &limits).expect("foreign child rejected");
         assert_eq!(missing.assertion, InheritedJobAssertion::Membership);
         assert!(missing.driver_present);
         assert!(!missing.child_present);
@@ -1562,14 +1634,42 @@ mod tests {
         assert_eq!(diagnostic.job, Some(missing));
         ids.assigned = 3;
         assert_eq!(
-            job_mismatch(&ids, 111, 222)
-                .expect("extra process")
+            job_mismatch(&ids, 111, 222, &accounting, &limits)
+                .expect("incomplete list")
                 .assertion,
             InheritedJobAssertion::Count
         );
+        ids.returned = 3;
+        ids.ids[2] = 444;
+        // Observed native case: a third listed ID does not itself establish
+        // a third active process. Both members, accounting and limits gate it.
+        assert!(job_mismatch(&ids, 111, 222, &accounting, &limits).is_none());
+        accounting.ActiveProcesses = 3;
+        assert_eq!(
+            job_mismatch(&ids, 111, 222, &accounting, &limits)
+                .expect("extra active process")
+                .assertion,
+            InheritedJobAssertion::ActiveProcesses
+        );
+        accounting.ActiveProcesses = 2;
+        limits.BasicLimitInformation.LimitFlags ^= JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        assert_eq!(
+            job_mismatch(&ids, 111, 222, &accounting, &limits)
+                .expect("missing kill fence")
+                .assertion,
+            InheritedJobAssertion::Limits
+        );
+        limits.BasicLimitInformation.LimitFlags = JOB_POLICY_FLAGS;
+        limits.JobMemoryLimit += 4096;
+        assert_eq!(
+            job_mismatch(&ids, 111, 222, &accounting, &limits)
+                .expect("changed memory cap")
+                .assertion,
+            InheritedJobAssertion::Limits
+        );
         ids.returned = u32::MAX;
         assert_eq!(
-            job_mismatch(&ids, 111, 222)
+            job_mismatch(&ids, 111, 222, &accounting, &limits)
                 .expect("oversized returned count")
                 .assertion,
             InheritedJobAssertion::Count
