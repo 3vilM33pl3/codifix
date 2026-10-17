@@ -332,8 +332,6 @@ if [[ -n "$APP_SIGN_IDENTITY" ]]; then
   codesign --verify --strict "$PAYLOAD/Applications/Codifix Network Access.app"
 fi
 
-ln -sf codifix "$PAYLOAD/usr/local/bin/codifix-cli"
-ln -sf codifix "$PAYLOAD/usr/local/bin/codifix"
 "$PAYLOAD/usr/local/bin/codifix" completion bash > "$PAYLOAD/usr/local/share/bash-completion/completions/codifix"
 "$PAYLOAD/usr/local/bin/codifix" completion zsh > "$PAYLOAD/usr/local/share/zsh/site-functions/_codifix"
 "$PAYLOAD/usr/local/bin/codifix" completion fish > "$PAYLOAD/usr/local/share/fish/vendor_completions.d/codifix.fish"

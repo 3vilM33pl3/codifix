@@ -67,7 +67,7 @@ IDENTIFIER = re.compile(r"[a-f0-9]{32}\Z")
 CONFIG_LIMIT = 65536
 MAX_EVENTS = 128
 MAX_GENERATIONS = 5
-UNIT_SHA256 = "418e629337592d207f11115226395015c11aa01223841692771b9e12f4db1dca"
+UNIT_SHA256 = "7c5c9f1834a64773185feb4cbd96f9105db7793996e80f286043eece8cbd1334"
 PHASES = {"planned", "copying", "ready", "release_intent", "release_done",
           "config_intent", "installed", "retain_intent", "retained"}
 

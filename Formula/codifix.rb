@@ -1,5 +1,5 @@
 class Codifix < Formula
-  desc "Local project codifix service and terminal UI for coding agents"
+  desc "Local project memory service and terminal UI for coding agents"
   homepage "https://github.com/3vilM33pl3/codifix"
   head "https://github.com/3vilM33pl3/codifix.git", branch: "main"
 

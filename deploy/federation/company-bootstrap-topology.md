@@ -81,10 +81,10 @@ import { companyBootstrapTopology } from './deploy/federation/company-bootstrap-
 
 const result = companyBootstrapTopology(reviewedCompanySettings, {
   schemaVersion: 1,
-  operatorHostname: 'operator.memory.company.internal',
-  repositoryHostname: 'space.memory.company.internal',
-  repositoryDid: 'did:web:space.memory.company.internal',
-  accountHandle: 'space.memory.company.internal',
+  operatorHostname: 'operator.codifix.company.internal',
+  repositoryHostname: 'space.codifix.company.internal',
+  repositoryDid: 'did:web:space.codifix.company.internal',
+  accountHandle: 'space.codifix.company.internal',
   didDocument: reviewedPublicDocumentBytes,
   didDocumentSha256: reviewedPublicDocumentDigest,
   caCertificateSha256: reviewedCaFileDigest,

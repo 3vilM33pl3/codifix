@@ -284,7 +284,7 @@ try {
     Assert-NativePostgresHealth $health $Port $journal.cluster_identity
     $journal.native_execution_verified=$true; $journal.verified_at=[DateTime]::UtcNow.ToString('o'); $journal.last_failure=$null
     Save-PgPhase 'completed'
-    [pscustomobject]@{phase='completed';receipt=$journalPath;cluster_directory=$plan.cluster_directory;service_name=$plan.service_name;cluster_identity=$journal.cluster_identity;verified_at=$journal.verified_at;native_execution_verified=$true;memory_application_database_provisioned=$false} | ConvertTo-Json
+    [pscustomobject]@{phase='completed';receipt=$journalPath;cluster_directory=$plan.cluster_directory;service_name=$plan.service_name;cluster_identity=$journal.cluster_identity;verified_at=$journal.verified_at;native_execution_verified=$true;codifix_application_database_provisioned=$false} | ConvertTo-Json
 } catch {
     if ($journalOwned -and $Action -eq 'Provision') {
         $journal.last_failure=[ordered]@{code='provisioning_incomplete';phase=$journal.phase;observed_at=[DateTime]::UtcNow.ToString('o');external_effects_retained=$true}

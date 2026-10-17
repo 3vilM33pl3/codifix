@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Stable application version
+        description: Application version (3.0.0-rc.1 or 3.0.0)
         type: string
         required: true
         default: 3.0.0
       publish:
-        description: Publish the verified stable release (otherwise build candidate only)
+        description: Publish the verified release (otherwise build candidate only)
         type: boolean
         required: true
         default: false
@@ -30,7 +30,7 @@ env:
 
 jobs:
   contract:
-    name: Freeze stable release contract
+    name: Freeze release contract
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.contract.outputs.version }}
@@ -369,13 +369,19 @@ jobs:
         run: ./packaging/windows/test-release-identity.ps1
       - name: Build ZIP, per-user MSI and server-tools MSI
         shell: pwsh
-        run: ./packaging/windows/build-windows.ps1 -InstallerBuild 1
+        env:
+          VERSION: ${{ needs.contract.outputs.version }}
+        run: |
+          # Release-specific ledger: RC.1 is build 1; stable must order after it.
+          $installerBuild = if ($env:VERSION -eq '3.0.0-rc.1') { 1 } elseif ($env:VERSION -eq '3.0.0') { 2 } else { throw 'Unallocated Windows installer build' }
+          "CODIFIX_INSTALLER_BUILD=$installerBuild" | Out-File -FilePath $env:GITHUB_ENV -Append
+          ./packaging/windows/build-windows.ps1 -InstallerBuild $installerBuild
       - name: Native core and installer acceptance
         shell: pwsh
         env:
           VERSION: ${{ needs.contract.outputs.version }}
         run: |
-          ./packaging/windows/check-release.ps1 -DistDir "target/windows/dist/windows-v$($env:VERSION)-build.1" -ExpectedVersion $env:VERSION -ExpectedCommit $env:GITHUB_SHA -TestDatabaseUrl $env:CODIFIX_RELEASE_TEST_DATABASE_URL
+          ./packaging/windows/check-release.ps1 -DistDir "target/windows/dist/windows-v$($env:VERSION)-build.$($env:CODIFIX_INSTALLER_BUILD)" -InstallerBuild $env:CODIFIX_INSTALLER_BUILD -ExpectedVersion $env:VERSION -ExpectedCommit $env:GITHUB_SHA -TestDatabaseUrl $env:CODIFIX_RELEASE_TEST_DATABASE_URL
       - name: Stop only the disposable test cluster
         if: always()
         shell: pwsh

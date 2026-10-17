@@ -1,5 +1,7 @@
 # macOS Packaging
 
+For the breaking 3.0.0 rename, follow the [release-specific reinstall procedure](../CODIFIX-3-REINSTALL.md) before installing.
+
 Codifix now supports a native macOS service model:
 
 - Homebrew for installation

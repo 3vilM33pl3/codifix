@@ -1,5 +1,7 @@
 # Windows Packaging
 
+For the breaking 3.0.0 rename, follow the [release-specific reinstall procedure](../CODIFIX-3-REINSTALL.md) before installing.
+
 Build a native Windows release from PowerShell on a machine with Rust/MSVC, Node, .NET, and WiX 4.0.5 installed:
 
 ```powershell

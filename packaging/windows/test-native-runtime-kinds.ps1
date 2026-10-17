@@ -16,7 +16,7 @@ foreach($kind in @('codifix-native-postgres-runtime','codifix-native-pi-runtime'
 $pdsPins=@{'pds/package.json'='c0e7740808e0d6bc26a9fd773162f780a45665b0cff2137a256157f3cff77fd5'
     'pds/pnpm-lock.yaml'='23a8c97e01dff561266a6dcf67a4b74b25e98ebc695e6fa17c60ddf964160f73'
     'pds/pds-server.mjs'='cf223ee540400e244fa55f2e7d6e718195f0f8066aa3623c1c57df37acec3fb8'
-    'pds/http-stdio.mjs'='0dac0e7fe040be14398c2304ce4b70e8d65b74023d52d80b79e88113a5e4c467'}
+    'pds/http-stdio.mjs'='9d7a04af99b878e4afdcce064e7c64b4a316bee345c96dfc14fce2ad14e481a2'}
 $addon='pds/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
 $pds=[pscustomobject]@{schema_version=1;kind='codifix-native-pds-runtime';platform='windows-x86_64';node_version='24.18.1';pds_version='0.5.27'
     pds_source_revision='374cf1d4ba782d4391bbb73e4e2d3f320d4846d6';pds_image_digest='sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12'
@@ -28,7 +28,7 @@ $pds=[pscustomobject]@{schema_version=1;kind='codifix-native-pds-runtime';platfo
 $pdsNames=@('node/node.exe','node/vcruntime140.dll','node/vcruntime140_1.dll','node/msvcp140.dll',
     'pds/node_modules/@atproto/pds/package.json','pds/node_modules/@atproto/pds/dist/index.js',$addon)+@($pdsPins.Keys)+@($pds.components | ForEach-Object notice_path)
 $pds.payload_files=@($pdsNames | ForEach-Object {[pscustomobject]@{name=$_;sha256=$(if($pdsPins.ContainsKey($_)){$pdsPins[$_]}else{$hash})}})
-$pathPatch=[pscustomobject]@{layout='windows-sha256-did-paths-v1';patch_sha256='4ba316f92a401d8a9854fe96595232bb845dfe14fa33aefe51837aacc5efcef0';files=@(
+$pathPatch=[pscustomobject]@{layout='windows-sha256-did-paths-v1';patch_sha256='79c8c8378fdab250457e663d2d48518cb28dbabf5a81b3ae832aa70a7b860441';files=@(
     [pscustomobject]@{name='actor-store/actor-store.js';original_sha256='33ba4bcf0b0afb06868b80a4cb0025388a2a7e8006338ce80a70785d2079af4f';patched_sha256='c192431cb2de642bbe5c8256fbe30f0de6fe5dc23f3b20b8baec71e969909965'},
     [pscustomobject]@{name='disk-blobstore.js';original_sha256='cc18ec422b23ba3bc06baea321146e512ce9cb14608ec90ccfe5e9bc71359811';patched_sha256='9da2aa49a53b58826ae1b24fd7ba8d4fbbe7c9aaf9c7ee8a24c91c792b736f5a'})}
 $patched=Copy-Value $pds

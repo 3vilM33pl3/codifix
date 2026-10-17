@@ -1,5 +1,7 @@
 # Debian 12 candidate builds (off-CA only)
 
+For the breaking 3.0.0 rename, follow the [release-specific reinstall procedure](../CODIFIX-3-REINSTALL.md) before installing.
+
 ## Public release orchestration
 
 For a frozen public release, build this directory's Dockerfile, capture its image

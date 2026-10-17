@@ -69,7 +69,7 @@ function Get-OnboardingPlan {
         $task = [ordered]@{name=('Codifix-DeviceSync-' + $identity.Substring(0,24));user_sid=$CallerSid;logon='Interactive';run_level='Limited';start='logon_and_now';interval='existing_cli_watch_300_seconds'}
     }
     return [pscustomobject][ordered]@{schema_version=1;kind='codifix-windows-onboarding-stage';stage=$Stage
-        memory=$Codifix;memory_sha256=$CodifixSha256;release_root=$ReleaseRoot;config=$Config;config_sha256=$ConfigSha256
+        codifix=$Codifix;codifix_sha256=$CodifixSha256;release_root=$ReleaseRoot;config=$Config;config_sha256=$ConfigSha256
         company=$Company;area=$Area;owner=$Owner.ToString();project=$Project.ToString();profile=$Profile;profile_sha256=$ProfileSha256;profile_scope=$ProfileScope
         arguments=$arguments;task=$task;prerequisites='already_provisioned_user_config_and_local_services'
         provisions_database=$false;creates_codifix_service=$false;enables_paid_models=$false;onboarding_acceptance_verified=$false}
@@ -96,10 +96,10 @@ function Get-OnboardingSyncCommand($Plan) {
     # checks rely on the protected immutable release/user-profile boundary;
     # they are not a claim of same-handle CreateProcess execution.
     $script = '$ErrorActionPreference=''Stop'';'
-    foreach ($pair in @(@($Plan.memory,$Plan.memory_sha256),@($Plan.config,$Plan.config_sha256),@($Plan.profile,$Plan.profile_sha256))) {
+    foreach ($pair in @(@($Plan.codifix,$Plan.codifix_sha256),@($Plan.config,$Plan.config_sha256),@($Plan.profile,$Plan.profile_sha256))) {
         $script += 'if((Get-FileHash -LiteralPath ' + (ConvertTo-OnboardingLiteral $pair[0]) + ').Hash.ToLowerInvariant() -cne ' + (ConvertTo-OnboardingLiteral $pair[1]) + '){throw ''Reviewed onboarding input changed''};'
     }
-    $script += '& ' + (ConvertTo-OnboardingLiteral $Plan.memory) + ' ' + (($Plan.arguments | ForEach-Object { ConvertTo-OnboardingLiteral $_ }) -join ' ') + ';exit $LASTEXITCODE'
+    $script += '& ' + (ConvertTo-OnboardingLiteral $Plan.codifix) + ' ' + (($Plan.arguments | ForEach-Object { ConvertTo-OnboardingLiteral $_ }) -join ' ') + ';exit $LASTEXITCODE'
     return '-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
 }
 

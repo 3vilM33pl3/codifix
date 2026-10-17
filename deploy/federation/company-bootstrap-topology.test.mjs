@@ -6,19 +6,19 @@ import { companyBootstrapTopology } from './company-bootstrap-topology.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 function company() {
-  return { schemaVersion: 1, name: 'codifix-company', root: '/srv/codifix-company', domain: 'memory.company.internal',
+  return { schemaVersion: 1, name: 'codifix-company', root: '/srv/codifix-company', domain: 'codifix.company.internal',
     images: Object.fromEntries(['app', 'gateway', 'postgres', 'pds', 'proxy'].map((key, index) => [key, `registry.company.internal/${key}@sha256:${String(index + 1).repeat(64)}`])),
     users: { app: '65532:65532', gateway: '65532:65532', proxy: '65532:65532', pds: '1000:1000', postgres: '999:999' } };
 }
 function bootstrap() {
-  const repositoryHostname = 'repository.memory.company.internal';
+  const repositoryHostname = 'repository.codifix.company.internal';
   const repositoryDid = `did:web:${repositoryHostname}`;
   const doc = { '@context': ['https://www.w3.org/ns/did/v1'], id: repositoryDid,
     alsoKnownAs: [`at://${repositoryHostname}`], verificationMethod: [{ id: `${repositoryDid}#atproto`, type: 'Multikey', controller: repositoryDid,
       publicKeyMultibase: `z${'a'.repeat(48)}` }],
-    service: [{ id: `${repositoryDid}#atproto_pds`, type: 'AtprotoPersonalDataServer', serviceEndpoint: 'https://pds.memory.company.internal' }] };
+    service: [{ id: `${repositoryDid}#atproto_pds`, type: 'AtprotoPersonalDataServer', serviceEndpoint: 'https://pds.codifix.company.internal' }] };
   const didDocument = `${JSON.stringify(doc)}\n`;
-  return { schemaVersion: 1, operatorHostname: 'operator.memory.company.internal', repositoryHostname, repositoryDid,
+  return { schemaVersion: 1, operatorHostname: 'operator.codifix.company.internal', repositoryHostname, repositoryDid,
     accountHandle: repositoryHostname, didDocument, didDocumentSha256: digest(didDocument), caCertificateSha256: 'a'.repeat(64) };
 }
 const networks = service => Array.isArray(service.networks) ? service.networks : Object.keys(service.networks);
@@ -34,10 +34,10 @@ test('bootstrap overlay leaves normal services/routes and original inputs unchan
   for (const [key, value] of Object.entries(base.compose.services)) if (!['pds', 'pds_tls'].includes(key)) assert.deepEqual(result.compose.services[key], value);
   assert.deepEqual(result.compose.services.pds_tls, { ...base.compose.services.pds_tls, sysctls: { 'net.ipv4.ip_unprivileged_port_start': '443' } });
   for (const [key, value] of Object.entries(base.proxyFiles)) {
-    assert.equal(result.proxyFiles[key], key === 'pds/tls/Caddyfile' ? value.replace('https://pds.memory.company.internal:8443 {', 'https://pds.memory.company.internal:443 {') : value);
+    assert.equal(result.proxyFiles[key], key === 'pds/tls/Caddyfile' ? value.replace('https://pds.codifix.company.internal:8443 {', 'https://pds.codifix.company.internal:443 {') : value);
   }
-  assert.equal(base.endpoints.pds, 'https://pds.memory.company.internal:8443');
-  assert.equal(result.endpoints.pds, 'https://pds.memory.company.internal');
+  assert.equal(base.endpoints.pds, 'https://pds.codifix.company.internal:8443');
+  assert.equal(result.endpoints.pds, 'https://pds.codifix.company.internal');
   assert.equal(result.posture.accountProvisioned, false);
   assert.equal(result.posture.installed, false);
   assert.equal(result.posture.externalProviders, false);
@@ -96,7 +96,7 @@ test('static DID response preserves exact reviewed bytes and digest across compa
     assert.equal(literal.replaceAll('\\{', '{'), input.didDocument);
     assert.equal(digest(literal.replaceAll('\\{', '{')), result.endpoints.repository.documentSha256);
     assert.ok(!/(?<!\\)\{/.test(literal));
-    assert.match(config, /https:\/\/repository.memory.company.internal:443/);
+    assert.match(config, /https:\/\/repository.codifix.company.internal:443/);
     assert.match(config, /@document \{\n method GET\n path \/.well-known\/did.json\n \}/);
     assert.ok(config.includes('Content-Type application/did+json'));
     assert.ok(config.includes('Cache-Control no-store'));
@@ -117,7 +117,7 @@ test('DID revision handoff uses a dedicated readonly config directory and a PDS-
   assert.equal(pds.environment.NODE_EXTRA_CA_CERTS, '/run/trust/repository-ca.pem');
   assert.equal(pds.environment.PDS_DISABLE_SSRF_PROTECTION, 'false');
   assert.equal(pds.environment.PDS_DEV_MODE, 'false');
-  assert.equal(pds.environment.PDS_SERVICE_HANDLE_DOMAINS, '.memory.company.internal');
+  assert.equal(pds.environment.PDS_SERVICE_HANDLE_DOMAINS, '.codifix.company.internal');
   const ca = result.requiredFiles.find(f => f.service === 'pds' && f.target === '/run/trust/repository-ca.pem');
   assert.equal(ca.sha256, input.caCertificateSha256);
   assert.equal(ca.secret, false);
@@ -133,9 +133,9 @@ test('reject malformed, ambiguous, wrong-identity, private-key and configuration
   };
   const bad = [
     { ...bootstrap(), schemaVersion: 2 }, { ...bootstrap(), accountPassword: 'not permitted' },
-    { ...bootstrap(), operatorHostname: 'workshop.memory.company.internal' },
+    { ...bootstrap(), operatorHostname: 'workshop.codifix.company.internal' },
     { ...bootstrap(), operatorHostname: bootstrap().repositoryHostname },
-    { ...bootstrap(), repositoryHostname: 'pds.memory.company.internal' },
+    { ...bootstrap(), repositoryHostname: 'pds.codifix.company.internal' },
     { ...bootstrap(), repositoryHostname: 'repository.example\nreverse_proxy host' },
     { ...bootstrap(), repositoryDid: 'did:web:wrong.example.com' },
     { ...bootstrap(), didDocumentSha256: 'b'.repeat(64) }, { ...bootstrap(), caCertificateSha256: 'bad' },

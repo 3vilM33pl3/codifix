@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { companyTopology } from './company-topology.mjs';
 
 function settings() {
-  return { schemaVersion: 1, name: 'codifix-company', root: '/srv/codifix-company', domain: 'memory.company.internal',
+  return { schemaVersion: 1, name: 'codifix-company', root: '/srv/codifix-company', domain: 'codifix.company.internal',
     images: Object.fromEntries(['app', 'gateway', 'postgres', 'pds', 'proxy'].map((key, index) => [key, `registry.company.internal/codifix/${key}@sha256:${String(index + 1).repeat(64)}`])),
     users: { app: '65532:65532', gateway: '65532:65532', proxy: '65532:65532', pds: '1000:1000', postgres: '999:999' } };
 }

@@ -143,7 +143,7 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
             $Manifest.sqlite_version -cne '3.53.2') { throw 'Unreviewed Node/PDS baseline' }
         $required=@{'node/node.exe'=$null;'pds/package.json'=$Manifest.pds_package_sha256;'pds/pnpm-lock.yaml'=$Manifest.pds_lock_sha256
             'pds/pds-server.mjs'='cf223ee540400e244fa55f2e7d6e718195f0f8066aa3623c1c57df37acec3fb8'
-            'pds/http-stdio.mjs'='0dac0e7fe040be14398c2304ce4b70e8d65b74023d52d80b79e88113a5e4c467'
+            'pds/http-stdio.mjs'='9d7a04af99b878e4afdcce064e7c64b4a316bee345c96dfc14fce2ad14e481a2'
             'pds/node_modules/@atproto/pds/package.json'=$null;'pds/node_modules/@atproto/pds/dist/index.js'=$null
             'pds/node_modules/better-sqlite3/build/Release/better_sqlite3.node'=$null}
         if($patched){
@@ -226,7 +226,7 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
 function Assert-NativePdsPathPatch($Patch){
     Assert-NativeRuntimeFields $Patch @('layout','patch_sha256','files')
     if($Patch.layout -cne 'windows-sha256-did-paths-v1' -or
-        $Patch.patch_sha256 -cne '4ba316f92a401d8a9854fe96595232bb845dfe14fa33aefe51837aacc5efcef0'){throw 'Unreviewed PDS filesystem patch'}
+        $Patch.patch_sha256 -cne '79c8c8378fdab250457e663d2d48518cb28dbabf5a81b3ae832aa70a7b860441'){throw 'Unreviewed PDS filesystem patch'}
     $pins=[ordered]@{
         'actor-store/actor-store.js'=[ordered]@{original_sha256='33ba4bcf0b0afb06868b80a4cb0025388a2a7e8006338ce80a70785d2079af4f';patched_sha256='c192431cb2de642bbe5c8256fbe30f0de6fe5dc23f3b20b8baec71e969909965'}
         'disk-blobstore.js'=[ordered]@{original_sha256='cc18ec422b23ba3bc06baea321146e512ce9cb14608ec90ccfe5e9bc71359811';patched_sha256='9da2aa49a53b58826ae1b24fd7ba8d4fbbe7c9aaf9c7ee8a24c91c792b736f5a'}

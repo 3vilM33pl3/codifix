@@ -228,17 +228,17 @@ class FirstRunContract(unittest.TestCase):
                            "version": ".".join(str(n) for n in sys.version_info[:3])})
         with patch.object(first.runtime_bundle, "verify_installed", return_value=descriptor), \
              patch.object(self.native, "command", return_value=(0, "codifix 3.0.0-fixture")) as command:
-            _, installed = real_prerequisite(self.args["runtime"], self.args["codifix"], self.native)
+            _, installed = real_prerequisite(self.args["runtime"], self.args["memory"], self.native)
             self.assertEqual(installed["sha256"], files.sha(self.fixture.memory))
             self.assertEqual(command.call_args_list[0].args[0][:2], ["/usr/bin/lipo", "-verify_arch"])
             self.assertEqual(command.call_args_list[1].args[0], [self.fixture.memory, "--version"])
             descriptor["python"]["version"] = "3.11.999"
             with self.assertRaisesRegex(files.Refused, "Python"):
-                real_prerequisite(self.args["runtime"], self.args["codifix"], self.native)
+                real_prerequisite(self.args["runtime"], self.args["memory"], self.native)
         descriptor["python"]["version"] = ".".join(str(n) for n in sys.version_info[:3])
         with patch.object(first.runtime_bundle, "verify_installed", return_value=descriptor), \
              patch.object(self.native, "command", return_value=(0, "unexpected output")), self.assertRaises(files.Refused):
-            real_prerequisite(self.args["runtime"], self.args["codifix"], self.native)
+            real_prerequisite(self.args["runtime"], self.args["memory"], self.native)
 
 
 if __name__ == "__main__":

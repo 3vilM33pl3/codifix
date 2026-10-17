@@ -52,7 +52,7 @@ const result = companyTopology({
   schemaVersion: 1,
   name: 'codifix-company',
   root: '/srv/codifix-company',
-  domain: 'memory.company.internal',
+  domain: 'codifix.company.internal',
   // Supply actual reviewed fully qualified image@sha256:<64 hex> references.
   images: reviewedImageDigests, // exact keys: app, gateway, postgres, pds, proxy
   // Explicit image-compatible non-root "uid:gid" values for the same five keys.

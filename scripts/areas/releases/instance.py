@@ -162,7 +162,7 @@ def unpack(archive_path, artifact, output_fd=None):
         require(hashlib.file_digest(source, "sha256").hexdigest() == checksum, "Archive changed during preparation")
     require("bin/codifix" in files and files["bin/codifix"]["size_bytes"] > 0
             and "web/index.html" in files and files["web/index.html"]["size_bytes"] > 0,
-            "Archive must include a nonempty memory binary and web/index.html")
+            "Archive must include a nonempty Codifix binary and web/index.html")
     require(not any(any(other.startswith(name + "/") for other in files) for name in files),
             "Archive file is also a parent directory")
     return dict(sorted(files.items()))

@@ -231,6 +231,13 @@ touch "$output"
         self.assertEqual(list(Path(self.env["TMPDIR"]).iterdir()), [])
         self.assertTrue((repo / "target/macos-pkg/keep").exists())
         capture = Path(self.env["CAPTURE"])
+        command = capture / "payload/usr/local/bin/codifix"
+        self.assertTrue(command.is_file())
+        self.assertFalse(command.is_symlink())
+        for legacy in ("memory", "memory-layer", "mem-cli", "codifix-cli"):
+            self.assertFalse(os.path.lexists(command.parent / legacy))
+        self.assertIn("--identifier dev.codifix.pkg", trace.read_text())
+        self.assertTrue((capture / "payload/Applications/Codifix Network Access.app").is_dir())
         for name in ("config.toml", "agents/astra_adviser.toml"):
             staged = capture / "payload/usr/local/share/codifix/onboarding/.codex" / name
             self.assertEqual(staged.read_bytes(), (REPO / ".codex" / name).read_bytes())
