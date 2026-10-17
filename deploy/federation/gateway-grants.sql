@@ -5,6 +5,8 @@ REVOKE CONNECT ON DATABASE memory_isolation FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT CONNECT ON DATABASE memory_isolation TO gateway_runtime;
 GRANT USAGE ON SCHEMA public TO gateway_runtime;
+-- The gateway checks retired spaces but cannot change their retirement fence.
+GRANT SELECT ON codifix_retired_federation_spaces TO gateway_runtime;
 GRANT SELECT, INSERT, UPDATE ON
     federation_gateway_spaces, federation_accepted, federation_publish_outbox,
     federation_security, federation_audit, federation_retention_decisions
