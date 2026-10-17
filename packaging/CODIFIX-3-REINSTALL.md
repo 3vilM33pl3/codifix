@@ -16,10 +16,14 @@ service definitions and exact old executables. Keep recovery material private.
 Record which services and watchers were active; inactive ones stay inactive.
 
 Semantic `memory_entries` tables, canonical IDs and area topology are preserved.
-Database names and roles remain unchanged except for the exact product-owned Mac
-onboarding names listed below. Existing state is transferred only by the
-reviewed release cutover and reconciliation procedure, never by installer hooks;
-no database is dropped, recreated or renamed by a broad name match.
+Rename product-owned database and role names only through the exact reviewed
+per-instance inventory, including Monolith and the Mac onboarding names below.
+Generic PostgreSQL names and neutral area/runtime roles remain unchanged.
+Existing state is transferred only by the reviewed release cutover and
+reconciliation procedure, never by installer hooks; no database is dropped,
+recreated or renamed by a broad name match. The private Monolith command ledger
+records proposed mappings and cold preparation steps; its existence does not
+establish a completed rehearsal or authorize copying commands across clusters.
 
 | Platform | Old installation | New installation |
 | --- | --- | --- |
@@ -46,6 +50,17 @@ no database is dropped, recreated or renamed by a broad name match.
    Compare content/IDs/attachments and permissions before enabling any service.
    Bring Workshop up first, keeping background and federation effects off until
    their separate cutover gates pass.
+
+Before renaming any database or role, bind the procedure to the exact cluster
+system identifier, data directory, database/role OIDs, owner/grant inventory and
+current connection state. Preserve SCRAM verifier bytes and object identities;
+refuse MD5 credentials, unexpected clients or target-name collisions. A bootstrap
+administrator that must itself be renamed needs the reviewed temporary-session
+authorization technique described below, rehearsed with that instance's exact
+mapping. Keep disabled restore-check databases disabled. The shared host dev
+cluster requires its own client and privilege inventory and remains separate
+from Workshop; do not stop unrelated PostgreSQL services or change authentication
+rules to make the rename possible.
 
 The disposable hosted installer check covers fresh installation, retained
 configuration/data, repair and removal. It is not a populated old-name cutover
