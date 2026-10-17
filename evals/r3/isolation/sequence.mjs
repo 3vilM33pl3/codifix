@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import { runOfflineExecution, validateExecutionInput, validateExecutionOutput } from './execution.mjs';
 import { createRustGrader, validateRustCase } from './rust.mjs';
+import { isNativeModelAgent } from './model-agent.mjs';
 
 const digest = files => createHash('sha256').update(JSON.stringify(
   Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0),
@@ -11,7 +12,7 @@ const digest = files => createHash('sha256').update(JSON.stringify(
 
 export function validateSequence({ image, execution, runAgent, initialFiles, submissionPaths, steps, timeoutMs = 10000 }) {
   const native = execution?.kind === 'windows-native-v1';
-  if (native && (image !== undefined || runAgent !== undefined)) throw Error('native sequence requires explicit native commands, not a Linux image/model adapter');
+  if (native && (image !== undefined || (runAgent !== undefined && !isNativeModelAgent(runAgent, execution)))) throw Error('native sequence requires explicit native commands or a profile-bound model adapter');
   const boundary = execution === undefined ? { image } : { execution, ...(image !== undefined ? { image } : {}) };
   if (!Array.isArray(steps) || steps.length !== 3) throw Error('require three sequence steps');
   if (!Array.isArray(submissionPaths) || !submissionPaths.length || new Set(submissionPaths).size !== submissionPaths.length) throw Error('invalid submission selection');
@@ -71,8 +72,19 @@ async function runSequence(options, runExecution) {
     // pass the step object: it contains the hidden probes and future context.
     const agent = structuredClone(runAgent ? await runAgent({ ...structuredClone(publicInput), stepId: step.id })
       : await runExecution(publicInput));
-    const { usage: agentUsage, ...agentExecution } = agent;
+    const { usage: agentUsage, commandExecutions, ...agentExecution } = agent;
     validateExecutionOutput(publicInput, agentExecution);
+    if (native && runAgent) {
+      if (!Array.isArray(commandExecutions) || commandExecutions.length < 1 || commandExecutions.length > 129) throw Error('native model command receipts required');
+      for (const [index, command] of commandExecutions.entries()) {
+        if (!command || Object.keys(command).sort().join(',') !== 'elapsedMs,execution,exitCode,kind'
+            || command.kind !== (index === commandExecutions.length - 1 ? 'final-export' : 'model-command')) throw Error('invalid native model command transcript');
+        validateExecutionOutput(publicInput, { version: 1, exitCode: command.exitCode, stdout: '', stderr: '', files: {},
+          execution: command.execution, elapsedMs: command.elapsedMs });
+      }
+      const final = commandExecutions.at(-1);
+      if (JSON.stringify(final.execution) !== JSON.stringify(agentExecution.execution) || final.exitCode !== agent.exitCode) throw Error('native model final receipt mismatch');
+    } else if (commandExecutions !== undefined) throw Error('unexpected model command transcript');
     if (runAgent && (!agentUsage || Object.keys(agentUsage).sort().join(',') !== 'input_tokens,microusd,new_provider_requests,output_tokens,provider_requests'
         || Object.values(agentUsage).some(v => !Number.isSafeInteger(v) || v < 0)
         || agentUsage.new_provider_requests > agentUsage.provider_requests)) throw Error('missing or invalid agent usage');
@@ -102,6 +114,7 @@ async function runSequence(options, runExecution) {
       graderInputSha256, graderKind: rust ? 'rust-blackbox' : 'command',
       agentElapsedMs: agent.elapsedMs, graderElapsedMs: grader.elapsedMs,
       ...(native ? { agentExecution: agent.execution, graderExecution: grader.execution,
+        ...(runAgent ? { modelCommandExecutions: structuredClone(commandExecutions) } : {}),
         ...(rust ? { graderProbes: grader.probes, graderReadinessExecution: grader.readinessExecution } : {}) } : {}),
       ...(runAgent ? { providerUsage: structuredClone(agentUsage) } : {}) });
     submission = selected;
