@@ -251,6 +251,7 @@ async fn serve_one(mut pipe: NamedPipeServer, router: axum::Router) -> Result<()
 fn record_failed_child_report(
     run_dir: &std::path::Path,
     report: &ChildReport,
+    spawn_diagnostic: Option<mem_platform::windows_process::InheritedSpawnDiagnostic>,
 ) -> Result<(), LaunchError> {
     use std::io::Write;
     let bytes = serde_json::to_vec(&serde_json::json!({
@@ -258,6 +259,7 @@ fn record_failed_child_report(
         "phase": "driver_report_rejected",
         "process": report.process,
         "failure": report.failure,
+        "spawn_diagnostic": spawn_diagnostic,
     }))
     .map_err(|_| LaunchError::Files)?;
     let mut file = mem_platform_files::windows::create_private_file(
@@ -371,7 +373,16 @@ pub(super) async fn run(
         let report: ChildReport = serde_json::from_slice(&out).map_err(|_| LaunchError::Child)?;
         if report.failure.is_some() || report.process != ProcessDisposition::Reaped {
             #[cfg(test)]
-            if record_failed_child_report(&run_dir, &report).is_err() {
+            if record_failed_child_report(
+                &run_dir,
+                &report,
+                serde_json::from_slice::<mem_platform::windows_process::InheritedSpawnDiagnostic>(
+                    &err,
+                )
+                .ok(),
+            )
+            .is_err()
+            {
                 eprintln!(
                     "protected child-report metadata unavailable; retaining original Child failure"
                 );

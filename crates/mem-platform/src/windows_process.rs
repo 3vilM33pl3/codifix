@@ -1097,6 +1097,93 @@ pub fn duplicate_broker_pipe(raw: usize) -> Result<File> {
     Ok(File::from(owned))
 }
 
+/// Fixed phase classes for explicit native rehearsal diagnosis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InheritedSpawnPhase {
+    ProcessPin,
+    TokenInspection,
+    CodeAccess,
+    CodeDigest,
+    PipeCreation,
+    HandleDuplication,
+    ProcessAttributes,
+    Environment,
+    ProcessCreation,
+    ChildToken,
+    JobVerification,
+    Resume,
+    Other,
+}
+
+/// Safe diagnostic metadata, never arbitrary error messages or paths. Emission
+/// is the caller's explicit diagnostic-build concern, not a production log.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InheritedSpawnDiagnostic {
+    pub phase: InheritedSpawnPhase,
+    pub raw_os_error: Option<i32>,
+}
+
+pub fn inherited_spawn_diagnostic(error: &anyhow::Error) -> InheritedSpawnDiagnostic {
+    use InheritedSpawnPhase as Phase;
+    let phase = error
+        .chain()
+        .find_map(|cause| {
+            Some(match cause.to_string().as_str() {
+                "pin driver process" => Phase::ProcessPin,
+                "inspect driver token"
+                | "driver is not an AppContainer"
+                | "inspect driver AppContainer identity"
+                | "verify driver AppContainer token" => Phase::TokenInspection,
+                "open pinned Pi executable"
+                | "read pinned Pi executable"
+                | "driver code directory unavailable"
+                | "locate current driver executable"
+                | "inspect pinned Pi executable"
+                | "Pi must be in the pinned driver bundle" => Phase::CodeAccess,
+                "Pi artifact too large" | "Pi artifact digest mismatch" => Phase::CodeDigest,
+                "create driver RPC pipe"
+                | "create Pi stdin pipe"
+                | "create Pi stdout pipe"
+                | "create Pi stderr pipe" => Phase::PipeCreation,
+                "driver handles must be pipes" | "duplicate Pi broker/RPC handle" => {
+                    Phase::HandleDuplication
+                }
+                "initialize process attributes"
+                | "set sandbox process attribute"
+                | "prepare Pi process attributes" => Phase::ProcessAttributes,
+                "missing admitted driver environment"
+                | "invalid driver environment key"
+                | "unapproved Pi environment override"
+                | "invalid broker bearer"
+                | "provider credentials cannot enter Pi"
+                | "missing driver scratch" => Phase::Environment,
+                "create inherited Pi process" => Phase::ProcessCreation,
+                "open child token"
+                | "child is not AppContainer"
+                | "wrong child AppContainer SID"
+                | "unexpected child network/other capabilities"
+                | "query sandbox token" => Phase::ChildToken,
+                "verify inherited Pi job"
+                | "unexpected inherited job process count"
+                | "Pi did not inherit admitted driver job" => Phase::JobVerification,
+                "could not resume admitted Pi" => Phase::Resume,
+                _ => return None,
+            })
+        })
+        .unwrap_or(Phase::Other);
+    let raw_os_error = error.chain().find_map(|cause| {
+        cause
+            .downcast_ref::<std::io::Error>()
+            .and_then(std::io::Error::raw_os_error)
+    });
+    InheritedSpawnDiagnostic {
+        phase,
+        raw_os_error,
+    }
+}
+
 /// Called only by the pinned driver inside its existing AppContainer. `broker`
 /// is its already inherited one-work channel. Overrides are restricted to Pi's
 /// private settings and a 64-hex one-work broker bearer, never provider keys.
@@ -1128,12 +1215,14 @@ pub fn spawn_inherited(
         "inspect driver token",
     )?;
     let token = unsafe { OwnedHandle::from_raw_handle(token) };
-    let app_info = token_information(&token, TokenAppContainerSid)?;
+    let app_info = token_information(&token, TokenAppContainerSid)
+        .context("inspect driver AppContainer identity")?;
     let app_sid =
         unsafe { (*app_info.as_ptr().cast::<TOKEN_APPCONTAINER_INFORMATION>()).TokenAppContainer };
     ensure!(!app_sid.is_null(), "driver is not an AppContainer");
-    verify_token(&current, app_sid)?;
-    let code = std::env::current_exe()?
+    verify_token(&current, app_sid).context("verify driver AppContainer token")?;
+    let code = std::env::current_exe()
+        .context("locate current driver executable")?
         .parent()
         .context("driver code directory unavailable")?
         .to_owned();
@@ -1145,15 +1234,22 @@ pub fn spawn_inherited(
         .read(true)
         .share_mode(FILE_SHARE_READ)
         .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
-        .open(&executable.path)?;
+        .open(&executable.path)
+        .context("open pinned Pi executable")?;
     ensure!(
-        source.metadata()?.len() <= MAX_CODE_BYTES,
+        source
+            .metadata()
+            .context("inspect pinned Pi executable")?
+            .len()
+            <= MAX_CODE_BYTES,
         "Pi artifact too large"
     );
     let mut digest = Sha256::new();
     let mut bytes = [0u8; 65536];
     loop {
-        let count = source.read(&mut bytes)?;
+        let count = source
+            .read(&mut bytes)
+            .context("read pinned Pi executable")?;
         if count == 0 {
             break;
         }
@@ -1163,9 +1259,9 @@ pub fn spawn_inherited(
         digest.finalize().as_slice() == executable.sha256,
         "Pi artifact digest mismatch"
     );
-    let (stdin_read, stdin_write) = anonymous_pipe()?;
-    let (stdout_read, stdout_write) = anonymous_pipe()?;
-    let (stderr_read, stderr_write) = anonymous_pipe()?;
+    let (stdin_read, stdin_write) = anonymous_pipe().context("create Pi stdin pipe")?;
+    let (stdout_read, stdout_write) = anonymous_pipe().context("create Pi stdout pipe")?;
+    let (stderr_read, stderr_write) = anonymous_pipe().context("create Pi stderr pipe")?;
     let mut inherited = Vec::new();
     for original in [
         stdin_read.as_raw_handle(),
@@ -1200,7 +1296,7 @@ pub fn spawn_inherited(
         inherited[2].as_raw_handle(),
         inherited[3].as_raw_handle(),
     ];
-    let mut attrs = Attributes::new()?;
+    let mut attrs = Attributes::new().context("prepare Pi process attributes")?;
     attrs.set(PROC_THREAD_ATTRIBUTE_HANDLE_LIST, &handles)?;
     let mut startup = STARTUPINFOEXW::default();
     startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
@@ -1332,6 +1428,32 @@ pub fn spawn_inherited(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn inherited_spawn_diagnostic_preserves_stage_and_os_code_without_error_text() {
+        let error = anyhow::Error::from(std::io::Error::from_raw_os_error(5))
+            .context("create driver RPC pipe")
+            .context("private source path or bearer must never enter metadata");
+        let diagnostic = inherited_spawn_diagnostic(&error);
+        assert_eq!(diagnostic.phase, InheritedSpawnPhase::PipeCreation);
+        assert_eq!(diagnostic.raw_os_error, Some(5));
+        assert_eq!(
+            serde_json::to_value(diagnostic).expect("typed metadata"),
+            serde_json::json!({"phase":"pipe_creation","raw_os_error":5})
+        );
+        let other = inherited_spawn_diagnostic(&anyhow::anyhow!("unreviewed secret/path"));
+        assert_eq!(other.phase, InheritedSpawnPhase::Other);
+        assert_eq!(other.raw_os_error, None);
+        let driver = inherited_spawn_diagnostic(
+            &anyhow::anyhow!("query sandbox token").context("verify driver AppContainer token"),
+        );
+        assert_eq!(driver.phase, InheritedSpawnPhase::TokenInspection);
+        assert!(
+            serde_json::from_value::<InheritedSpawnDiagnostic>(
+                serde_json::json!({"phase":"pipe_creation","raw_os_error":5,"stderr":"private"})
+            )
+            .is_err()
+        );
+    }
     use std::io::Write;
     #[test]
     fn broker_duplicate_rejects_invalid_pseudo_and_disk_handles_without_adoption() {

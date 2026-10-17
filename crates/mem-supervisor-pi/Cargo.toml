@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[features]
+windows-native-diagnostics = []
+
 [dependencies]
 mem-supervisor = { path = "../mem-supervisor" }
 serde.workspace = true

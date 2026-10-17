@@ -116,7 +116,17 @@ async fn execute() -> Result<[u8; 32], (Failure, ProcessDisposition)> {
         broker.as_handle(),
         &overrides,
     )
-    .map_err(|_| not_started(Failure::SpawnFailed))?;
+    .map_err(|error| {
+        #[cfg(feature = "windows-native-diagnostics")]
+        if let Ok(metadata) = serde_json::to_string(
+            &mem_platform::windows_process::inherited_spawn_diagnostic(&error),
+        ) {
+            eprintln!("{metadata}");
+        }
+        #[cfg(not(feature = "windows-native-diagnostics"))]
+        let _ = error;
+        not_started(Failure::SpawnFailed)
+    })?;
     let stdin = child
         .stdin
         .take()
