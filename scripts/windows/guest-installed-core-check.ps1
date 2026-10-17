@@ -8,7 +8,7 @@ if($env:OS -cne 'Windows_NT' -or $env:COMPUTERNAME -cne 'MEMORY-WINLAB' -or
     $InstallOperationId -eq [guid]::Empty -or
     $SourceRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+$' -or
     $SourceRoot.Split('\') -contains '..'){throw 'Exact disposable lab installation required'}
-. (Join-Path $SourceRoot 'scripts/windows/guest-core-install.ps1') -FunctionsOnly
+. (Join-Path $SourceRoot 'scripts/windows/guest-core-install.ps1') -FunctionsOnly -InstallOperationId $InstallOperationId -SourceRoot $SourceRoot
 . (Join-Path $SourceRoot 'packaging/windows/native-instance-functions.ps1')
 $root="C:\MemoryLab\runs\$InstallOperationId\core-install"
 $oldPath=Join-Path $root 'result.json';Assert-CoreInstallPath $oldPath
