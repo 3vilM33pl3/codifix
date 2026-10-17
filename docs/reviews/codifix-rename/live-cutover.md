@@ -54,13 +54,14 @@ operational evidence directory below.
 
 ## Remaining work
 
-- Complete the native Mac installation and client wiring. The Apple Silicon
-  candidate package and native acceptance passed; packages are verified and
-  staged. Installation requires the user's local administrator authentication;
-  a runtime-inclusive installer handoff is ready at
-  `~/.local/state/codifix-rename-20261017/mac-install-and-resume.md`. It installs
-  the verified payload/runtime; preserved-state activation follows. Publish final release
-  packages after the corrected candidate completes.
+- Complete native Mac preserved-state activation and client wiring. Olivier ran
+  the runtime-inclusive installer; live verification confirms Codifix 3.0.0-rc.1,
+  its package receipt and the accepted native runtime. The original completed
+  installation journal and populated area data are intact. Activation is now in
+  progress, using one cold recovery copy and the retained native rebind helper.
+  The handoff is at
+  `~/.local/state/codifix-rename-20261017/mac-install-and-resume.md`.
+  Publish final release packages after the corrected candidate completes.
 - Refresh running client sessions. Codifix desktop plugin is installed/enabled;
   the legacy plugin is disabled with its cache retained. Primary MCP project
   access and both scoped stdio wrappers passed. Watch manager, Workshop/Homelab
@@ -99,7 +100,6 @@ Corrected unpublished candidate run `39073102523` is running at source
 recovery snapshot showed Linux amd64/arm64 and Apple Silicon builds active with
 no failures reported. No public release or tag has been published.
 
-Crash recovery reconfirmed all three Monolith area health checks. The Mac
-installer has not yet run: the Codifix binary, runtime and package receipt are
-absent, and all seven original jobs remain loaded. Its verified installer still
-requires local administrator authentication; activation remains pending.
+Crash recovery reconfirmed all three Monolith area health checks. The initial
+Mac installer authentication blocker is resolved; preserved-state activation
+and main application/client verification remain in progress.
