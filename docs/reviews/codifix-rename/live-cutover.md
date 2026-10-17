@@ -58,13 +58,7 @@ operational evidence directory below.
 
 ## Remaining work
 
-- Complete native Mac preserved-state activation and client wiring. Olivier ran
-  the runtime-inclusive installer; live verification confirms Codifix 3.0.0-rc.1,
-  its package receipt and the accepted native runtime. The original completed
-  installation journal and populated area data are intact. Activation is now in
-  progress, using one cold recovery copy and the retained native rebind helper.
-  The handoff is at
-  `~/.local/state/codifix-rename-20261017/mac-install-and-resume.md`.
+- Finish Mac sync/client wiring after the local Keychain transfer below.
   Publish final release packages after the corrected candidate completes.
 - Refresh running client sessions. Codifix desktop plugin is installed/enabled;
   the legacy plugin is disabled with its cache retained. Primary MCP project
@@ -105,8 +99,7 @@ recovery snapshot showed Linux amd64/arm64 and Apple Silicon builds active with
 no failures reported. No public release or tag has been published.
 
 Crash recovery reconfirmed all three Monolith area health checks. The initial
-Mac installer authentication blocker is resolved; preserved-state activation
-and main application/client verification remain in progress.
+Mac installer authentication blocker is resolved.
 
 Follow-up found the old dev unit and a duplicate legacy-labelled Workshop relay
 had restarted after the crash. Both are now disabled/stopped; the Codifix relay
@@ -115,3 +108,36 @@ copies and the scoped provisioning script are retained privately under
 `dev-restoration/` and `provision-isolated-dev.py` in the operational evidence
 directory. Existing PostgreSQL administrator privileges sufficed; authentication
 and shared cluster roles were not changed.
+
+## Mac runtime cutover
+
+Olivier completed the native runtime installer. One cold recovery copy preserves
+3,188 files. The existing PostgreSQL cluster system identifier
+`7696918038469587144`, role/database OIDs, password verifiers, project/device/
+subscription IDs and original caches are retained. Both databases are renamed
+and migrated from schema 84 to 85; old federation bindings are retired with
+their signed evidence retained. Existing audit rows are unchanged; migration
+history and one definitions-registration audit per area account for the changes.
+
+The three Codifix core launchd jobs are active and healthy. Separate active
+plists in `~/Library/LaunchAgents` retain normal login/restart settings; the
+bound helper's inert originals are unchanged. All seven old labels are disabled.
+Original cached search and history passed for both areas, with all 161 table
+fingerprints unchanged during those reads. Astra independently reviewed the
+preservation, activation and read evidence; no core-runtime blocker remains.
+
+The native desktop app is copied from the successful private test build; this
+does not establish signed/notarized distribution. Company sync still needs
+local Keychain access for two original items: SSH returns OSStatus `-25308`.
+Olivier has been asked to run the reviewed additive transfer locally:
+
+```bash
+/usr/bin/swift /Users/olivier/.local/state/codifix-rename-20261017/macos-state.swift --apply --company-origin https://memory.metatao.net
+```
+
+Original credentials and profiles remain preserved. After transfer, rewire the
+copied app profile to the actual native Workshop endpoint and restore the
+original sync/watch functions. The old profile points at a separate source-dev
+backend, not the native cache. Sync reconnection and complete UI acceptance are
+not yet claimed. Private evidence: `mac-actual-evidence/`,
+`mac-actual-read-result.json` and `mac-actual-retirement-result.json`.
