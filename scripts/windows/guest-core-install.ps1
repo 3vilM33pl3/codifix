@@ -76,6 +76,11 @@ function Get-CoreInstallKnownFolderEnvironment{
             $path.Contains([char]0) -or $path.Contains("`r") -or $path.Contains("`n")){throw ('Required Windows known folder unavailable: '+$key)}
         $result[$key]=$path
     }
+    # Shell known-folder expansion needs SystemDrive even when ProgramData is
+    # explicit. Without it .NET returns an empty CommonApplicationData path.
+    $drive=[IO.Path]::GetPathRoot([Environment]::GetFolderPath('Windows')).TrimEnd('\')
+    if($drive -cnotmatch '^[A-Za-z]:$'){throw 'Required Windows system drive unavailable'}
+    $result.SystemDrive=$drive
     return $result
 }
 function New-CoreInstallerDiagnosticCommand([string[]]$Arguments,[string]$Diagnostic){
