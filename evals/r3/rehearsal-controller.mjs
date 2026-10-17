@@ -13,16 +13,32 @@ import { openRequestMediator } from './request-mediator.mjs';
 import { openSyntheticWireProvider } from './synthetic-wire-provider.mjs';
 import { openProviderCampaignSession } from './provider-campaign-session.mjs';
 import { openCampaignDispatch } from './campaign-dispatch.mjs';
+import { createWindowsHostJournal } from './windows-host-journal.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = path.join(root, 'campaign.json');
 const manifest = JSON.parse(await fs.readFile(manifestPath));
-const configuration = JSON.parse(await fs.readFile(path.join(root, 'private/runtime.json')));
+const configurationBytes = await fs.readFile(path.join(root, 'private/runtime.json'));
+const configuration = JSON.parse(configurationBytes);
+const configurationSha256 = createHash('sha256').update(configurationBytes).digest('hex');
+const native = configuration.execution?.kind === 'windows-native-v1';
 if (!manifest.smoke_only || manifest.label_status !== 'draft' || manifest.limits.microusd !== 0
     || process.env.MEMORY_LAYER_TEST_REQUIRE_DB !== '1') throw Error('offline disposable rehearsal only');
-const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME, MEMORY_LAYER_PROFILE: 'prod' };
+if ((process.platform === 'win32' && !native) || (configuration.execution !== undefined && !native)
+    || (native && (configuration.syntheticWire || manifest.provider_budget || manifest.preparation_budget
+      || configuration.socket !== undefined || configuration.images !== undefined
+      || Object.keys(configuration.dispatch ?? {}).sort().join(',') !== 'endpoint,kind'
+      || configuration.dispatch.kind !== 'windows-loopback-v1'
+      || configuration.dispatch.endpoint !== 'private/dispatch-endpoint.json'))) throw Error('explicit deterministic native controller required');
+if (!manifest.assets.some(asset => asset.path === 'private/runtime.json' && asset.sha256 === configurationSha256)) throw Error('controller configuration changed');
+const journal = native ? await createWindowsHostJournal(configuration.execution) : undefined;
+if (journal && JSON.stringify(await journal.read(path.join(root, 'private'), 'runtime.json')) !== JSON.stringify(configuration)) throw Error('protected controller configuration changed');
+const env = native ? { SystemRoot: process.env.SystemRoot, WINDIR: process.env.SystemRoot,
+  PATH: path.dirname(configuration.binaries.node.path), HOME: process.env.HOME, USERPROFILE: process.env.HOME,
+  TEMP: process.env.HOME, TMP: process.env.HOME, MEMORY_LAYER_PROFILE: 'prod' }
+  : { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME, MEMORY_LAYER_PROFILE: 'prod' };
 let activeCli, stopping = false, dispatcher;
-const interrupted = () => { stopping = true; activeCli?.kill('SIGINT'); void dispatcher?.close(); };
+const interrupted = () => { stopping = true; activeCli?.kill(native ? 'SIGKILL' : 'SIGINT'); void dispatcher?.close(); };
 process.once('SIGINT', interrupted);
 process.once('SIGTERM', interrupted);
 const cli = args => new Promise((resolve, reject) => {
@@ -40,6 +56,7 @@ const cli = args => new Promise((resolve, reject) => {
   child.once('close', (code, signal) => { activeCli = undefined; resolve({ code: signal ? 1 : code, stdout, stderr }); });
 });
 const verifyBinaries = async () => {
+  if (createHash('sha256').update(await fs.readFile(path.join(root, 'private/runtime.json'))).digest('hex') !== configurationSha256) throw Error('controller configuration changed');
   for (const binary of Object.values(configuration.binaries)) {
     const digest = createHash('sha256');
     for await (const chunk of createReadStream(binary.path)) digest.update(chunk);
@@ -99,14 +116,15 @@ try {
         timeoutMs: 10000, invoke: async payload => ({ output: syntheticVector(payload.input), usage: { input_tokens: 1, output_tokens: 0, microusd: 0 } }) });
       session = await openPreparedSession({ snapshotBinary: configuration.binaries.snapshot.path,
         memoryBinary: configuration.binaries.memory.path, databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL,
-        semanticTime: manifest.semantic_time, documents, embedding });
+        semanticTime: manifest.semantic_time, documents, embedding, ...(native ? { execution: configuration.execution } : {}) });
       if (mediator) for (const document of documents) {
         baselineEmbeddings.set(`${document.project}:${document.source}`, await embedding.embed(document.text, 'document'));
       }
       execute = await createRehearsalExecutor({ session, wireProvider, baselineEmbeddings: mediator ? baselineEmbeddings : undefined, configuration: { root,
-        manifestSha256: plan.manifest_sha256, nodeImage: configuration.images.node, rustImage: configuration.images.rust,
-        scoreBinary: configuration.binaries.score.path, retrieverBinary: configuration.binaries.retriever.path,
-        budgetBinary: configuration.binaries.budget?.path,
+        manifestSha256: plan.manifest_sha256, retrieverBinary: configuration.binaries.retriever.path,
+        ...(native ? { execution: configuration.execution, nativeScorer: configuration.nativeScorer, compiler: configuration.compiler }
+          : { nodeImage: configuration.images.node, rustImage: configuration.images.rust,
+            scoreBinary: configuration.binaries.score.path, budgetBinary: configuration.binaries.budget?.path }),
         driverSha256: manifest.assets.find(asset => asset.path === 'runtime/offline-driver.mjs').sha256,
         configurationSha256: manifest.assets.find(asset => asset.path === 'private/runtime.json').sha256,
         serviceBuild: `memory-sha256:${configuration.binaries.memory.sha256}` } });
@@ -115,7 +133,9 @@ try {
   };
   if (!manifest.preparation_budget) await prepare();
   const driver = path.join(root, 'runtime/offline-driver.mjs');
-  dispatcher = await openCampaignDispatch({ root, directory: path.join(root, 'private/dispatch'), socket: configuration.socket,
+  dispatcher = await openCampaignDispatch({ root, directory: path.join(root, 'private/dispatch'),
+    ...(native ? { native: { journal, configurationSha256, endpointPath: path.join(root, configuration.dispatch.endpoint) } }
+      : { socket: configuration.socket }),
     manifestSha256: plan.manifest_sha256, work: plan.work, offline: true, preparation: !!manifest.preparation_budget,
     verify: verifyBinaries, prepare, execute: (work, contract) => execute(work, contract),
     onProgress: (cursor, total) => console.error(`Offline rehearsal completed ${cursor}/${total} tasks.`) });
@@ -125,7 +145,8 @@ try {
   // Private bounded diagnostics from the host CLI, never an operational listing
   // or agent input. This lets an operator distinguish schema failures from
   // genuine pending review without rerunning an uncertain dispatch.
-  await fs.writeFile(path.join(root, 'private/run-diagnostic.txt'), run.stderr, { flag: 'wx', mode: 0o600 });
+  if (journal) await journal.write(path.join(root, 'private'), 'run-diagnostic.json', { stderr: run.stderr });
+  else await fs.writeFile(path.join(root, 'private/run-diagnostic.txt'), run.stderr, { flag: 'wx', mode: 0o600 });
   const artifact = JSON.parse(await fs.readFile(path.join(out, 'artifact.json')));
   if (!artifact.completed || artifact.observations.length !== plan.work.length || dispatcher.completed !== plan.work.length) throw Error('rehearsal incomplete');
   if (wireProvider && wireProvider.calls !== artifact.preparation_receipt.audit.ledger.requests
@@ -145,7 +166,7 @@ try {
   process.exitCode = 1;
 } finally {
   stopping = true;
-  activeCli?.kill('SIGINT');
+  activeCli?.kill(native ? 'SIGKILL' : 'SIGINT');
   await wireProvider?.close();
   await dispatcher?.close();
   if (session) {
