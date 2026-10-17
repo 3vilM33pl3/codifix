@@ -14,7 +14,7 @@ pkgutil --expand-full "$update" "$stage/update"
 for variant in standard update; do
   binary="$stage/$variant/Payload/usr/local/bin/memory"
   [[ -x "$binary" && -f "$stage/$variant/Payload/usr/local/share/memory-layer/web/index.html" ]]
-  lipo -verify_arch "$native_arch" "$binary"
+  lipo "$binary" -verify_arch "$native_arch"
   [[ $("$binary" --version) == "memory $version" ]]
   "$binary" --help >/dev/null
   # Standalone package executables must not resolve libraries from build hosts.
