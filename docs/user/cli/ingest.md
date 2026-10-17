@@ -1,10 +1,10 @@
-# `memory ingest`
+# `codifix ingest`
 
 Turn any directory of documents into durable, queryable memory — no git repository required.
 
 ```bash
-memory ingest ~/notes --project notes --dry-run
-memory ingest ./papers --project research --type documentation --tag corpus-2026
+codifix ingest ~/notes --project notes --dry-run
+codifix ingest ./papers --project research --type documentation --tag corpus-2026
 ```
 
 Each text document becomes one memory candidate: the first heading (or file name) as the summary, a capped excerpt as the canonical text, and the file itself as verifiable provenance. Candidates are captured in batches and curated like any other memory — deterministic, keyless, and gated by the same curation pipeline.

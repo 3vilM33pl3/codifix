@@ -52,7 +52,7 @@ Restart active services after an install or upgrade:
 codifix service restart-all --mark-tui-restart --json
 ```
 
-`restart-all` restarts only services that are already active or loaded. It does not start services that the user intentionally stopped. On Linux it checks the system backend service and active user watcher services. When run as root during a package install, it also checks logged-in user systemd sessions under `/run/user/*`. On macOS it checks loaded Codifix LaunchAgents. On Windows it checks the current user's `MemoryLayer-*` scheduled tasks.
+`restart-all` restarts only services that are already active or loaded. It does not start services that the user intentionally stopped. On Linux it checks the system backend service and active user watcher services. When run as root during a package install, it also checks logged-in user systemd sessions under `/run/user/*`. On macOS it checks loaded Codifix LaunchAgents. On Windows it checks the current user's `Codifix-*` scheduled tasks.
 
 Installers pass `--mark-tui-restart` so a TUI that is already open can show `restart` in red in the bottom status bar. Restarting the TUI is still a user action; the installer does not kill the running terminal UI.
 
@@ -71,20 +71,20 @@ The HTTP API does not trust `Origin` or `Referer` headers as authentication, eve
 
 On macOS, `codifix service enable` manages the LaunchAgent.
 
-On Windows, `codifix service enable` registers and starts the current-user, least-privilege `MemoryLayer-Backend` Task Scheduler task. It starts at sign-in and is configured to restart after failures. Use the same CLI commands to inspect, restart, or remove it; no administrator shell is required.
+On Windows, `codifix service enable` registers and starts the current-user, least-privilege `Codifix-Backend` Task Scheduler task. It starts at sign-in and is configured to restart after failures. Use the same CLI commands to inspect, restart, or remove it; no administrator shell is required.
 
 Native named server instances are separate from that legacy per-user task.
 Select the exact installed configuration to inspect one:
 
 ```powershell
-memory --config "C:\ProgramData\MemoryLayer\configurations\homelab\codifix.toml" service status
+codifix --config "C:\ProgramData\Codifix\configurations\homelab\codifix.toml" service status
 ```
 
 The actual installation root comes from Windows' native known folders. Status
 checks the protected installation registration and completed operation receipts,
 then compares the SCM command/account to that exact instance. It does not guess
 a service name from an area label, adopt an unrelated registration, or fall back
-to `MemoryLayer-Backend` when the selected instance is unavailable. Reading the
+to `Codifix-Backend` when the selected instance is unavailable. Reading the
 protected receipts requires the installing operator's existing access.
 
 This is read-only SCM status—not an HTTP health check, configuration-content

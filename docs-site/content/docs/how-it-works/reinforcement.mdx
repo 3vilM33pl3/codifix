@@ -24,8 +24,8 @@ The model follows ACT-R activation from cognitive science:
 Inspect scores any time:
 
 ```bash
-memory scores --project <slug>
-memory scores --project <slug> --needs-review
+codifix scores --project <slug>
+codifix scores --project <slug> --needs-review
 ```
 
 ## Volatility
@@ -34,7 +34,7 @@ Each scored memory tracks how often its source files change (an exponentially we
 
 ## Validation
 
-When activation crosses the configured threshold (or you run `memory validate <memory-id>` manually), the pipeline runs three stages:
+When activation crosses the configured threshold (or you run `codifix validate <memory-id>` manually), the pipeline runs three stages:
 
 1. **Evidence gathering** (deterministic, read-only): the memory's sources and their provenance status, related memories, previous validation runs, and recent git history touching its source paths.
 2. **Verdict**: the configured LLM judges the memory — `valid`, `partially_valid`, `outdated`, `ambiguous`, or `unsupported` — citing only evidence it was actually shown. A verdict that cites anything outside the gathered evidence is rejected outright.
@@ -83,7 +83,7 @@ Configuration lives in the [`[procedural]` section](/docs/reference/config-globa
 
 ## Rollout advice
 
-1. Leave scoring on and watch `memory scores` for a while — no cost, useful signal.
+1. Leave scoring on and watch `codifix scores` for a while — no cost, useful signal.
 2. Enable `validation_enabled` with dry-run on; check `codifix review list --all` to see what validation *would* do.
 3. Turn off dry-run once the verdicts look right.
 4. Enable `auto_apply_rewording` only when you trust the verdicts — corrections always stay human-gated regardless.

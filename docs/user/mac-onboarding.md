@@ -16,7 +16,7 @@ for the installed candidate and owner changes.
 
 From a selected repository, run `codifix tui`; its operator-owned routing chooses
 the corresponding local area. Outside a mapped repository, use
-`memory --area homelab tui` or `memory --area workshop tui`. An unavailable area
+`codifix --area homelab tui` or `codifix --area workshop tui`. An unavailable area
 does not redirect writes somewhere else.
 
 Use **Query** for normal local retrieval, or **More → Offline** for downloaded
@@ -86,7 +86,7 @@ unchanged and remains read-only.
 The local queue records curated additions transactionally. Accepted additions
 receive an owner receipt; changes to an existing owner stream become correction
 proposals, with version conflicts visible rather than overwritten. The client
-retains operation IDs across retries. `memory projects sync-status --profile
+retains operation IDs across retries. `codifix projects sync-status --profile
 <private-profile>` includes queued, accepted, proposed, conflict and blocked counts.
 Downloaded records stay in a separate read-only projection and never enter the
 upload trigger. Git commit, merge and push remain your normal Git workflow.
@@ -94,7 +94,7 @@ upload trigger. Git commit, merge and push remain your normal Git workflow.
 Inspect an owner's downloaded versions without following private source links:
 
 ```bash
-memory --area homelab history CANONICAL_UUID --subscription SUBSCRIPTION_UUID --json
+codifix --area homelab history CANONICAL_UUID --subscription SUBSCRIPTION_UUID --json
 ```
 
 Use `--after-version N --limit 16` for subsequent pages. The Web query/Offline
@@ -110,8 +110,8 @@ To propose a correction to an owner copy, inspect its downloaded version and
 digest, then use the correction form in its history view or the local CLI:
 
 ```bash
-memory --area homelab projects propose-correction --subscription SUBSCRIPTION_UUID --request correction.json
-memory --area homelab projects propose-correction --subscription SUBSCRIPTION_UUID --request correction.json --confirm
+codifix --area homelab projects propose-correction --subscription SUBSCRIPTION_UUID --request correction.json
+codifix --area homelab projects propose-correction --subscription SUBSCRIPTION_UUID --request correction.json --confirm
 ```
 
 The first command previews only. The request contains a stable `operation_id`,
@@ -253,7 +253,7 @@ agent identities now exist. Native Mac acceptance remains unfinished.
 
 ## Journaled workspace preparation in the development build
 
-After a reviewed device login, `memory projects available --company
+After a reviewed device login, `codifix projects available --company
 https://<company-origin>` lists the device's current project scope. The initial
 workspace commands require that approved Keychain credential; Linux tests use
 fake stores, not a production plaintext fallback. Native Mac execution is still
@@ -268,7 +268,7 @@ codifix auth login --company https://<company-origin> --name "My Mac"
 After browser approval, a TUI-enabled build can prepare one project interactively:
 
 ```bash
-memory projects select --company https://<company-origin> \
+codifix projects select --company https://<company-origin> \
   --workspace /Users/<you>/Projects/<repository> \
   --journal /Users/<you>/Projects/project-onboarding.json
 ```
@@ -287,15 +287,15 @@ revision, not the project slug. Both paths must be absolute, their parent
 directories must already exist, and the journal must be outside the repository:
 
 ```bash
-memory projects prepare --company https://<company-origin> \
+codifix projects prepare --company https://<company-origin> \
   --area workshop --owner-instance <instance-uuid> \
   --project <project-uuid> --revision <reviewed-revision> \
   --workspace /Users/<you>/Projects/<repository> \
   --journal /Users/<you>/Projects/project-onboarding.json
-memory projects apply --company https://<company-origin> \
+codifix projects apply --company https://<company-origin> \
   --journal /Users/<you>/Projects/project-onboarding.json \
   --plan-sha256 <exact-digest-from-preview> --confirm
-memory projects status --journal /Users/<you>/Projects/project-onboarding.json
+codifix projects status --journal /Users/<you>/Projects/project-onboarding.json
 ```
 
 Prepare writes only a metadata journal containing immutable manifest/template
@@ -369,10 +369,10 @@ complete repository commitment.
 For a provisioned development laptop with a reviewed private replica profile:
 
 ```bash
-memory projects sync --profile /Users/<you>/.config/codifix/subscriptions/<project>.json
-memory projects sync --profile /Users/<you>/.config/codifix/subscriptions/<project>.json --watch
-memory projects sync-status --profile /Users/<you>/.config/codifix/subscriptions/<project>.json
-memory projects offline-search --profile /Users/<you>/.config/codifix/subscriptions/<project>.json \
+codifix projects sync --profile /Users/<you>/.config/codifix/subscriptions/<project>.json
+codifix projects sync --profile /Users/<you>/.config/codifix/subscriptions/<project>.json --watch
+codifix projects sync-status --profile /Users/<you>/.config/codifix/subscriptions/<project>.json
+codifix projects offline-search --profile /Users/<you>/.config/codifix/subscriptions/<project>.json \
   --question "What is the approved procedure?" --limit 8
 ```
 
@@ -418,11 +418,11 @@ must already be private (0700); the output is create-only (0600), never a device
 credential or a server database connection:
 
 ```bash
-memory projects subscription --company https://<company-origin> \
+codifix projects subscription --company https://<company-origin> \
   --area workshop --owner-instance <instance-uuid> \
   --project <project-uuid> --revision <reviewed-revision> \
   --output /Users/<you>/.config/codifix/subscription.json
-memory projects subscription --company https://<company-origin> \
+codifix projects subscription --company https://<company-origin> \
   --area workshop --owner-instance <instance-uuid> \
   --project <project-uuid> --revision <reviewed-revision> \
   --output /Users/<you>/.config/codifix/subscription.json \
@@ -510,10 +510,10 @@ remote authorization or successful native Mac acceptance.
 Manual preparation/inspection uses the same implementation:
 
 ```bash
-memory projects agents prepare --company https://<company-origin> \
+codifix projects agents prepare --company https://<company-origin> \
   --caller codex --workspace-journal /ABS/PRIVATE/project-onboarding.json --open-browser
-memory projects agents status --company https://<company-origin> --agent-id AGENT_UUID
-memory projects agents configure --company https://<company-origin> \
+codifix projects agents status --company https://<company-origin> --agent-id AGENT_UUID
+codifix projects agents configure --company https://<company-origin> \
   --agent-id AGENT_UUID --profile /ABS/PRIVATE/installation/profiles/SUBSCRIPTION_UUID.json \
   --workspace-journal /ABS/PRIVATE/project-onboarding.json
 ```

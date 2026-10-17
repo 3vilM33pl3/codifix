@@ -62,7 +62,7 @@ codifix auth whoami
 python3 scripts/check-codex-plugin.py
 ```
 
-- **`memory` not found:** install Codifix so the Codex process can find it on `PATH`.
+- **`codifix` not found:** install Codifix so the Codex process can find it on `PATH`.
 - **Service unavailable:** start or repair the local service, then rerun MCP status.
 - **Authentication failed:** refresh the scoped token, restart Codex, and check `codifix auth whoami`. The plugin explicitly passes `CODIFIX_CLIENT_TOKEN` to the MCP process because Codex filters ordinary child-process variables whose names contain `TOKEN`.
 - **Wrong project:** open an initialized repository or pass the intended project to the relevant tool call.

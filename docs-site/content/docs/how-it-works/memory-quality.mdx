@@ -44,7 +44,7 @@ Nothing destructive happens to accepted knowledge. Replacements, corrections, an
 
 Memories cite their evidence: files, symbols, commits, prompts. A background verifier re-checks that cited files still exist and cited symbols still appear in the code graph. Verification never deletes anything — a memory whose evidence went missing is *down-ranked* at query time and surfaced with a diagnostic, and the rate of change in a memory's source files feeds its volatility, which schedules it for earlier re-validation.
 
-**Read more:** [`memory verify-provenance`](/docs/reference/cli/query-briefings#memory-verify-provenance) · [Retrieval and search](/docs/how-it-works/retrieval-search)
+**Read more:** [`codifix verify-provenance`](/docs/reference/cli/query-briefings#codifix-verify-provenance) · [Retrieval and search](/docs/how-it-works/retrieval-search)
 
 ## Maintenance
 
@@ -52,13 +52,13 @@ Memories cite their evidence: files, symbols, commits, prompts. A background ver
 
 Every memory earns an activation score from real usage: being cited in a synthesized answer counts most, appearing in results counts, direct reads count a little. Scores decay exponentially between accesses and spread to related memories with fan normalization, following the ACT-R activation model from cognitive science. Activation gives ranking a tie-breaking usage signal and tells the validation pipeline which memories are hot enough to be worth re-checking.
 
-**Read more:** [Self-maintaining memory](/docs/how-it-works/reinforcement) · [`memory scores`](/docs/reference/cli/reinforcement)
+**Read more:** [Self-maintaining memory](/docs/how-it-works/reinforcement) · [`codifix scores`](/docs/reference/cli/reinforcement)
 
 ### Evidence-backed validation
 
 When a hot memory crosses the activation threshold, the pipeline gathers deterministic evidence — sources, provenance status, related memories, recent git history — and asks an LLM for a verdict under strict rules: it may cite only evidence it was shown, and any verdict citing anything else is rejected outright. The cardinal rule is that **weak or contradictory evidence never edits content**: corrections are always human-gated, and ambiguous verdicts only flag the memory `needs review`, which rank-penalizes it until a person resolves it.
 
-**Read more:** [Validation](/docs/how-it-works/reinforcement#validation) · [`memory validate` and `codifix review`](/docs/reference/cli/reinforcement) · [TUI review queue](/docs/tui/review)
+**Read more:** [Validation](/docs/how-it-works/reinforcement#validation) · [`codifix validate` and `codifix review`](/docs/reference/cli/reinforcement) · [TUI review queue](/docs/tui/review)
 
 ### Hygiene automations
 

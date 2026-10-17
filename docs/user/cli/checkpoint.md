@@ -1,15 +1,15 @@
-# `memory checkpoint`
+# `codifix checkpoint`
 
-`memory checkpoint` manages saved project checkpoints, approved-plan execution, and direct no-plan task starts.
+`codifix checkpoint` manages saved project checkpoints, approved-plan execution, and direct no-plan task starts.
 
 ## Subcommands
 
 ### Save
 
 ```bash
-memory checkpoint save --project memory
-memory checkpoint save --project memory --note "Waiting on review"
-memory checkpoint save --project memory --dry-run
+codifix checkpoint save --project memory
+codifix checkpoint save --project memory --note "Waiting on review"
+codifix checkpoint save --project memory --dry-run
 ```
 
 Saves a local checkpoint for later resume use.
@@ -17,7 +17,7 @@ Saves a local checkpoint for later resume use.
 ### Show
 
 ```bash
-memory checkpoint show --project memory
+codifix checkpoint show --project memory
 ```
 
 Shows the currently saved checkpoint for a project.
@@ -25,8 +25,8 @@ Shows the currently saved checkpoint for a project.
 ### Start Execution
 
 ```bash
-memory checkpoint start-execution --project memory --plan-file /tmp/plan.md
-memory checkpoint start-execution --project memory --plan-stdin --thread-key task-123
+codifix checkpoint start-execution --project memory --plan-file /tmp/plan.md
+codifix checkpoint start-execution --project memory --plan-stdin --thread-key task-123
 ```
 
 Saves the checkpoint and stores the approved plan as a `plan` memory. The plan must contain Markdown checkbox items.
@@ -34,12 +34,12 @@ Saves the checkpoint and stores the approved plan as a `plan` memory. The plan m
 ### Start Task
 
 ```bash
-memory checkpoint start-task \
+codifix checkpoint start-task \
   --project memory \
   --title "Fix query input" \
   --prompt "The query input field should activate with Enter and keep query history."
 
-memory checkpoint start-task \
+codifix checkpoint start-task \
   --project memory \
   --title "Update README" \
   --prompt "Highlight the benchmark report" \
@@ -58,10 +58,10 @@ After the direct task is complete, use `codifix remember --type implementation`,
 ### Finish Execution
 
 ```bash
-memory checkpoint finish-execution --project memory
-memory checkpoint finish-execution --project memory --plan-file /tmp/plan.md --json
-memory checkpoint finish-execution --project memory --implementation-summary "Implemented the watcher manager footer refresh"
-memory checkpoint finish-execution --project memory --dry-run
+codifix checkpoint finish-execution --project memory
+codifix checkpoint finish-execution --project memory --plan-file /tmp/plan.md --json
+codifix checkpoint finish-execution --project memory --implementation-summary "Implemented the watcher manager footer refresh"
+codifix checkpoint finish-execution --project memory --dry-run
 ```
 
 Verifies that every checkbox item in the active approved plan is complete before the work is presented as finished.

@@ -1,15 +1,15 @@
-# `memory verify-provenance`
+# `codifix verify-provenance`
 
-`memory verify-provenance` checks whether memory source citations still point at files in the repository.
+`codifix verify-provenance` checks whether memory source citations still point at files in the repository.
 
 Use it after refactors, file moves, deletes, or cleanup work. It does not mutate memory text; it records verification metadata for source rows unless `--dry-run` is passed.
 
 ## Common Usage
 
 ```bash
-memory verify-provenance --project memory --dry-run --json
-memory verify-provenance --project memory --repo-root . --json
-memory verify-provenance --project memory
+codifix verify-provenance --project memory --dry-run --json
+codifix verify-provenance --project memory --repo-root . --json
+codifix verify-provenance --project memory
 ```
 
 ## Useful Flags

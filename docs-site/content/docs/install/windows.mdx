@@ -23,14 +23,14 @@ Windows ARM64 is not a release target yet.
 Download the MSI and matching checksum from the
 [v2.1.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0),
 verify it, and run the installer. The per-user installer places
-`memory.exe`, the bundled web UI, skill templates, README, example config, and
+`codifix.exe`, the bundled web UI, skill templates, README, example config, and
 PowerShell completion under `%LOCALAPPDATA%\Programs\Codifix`, then adds
 its `bin` directory to the user `PATH`.
 
 After installing:
 
 ```powershell
-memory --version
+codifix --version
 codifix wizard --global
 codifix doctor
 codifix health
@@ -47,7 +47,7 @@ Use the ZIP when you want to inspect or run the binary without installing the
 MSI. Extract the archive, add its directory to `PATH`, then run:
 
 ```powershell
-memory --version
+codifix --version
 codifix doctor
 ```
 
@@ -57,7 +57,7 @@ The bundled Compose stack runs under [Docker Desktop](https://docs.docker.com/de
 
 ```powershell
 git clone https://github.com/3vilM33pl3/codifix
-cd memory
+cd codifix
 docker compose up
 ```
 
@@ -66,7 +66,7 @@ UI at [http://localhost:4040](http://localhost:4040). Load the showcase project
 from inside the container:
 
 ```powershell
-docker compose exec memory codifix demo
+docker compose exec codifix codifix demo
 ```
 
 ## WSL2

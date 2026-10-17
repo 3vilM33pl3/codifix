@@ -1,6 +1,6 @@
 # Project onboarding and synchronization
 
-`memory projects` manages company-authorized laptop projects. Use the full native
+`codifix projects` manages company-authorized laptop projects. Use the full native
 package for synchronization; lean builds report the missing capability explicitly.
 The complete native Mac installation still requires real-Mac acceptance.
 

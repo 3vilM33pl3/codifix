@@ -10,8 +10,8 @@ An Obsidian vault is already what Codifix wants: a folder of Markdown files, eac
 ## Ingest the vault
 
 ```bash
-memory ingest ~/Documents/vault --project vault --tag obsidian --dry-run   # review first
-memory ingest ~/Documents/vault --project vault --tag obsidian
+codifix ingest ~/Documents/vault --project vault --tag obsidian --dry-run   # review first
+codifix ingest ~/Documents/vault --project vault --tag obsidian
 ```
 
 Each note becomes a memory: its first heading as the summary, an excerpt as the canonical text, and the file as verifiable provenance. Files over 256 KB, hidden folders, and non-Markdown attachments are skipped automatically.
@@ -26,11 +26,11 @@ Answers cite the exact notes they draw from — and when your vault doesn't cont
 
 ## Keep it synced
 
-Re-running `memory ingest` on an unchanged vault re-observes rather than duplicates (re-observation raises confidence). A daily cron keeps it fresh:
+Re-running `codifix ingest` on an unchanged vault re-observes rather than duplicates (re-observation raises confidence). A daily cron keeps it fresh:
 
 ```bash
 # crontab -e
-0 7 * * * memory ingest ~/Documents/vault --project vault --tag obsidian
+0 7 * * * codifix ingest ~/Documents/vault --project vault --tag obsidian
 ```
 
 Edited notes arrive as new candidates; curation's replacement engine supersedes the old version or queues a reviewable proposal, so your query results track the vault instead of its history.

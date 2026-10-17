@@ -1,15 +1,15 @@
-# `memory prune-history`
+# `codifix prune-history`
 
-`memory prune-history` permanently removes old memory versions according to retention thresholds.
+`codifix prune-history` permanently removes old memory versions according to retention thresholds.
 
 Use it only after previewing the effect. This command can delete tombstoned canonical rows and superseded non-latest versions.
 
 ## Common Usage
 
 ```bash
-memory prune-history --project memory --dry-run --json
-memory prune-history --project memory --tombstone-after 90d --superseded-after 180d --dry-run
-memory prune-history --project memory --tombstone-after 90d --superseded-after 180d
+codifix prune-history --project memory --dry-run --json
+codifix prune-history --project memory --tombstone-after 90d --superseded-after 180d --dry-run
+codifix prune-history --project memory --tombstone-after 90d --superseded-after 180d
 ```
 
 ## Options

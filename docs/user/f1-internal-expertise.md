@@ -7,7 +7,7 @@ local. Start with deterministic excerpts; no model account is required.
 
 ## Installation checklist for a separately approved activation
 
-1. Provision one Memory instance/database for `homelab` and one for `memory`,
+1. Provision one Codifix instance/database for `homelab` and one for `memory`,
    plus a dedicated company-space gateway database and private PDS. Use separate
    runtime credentials. Follow the [gateway topology](../../deploy/federation/README.md),
    [runtime configuration](federation-runtime.md) and

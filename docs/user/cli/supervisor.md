@@ -13,9 +13,9 @@ When the operator configures `[supervisor.interaction]` with a private, hash-bou
 Workshop work manifest, its saved result is available in the exact project:
 
 ```sh
-memory supervisor proposals --project memory
-memory supervisor result --project memory --action ACTION_UUID
-memory supervisor review --project memory --action ACTION_UUID --digest RESULT_SHA256 --request-id NEW_UUID --decision approve
+codifix supervisor proposals --project memory
+codifix supervisor result --project memory --action ACTION_UUID
+codifix supervisor review --project memory --action ACTION_UUID --digest RESULT_SHA256 --request-id NEW_UUID --decision approve
 ```
 
 The review command previews the exact terms. Repeat with `--confirm` only after
@@ -51,7 +51,7 @@ the panel does not deploy or enable a paid question worker.
 Prepare one question, using a fresh non-nil UUID for this new request:
 
 ```sh
-memory supervisor ask --project memory --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID
+codifix supervisor ask --project memory --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID
 ```
 
 The preparation displays the **exact question**, OpenAI destination,
@@ -60,11 +60,11 @@ It does not invoke a model or enqueue work. Inspect these terms, then copy both
 hashes into the confirmation with the **same question and request UUID**:
 
 ```sh
-memory supervisor ask --project memory --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID --profile-digest PROFILE_SHA256 --request-digest REQUEST_SHA256 --confirm
-memory supervisor question --project memory --request-id REQUEST_UUID
-memory supervisor questions --project memory
+codifix supervisor ask --project memory --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID --profile-digest PROFILE_SHA256 --request-digest REQUEST_SHA256 --confirm
+codifix supervisor question --project memory --request-id REQUEST_UUID
+codifix supervisor questions --project memory
 # Optional bounded pagination:
-memory supervisor questions --project memory --after LAST_REQUEST_UUID
+codifix supervisor questions --project memory --after LAST_REQUEST_UUID
 ```
 
 Confirmation does not silently prepare replacement terms. A changed profile,
@@ -80,7 +80,7 @@ policy. Exhaustion does not authorize increasing limits or selecting another
 model. Model suggestions are untrusted text, not executable instructions.
 
 Poll status explicitly. When `proposal_available` is true, use its `action_id`
-with `memory supervisor result` above. Status listings are requester-private
+with `codifix supervisor result` above. Status listings are requester-private
 metadata, not question bodies. After an ambiguous submission, retain the same
 UUID, question and hashes: inspect status or repeat the exact confirmed command.
 This only reconciles the original request; it does not authorize another provider
@@ -147,14 +147,14 @@ policy or a successful enqueue is not evidence that this worker is running.
 
 ## Operational metadata
 
-`memory supervisor` reads this installation's metadata-only policy, budget and
+`codifix supervisor` reads this installation's metadata-only policy, budget and
 ordered history. It requires **global `memory_read`**; a project administrator
 cannot inspect other projects' instance-wide supervisor activity.
 
 ```sh
-memory supervisor
-memory supervisor --json
-memory supervisor --after 123 --limit 50
+codifix supervisor
+codifix supervisor --json
+codifix supervisor --after 123 --limit 50
 ```
 
 The service uses an explicitly configured durable identity:
@@ -206,11 +206,11 @@ the exact instance, policy and request ID. TUI uses `p` / `e` to prepare and
 `Enter` to confirm; `c` closes and refreshes without undoing a sent request.
 
 ```sh
-memory supervisor --json
-memory supervisor pause --instance INSTANCE_UUID --policy POLICY_UUID --request-id NEW_REQUEST_UUID
+codifix supervisor --json
+codifix supervisor pause --instance INSTANCE_UUID --policy POLICY_UUID --request-id NEW_REQUEST_UUID
 # Review the preview, then repeat the identical command with --confirm.
-memory supervisor pause --instance INSTANCE_UUID --policy POLICY_UUID --request-id NEW_REQUEST_UUID --confirm
-memory supervisor
+codifix supervisor pause --instance INSTANCE_UUID --policy POLICY_UUID --request-id NEW_REQUEST_UUID --confirm
+codifix supervisor
 ```
 
 Replace `pause` with `resume` only after inspecting a currently paused policy.

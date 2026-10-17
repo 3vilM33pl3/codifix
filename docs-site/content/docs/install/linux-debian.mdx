@@ -49,14 +49,14 @@ and rerun the package install.
 ## Verify
 
 ```bash
-memory --version
+codifix --version
 systemctl status codifix.service
 codifix status --project <project-slug>
 ```
 
 ## Troubleshooting
 
-- `memory command not found`: open a new shell or check the package install path.
+- `codifix command not found`: open a new shell or check the package install path.
 - `connection refused`: verify the service is running and the configured port matches.
 - `extension "vector" is not available`: install the pgvector package for your PostgreSQL major version.
 

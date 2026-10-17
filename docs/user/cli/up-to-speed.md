@@ -1,15 +1,15 @@
-# `memory up-to-speed`
+# `codifix up-to-speed`
 
-`memory up-to-speed` creates a short briefing for a new or returning agent so it can start productive work without manually reading the full memory database.
+`codifix up-to-speed` creates a short briefing for a new or returning agent so it can start productive work without manually reading the full memory database.
 
 It is broader than `codifix resume`: resume is checkpoint-oriented, while up-to-speed is activity-oriented. It uses persisted activities, recent memory changes, useful durable memories, commits, warnings, and token-count summaries.
 
 ## Common Usage
 
 ```bash
-memory up-to-speed --project memory
-memory up-to-speed --project memory --text
-memory up-to-speed --project memory --llm
+codifix up-to-speed --project memory
+codifix up-to-speed --project memory --text
+codifix up-to-speed --project memory --llm
 ```
 
 JSON is the default for agent workflows. Use `--text` for a concise human-readable briefing.

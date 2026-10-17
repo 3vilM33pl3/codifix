@@ -17,7 +17,7 @@ before upgrading a production installation.
 Stop if either diagnostic already reports a database or authentication problem:
 
 ```bash
-memory --version
+codifix --version
 codifix status --project <project-slug>
 codifix doctor
 codifix health
@@ -121,7 +121,7 @@ codifix upgrade
 ## 5. Verify integrations
 
 ```bash
-memory --version
+codifix --version
 codifix query --project <project-slug> --question "What changed recently?"
 codifix resume --project <project-slug>
 codifix watcher status --project <project-slug>

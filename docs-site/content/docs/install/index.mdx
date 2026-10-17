@@ -16,7 +16,11 @@ The installer detects your platform, checks whether PostgreSQL is reachable, and
 The current stable release is
 [v2.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0). If you are
 upgrading from v1, stop here and use the [Update guide](/docs/install/update)
-before restarting the service.
+before restarting the service. The published v2.1.0 distribution remains the
+stable release. This source tree is preparing the breaking v3.0.0-rc.1 rename:
+its executable is `codifix`, while v2.1.0 installs `memory`. The candidate is not
+published and must not be treated as a stable package or upgrade. See the
+[RC.1 preparation note](https://github.com/3vilM33pl3/codifix/blob/main/docs/releases/3.0.0-rc.1.md).
 
 ## Choose a platform
 
@@ -42,7 +46,8 @@ You need a PostgreSQL database with the pgvector extension enabled. See [Postgre
 |---|---|---|
 | PostgreSQL | Durable storage for projects, captures, memories, activity, and history. | `psql "$DATABASE_URL" -c "SELECT 1;"` |
 | pgvector | Vector storage for semantic retrieval. | `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"` |
-| `codifix` binary | CLI, TUI launcher, service management, MCP, evals. | `memory --version` (current release: `2.1.0`) |
+| Stable v2.1.0 binary | CLI, TUI launcher, service management, MCP, evals. | `memory --version` (current release: `2.1.0`) |
+| v3.0.0-rc.1 source candidate | Renamed CLI and service tooling. | `codifix --version` (unpublished candidate) |
 | Optional LLM provider | Better curation, summaries, and answer synthesis. | `codifix doctor` |
 | Optional embedding provider | Semantic search and graph-enhanced retrieval quality. | `codifix embeddings list` |
 

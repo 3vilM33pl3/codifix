@@ -9,30 +9,30 @@ These commands operate the [self-maintaining memory](/docs/how-it-works/reinforc
 
 | Command | Writes | Purpose |
 |---|---:|---|
-| `memory scores` | No | Show activation scores, volatility, and review flags for a project. |
-| `memory validate` | Yes | Run evidence-backed validation for one memory (LLM call). |
+| `codifix scores` | No | Show activation scores, volatility, and review flags for a project. |
+| `codifix validate` | Yes | Run evidence-backed validation for one memory (LLM call). |
 | `codifix review` | Yes | List, apply, or reject corrections proposed by validation. |
 
-## `memory scores`
+## `codifix scores`
 
 Read-only view of how strongly each memory has been used recently, with time decay applied.
 
 ```bash
-memory scores --project memory
-memory scores --project memory --needs-review
-memory scores --project memory --limit 50 --json
+codifix scores --project memory
+codifix scores --project memory --needs-review
+codifix scores --project memory --limit 50 --json
 ```
 
 Columns worth knowing: `ACTIVATION` is the decay-corrected score (crossing the configured threshold makes the memory due for validation), `VOLAT` is the observed change rate of the memory's source files, and memories flagged by validation show `[NEEDS REVIEW]` and rank lower in query results until resolved.
 
-## `memory validate`
+## `codifix validate`
 
 Triggers the validation pipeline for one memory: gather evidence (sources, provenance, related memories, recent git history), get an LLM verdict, apply the configured policy. Manual runs bypass the activation threshold but respect the global daily budget.
 
 ```bash
-memory validate <memory-id>            # uses the configured dry-run default
-memory validate <memory-id> --dry-run  # report only, never changes anything
-memory validate <memory-id> --execute  # allow policy actions to apply
+codifix validate <memory-id>            # uses the configured dry-run default
+codifix validate <memory-id> --dry-run  # report only, never changes anything
+codifix validate <memory-id> --execute  # allow policy actions to apply
 ```
 
 Outcomes: `revalidated` (accurate and clear), `reworded` (wording improved as a new version — only with auto-apply enabled), `correction_pending` (proposal queued for review), or `flagged_needs_review` (weak or contradictory evidence; content never modified). Dry runs report the same outcomes as `would_*` actions.

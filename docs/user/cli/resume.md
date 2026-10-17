@@ -7,19 +7,19 @@ Use `resume` when you return to a project after an interruption and want a fast 
 Save a checkpoint before leaving:
 
 ```bash
-memory checkpoint save --project my-project --note "Waiting on agent review"
+codifix checkpoint save --project my-project --note "Waiting on agent review"
 ```
 
 Preview the checkpoint payload and storage path without saving it:
 
 ```bash
-memory checkpoint save --project my-project --note "Waiting on agent review" --dry-run
+codifix checkpoint save --project my-project --note "Waiting on agent review" --dry-run
 ```
 
 For agent-driven workflows, a good checkpoint moment is right after a planning session ends and execution is approved:
 
 ```bash
-memory checkpoint start-execution \
+codifix checkpoint start-execution \
   --project my-project \
   --plan-file /tmp/approved-plan.md
 ```
@@ -27,7 +27,7 @@ memory checkpoint start-execution \
 Preview the checkpoint, plan capture, and curate actions without persisting them:
 
 ```bash
-memory checkpoint start-execution \
+codifix checkpoint start-execution \
   --project my-project \
   --plan-file /tmp/approved-plan.md \
   --dry-run
@@ -46,19 +46,19 @@ Use Markdown checkbox items in the approved plan:
 Before plan-backed work is treated as finished, verify the active approved plan:
 
 ```bash
-memory checkpoint finish-execution --project my-project
+codifix checkpoint finish-execution --project my-project
 ```
 
 Check whether the active plan would verify cleanly without syncing or logging anything:
 
 ```bash
-memory checkpoint finish-execution --project my-project --dry-run
+codifix checkpoint finish-execution --project my-project --dry-run
 ```
 
 If the plan changed during execution, sync the updated checkbox state and verify in one step:
 
 ```bash
-memory checkpoint finish-execution \
+codifix checkpoint finish-execution \
   --project my-project \
   --plan-file /tmp/approved-plan.md
 ```
@@ -66,7 +66,7 @@ memory checkpoint finish-execution \
 Show the current checkpoint:
 
 ```bash
-memory checkpoint show --project my-project
+codifix checkpoint show --project my-project
 ```
 
 Generate a resume briefing:

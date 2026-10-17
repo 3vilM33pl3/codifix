@@ -65,10 +65,10 @@ codifix watcher enable --project my-project
 On Windows, manual tasks also support operator-owned area routing:
 
 ```powershell
-memory --area homelab watcher enable --project my-project --dry-run
-memory --area homelab watcher enable --project my-project
-memory --area homelab watcher status --project my-project
-memory --area homelab watcher disable --project my-project
+codifix --area homelab watcher enable --project my-project --dry-run
+codifix --area homelab watcher enable --project my-project
+codifix --area homelab watcher status --project my-project
+codifix --area homelab watcher disable --project my-project
 ```
 
 The task retains the selected configuration and routing policy. Its identity

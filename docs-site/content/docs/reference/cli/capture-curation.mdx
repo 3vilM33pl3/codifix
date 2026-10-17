@@ -12,15 +12,15 @@ These commands write or modify memory state. Use `--dry-run` where available, ke
 | `codifix remember` | Yes | Capture and curate completed work into memory. |
 | `codifix capture` | Yes | Store structured raw task context from a file. |
 | `codifix scan` | Yes | Scan a repo for candidate durable memories. |
-| `memory ingest` | Yes | Import documents from a directory, with or without a Git repository. |
+| `codifix ingest` | Yes | Import documents from a directory, with or without a Git repository. |
 | `codifix curate` | Yes | Convert raw captures into canonical memories. |
 | `codifix proposals` | Yes | Review, approve, or reject memory replacement proposals. |
 | `codifix consolidate` | Mixed | Find related memories and prepare higher-level insight proposals. |
 | `codifix structure` | No | Inspect the insight tree and discovered consolidation groups. |
 | `codifix review` | Mixed | Review validation corrections proposed for existing memories. |
-| `memory archive` | Yes | Archive low-signal memories by confidence and importance. |
-| `memory prune-history` | Yes | Prune old versions and tombstoned canonicals. |
-| `memory checkpoint` | Yes | Save, inspect, and verify execution checkpoints. |
+| `codifix archive` | Yes | Archive low-signal memories by confidence and importance. |
+| `codifix prune-history` | Yes | Prune old versions and tombstoned canonicals. |
+| `codifix checkpoint` | Yes | Save, inspect, and verify execution checkpoints. |
 
 ## `codifix remember`
 
@@ -61,13 +61,13 @@ codifix scan --project memory --dry-run --json
 
 Scan is useful for onboarding an existing repository, but it is not a replacement for human review. Prefer smaller scans when investigating a subsystem.
 
-## `memory ingest`
+## `codifix ingest`
 
 Ingest is the document-first counterpart to repository scanning. It works when the source is a folder of notes, exported documents, or other material that does not need Git metadata.
 
 ```bash
-memory ingest ./research --project memory --dry-run
-memory ingest ./research --project memory
+codifix ingest ./research --project memory --dry-run
+codifix ingest ./research --project memory
 ```
 
 ## `codifix proposals`
@@ -98,27 +98,27 @@ codifix structure --project memory               # insight tree + discovered gro
 
 `codifix structure` is the read-only view of the result: the committed insight tree (`summarizes` relations, recursive across tiers) plus the clusters a scan would currently propose. Requires the `memory_consolidation` loop to be enabled for non-dry runs.
 
-## `memory archive` and `memory prune-history`
+## `codifix archive` and `codifix prune-history`
 
 Archive hides low-signal memories without deleting their audit trail. Prune removes old versions and tombstones according to retention rules.
 
 ```bash
-memory archive --project memory --dry-run
-memory archive --project memory --max-confidence 0.2 --dry-run
-memory prune-history --project memory --tombstone-after 90d --superseded-after 180d --dry-run
+codifix archive --project memory --dry-run
+codifix archive --project memory --max-confidence 0.2 --dry-run
+codifix prune-history --project memory --tombstone-after 90d --superseded-after 180d --dry-run
 ```
 
 Run dry-runs first and keep backups before aggressive cleanup.
 
-## `memory checkpoint`
+## `codifix checkpoint`
 
 Checkpoint tracks plan execution and interruption recovery.
 
 ```bash
-memory checkpoint start-execution --project memory --plan-file approved-plan.md
-memory checkpoint show --project memory
-memory checkpoint finish-execution --project memory
-memory checkpoint finish-execution --project memory --plan-file approved-plan.md --json
+codifix checkpoint start-execution --project memory --plan-file approved-plan.md
+codifix checkpoint show --project memory
+codifix checkpoint finish-execution --project memory
+codifix checkpoint finish-execution --project memory --plan-file approved-plan.md --json
 ```
 
 Use it for plan-backed work so future agents can see what started, what remains, and whether the implementation was verified.

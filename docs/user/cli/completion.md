@@ -1,6 +1,6 @@
 # Shell Completion
 
-Use `codifix completion` to generate shell completion scripts from the same command metadata that powers `memory --help`.
+Use `codifix completion` to generate shell completion scripts from the same command metadata that powers `codifix --help`.
 
 Supported shells:
 
@@ -14,10 +14,10 @@ codifix completion fish
 
 Normal package installs generate completion files automatically:
 
-- Debian package: `/usr/share/bash-completion/completions/memory`, `/usr/share/zsh/vendor-completions/_memory`, `/usr/share/fish/vendor_completions.d/memory.fish`
-- macOS `.pkg`: `/usr/local/share/bash-completion/completions/memory`, `/usr/local/share/zsh/site-functions/_memory`, `/usr/local/share/fish/vendor_completions.d/memory.fish`
+- Debian package: `/usr/share/bash-completion/completions/codifix`, `/usr/share/zsh/vendor-completions/_codifix`, `/usr/share/fish/vendor_completions.d/codifix.fish`
+- macOS `.pkg`: `/usr/local/share/bash-completion/completions/codifix`, `/usr/local/share/zsh/site-functions/_codifix`, `/usr/local/share/fish/vendor_completions.d/codifix.fish`
 - Homebrew: Homebrew's standard bash, zsh, and fish completion directories
-- Local install script: `${XDG_DATA_HOME:-~/.local/share}/bash-completion/completions/memory`, `${XDG_DATA_HOME:-~/.local/share}/zsh/site-functions/_memory`, `${XDG_DATA_HOME:-~/.local/share}/fish/vendor_completions.d/memory.fish`
+- Local install script: `${XDG_DATA_HOME:-~/.local/share}/bash-completion/completions/codifix`, `${XDG_DATA_HOME:-~/.local/share}/zsh/site-functions/_codifix`, `${XDG_DATA_HOME:-~/.local/share}/fish/vendor_completions.d/codifix.fish`
 
 After installing, open a new shell. Bash and fish usually discover these locations automatically when completion support is enabled. For zsh, make sure the installed directory is in `fpath` before `compinit`.
 
@@ -29,7 +29,7 @@ Bash:
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions
-codifix completion bash > ~/.local/share/bash-completion/completions/memory
+codifix completion bash > ~/.local/share/bash-completion/completions/codifix
 ```
 
 For the current bash session only:
@@ -42,7 +42,7 @@ Zsh:
 
 ```bash
 mkdir -p ~/.zfunc
-codifix completion zsh > ~/.zfunc/_memory
+codifix completion zsh > ~/.zfunc/_codifix
 ```
 
 Add this before `compinit` in `~/.zshrc` if `~/.zfunc` is not already in `fpath`:
@@ -57,7 +57,7 @@ Fish:
 
 ```fish
 mkdir -p ~/.config/fish/completions
-codifix completion fish > ~/.config/fish/completions/memory.fish
+codifix completion fish > ~/.config/fish/completions/codifix.fish
 ```
 
 ## Development Builds

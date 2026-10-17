@@ -1,13 +1,13 @@
-# `memory archive`
+# `codifix archive`
 
-`memory archive` archives low-confidence, low-importance memories in a project.
+`codifix archive` archives low-confidence, low-importance memories in a project.
 
 ## Common Usage
 
 ```bash
-memory archive --project memory
-memory archive --project memory --max-confidence 0.2 --max-importance 1
-memory archive --project memory --dry-run
+codifix archive --project memory
+codifix archive --project memory --max-confidence 0.2 --max-importance 1
+codifix archive --project memory --dry-run
 ```
 
 ## Notes

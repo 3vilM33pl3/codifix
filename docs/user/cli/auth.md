@@ -82,7 +82,7 @@ Select the intended instance's private client configuration, verify its URL and
 rely on the development default configuration for installation. First preview:
 
 ```sh
-memory --config /private/selected-instance/client.toml auth expertise-answerer \
+codifix --config /private/selected-instance/client.toml auth expertise-answerer \
   --request-id <stable-request-uuid> --principal <new-principal-uuid> \
   --project homelab --name 'Homelab deterministic answerer'
 ```
@@ -137,7 +137,7 @@ flow:
 
 ```bash
 codifix auth login --company https://YOUR-COMPANY-MEMORY-ORIGIN --name "My Mac"
-memory projects available --company https://YOUR-COMPANY-MEMORY-ORIGIN
+codifix projects available --company https://YOUR-COMPANY-MEMORY-ORIGIN
 codifix auth logout --company https://YOUR-COMPANY-MEMORY-ORIGIN
 ```
 

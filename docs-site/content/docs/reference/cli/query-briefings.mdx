@@ -11,10 +11,10 @@ These commands are the read path agents should use before making project-specifi
 |---|---:|---|
 | `codifix query` | Audit only | Ask a project-specific question against curated memory. |
 | `codifix resume` | Audit only | Generate a briefing for returning to interrupted work. |
-| `memory up-to-speed` | Audit only | Generate a broader new-agent project briefing. |
+| `codifix up-to-speed` | Audit only | Generate a broader new-agent project briefing. |
 | `codifix activities` | No | List persisted project activity events. |
 | `codifix history` | No | Show memory version history, including tombstones. |
-| `memory verify-provenance` | No | Check memory source evidence against the filesystem. |
+| `codifix verify-provenance` | No | Check memory source evidence against the filesystem. |
 
 ## `codifix query`
 
@@ -41,13 +41,13 @@ codifix resume --project memory --limit 20
 
 It combines recent activity, changed memories, warnings, next actions, and checkpoint context when available.
 
-## `memory up-to-speed`
+## `codifix up-to-speed`
 
 Use this for a new agent or a wider handoff.
 
 ```bash
-memory up-to-speed --project memory
-memory up-to-speed --project memory --llm
+codifix up-to-speed --project memory
+codifix up-to-speed --project memory --llm
 ```
 
 It is broader than `resume` and should be run at task start when the agent lacks project continuity.
@@ -74,14 +74,14 @@ codifix history <memory-id> --json
 
 Use it when a remembered fact seems stale, replaced, or tombstoned.
 
-## `memory verify-provenance`
+## `codifix verify-provenance`
 
 Verify provenance before relying on a memory that cites files or directories.
 
 ```bash
-memory verify-provenance --project memory
-memory verify-provenance --project memory --json
-memory verify-provenance --project memory --dry-run --json
+codifix verify-provenance --project memory
+codifix verify-provenance --project memory --json
+codifix verify-provenance --project memory --dry-run --json
 ```
 
 This does not prove a memory is semantically correct, but it catches missing, moved, or changed source evidence.

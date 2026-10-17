@@ -296,7 +296,7 @@ psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 've
 codifix wizard --global
 ```
 
-This is where you set the shared database URL and explicitly provision the shared service API token. The Debian installation hook does not generate or rotate a token. For a manually configured system service, use `sudo memory --config /etc/codifix/codifix.toml service ensure-api-token --json` after reviewing that configuration; replacing an existing credential is a separate operator action. A writer ID is optional; if you do not set one, Codifix derives a stable writer identity automatically.
+This is where you set the shared database URL and explicitly provision the shared service API token. The Debian installation hook does not generate or rotate a token. For a manually configured system service, use `sudo codifix --config /etc/codifix/codifix.toml service ensure-api-token --json` after reviewing that configuration; replacing an existing credential is a separate operator action. A writer ID is optional; if you do not set one, Codifix derives a stable writer identity automatically.
 
 5. Go to the project you want to use:
 
@@ -410,14 +410,14 @@ codifix tui
 ```
 
 The backend is a current-user, least-privilege Task Scheduler task named
-`MemoryLayer-Backend`. If you want Codex-linked background watcher automation,
+`Codifix-Backend`. If you want Codex-linked background watcher automation,
 enable the separate optional task:
 
 ```powershell
 codifix watcher manager enable
 ```
 
-Its task is named `MemoryLayer-WatcherManager`. Backend and watcher-manager
+Its task is named `Codifix-WatcherManager`. Backend and watcher-manager
 config, state, cache, and task metadata live under
 `%LOCALAPPDATA%\codifix`.
 

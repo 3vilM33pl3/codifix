@@ -10,9 +10,9 @@ The `codifix` CLI is the primary automation surface for Codifix. It configures p
 Use command help as the final source of truth before scripting:
 
 ```bash
-memory --help
-memory <command> --help
-memory <command> <subcommand> --help
+codifix --help
+codifix <command> --help
+codifix <command> <subcommand> --help
 ```
 
 ## Global options
@@ -47,7 +47,7 @@ Agents should follow a repeatable command pattern:
 
 1. Run `codifix query` before answering project-specific questions.
 2. Run `codifix resume` after interruptions or context loss.
-3. Use `memory checkpoint start-execution` when beginning approved plans.
+3. Use `codifix checkpoint start-execution` when beginning approved plans.
 4. Use `codifix remember` after meaningful completed work.
 5. Use `codifix status`, `codifix doctor`, and `codifix health` before blaming retrieval or the TUI.
 

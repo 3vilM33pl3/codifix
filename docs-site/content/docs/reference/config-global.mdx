@@ -16,7 +16,7 @@ Dev-profile cargo runs are different: the dev stack ignores global config and us
 | Debian/system package | `/etc/codifix/codifix.toml` | `/etc/codifix/codifix.env` |
 | Local Linux install | `~/.config/codifix/codifix.toml` | `~/.config/codifix/codifix.env` |
 | macOS app support | `~/Library/Application Support/codifix/codifix.toml` | `~/Library/Application Support/codifix/codifix.env` |
-| Explicit override | `memory --config <path> ...` | `<config-dir>/codifix.env` |
+| Explicit override | `codifix --config <path> ...` | `<config-dir>/codifix.env` |
 
 The env file is loaded next to the config file and is the right place for generated service tokens and provider API keys.
 

@@ -1,6 +1,6 @@
 # Scores Command
 
-`memory scores` shows reinforcement activation scores for a project's
+`codifix scores` shows reinforcement activation scores for a project's
 memories: how strongly each memory has been used recently (query
 retrievals, answer citations, direct reads, and activation spread from
 linked memories), with time decay.
@@ -12,9 +12,9 @@ are.
 ## Usage
 
 ```bash
-memory scores --project memory
-memory scores --project memory --needs-review
-memory scores --project memory --limit 50 --json
+codifix scores --project memory
+codifix scores --project memory --needs-review
+codifix scores --project memory --limit 50 --json
 ```
 
 ## Columns

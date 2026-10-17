@@ -1,6 +1,6 @@
 # Validate Command
 
-`memory validate` runs the evidence-backed validation pipeline for one
+`codifix validate` runs the evidence-backed validation pipeline for one
 memory: it gathers the memory's sources, provenance status, related
 memories, and recent git history over its source paths, asks the configured
 LLM for a verdict, and applies the configured policy.
@@ -11,10 +11,10 @@ Manual runs bypass the activation threshold but respect the global
 ## Usage
 
 ```bash
-memory validate <memory-id>            # uses the configured dry-run default
-memory validate <memory-id> --dry-run  # report only, never changes anything
-memory validate <memory-id> --execute  # allow policy actions to apply
-memory validate <memory-id> --execute --json
+codifix validate <memory-id>            # uses the configured dry-run default
+codifix validate <memory-id> --dry-run  # report only, never changes anything
+codifix validate <memory-id> --execute  # allow policy actions to apply
+codifix validate <memory-id> --execute --json
 ```
 
 The TUI Memories tab uses the same endpoint in preview mode. Press `v` on a

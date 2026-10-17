@@ -67,9 +67,9 @@ selected config/service never redirects into General. Explicit `--config`
 must agree with the selected route for knowledge commands.
 
 ```bash
-memory --area workshop query --project memory --question "What changed?"
-memory --area homelab tui --project homelab
-memory --area workshop status --project memory --json
+codifix --area workshop query --project memory --question "What changed?"
+codifix --area homelab tui --project homelab
+codifix --area workshop status --project memory --json
 ```
 
 Status JSON includes `area.name` and `area.instance_id`. The TUI header shows the
