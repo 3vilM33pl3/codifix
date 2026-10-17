@@ -34,9 +34,11 @@ when repeated instructions or project knowledge should survive future sessions.
 - Use GPT-6.1 Sol for code, infrastructure, debugging and implementation.
 - Use GPT-6 Astra for bounded planning, advice and independent reviews; the
   project-scoped `astra_adviser` agent is read-only by default.
-- Delegate distinct tasks when useful, without a project-imposed subagent cap.
-  Respect actual runtime capacity and use one writer per checkout; cheaper
-  available helpers may handle narrow docs/GitHub work.
+- Default to delegating independent subtasks to subagents. Keep coordination and
+  final integration with the main agent, and verify subagent results. Handle
+  simple tasks directly when delegation would add overhead.
+- No project-imposed subagent cap; respect actual runtime capacity and use one
+  writer per checkout. Cheaper helpers may handle narrow docs/GitHub work.
 - These project defaults supersede the older GPT-5.4 engineering preference.
   Claude model settings and provider credentials remain independent.
 
