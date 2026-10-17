@@ -7,6 +7,24 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_native_evaluation_proof_keeps_private_labels_and_paid_campaign_separate(self):
+        root = Path(__file__).parent
+        script = (root / 'guest-native-eval.ps1').read_text()
+        for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", 'SessionId -eq 0',
+                         'rev-parse HEAD', '--untracked-files=no', 'WaitForExit(180000)',
+                         '/PID $process.Id /T /F', 'provider_requests -ne 0', 'official_evidence -ne $false']:
+            self.assertIn(required, script)
+        driver = (root / 'guest-evaluation-proof.mjs').read_text()
+        for required in ['runOfflineExecution', 'createKnowledgeRunner', 'nativeProfileHash',
+                         "assert.equal(negative.assessment.citations_valid, false)",
+                         'human_judgments_unresolved: true', 'official_evidence: false',
+                         'rust_grading_verified: false', 'campaign_verified: false',
+                         "['EACCES','EPERM'].includes(error.code)", "Object.keys(input).sort().join(',')!=='context,question'"]:
+            self.assertIn(required, driver)
+        self.assertNotIn('createNativeWindowsExecutor({', driver)
+        self.assertNotIn('dispatchModel', driver)
+        self.assertNotIn('fetch(', driver)
+
     def test_pds_stdio_proof_keeps_native_startup_separate_from_repository_acceptance(self):
         script = (Path(__file__).parent / 'guest-pds-stdio.ps1').read_text()
         for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'",'Native PDS runtime inventory changed',
@@ -90,7 +108,7 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn('Queued native proof file inventory changed', stage)
         self.assertIn('New-TimeSpan -Minutes 20', stage)
         self.assertIn('-LogonType Interactive', stage)
-        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','PdsVerify')) { 'Limited' } else { 'Highest' }",stage)
+        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','PdsVerify','NativeEval')) { 'Limited' } else { 'Highest' }",stage)
         self.assertIn('-LogonType Interactive -RunLevel $runLevel',stage)
         script = (root / 'guest-native-api.ps1').read_text()
         for required in ['memory-windows-native-api-v1', 'Get-FileHash',
