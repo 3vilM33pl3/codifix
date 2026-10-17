@@ -244,6 +244,30 @@ async fn serve_one(mut pipe: NamedPipeServer, router: axum::Router) -> Result<()
     pipe.flush().await.map_err(|_| LaunchError::Child)
 }
 
+/// Native rehearsal diagnostics are deliberately absent from production builds.
+/// Only fixed phase names and typed enum metadata can enter this protected file;
+/// never child stdout/stderr, prompts, bearer tokens or provider responses.
+#[cfg(test)]
+fn record_failed_child_report(
+    run_dir: &std::path::Path,
+    report: &ChildReport,
+) -> Result<(), LaunchError> {
+    use std::io::Write;
+    let bytes = serde_json::to_vec(&serde_json::json!({
+        "schema_version": 1,
+        "phase": "driver_report_rejected",
+        "process": report.process,
+        "failure": report.failure,
+    }))
+    .map_err(|_| LaunchError::Files)?;
+    let mut file = mem_platform_files::windows::create_private_file(
+        &run_dir.join("rehearsal-driver-report.json"),
+    )
+    .map_err(|_| LaunchError::Files)?;
+    file.write_all(&bytes).map_err(|_| LaunchError::Files)?;
+    file.sync_all().map_err(|_| LaunchError::Files)
+}
+
 pub(super) async fn run(
     config: SandboxConfig,
     request: Arc<PreparedRequest>,
@@ -346,6 +370,10 @@ pub(super) async fn run(
         }
         let report: ChildReport = serde_json::from_slice(&out).map_err(|_| LaunchError::Child)?;
         if report.failure.is_some() || report.process != ProcessDisposition::Reaped {
+            #[cfg(test)]
+            if record_failed_child_report(&run_dir, &report).is_err() {
+                eprintln!("protected child-report metadata unavailable; retaining original Child failure");
+            }
             return Err(LaunchError::Child);
         }
         report.proposal_sha256.ok_or(LaunchError::Child)

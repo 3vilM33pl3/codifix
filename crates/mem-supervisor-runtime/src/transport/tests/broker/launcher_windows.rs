@@ -101,6 +101,21 @@ async fn run(mode: Mode, cancel: bool) {
         .await
         .expect("bounded native cleanup")
         .expect("launcher joined");
+    let after = entries(&runtime);
+    let retained: Vec<_> = after.difference(&before).collect();
+    if result.is_err()
+        && record_failure_metadata(&runtime, &retained, result, &fake, cancel).is_err()
+    {
+        eprintln!("protected rehearsal metadata unavailable; original launcher result follows");
+    }
+    // Report the actual typed launcher failure before a secondary zero-call
+    // assertion can hide the cause. No raw child/provider output is printed.
+    if matches!(mode, Mode::Good) && !cancel {
+        assert!(
+            result.is_ok(),
+            "native production launcher failed before delivery: {result:?}; inspect protected rehearsal metadata"
+        );
+    }
     assert_eq!(fake.count.load(Ordering::SeqCst), 1);
     if matches!(mode, Mode::Good) && !cancel {
         let digest = result.expect("native production launcher delivered");
@@ -181,8 +196,6 @@ async fn run(mode: Mode, cancel: bool) {
                 AttemptState::Uncertain
             );
         }
-        let after = entries(&runtime);
-        let retained: Vec<_> = after.difference(&before).collect();
         assert_eq!(
             retained.len(),
             1,
@@ -192,4 +205,33 @@ async fn run(mode: Mode, cancel: bool) {
     }
     provider.abort();
     db.cleanup().await.expect("dispose synthetic database");
+}
+
+fn record_failure_metadata(
+    runtime: &std::path::Path,
+    retained: &[&std::ffi::OsString],
+    result: Result<[u8; 32], launcher::LaunchError>,
+    fake: &Fake,
+    cancel: bool,
+) -> std::io::Result<()> {
+    use std::io::Write;
+    for name in retained {
+        if !name.to_string_lossy().starts_with("pi-") {
+            continue;
+        }
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "schema_version": 1,
+            "phase": "launcher_returned",
+            "launch_error": result.err().map(|error| format!("{error:?}")),
+            "fake_count_calls": fake.count.load(Ordering::SeqCst),
+            "fake_generate_calls": fake.generated.load(Ordering::SeqCst),
+            "cancellation_requested": cancel,
+        }))
+        .expect("fixed diagnostic metadata");
+        let path = runtime.join(name).join("rehearsal-launcher-result.json");
+        let mut file = mem_platform_files::windows::create_private_file(&path)?;
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+    }
+    Ok(())
 }
