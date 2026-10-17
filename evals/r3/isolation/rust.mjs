@@ -32,14 +32,29 @@ const {spawnSync}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path');
 const probe=JSON.parse(fs.readFileSync('harness/probe.json','utf8'));
 const failed=r=>r.error||r.signal||[0xc0000135,0xc0000142].includes(r.status>>>0);
-const compiled=spawnSync(${JSON.stringify(compiler.path)},[
+// Avoid libuv UV_CREATE_PIPE's non-LOCAL named-pipe namespace in AppContainer.
+// Probe inputs, not hidden expectations, enter these scratch files. Results
+// remain untrusted and bounded; the outer helper owns the process-tree deadline.
+const execute=(exe,args,input,timeout)=>{
+  const root=fs.mkdtempSync(path.join('harness','stdio-')),fds=[];
+  try {
+    fs.writeFileSync(path.join(root,'stdin'),input,{flag:'wx'});
+    fds.push(fs.openSync(path.join(root,'stdin'),'r'));
+    for(const name of ['stdout','stderr'])fds.push(fs.openSync(path.join(root,name),'wx+'));
+    const result=spawnSync(exe,args,{timeout,windowsHide:true,stdio:fds});
+    const sizes=fds.slice(1).map(fd=>fs.fstatSync(fd).size);
+    if(sizes[0]+sizes[1]>1048576)return {error:true};
+    const read=(fd,size)=>{const bytes=Buffer.alloc(size);let n=0;while(n<size){const count=fs.readSync(fd,bytes,n,size-n,n);if(!count)throw Error('changed output');n+=count;}return bytes.toString('utf8');};
+    return {...result,stdout:read(fds[1],sizes[0]),stderr:read(fds[2],sizes[1])};
+  } catch { return {error:true}; }
+  finally {for(const fd of fds)fs.closeSync(fd);}
+};
+const compiled=execute(${JSON.stringify(compiler.path)},[
   '--edition=2024','-C','debuginfo=0','submission/src/main.rs','-o','program.exe'
-],{encoding:'utf8',timeout:20000,maxBuffer:1048576,windowsHide:true});
+],'',20000);
 if(failed(compiled)) process.exit(70);
 if(compiled.status!==0) process.exit(65);
-const run=spawnSync(path.resolve('program.exe'),probe.argv,{
-  input:probe.stdin,encoding:'utf8',timeout:5000,maxBuffer:1048576,windowsHide:true
-});
+const run=execute(path.resolve('program.exe'),probe.argv,probe.stdin,5000);
 if(run.error?.code==='EPIPE') process.exit(66);
 if(failed(run)) process.exit(70);
 if(run.status!==0) process.exit(66);

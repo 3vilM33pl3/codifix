@@ -29,6 +29,8 @@ function fake({ exitCode = 0, mismatch = false } = {}) {
       assert.equal(input.profile, 'rust'); assert.deepEqual(input.exportPaths, []);
       assert.deepEqual(input.argv, [input.execution.profile.node.path, 'harness/run.cjs']);
       assert(input.files['harness/run.cjs'].includes('submission/src/main.rs'));
+      assert(input.files['harness/run.cjs'].includes('stdio:fds'));
+      assert(!input.files['harness/run.cjs'].includes('input:probe.stdin'));
       assert(!input.files['harness/run.cjs'].includes('/usr/local/'));
       if (source.includes('r3-toolchain-ready')) stdout = 'r3-toolchain-ready\n';
       else { stdout = (source.match(/answer-\d/)?.[0] ?? 'wrong') + '\n'; status = exitCode; }
