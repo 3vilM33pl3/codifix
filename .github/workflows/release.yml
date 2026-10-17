@@ -100,7 +100,7 @@ jobs:
           cargo test --workspace --all-targets --locked
           cargo clippy --workspace --all-targets --locked -- -D warnings
           bash scripts/check-boundaries.sh
-          cargo build --locked -p mem-cli --no-default-features --bin memory
+          cargo build --locked -p mem-cli --no-default-features --features tui,project-sync --bin memory
       - name: Packaging and stable/RC operator contracts
         run: |
           for suite in test_release.py test_instance.py test_console.py test_upgrade.py; do
@@ -124,7 +124,8 @@ jobs:
           npm --prefix docs-site audit --audit-level=low
       - name: Pinned PDS security overlay validation
         run: |
-          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream install --frozen-lockfile
+          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream install --prod --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
+          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream rebuild better-sqlite3 --config.node-linker=hoisted
           npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream audit --audit-level=low
           node --test packaging/windows-pds/security.test.mjs packaging/windows-pds/http-stdio.test.mjs packaging/windows-pds/windows-paths.test.mjs
       - name: Rust audit with explicit documented RSA exception
@@ -421,7 +422,8 @@ jobs:
             git push origin "refs/tags/$tag"
           fi
           # No replacement, clobbering, retagging or automatic release deletion.
-          gh release create "$tag" target/release-assets/* --draft --verify-tag --title "Memory Layer $tag" --notes-file "docs/releases/$VERSION.md"
+          mapfile -d '' release_files < <(find target/release-assets -maxdepth 1 -type f -print0)
+          gh release create "$tag" "${release_files[@]}" --draft --verify-tag --title "Memory Layer $tag" --notes-file "docs/releases/$VERSION.md"
           download="$(mktemp -d "$RUNNER_TEMP/memory-published-assets.XXXXXXXX")"
           gh release download "$tag" --dir "$download"
           cmp target/release-assets/SHA256SUMS "$download/SHA256SUMS"
