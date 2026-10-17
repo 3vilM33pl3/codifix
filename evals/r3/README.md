@@ -326,6 +326,25 @@ and the explicit disposable `MEMORY_LAYER_TEST_DATABASE_URL`. Set
 run `node --test evals/r3/isolation/service-session-native.test.mjs`. It exercises
 two scoped reads with unchanged snapshot fingerprints, without provider calls.
 
+The explicit native bootstrap currently prepares a reviewable pack with
+`node evals/r3/rehearse.mjs PROFILE_IO_ROOT/FRESH_UUID/pack --native --prepare-only`
+(optionally `--one-family-per-track`). It requires the same execution JSON,
+`MEMORY_R3_NATIVE_COMPILER` selecting its exact pinned `rustc.exe`, the four
+explicit native first-party executable variables, and the disposable database
+settings above. Run the reviewed profile's Node inside its trusted outer Job;
+the helper verifies that Job and creates the private UUID parent before any
+pack writes. The bootstrap rejects Linux images, `--mediated` and `--wire`.
+
+Native first-party executable copies keep `.exe` names. The pack locks its
+private Node copy, the Windows driver sidecar and the required native execution
+modules as configuration assets. Its relocated profile adds private executable
+and guest trees; existing reviewed external toolchain trees, including the Rust
+compiler, must remain immutable and available. Native runtime configuration
+contains the explicit execution/scorer/compiler bindings and a
+`windows-loopback-v1` dispatch descriptor; the endpoint is generated separately.
+Native execution stays closed until protected controller IPC is integrated;
+preparation alone makes no completed-campaign or native-isolation claim.
+
 The complete development allocation has now executed all660 dispatches through
 this controller with valid execution evidence, unchanged snapshots and zero
 provider calls. Six hundred knowledge judgments remain pending; all60 no-op
