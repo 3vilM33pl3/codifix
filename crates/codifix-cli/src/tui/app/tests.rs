@@ -162,7 +162,7 @@ fn skills_tab_defaults_to_memory_filter() {
     app.meta.skill_inventory = test_skill_inventory();
     app.clamp_skill_selection();
 
-    assert_eq!(app.skills.filter, SkillsFilter::Memory);
+    assert_eq!(app.skills.filter, SkillsFilter::Codifix);
     assert_eq!(app.filtered_skill_count(), 2);
     assert_eq!(app.skills.table_state.selected(), Some(0));
 }
@@ -2230,13 +2230,13 @@ fn test_skill_inventory() -> SkillInventoryReport {
         skills: vec![
             test_skill(
                 "codifix",
-                SkillSourceKind::RepoMemory,
+                SkillSourceKind::RepoCodifix,
                 true,
                 SkillUpgradeAction::Skip,
             ),
             test_skill(
                 "memory-remember",
-                SkillSourceKind::RepoMemory,
+                SkillSourceKind::RepoCodifix,
                 true,
                 SkillUpgradeAction::Replace,
             ),

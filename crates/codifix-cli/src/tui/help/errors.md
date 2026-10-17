@@ -15,7 +15,7 @@ Inspect backend diagnostics and session-local TUI errors with explanations and s
 
 ## Workflows
 - Open this tab when the footer shows warnings/errors or an operation fails.
-- Prefer suggested `memory doctor` commands when shown.
+- Prefer suggested `codifix doctor` commands when shown.
 - Use source/component to route fixes to config, service, watcher, manager, provider, or database.
 
 ## Troubleshooting

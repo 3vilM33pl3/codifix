@@ -3076,7 +3076,7 @@ fn visible_skill_inventory_classifies_repo_home_codex_and_plugin_skills() {
         .iter()
         .find(|skill| {
             skill.name == CODIFIX_SKILL_NAMES[0]
-                && skill.source_kind == SharedSkillSourceKind::RepoMemory
+                && skill.source_kind == SharedSkillSourceKind::RepoCodifix
         })
         .expect("repo memory skill");
     assert!(repo_memory.repairable);
@@ -3094,7 +3094,7 @@ fn visible_skill_inventory_classifies_repo_home_codex_and_plugin_skills() {
 
     assert!(inventory.skills.iter().any(|skill| {
         skill.name == CODIFIX_SKILL_NAMES[1]
-            && skill.source_kind == SharedSkillSourceKind::HomeMemory
+            && skill.source_kind == SharedSkillSourceKind::HomeCodifix
     }));
     assert!(inventory.skills.iter().any(|skill| {
         skill.name == "home-custom" && skill.source_kind == SharedSkillSourceKind::HomeLocal

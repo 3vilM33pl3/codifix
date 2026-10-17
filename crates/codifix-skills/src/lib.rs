@@ -90,9 +90,9 @@ impl SkillBundleStatus {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SkillSourceKind {
-    RepoMemory,
+    RepoCodifix,
     RepoLocal,
-    HomeMemory,
+    HomeCodifix,
     HomeLocal,
     CodexUser,
     CodexSystem,
@@ -102,9 +102,9 @@ pub enum SkillSourceKind {
 impl SkillSourceKind {
     pub fn label(self) -> &'static str {
         match self {
-            Self::RepoMemory => "memory",
+            Self::RepoCodifix => "codifix",
             Self::RepoLocal => "repo local",
-            Self::HomeMemory => "home memory",
+            Self::HomeCodifix => "home codifix",
             Self::HomeLocal => "home local",
             Self::CodexUser => "codex",
             Self::CodexSystem => "codex system",
@@ -113,7 +113,7 @@ impl SkillSourceKind {
     }
 
     pub fn is_home(self) -> bool {
-        matches!(self, Self::HomeMemory | Self::HomeLocal)
+        matches!(self, Self::HomeCodifix | Self::HomeLocal)
     }
 
     pub fn is_codex(self) -> bool {
@@ -122,7 +122,7 @@ impl SkillSourceKind {
 }
 
 fn default_skill_source_kind() -> SkillSourceKind {
-    SkillSourceKind::RepoMemory
+    SkillSourceKind::RepoCodifix
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -250,7 +250,7 @@ pub fn visible_skill_inventory_with_template(
         &repo_skill_root,
         |name| {
             if is_memory_skill_name(name) {
-                SkillSourceKind::RepoMemory
+                SkillSourceKind::RepoCodifix
             } else {
                 SkillSourceKind::RepoLocal
             }
@@ -266,7 +266,7 @@ pub fn visible_skill_inventory_with_template(
             &home_skill_root,
             |name| {
                 if is_memory_skill_name(name) {
-                    SkillSourceKind::HomeMemory
+                    SkillSourceKind::HomeCodifix
                 } else {
                     SkillSourceKind::HomeLocal
                 }
@@ -424,7 +424,7 @@ pub fn skill_version_info(
         name: name.to_string(),
         project_path: project_path.display().to_string(),
         template_path: template_path.map(|path| path.display().to_string()),
-        source_kind: SkillSourceKind::RepoMemory,
+        source_kind: SkillSourceKind::RepoCodifix,
         repairable: true,
         description: read_skill_description(project_path).ok().flatten(),
         project_version,
@@ -477,7 +477,7 @@ fn add_external_skill(
     };
     let template_path = if matches!(
         source_kind,
-        SkillSourceKind::RepoMemory | SkillSourceKind::HomeMemory
+        SkillSourceKind::RepoCodifix | SkillSourceKind::HomeCodifix
     ) {
         template_root.map(|root| root.join(name))
     } else {
@@ -487,7 +487,7 @@ fn add_external_skill(
     let template_version = template_path
         .as_deref()
         .and_then(|path| read_skill_version(path).ok().flatten());
-    let detail = if source_kind == SkillSourceKind::RepoMemory {
+    let detail = if source_kind == SkillSourceKind::RepoCodifix {
         Some("Repo-local Memory skill is managed by Codifix repair.".to_string())
     } else {
         Some("Skill is visible here but is not mutated by Codifix repair.".to_string())

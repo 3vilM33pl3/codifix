@@ -38,7 +38,7 @@ pub(in crate::tui) fn draw_skills_tab(
         .or_else(|| app.skills.message.clone())
         .unwrap_or_else(|| inventory.summary.clone());
     let filter_summary = format!(
-        "Filter: {} ({}/{})  f next  F previous  u repair Memory skills",
+        "Filter: {} ({}/{})  f next  F previous  u repair Codifix skills",
         app.skills.filter.label(),
         visible_skills.len(),
         inventory.skills.len()

@@ -194,7 +194,7 @@ pub(super) struct SkillsTabState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum SkillsFilter {
-    Memory,
+    Codifix,
     RepoLocal,
     Home,
     Codex,
@@ -206,7 +206,7 @@ pub(super) enum SkillsFilter {
 
 impl SkillsFilter {
     pub(super) const ALL: [Self; 8] = [
-        Self::Memory,
+        Self::Codifix,
         Self::RepoLocal,
         Self::Home,
         Self::Codex,
@@ -218,7 +218,7 @@ impl SkillsFilter {
 
     pub(super) fn label(self) -> &'static str {
         match self {
-            Self::Memory => "Memory",
+            Self::Codifix => "Codifix",
             Self::RepoLocal => "Repo local",
             Self::Home => "Home",
             Self::Codex => "Codex",
@@ -231,10 +231,10 @@ impl SkillsFilter {
 
     pub(super) fn matches(self, skill: &SkillVersionInfo) -> bool {
         match self {
-            Self::Memory => skill.source_kind == SkillSourceKind::RepoMemory,
+            Self::Codifix => skill.source_kind == SkillSourceKind::RepoCodifix,
             Self::RepoLocal => matches!(
                 skill.source_kind,
-                SkillSourceKind::RepoMemory | SkillSourceKind::RepoLocal
+                SkillSourceKind::RepoCodifix | SkillSourceKind::RepoLocal
             ),
             Self::Home => skill.source_kind.is_home(),
             Self::Codex => skill.source_kind.is_codex(),

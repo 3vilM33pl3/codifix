@@ -554,7 +554,7 @@ impl App {
             },
             watchers: WatchersTabState { watcher_scroll: 0 },
             skills: SkillsTabState {
-                filter: SkillsFilter::Memory,
+                filter: SkillsFilter::Codifix,
                 selected_index: 0,
                 table_state: skills_table_state,
                 detail_scroll: 0,

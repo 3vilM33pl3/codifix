@@ -2,7 +2,7 @@
 
 The website text lives in `content/docs/**/*.mdx`.
 
-Open `Memory Docs.code-workspace` in VSCode when you want to edit prose. It puts the content files first and hides generated folders such as `.next`, `.source`, and `node_modules`.
+Open `Codifix Docs.code-workspace` in VSCode when you want to edit prose. It puts the content files first and hides generated folders such as `.next`, `.source`, and `node_modules`.
 
 ## Route map
 
