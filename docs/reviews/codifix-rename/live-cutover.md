@@ -57,7 +57,9 @@ operational evidence directory below.
 - Complete the native Mac installation and client wiring. The Apple Silicon
   candidate package and native acceptance passed; packages are verified and
   staged. Installation requires the user's local administrator authentication;
-  a runtime-inclusive installer handoff is being prepared. Publish final release
+  a runtime-inclusive installer handoff is ready at
+  `~/.local/state/codifix-rename-20261017/mac-install-and-resume.md`. It installs
+  the verified payload/runtime; preserved-state activation follows. Publish final release
   packages after the corrected candidate completes.
 - Refresh running client sessions. Codifix desktop plugin is installed/enabled;
   the legacy plugin is disabled with its cache retained. Primary MCP project
