@@ -1,6 +1,6 @@
 {
   "lexicon": 1,
-  "id": "dev.memory-layer.unspecced.membership",
+  "id": "dev.codifix.unspecced.relation",
   "defs": {
     "main": {
       "type": "record",
@@ -13,8 +13,10 @@
           "projectSpaceId",
           "author",
           "authoredAt",
-          "member",
-          "capability"
+          "srcCanonicalId",
+          "relationType",
+          "dstCanonicalId",
+          "assertedAt"
         ],
         "properties": {
           "schemaVersion": { "type": "integer", "minimum": 1 },
@@ -23,8 +25,10 @@
           "author": { "type": "string" },
           "authoredAt": { "type": "string", "format": "datetime" },
           "causationId": { "type": "string" },
-          "member": { "type": "string" },
-          "capability": { "type": "string" }
+          "srcCanonicalId": { "type": "string" },
+          "relationType": { "type": "string" },
+          "dstCanonicalId": { "type": "string" },
+          "assertedAt": { "type": "string", "format": "datetime" }
         }
       }
     }

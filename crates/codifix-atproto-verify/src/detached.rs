@@ -2,7 +2,7 @@
 //! Domain-separated gateway attestations, independent of repository history.
 use crate::{Result, VerifyError, validate_signing_key};
 use atrium_crypto::keypair::{Did as _, Secp256k1Keypair};
-const DOMAIN: &[u8] = b"memory-private-gateway-attestation-v1\0";
+const DOMAIN: &[u8] = b"codifix-private-gateway-attestation-v1\0";
 const MAX_MESSAGE: usize = 4 * 1024 * 1024;
 
 // Intentionally no Debug/Serialize/Clone exposing the private scalar.

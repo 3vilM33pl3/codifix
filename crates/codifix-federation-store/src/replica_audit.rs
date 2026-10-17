@@ -18,7 +18,7 @@ pub fn receipt_matches(
         .ok_or(StoreError::Binding)?;
     let c = &receipt.claims;
     c.policy.validate()?;
-    if c.purpose != "memory-publication-receipt-v1"
+    if c.purpose != "codifix-publication-receipt-v1"
         || c.space != delivery.envelope.space
         || c.authority != authority
         || c.sequence != delivery.sequence.get()

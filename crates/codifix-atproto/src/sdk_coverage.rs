@@ -184,6 +184,6 @@ fn authentication_failure_is_not_retried_as_an_anonymous_read() {
 
 #[test]
 fn current_profile_does_not_silently_accept_native_spaces_addressing() {
-    let native = "at://did:web:authority.example.test/space/dev.memory-layer.unspecced.space/demo/did:web:author.example.test/dev.memory-layer.unspecced.memoryVersion/key";
+    let native = "at://did:web:authority.example.test/space/dev.codifix.unspecced.space/demo/did:web:author.example.test/dev.codifix.unspecced.memoryVersion/key";
     assert!(native.parse::<crate::AtUri>().is_err());
 }

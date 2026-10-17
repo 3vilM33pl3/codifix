@@ -1,6 +1,6 @@
 {
   "lexicon": 1,
-  "id": "dev.memory-layer.unspecced.revocation",
+  "id": "dev.codifix.unspecced.canonicalState",
   "defs": {
     "main": {
       "type": "record",
@@ -13,7 +13,13 @@
           "projectSpaceId",
           "author",
           "authoredAt",
-          "member"
+          "canonicalId",
+          "memoryId",
+          "versionNo",
+          "isTombstone",
+          "status",
+          "confidencePpm",
+          "updatedAt"
         ],
         "properties": {
           "schemaVersion": { "type": "integer", "minimum": 1 },
@@ -22,9 +28,13 @@
           "author": { "type": "string" },
           "authoredAt": { "type": "string", "format": "datetime" },
           "causationId": { "type": "string" },
-          "member": { "type": "string" },
-          "capability": { "type": "string" },
-          "reason": { "type": "string" }
+          "canonicalId": { "type": "string" },
+          "memoryId": { "type": "string" },
+          "versionNo": { "type": "integer", "minimum": 1 },
+          "isTombstone": { "type": "boolean" },
+          "status": { "type": "string" },
+          "confidencePpm": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+          "updatedAt": { "type": "string", "format": "datetime" }
         }
       }
     }

@@ -62,7 +62,7 @@ impl ReceiptTrust {
     ) -> Result<crate::GatewayStatus> {
         let c = &signed.claims;
         let now = Utc::now();
-        if c.purpose != "memory-gateway-status-v1"
+        if c.purpose != "codifix-gateway-status-v1"
             || c.nonce != nonce
             || nonce.is_nil()
             || c.audience != audience
@@ -179,7 +179,7 @@ impl ReceiptTrust {
         authority: InstanceId,
     ) -> std::result::Result<PublishedPage, PageVerificationError> {
         let c = &signed.claims;
-        if c.purpose != "memory-pull-page-v1"
+        if c.purpose != "codifix-pull-page-v1"
             || c.nonce != nonce
             || c.page.space != space
             || c.page.authority != authority
@@ -235,7 +235,7 @@ impl GatewaySecurity {
     ) -> Result<crate::SignedGatewayStatus> {
         let now = Utc::now();
         let claims = crate::GatewayStatusClaims {
-            purpose: "memory-gateway-status-v1".into(),
+            purpose: "codifix-gateway-status-v1".into(),
             nonce,
             audience,
             space,
@@ -332,7 +332,7 @@ impl GatewaySecurity {
     }
     pub(crate) fn sign_page(&self, page: PublishedPage, nonce: Uuid) -> Result<SignedPage> {
         let claims = PageClaims {
-            purpose: "memory-pull-page-v1".into(),
+            purpose: "codifix-pull-page-v1".into(),
             nonce,
             key_generation: self.generation(),
             page,
@@ -452,7 +452,7 @@ mod tests {
                 .is_err()
         );
         for mutate in [
-            (|c: &mut crate::GatewayStatusClaims| c.purpose = "memory-pull-page-v1".into())
+            (|c: &mut crate::GatewayStatusClaims| c.purpose = "codifix-pull-page-v1".into())
                 as fn(&mut crate::GatewayStatusClaims),
             |c| c.expires_at = Utc::now() - chrono::Duration::seconds(1),
             |c| c.expires_at = c.issued_at + chrono::Duration::seconds(31),
@@ -555,7 +555,7 @@ mod tests {
         // Even correctly signed responses cannot authorize stale, future-dated,
         // overlong, cross-purpose or old-key replies.
         for mutate in [
-            (|c: &mut ExpertiseClaims| c.purpose = "memory-pull-page-v1".into())
+            (|c: &mut ExpertiseClaims| c.purpose = "codifix-pull-page-v1".into())
                 as fn(&mut ExpertiseClaims),
             |c| c.expires_at = Utc::now() - chrono::Duration::seconds(1),
             |c| c.issued_at = Utc::now() + chrono::Duration::seconds(5),

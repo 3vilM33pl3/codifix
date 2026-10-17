@@ -234,7 +234,7 @@ impl GatewayStore {
                     Some(audit_digest(&prior.0)?)
                 };
                 let claims = ReceiptClaims {
-                    purpose: "memory-publication-receipt-v1".into(),
+                    purpose: "codifix-publication-receipt-v1".into(),
                     space: lease.fence.space,
                     authority,
                     sequence: lease.delivery.sequence.get(),

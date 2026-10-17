@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{EncodedAtRecord, MemAtprotoError, dag_cbor_cid, uuid_rkey};
 
-pub const COLLECTION: &str = "dev.memory-layer.unspecced.publication";
+pub const COLLECTION: &str = "dev.codifix.unspecced.publication";
 pub const MAX_RECORD_BYTES: usize = 64 * 1024;
 
 pub fn validate_repository(repository: &str) -> Result<(), MemAtprotoError> {

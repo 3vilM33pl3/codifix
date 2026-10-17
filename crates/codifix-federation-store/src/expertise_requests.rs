@@ -25,7 +25,7 @@ fn review_digest(
     question: &ExpertiseQuestion,
     ad: &ContentDigest,
 ) -> Result<ContentDigest> {
-    CanonicalJsonCodec::digest(&("memory-expertise-consent-v1", project, question, ad))
+    CanonicalJsonCodec::digest(&("codifix-expertise-consent-v1", project, question, ad))
         .map_err(|_| StoreError::Binding)
 }
 async fn authorize(

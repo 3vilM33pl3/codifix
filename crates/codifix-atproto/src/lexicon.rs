@@ -5,36 +5,36 @@ pub struct LexiconSchema {
     pub json: &'static str,
 }
 
-pub const MEMORY_VERSION_NSID: &str = "dev.memory-layer.unspecced.memoryVersion";
-pub const CANONICAL_STATE_NSID: &str = "dev.memory-layer.unspecced.canonicalState";
-pub const EVIDENCE_NSID: &str = "dev.memory-layer.unspecced.evidence";
-pub const RELATION_NSID: &str = "dev.memory-layer.unspecced.relation";
-pub const MEMBERSHIP_NSID: &str = "dev.memory-layer.unspecced.membership";
-pub const REVOCATION_NSID: &str = "dev.memory-layer.unspecced.revocation";
+pub const MEMORY_VERSION_NSID: &str = "dev.codifix.unspecced.memoryVersion";
+pub const CANONICAL_STATE_NSID: &str = "dev.codifix.unspecced.canonicalState";
+pub const EVIDENCE_NSID: &str = "dev.codifix.unspecced.evidence";
+pub const RELATION_NSID: &str = "dev.codifix.unspecced.relation";
+pub const MEMBERSHIP_NSID: &str = "dev.codifix.unspecced.membership";
+pub const REVOCATION_NSID: &str = "dev.codifix.unspecced.revocation";
 
 pub const UNSPECCED_LEXICONS: &[LexiconSchema] = &[
     LexiconSchema {
         nsid: MEMORY_VERSION_NSID,
-        json: include_str!("../lexicons/dev.memory-layer.unspecced.memoryVersion.json"),
+        json: include_str!("../lexicons/dev.codifix.unspecced.memoryVersion.json"),
     },
     LexiconSchema {
         nsid: CANONICAL_STATE_NSID,
-        json: include_str!("../lexicons/dev.memory-layer.unspecced.canonicalState.json"),
+        json: include_str!("../lexicons/dev.codifix.unspecced.canonicalState.json"),
     },
     LexiconSchema {
         nsid: EVIDENCE_NSID,
-        json: include_str!("../lexicons/dev.memory-layer.unspecced.evidence.json"),
+        json: include_str!("../lexicons/dev.codifix.unspecced.evidence.json"),
     },
     LexiconSchema {
         nsid: RELATION_NSID,
-        json: include_str!("../lexicons/dev.memory-layer.unspecced.relation.json"),
+        json: include_str!("../lexicons/dev.codifix.unspecced.relation.json"),
     },
     LexiconSchema {
         nsid: MEMBERSHIP_NSID,
-        json: include_str!("../lexicons/dev.memory-layer.unspecced.membership.json"),
+        json: include_str!("../lexicons/dev.codifix.unspecced.membership.json"),
     },
     LexiconSchema {
         nsid: REVOCATION_NSID,
-        json: include_str!("../lexicons/dev.memory-layer.unspecced.revocation.json"),
+        json: include_str!("../lexicons/dev.codifix.unspecced.revocation.json"),
     },
 ];

@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use crate::{EncodedAtRecord, MemAtprotoError, dag_cbor_cid, uuid_rkey};
 
-pub const QUESTION_COLLECTION: &str = "dev.memory-layer.unspecced.expertiseQuestion";
-pub const ANSWER_COLLECTION: &str = "dev.memory-layer.unspecced.expertiseAnswer";
+pub const QUESTION_COLLECTION: &str = "dev.codifix.unspecced.expertiseQuestion";
+pub const ANSWER_COLLECTION: &str = "dev.codifix.unspecced.expertiseAnswer";
 pub const MAX_RECORD_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

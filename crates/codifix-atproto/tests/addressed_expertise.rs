@@ -100,12 +100,12 @@ fn unpublished_lexicons_have_distinct_ids() {
         (
             QUESTION_COLLECTION,
             include_str!(
-                "../publication-lexicons/dev.memory-layer.unspecced.expertiseQuestion.json"
+                "../publication-lexicons/dev.codifix.unspecced.expertiseQuestion.json"
             ),
         ),
         (
             ANSWER_COLLECTION,
-            include_str!("../publication-lexicons/dev.memory-layer.unspecced.expertiseAnswer.json"),
+            include_str!("../publication-lexicons/dev.codifix.unspecced.expertiseAnswer.json"),
         ),
     ] {
         let lexicon: serde_json::Value = serde_json::from_str(value).unwrap();

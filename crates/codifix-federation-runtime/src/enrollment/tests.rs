@@ -288,7 +288,7 @@ async fn accept(
     let receipt = f
         .security
         .sign(ReceiptClaims {
-            purpose: "memory-publication-receipt-v1".into(),
+            purpose: "codifix-publication-receipt-v1".into(),
             space: f.config.plan.space,
             authority: f.config.plan.authority,
             sequence: delivery.sequence.get(),

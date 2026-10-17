@@ -66,7 +66,7 @@ impl ReceiptTrust {
     ) -> Result<ProjectPage> {
         let c = &signed.claims;
         if !expected.valid()
-            || c.purpose != "memory-scoped-page-v1"
+            || c.purpose != "codifix-scoped-page-v1"
             || c.key_generation != self.keys().len() as u32
             || !fresh(c.issued_at, c.expires_at)
             || c.page.request != *expected
@@ -121,7 +121,7 @@ impl ReceiptTrust {
         expected: &ProjectFeedRegistration,
     ) -> Result<ProjectBindingReceipt> {
         let c = &signed.claims;
-        if c.purpose != "memory-scoped-binding-v1"
+        if c.purpose != "codifix-scoped-binding-v1"
             || c.request != *expected
             || c.key_generation != self.keys().len() as u32
             || !fresh(c.issued_at, c.expires_at)
@@ -148,7 +148,7 @@ impl GatewaySecurity {
         }
         let now = Utc::now();
         let claims = ProjectPageClaims {
-            purpose: "memory-scoped-page-v1".into(),
+            purpose: "codifix-scoped-page-v1".into(),
             key_generation: self.trust().keys().len() as u32,
             issued_at: now,
             expires_at: now + Duration::seconds(30),
@@ -166,7 +166,7 @@ impl GatewaySecurity {
     ) -> Result<SignedProjectBinding> {
         let now = Utc::now();
         let claims = ProjectBindingClaims {
-            purpose: "memory-scoped-binding-v1".into(),
+            purpose: "codifix-scoped-binding-v1".into(),
             key_generation: self.trust().keys().len() as u32,
             issued_at: now,
             expires_at: now + Duration::seconds(30),
@@ -345,7 +345,7 @@ mod tests {
             );
         }
         for change in [
-            (|c: &mut ProjectPageClaims| c.purpose = "memory-pull-page-v1".into())
+            (|c: &mut ProjectPageClaims| c.purpose = "codifix-pull-page-v1".into())
                 as fn(&mut ProjectPageClaims),
             |c| c.expires_at = c.issued_at + Duration::seconds(31),
             |c| c.expires_at = Utc::now() - Duration::seconds(1),
@@ -406,7 +406,7 @@ mod tests {
         .unwrap();
         let receipt = security
             .sign(ReceiptClaims {
-                purpose: "memory-publication-receipt-v1".into(),
+                purpose: "codifix-publication-receipt-v1".into(),
                 space: page.request.scope.space,
                 authority: page.authority,
                 sequence: 73,

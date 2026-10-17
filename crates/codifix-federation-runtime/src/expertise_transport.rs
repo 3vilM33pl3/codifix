@@ -58,19 +58,19 @@ pub enum ExpertiseOperation {
 impl ExpertiseOperation {
     pub(crate) fn purpose(&self) -> &'static str {
         match self {
-            Self::Discover { .. } => "memory-expertise-discover-v1",
-            Self::Submit { .. } => "memory-expertise-submit-v1",
-            Self::AddressedSubmit { .. } => "memory-addressed-submit-v1",
-            Self::AddressedClaim => "memory-addressed-claim-v1",
-            Self::AddressedRead { .. } => "memory-addressed-read-v1",
-            Self::AddressedInbox { .. } => "memory-addressed-inbox-v1",
-            Self::Result { .. } => "memory-expertise-result-v1",
-            Self::Claim => "memory-expertise-claim-v1",
-            Self::ClaimDelivery => "memory-expertise-delivery-claim-v1",
-            Self::AuthorizeDelivery { .. } => "memory-expertise-delivery-release-v1",
-            Self::Renew { .. } => "memory-expertise-renew-v1",
-            Self::ReserveModel { .. } => "memory-expertise-model-reservation-v1",
-            Self::Complete { .. } => "memory-expertise-complete-v1",
+            Self::Discover { .. } => "codifix-expertise-discover-v1",
+            Self::Submit { .. } => "codifix-expertise-submit-v1",
+            Self::AddressedSubmit { .. } => "codifix-addressed-submit-v1",
+            Self::AddressedClaim => "codifix-addressed-claim-v1",
+            Self::AddressedRead { .. } => "codifix-addressed-read-v1",
+            Self::AddressedInbox { .. } => "codifix-addressed-inbox-v1",
+            Self::Result { .. } => "codifix-expertise-result-v1",
+            Self::Claim => "codifix-expertise-claim-v1",
+            Self::ClaimDelivery => "codifix-expertise-delivery-claim-v1",
+            Self::AuthorizeDelivery { .. } => "codifix-expertise-delivery-release-v1",
+            Self::Renew { .. } => "codifix-expertise-renew-v1",
+            Self::ReserveModel { .. } => "codifix-expertise-model-reservation-v1",
+            Self::Complete { .. } => "codifix-expertise-complete-v1",
         }
     }
 }

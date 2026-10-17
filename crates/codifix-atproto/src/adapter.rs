@@ -54,7 +54,7 @@ pub fn record_locator_rkey(
         Err(_) => uuid_rkey(Uuid::new_v5(
             &Uuid::NAMESPACE_URL,
             format!(
-                "https://memory-layer.dev/federation/record-id/{}",
+                "https://codifix.dev/federation/record-id/{}",
                 record_id.as_str()
             )
             .as_bytes(),

@@ -50,7 +50,7 @@ impl GatewaySecurity {
         }
         let now = Utc::now();
         let claims = DeviceReplicaClaims {
-            purpose: "memory-private-device-replica-v1".into(),
+            purpose: "codifix-private-device-replica-v1".into(),
             authority,
             key_generation: self.trust().keys().len() as u32,
             issued_at: now,
@@ -71,7 +71,7 @@ impl ReceiptTrust {
     ) -> Result<()> {
         let c = &signed.claims;
         let now = Utc::now();
-        if c.purpose != "memory-private-device-replica-v1"
+        if c.purpose != "codifix-private-device-replica-v1"
             || c.authority != authority
             || c.key_generation != self.keys().len() as u32
             || c.issued_at > now + Duration::seconds(1)
@@ -206,7 +206,7 @@ mod tests {
                 .is_err()
         );
         let mut altered = signed.clone();
-        altered.claims.purpose = "memory-project-page-v1".into();
+        altered.claims.purpose = "codifix-project-page-v1".into();
         assert!(
             trust
                 .verify_device_replica_page(&altered, &request, authority)
