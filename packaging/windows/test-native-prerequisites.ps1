@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Portable contract tests, not native installation/runtime evidence.
 $ErrorActionPreference='Stop'
+$reader=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'native-prerequisites.ps1') -Raw
+$compression=[regex]::Match($reader,'(?m)^\s*Add-Type -AssemblyName System.IO.Compression\s*$')
+if(-not $compression.Success -or $compression.Index -gt $reader.IndexOf('[IO.Compression.ZipArchive]::new')){
+    throw 'Windows PowerShell must load the ZipArchive assembly before extraction'
+}
 . (Join-Path $PSScriptRoot 'native-instance-functions.ps1')
 . (Join-Path $PSScriptRoot 'native-prerequisites-functions.ps1')
 $hash='a'*64

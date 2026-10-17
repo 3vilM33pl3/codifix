@@ -67,6 +67,9 @@ try {
             }
             Set-NativePrivateDirectory $stage
             $journal.phase='staging'; Write-NativeJournal $receipt $journal
+            # Windows PowerShell 5.1 does not load ZipArchive merely by loading
+            # the separate ZipFile extension assembly.
+            Add-Type -AssemblyName System.IO.Compression
             Add-Type -AssemblyName System.IO.Compression.FileSystem
             $archive = [IO.Compression.ZipArchive]::new($package,[IO.Compression.ZipArchiveMode]::Read,$true)
             try {
