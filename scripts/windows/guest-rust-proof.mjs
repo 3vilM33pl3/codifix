@@ -38,6 +38,7 @@ const positive = await grader(options);
 assert.equal(positive.success, true);
 const negative = await grader({ ...options, files: { 'src/main.rs': 'fn main(){println!("wrong");}' } });
 assert.equal(negative.success, false);
+assert.equal(negative.probes[0].exitCode, 0, 'wrong output must fail scoring, not compilation or execution');
 const broken = await grader({ ...options, files: { 'src/main.rs': 'not valid rust' } });
 assert.equal(broken.success, false);
 assert.equal(broken.probes[0].exitCode, 65);
