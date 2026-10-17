@@ -274,7 +274,8 @@ $manifest.payload_files=Get-PackInventory $script:payload
 $null=Get-NativePrerequisitePlan ([pscustomobject]$manifest)
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip=Join-Path $output 'runtime.zip'
-[IO.Compression.ZipFile]::CreateFromDirectory($script:payload,$zip,[IO.Compression.CompressionLevel]::Optimal,$false)
+$fileLimit=if($manifest.kind -ceq 'memory-native-pds-runtime'){65536}else{20000}
+New-NativeCanonicalArchive $script:payload $zip $manifest.payload_files -FileLimit $fileLimit
 $manifest.package_sha256=Get-PackHash $zip
 $null=Get-NativePrerequisitePlan ([pscustomobject]$manifest)
 $manifestPath=Join-Path $output 'runtime.json';Write-PackJson $manifestPath $manifest

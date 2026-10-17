@@ -7,6 +7,7 @@ import unittest
 
 
 SCRIPT = Path(__file__).with_name("guest-core-install.ps1")
+NATIVE_FUNCTIONS = SCRIPT.parents[2] / "packaging/windows/native-instance-functions.ps1"
 
 
 class CoreInstallTests(unittest.TestCase):
@@ -59,13 +60,26 @@ class CoreInstallTests(unittest.TestCase):
         for required in ["[ValidateRange(60000,60999)][int]$InstallerBuild=60000",
                          "installer_build=$InstallerBuild", "'LAB-ONLY-memory-rc5-build'+$InstallerBuild+'.zip'",
                          "New-CoreInstallArchive $payload $package $payloadFiles",
+                         "New-NativeCanonicalArchive $Payload $Package $PayloadFiles",
+                         "Selected LAB-ONLY build already exists; preserve it"]:
+            self.assertIn(required, source)
+        writer = NATIVE_FUNCTIONS.read_text().split("function New-NativeCanonicalArchive", 1)[1].split("function Get-NativeInputDigest", 1)[0]
+        for required in ["[ValidateRange(1,65536)][int]$FileLimit=20000",
                          "$entryName=([string]$item.name).Replace('\\','/');Assert-NativeArchiveName $entryName",
                          "$archive.CreateEntry($entryName,[IO.Compression.CompressionLevel]::Optimal)",
                          "$entryName.EndsWith('/')", "$sha.ComputeHash($inputFile)",
-                         "Selected LAB-ONLY build already exists; preserve it", "$stream.Flush($true)"]:
-            self.assertIn(required, source)
+                         "$entryName -cne $item.name", "ReparsePoint", "[IO.FileMode]::CreateNew", "$stream.Flush($true)"]:
+            self.assertIn(required, writer)
         self.assertNotIn("[IO.Compression.ZipFile]::CreateFromDirectory", source)
         self.assertNotIn("installer_build=60000", source)
+
+    def test_runtime_packages_share_canonical_writer_without_weakening_reader(self):
+        source = SCRIPT.with_name("guest-runtime-pack.ps1").read_text()
+        self.assertIn("$fileLimit=if($manifest.kind -ceq 'memory-native-pds-runtime'){65536}else{20000}", source)
+        self.assertIn("New-NativeCanonicalArchive $script:payload $zip $manifest.payload_files -FileLimit $fileLimit", source)
+        self.assertNotIn("[IO.Compression.ZipFile]::CreateFromDirectory", source)
+        guard = NATIVE_FUNCTIONS.read_text().split("function Assert-NativeArchiveName", 1)[1].split("function New-NativeCanonicalArchive", 1)[0]
+        self.assertIn("$Name.Contains('\\')", guard)
 
     def test_sanitized_installer_environment_preserves_fixed_windows_identity(self):
         source = SCRIPT.read_text()
@@ -108,8 +122,9 @@ class CoreInstallTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("pwsh"), "PowerShell unavailable; native/parser proof remains unclaimed")
     def test_powershell_parser_and_pure_helpers(self):
-        subprocess.run([shutil.which("pwsh"), "-NoProfile", "-File",
-                        str(SCRIPT.with_name("test-core-install.ps1"))], check=True)
+        for test in ["test-core-install.ps1", "test-runtime-pack.ps1"]:
+            subprocess.run([shutil.which("pwsh"), "-NoProfile", "-File",
+                            str(SCRIPT.with_name(test))], check=True)
 
 
 if __name__ == "__main__":

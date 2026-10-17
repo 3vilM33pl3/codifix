@@ -162,6 +162,50 @@ function Assert-NativeArchiveName([string]$Name) {
     }
 }
 
+function New-NativeCanonicalArchive([string]$Root,[string]$Package,$PayloadFiles,
+    [ValidateRange(1,65536)][int]$FileLimit=20000) {
+    Add-Type -AssemblyName System.IO.Compression
+    $assertPath={param([string]$Path)
+        $current=[IO.Path]::GetFullPath($Path)
+        while($current){
+            if((Test-Path -LiteralPath $current) -and ((Get-Item -LiteralPath $current -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)){
+                throw 'Canonical archive paths must not traverse reparse points'
+            }
+            $parent=[IO.Path]::GetDirectoryName($current);if($parent -eq $current){break};$current=$parent
+        }
+    }
+    &$assertPath $Root;&$assertPath $Package
+    if(-not $PayloadFiles -or @($PayloadFiles).Count -gt $FileLimit){throw 'Bounded complete archive inventory required'}
+    $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $stream=[IO.File]::Open($Package,[IO.FileMode]::CreateNew,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+    try{
+        $archive=[IO.Compression.ZipArchive]::new($stream,[IO.Compression.ZipArchiveMode]::Create,$true)
+        try{
+            $total=[int64]0
+            foreach($item in $PayloadFiles){
+                # .NET Framework CreateFromDirectory can emit Windows '\' names.
+                # Inventory and file-only ZIP names are explicitly canonical.
+                $entryName=([string]$item.name).Replace('\','/');Assert-NativeArchiveName $entryName
+                if($entryName -cne $item.name -or $entryName.EndsWith('/') -or -not $seen.Add($entryName) -or $item.sha256 -cnotmatch '^[0-9a-f]{64}$'){
+                    throw 'Duplicate, noncanonical or malformed archive inventory entry'
+                }
+                $path=Join-Path $Root $entryName.Replace('/',[IO.Path]::DirectorySeparatorChar);&$assertPath $path
+                $inputFile=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+                try{
+                    $total+=$inputFile.Length;if($total -gt 2GB){throw 'Expanded archive exceeds 2GiB'}
+                    $sha=[Security.Cryptography.SHA256]::Create()
+                    try{$hash=([BitConverter]::ToString($sha.ComputeHash($inputFile))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose()}
+                    if($hash -cne $item.sha256){throw 'Payload changed before ZIP publication'}
+                    $inputFile.Position=0
+                    $entry=$archive.CreateEntry($entryName,[IO.Compression.CompressionLevel]::Optimal);$output=$entry.Open()
+                    try{$inputFile.CopyTo($output)}finally{$output.Dispose()}
+                }finally{$inputFile.Dispose()}
+            }
+        }finally{$archive.Dispose()}
+        $stream.Flush($true)
+    }finally{$stream.Dispose()}
+}
+
 function Get-NativeInputDigest($Value) {
     $sha = [Security.Cryptography.SHA256]::Create()
     try {

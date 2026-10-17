@@ -115,6 +115,7 @@ try{
     Reject-CoreInstall {New-CoreInstallArchive $payload $zip $inventory}
     if((Get-CoreInstallHash $zip) -cne $zipHash){throw 'Existing ZIP evidence was changed'}
     Reject-CoreInstall {New-CoreInstallArchive $payload (Join-Path $root 'unsafe.zip') @(@{name='../outside';sha256=$memoryPin})}
+    Reject-CoreInstall {New-CoreInstallArchive $payload (Join-Path $root 'noncanonical.zip') @(@{name='web\assets\app.js';sha256=$memoryPin})}
     Reject-CoreInstall {New-CoreInstallArchive $payload (Join-Path $root 'duplicate.zip') @($inventory[0],$inventory[0])}
     [IO.File]::AppendAllText((Join-Path $webAssets 'app.js'),'changed')
     Reject-CoreInstall {New-CoreInstallArchive $payload (Join-Path $root 'changed.zip') $inventory}

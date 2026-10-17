@@ -42,37 +42,7 @@ function Copy-CoreInstallFile([string]$From,[string]$To,[string]$Expected,
     }catch{throw ('Pinned core installation input unavailable or changed: '+$Component)}
 }
 function New-CoreInstallArchive([string]$Payload,[string]$Package,$PayloadFiles){
-    Add-Type -AssemblyName System.IO.Compression
-    Assert-CoreInstallPath $Payload;Assert-CoreInstallPath $Package
-    if(-not $PayloadFiles -or @($PayloadFiles).Count -gt 20000){throw 'Bounded complete lab payload inventory required'}
-    $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    $stream=[IO.File]::Open($Package,[IO.FileMode]::CreateNew,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
-    try{
-        $archive=[IO.Compression.ZipArchive]::new($stream,[IO.Compression.ZipArchiveMode]::Create,$true)
-        try{
-            $total=[int64]0
-            foreach($item in $PayloadFiles){
-                # .NET Framework CreateFromDirectory may emit Windows '\' names.
-                # Write file entries explicitly; the product's strict guard stays unchanged.
-                $entryName=([string]$item.name).Replace('\','/');Assert-NativeArchiveName $entryName
-                if($entryName.EndsWith('/') -or -not $seen.Add($entryName) -or $item.sha256 -cnotmatch '^[0-9a-f]{64}$'){
-                    throw 'Duplicate or malformed lab payload entry'
-                }
-                $path=Join-Path $Payload $entryName.Replace('/',[IO.Path]::DirectorySeparatorChar);Assert-CoreInstallPath $path
-                $inputFile=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
-                try{
-                    $total+=$inputFile.Length;if($total -gt 2GB){throw 'Expanded lab release exceeds 2GiB'}
-                    $sha=[Security.Cryptography.SHA256]::Create()
-                    try{$hash=([BitConverter]::ToString($sha.ComputeHash($inputFile))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose()}
-                    if($hash -cne $item.sha256){throw 'Lab payload changed before ZIP publication'}
-                    $inputFile.Position=0
-                    $entry=$archive.CreateEntry($entryName,[IO.Compression.CompressionLevel]::Optimal);$output=$entry.Open()
-                    try{$inputFile.CopyTo($output)}finally{$output.Dispose()}
-                }finally{$inputFile.Dispose()}
-            }
-        }finally{$archive.Dispose()}
-        $stream.Flush($true)
-    }finally{$stream.Dispose()}
+    New-NativeCanonicalArchive $Payload $Package $PayloadFiles
 }
 function Get-CoreInstallBinding([string]$Text,[guid]$Operation,[guid]$Instance){
     $patterns=@{instance="(?m)^instance_id = '([0-9a-f-]{36})'\r?$";port="(?m)^bind_addr = '127\.0\.0\.1:([0-9]{1,5})'\r?$"

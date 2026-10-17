@@ -19,6 +19,20 @@ try{
     if(Test-Path (Join-Path $script:payload 'notices/changed.txt')){throw 'Changed source was copied before pin validation'}
     $inventory=@(Get-PackInventory $script:payload)
     if($inventory.Count -ne 1 -or $inventory[0].name -cne 'notices/component.txt' -or $inventory[0].sha256 -cne $hash){throw 'Incomplete payload digest inventory'}
+    $zip=Join-Path $root 'runtime.zip';New-NativeCanonicalArchive $script:payload $zip $inventory -FileLimit 65536
+    $zipHash=Get-PackHash $zip
+    $stream=[IO.File]::OpenRead($zip);$archive=[IO.Compression.ZipArchive]::new($stream,[IO.Compression.ZipArchiveMode]::Read)
+    try{
+        if($archive.Entries.Count -ne 1 -or $archive.Entries[0].FullName -cne 'notices/component.txt'){throw 'Runtime ZIP did not use canonical slash entries'}
+        Assert-NativeArchiveName $archive.Entries[0].FullName
+        $inputStream=$archive.Entries[0].Open();$sha=[Security.Cryptography.SHA256]::Create()
+        try{$entryHash=([BitConverter]::ToString($sha.ComputeHash($inputStream))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose();$inputStream.Dispose()}
+        if($entryHash -cne $hash){throw 'Runtime ZIP member bytes changed'}
+    }finally{$archive.Dispose();$stream.Dispose()}
+    Reject-Pack {New-NativeCanonicalArchive $script:payload $zip $inventory}
+    if((Get-PackHash $zip) -cne $zipHash){throw 'Existing runtime package evidence was overwritten'}
+    Reject-Pack {New-NativeCanonicalArchive $script:payload (Join-Path $root 'over-limit.zip') @($inventory[0],$inventory[0]) -FileLimit 1}
+    Reject-Pack {New-NativeCanonicalArchive $script:payload (Join-Path $root 'changed.zip') @(@{name='notices/component.txt';sha256=('0'*64)})}
     Write-PackJson (Join-Path $root 'receipt.json') ([ordered]@{source=$hash;installed=$false})
     $receipt=Read-PackJson (Join-Path $root 'receipt.json')
     if($receipt.source -cne $hash -or $receipt.installed -ne $false){throw 'Packaging receipt changed'}
