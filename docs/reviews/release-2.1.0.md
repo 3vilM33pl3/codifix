@@ -13,9 +13,9 @@ capture `3acbd25f-7ad2-4354-81e3-d02912e611a7`, baseline `0f5fd703`.
 - [x] Checkpoint approved scope and inspect clean pushed main.
 - [x] Align application, workspace, Web, docs and bundled skill metadata to 2.1.0.
 - [x] Stable Linux manifest acceptance and RC/stable ordering with signed-fixture tests.
-- [ ] Packaging/workflow preparation and actual test/Clippy repairs.
+- [x] Packaging/workflow preparation and actual test/Clippy repairs.
 - [ ] Freeze one clean source commit for all builds.
-- [ ] Consolidated required-database Rust and frontend verification.
+- [x] Consolidated local required-database Rust and frontend verification.
 - [ ] Linux Bookworm-compatible packages and ABI/install verification.
 - [ ] Both Mac architectures, standard and runtime-preserving update packages.
 - [ ] Windows native ZIP/user MSI/server-tools MSI and disposable package checks.
@@ -61,3 +61,32 @@ Build/test results and publication hashes will be recorded below as observed.
   and substituted package bytes; positive checksum generation passes.
 - Web/docs audits remain zero. The raw Rust audit retains only the documented
   RSA advisory plus the known yanked-spin warning. Publication rejects new findings.
+
+## Native candidate rehearsal
+
+First run: [39025110663](https://github.com/3vilM33pl3/memory/actions/runs/39025110663),
+source `49be5bb58b000f7bf69278a0dc8ff180d848021c`. This is **not a release pass**:
+
+- Windows setup exposed PowerShell 7 command-line quoting of the MSVC environment
+  script. Raw `ProcessStartInfo` arguments preserve the intended quoting; the
+  corrected command was separately exercised in the existing Windows lab.
+- Hosted Rust tests exposed a desktop-discovery fixture's dependency on a real
+  `~/.codex/sessions` directory. The test now supplies its own directory without
+  modifying `HOME` or relaxing production discovery. All 33 focused tests pass
+  with the actual Codex directory hidden. The normal required-database workspace
+  rerun passes **1,513 tests across 99 groups**, with 14 existing ignored tests.
+- Both Linux architectures compiled and passed static ABI inspection. AMD64's
+  runtime probe initially used Docker's non-executable `/tmp`; validation now
+  uses a dedicated executable, bounded `/candidate` tmpfs. ARM64 then exposed a
+  harness assumption that the positional gateway accepts `--help`. It now checks
+  the exact no-config rejection, with a timeout; loader errors remain failures.
+- Build caches are retained after failed, non-cancelled candidate checks. No
+  failed package is promoted or relabelled; the replacement run rebuilds every
+  platform from one new commit.
+- Windows packages require the separately installed Visual C++ v14 x64 runtime.
+  The builder records actual direct PE imports for every shipped executable;
+  it does not silently bundle a runtime or claim clean-machine acceptance.
+
+A supplemental full-suite user-namespace run is not acceptance evidence: mapping
+root-owned ancestors to an unmapped UID correctly triggers protected-file checks.
+The successful full-suite result above uses the normal required-database runner.
