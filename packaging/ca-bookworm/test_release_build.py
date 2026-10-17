@@ -79,6 +79,23 @@ class ReleaseBuildTests(unittest.TestCase):
         self.work.chmod(0o755)
         self.assertNotEqual(self.build().returncode, 0)
 
+    def test_gateway_probe_accepts_only_exact_missing_argument_error(self):
+        # Execute the actual bounded probe used by the release harness. Loader
+        # failure, timeout, malformed output and unexpected success must reject.
+        probe = "gateway_status=0\n" + SCRIPT.read_text().split("  gateway_status=0\n", 1)[1].split("  test -s", 1)[0]
+        fake = self.root / "fake-gateway"
+        fake.write_text('#!/bin/sh\nprintf "%s\\n" "$FAKE_OUTPUT"\nexit "$FAKE_STATUS"\n')
+        fake.chmod(0o700)
+        expected = 'Error: "expected private gateway configuration file"'
+        for status, output, accepted in ((1, expected, True), (126, expected, False),
+                                         (124, expected, False), (0, expected, False),
+                                         (1, "configuration unavailable", False)):
+            with self.subTest(status=status, output=output):
+                environment = dict(os.environ, FAKE_STATUS=str(status), FAKE_OUTPUT=output)
+                result = subprocess.run(["bash", "-euc", 'runner=(); binaries=(unused unused unused "$1");\n' + probe,
+                                         "bash", str(fake)], env=environment, capture_output=True, timeout=20)
+                self.assertEqual(result.returncode == 0, accepted)
+
 
 if __name__ == "__main__":
     unittest.main()
