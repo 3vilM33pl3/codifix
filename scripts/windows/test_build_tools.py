@@ -7,6 +7,19 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_portability_rerun_is_exactly_four_packages_not_workspace(self):
+        script=(Path(__file__).parent/'guest-native-db.ps1').read_text()
+        self.assertIn("'Portability' {'native-portability-db'}",script)
+        self.assertIn("$receipt.packages=@('mem-cli','mem-config','mem-eval','mem-federation-runtime')",script)
+        self.assertIn("$receipt.whole_workspace_verified=$false",script)
+        branch=script.split("elseif ($Scope -eq 'Portability')",1)[1].split("elseif",1)[0]
+        for required in ["'test'", "'-p','mem-cli'", "'-p','mem-config'", "'-p','mem-eval'",
+                         "'-p','mem-federation-runtime'", "'--all-targets'", "'--locked'",
+                         "'--no-fail-fast'", "'--test-threads=1'"]:
+            self.assertIn(required,branch)
+        self.assertNotIn("'--workspace'",branch)
+        self.assertNotIn("'--ignored'",branch)
+
     def test_native_database_tests_use_only_the_existing_disposable_cluster(self):
         script=(Path(__file__).parent/'guest-native-db.ps1').read_text()
         for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", "'test-password.dpapi'",
