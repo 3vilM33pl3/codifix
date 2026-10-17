@@ -218,7 +218,7 @@ jobs:
         with:
           name: linux-${{ matrix.arch }}
           path: target/linux-package
-      - name: Native install, service, capture and search checks
+      - name: Native package install, upgrade, repair and removal checks
         env:
           VERSION: ${{ needs.contract.outputs.version }}
           ARCH: ${{ matrix.arch }}
