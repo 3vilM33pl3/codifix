@@ -66,7 +66,8 @@ operational evidence directory below.
   access and both scoped stdio wrappers passed. Watch manager, Workshop/Homelab
   watchers and existing embedding bridges/timers are restored. The General latch
   was confirmed stale and archived; normal scheduling resumed without a manual
-  provider call.
+  provider call. After crash recovery, this Codex session exposes the renamed
+  primary and scoped Codifix MCP tools; other existing clients may still need reload.
 - CA stays on its existing installation. Any change there requires Olivier's
   approval; SSH remains disabled. CA work does not block other participants.
 
@@ -87,11 +88,18 @@ The current area binary SHA-256 is
 `94e50052aed58b3d5e227f2cafb801805a19114b81e95347e14c479166d3f8c3`.
 Website behavior was verified at source `79186b2f494c9ca92de5c42dc79dd86fbe20bbd7`.
 Source validation, Linux candidate builds and both Linux installation acceptance
-jobs passed. Apple Silicon build/native acceptance also passed; Mac Intel and
-Windows builds continue separately. Candidate run 39068603586
-predates the gateway fix; final public packages must include it. These builds
-do not gate the running Monolith applications.
+jobs passed. Apple Silicon build/native acceptance and Windows x64 also passed.
+Superseded candidate run `39068603586` predates the gateway fix and was cancelled
+while its remaining Intel Mac build was running, freeing the release concurrency
+slot. Its completed artifacts are retained, including the staged Mac installer.
+These builds do not gate the running Monolith applications.
 
-Corrected unpublished candidate run `39073102523` is queued at source
-`66c2d1ecc4ca9b0c052e1d854f71a0703f998b71`, including the gateway fix. No public
-release or tag has been published.
+Corrected unpublished candidate run `39073102523` is running at source
+`66c2d1ecc4ca9b0c052e1d854f71a0703f998b71`, including the gateway fix. The crash
+recovery snapshot showed Linux amd64/arm64 and Apple Silicon builds active with
+no failures reported. No public release or tag has been published.
+
+Crash recovery reconfirmed all three Monolith area health checks. The Mac
+installer has not yet run: the Codifix binary, runtime and package receipt are
+absent, and all seven original jobs remain loaded. Its verified installer still
+requires local administrator authentication; activation remains pending.
