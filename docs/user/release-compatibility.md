@@ -1,12 +1,23 @@
 # Release Compatibility And Known Limitations
 
-Memory Layer v2.0.1 is the current stable release. It retains the v2.0.0
-application behavior and repairs release-artifact compatibility with databases
-that already applied migrations 33 through 52. The v2 line is a breaking major
-release that simplifies the runtime and prepares the record model for future
-federation work. Existing PostgreSQL databases migrate in place, and bundle v1
-imports remain supported, but v1 clients and configuration should be reviewed
-before upgrading.
+Memory Layer v2.1.0 is the current stable release. It adds private federation,
+project/device onboarding, curated project synchronization and durable jobs.
+Windows packages remain a preview of client/operator functionality, not a
+complete native PostgreSQL/PDS/Pi installation. Existing PostgreSQL databases
+migrate in place; back them up before starting the new application.
+
+Version 2.1.0 embeds migrations through 0084. Already-applied migrations are
+unchanged. Do not run an older executable against a newer database. Named
+instances require an explicit selected-instance upgrade; downloading or
+installing a package does not replace independently pinned instance releases.
+For a bundled Mac installation, use the architecture-matched
+`application-update.pkg` to preserve its runtime; standard packages require
+separately provisioned dependencies and refuse to replace bundled runtimes.
+
+See the [2.1.0 changelog](../../CHANGELOG.md) and
+[dependency security evidence](../reviews/security-dependencies-20261017.md).
+The unpatched upstream RSA advisory is retained, not suppressed; the inspected
+OIDC path uses public-key verification rather than private-key operations.
 
 Read the [v2.0.0 release](https://github.com/3vilM33pl3/memory/releases/tag/v2.0.0)
 and [changelog](../../CHANGELOG.md) before updating a v1 production installation.
@@ -118,8 +129,11 @@ GitHub Releases publish the supported native installer set:
 - Windows x86_64 portable archive: `memory-layer-<version>-windows-x86_64.zip`
 - Homebrew source archive: `memory-<version>.tar.gz`
 
-For v2.0.1, replace `<version>` with `2.0.1`. Every published package has a
-matching `.sha256` checksum file.
+For v2.1.0, replace `<version>` with `2.1.0`. Mac application-update installers
+have the additional `-application-update.pkg` suffix. Windows preview filenames
+include `-build.1`; the server-tools MSI is tools-only, not a bundled server.
+Use the release's exact asset inventory and `SHA256SUMS` rather than guessing
+filenames. Every published package has a matching `.sha256` checksum file.
 
 The Debian arm64 package targets 64-bit ARM Linux, including Raspberry Pi 4/5
 systems running a 64-bit Debian-family OS. Windows ARM64 and 32-bit Raspberry Pi

@@ -1,15 +1,15 @@
 ---
 title: "Update"
-description: "Upgrade to Memory Layer v2.0.0 safely, including backups, breaking changes, migrations, and verification."
+description: "Upgrade to Memory Layer v2.1.0 safely, including backups, breaking changes, migrations, and verification."
 ---
 
 # Update
 
-Memory Layer v2.0.0 is the current stable release. It is a breaking major
+Memory Layer v2.1.0 is the current stable release. It is a breaking major
 upgrade from v1: PostgreSQL data migrates in place and old bundles still import,
 but direct API clients, configuration, and renamed CLI commands need review.
 
-Read the [v2.0.0 release notes](https://github.com/3vilM33pl3/memory/releases/tag/v2.0.0)
+Read the [v2.1.0 release notes](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0)
 before upgrading a production installation.
 
 ## 1. Back up and inspect
@@ -52,19 +52,19 @@ memory bundle export --project <project-slug> --out <project-slug>-before-v2.mlb
 - Expect new bundle exports to use deterministic schema v2. Existing schema v1
   bundles remain importable.
 
-## 3. Install v2.0.0
+## 3. Install v2.1.0
 
 Choose the command for the way you installed Memory Layer.
 
 ### Debian or Ubuntu
 
-Download the matching v2.0.0 `.deb` and checksum from
-[GitHub Releases](https://github.com/3vilM33pl3/memory/releases/tag/v2.0.0),
+Download the matching v2.1.0 `.deb` and checksum from
+[GitHub Releases](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0),
 verify the checksum, then install it:
 
 ```bash
-sha256sum -c memory-layer_2.0.0_amd64.deb.sha256
-sudo dpkg -i memory-layer_2.0.0_amd64.deb
+sha256sum -c memory-layer_2.1.0_amd64.deb.sha256
+sudo dpkg -i memory-layer_2.1.0_amd64.deb
 ```
 
 Use the `arm64` filenames on 64-bit ARM Linux.
@@ -78,27 +78,37 @@ brew upgrade 3vilM33pl3/memory/memory-layer
 
 ### macOS package or Windows MSI
 
-Download the v2.0.0 installer and matching checksum from the release page, then
-run it over the existing installation. Windows remains a per-user install under
-`%LOCALAPPDATA%\Programs\Memory Layer`.
+Download the architecture-matched v2.1.0 installer and checksum. For a bundled
+Mac installation, choose the **application-update** package: it preserves the
+existing PostgreSQL/runtime tree. The standard package requires separately
+provisioned dependencies and refuses to overwrite a bundled runtime.
+
+Windows is a **preview**. Use the exact `-build.1` filenames in the release;
+the per-user installer uses `%LOCALAPPDATA%\Programs\Memory Layer`. Its separate
+server-tools MSI does not install the complete PostgreSQL/PDS/Pi stack.
+Signing and notarization status are stated in the release notes.
 
 ### Source checkout
 
-Check out the signed `v2.0.0` tag, build with `--locked`, and follow the same
+Check out the `v2.1.0` tag, build with `--locked`, and follow the same
 service restart and verification steps as your original source installation.
 
 ## 4. Restart and migrate
 
 ```bash
-memory service restart-all
+memory service restart
 memory doctor
 memory health
 memory status --project <project-slug>
 ```
 
-The service applies append-only migrations 0027-0032 at startup. Do not run a
-v1 binary against the migrated database. To roll back, restore the database
-backup and the previous binary/config together.
+The service embeds append-only migrations through 0084 and applies pending
+migrations at startup. Restart only the selected installation after reviewing
+its configuration and database. Named instances need their explicit upgrade
+procedure; package installation does not switch independently pinned releases.
+Do not run an older binary against the migrated database. Once new writes have
+been accepted, preserve them and recover forward rather than restoring stale
+state as authority.
 
 Refresh repo-local Memory Layer skills only after reviewing the preview:
 

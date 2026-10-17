@@ -5,12 +5,12 @@ description: "The Memory Layer v2 compatibility boundary, advanced surfaces, and
 
 # Known limitations
 
-Memory Layer v2.0.0 is the current stable release. It is a breaking major
+Memory Layer v2.1.0 is the current stable release. It is a breaking major
 release: databases migrate in place and bundle v1 imports remain supported,
 but v1 clients, direct API integrations, and configuration need review before
 an upgrade.
 
-Read the [v2.0.0 release notes](https://github.com/3vilM33pl3/memory/releases/tag/v2.0.0)
+Read the [v2.1.0 release notes](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0)
 and [Update guide](/docs/install/update) before changing a production install.
 
 ## v2 compatibility targets
@@ -25,6 +25,10 @@ and [Update guide](/docs/install/update) before changing a production install.
 | Packages | Debian amd64/arm64, Homebrew, macOS Intel/Apple Silicon, and Windows x86_64 are release targets. |
 
 ## Advanced surfaces
+
+Windows 2.1.0 packages are a **preview** of client/operator tools. They do not
+bundle the complete native PostgreSQL/PDS/Pi stack or establish full Windows
+parity. Publication does not upgrade existing installations.
 
 | Surface | Limitation |
 |---|---|
@@ -66,8 +70,10 @@ memory status --project <project-slug>
 memory upgrade --dry-run
 ```
 
-The service applies migrations 0027-0032 at startup. Do not run an older binary
-against a migrated database; restore the pre-upgrade backup if you need to roll
-back. Review `memory upgrade --dry-run` before refreshing repo-local skills.
+The service embeds append-only migrations through 0084 and applies pending ones
+at startup. Do not run an older binary against a migrated database. After new
+writes, preserve accepted work and recover forward rather than restoring a
+stale database as authority. Review `memory upgrade --dry-run` before refreshing
+repo-local skills. Restart only the selected installation, not unrelated areas.
 
 Read [Operations](/docs/operations), [Doctor and health](/docs/help/doctor-and-health), or [Update](/docs/install/update).
