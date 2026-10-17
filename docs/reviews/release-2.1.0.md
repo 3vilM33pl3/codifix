@@ -22,7 +22,7 @@ capture `3acbd25f-7ad2-4354-81e3-d02912e611a7`, baseline `0f5fd703`.
 - [x] Astra final review, exact artifact inventory and checksums.
 - [x] Publish stable/latest release and verify downloaded assets.
 - [x] Update both Homebrew formula entrypoints to verified published source hash.
-- [ ] Commit/push final evidence, verify approved plan and remember result.
+- [x] Commit/push final evidence, verify approved plan and remember result.
 
 ## Boundaries
 
@@ -163,3 +163,9 @@ The published [release instructions](../releases/2.1.0.md) retain package
 prerequisites, migration/recovery guidance, unsigned/notarization status, the RSA
 limitation and Windows-preview/unbundled-stack boundaries. Full Windows parity,
 clean-PC runtime acceptance, paid R3 evaluation and live upgrades remain separate.
+
+Workshop `finish-plan-execution` verifies **22/22** approved checklist items,
+records and curates implementation memory `c764caaf-fe3f-416d-8493-7d6dd59cd1b0`
+(capture `8468ddf7-bde7-469a-a2d8-524597f6272b`), and archives the completed plan.
+The final local source/evidence tree is committed and pushed to `main`; the
+release tag remains pinned to the original frozen artifact commit.
