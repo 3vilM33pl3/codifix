@@ -93,6 +93,87 @@ pub fn prepare_io(root: &Path, request_id: uuid::Uuid) -> Result<PreparedIo> {
 }
 
 #[derive(Serialize)]
+pub struct OuterJob {
+    format: &'static str,
+    caller_pid: u32,
+    helper_pid: u32,
+    kill_on_close: bool,
+    breakaway_allowed: bool,
+}
+
+/// Read-only preflight for trusted Node orchestration. Its spawned helpers and
+/// services must inherit a non-breakaway kill-on-close Job owned by the outer
+/// native campaign launcher. This does not create or modify any Job or ACL.
+pub fn verify_outer_job(caller_pid: u32) -> Result<OuterJob> {
+    use std::mem::size_of_val;
+    use windows_sys::Win32::System::JobObjects::{
+        JOB_OBJECT_LIMIT_BREAKAWAY_OK, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JobObjectBasicProcessIdList, JobObjectExtendedLimitInformation, QueryInformationJobObject,
+    };
+    ensure!(
+        caller_pid != 0 && caller_pid != std::process::id(),
+        "distinct caller process required"
+    );
+    let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+    ensure!(
+        unsafe {
+            QueryInformationJobObject(
+                null_mut(),
+                JobObjectExtendedLimitInformation,
+                (&mut limits as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                size_of_val(&limits) as u32,
+                null_mut(),
+            )
+        } != 0,
+        "trusted orchestration requires an outer Job"
+    );
+    let flags = limits.BasicLimitInformation.LimitFlags;
+    ensure!(
+        flags & JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE != 0
+            && flags & (JOB_OBJECT_LIMIT_BREAKAWAY_OK | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK) == 0,
+        "outer Job must kill on close and forbid breakaway"
+    );
+    #[repr(C)]
+    struct Members {
+        assigned: u32,
+        returned: u32,
+        ids: [usize; 4096],
+    }
+    let mut members = Members {
+        assigned: 0,
+        returned: 0,
+        ids: [0; 4096],
+    };
+    ensure!(
+        unsafe {
+            QueryInformationJobObject(
+                null_mut(),
+                JobObjectBasicProcessIdList,
+                (&mut members as *mut Members).cast(),
+                size_of_val(&members) as u32,
+                null_mut(),
+            )
+        } != 0
+            && members.assigned == members.returned
+            && (2..=4096).contains(&members.returned),
+        "outer Job process inventory unavailable or excessive"
+    );
+    let ids = &members.ids[..members.returned as usize];
+    ensure!(
+        ids.contains(&(caller_pid as usize)) && ids.contains(&(std::process::id() as usize)),
+        "caller is not a member of the helper's outer Job"
+    );
+    Ok(OuterJob {
+        format: "memory-windows-trusted-outer-job-v1",
+        caller_pid,
+        helper_pid: std::process::id(),
+        kill_on_close: true,
+        breakaway_allowed: false,
+    })
+}
+
+#[derive(Serialize)]
 pub struct Artifact {
     pub source: String,
     pub file: String,
@@ -499,6 +580,80 @@ mod tests {
             .unwrap();
         assert!(status.success());
         assert!(prepare_io(&base, uuid::Uuid::new_v4()).is_err());
+        std::fs::remove_dir_all(base).unwrap();
+    }
+    #[test]
+    fn native_outer_job_fixture_process() {
+        match std::env::var("MEMORY_OUTER_JOB_FIXTURE").as_deref() {
+            Ok("root") => {
+                let status = std::process::Command::new(std::env::current_exe().unwrap())
+                    .args([
+                        "--exact",
+                        "windows_evaluation_helper::tests::native_outer_job_fixture_process",
+                        "--nocapture",
+                    ])
+                    .env_clear()
+                    .env("MEMORY_OUTER_JOB_FIXTURE", "leaf")
+                    .env("MEMORY_OUTER_JOB_CALLER", std::process::id().to_string())
+                    .status()
+                    .unwrap();
+                assert!(status.success());
+            }
+            Ok("leaf") => {
+                let caller = std::env::var("MEMORY_OUTER_JOB_CALLER")
+                    .unwrap()
+                    .parse()
+                    .unwrap();
+                let receipt = verify_outer_job(caller).unwrap();
+                assert!(receipt.kill_on_close);
+                assert!(!receipt.breakaway_allowed);
+                assert_eq!(receipt.caller_pid, caller);
+                assert_eq!(receipt.helper_pid, std::process::id());
+                assert!(verify_outer_job(u32::MAX).is_err());
+                assert!(verify_outer_job(0).is_err());
+                assert!(verify_outer_job(std::process::id()).is_err());
+                std::fs::write("verified.json", serde_json::to_vec(&receipt).unwrap()).unwrap();
+            }
+            _ => {}
+        }
+    }
+    #[test]
+    fn native_outer_job_verifies_exact_caller_membership_without_changing_job() {
+        let base = std::env::temp_dir().join(format!("memory-outer-job-{}", uuid::Uuid::new_v4()));
+        create_private_directory(&base).unwrap();
+        let stdout = File::create(base.join("stdout")).unwrap();
+        let stderr = File::create(base.join("stderr")).unwrap();
+        let process = crate::windows_trusted_process::spawn(
+            &std::env::current_exe().unwrap(),
+            &[
+                "--exact".into(),
+                "windows_evaluation_helper::tests::native_outer_job_fixture_process".into(),
+                "--nocapture".into(),
+            ],
+            &base,
+            &[("MEMORY_OUTER_JOB_FIXTURE".into(), "root".into())],
+            &stdout,
+            &stderr,
+        )
+        .unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(15);
+        loop {
+            if let Some(code) = process.try_wait().unwrap() {
+                assert_eq!(code, 0);
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(10));
+        }
+        let value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(base.join("verified.json")).unwrap()).unwrap();
+        assert_eq!(value["format"], "memory-windows-trusted-outer-job-v1");
+        while process.active_processes().unwrap() != 0 {
+            assert!(std::time::Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(10));
+        }
+        drop(process);
+        drop((stdout, stderr));
         std::fs::remove_dir_all(base).unwrap();
     }
     #[test]

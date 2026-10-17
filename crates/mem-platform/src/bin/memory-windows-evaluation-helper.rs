@@ -10,6 +10,17 @@ fn main() {
 fn main() {
     use std::path::Path;
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.len() == 2 && args[0] == "--verify-outer-job" {
+        if let Some(pid) = args[1].to_str().and_then(|value| value.parse::<u32>().ok())
+            && let Ok(receipt) = mem_platform::windows_evaluation_helper::verify_outer_job(pid)
+            && let Ok(json) = serde_json::to_string(&receipt)
+        {
+            println!("{json}");
+            return;
+        }
+        eprintln!("native trusted outer Job verification failed; no payload should be written");
+        std::process::exit(1);
+    }
     if args.len() == 4 && args[0] == "--prepare-io" && args[2] == "--request-id" {
         let id = args[3]
             .to_str()
