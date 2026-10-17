@@ -28,7 +28,7 @@ class CoreInstallTests(unittest.TestCase):
 
     def test_real_installer_preview_digest_and_separate_build_provenance(self):
         source = SCRIPT.read_text()
-        for required in ["Get-WindowsReleaseIdentity '2.1.0-rc.5' 60000", "lab_only=$true;release_candidate=$false",
+        for required in ["Get-WindowsReleaseIdentity '2.1.0-rc.5' $InstallerBuild", "lab_only=$true;release_candidate=$false",
                          "installer_source_commit=$head;binary_source_commit=$build.source_commit",
                          "'native-instance.ps1'", "'-Action','Preview','-PreviewAction','Install'",
                          "'-Action','Install','-ExpectedInputSha256',$preview.input_sha256",
@@ -53,6 +53,19 @@ class CoreInstallTests(unittest.TestCase):
                          "Pinned core installation input unavailable or changed: '+$Component"]:
             self.assertIn(required, source)
         self.assertNotIn("Copy-CoreInstallFile (Join-Path $debug $file)", source)
+
+    def test_zip_names_are_explicit_canonical_files_and_new_builds_do_not_rebind(self):
+        source = SCRIPT.read_text()
+        for required in ["[ValidateRange(60000,60999)][int]$InstallerBuild=60000",
+                         "installer_build=$InstallerBuild", "'LAB-ONLY-memory-rc5-build'+$InstallerBuild+'.zip'",
+                         "New-CoreInstallArchive $payload $package $payloadFiles",
+                         "$entryName=([string]$item.name).Replace('\\','/');Assert-NativeArchiveName $entryName",
+                         "$archive.CreateEntry($entryName,[IO.Compression.CompressionLevel]::Optimal)",
+                         "$entryName.EndsWith('/')", "$sha.ComputeHash($inputFile)",
+                         "Selected LAB-ONLY build already exists; preserve it", "$stream.Flush($true)"]:
+            self.assertIn(required, source)
+        self.assertNotIn("[IO.Compression.ZipFile]::CreateFromDirectory", source)
+        self.assertNotIn("installer_build=60000", source)
 
     def test_sanitized_installer_environment_preserves_fixed_windows_identity(self):
         source = SCRIPT.read_text()

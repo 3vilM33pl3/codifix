@@ -6,11 +6,13 @@
 # Example inputs (the same completed core operation is deliberately reused):
 # -OperationId 399bb47c-2931-46e5-967f-e5c88625eb26
 # -InstallOperationId <fresh-UUID-for-this-install-attempt>
+# -InstallerBuild 60001 # Fresh LAB-ONLY identity for corrected package inputs.
 # -BuildOperationId 19627f7d-bc81-4a6a-ab2d-7db3312447fe
 # -SourceRoot C:\MemoryLab\source\<committed-operator-copy>
 # -WebRoot C:\MemoryLab\source\native-stack-v6\web\dist
 [CmdletBinding()]
-param([guid]$OperationId,[guid]$InstallOperationId,[guid]$BuildOperationId,[string]$SourceRoot,[string]$WebRoot,[switch]$FunctionsOnly)
+param([guid]$OperationId,[guid]$InstallOperationId,[guid]$BuildOperationId,[string]$SourceRoot,[string]$WebRoot,
+    [ValidateRange(60000,60999)][int]$InstallerBuild=60000,[switch]$FunctionsOnly)
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 function Assert-CoreInstallPath([string]$Path){
     $current=[IO.Path]::GetFullPath($Path)
@@ -38,6 +40,39 @@ function Copy-CoreInstallFile([string]$From,[string]$To,[string]$Expected,
             try{$inputFile.CopyTo($outputFile);$outputFile.Flush($true)}finally{$outputFile.Dispose()}}finally{$inputFile.Dispose()}
         if((Get-CoreInstallHash $To) -cne $Expected){throw 'Private payload pin differs'}
     }catch{throw ('Pinned core installation input unavailable or changed: '+$Component)}
+}
+function New-CoreInstallArchive([string]$Payload,[string]$Package,$PayloadFiles){
+    Add-Type -AssemblyName System.IO.Compression
+    Assert-CoreInstallPath $Payload;Assert-CoreInstallPath $Package
+    if(-not $PayloadFiles -or @($PayloadFiles).Count -gt 20000){throw 'Bounded complete lab payload inventory required'}
+    $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $stream=[IO.File]::Open($Package,[IO.FileMode]::CreateNew,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+    try{
+        $archive=[IO.Compression.ZipArchive]::new($stream,[IO.Compression.ZipArchiveMode]::Create,$true)
+        try{
+            $total=[int64]0
+            foreach($item in $PayloadFiles){
+                # .NET Framework CreateFromDirectory may emit Windows '\' names.
+                # Write file entries explicitly; the product's strict guard stays unchanged.
+                $entryName=([string]$item.name).Replace('\','/');Assert-NativeArchiveName $entryName
+                if($entryName.EndsWith('/') -or -not $seen.Add($entryName) -or $item.sha256 -cnotmatch '^[0-9a-f]{64}$'){
+                    throw 'Duplicate or malformed lab payload entry'
+                }
+                $path=Join-Path $Payload $entryName.Replace('/',[IO.Path]::DirectorySeparatorChar);Assert-CoreInstallPath $path
+                $inputFile=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+                try{
+                    $total+=$inputFile.Length;if($total -gt 2GB){throw 'Expanded lab release exceeds 2GiB'}
+                    $sha=[Security.Cryptography.SHA256]::Create()
+                    try{$hash=([BitConverter]::ToString($sha.ComputeHash($inputFile))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose()}
+                    if($hash -cne $item.sha256){throw 'Lab payload changed before ZIP publication'}
+                    $inputFile.Position=0
+                    $entry=$archive.CreateEntry($entryName,[IO.Compression.CompressionLevel]::Optimal);$output=$entry.Open()
+                    try{$inputFile.CopyTo($output)}finally{$output.Dispose()}
+                }finally{$inputFile.Dispose()}
+            }
+        }finally{$archive.Dispose()}
+        $stream.Flush($true)
+    }finally{$stream.Dispose()}
 }
 function Get-CoreInstallBinding([string]$Text,[guid]$Operation,[guid]$Instance){
     $patterns=@{instance="(?m)^instance_id = '([0-9a-f-]{36})'\r?$";port="(?m)^bind_addr = '127\.0\.0\.1:([0-9]{1,5})'\r?$"
@@ -152,11 +187,11 @@ $null=New-Item -ItemType Directory -Path $root
 $sid=$identity.User.Value
 & "$env:SystemRoot\System32\icacls.exe" $root /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 if($LASTEXITCODE){throw 'Private installation rehearsal directory required'}
-$releaseIdentity=Get-WindowsReleaseIdentity '2.1.0-rc.5' 60000
+$releaseIdentity=Get-WindowsReleaseIdentity '2.1.0-rc.5' $InstallerBuild
 $release=Join-Path ([Environment]::GetFolderPath('ProgramFiles')) ('Memory Layer\releases\'+$releaseIdentity.release_identity)
-if(Test-Path -LiteralPath $release){throw 'LAB-ONLY build60000 already exists; preserve it for reconciliation'}
+if(Test-Path -LiteralPath $release){throw 'Selected LAB-ONLY build already exists; preserve it and select a fresh build identity'}
 $receipt=[ordered]@{format='memory-native-core-install-v1';state='running';operation_id=$InstallOperationId.ToString();core_operation_id=$OperationId.ToString();lab_only=$true;release_candidate=$false
-    installer_build=60000;installer_source_commit=$head;binary_source_commit=$build.source_commit;core_source_commit=$core.source_commit
+    installer_build=$InstallerBuild;installer_source_commit=$head;binary_source_commit=$build.source_commit;core_source_commit=$core.source_commit
     build_operation_id=$BuildOperationId.ToString();build_receipt_sha256=(Get-CoreInstallHash $buildPath);core_receipt_sha256=(Get-CoreInstallHash $corePath)
     script_sha256=(Get-CoreInstallHash $PSCommandPath);service_name=$serviceName;instance=$instance.ToString();database_reused=$true
     real_provider_calls=0;installation_verified=$false;scm_virtual_identity_verified=$false;health_verified=$false;web_verified=$false;search_verified=$false
@@ -213,9 +248,9 @@ try{
     $payloadFiles=@(Get-ChildItem -LiteralPath $payload -Recurse -File | Sort-Object FullName | ForEach-Object {
         @{name=$_.FullName.Substring($payload.Length+1).Replace('\','/');sha256=(Get-CoreInstallHash $_.FullName)}})
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $package=Join-Path $root 'LAB-ONLY-memory-rc5-build60000.zip'
-    [IO.Compression.ZipFile]::CreateFromDirectory($payload,$package,[IO.Compression.CompressionLevel]::Optimal,$false)
-    $manifest=[ordered]@{schema_version=1;platform='windows-x86_64';application_version='2.1.0-rc.5';installer_build=60000
+    $package=Join-Path $root ('LAB-ONLY-memory-rc5-build'+$InstallerBuild+'.zip')
+    New-CoreInstallArchive $payload $package $payloadFiles
+    $manifest=[ordered]@{schema_version=1;platform='windows-x86_64';application_version='2.1.0-rc.5';installer_build=$InstallerBuild
         release_identity=$releaseIdentity.release_identity;installer_version=$releaseIdentity.installer_version;lab_only=$true;release_candidate=$false
         signing_status='unsigned-lab-debug';native_stack_bundled=$false;payload_files=$payloadFiles
         artifacts=@(@{name=[IO.Path]::GetFileName($package);sha256=(Get-CoreInstallHash $package)})}
