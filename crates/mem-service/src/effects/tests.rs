@@ -180,6 +180,19 @@ fn project_policy_cannot_write_another_root_or_follow_an_escaping_symlink() {
     std::fs::remove_dir_all(root).unwrap();
 }
 
+#[test]
+fn atomic_file_replacement_confirms_creation_and_existing_target() {
+    let root = std::env::temp_dir().join(format!("memory-effects-atomic-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let path = root.join("configuration with spaces.toml");
+    atomic_replace(&path, b"first = true\n", Uuid::new_v4()).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), b"first = true\n");
+    atomic_replace(&path, b"second = true\n", Uuid::new_v4()).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), b"second = true\n");
+    assert_eq!(std::fs::read_dir(&root).unwrap().count(), 1);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
 #[tokio::test]
 async fn acknowledged_file_writes_are_serialized_and_failed_ack_is_not_rollback() {
     let Some(pool) = mem_test_support::migrated_pool().await else {

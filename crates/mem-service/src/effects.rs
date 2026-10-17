@@ -264,8 +264,20 @@ fn atomic_replace(path: &Path, bytes: &[u8], id: Uuid) -> std::io::Result<()> {
     }
     file.write_all(bytes)?;
     file.sync_all()?;
-    std::fs::rename(&temporary, path)?;
-    std::fs::File::open(parent)?.sync_all()?;
+    drop(file);
+    #[cfg(windows)]
+    {
+        // Windows cannot open/flush a directory like a POSIX file. Use the
+        // shared same-directory write-through replacement after flushing and
+        // closing the new file; never label an applied rename a failed write
+        // merely because a Unix-only directory flush is unavailable.
+        mem_platform::private_windows::replace_file(&temporary, path)?;
+    }
+    #[cfg(not(windows))]
+    {
+        std::fs::rename(&temporary, path)?;
+        std::fs::File::open(parent)?.sync_all()?;
+    }
     Ok(())
 }
 
