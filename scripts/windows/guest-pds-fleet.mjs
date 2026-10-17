@@ -25,23 +25,31 @@ const actualFiles = new Set();
 const inventoryTree = async directory => {
   const metadata = await fs.lstat(directory);
   assert(metadata.isDirectory() && !metadata.isSymbolicLink(), 'runtime reparse directory');
-  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
-    const file = path.join(directory, entry.name), info = await fs.lstat(file);
-    assert(!info.isSymbolicLink(), 'runtime reparse entry');
-    if (info.isDirectory()) await inventoryTree(file);
-    else {
-      assert(info.isFile(), 'runtime special entry');
-      assert(actualFiles.size < 65536, 'runtime inventory limit');
-      actualFiles.add(path.relative(runtime, file).replaceAll('\\', '/'));
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  for (let offset = 0; offset < entries.length; offset += 16) {
+    const selected = await Promise.all(entries.slice(offset, offset + 16).map(async entry => {
+      const file = path.join(directory, entry.name);
+      return { file, info: await fs.lstat(file) };
+    }));
+    for (const { file, info } of selected) {
+      assert(!info.isSymbolicLink(), 'runtime reparse entry');
+      if (info.isDirectory()) await inventoryTree(file);
+      else {
+        assert(info.isFile(), 'runtime special entry');
+        assert(actualFiles.size < 65536, 'runtime inventory limit');
+        actualFiles.add(path.relative(runtime, file).replaceAll('\\', '/'));
+      }
     }
   }
 };
 await inventoryTree(runtime);
 assert.equal(actualFiles.size, prepared.files.length, 'runtime file inventory changed');
-for (const item of prepared.files) {
-  assert(!path.win32.isAbsolute(item.path) && !item.path.includes('..') && !item.path.includes(':'));
-  assert(actualFiles.delete(item.path), 'missing or duplicate prepared runtime file');
-  assert.equal(await digest(path.join(runtime, item.path)), item.sha256);
+for (let offset = 0; offset < prepared.files.length; offset += 16) {
+  await Promise.all(prepared.files.slice(offset, offset + 16).map(async item => {
+    assert(!path.win32.isAbsolute(item.path) && !item.path.includes('..') && !item.path.includes(':'));
+    assert(actualFiles.delete(item.path), 'missing or duplicate prepared runtime file');
+    assert.equal(await digest(path.join(runtime, item.path)), item.sha256);
+  }));
 }
 assert.equal(actualFiles.size, 0);
 const build = JSON.parse((await fs.readFile('C:\\MemoryLab\\runs\\79a6444a-a60b-4494-a8e3-de90d1b4c807\\product-build\\result.json', 'utf8')).replace(/^\uFEFF/, ''));
@@ -108,7 +116,13 @@ try {
       frames.push(pending.subarray(4, size + 4)); pending = pending.subarray(size + 4); wake?.();
     }
   });
-  child.stderr.resume();
+  const diagnostics = await fs.open(path.join(root, 'provision.stderr.log'), 'wx');
+  let diagnosticBytes = 0, diagnosticWrite = Promise.resolve();
+  child.stderr.on('data', bytes => {
+    diagnosticBytes += bytes.length;
+    if (diagnosticBytes <= 1024 * 1024) diagnosticWrite = diagnosticWrite.then(() => diagnostics.write(bytes));
+  });
+  child.stderr.once('end', () => { void diagnosticWrite.finally(() => diagnostics.close()); });
   const frame = async () => {
     const until = Date.now() + 120000;
     while (!frames.length) {
