@@ -27,7 +27,9 @@ Input JSON has exactly these keys:
   `major`, `tool_sha256` (postgres/initdb/pg_ctl/psql/pg_config/pg_controldata),
   `vector_library`, `vector_library_sha256`, `vector_control`,
   `vector_control_sha256`, `vector_version`, `vector_sql` (name→hash).
-  The same major and pgvector version are required; no dependency upgrade.
+  The original PostgreSQL major and pgvector version are required. PostgreSQL
+  tool hashes may change within that major when explicitly reviewed and pinned;
+  this guard does not require byte-identical dependency binaries.
 - `reconciliation`: `{path, sha256}` for the reviewed private proof below.
 - `old_jobs`: exact `{label, prior_state, plist:{path, sha256}}` entries;
   `prior_state` is active/inactive/failed. Schema-2 two-area/two-repository/two-cache

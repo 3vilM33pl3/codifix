@@ -1,17 +1,17 @@
 {
   "project": "demo",
-  "task_title": "Load the Memory Layer demo showcase",
+  "task_title": "Load the Codifix demo showcase",
   "user_prompt": "Seed a relatable demo project so a new user can query, browse, and resume against real memories.",
-  "writer_id": "memory-demo-seed",
-  "writer_name": "Memory Layer Demo",
-  "agent_summary": "Seeded a self-referential showcase corpus of durable facts about Memory Layer itself.",
+  "writer_id": "codifix-demo-seed",
+  "writer_name": "Codifix Demo",
+  "agent_summary": "Seeded a self-referential showcase corpus of durable facts about Codifix itself.",
   "files_changed": [],
   "tests": [],
-  "notes": ["Self-referential demo corpus; safe to delete and reseed with `memory demo`."],
+  "notes": ["Self-referential demo corpus; safe to delete and reseed with `codifix demo`."],
   "structured_candidates": [
     {
-      "canonical_text": "Memory Layer is a local-first memory system for coding agents: it captures durable project knowledge, curates it into canonical memories, and serves it back over a hybrid lexical + vector + graph retrieval path. The service, TUI, and web UI all read the same backend APIs.",
-      "summary": "Memory Layer captures, curates, and serves durable project memory locally.",
+      "canonical_text": "Codifix is a local-first memory system for coding agents: it captures durable project knowledge, curates it into canonical memories, and serves it back over a hybrid lexical + vector + graph retrieval path. The service, TUI, and web UI all read the same backend APIs.",
+      "summary": "Codifix captures, curates, and serves durable project memory locally.",
       "memory_type": "architecture",
       "confidence": 0.95,
       "importance": 5,
@@ -46,13 +46,13 @@
       "sources": [{"source_kind": "note", "excerpt": "three-signal clustering; human-gated insight proposals"}]
     },
     {
-      "canonical_text": "Loop automations run through the local service control plane and produce reports, approval requests, or reviewable proposals rather than bypassing the Memory APIs. Built-ins cover context-pack refresh, memory hygiene, CI triage, and evaluation.",
+      "canonical_text": "Loop automations run through the local service control plane and produce reports, approval requests, or reviewable proposals rather than bypassing the Codifix APIs. Built-ins cover context-pack refresh, memory hygiene, CI triage, and evaluation.",
       "summary": "Loop automations are approval-gated and run through the service control plane.",
       "memory_type": "architecture",
       "confidence": 0.9,
       "importance": 4,
       "tags": ["automations", "safety"],
-      "sources": [{"source_kind": "note", "excerpt": "reports, approval requests, or reviewable proposals; never bypass Memory APIs"}]
+      "sources": [{"source_kind": "note", "excerpt": "reports, approval requests, or reviewable proposals; never bypass Codifix APIs"}]
     },
     {
       "canonical_text": "The built-in MCP server is read-first: it exposes query, resume, overview, activities, and memory-inspection tools for agents, while write and loop-control tools require approval. HTTP MCP is protected by the service API token.",
@@ -100,13 +100,13 @@
       "sources": [{"source_kind": "note", "excerpt": "files, symbols, references; imports, callers, memory provenance"}]
     },
     {
-      "canonical_text": "Repo-local skills resolve the source checkout's dev CLI before an installed memory binary, so a running dev service is used in preference to the packaged one. This avoids 401 invalid-api-token errors from mixing dev and prod services.",
-      "summary": "Repo-local skills prefer the dev CLI to avoid mixed dev/prod token errors.",
+      "canonical_text": "Repo-local skills use the explicitly configured Workshop API for durable project memory. Backend tests use the separate disposable dev service; the helper does not silently switch to dev when Workshop is unavailable.",
+      "summary": "Repo-local skills route durable project memory explicitly to Workshop.",
       "memory_type": "environment",
       "confidence": 0.85,
       "importance": 3,
       "tags": ["skills", "auth", "dev"],
-      "sources": [{"source_kind": "note", "excerpt": "prefer source checkout dev CLI; avoids 401 from mixed services"}]
+      "sources": [{"source_kind": "note", "excerpt": "explicit Workshop route; separate disposable dev service"}]
     },
     {
       "canonical_text": "The public documentation site is a separate Next.js + Fumadocs app rooted at docs-site and deployed on Vercel; the /demo route is a backend-free snapshot using sanitized static data and browser-only interactions.",
@@ -136,17 +136,17 @@
       "sources": [{"source_kind": "note", "excerpt": "verifies tags, packages, GitHub assets, Homebrew formula"}]
     },
     {
-      "canonical_text": "Incident: a 401 'invalid api token' surfaced when a repo-local skill talked to the installed prod service while the dev service was running on a different port and token. The fix was to make skill helpers resolve the dev CLI and its token first.",
-      "summary": "A 401 came from mixing dev/prod services; fixed by resolving the dev CLI first.",
+      "canonical_text": "Incident: a 401 'invalid api token' surfaced when a repo-local skill talked to the installed prod service while the dev service was running on a different port and token. Use the intended service and its matching token; durable project-memory helpers now select Workshop explicitly.",
+      "summary": "A 401 came from mixing service endpoints and tokens; keep routing explicit.",
       "memory_type": "incident",
       "confidence": 0.9,
       "importance": 3,
       "tags": ["auth", "dev", "incident"],
-      "sources": [{"source_kind": "note", "excerpt": "401 from mixed dev/prod services; resolve dev CLI + token first"}]
+      "sources": [{"source_kind": "note", "excerpt": "401 from mismatched service/token; explicitly select the intended route"}]
     },
     {
-      "canonical_text": "Insight: Memory Layer's safety posture is consistent across surfaces — consolidation, curation replacements, loop automations, and MCP writes all produce human-gated proposals rather than silent mutations. The unifying rule is that durable state changes are reviewable, and the open tension is latency when a reviewer is not present.",
-      "summary": "Every durable state change in Memory Layer is a human-gated, reviewable proposal.",
+      "canonical_text": "Insight: Codifix's safety posture is consistent across surfaces — consolidation, curation replacements, loop automations, and MCP writes all produce human-gated proposals rather than silent mutations. The unifying rule is that durable state changes are reviewable, and the open tension is latency when a reviewer is not present.",
+      "summary": "Every durable state change in Codifix is a human-gated, reviewable proposal.",
       "memory_type": "insight",
       "confidence": 0.85,
       "importance": 4,
