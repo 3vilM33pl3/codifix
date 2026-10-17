@@ -86,7 +86,8 @@ jobs:
           cache-dependency-path: |
             web/package-lock.json
             docs-site/package-lock.json
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: cargo-cache
         with:
           path: |
             ~/.cargo/registry
@@ -97,7 +98,7 @@ jobs:
       - name: Required-database Rust validation
         run: |
           cargo fmt --check
-          cargo test --workspace --all-targets --locked
+          cargo test --workspace --all-targets --locked --no-fail-fast
           cargo clippy --workspace --all-targets --locked -- -D warnings
           bash scripts/check-boundaries.sh
           cargo build --locked -p mem-cli --no-default-features --features tui,project-sync --bin memory
@@ -140,6 +141,15 @@ jobs:
           name: release-quality-reports
           path: target/release-rust-audit.json
           if-no-files-found: ignore
+      - name: Preserve reusable Rust build cache after checks
+        uses: actions/cache/save@v4
+        if: ${{ always() && !cancelled() && steps.cargo-cache.outputs.cache-hit != 'true' && steps.cargo-cache.outputs.cache-primary-key != '' }}
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   source-release:
     name: Build source archive
@@ -175,7 +185,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Prepare private build directory
         run: mkdir -p "$RUNNER_TEMP/memory-linux-build" && chmod 700 "$RUNNER_TEMP/memory-linux-build"
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: build-cache
         with:
           path: |
             ${{ runner.temp }}/memory-linux-build/memory-cargo
@@ -193,6 +204,15 @@ jobs:
             python3 scripts/areas/releases/test_console_cli.py --image "$(cat "$RUNNER_TEMP/bookworm-image-id")" --evidence-parent "$RUNNER_TEMP"
           fi
           bash packaging/ca-bookworm/release.sh "$GITHUB_SHA" "$RUNNER_TEMP/memory-linux-build" "$(cat "$RUNNER_TEMP/bookworm-image-id")" "$ARCH"
+      - name: Preserve reusable Bookworm cache after package checks
+        uses: actions/cache/save@v4
+        if: ${{ always() && !cancelled() && steps.build-cache.outputs.cache-hit != 'true' && steps.build-cache.outputs.cache-primary-key != '' }}
+        with:
+          path: |
+            ${{ runner.temp }}/memory-linux-build/memory-cargo
+            ${{ runner.temp }}/memory-linux-build/memory-target
+            ${{ runner.temp }}/memory-linux-build/npm-cache
+          key: ${{ steps.build-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
@@ -253,7 +273,8 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: build-cache
         with:
           path: |
             ~/.cargo/registry
@@ -287,6 +308,15 @@ jobs:
           const command = (name,args=[]) => cp.execFileSync(name,args,{encoding:'utf8'}).trim();
           fs.writeFileSync(`target/memory-layer-${application_version}-macos-${architecture}-build.json`,JSON.stringify({format:'memory-macos-build-v1',application_version,architecture,source_commit,signing_status:'unsigned',notarized:false,native_package_acceptance:true,runtime_preservation_check:'sentinel-files-only',runtime_bundled:false,artifacts,toolchains:{rustc:command('rustc',['-vV']),node:process.version,npm:command('npm',['--version']),macos:command('sw_vers',['-productVersion']),xcode:command('xcodebuild',['-version'])}},null,2)+'\n');
           NODE
+      - name: Preserve reusable Mac build cache after package checks
+        uses: actions/cache/save@v4
+        if: ${{ always() && !cancelled() && steps.build-cache.outputs.cache-hit != 'true' && steps.build-cache.outputs.cache-primary-key != '' }}
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/${{ matrix.target }}
+          key: ${{ steps.build-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}
@@ -316,7 +346,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: build-cache
         with:
           path: |
             ~/.cargo/registry
@@ -353,6 +384,15 @@ jobs:
             & "$env:MEMORY_RELEASE_PGBIN\pg_ctl.exe" -D $env:MEMORY_RELEASE_PGDATA -m fast -w stop
             if ($LASTEXITCODE -ne 0) { throw 'Disposable PostgreSQL shutdown failed' }
           }
+      - name: Preserve reusable Windows build cache after package checks
+        uses: actions/cache/save@v4
+        if: ${{ always() && !cancelled() && steps.build-cache.outputs.cache-hit != 'true' && steps.build-cache.outputs.cache-primary-key != '' }}
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/x86_64-pc-windows-msvc
+          key: ${{ steps.build-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64
