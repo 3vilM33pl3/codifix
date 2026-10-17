@@ -36,14 +36,29 @@ each at cursor 12 with zero sync failures; original retired cursor 23 and local
 permissions remain preserved. There were zero source subscriptions before and
 after, and no knowledge was republished. Evidence: `nonca-reconnected-smoke.json`.
 
+## Approved local certificate renewal
+
+Olivier approved the scoped renewal on 17 October. It is installed with unchanged
+signing/service keys, subjects, SANs, extensions and permissions. The local root
+now expires **16 November 2026 at 22:05:06 UTC**; the four existing leaves expire
+**24 October 2026 at 22:05:06 UTC**. Active Codifix trust copies and fingerprint
+pins, including the refresh maintainer's bound policy, were updated together.
+Historical evidence and original bytes remain in the private recovery set.
+
+All ten named containers are running. Verified TLS/hostname checks passed for
+all four endpoints; Workshop/Homelab/General health and federation cursor 12
+passed with zero sync failures. The existing PDS session remains generation 284.
+The separate ca.metatao.net host, SSH and Trust enrolment were untouched.
+Evidence: `approved-root-renewal/result.json` and `smoke.json` in the private
+operational evidence directory below.
+
 ## Remaining work
 
-- Renew the local preview issuer certificate before its 19 October 2026
-  11:28:57 UTC expiry, subject to the pending explicit approval. The prepared
-  scope preserves its key/identity and existing trust permissions. The separate
-  ca.metatao.net host and Trust enrolment remain untouched.
-- Install the native Mac candidate when its build artifact becomes available;
-  finish native client wiring and publish the release packages.
+- Complete the native Mac installation and client wiring. The Apple Silicon
+  candidate package and native acceptance passed; packages are verified and
+  staged. Installation requires the user's local administrator authentication;
+  a runtime-inclusive installer handoff is being prepared. Publish final release
+  packages after the corrected candidate completes.
 - Refresh running client sessions. Codifix desktop plugin is installed/enabled;
   the legacy plugin is disabled with its cache retained. Primary MCP project
   access and both scoped stdio wrappers passed. Watch manager, Workshop/Homelab
@@ -70,7 +85,8 @@ The current area binary SHA-256 is
 `94e50052aed58b3d5e227f2cafb801805a19114b81e95347e14c479166d3f8c3`.
 Website behavior was verified at source `79186b2f494c9ca92de5c42dc79dd86fbe20bbd7`.
 Source validation, Linux candidate builds and both Linux installation acceptance
-jobs passed. Mac/Windows builds continue separately. Candidate run 39068603586
+jobs passed. Apple Silicon build/native acceptance also passed; Mac Intel and
+Windows builds continue separately. Candidate run 39068603586
 predates the gateway fix; final public packages must include it. These builds
 do not gate the running Monolith applications.
 
