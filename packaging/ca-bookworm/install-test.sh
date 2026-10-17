@@ -29,7 +29,7 @@ check_binary() {
   done
   # Gateway has positional private-config arguments, not general --help flags.
   local gateway_status=0 gateway_output
-  gateway_output=$(/usr/bin/memory-federation-gateway 2>&1) || gateway_status=$?
+  gateway_output=$(timeout 15s /usr/bin/memory-federation-gateway 2>&1) || gateway_status=$?
   [[ $gateway_status == 1 && $gateway_output == 'Error: "expected private gateway configuration file"' ]]
   test -s /usr/share/memory-layer/web/index.html
   test -s /usr/libexec/memory-layer/releases/release.py
