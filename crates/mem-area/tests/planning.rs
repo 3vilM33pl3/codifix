@@ -1424,7 +1424,7 @@ fn row_order_does_not_change_digest_but_missing_history_does() {
 }
 
 #[test]
-fn reviewed_schema_catalog_matches_every_current_repository_table() {
+fn reviewed_schema_catalog_matches_every_table_at_supported_import_head() {
     let migrations = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations");
     let mut paths: Vec<_> = std::fs::read_dir(migrations)
         .expect("migrations directory")
@@ -1434,6 +1434,19 @@ fn reviewed_schema_catalog_matches_every_current_repository_table() {
     let mut active = BTreeSet::from(["public._sqlx_migrations".to_owned()]);
     for path in paths {
         if path.extension().is_none_or(|extension| extension != "sql") {
+            continue;
+        }
+        let version: u32 = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| name.split_once('_'))
+            .expect("numbered migration")
+            .0
+            .parse()
+            .expect("migration version");
+        // This importer explicitly accepts only reviewed historical heads.
+        // Later application schemas must not silently broaden that contract.
+        if version > AREA_IMPORT_HEAD_MIGRATION {
             continue;
         }
         for line in std::fs::read_to_string(path)
@@ -1481,7 +1494,35 @@ fn reviewed_schema_catalog_matches_every_current_repository_table() {
     );
     assert_eq!(
         catalog, active,
-        "schema changes require explicit policy review"
+        "historical import schema changes require explicit policy review"
+    );
+}
+
+#[test]
+fn later_repository_schema_is_not_silently_accepted_by_historical_importer() {
+    let migrations = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations");
+    let latest = std::fs::read_dir(migrations)
+        .expect("migrations directory")
+        .map(|entry| entry.expect("migration entry").path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "sql"))
+        .map(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .and_then(|name| name.split_once('_'))
+                .expect("numbered migration")
+                .0
+                .parse::<u32>()
+                .expect("migration version")
+        })
+        .max()
+        .expect("repository migrations");
+    assert!(latest > AREA_IMPORT_HEAD_MIGRATION);
+    let mut inventory = fixture();
+    inventory.migration_version = latest;
+    assert!(
+        verify_inventory(&inventory).iter().any(|error| {
+            error.starts_with(&format!("unsupported migration version {latest};"))
+        })
     );
 }
 
