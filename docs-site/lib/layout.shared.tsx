@@ -59,8 +59,8 @@ const socialLinks = [
     icon: <GitHubIcon />,
   },
   {
-    label: 'Codifix v2.1.0 release',
-    text: 'v2.1.0',
+    label: 'Legacy Memory Layer v2.1.0 release',
+    text: 'Legacy v2.1.0',
     href: 'https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0',
     icon: <ReleaseIcon />,
   },
