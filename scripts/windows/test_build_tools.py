@@ -7,6 +7,17 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_native_database_tests_use_only_the_existing_disposable_cluster(self):
+        script=(Path(__file__).parent/'guest-native-db.ps1').read_text()
+        for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", "'test-password.dpapi'",
+                         "$verified.production -ne $false", "'--all-targets'", "'--test-threads=1'",
+                         "$env:MEMORY_LAYER_TEST_REQUIRE_DB='1'", 'ZeroFreeBSTR',
+                         'WaitForExit(7200000)', 'workflow_verified=$false']:
+            self.assertIn(required,script)
+        self.assertNotIn('Invoke-WebRequest',script)
+        self.assertNotIn('pg_ctl',script)
+        self.assertNotIn('initdb',script)
+
     def test_native_onboarding_task_proof_never_runs_a_sync_or_adopts_a_task(self):
         script=(Path(__file__).parent/'guest-onboarding-task.ps1').read_text()
         for required in ['Get-OnboardingPlan -Stage EnableSync', 'Assert-OnboardingTask',
@@ -81,7 +92,7 @@ class BuildToolsManifestTests(unittest.TestCase):
     def test_native_build_families_are_separate_but_each_is_serialized(self):
         script = (Path(__file__).parent / 'guest-stage.ps1').read_text()
         for required in ["'PiBuild' { 'Local\\MemoryLab-NativePiBuild' }",
-                         "{ $_ -in @('ProductCheck','ProductBuild') } { 'Local\\MemoryLab-NativeProductBuild' }",
+                         "{ $_ -in @('ProductCheck','ProductBuild','NativeDb') } { 'Local\\MemoryLab-NativeProductBuild' }",
                          "default { 'Local\\MemoryLab-NativeBuildStage' }",'$mutex.WaitOne(0)']:
             self.assertIn(required,script)
 
@@ -134,7 +145,7 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn('Queued native proof file inventory changed', stage)
         self.assertIn('New-TimeSpan -Minutes 20', stage)
         self.assertIn('-LogonType Interactive', stage)
-        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','ProductBuild','PdsVerify','NativeEval')) { 'Limited' } else { 'Highest' }",stage)
+        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','ProductBuild','NativeDb','PdsVerify','NativeEval')) { 'Limited' } else { 'Highest' }",stage)
         self.assertIn('-LogonType Interactive -RunLevel $runLevel',stage)
         script = (root / 'guest-native-api.ps1').read_text()
         for required in ['memory-windows-native-api-v1', 'Get-FileHash',
