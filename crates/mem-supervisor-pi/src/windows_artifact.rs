@@ -108,16 +108,19 @@ mod tests {
             "helper_source_sha256",
             "patched_lock_sha256",
         ] {
-            let mut changed = serde_json::to_value(&value).unwrap();
+            let mut changed = serde_json::to_value(&value).expect("native artifact fixture");
             changed[field] = "0".repeat(64).into();
             assert!(
                 serde_json::from_value::<WindowsArtifact>(changed)
-                    .unwrap()
+                    .expect("changed artifact fixture")
                     .validate()
                     .is_err()
             );
-            let mut missing = serde_json::to_value(&value).unwrap();
-            missing.as_object_mut().unwrap().remove(field);
+            let mut missing = serde_json::to_value(&value).expect("native artifact fixture");
+            missing
+                .as_object_mut()
+                .expect("artifact object")
+                .remove(field);
             assert!(serde_json::from_value::<WindowsArtifact>(missing).is_err());
         }
         value.source_revision = "latest".into();

@@ -1,11 +1,8 @@
 //! Native AppContainer driver. The trusted parent owns the job and filesystem
 //! grants; the driver can inherit only its already admitted one-work broker.
 use super::*;
-use mem_platform::windows_process::{CodeFile, spawn_inherited};
-use std::{
-    ffi::OsString,
-    os::windows::io::{BorrowedHandle, RawHandle},
-};
+use mem_platform::windows_process::{CodeFile, duplicate_broker_pipe, spawn_inherited};
+use std::{ffi::OsString, os::windows::io::AsHandle};
 
 const SETTINGS: &str = r#"{"retry":{"enabled":false,"maxRetries":0,"fallbackChains":{},"maxFailoversPerTurn":0},"compaction":{"enabled":false}}"#;
 
@@ -48,10 +45,9 @@ async fn execute() -> Result<[u8; 32], (Failure, ProcessDisposition)> {
         .and_then(|value| value.parse::<usize>().ok())
         .filter(|raw| *raw != 0 && *raw != usize::MAX)
         .ok_or_else(|| not_started(Failure::UnsafeState))?;
-    // Supplied by the protected parent STARTUPINFOEX handle list, never input
-    // from the model or question. spawn_inherited validates its pipe type and
-    // verifies the current/descendant AppContainer token before resuming Pi.
-    let broker = unsafe { BorrowedHandle::borrow_raw(broker as RawHandle) };
+    // Duplicate first; never construct a borrowed/owned handle from an unchecked
+    // environment integer. The protected parent's handle list remains authority.
+    let broker = duplicate_broker_pipe(broker).map_err(|_| not_started(Failure::UnsafeState))?;
     let input = timeout(Duration::from_secs(2), async {
         let mut bytes = Vec::new();
         tokio::io::stdin()
@@ -117,7 +113,7 @@ async fn execute() -> Result<[u8; 32], (Failure, ProcessDisposition)> {
             sha256,
         },
         &arguments,
-        broker,
+        broker.as_handle(),
         &overrides,
     )
     .map_err(|_| not_started(Failure::SpawnFailed))?;

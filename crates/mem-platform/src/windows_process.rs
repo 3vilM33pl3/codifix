@@ -56,7 +56,7 @@ use windows_sys::Win32::{
             JobObjectCpuRateControlInformation, JobObjectExtendedLimitInformation,
             QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
         },
-        Pipes::CreatePipe,
+        Pipes::{CreatePipe, GetNamedPipeInfo},
         SystemInformation::GetWindowsDirectoryW,
         Threading::{
             ALL_PROCESSOR_GROUPS, CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
@@ -1054,6 +1054,49 @@ fn anonymous_pipe() -> Result<(File, File)> {
     Ok(unsafe { (File::from_raw_handle(reader), File::from_raw_handle(writer)) })
 }
 
+/// Safely own a fresh non-inheritable duplicate of a broker pipe handle value.
+/// This proves ownership/type only, not admission: the parent's exact inherited
+/// handle list and one-work bearer remain the broker authentication boundary.
+pub fn duplicate_broker_pipe(raw: usize) -> Result<File> {
+    ensure!(raw != 0 && raw != usize::MAX, "invalid broker handle value");
+    let mut duplicate = null_mut();
+    ok(
+        unsafe {
+            DuplicateHandle(
+                GetCurrentProcess(),
+                raw as _,
+                GetCurrentProcess(),
+                &mut duplicate,
+                0,
+                0,
+                DUPLICATE_SAME_ACCESS,
+            )
+        },
+        "duplicate inherited broker pipe",
+    )?;
+    // SAFETY: DuplicateHandle succeeded; this function owns only its new handle.
+    // Never adopt/close the untrusted original or request DUPLICATE_CLOSE_SOURCE.
+    let owned = unsafe { OwnedHandle::from_raw_handle(duplicate) };
+    ensure!(
+        unsafe { GetFileType(owned.as_raw_handle()) } == FILE_TYPE_PIPE,
+        "broker handle is not a pipe"
+    );
+    // FILE_TYPE_PIPE alone also includes sockets; require an actual Win32 pipe.
+    ok(
+        unsafe {
+            GetNamedPipeInfo(
+                owned.as_raw_handle(),
+                null_mut(),
+                null_mut(),
+                null_mut(),
+                null_mut(),
+            )
+        },
+        "validate inherited broker pipe",
+    )?;
+    Ok(File::from(owned))
+}
+
 /// Called only by the pinned driver inside its existing AppContainer. `broker`
 /// is its already inherited one-work channel. Overrides are restricted to Pi's
 /// private settings and a 64-hex one-work broker bearer, never provider keys.
@@ -1289,6 +1332,49 @@ pub fn spawn_inherited(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    #[test]
+    fn broker_duplicate_rejects_invalid_pseudo_and_disk_handles_without_adoption() {
+        for value in [0, usize::MAX, usize::MAX - 1] {
+            assert!(duplicate_broker_pipe(value).is_err());
+        }
+        let path =
+            std::env::temp_dir().join(format!("memory-broker-disk-{}", uuid::Uuid::new_v4()));
+        let mut original = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
+        assert!(duplicate_broker_pipe(original.as_raw_handle() as usize).is_err());
+        original.write_all(b"original remains usable").unwrap();
+        drop(original);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn broker_duplicate_is_noninheritable_and_does_not_close_original() {
+        use windows_sys::Win32::Foundation::{GetHandleInformation, HANDLE_FLAG_INHERIT};
+        let (mut original, mut writer) = anonymous_pipe().unwrap();
+        let raw = original.as_raw_handle() as usize;
+        let mut duplicate = duplicate_broker_pipe(raw).unwrap();
+        let mut flags = 0;
+        ok(
+            unsafe { GetHandleInformation(duplicate.as_raw_handle(), &mut flags) },
+            "read duplicate flags",
+        )
+        .unwrap();
+        assert_eq!(flags & HANDLE_FLAG_INHERIT, 0);
+        writer.write_all(b"ab").unwrap();
+        let mut byte = [0; 1];
+        duplicate.read_exact(&mut byte).unwrap();
+        assert_eq!(&byte, b"a");
+        drop(duplicate);
+        original.read_exact(&mut byte).unwrap();
+        assert_eq!(&byte, b"b");
+        drop(original);
+        // No allocation intervenes between closure and duplicate attempt.
+        assert!(duplicate_broker_pipe(raw).is_err());
+    }
     #[test]
     fn native_local_app_data_comes_from_current_identity_known_folder() {
         let folder = local_app_data().unwrap();
