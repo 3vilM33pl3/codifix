@@ -117,3 +117,12 @@ still required.
 user docs and embedded help were refreshed, while historical source evidence
 and exact old objects in cutover instructions remain preserved. The final
 candidate run must include these source corrections; no live cutover occurred.
+
+Both Linux native lifecycle jobs subsequently reached successful fresh dpkg
+installation, then failed the version assertion. The test used an unescaped
+Bash tilde pattern, which expands to HOME and leaves `3.0.0~rc.1` unchanged.
+The corrected escaped pattern was exercised directly from the script for
+stable, rc.1 and six-digit RC versions; all three pass, and shell syntax passes.
+This is a test harness correction; native lifecycle acceptance still requires
+rerunning it. Run `39068466765` at `3701fd10` was cancelled while pending with
+zero jobs so the replacement candidate can include this correction.

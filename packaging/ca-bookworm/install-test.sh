@@ -12,7 +12,8 @@ arch=$(dpkg-deb -f "$package" Architecture)
 version=$(dpkg-deb -f "$package" Version)
 [[ $(dpkg --print-architecture) == "$arch" ]]
 [[ $version =~ ^3\.0\.0(~rc\.[1-9][0-9]{0,5})?$ ]]
-application_version=${version/~/-}
+# Escape the pattern: an unquoted bare tilde expands to HOME in Bash.
+application_version=${version/\~/-}
 [[ ! -e /usr/bin/codifix && ! -e /etc/codifix && ! -e /var/lib/codifix ]]
 [[ -z $(dpkg-query -W -f='${Version}' codifix 2>/dev/null || true) ]]
 work=$(mktemp -d /tmp/codifix-debian-install.XXXXXXXX)
