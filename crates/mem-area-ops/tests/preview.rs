@@ -4,13 +4,8 @@ use mem_area::*;
 use mem_area_ops::preview::*;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink},
-    path::Path,
-    process::Command,
-};
+mod private_fixture;
+use std::{fs, path::Path, process::Command};
 use uuid::Uuid;
 
 const PRIVATE: &str = "SYNTHETIC_PRIVATE_CANONICAL_TEXT";
@@ -410,21 +405,7 @@ fn source_with_null_task_or_memory_target_never_falls_back_to_copying_context() 
     }
 }
 
-fn private_dir() -> tempfile::TempDir {
-    tempfile::Builder::new()
-        .permissions(fs::Permissions::from_mode(0o700))
-        .tempdir()
-        .expect("private fixture")
-}
-fn write(path: &Path, bytes: &[u8]) {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)
-        .expect("private input");
-    file.write_all(bytes).expect("fixture bytes");
-}
+use private_fixture::{private_dir, write};
 fn execute(input: &Path, output: &Path, selection_sha: &str) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_memory-area-import"))
         .args(["preview-manifest", "--inventory"])
@@ -457,14 +438,7 @@ fn real_cli_writes_only_private_exclusive_outputs_and_suppresses_errors() {
     );
     assert!(result.stdout.is_empty() && result.stderr.is_empty());
     for name in ["preview-manifest.json", "preview-receipt.json"] {
-        assert_eq!(
-            fs::metadata(output.path().join(name))
-                .expect("metadata")
-                .permissions()
-                .mode()
-                & 0o777,
-            0o600
-        );
+        private_fixture::assert_private(&output.path().join(name));
     }
     let receipt: serde_json::Value = serde_json::from_slice(
         &fs::read(output.path().join("preview-receipt.json")).expect("receipt"),
@@ -494,25 +468,18 @@ fn real_cli_writes_only_private_exclusive_outputs_and_suppresses_errors() {
             .success()
     );
     assert_eq!(fs::read_dir(bad.path()).expect("directory").count(), 0);
-    fs::set_permissions(
-        input.path().join("selection.json"),
-        fs::Permissions::from_mode(0o644),
-    )
-    .expect("mode");
+    private_fixture::public_read(&input.path().join("selection.json"));
     let failed = execute(input.path(), bad.path(), &digest(&bytes));
     assert!(!failed.status.success());
     assert!(failed.stdout.is_empty());
     assert!(!String::from_utf8_lossy(&failed.stderr).contains(PRIVATE));
-    fs::set_permissions(
-        input.path().join("selection.json"),
-        fs::Permissions::from_mode(0o600),
-    )
-    .expect("mode");
+    private_fixture::restore_private(&input.path().join("selection.json"));
     let alias = input.path().join("alias");
-    symlink(output.path(), &alias).expect("symlink");
+    private_fixture::directory_alias(output.path(), &alias);
     assert!(
         !execute(input.path(), &alias, &digest(&bytes))
             .status
             .success()
     );
+    private_fixture::remove_directory_alias(&alias);
 }

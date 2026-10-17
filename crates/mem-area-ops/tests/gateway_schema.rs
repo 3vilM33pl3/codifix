@@ -3,9 +3,8 @@
 #![allow(clippy::unwrap_used)]
 use serde_json::{Value, json};
 use sqlx::{ConnectOptions, Connection, PgConnection, PgPool, postgres::PgConnectOptions};
+mod private_fixture;
 use std::{
-    fs,
-    os::unix::fs::PermissionsExt,
     path::Path,
     process::{Command, Output},
 };
@@ -20,15 +19,11 @@ fn command() -> Command {
     }
     command
 }
-fn private() -> tempfile::TempDir {
-    tempfile::Builder::new()
-        .permissions(fs::Permissions::from_mode(0o700))
-        .tempdir()
-        .unwrap()
+fn private() -> private_fixture::PrivateDir {
+    private_fixture::private_dir()
 }
 fn write(path: &Path, value: &Value) {
-    fs::write(path, serde_json::to_vec(value).unwrap()).unwrap();
-    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+    private_fixture::replace(path, &serde_json::to_vec(value).unwrap());
 }
 fn success(output: Output) -> Value {
     assert!(
@@ -99,10 +94,13 @@ fn default_review_is_offline_exact_and_never_discloses_private_values() {
     );
     value["connection"] = json!({"kind":"unix","directory":"/run/postgresql","port":5432});
     write(&path, &value);
+    #[cfg(unix)]
     assert_eq!(
         success(command().arg(&path).output().unwrap())["connection"]["kind"],
         "unix"
     );
+    #[cfg(windows)]
+    failure(command().arg(&path).output().unwrap(), "target");
 }
 
 #[test]
@@ -129,7 +127,7 @@ fn invalid_target_environment_permissions_and_confirmation_fail_closed() {
             .unwrap(),
         "environment overrides",
     );
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+    private_fixture::public_read(&path);
     failure(
         command().arg(&path).output().unwrap(),
         "private file boundary",

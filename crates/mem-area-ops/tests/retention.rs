@@ -5,31 +5,20 @@ use mem_area::{
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+mod private_fixture;
+use private_fixture::PrivateDir as TempDir;
 use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    fs,
     path::Path,
     process::{Command, Output},
 };
-use tempfile::TempDir;
 use uuid::Uuid;
 
 fn private_dir() -> TempDir {
-    tempfile::Builder::new()
-        .permissions(fs::Permissions::from_mode(0o700))
-        .tempdir()
-        .expect("private synthetic directory")
+    private_fixture::private_dir()
 }
 fn write(path: &Path, bytes: &[u8]) {
-    OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)
-        .expect("synthetic file")
-        .write_all(bytes)
-        .expect("synthetic bytes");
+    private_fixture::write(path, bytes);
 }
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))

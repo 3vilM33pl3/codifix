@@ -7,11 +7,8 @@ mod support;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{ConnectOptions, Connection, PgConnection, PgPool, postgres::PgConnectOptions};
-use std::{
-    fs,
-    os::unix::fs::PermissionsExt,
-    process::{Command, Output},
-};
+mod private_fixture;
+use std::process::{Command, Output};
 use uuid::Uuid;
 
 struct Fixture {
@@ -76,8 +73,7 @@ fn request(fixture: &Fixture, dir: &std::path::Path) -> Command {
         "password":fixture.options.to_url_lossy().password().map(|p|percent_encoding::percent_decode_str(p).decode_utf8().unwrap().into_owned())});
     let bytes = serde_json::to_vec(&descriptor).unwrap();
     let path = dir.join("target.json");
-    fs::write(&path, &bytes).unwrap();
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    private_fixture::write(&path, &bytes);
     let mut cmd = command();
     cmd.arg("initialize-schema")
         .arg("--target")
@@ -88,11 +84,8 @@ fn request(fixture: &Fixture, dir: &std::path::Path) -> Command {
         .arg(plan["schema_sha256"].as_str().unwrap());
     cmd
 }
-fn private() -> tempfile::TempDir {
-    tempfile::Builder::new()
-        .permissions(fs::Permissions::from_mode(0o700))
-        .tempdir()
-        .unwrap()
+fn private() -> private_fixture::PrivateDir {
+    private_fixture::private_dir()
 }
 fn confirm(cmd: &mut Command) {
     cmd.args(["--execute", "--writers-stopped", "--fresh-database"]);

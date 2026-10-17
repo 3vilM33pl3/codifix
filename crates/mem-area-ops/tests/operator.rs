@@ -7,30 +7,21 @@ mod support;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::ConnectOptions;
+mod private_fixture;
+use private_fixture::PrivateDir as TempDir;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
-    os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink},
     path::Path,
     process::{Command, Output},
 };
-use tempfile::TempDir;
 
 fn private_dir() -> TempDir {
-    tempfile::Builder::new()
-        .permissions(fs::Permissions::from_mode(0o700))
-        .tempdir()
-        .expect("synthetic operator fixture")
+    private_fixture::private_dir()
 }
 
 fn write(path: &Path, bytes: &[u8]) {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)
-        .expect("synthetic operator fixture");
-    file.write_all(bytes).expect("synthetic operator fixture");
+    private_fixture::write(path, bytes);
 }
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
@@ -240,14 +231,7 @@ async fn actual_command_prepares_imports_and_reconciles_only_an_inactive_target(
         fs::read(artifacts.path().join("archive.ndjson")).expect("synthetic operator fixture");
     assert!(String::from_utf8_lossy(&archive).contains(support::PRIVATE));
     for name in ["archive.ndjson", "prepared.json"] {
-        assert_eq!(
-            fs::metadata(artifacts.path().join(name))
-                .expect("synthetic operator fixture")
-                .permissions()
-                .mode()
-                & 0o777,
-            0o600
-        );
+        private_fixture::assert_private(&artifacts.path().join(name));
     }
     failure(
         prepare.output().expect("synthetic operator fixture"),
@@ -554,14 +538,12 @@ fn private_input_boundaries_and_errors_are_sanitized() {
         inspect().output().expect("synthetic operator fixture"),
         "JSON contract is invalid",
     );
-    fs::set_permissions(&inventory, fs::Permissions::from_mode(0o644))
-        .expect("synthetic operator fixture");
+    private_fixture::public_read(&inventory);
     failure(
         inspect().output().expect("synthetic operator fixture"),
         "private file boundary",
     );
-    fs::set_permissions(&inventory, fs::Permissions::from_mode(0o600))
-        .expect("synthetic operator fixture");
+    private_fixture::restore_private(&inventory);
     let alias = dir.path().join("alias");
     fs::hard_link(&inventory, &alias).expect("synthetic operator fixture");
     failure(
@@ -569,16 +551,33 @@ fn private_input_boundaries_and_errors_are_sanitized() {
         "private file boundary",
     );
     fs::remove_file(&alias).expect("synthetic operator fixture");
-    fs::rename(&inventory, &alias).expect("synthetic operator fixture");
-    symlink(&alias, &inventory).expect("synthetic operator fixture");
+    // A directory junction exercises the native reparse boundary without
+    // requiring developer mode or symbolic-link privileges on Windows.
+    #[cfg(unix)]
+    {
+        fs::rename(&inventory, &alias).expect("synthetic operator fixture");
+        std::os::unix::fs::symlink(&alias, &inventory).expect("synthetic operator fixture");
+    }
+    #[cfg(windows)]
+    {
+        fs::remove_file(&inventory).expect("fixture file");
+        private_fixture::directory_alias(dir.path(), &inventory);
+    }
     failure(
         inspect().output().expect("synthetic operator fixture"),
         "private file boundary",
     );
-    fs::remove_file(&inventory).expect("synthetic operator fixture");
-    fs::rename(&alias, &inventory).expect("synthetic operator fixture");
-    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o750))
-        .expect("synthetic operator fixture");
+    #[cfg(unix)]
+    {
+        fs::remove_file(&inventory).expect("synthetic operator fixture");
+        fs::rename(&alias, &inventory).expect("synthetic operator fixture");
+    }
+    #[cfg(windows)]
+    {
+        private_fixture::remove_directory_alias(&inventory);
+        write(&inventory, support::PRIVATE.as_bytes());
+    }
+    private_fixture::public_read(dir.path());
     failure(
         inspect().output().expect("synthetic operator fixture"),
         "private file boundary",
