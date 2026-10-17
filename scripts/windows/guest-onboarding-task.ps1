@@ -37,8 +37,9 @@ try {
     $null=Register-ScheduledTask -TaskPath '\' -TaskName $plan.task.name -InputObject $task
     $registered=$true
     $installed=Get-ScheduledTask -TaskPath '\' -TaskName $plan.task.name
-    $expected=Get-OnboardingTaskPolicy $task
-    $actual=Get-OnboardingTaskPolicy $installed
+    $resolveUser={ param($User) ([Security.Principal.NTAccount]::new($User)).Translate([Security.Principal.SecurityIdentifier]).Value }
+    $expected=Get-OnboardingTaskPolicy $task $sid $resolveUser
+    $actual=Get-OnboardingTaskPolicy $installed $sid $resolveUser
     @{format='memory-native-onboarding-task-proof-v1';task=$plan.task.name;expected=$expected;actual=$actual;state='observed_not_yet_verified'} |
         ConvertTo-Json -Depth 24 | Set-Content -LiteralPath (Join-Path $root 'policy.json') -Encoding UTF8
     Assert-OnboardingTask $installed $plan $powershell $arguments $digest $task
