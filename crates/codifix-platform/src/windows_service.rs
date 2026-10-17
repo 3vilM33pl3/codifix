@@ -265,7 +265,7 @@ unsafe extern "system" fn service_main(_: u32, _: *mut *mut u16) {
     let exit = match result {
         Ok(code) => code,
         Err(error) => {
-            eprintln!("Memory service host failed: {error:#}");
+            eprintln!("Codifix service host failed: {error:#}");
             1066
         }
     };

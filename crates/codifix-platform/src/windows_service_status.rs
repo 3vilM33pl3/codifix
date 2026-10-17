@@ -91,7 +91,7 @@ pub fn observe(name: &str) -> Result<Observation> {
         name.starts_with("Codifix-")
             && name.len() <= 60
             && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'),
-        "invalid Memory service name"
+        "invalid Codifix service name"
     );
     let wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
     // SAFETY: null selects local active SCM; only read-only rights requested.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! A deliberately separate, project-bound cache bridge. Never delegates to the
-//! ordinary Memory server, takes a caller's destination, or exposes mutations.
+//! ordinary Codifix server, takes a caller's destination, or exposes mutations.
 use anyhow::Result;
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,

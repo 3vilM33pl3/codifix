@@ -1432,7 +1432,7 @@ pub(in crate::commands) enum Command {
     Agent(AgentArgs),
     #[command(about = "Inspect and operate loop automations.", after_help = LOOPS_GROUP_AFTER_HELP)]
     Loops(LoopsArgs),
-    #[command(about = "Run and inspect the built-in Memory MCP server.", after_help = MCP_GROUP_AFTER_HELP)]
+    #[command(about = "Run and inspect the built-in Codifix MCP server.", after_help = MCP_GROUP_AFTER_HELP)]
     Mcp(McpArgs),
     #[command(about = "Rebuild and maintain embedding spaces.", after_help = EMBEDDINGS_GROUP_AFTER_HELP)]
     Embeddings(EmbeddingsArgs),
@@ -1757,7 +1757,7 @@ pub(in crate::commands) struct ServiceEnsureApiTokenArgs {
 
 #[derive(Debug, Args)]
 #[command(
-    about = "Run and inspect the built-in Memory MCP server.",
+    about = "Run and inspect the built-in Codifix MCP server.",
     after_help = MCP_GROUP_AFTER_HELP
 )]
 pub(in crate::commands) struct McpArgs {

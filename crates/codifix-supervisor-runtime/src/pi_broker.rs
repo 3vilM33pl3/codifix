@@ -202,7 +202,7 @@ struct Session {
 }
 
 /// A router for ONE exact job. Creating it neither starts a listener nor proves
-/// sandbox/egress isolation. Never mount it on the ordinary Memory service or a
+/// sandbox/egress isolation. Never mount it on the ordinary Codifix service or a
 /// public interface; a supervisor-owned private Unix socket is the intended
 /// transport. The future sandbox relay must expose only this router to Pi.
 pub struct PiBroker {

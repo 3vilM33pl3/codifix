@@ -237,7 +237,7 @@ impl ServerHandler for MemoryMcpServer {
             }
             other => Err(McpError::new(
                 rmcp::model::ErrorCode::METHOD_NOT_FOUND,
-                format!("unknown Memory MCP tool: {other}"),
+                format!("unknown Codifix MCP tool: {other}"),
                 None,
             )),
         }
@@ -363,7 +363,7 @@ impl ServerHandler for MemoryMcpServer {
             other => {
                 return Err(McpError::new(
                     rmcp::model::ErrorCode::METHOD_NOT_FOUND,
-                    format!("unknown Memory MCP prompt: {other}"),
+                    format!("unknown Codifix MCP prompt: {other}"),
                     None,
                 ));
             }

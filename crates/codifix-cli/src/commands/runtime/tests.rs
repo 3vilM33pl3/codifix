@@ -1601,21 +1601,21 @@ fn agent_build_prompt_forbids_memory_for_no_memory_condition() {
     assert!(prompt.contains("no-memory"));
     assert!(prompt.contains("Do not query"));
     assert!(prompt.contains("Do not create memory-evidence.md"));
-    assert!(prompt.contains(".memory-eval"));
+    assert!(prompt.contains(".codifix-eval"));
     assert!(!prompt.contains("What changed recently?"));
 }
 
 #[test]
 fn agent_build_memory_evidence_verifies_required_queries() {
     let workspace = std::env::temp_dir().join(format!("memory-eval-test-{}", Uuid::new_v4()));
-    fs::create_dir_all(workspace.join(".memory-eval")).unwrap();
+    fs::create_dir_all(workspace.join(".codifix-eval")).unwrap();
     fs::write(
-        workspace.join(".memory-eval/q1.status.json"),
-        r#"{"question_id":"q1","exit_code":0,"output_file":".memory-eval/q1.json"}"#,
+        workspace.join(".codifix-eval/q1.status.json"),
+        r#"{"question_id":"q1","exit_code":0,"output_file":".codifix-eval/q1.json"}"#,
     )
     .unwrap();
     fs::write(
-        workspace.join(".memory-eval/q1.json"),
+        workspace.join(".codifix-eval/q1.json"),
         r#"{"results":[{"memory_id":"00000000-0000-0000-0000-000000000000"}]}"#,
     )
     .unwrap();

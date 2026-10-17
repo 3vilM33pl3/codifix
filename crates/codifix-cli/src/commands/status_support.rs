@@ -1638,7 +1638,7 @@ async fn backend_checks(
                         .is_none()
                 {
                     Some(
-                        "Start a database-connected Memory service on the local network or fix the local database connection."
+                        "Start a database-connected Codifix service on the local network or fix the local database connection."
                             .to_string(),
                     )
                 } else {

@@ -248,7 +248,7 @@ pub(super) async fn app(
             }
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
-        assert!(ready, "disposable Memory service process did not start");
+        assert!(ready, "disposable Codifix service process did not start");
         (vec![], Some(process))
     } else {
         let router = crate::routes::build_http_app(state.clone());

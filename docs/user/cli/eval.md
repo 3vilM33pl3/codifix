@@ -223,12 +223,12 @@ instructions to the prompt: `no-memory` tells the agent not to use Memory and
 clears common Memory environment variables; Memory-enabled conditions tell the
 agent to use Memory when useful. For Memory-enabled build tasks,
 `memory_questions` are appended as required questions and the runner exposes the
-Memory CLI in `$MEMORY_EVAL_MEMORY_COMMAND`.
+Codifix CLI in `$MEMORY_EVAL_MEMORY_COMMAND`.
 
 For build tasks with `memory_questions`, the harness also writes
-`./.memory-eval/query-memory` into the copied workspace. The generated prompt
+`./.codifix-eval/query-memory` into the copied workspace. The generated prompt
 requires the agent to run that helper for each required question. The helper
-writes raw query JSON and status files under `.memory-eval/`, and the harness
+writes raw query JSON and status files under `.codifix-eval/`, and the harness
 fails the item unless every required question has a successful query response
 with at least one returned memory. Hand-written `memory-evidence.md` is useful
 for humans, but it is not accepted as proof of Memory access by itself.

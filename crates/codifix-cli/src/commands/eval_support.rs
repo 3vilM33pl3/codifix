@@ -2124,8 +2124,8 @@ pub(crate) fn run_agent_build_sequence_eval_item(
         fs::create_dir_all(&step_dir).with_context(|| format!("create {}", step_dir.display()))?;
         let step_timeout = step.timeout_seconds.unwrap_or(item.timeout_seconds);
         let step_task = sequence_step_as_task(item, step, step_timeout);
-        if workspace.join(".memory-eval").exists() {
-            fs::remove_dir_all(workspace.join(".memory-eval"))
+        if workspace.join(".codifix-eval").exists() {
+            fs::remove_dir_all(workspace.join(".codifix-eval"))
                 .with_context(|| format!("clear step Memory evidence for {}", step.id))?;
         }
         if condition != codifix_eval::EvalCondition::NoMemory && !step.memory_questions.is_empty() {
@@ -2171,9 +2171,9 @@ pub(crate) fn run_agent_build_sequence_eval_item(
         memory_queries_required += memory_evidence.required;
         memory_queries_verified += memory_evidence.verified;
         memory_evidence_ok &= memory_evidence.ok;
-        if workspace.join(".memory-eval").is_dir() {
+        if workspace.join(".codifix-eval").is_dir() {
             copy_dir_recursive(
-                &workspace.join(".memory-eval"),
+                &workspace.join(".codifix-eval"),
                 &step_dir.join("memory-eval"),
             )?;
         }
@@ -2423,10 +2423,10 @@ pub(crate) fn write_agent_build_memory_helper(
     item: &codifix_eval::AgentBuildTaskItem,
     _context: &EvalRunContext,
 ) -> Result<()> {
-    let evidence_dir = workspace.join(".memory-eval");
+    let evidence_dir = workspace.join(".codifix-eval");
     fs::create_dir_all(&evidence_dir)
         .with_context(|| format!("create {}", evidence_dir.display()))?;
-    let helper_binary = evidence_dir.join("memory");
+    let helper_binary = evidence_dir.join("codifix");
     let current_exe = env::current_exe()?;
     let copy_source = if Path::new("/proc/self/exe").is_file() {
         Path::new("/proc/self/exe")
@@ -2434,7 +2434,7 @@ pub(crate) fn write_agent_build_memory_helper(
         current_exe.as_path()
     };
     fs::copy(copy_source, &helper_binary)
-        .with_context(|| format!("copy Memory CLI to {}", helper_binary.display()))?;
+        .with_context(|| format!("copy Codifix CLI to {}", helper_binary.display()))?;
     #[cfg(unix)]
     {
         let mut permissions = fs::metadata(&helper_binary)
@@ -2469,7 +2469,7 @@ pub(crate) fn write_agent_build_memory_helper(
 set -eu
 
 if [ "$#" -lt 2 ]; then
-  echo "usage: ./.memory-eval/query-memory <question-id> <question>" >&2
+  echo "usage: ./.codifix-eval/query-memory <question-id> <question>" >&2
   exit 64
 fi
 
@@ -2485,11 +2485,11 @@ case "$question_id" in
     ;;
 esac
 
-mkdir -p .memory-eval
-out=".memory-eval/${question_id}.json"
-err=".memory-eval/${question_id}.stderr.txt"
-status=".memory-eval/${question_id}.status.json"
-cmd="./.memory-eval/memory"
+mkdir -p .codifix-eval
+out=".codifix-eval/${question_id}.json"
+err=".codifix-eval/${question_id}.stderr.txt"
+status=".codifix-eval/${question_id}.status.json"
+cmd="./.codifix-eval/codifix"
 
 set +e
 "$cmd" query --project "${CODIFIX_PROJECT:?}" --question "$question" --json > "$out" 2> "$err"
@@ -2526,7 +2526,7 @@ pub(crate) fn validate_agent_build_memory_evidence(
         let forbidden = [
             workspace.join("memory-evidence.md"),
             workspace.join("memory-evidence.json"),
-            workspace.join(".memory-eval"),
+            workspace.join(".codifix-eval"),
         ];
         let leaked = forbidden
             .iter()
@@ -2568,10 +2568,10 @@ pub(crate) fn validate_agent_build_memory_evidence(
     for (index, question) in item.memory_questions.iter().enumerate() {
         let question_id = agent_build_memory_question_id(index);
         let output_path = workspace
-            .join(".memory-eval")
+            .join(".codifix-eval")
             .join(format!("{question_id}.json"));
         let status_path = workspace
-            .join(".memory-eval")
+            .join(".codifix-eval")
             .join(format!("{question_id}.status.json"));
         let status_ok = if !status_path.is_file() {
             notes.push(format!("missing Memory query status for {question_id}"));
@@ -2888,16 +2888,16 @@ pub(crate) fn agent_build_prompt(
     prompt.push_str("\n\n");
     match condition {
         codifix_eval::EvalCondition::NoMemory => prompt.push_str(
-            "Evaluation condition: no-memory. Do not query, read, or use Codifix context. Do not create memory-evidence.md, memory-evidence.json, or .memory-eval artifacts. Work only from the repository files and this prompt.\n",
+            "Evaluation condition: no-memory. Do not query, read, or use Codifix context. Do not create memory-evidence.md, memory-evidence.json, or .codifix-eval artifacts. Work only from the repository files and this prompt.\n",
         ),
         _ => {
             prompt.push_str(
                 "Evaluation condition: memory-enabled. Use Codifix context before implementing, then make the requested code changes in the workspace.\n",
             );
-            prompt.push_str("\nUse this Memory CLI command from the shell:\n\n```bash\n");
+            prompt.push_str("\nUse this Codifix CLI command from the shell:\n\n```bash\n");
             prompt.push_str(&context.memory_command);
             prompt.push_str("\n```\n\n");
-            prompt.push_str("A harness-provided helper exists at `./.memory-eval/query-memory`. Use that helper for every required Memory question so the eval can verify real Memory service access. Do not fabricate Memory evidence; if a helper command fails, stop and report the failure.\n");
+            prompt.push_str("A harness-provided helper exists at `./.codifix-eval/query-memory`. Use that helper for every required Memory question so the eval can verify real Codifix service access. Do not fabricate Memory evidence; if a helper command fails, stop and report the failure.\n");
             prompt.push_str("Write a file named memory-evidence.md that summarizes the useful facts you used after the helper commands succeed.\n");
             if !item.memory_questions.is_empty() {
                 prompt.push_str("\nRequired Memory questions:\n");
@@ -2912,7 +2912,7 @@ pub(crate) fn agent_build_prompt(
                 prompt.push_str("\nRun these exact helper commands before editing files:\n\n```bash\n");
                 for (index, question) in item.memory_questions.iter().enumerate() {
                     let question_id = agent_build_memory_question_id(index);
-                    prompt.push_str("./.memory-eval/query-memory ");
+                    prompt.push_str("./.codifix-eval/query-memory ");
                     prompt.push_str(&question_id);
                     prompt.push(' ');
                     prompt.push_str(&shell_quote_value(question));

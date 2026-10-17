@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Intentionally has no general Memory service routes or user database access.
+//! Intentionally has no general Codifix service routes or user database access.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let all: Vec<_> = std::env::args_os().skip(1).collect();

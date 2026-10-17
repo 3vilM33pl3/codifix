@@ -12,11 +12,11 @@ grep -qi "linear-gradient" styles.css
 if [ "${CODIFIX_EVAL_CONDITION:-}" = "no-memory" ]; then
   test ! -f memory-evidence.md
   test ! -f memory-evidence.json
-  test ! -d .memory-eval
+  test ! -d .codifix-eval
 else
   test -f memory-evidence.md
-  test -f .memory-eval/q1.status.json
-  test -f .memory-eval/q1.json
+  test -f .codifix-eval/q1.status.json
+  test -f .codifix-eval/q1.json
 fi
 
 test ! -f debug.log
