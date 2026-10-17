@@ -185,13 +185,16 @@ not replace the per-user installer identity. Removing this MSI removes only its
 tools directory. Named service releases, configuration and databases created
 through the explicit operator are retained and must be retired separately.
 
-## Offline native PostgreSQL runtime prerequisite
+## Offline native runtime prerequisites
 
 `operators/native-prerequisites.ps1` is a separate, explicit `Preview`/`Install`
 operation. It installs **already built** PostgreSQL 17.11, pgvector 0.8.7 and
 app-local MSVC CRT bytes; it does not require Visual Studio, download software,
-initialize a database, create services or touch an existing database. PDS and Pi
-are not supplied by this operation. `native_stack_bundled` remains false.
+initialize a database, create services or touch an existing database. Separate
+strict manifest kinds also accept prepared pinned Node/PDS and patched Pi
+payloads; see [runtime schemas](NATIVE-RUNTIME-SCHEMAS.md). This does not build
+those payloads or install/configure their services. `native_stack_bundled`
+remains false.
 
 Supply a ZIP and a digest-pinned JSON manifest from an operator-protected input
 directory. Manifest fields are `schema_version: 1`,

@@ -20,10 +20,12 @@ try {
     # through validation/copy. Existing runtime/instance directories are never
     # treated as download caches or overwritten.
     $manifestGuard = [MemoryLayer.ProtectedRelease]::Open((Split-Path -Parent ([IO.Path]::GetFullPath($ManifestPath))))
+    $manifestLength=(Get-Item -LiteralPath $ManifestPath).Length
+    if ($manifestLength -gt 32MB) { throw 'Prerequisite manifest too large' }
     if ((Get-FileHash -LiteralPath $ManifestPath).Hash.ToLowerInvariant() -cne $ManifestSha256) { throw 'Prerequisite manifest differs from reviewed digest' }
-    if ((Get-Item -LiteralPath $ManifestPath).Length -gt 8MB) { throw 'Prerequisite manifest too large' }
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
     $plan = Get-NativePrerequisitePlan $manifest
+    Assert-NativeRuntimeManifestSize $manifestLength $plan.kind
     $packageParent = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($PackagePath))
     $packageGuard = [MemoryLayer.ProtectedRelease]::Open($packageParent)
     try {
@@ -33,7 +35,7 @@ try {
         try { $hash = ([BitConverter]::ToString($sha.ComputeHash($package))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() }
         if ($hash -cne $plan.package_sha256) { throw 'Prerequisite package differs from manifest' }
         $package.Position = 0
-        $identity = 'postgres-17.11-vector-0.8.7-' + $ManifestSha256
+        $identity = Get-NativeRuntimeIdentity $plan $ManifestSha256
         $root = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Memory Layer\runtimes'
         $release = Join-Path $root $identity
         $binding = [ordered]@{ schema_version=1; manifest_sha256=$ManifestSha256; plan=$plan; destination=$release }
@@ -68,7 +70,8 @@ try {
             Add-Type -AssemblyName System.IO.Compression.FileSystem
             $archive = [IO.Compression.ZipArchive]::new($package,[IO.Compression.ZipArchiveMode]::Read,$true)
             try {
-                if ($archive.Entries.Count -gt 30000) { throw 'Prerequisite archive too many entries' }
+                $entryLimit=if($plan.kind -ceq 'memory-native-pds-runtime'){100000}else{30000}
+                if ($archive.Entries.Count -gt $entryLimit) { throw 'Prerequisite archive too many entries' }
                 $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase); $total=[int64]0
                 foreach ($entry in $archive.Entries) {
                     Assert-NativeArchiveName $entry.FullName
