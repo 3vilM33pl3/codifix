@@ -149,14 +149,14 @@ cargo run --bin codifix -- doctor
 ## Project Memory Routing And Recovery
 
 For development of Codifix itself, keep **durable project knowledge** in
-Workshop's `memory` project. This repository's shared Go helper explicitly reads
+Workshop's `codifix` project. This repository's shared Go helper explicitly reads
 `.agents/codifix-command.json` (`["codifix", "--area", "workshop"]`). Task
 starts, plans, completed work and normal memory queries therefore use Workshop's
 API, including while a development backend is stopped or being restarted.
 
 ```bash
 go run ./.agents/skills/codifix/scripts/main.go \
-  query-memory 'What changed in this project?' memory
+  query-memory 'What changed in this project?' codifix
 ```
 
 The **dev service and database** are for backend tests. Test records do not
@@ -166,7 +166,7 @@ helper:
 ```bash
 CODIFIX_BIN='cargo run --quiet --bin codifix --' \
   go run ./.agents/skills/codifix/scripts/main.go \
-  query-memory 'A synthetic test question' memory
+  query-memory 'A synthetic test question' codifix
 ```
 
 Source CLI commands without an explicit area force the dev profile and omit
@@ -199,9 +199,11 @@ errors, inspect the dev overlay and client identity rather than starting another
 service. Do not use packaged `codifix service enable` to recover a source backend.
 
 The restored Monolith dev instance uses a dedicated local PostgreSQL database
-and login named `memory_project_dev`. Its protected user-local dev overlay holds
-the credentials; the previous overlay is preserved beside it. The retired
-shared `memory` login remains disabled. Cluster discovery, offline replay,
+and login named `codifix_project_dev`. Its protected user-local dev overlay holds
+the credentials; the previous overlay is preserved privately in the rename
+recovery directory. The old dev database is retained, and the old
+`memory-layer-dev.service` is disabled. The retired shared `memory` login remains
+disabled. Cluster discovery, offline replay,
 automatic background work, embeddings and model curation are disabled for this
 test instance. Workshop credentials and database settings are unchanged.
 

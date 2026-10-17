@@ -21,6 +21,10 @@ older rehearsal notes describe historical states, not the live deployment.
   `codifix` retains UUID `fb83249e-c78c-43eb-a4ba-928513a9023a` and existing memory.
   Its path-keyed configuration/state/cache key is `codifix-6b784a8b3a7500a1`.
   The repository helper successfully resumes it through the Workshop API.
+- The separate source dev service runs Codifix 3.0.0-rc.1-dev against a fresh
+  `codifix_project_dev` database/login. Health reports `status=ok`, `database=up`.
+  The old dev unit is disabled; old dev/shared databases remain unchanged.
+  Discovery, offline replay, automation, background and model work stay disabled.
 
 The gateway is also live on a fresh Codifix space, retaining its original
 authority and history. Signed status returned 200; missing/invalid authentication
@@ -103,3 +107,11 @@ no failures reported. No public release or tag has been published.
 Crash recovery reconfirmed all three Monolith area health checks. The initial
 Mac installer authentication blocker is resolved; preserved-state activation
 and main application/client verification remain in progress.
+
+Follow-up found the old dev unit and a duplicate legacy-labelled Workshop relay
+had restarted after the crash. Both are now disabled/stopped; the Codifix relay
+and source dev unit are active. Workshop remains healthy. Dev overlay recovery
+copies and the scoped provisioning script are retained privately under
+`dev-restoration/` and `provision-isolated-dev.py` in the operational evidence
+directory. Existing PostgreSQL administrator privileges sufficed; authentication
+and shared cluster roles were not changed.
