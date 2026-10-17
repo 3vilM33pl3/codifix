@@ -153,6 +153,15 @@ function ConvertTo-NativeCommandArgument([string]$Value) {
     return '"' + ([regex]::Replace($Value, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'
 }
 
+function Get-NativeScmFailure {
+    param([ValidateSet('create','config','sidtype')][string]$Operation,[int]$ExitCode)
+    # OS-derived text only: never SCM stdout, selected service arguments,
+    # binary paths, configuration content or account names.
+    $message=[ComponentModel.Win32Exception]::new($ExitCode).Message
+    if($message.Length -gt 512){$message=$message.Substring(0,512)}
+    return [ordered]@{operation=$Operation;exit_code=$ExitCode;win32_message=$message}
+}
+
 function Assert-NativeArchiveName([string]$Name) {
     if (-not $Name -or $Name.Length -gt 240 -or $Name.Contains('\') -or $Name.Contains(':') -or
         $Name.StartsWith('/') -or $Name.Contains([char]0)) { throw 'Unsafe ZIP entry name' }

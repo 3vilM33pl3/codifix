@@ -81,6 +81,23 @@ class CoreInstallTests(unittest.TestCase):
         guard = NATIVE_FUNCTIONS.read_text().split("function Assert-NativeArchiveName", 1)[1].split("function New-NativeCanonicalArchive", 1)[0]
         self.assertIn("$Name.Contains('\\')", guard)
 
+    def test_native_scm_failures_persist_only_static_bounded_diagnostics(self):
+        source = (NATIVE_FUNCTIONS.parent / "native-instance.ps1").read_text()
+        function = source.split("function Invoke-Sc", 1)[1].split("function Get-SelectedService", 1)[0]
+        self.assertIn("[Diagnostics.ProcessStartInfo]::new()", function)
+        self.assertIn("$start.Arguments=($Arguments | ForEach-Object {ConvertTo-NativeCommandArgument $_}) -join ' '", function)
+        self.assertIn("$start.UseShellExecute=$false", function)
+        self.assertIn("WaitForExit(30000)", function)
+        self.assertIn("$out.Length+$err.Length -gt 64KB", function)
+        self.assertIn("$code=$process.ExitCode", function)
+        self.assertNotIn("@Arguments 2>&1", function)
+        self.assertIn("$journal.scm_failure=Get-NativeScmFailure $Arguments[0] $code", function)
+        self.assertLess(function.index("Write-NativeJournal $journalPath $journal"), function.index('throw "SCM'))
+        helper = NATIVE_FUNCTIONS.read_text().split("function Get-NativeScmFailure", 1)[1].split("function Assert-NativeArchiveName", 1)[0]
+        self.assertIn("[ComponentModel.Win32Exception]::new($ExitCode).Message", helper)
+        self.assertIn("$message.Substring(0,512)", helper)
+        self.assertIn("@{operation=$Operation;exit_code=$ExitCode;win32_message=$message}", helper)
+
     def test_sanitized_installer_environment_preserves_fixed_windows_identity(self):
         source = SCRIPT.read_text()
         clear = source.index("$info.EnvironmentVariables.Clear()")
@@ -125,6 +142,8 @@ class CoreInstallTests(unittest.TestCase):
         for test in ["test-core-install.ps1", "test-runtime-pack.ps1"]:
             subprocess.run([shutil.which("pwsh"), "-NoProfile", "-File",
                             str(SCRIPT.with_name(test))], check=True)
+        subprocess.run([shutil.which("pwsh"), "-NoProfile", "-File",
+                        str(NATIVE_FUNCTIONS.with_name("test-native-instance.ps1"))], check=True)
 
 
 if __name__ == "__main__":

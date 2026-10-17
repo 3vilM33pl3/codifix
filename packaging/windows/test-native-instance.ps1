@@ -11,6 +11,21 @@ foreach ($bad in @('Homelab', '../trust', 'space name', ('x' * 49))) {
 }
 if ((ConvertTo-NativeCommandArgument 'C:\a b\') -ne '"C:\a b\\"') { throw 'Native trailing slash quoting failed' }
 if ((ConvertTo-NativeCommandArgument 'a"b') -ne '"a\"b"') { throw 'Native quote escaping failed' }
+$nestedBinary='"C:\Program Files\Memory Layer\wrapper.exe" "--name" "MemoryLayer-synthetic"'
+$nestedExpected='"\"C:\Program Files\Memory Layer\wrapper.exe\" \"--name\" \"MemoryLayer-synthetic\""'
+if((ConvertTo-NativeCommandArgument $nestedBinary) -cne $nestedExpected){throw 'Nested SCM binPath quoting changed'}
+function Test-ScmArrayBinding([string[]]$Arguments){return $Arguments}
+$bound=@(Test-ScmArrayBinding @('create','selected','binPath=','"C:\synthetic path\wrapper.exe" "--name" "synthetic"'))
+if($bound.Count -ne 4 -or $bound[0] -cne 'create' -or $bound[3] -cne '"C:\synthetic path\wrapper.exe" "--name" "synthetic"'){
+    throw 'SCM array expression binding dropped or changed arguments'
+}
+foreach($operation in @('create','config','sidtype')){
+    $failure=Get-NativeScmFailure $operation 87
+    if($failure.operation -cne $operation -or $failure.exit_code -ne 87 -or -not $failure.win32_message -or $failure.win32_message.Length -gt 512){
+        throw 'Bounded SCM failure code diagnostic changed'
+    }
+    if((($failure.Keys | Sort-Object) -join ',') -cne 'exit_code,operation,win32_message'){throw 'SCM failure diagnostic included dynamic command data'}
+}
 foreach ($bad in @('../secret', '/absolute', 'bin\memory.exe', 'x:y', 'AUX.json', 'bin/con.txt', 'bin/x.')) {
     $rejected = $false
     try { Assert-NativeArchiveName $bad } catch { $rejected = $true }

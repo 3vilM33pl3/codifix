@@ -42,8 +42,33 @@ function Set-PrivateDirectory([string]$Path, [string]$ServiceSid = '', [switch]$
     Set-NativePrivateDirectory $Path $ServiceSid -ReadOnly:$ReadOnly
 }
 function Invoke-Sc([string[]]$Arguments) {
-    $null = & "$env:SystemRoot\System32\sc.exe" @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "SCM operation failed with code $LASTEXITCODE; inspect the selected service locally" }
+    # PowerShell 5.1 native invocation rewrites embedded quotes in binPath.
+    # Preserve each sc.exe argument through the shared Windows argv encoder,
+    # as the native PostgreSQL installer already does for SCM creation.
+    $start=[Diagnostics.ProcessStartInfo]::new()
+    $start.FileName=Join-Path $env:SystemRoot 'System32\sc.exe'
+    $start.Arguments=($Arguments | ForEach-Object {ConvertTo-NativeCommandArgument $_}) -join ' '
+    $start.UseShellExecute=$false;$start.CreateNoWindow=$true
+    $start.RedirectStandardOutput=$true;$start.RedirectStandardError=$true;$start.WorkingDirectory=$operationRoot
+    $process=[Diagnostics.Process]::new();$process.StartInfo=$start
+    try{
+        if(-not $process.Start()){throw 'Exact SCM process failed to start'}
+        $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
+        if(-not $process.WaitForExit(30000)){
+            $process.Kill();$null=$process.WaitForExit(10000)
+            throw 'Exact SCM process exceeded deadline; inspect retained operation before retry'
+        }
+        $process.WaitForExit();$out=$stdout.GetAwaiter().GetResult();$err=$stderr.GetAwaiter().GetResult()
+        $code=$process.ExitCode
+        if($out.Length+$err.Length -gt 64KB){throw 'SCM output exceeded its bound; inspect retained operation'}
+        # Deliberately discard native stdout/stderr. Only the static verb and
+        # numeric OS outcome may enter the private operation journal.
+    }finally{$process.Dispose()}
+    if ($code -ne 0) {
+        $journal.scm_failure=Get-NativeScmFailure $Arguments[0] $code
+        Write-NativeJournal $journalPath $journal
+        throw "SCM $($journal.scm_failure.operation) failed with code $code; inspect the private operation journal"
+    }
 }
 function Get-SelectedService { return Get-CimInstance Win32_Service -Filter "Name='$($plan.service_name)'" }
 function Save-Phase([string]$Phase) {
