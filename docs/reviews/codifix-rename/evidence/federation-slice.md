@@ -53,8 +53,40 @@ Metadata manifests stay mode0600 under
 are in `federation-test.env`; no credentials or payloads are committed here.
 
 No live service, database, CA, peer or provider was mutated or contacted by this
-slice. Populated Mac device-cache rehearsal, other populated area/gateway clone
-checks, consolidated workspace checks and the operational stop/drain/restart
+slice. Populated Mac device-cache rehearsal, consolidated workspace checks and
+the operational stop/drain/restart
 cutover remain parent release gates. Original seed restores remain untouched.
 The release operators document that old processes must be drained before applying
 markers and only candidate binaries may restart afterwards.
+
+## Additional populated snapshot rehearsals
+
+Rehearsed General, Homelab and gateway on fresh isolated clones of the existing
+seed dumps. Source was checked against integrated candidate `4eca6946`: the
+migrations, retirement operators and historical verifier were unchanged from
+the validated E slice. The existing read-only verifier binary was reused; no
+Cargo build or live action was needed. Each seed's SHA256 was checked before
+and after its rehearsal and stayed identical.
+
+| Clone | Upgrade | Preserved table fingerprints | Retired spaces | Retained records / receipts verified |
+| --- | --- | --- | --- | --- |
+| General | 76 → 85 | 159 | 1 | 23 / 23 |
+| Homelab | 84 → 85 | 159 | 1 | 23 / 23 |
+| gateway | 76 → 85 | 159 | 1 | 0 / 0 (no replica history) |
+
+For each clone, every applied source migration checksum matched before upgrade.
+After upgrade, all migration checksums and the normalized semantic schema matched
+an independently migrated pristine candidate. Retirement and exact retry passed,
+and all reviewed preserved table fingerprints matched the pre-retirement values.
+These fingerprints omit only the explicitly reviewed operational fields described
+by the operator; they are evidence of preservation, not a functional grant,
+authorization or citation test. Gateway's empty verifier result does not exercise
+historical signatures. The focused synthetic/HTTP tests above cover authorization
+and origin behavior separately.
+
+Mode0600 local metadata is retained under the same state directory in
+`federation-additional-schema-reference.json`,
+`federation-additional-rehearsal-results.json` and the three
+`federation-{general,homelab,gateway}-retire-rehearsal.json` manifests. Original
+seed restores and dumps remain untouched; all upgraded/retired databases are
+disposable clones in the existing loopback-only PostgreSQL test container.
