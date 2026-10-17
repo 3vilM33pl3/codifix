@@ -1,83 +1,159 @@
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable application version
+        type: string
+        required: true
+        default: 2.1.0
+      publish:
+        description: Publish the verified stable release (otherwise build candidate only)
+        type: boolean
+        required: true
+        default: false
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: memory-release
   cancel-in-progress: false
 
+env:
+  CARGO_BUILD_JOBS: "2"
+  RUST_TEST_THREADS: "4"
+  CARGO_TERM_COLOR: always
+
 jobs:
-  validate-release:
-    name: Validate Release
+  contract:
+    name: Freeze stable release contract
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.contract.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Verify versions and clean frozen source
+        id: contract
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="$REQUESTED_VERSION"
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then version="${GITHUB_REF_NAME#v}"; fi
+          node scripts/release/contract.mjs "$version"
+          test -f "docs/releases/$version.md"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  validate-release:
+    name: Validate frozen source and security overlays
+    runs-on: ubuntu-24.04
+    needs: contract
+    timeout-minutes: 180
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: memory
+          POSTGRES_PASSWORD: memory
+          POSTGRES_DB: memory_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U memory -d memory_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      MEMORY_LAYER_TEST_DATABASE_URL: postgresql://memory:memory@127.0.0.1:5432/memory_test
+      MEMORY_LAYER_TEST_REQUIRE_DB: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
-
-      - name: Validate release versions
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          cargo_version="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
-          web_version="$(node -p "require('./web/package.json').version")"
-          lock_web_version="$(node -p "require('./web/package-lock.json').version")"
-          docs_site_version="$(node -p "require('./docs-site/package.json').version")"
-          lock_docs_site_version="$(node -p "require('./docs-site/package-lock.json').version")"
-          lock_mem_cli_version="$(awk '
-            $0 == "name = \"mem-cli\"" { found = 1; next }
-            found && /^version = / { gsub(/"/, "", $3); print $3; exit }
-          ' Cargo.lock)"
-
-          test "$cargo_version" = "$version"
-          test "$web_version" = "$version"
-          test "$lock_web_version" = "$version"
-          test "$docs_site_version" = "$version"
-          test "$lock_docs_site_version" = "$version"
-          test "$lock_mem_cli_version" = "$version"
-
-      - name: Run release validation
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            docs-site/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-quality-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: release-quality-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-
+      - name: Required-database Rust validation
         run: |
           cargo fmt --check
           cargo test --workspace --all-targets --locked
           cargo clippy --workspace --all-targets --locked -- -D warnings
+          bash scripts/check-boundaries.sh
+          cargo build --locked -p mem-cli --no-default-features --bin memory
+      - name: Packaging and stable/RC operator contracts
+        run: |
+          for suite in test_release.py test_instance.py test_console.py test_upgrade.py; do
+            python3 -m unittest discover -s scripts/areas/releases -p "$suite"
+          done
+          python3 -m unittest discover -s packaging/macos/tests
+          python3 -m unittest discover -s packaging/ca-bookworm -p 'test_*.py'
+      - name: Web validation
+        run: |
+          npm --prefix web ci
+          npm --prefix web test
+          npm --prefix web run build
+          npm --prefix web audit --audit-level=low
+      - name: Documentation validation
+        run: |
+          npm --prefix docs-site ci
+          npm --prefix docs-site run check:content
+          npm --prefix docs-site run lint:links
+          npm --prefix docs-site run check:assets
+          npm --prefix docs-site run build
+          npm --prefix docs-site audit --audit-level=low
+      - name: Pinned PDS security overlay validation
+        run: |
+          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream install --frozen-lockfile
+          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream audit --audit-level=low
+          node --test packaging/windows-pds/security.test.mjs packaging/windows-pds/http-stdio.test.mjs packaging/windows-pds/windows-paths.test.mjs
+      - name: Rust audit with explicit documented RSA exception
+        run: |
+          cargo install cargo-audit --locked
+          mkdir -p target
+          cargo audit --json > target/release-rust-audit.json || test "$?" -eq 1
+          node scripts/release/check-audit.mjs target/release-rust-audit.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-quality-reports
+          path: target/release-rust-audit.json
+          if-no-files-found: ignore
 
   source-release:
-    name: Build Source Archive
+    name: Build source archive
     runs-on: ubuntu-24.04
-    needs: validate-release
+    needs: contract
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Build source archive
+      - name: Archive frozen source
+        env:
+          VERSION: ${{ needs.contract.outputs.version }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
           mkdir -p target/source
-          git archive \
-            --format=tar.gz \
-            --prefix="memory-${version}/" \
-            --output="target/source/memory-${version}.tar.gz" \
-            "$GITHUB_SHA"
-          (
-            cd target/source
-            sha256sum "memory-${version}.tar.gz" > "memory-${version}.tar.gz.sha256"
-          )
-
+          git archive --format=tar.gz --prefix="memory-$VERSION/" --output="target/source/memory-$VERSION.tar.gz" "$GITHUB_SHA"
+          (cd target/source && sha256sum "memory-$VERSION.tar.gz" > "memory-$VERSION.tar.gz.sha256")
       - uses: actions/upload-artifact@v4
         with:
           name: source-release
@@ -85,97 +161,147 @@ jobs:
           if-no-files-found: error
 
   linux-release:
-    name: Build Linux ${{ matrix.deb_arch }} Package
-    runs-on: ${{ matrix.runner }}
-    needs: validate-release
+    name: Build Bookworm Linux ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    needs: contract
+    timeout-minutes: 180
     strategy:
       fail-fast: false
+      max-parallel: 2
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare private build directory
+        run: mkdir -p "$RUNNER_TEMP/memory-linux-build" && chmod 700 "$RUNNER_TEMP/memory-linux-build"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/memory-linux-build/memory-cargo
+            ${{ runner.temp }}/memory-linux-build/memory-target
+            ${{ runner.temp }}/memory-linux-build/npm-cache
+          key: release-bookworm-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'web/package-lock.json', 'packaging/ca-bookworm/Dockerfile') }}-${{ github.sha }}
+          restore-keys: release-bookworm-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'web/package-lock.json', 'packaging/ca-bookworm/Dockerfile') }}-
+      - name: Build ABI-constrained packages from frozen source
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          docker build --iidfile "$RUNNER_TEMP/bookworm-image-id" -f packaging/ca-bookworm/Dockerfile packaging/ca-bookworm
+          if [[ "$ARCH" == amd64 ]]; then
+            python3 scripts/areas/releases/test_console_cli.py --image "$(cat "$RUNNER_TEMP/bookworm-image-id")" --evidence-parent "$RUNNER_TEMP"
+          fi
+          bash packaging/ca-bookworm/release.sh "$GITHUB_SHA" "$RUNNER_TEMP/memory-linux-build" "$(cat "$RUNNER_TEMP/bookworm-image-id")" "$ARCH"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: ${{ runner.temp }}/memory-linux-build/output/*
+          if-no-files-found: error
+
+  linux-install:
+    name: Install Linux ${{ matrix.arch }} package
+    needs: [contract, linux-release]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - runner: ubuntu-24.04
-            deb_arch: amd64
-            rust_target: x86_64-unknown-linux-gnu
+            arch: amd64
           - runner: ubuntu-24.04-arm
-            deb_arch: arm64
-            rust_target: aarch64-unknown-linux-gnu
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v8
         with:
-          targets: ${{ matrix.rust_target }}
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-
-      - name: Build Debian package
-        run: ./packaging/build-deb.sh --arch "${{ matrix.deb_arch }}" --target "${{ matrix.rust_target }}"
-
-      - name: Generate checksum
+          name: linux-${{ matrix.arch }}
+          path: target/linux-package
+      - name: Native install, service, capture and search checks
+        env:
+          VERSION: ${{ needs.contract.outputs.version }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          deb="memory-layer_${version}_${{ matrix.deb_arch }}.deb"
-          (
-            cd target/debian
-            sha256sum "$deb" > "${deb}.sha256"
-          )
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-${{ matrix.deb_arch }}
-          path: |
-            target/debian/memory-layer_*_${{ matrix.deb_arch }}.deb
-            target/debian/memory-layer_*_${{ matrix.deb_arch }}.deb.sha256
-          if-no-files-found: error
+          package="$(realpath "target/linux-package/memory-layer_${VERSION}_${ARCH}.deb")"
+          sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env MEMORY_HOSTED_INSTALL_TEST=yes bash packaging/ca-bookworm/install-test.sh "$package"
 
   macos-release:
-    name: Build macOS ${{ matrix.pkg_arch }} Package
+    name: Build and install macOS ${{ matrix.arch }} variants
     runs-on: ${{ matrix.runner }}
-    needs: validate-release
+    needs: contract
+    timeout-minutes: 180
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - runner: macos-15-intel
-            pkg_arch: x86_64
-            rust_target: x86_64-apple-darwin
+            arch: x86_64
+            target: x86_64-apple-darwin
           - runner: macos-15
-            pkg_arch: aarch64
-            rust_target: aarch64-apple-darwin
+            arch: aarch64
+            target: aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.rust_target }}
+          targets: ${{ matrix.target }}
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
-
-      - name: Build macOS package
-        run: ./packaging/build-pkg.sh --arch "${{ matrix.pkg_arch }}" --target "${{ matrix.rust_target }}"
-
-      - name: Generate checksum
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/${{ matrix.target }}
+          key: release-macos-${{ matrix.arch }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: release-macos-${{ matrix.arch }}-${{ hashFiles('Cargo.lock') }}-
+      - name: Build matching standard and runtime-preserving packages
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          bash packaging/build-pkg.sh --arch "$ARCH"
+          bash packaging/build-pkg.sh --arch "$ARCH" --application-update --skip-build
+      - name: Native package acceptance and metadata
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.contract.outputs.version }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          pkg="memory-layer-${version}-macos-${{ matrix.pkg_arch }}.pkg"
-          (
-            cd target
-            shasum -a 256 "$pkg" > "${pkg}.sha256"
-          )
-
+          standard="target/memory-layer-$VERSION-macos-$ARCH.pkg"
+          update="target/memory-layer-$VERSION-macos-$ARCH-application-update.pkg"
+          bash packaging/macos/check-release.sh "$ARCH" "$VERSION" "$standard" "$update"
+          for package in "$standard" "$update"; do
+            (cd target && shasum -a 256 "$(basename "$package")") > "$package.sha256"
+          done
+          node <<'NODE'
+          const fs = require('fs'), crypto = require('crypto'), cp = require('child_process');
+          const {ARCH:architecture, VERSION:application_version, GITHUB_SHA:source_commit} = process.env;
+          const packages = [`memory-layer-${application_version}-macos-${architecture}.pkg`, `memory-layer-${application_version}-macos-${architecture}-application-update.pkg`];
+          const artifacts = Object.fromEntries(packages.map(name => [name, crypto.createHash('sha256').update(fs.readFileSync(`target/${name}`)).digest('hex')]));
+          const command = (name,args=[]) => cp.execFileSync(name,args,{encoding:'utf8'}).trim();
+          fs.writeFileSync(`target/memory-layer-${application_version}-macos-${architecture}-build.json`,JSON.stringify({format:'memory-macos-build-v1',application_version,architecture,source_commit,signing_status:'unsigned',notarized:false,native_package_acceptance:true,runtime_preservation_check:'sentinel-files-only',runtime_bundled:false,artifacts,toolchains:{rustc:command('rustc',['-vV']),node:process.version,npm:command('npm',['--version']),macos:command('sw_vers',['-productVersion']),xcode:command('xcodebuild',['-version'])}},null,2)+'\n');
+          NODE
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-${{ matrix.pkg_arch }}
+          name: macos-${{ matrix.arch }}
           path: |
-            target/memory-layer-*-macos-${{ matrix.pkg_arch }}.pkg
-            target/memory-layer-*-macos-${{ matrix.pkg_arch }}.pkg.sha256
+            target/memory-layer-*-macos-${{ matrix.arch }}*.pkg
+            target/memory-layer-*-macos-${{ matrix.arch }}*.pkg.sha256
+            target/memory-layer-*-macos-${{ matrix.arch }}-build.json
           if-no-files-found: error
 
   windows-release:
-    name: Build Windows x86_64 Package
+    name: Build and install Windows x64 preview
     runs-on: windows-2025
-    needs: validate-release
+    needs: contract
+    timeout-minutes: 180
+    env:
+      DOTNET_ROLL_FORWARD: Major
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -184,20 +310,48 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/x86_64-pc-windows-msvc
+          key: release-windows-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: release-windows-${{ hashFiles('Cargo.lock') }}-
       - name: Install WiX
         shell: pwsh
         run: |
           dotnet tool install --global wix --version 4.0.5
+          if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }
           "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append
-
-      - name: Build Windows artifacts
+      - name: Start disposable native PostgreSQL and pgvector
+        shell: pwsh
+        run: ./packaging/windows/start-release-postgres.ps1
+      - name: Test stable Windows installer identity
+        shell: pwsh
+        run: ./packaging/windows/test-release-identity.ps1
+      - name: Build ZIP, per-user MSI and server-tools MSI
         shell: pwsh
         run: ./packaging/windows/build-windows.ps1 -InstallerBuild 1
-
+      - name: Native core and installer acceptance
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.contract.outputs.version }}
+        run: |
+          ./packaging/windows/check-release.ps1 -DistDir "target/windows/dist/windows-v$env:VERSION-build.1" -ExpectedVersion $env:VERSION -ExpectedCommit $env:GITHUB_SHA -TestDatabaseUrl $env:MEMORY_RELEASE_TEST_DATABASE_URL
+      - name: Stop only the disposable test cluster
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:MEMORY_RELEASE_PGBIN -and $env:MEMORY_RELEASE_PGDATA) {
+            & "$env:MEMORY_RELEASE_PGBIN\pg_ctl.exe" -D $env:MEMORY_RELEASE_PGDATA -m fast -w stop
+            if ($LASTEXITCODE -ne 0) { throw 'Disposable PostgreSQL shutdown failed' }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64
@@ -205,57 +359,71 @@ jobs:
           if-no-files-found: error
 
   publish-release:
-    name: Publish GitHub Release
+    name: Collect and optionally publish stable release
     runs-on: ubuntu-24.04
-    needs:
-      - source-release
-      - linux-release
-      - macos-release
-      - windows-release
+    needs: [contract, validate-release, source-release, linux-release, linux-install, macos-release, windows-release]
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # Explicit names prevent audit/test reports from becoming public assets.
       - uses: actions/download-artifact@v8
         with:
-          path: target/release-assets
-          merge-multiple: true
-
-      - name: Generate release notes
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          previous_tag="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
-          {
-            echo "## Memory Layer ${GITHUB_REF_NAME}"
-            echo
-            echo "### Changes"
-            if [ -n "$previous_tag" ]; then
-              git log --pretty=format:"- %s" "${previous_tag}..${GITHUB_REF_NAME}"
-            else
-              git log --pretty=format:"- %s" -20 "${GITHUB_REF_NAME}"
-            fi
-            echo
-            echo
-            echo "### Packages"
-            echo "- Debian x86_64: \`memory-layer_${version}_amd64.deb\`"
-            echo "- Debian arm64: \`memory-layer_${version}_arm64.deb\`"
-            echo "- macOS Intel: \`memory-layer-${version}-macos-x86_64.pkg\`"
-            echo "- macOS Apple Silicon: \`memory-layer-${version}-macos-aarch64.pkg\`"
-            echo "- Windows x86_64 ZIP: \`memory-layer-${version}-windows-x86_64.zip\`"
-            echo "- Windows x86_64 MSI: \`memory-layer-${version}-windows-x86_64.msi\`"
-            echo "- Source archive for Homebrew: \`memory-${version}.tar.gz\`"
-            echo
-            echo "Each package has a matching \`.sha256\` checksum file."
-          } > release-notes.md
-
-      - name: Publish GitHub Release
+          name: source-release
+          path: target/release-assets/source
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-amd64
+          path: target/release-assets/linux-amd64
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-arm64
+          path: target/release-assets/linux-arm64
+      - uses: actions/download-artifact@v8
+        with:
+          name: macos-x86_64
+          path: target/release-assets/macos-x86_64
+      - uses: actions/download-artifact@v8
+        with:
+          name: macos-aarch64
+          path: target/release-assets/macos-aarch64
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-x86_64
+          path: target/release-assets/windows-x86_64
+      - name: Verify complete asset inventory and aggregate checksums
+        env:
+          VERSION: ${{ needs.contract.outputs.version }}
+        run: node scripts/release/assets.mjs target/release-assets "$VERSION" "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-release-candidate
+          path: target/release-assets/*
+          if-no-files-found: error
+      - name: Create immutable tag, publish draft and verify downloaded assets
+        if: github.event_name == 'push' || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.contract.outputs.version }}
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" \
-            target/release-assets/* \
-            --target "$GITHUB_SHA" \
-            --title "Memory Layer ${GITHUB_REF_NAME}" \
-            --notes-file release-notes.md
+          tag="v$VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            git fetch origin "refs/tags/$tag:refs/tags/$tag"
+            test "$(git rev-parse "$tag^{commit}")" = "$GITHUB_SHA"
+          else
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "refs/tags/$tag"
+          fi
+          # No replacement, clobbering, retagging or automatic release deletion.
+          gh release create "$tag" target/release-assets/* --draft --verify-tag --title "Memory Layer $tag" --notes-file "docs/releases/$VERSION.md"
+          download="$(mktemp -d "$RUNNER_TEMP/memory-published-assets.XXXXXXXX")"
+          gh release download "$tag" --dir "$download"
+          cmp target/release-assets/SHA256SUMS "$download/SHA256SUMS"
+          (cd "$download" && sha256sum -c SHA256SUMS)
+          gh release edit "$tag" --draft=false --prerelease=false --latest

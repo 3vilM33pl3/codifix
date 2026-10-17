@@ -27,8 +27,9 @@ cmp "$stage/standard/Payload/usr/local/bin/memory" "$stage/update/Payload/usr/lo
 diff -r "$stage/standard/Payload/usr/local/share/memory-layer/web" "$stage/update/Payload/usr/local/share/memory-layer/web"
 sudo installer -pkg "$standard" -target /
 [[ $(/usr/local/bin/memory --version) == "memory $version" ]]
-# Model an independently receipted runtime: application updates must leave it
-# byte-identical and must not remove its launcher. No dependency is executed.
+# Sentinel-only runtime preservation check, not a separately receipted runtime
+# installation: updates must preserve these bytes and the existing launcher.
+# No dependency is executed and this is not full runtime-upgrade acceptance.
 runtime=/usr/local/share/memory-layer/runtime/release-check
 sudo mkdir -p "$runtime"
 printf 'preserve independently owned runtime\n' | sudo tee "$runtime/sentinel" >/dev/null
