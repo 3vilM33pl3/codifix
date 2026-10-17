@@ -372,7 +372,9 @@ pub(super) async fn run(
         if report.failure.is_some() || report.process != ProcessDisposition::Reaped {
             #[cfg(test)]
             if record_failed_child_report(&run_dir, &report).is_err() {
-                eprintln!("protected child-report metadata unavailable; retaining original Child failure");
+                eprintln!(
+                    "protected child-report metadata unavailable; retaining original Child failure"
+                );
             }
             return Err(LaunchError::Child);
         }
