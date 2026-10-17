@@ -149,13 +149,29 @@ actual live cold-window state transfer and launchd activation remain separate
 acceptance gates. These Python tests neither execute a real native binary nor
 establish live readiness. No activation bypass is provided.
 
-## Reviewed source hashes
+## Original reviewed source hashes
 
 - `scripts/codifix-cutover/macos-runtime-rebind.py`: `b0aad740d42e77c7390fe987769825b24d319efcd3f72ced5756784d4567779c`
 - `scripts/codifix-cutover/test_macos_runtime_rebind.py`: `ab0d2414f7428194698b46c7a3fbf04a56ad785bb58e15a9268c3fb9a79cfc6a`
 - `packaging/macos/onboard.py`: `33d09054db3b4602c9c7caa45ad49980359329203a41fbdf984c0404b8da654b`
 - `packaging/macos/onboarding_files.py`: `7807e076ad80006439e1cddbd8aa1d8e5adb626b04e03d1bc50b9374b6e8d27e`
 - `packaging/macos/onboarding_native.py`: `31f2e2138e0c04cdd52932db7f9692cba0a7e2358711122fdc7d01929a6e8a02`
+
+## Actual cutover correction — 17 October
+
+The first live native inspection reached the final legacy-role check and found
+that bare PostgreSQL `EXISTS` returns `f`, while the shared query reader requires
+JSON. Commit `b3453aaf` wraps that result in `to_json` without changing the
+predicate. Corrected helper SHA-256:
+`fc5df21d399bb8881755dc9486f7b856cf17b962d3654bae7dc4460ec9996d22`.
+The retained Mac helper was replaced and its manifest regenerated before binding.
+Real native inspect and bind then passed. A real PostgreSQL boolean serialization
+check passed, and all 13 focused tests pass, including the native JSON reader's
+false/true cases and rejection when a legacy role remains (`f031789c`).
+
+The earlier native gaps above describe the original source review. Current live
+deployment and remaining client/sync work are tracked in the
+[live cutover ledger](../live-cutover.md).
 
 PostgreSQL references: [pg_controldata](https://www.postgresql.org/docs/17/app-pgcontroldata.html),
 [transaction read-only mode](https://www.postgresql.org/docs/17/sql-set-transaction.html),
