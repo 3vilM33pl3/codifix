@@ -119,6 +119,15 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertNotIn('Invoke-WebRequest', script)
         self.assertNotIn('Add-WindowsCapability', script)
 
+    def test_native_web_build_uses_locked_dependencies_and_does_not_claim_browser_acceptance(self):
+        script = (Path(__file__).parent / 'guest-native-product.ps1').read_text()
+        for required in ["[ValidateSet('Check','Build','Web')]", "if ($Action -eq 'Web')",
+                         "@('ci','--no-audit','--no-fund')", "@('test')", "@('run','build')",
+                         'web_lock_sha256', 'Pinned native Node required', 'WaitForExit(1800000)',
+                         'Web build changed frozen package lock', 'browser_workflow_verified=$false']:
+            self.assertIn(required, script)
+        self.assertNotIn('npm install', script)
+
     def test_native_onboarding_compiles_the_settings_feature_it_tests(self):
         script = (Path(__file__).resolve().parents[2] / 'packaging/windows/check-onboarding.ps1').read_text()
         self.assertEqual(script.count('--features project-sync'), 2)
