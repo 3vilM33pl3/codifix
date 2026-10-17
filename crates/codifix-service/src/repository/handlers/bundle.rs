@@ -576,10 +576,7 @@ async fn confirm_export_prepared_tx(
             .project_id
             .ok_or_else(|| ApiError::internal("export missing project"))?,
         ActivityKind::BundleExport,
-        format!(
-            "Prepared memory bundle {} for download",
-            manifest.bundle_id
-        ),
+        format!("Prepared memory bundle {} for download", manifest.bundle_id),
     );
     event.id = Uuid::new_v5(&effect.id, b"event");
     event.operation_id = Some(effect.id.to_string());

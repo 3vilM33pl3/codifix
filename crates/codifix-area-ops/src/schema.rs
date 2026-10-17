@@ -9,10 +9,10 @@ use sqlx::{
 };
 use std::{borrow::Cow, path::PathBuf, time::Duration};
 
-// Explicitly reviewed through the device-replica sync-health migration. Never
+// Explicitly reviewed through the Codifix federation-retirement migration. Never
 // derive this from the current directory: new SQL requires a fresh-schema review.
-const HEAD: i64 = 84;
-// Same compatibility rule as mem-service::runtime and mem-test-support. Preserve
+const HEAD: i64 = 85;
+// Same compatibility rule as codifix-service::runtime and codifix-test-support. Preserve
 // the applied checksum; migration 16 removes the obsolete dimensionless index.
 const VECTOR_COMPAT: &str = r#"
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -304,8 +304,8 @@ mod tests {
         let original = sqlx::migrate!("../../migrations");
         let compatible = migrations();
         let plan = describe(&compatible).unwrap();
-        assert_eq!(plan.migration_head, 84);
-        assert_eq!(plan.migrations, 84);
+        assert_eq!(plan.migration_head, 85);
+        assert_eq!(plan.migrations, 85);
         assert!(!plan.creates_credentials && !plan.starts_services);
         for (original, actual) in original.iter().zip(compatible.iter()) {
             assert_eq!(original.checksum, actual.checksum);

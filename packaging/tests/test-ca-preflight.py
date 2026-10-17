@@ -33,9 +33,9 @@ class InventoryTests(unittest.TestCase):
             program = arguments[0]
             if scenario == "timeout":
                 raise subprocess.TimeoutExpired(arguments, 6, stderr=SECRET)
-            if program == "codifix":
-                self.assertEqual(arguments, ["codifix", "--version"])
-                output = SECRET if scenario == "malformed" else "codifix 3.0.0-rc.1\n"
+            if program in ("codifix", "memory"):
+                self.assertEqual(arguments, [program, "--version"])
+                output = SECRET if scenario == "malformed" else f"{program} {'2.1.0' if program == 'memory' else '3.0.0-rc.1'}\n"
             elif program == "systemctl":
                 if arguments == ["systemctl", "--version"]:
                     output = "systemd 252 (252.31-1)\n+PAM +SECCOMP +BPF_FRAMEWORK\n"
@@ -155,6 +155,9 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(report["host"]["architecture"], "aarch64")
         self.assertEqual(report["host"]["os"]["id"], "debian")
         self.assertEqual(report["codifix"]["version"], "3.0.0-rc.1")
+        self.assertEqual(report["legacy_memory"]["version"], "2.1.0")
+        for unit in ("memory-layer.service", "memory-layer@trust.service", "codifix.service", "codifix@trust.service"):
+            self.assertIn(unit, report["services"])
         database = report["postgresql"]["database_inventory"]["clusters"][0]["databases"][0]
         self.assertEqual(database["name"], "memory_trust")
         self.assertEqual(database["counts"]["tables"]["memory_entries"], 12)
@@ -248,7 +251,7 @@ class InventoryTests(unittest.TestCase):
                 self.assertFalse(pi["artifact_executed"])
                 self.assertFalse(pi["local_artifact_inspected"])
                 self.assertFalse(pi["activation_authorized"])
-                self.assertTrue(all(args[0] in ("systemctl", "codifix", "ss", "runuser") for args in commands))
+                self.assertTrue(all(args[0] in ("systemctl", "codifix", "memory", "ss", "runuser") for args in commands))
 
     def test_wrong_architecture_and_unknown_libc_never_pass_native_check(self):
         report, _ = self.inventory(architecture="armv7l", libc="glibc 2.43")

@@ -33,7 +33,7 @@ class CoreInstallTests(unittest.TestCase):
                          "installer_source_commit=$head;binary_source_commit=$build.source_commit",
                          "'native-instance.ps1'", "'-Action','Preview','-PreviewAction','Install'",
                          "'-Action','Install','-ExpectedInputSha256',$preview.input_sha256",
-                         "'-DatabaseCompatibilityConfirmed'", "schema.Trim() -cne '84:0'",
+                         "'-DatabaseCompatibilityConfirmed'", "schema.Trim() -cne '85:0'",
                          "Get-CoreInstallExecutableSource $file $coreRoot $debug", "$pin[0].sha256 -cne $core.binary_sha256",
                          "payload_files=$payloadFiles", "package_sha256=Get-CoreInstallHash $package",
                          "'LAB-ONLY-manifest.json'", "'unsigned-lab-debug'", "database_reused=$true"]:

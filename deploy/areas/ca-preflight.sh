@@ -80,11 +80,11 @@ def run(arguments, timeout=6):
     return "ok", None, result.stdout
 
 
-def version():
-    status, reason, output = run(["codifix", "--version"])
+def version(binary):
+    status, reason, output = run([binary, "--version"])
     if status != "ok":
         return outcome(status, reason)
-    match = re.fullmatch(r"codifix ([0-9][A-Za-z0-9.+_~-]{0,95})\s*", output)
+    match = re.fullmatch(re.escape(binary) + r" ([0-9][A-Za-z0-9.+_~-]{0,95})\s*", output)
     return outcome("ok", version=match[1]) if match else outcome("unavailable", "unexpected_version_output")
 
 
@@ -186,7 +186,8 @@ def host():
         os_result = outcome("unavailable", "os_metadata_missing")
     disks = {}
     # Labels identify the purpose, without publishing filesystem/mount paths.
-    for label, location in (("root", "/"), ("memory_data", "/var/lib/codifix"),
+    for label, location in (("root", "/"), ("candidate_data", "/var/lib/codifix"),
+                            ("legacy_data", "/var/lib/memory-layer"),
                             ("postgres_data", "/var/lib/postgresql")):
         try:
             info = os.statvfs(location)
@@ -417,9 +418,11 @@ report = {
     "host": host_metadata,
     "runtime": runtime_metadata(),
     "pi_arm64": pi_compatibility(host_metadata),
-    "codifix": version(),
+    "codifix": version("codifix"),
+    "legacy_memory": version("memory"),
     "services": {unit: service(unit) for unit in
-                 ("codifix.service", "codifix@trust.service", "step-ca.service", "openbao.service", "sshd.service", "ssh.service", "postgresql.service", "docker.service", "containerd.service", "podman.socket")},
+                 ("memory-layer.service", "memory-layer@trust.service",
+                  "codifix.service", "codifix@trust.service", "step-ca.service", "openbao.service", "sshd.service", "ssh.service", "postgresql.service", "docker.service", "containerd.service", "podman.socket")},
     "network": listeners(),
     "dataset_coverage": {
         "status": "unknown_requires_operator_reconciliation",

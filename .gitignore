@@ -17,6 +17,8 @@
 /docs-site/.next
 /docs-site/.source
 /formal/codifix-federation/.lake
+# Preserve the old build cache during the rename until explicit cleanup.
+/formal/memory-federation/.lake
 /demo/output
 __pycache__/
 *.pyc

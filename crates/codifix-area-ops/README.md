@@ -262,7 +262,7 @@ creates administration and loop definitions, which correctly makes a target
 ineligible for fresh import. For a newly provisioned **empty** dedicated database,
 use the reviewed executable's `memory-area-import schema-plan` first. It makes
 no connection and prints the exact compiled schema digest and fixed reviewed
-head (currently 0084). That current profile prepares a normal empty runtime
+head (currently 0085). That current profile prepares a normal empty runtime
 schema; it is **not** an assertion that the historical area importer supports it.
 The historical importer accepts only its reviewed 0056–0065 catalog. For that
 separate route, request `schema-plan --profile area-import-65` and use the same
@@ -297,7 +297,7 @@ an interrupted/ambiguous result, inspect the target: an initialized database is
 deliberately refused on replay. Never drop/reinitialize it to force a retry. A
 confirmed pristine supported schema may proceed to the separately reviewed
 import below. No existing database is upgraded by this command. After an import
-and verification at 0065, ordinary runtime migrations may upgrade to 0084 while
+and verification at 0065, ordinary runtime migrations may upgrade to 0085 while
 preserving knowledge and import receipts. Import/replay/reconciliation into that
 upgraded schema remains unsupported and fails closed; this profile is not a
 current-schema snapshot migration solution.

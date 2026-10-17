@@ -46,7 +46,7 @@ const TOOL_MEMORY_UP_TO_SPEED: &str = "codifix_up_to_speed";
 const TOOL_MEMORY_OVERVIEW: &str = "codifix_overview";
 const TOOL_MEMORY_LIST_MEMORIES: &str = "codifix_list_memories";
 const TOOL_MEMORY_GET_MEMORY: &str = "codifix_get_memory";
-const TOOL_MEMORY_MEMORY_HISTORY: &str = "codifix_codifix_history";
+const TOOL_MEMORY_MEMORY_HISTORY: &str = "codifix_memory_history";
 const TOOL_MEMORY_LIST_ACTIVITIES: &str = "codifix_list_activities";
 const TOOL_MEMORY_LIST_REPLACEMENT_PROPOSALS: &str = "codifix_list_replacement_proposals";
 const TOOL_MEMORY_LOOP_LIST: &str = "codifix_loop_list";
@@ -211,7 +211,7 @@ impl ServerHandler for MemoryMcpServer {
             TOOL_MEMORY_OVERVIEW => server.tool_overview(arguments).await,
             TOOL_MEMORY_LIST_MEMORIES => server.tool_list_memories(arguments).await,
             TOOL_MEMORY_GET_MEMORY => server.tool_get_memory(arguments).await,
-            TOOL_MEMORY_MEMORY_HISTORY => server.tool_codifix_history(arguments).await,
+            TOOL_MEMORY_MEMORY_HISTORY => server.tool_memory_history(arguments).await,
             TOOL_MEMORY_LIST_ACTIVITIES => server.tool_list_activities(arguments).await,
             TOOL_MEMORY_LIST_REPLACEMENT_PROPOSALS => {
                 server.tool_list_replacement_proposals(arguments).await
@@ -302,7 +302,7 @@ impl ServerHandler for MemoryMcpServer {
                 json!(
                     server
                         .client
-                        .codifix_history(&memory_id)
+                        .memory_history(&memory_id)
                         .await
                         .map_err(api_error)?
                 )
@@ -534,14 +534,14 @@ impl MemoryMcpServer {
         )
     }
 
-    async fn tool_codifix_history(
+    async fn tool_memory_history(
         &self,
         arguments: Map<String, Value>,
     ) -> Result<CallToolResult, McpError> {
         let args: MemoryIdArg = from_args(arguments)?;
         let response = self
             .client
-            .codifix_history(&args.memory_id)
+            .memory_history(&args.memory_id)
             .await
             .map_err(api_error)?;
         let text = response
@@ -1095,7 +1095,7 @@ impl MemoryApiClient {
         self.get(&format!("/v1/memory/{memory_id}")).await
     }
 
-    pub async fn codifix_history(&self, memory_id: &str) -> Result<MemoryHistoryResponse> {
+    pub async fn memory_history(&self, memory_id: &str) -> Result<MemoryHistoryResponse> {
         self.get(&format!("/v1/memory/{memory_id}/history")).await
     }
 
@@ -2319,6 +2319,12 @@ mod tests {
             .map(|tool| tool.name.into_owned())
             .collect::<Vec<_>>();
         assert!(names.contains(&TOOL_MEMORY_QUERY.to_string()));
+        assert!(names.contains(&"codifix_memory_history".to_string()));
+        assert!(
+            !names
+                .iter()
+                .any(|name| name.starts_with("codifix_codifix_"))
+        );
         assert!(names.contains(&TOOL_MEMORY_SEARCH_ALL.to_string()));
         assert!(names.contains(&TOOL_MEMORY_LIST_REPLACEMENT_PROPOSALS.to_string()));
         assert!(names.contains(&TOOL_MEMORY_LOOP_LIST.to_string()));

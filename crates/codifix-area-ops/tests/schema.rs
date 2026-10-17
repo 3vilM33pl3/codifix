@@ -65,7 +65,7 @@ fn failure(output: Output, message: &str) {
     assert!(String::from_utf8_lossy(&output.stderr).contains(message));
 }
 fn request(fixture: &Fixture, dir: &std::path::Path) -> Command {
-    request_profile(fixture, dir, "current", 84)
+    request_profile(fixture, dir, "current", 85)
 }
 fn request_profile(fixture: &Fixture, dir: &std::path::Path, profile: &str, head: i64) -> Command {
     let plan = success(
@@ -123,7 +123,7 @@ async fn cli_initializes_without_bootstrap_and_refuses_reinitialization() {
             .fetch_one(&mut connection)
             .await
             .unwrap(),
-        84
+        85
     );
     for table in [
         "projects",
@@ -163,7 +163,7 @@ fn historical_profile_is_explicit_distinct_and_not_an_arbitrary_head() {
             .unwrap(),
     );
     assert_eq!(current["profile"], "current");
-    assert_eq!(current["migration_head"], 84);
+    assert_eq!(current["migration_head"], 85);
     assert_eq!(historical["profile"], "area-import-65");
     assert_eq!(historical["migration_head"], 65);
     assert_ne!(current["schema_sha256"], historical["schema_sha256"]);
@@ -261,7 +261,7 @@ async fn explicit_historical_import_upgrades_without_receipt_relabeling_or_repla
             .fetch_one(&target)
             .await
             .unwrap(),
-        84
+        85
     );
     assert_eq!(
         support::rows(&target, "public.area_import_receipts").await,

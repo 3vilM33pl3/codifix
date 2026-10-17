@@ -240,8 +240,8 @@ try{
     $psql=Join-Path $pg 'runtime\pgsql\bin\psql.exe'
     $schema=Invoke-CoreInstallerProcess $psql @('-X','-h','127.0.0.1','-p','55471','-U','memorylab_test','-d',$binding.database,'-A','-t','-v','ON_ERROR_STOP=1','-c',"SELECT coalesce(max(version),0)::text || ':' || (count(*) FILTER (WHERE NOT success))::text FROM _sqlx_migrations") 'schema-read' $binding.password
     $binding.password=$null
-    if($schema.Trim() -cne '84:0'){throw 'Already prepared native schema84 required; installer never initializes or migrates the lab database'}
-    $receipt.schema_version=84;$receipt.postgres_proof_sha256=Get-CoreInstallHash $pgProofPath
+    if($schema.Trim() -cne '85:0'){throw 'Already prepared native schema85 required; installer never initializes or migrates the lab database'}
+    $receipt.schema_version=85;$receipt.postgres_proof_sha256=Get-CoreInstallHash $pgProofPath
     $operator=Join-Path $operators 'native-instance.ps1';$receipt.operator_sha256=Get-CoreInstallHash $operator
     $receipt.operator_helpers=@(@('native-instance-functions.ps1','native-prerequisites-functions.ps1','release-identity.ps1') | ForEach-Object {
         @{name=$_;sha256=(Get-CoreInstallHash (Join-Path $operators $_))}})

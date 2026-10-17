@@ -65,7 +65,11 @@ marker. Its preparation does not confirm that it reached the CA. Run the script
 only after that independent identity check; no download-and-execute command is
 provided.
 
-Expected: one `memory-ca-preflight-v2` JSON object with
+The report labels the installed legacy `memory` binary and `memory-layer` units
+separately from candidate `codifix` probes. These are inventory-only probes, not
+runtime compatibility aliases. No SSH login or certificate renewal is required.
+
+Expected: one `codifix-ca-preflight-v2` JSON object with
 `status: inventory_only_activation_not_approved`. It uses Python 3, a fixed
 system executable search path, and a 60-second total subprocess budget. Missing
 tools/permissions, denied local database access and exhausted checks are explicit
@@ -223,7 +227,7 @@ The remaining required evidence is not produced by this handoff:
 
 The software now provides `memory-area-import schema-plan` and explicitly
 confirmed `initialize-schema` for an already provisioned empty dedicated local
-database. See the [schema-only preparation guide](../../crates/mem-area-ops/README.md#schema-only-preparation-before-importing).
+database. See the [schema-only preparation guide](../../crates/codifix-area-ops/README.md#schema-only-preparation-before-importing).
 Do not start the Memory service to obtain that schema: it also bootstraps
 administration and makes fresh import ineligible. This available operator tool
 does not authorize running migrations on the CA before its target, backup,
