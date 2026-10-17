@@ -68,9 +68,13 @@ claim. Original dumps remain unchanged. Mac credentials were inspected as metada
 no Keychain transfer was applied. DNS, GitHub repository identity and published
 release status remain unchanged.
 
-CA SSH is deliberately disabled and must stay disabled. Its HTTPS health endpoint
-returned 200/ok; OpenBao TLS negotiation failed, leaving OpenBao health unverified.
-All host-local CA checks remain pending console results.
+CA SSH is deliberately disabled and must stay disabled. The console inventory
+has been received and its JSON checksum verified. At 21:25 UTC CA HTTPS returned
+200/ok and canonical OpenBao HTTPS returned 200, initialized/unsealed/active.
+The earlier TLS failure was on a different hostname. Process/database binding,
+recovery coverage and restore validation remain pending. See
+[CA console checks](../ca-console-checks.md); any CA change requires Olivier's
+approval. Follow-up observations are coordinated through Notion page bodies.
 
 
 ## First hosted candidate attempt
@@ -131,10 +135,11 @@ zero jobs so the replacement candidate can include this correction.
 
 Corrected unpublished candidate [run 39068603586](https://github.com/3vilM33pl3/memory/actions/runs/39068603586)
 is pinned to `afbde0b8d7bccaef05d6cdacc8e3c5bd9ed80eb3`, version 3.0.0-rc.1,
-`publish=false`. It is queued behind the first run's ongoing Mac Intel build;
-no corrected-candidate acceptance is claimed yet. Later commits only add docs
-and private-rehearsal evidence; they do not alter that candidate's Rust/package
-code.
+`publish=false`. It is now running; the first run completed with the recorded
+Windows/Linux failures and both Mac architectures' package acceptance passing.
+No corrected-candidate acceptance is claimed yet. Later commits add docs,
+private-rehearsal evidence and a standalone CA observational helper; they do not
+alter that candidate's Rust/package code.
 
 [Workshop HTTP reads](populated-workshop-reads.md) and
 [restored Mac cache HTTP reads](populated-mac-cache-reads.md) now pass against

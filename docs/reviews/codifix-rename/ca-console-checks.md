@@ -32,6 +32,29 @@ Existing recovery receipts need exact operator-supplied paths and a reviewed
 schema; do not recursively search arbitrary backup/private directories. An old
 installation receipt is not proof of a current matched recovery bundle.
 
+## Current Notion follow-ups
+
+[CURRENT ACTION](https://app.notion.com/p/3e78990715f48170a918f3f2c70277c9)
+contains two read-only requests, with prior installation instructions marked
+historical:
+
+- `monolith-ca-20261017-recovery-evidence-paths-v2`: metadata for already-known
+  recovery receipts/manifests, exact paths and field names for scoped review.
+- `monolith-ca-20261017-binding-observation-v3`: complete
+  [binding helper source](../../../deploy/areas/ca-binding-check.py) from commit
+  `f6791fa4830040b06de821e4d0fc603482c36a0f`, 12,963 bytes, SHA-256
+  `8a98b258264306e98ebe2bd79c1c0905427c030daae3e3458881cf10c9ddf5a3`.
+  All 22 synthetic tests passed; Astra's final source review found no blocker
+  within the stated observational scope. Notion source was fetched again and
+  matched byte-for-byte, including its final newline.
+
+The helper checks pinned executable identity, current process-view credential
+target and stable socket/PostgreSQL metadata correlation separately. It emits
+fixed failure-stage/status enums and permission limits. Correlation does not
+prove startup credential bytes, Unix-socket/TCP server identity, exclusive writer
+ownership or recovery. See its [scope and limitations](../../../deploy/areas/ca-binding-check.md).
+Both CA-local follow-up results are pending; no native execution is claimed.
+
 ## Completed inventory procedure (historical reference)
 
 Transfer `deploy/areas/ca-preflight.sh` from commit `4eca6946` through the existing
