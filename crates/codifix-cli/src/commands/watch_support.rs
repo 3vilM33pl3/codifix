@@ -2172,8 +2172,8 @@ pub(crate) fn render_backend_launch_agent(config_path: &Path) -> Result<String> 
     let binary = memory_binary_path()?;
     let working_directory =
         macos_app_support_dir().ok_or_else(|| anyhow::anyhow!("HOME is not set"))?;
-    let stdout_path = user_memory_layer_log_dir()?.join("mem-service.stdout.log");
-    let stderr_path = user_memory_layer_log_dir()?.join("mem-service.stderr.log");
+    let stdout_path = user_memory_layer_log_dir()?.join("codifix-service.stdout.log");
+    let stderr_path = user_memory_layer_log_dir()?.join("codifix-service.stderr.log");
     let command = launch_agent_shell_command(&[
         binary.display().to_string(),
         "--config".to_string(),

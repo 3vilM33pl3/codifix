@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Shared pure lexical/excerpt helpers extracted from mem-search. No repository
+//! Shared pure lexical/excerpt helpers extracted from codifix-search. No repository
 //! lookup, project paths, ranking configuration or writeback enters this module.
 use std::collections::HashSet;
 
@@ -27,7 +27,7 @@ pub fn extract_lexical_terms(query: &str) -> Vec<String> {
         })
         .collect()
 }
-/// The caller supplies normalized text and terms, as in mem-search.
+/// The caller supplies normalized text and terms, as in codifix-search.
 pub fn lexical_overlap_ratio(text: &str, terms: &[String]) -> f64 {
     if terms.is_empty() {
         return 0.0;

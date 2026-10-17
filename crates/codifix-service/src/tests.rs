@@ -326,7 +326,7 @@ async fn insert_symbol_provenance_fixture(
         INSERT INTO graph_extraction_runs
             (id, project_id, repo_root, git_head, analyzer_version, strategy_version,
              status, started_at, completed_at, summary_json)
-        VALUES ($1, $2, $3, 'abc', 'mem-analyze-v2', 'code-graph-resolution-v1',
+        VALUES ($1, $2, $3, 'abc', 'codifix-analyze-v2', 'code-graph-resolution-v1',
                 'completed', now(), now(), '{}'::jsonb)
         "#,
     )
@@ -893,7 +893,7 @@ fn graph_activity_summary_and_details_capture_extraction_counts() {
         dry_run: false,
         reused_existing_run: true,
         index_reused: true,
-        analyzer_version: "mem-analyze-v2".to_string(),
+        analyzer_version: "codifix-analyze-v2".to_string(),
         strategy_version: "code-graph-resolution-v1".to_string(),
         symbol_count: 1919,
         reference_count: 80116,

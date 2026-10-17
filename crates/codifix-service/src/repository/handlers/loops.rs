@@ -3958,7 +3958,7 @@ fn issue_test_strategy(issue: &str) -> String {
     if contains_any(&lower, &["web", "ui", "browser"]) {
         "Add or update Vitest component coverage and run `npm --prefix web run test && npm --prefix web run build`.".to_string()
     } else if contains_any(&lower, &["service", "api", "database", "route"]) {
-        "Add service/repository tests and run focused cargo tests for mem-service.".to_string()
+        "Add service/repository tests and run focused cargo tests for codifix-service.".to_string()
     } else {
         "Run focused cargo tests for touched crates and add regression coverage for changed behavior.".to_string()
     }

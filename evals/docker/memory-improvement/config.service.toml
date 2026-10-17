@@ -8,7 +8,7 @@ url = "postgresql://memory:memory@postgres:5432/memory"
 
 [cluster]
 enabled = false
-service_id = "memory-layer-memory-improvement"
+service_id = "codifix-memory-improvement"
 
 [features]
 llm_curation = false

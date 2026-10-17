@@ -41,7 +41,7 @@ pub(crate) async fn web_unavailable() -> impl IntoResponse {
   <body>
     <main>
       <h1>Codifix Web UI is not installed</h1>
-      <p><code>mem-service</code> is running, but it could not find built web assets.</p>
+      <p><code>codifix-service</code> is running, but it could not find built web assets.</p>
       <p>Build the frontend under <code>web/</code> or install a package that ships <code>share/codifix/web</code>.</p>
     </main>
   </body>

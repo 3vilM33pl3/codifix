@@ -75,7 +75,7 @@ pub struct Case {
     pub cluster: String,
     pub track: Track,
     pub split: Split,
-    /// Existing mem-eval suite directory, run with just this item selected.
+    /// Existing codifix-eval suite directory, run with just this item selected.
     pub suite: PathBuf,
     pub sources: Vec<PathBuf>,
 }

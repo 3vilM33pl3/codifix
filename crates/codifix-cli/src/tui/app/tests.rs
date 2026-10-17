@@ -1897,7 +1897,7 @@ fn backend_graph_extract_activity_detail_renders_counts() {
             dry_run: false,
             reused_existing_run: false,
             index_reused: true,
-            analyzer_version: "mem-analyze-v2".to_string(),
+            analyzer_version: "codifix-analyze-v2".to_string(),
             strategy_version: "code-graph-resolution-v1".to_string(),
             symbol_count: 10,
             reference_count: 20,
@@ -1928,7 +1928,7 @@ fn backend_graph_extract_activity_detail_renders_counts() {
     assert!(rendered.contains("Extraction run:"));
     assert!(rendered.contains("Symbols: 10"));
     assert!(rendered.contains("Graph edges: 9"));
-    assert!(rendered.contains("Analyzer: mem-analyze-v2"));
+    assert!(rendered.contains("Analyzer: codifix-analyze-v2"));
 }
 
 #[test]

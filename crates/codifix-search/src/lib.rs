@@ -1806,12 +1806,12 @@ mod tests {
 
     #[test]
     fn graph_terms_keep_code_specific_words() {
-        let intent = QueryIntent::from_query("How does MemoryType parsing work in mem-search?");
+        let intent = QueryIntent::from_query("How does MemoryType parsing work in codifix-search?");
         let terms = graph_like_terms(&intent);
 
         assert!(terms.contains(&"%memorytype%".to_string()));
         assert!(terms.contains(&"%parsing%".to_string()));
-        assert!(terms.contains(&"%mem-search%".to_string()));
+        assert!(terms.contains(&"%codifix-search%".to_string()));
         assert!(!terms.contains(&"%memory%".to_string()));
     }
 

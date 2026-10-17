@@ -556,7 +556,7 @@ mod tests {
 
     #[test]
     fn resolve_project_uses_repo_metadata_when_present() {
-        let repo_root = unique_temp_dir("mem-watch-project-slug");
+        let repo_root = unique_temp_dir("codifix-watch-project-slug");
         fs::create_dir_all(repo_root.join(".codifix")).expect("create .codifix directory");
         fs::write(
             repo_root.join(".codifix").join("project.toml"),
@@ -574,7 +574,7 @@ mod tests {
 
     #[test]
     fn repository_events_prune_ignored_and_nested_repository_directories() {
-        let repo_root = unique_temp_dir("mem-watch-event-source");
+        let repo_root = unique_temp_dir("codifix-watch-event-source");
         fs::create_dir_all(repo_root.join("src").join("nested")).expect("create source directory");
         fs::create_dir_all(repo_root.join("src").join("target").join("debug"))
             .expect("create nested target directory");

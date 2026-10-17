@@ -351,7 +351,7 @@ async fn insert_graph_query_fixture(
         INSERT INTO graph_extraction_runs
             (id, project_id, repo_root, git_head, analyzer_version, strategy_version,
              status, started_at, completed_at, summary_json)
-        VALUES ($1, $2, '/repo', 'abc', 'mem-analyze-v2', 'code-graph-resolution-v1',
+        VALUES ($1, $2, '/repo', 'abc', 'codifix-analyze-v2', 'code-graph-resolution-v1',
                 'completed', now(), now(), '{}'::jsonb)
         "#,
     )

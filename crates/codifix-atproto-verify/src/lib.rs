@@ -67,7 +67,7 @@ pub struct PinnedRepository {
 
 /// Proof of inclusion in this signed snapshot only. It proves neither factual
 /// truth nor current authorization/freshness/append-only history. Durable audit
-/// receipts and receiver verification are provided by mem-federation-runtime.
+/// receipts and receiver verification are provided by codifix-federation-runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerifiedRepository {
     pub repository: String,

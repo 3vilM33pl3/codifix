@@ -21,7 +21,7 @@ pub async fn store_capture(
     Ok(store_capture_as(
         pool,
         request,
-        &codifix_store::events::MutationContext::internal("mem-curate"),
+        &codifix_store::events::MutationContext::internal("codifix-curate"),
     )
     .await?
     .response)
@@ -189,7 +189,7 @@ pub async fn curate(pool: &PgPool, request: &CurateRequest) -> Result<CurateResp
     Ok(curate_as(
         pool,
         request,
-        &codifix_store::events::MutationContext::internal("mem-curate"),
+        &codifix_store::events::MutationContext::internal("codifix-curate"),
     )
     .await?
     .response)

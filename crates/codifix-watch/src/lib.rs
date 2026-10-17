@@ -1002,7 +1002,7 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_automation_state_is_preserved_and_rebuilt() {
-        let repo_root = unique_temp_dir("mem-watch-invalid-state");
+        let repo_root = unique_temp_dir("codifix-watch-invalid-state");
         let state_file = repo_root.join("runtime").join("automation-state.json");
         tokio::fs::create_dir_all(state_file.parent().expect("state parent"))
             .await
@@ -1036,7 +1036,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn concurrent_automation_state_writes_remain_valid_json() {
-        let repo_root = unique_temp_dir("mem-watch-atomic-state");
+        let repo_root = unique_temp_dir("codifix-watch-atomic-state");
         let state_file = repo_root.join("runtime").join("automation-state.json");
         let config = AutomationConfig {
             state_file_path: Some(state_file.display().to_string()),

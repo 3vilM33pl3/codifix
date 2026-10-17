@@ -344,7 +344,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
             tokio::select! {
                 result = &mut http_server => {
                     if let Some(worker) = &supervisor_model { worker.stop(); }
-                    result.context("join mem-service task")??;
+                    result.context("join codifix-service task")??;
                     break;
                 }
                 result = tokio::signal::ctrl_c() => {
@@ -366,7 +366,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
             tokio::select! {
                 result = &mut http_server => {
                     if let Some(worker) = &supervisor_model { worker.stop(); }
-                    result.context("join mem-service task")??;
+                    result.context("join codifix-service task")??;
                     break;
                 }
                 result = tokio::signal::ctrl_c() => {
@@ -756,7 +756,7 @@ pub(crate) async fn shutdown_http_server_with_timeout(
     request_runtime_shutdown(shutdown);
     tokio::select! {
         result = &mut *http_server => {
-            result.context("join mem-service task")??;
+            result.context("join codifix-service task")??;
         }
         _ = tokio::time::sleep(grace_period) => {
             tracing::warn!(
@@ -766,9 +766,9 @@ pub(crate) async fn shutdown_http_server_with_timeout(
             );
             http_server.abort();
             match http_server.await {
-                Ok(result) => result.context("run mem-service task after forced shutdown")?,
+                Ok(result) => result.context("run codifix-service task after forced shutdown")?,
                 Err(error) if error.is_cancelled() => {}
-                Err(error) => return Err(error).context("join mem-service task after forced shutdown"),
+                Err(error) => return Err(error).context("join codifix-service task after forced shutdown"),
             }
         }
     }

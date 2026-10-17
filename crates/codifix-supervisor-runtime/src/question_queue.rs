@@ -28,7 +28,7 @@ pub struct ServiceExecutionGuard {
 }
 
 // Data-only view of the operator-pinned TOML, never config discovery/platform
-// dependencies. Mirrors mem-config::app safety semantics: semantic_time enables
+// dependencies. Mirrors codifix-config::app safety semantics: semantic_time enables
 // evaluation, read_only defaults false, clustering defaults true. Unrelated app
 // fields are ignored; malformed safety fields fail closed. No env coercions.
 #[derive(Deserialize)]

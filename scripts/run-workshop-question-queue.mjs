@@ -62,7 +62,7 @@ async function main() {
       || hash(readPrivate(`${root}/app.toml`)) !== artifacts.service_config_sha256) throw Error('Pinned operator configuration changed; inspect before restarting');
     const env = { PATH: '/usr/bin:/bin', HOME: '/home/olivier',
       DATABASE_URL: `postgresql://workshop_worker:${encodeURIComponent(d.worker_password)}@127.0.0.1:55460/${d.database}`,
-      OPENAI_API_KEY: credential(readPrivate('/home/olivier/.config/memory-layer/memory-layer.env')) };
+      OPENAI_API_KEY: credential(readPrivate('/home/olivier/.config/codifix/codifix.env')) };
     if (stopped) break;
     child = spawn(`${stage}/worker`, ['run-next', `${stage}/work.json`, artifacts.manifest_sha256,
       d.instance_id, `${root}/app.toml`, artifacts.service_config_sha256],

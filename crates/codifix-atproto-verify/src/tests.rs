@@ -311,7 +311,9 @@ fn signed_resource_bombs_are_bounded_before_trusted_tree_reconstruction() {
     assert_eq!(verify(&wide, FixtureKey::K256), Err(VerifyError::Limit));
     let (root, blocks) = unpack(&car);
     let header = pack(root, &BTreeMap::new());
-    let (cid, value) = blocks.first_key_value().unwrap();
+    // Hash ordering changes with namespace bytes. Choose the smallest valid
+    // frame so this fixture isolates the block-count bound, not the CAR byte bound.
+    let (cid, value) = blocks.iter().min_by_key(|(_, value)| value.len()).unwrap();
     let frame = pack(root, &BTreeMap::from([(*cid, value.clone())]));
     let mut repeated = header.clone();
     for _ in 0..32769 {

@@ -729,7 +729,7 @@ pub fn default_curate_on_explicit_flush() -> bool {
 /// Logarithmic so the score -> rank -> access feedback loop saturates. Lives
 /// beside `ReinforcementConfig` because it is the interpretation of its
 /// `activation_rank_weight` / `activation_rank_cap` parameters, shared by the
-/// write path (mem-reinforce) and the read path (mem-search).
+/// write path (codifix-reinforce) and the read path (codifix-search).
 pub fn activation_rank_boost(activation: f64, weight: f64, cap: f64) -> f64 {
     (weight * (1.0 + activation.max(0.0)).ln()).min(cap)
 }

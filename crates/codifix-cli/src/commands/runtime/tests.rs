@@ -1347,7 +1347,7 @@ fn graph_activity_request_copies_extraction_report_counts() {
         repo_root: "/repo".to_string(),
         git_head: Some("abc123".to_string()),
         since: Some("HEAD~1".to_string()),
-        analyzer_version: "mem-analyze-v2".to_string(),
+        analyzer_version: "codifix-analyze-v2".to_string(),
         strategy_version: "code-graph-resolution-v1".to_string(),
         extraction_run_id: Some(run_id),
         reused_existing_run: true,
@@ -2437,7 +2437,7 @@ fn managed_watcher_keeps_stable_real_session_for_repo() {
 #[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn managed_watcher_resolves_only_one_session_per_repository() {
-    let repo_root = unique_temp_dir("mem-watch-deduplicate-repo");
+    let repo_root = unique_temp_dir("codifix-watch-deduplicate-repo");
     fs::create_dir_all(&repo_root).unwrap();
     assert!(
         std::process::Command::new("git")
@@ -2478,7 +2478,7 @@ fn managed_watcher_resolves_only_one_session_per_repository() {
 #[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn managed_watcher_reuses_tracked_repository_for_same_process() {
-    let repo_root = unique_temp_dir("mem-watch-tracked-repo");
+    let repo_root = unique_temp_dir("codifix-watch-tracked-repo");
     fs::create_dir_all(&repo_root).unwrap();
     let session = LightweightAgentSession {
         agent_cli: "codex",
@@ -2513,7 +2513,7 @@ fn managed_watcher_reuses_tracked_repository_for_same_process() {
 #[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn watch_unit_uses_repo_root_and_project() {
-    let repo_root = unique_temp_dir("mem-watch-unit");
+    let repo_root = unique_temp_dir("codifix-watch-unit");
     fs::create_dir_all(&repo_root).unwrap();
     let unit = render_watch_unit(&repo_root, "homelab").unwrap();
 
@@ -2555,7 +2555,7 @@ fn agent_watcher_start_logic_reuses_loaded_active_units() {
 
 #[test]
 fn watcher_manager_resolves_one_initialized_repo_beneath_a_workspace() {
-    let workspace = unique_temp_dir("mem-watch-workspace");
+    let workspace = unique_temp_dir("codifix-watch-workspace");
     let repo = workspace.join("memory");
     fs::create_dir_all(repo.join(".codifix")).unwrap();
     fs::write(
@@ -2615,13 +2615,13 @@ fn backend_launch_agent_uses_global_config_path() {
     assert!(plist.contains("<string>/bin/zsh</string>"));
     assert!(plist.contains("--config"));
     assert!(plist.contains("codifix.toml"));
-    assert!(plist.contains("mem-service.stdout.log"));
+    assert!(plist.contains("codifix-service.stdout.log"));
 }
 
 #[cfg(target_os = "macos")]
 #[test]
 fn watch_launch_agent_uses_repo_root_and_project() {
-    let repo_root = unique_temp_dir("mem-watch-launch-agent");
+    let repo_root = unique_temp_dir("codifix-watch-launch-agent");
     fs::create_dir_all(&repo_root).unwrap();
     let plist = render_watch_launch_agent(&repo_root, "homelab").unwrap();
 

@@ -229,7 +229,7 @@ fn archived_notices_do_not_downgrade_declared_fk_or_logical_targets() {
 
 #[test]
 fn cli_inventory_draft_and_verification_expose_all_retention_notices() {
-    let temporary = std::env::temp_dir().join(format!("mem-area-notices-{}", Uuid::new_v4()));
+    let temporary = std::env::temp_dir().join(format!("codifix-area-notices-{}", Uuid::new_v4()));
     std::fs::create_dir(&temporary).expect("synthetic directory");
     let inventory = fixture();
     let input = temporary.join("inventory.json");

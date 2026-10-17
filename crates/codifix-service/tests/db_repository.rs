@@ -1744,7 +1744,7 @@ async fn loop_repository_skill_mining_creates_learned_skill_proposal() {
                 "title": "Validate loop DB repository changes",
                 "applicability": ["service repository loop handlers change"],
                 "recipe": "Add a DB repository test, run focused cargo tests, then run web checks.",
-                "commands": ["cargo test -p mem-service --test db_repository"],
+                "commands": ["cargo test -p codifix-service --test db_repository"],
                 "validation_evidence": ["db_repository test passed"],
                 "source_run": "3VI-619-test"
             })),
@@ -2248,7 +2248,7 @@ fn init_git_repo(name: &str) -> PathBuf {
         .join("Temp");
     #[cfg(not(target_os = "windows"))]
     let temp_root = std::env::temp_dir();
-    let repo = temp_root.join(format!("mem-service-loop-{name}-{}", Uuid::new_v4()));
+    let repo = temp_root.join(format!("codifix-service-loop-{name}-{}", Uuid::new_v4()));
     fs::create_dir_all(&repo).expect("create temp repo");
     git(&repo, &["init"]);
     git(&repo, &["checkout", "-b", "main"]);

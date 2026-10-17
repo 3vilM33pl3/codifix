@@ -731,7 +731,7 @@ fn null_task_and_unknown_source_check_edges_do_not_gain_a_projection_exception()
 #[test]
 fn cli_validates_v2_projection_and_still_reports_no_import_support() {
     let (inventory, manifest) = projection_fixture();
-    let temp = std::env::temp_dir().join(format!("mem-area-v2-test-{}", Uuid::new_v4()));
+    let temp = std::env::temp_dir().join(format!("codifix-area-v2-test-{}", Uuid::new_v4()));
     std::fs::create_dir(&temp).expect("temporary synthetic fixture directory");
     let inventory_path = temp.join("inventory.json");
     let manifest_path = temp.join("manifest.json");
@@ -1899,7 +1899,7 @@ fn serde_rejects_unknown_fields_and_stable_area_ids_round_trip() {
 
 #[test]
 fn cli_only_emits_reviewable_offline_plans_and_reports_blockers_with_exit_two() {
-    let temp = std::env::temp_dir().join(format!("mem-area-test-{}", Uuid::new_v4()));
+    let temp = std::env::temp_dir().join(format!("codifix-area-test-{}", Uuid::new_v4()));
     std::fs::create_dir(&temp).expect("temporary fixture directory");
     let inventory = fixture();
     let inventory_path = temp.join("inventory.json");

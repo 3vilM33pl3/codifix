@@ -8,7 +8,7 @@ url = "postgresql://memory:memory@postgres:5432/memory_eval"
 
 [cluster]
 enabled = false
-service_id = "memory-layer-docker-eval"
+service_id = "codifix-docker-eval"
 
 [features]
 llm_curation = false

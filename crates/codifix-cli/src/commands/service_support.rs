@@ -95,8 +95,8 @@ pub(crate) fn start_backend_service_once(config_path: &Path) -> Result<String> {
     {
         let plist_path = backend_launch_agent_path()?;
         let label = backend_launch_agent_label();
-        let stdout_path = user_memory_layer_log_dir()?.join("mem-service.stdout.log");
-        let stderr_path = user_memory_layer_log_dir()?.join("mem-service.stderr.log");
+        let stdout_path = user_memory_layer_log_dir()?.join("codifix-service.stdout.log");
+        let stderr_path = user_memory_layer_log_dir()?.join("codifix-service.stderr.log");
         write_launch_agent(
             &plist_path,
             render_backend_launch_agent(config_path)?,
@@ -288,7 +288,7 @@ pub(crate) fn backend_service_status(config_path: &Path) -> Result<String> {
             launchctl_domain_target()?,
             label,
             user_memory_layer_log_dir()?
-                .join("mem-service.stderr.log")
+                .join("codifix-service.stderr.log")
                 .display(),
         ))
     }

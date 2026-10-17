@@ -564,7 +564,7 @@ impl LoopRunner for MockLoopRunner {
             .allowed_commands
             .first()
             .cloned()
-            .unwrap_or_else(|| "cargo test -p mem-loops".to_string());
+            .unwrap_or_else(|| "cargo test -p codifix-loops".to_string());
         let policy_decision = PolicyDecision {
             action: LoopActionKind::InvokeRunner,
             allowed: true,
@@ -973,7 +973,7 @@ mod tests {
                 can_write_repo: true,
                 can_run_commands: true,
                 can_propose_memory: true,
-                allowed_commands: vec!["cargo test -p mem-cli".to_string()],
+                allowed_commands: vec!["cargo test -p codifix-cli".to_string()],
             },
             workspace: RunnerWorkspaceRef {
                 repo_root: "/repo".to_string(),
