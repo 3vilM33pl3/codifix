@@ -63,10 +63,11 @@ use windows_sys::Win32::{
             ALL_PROCESSOR_GROUPS, CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
             CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
             GetActiveProcessorCount, GetCurrentProcess, GetCurrentProcessId, GetExitCodeProcess,
-            InitializeProcThreadAttributeList, OpenProcessToken, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-            PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, PROCESS_INFORMATION, ResumeThread,
-            STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute,
-            WaitForSingleObject,
+            InitializeProcThreadAttributeList, OpenProcess, OpenProcessToken,
+            PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+            PROCESS_INFORMATION, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+            ResumeThread, STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess,
+            UpdateProcThreadAttribute, WaitForSingleObject,
         },
     },
     UI::Shell::{FOLDERID_LocalAppData, SHGetKnownFolderPath},
@@ -1138,6 +1139,17 @@ pub enum InheritedJobAssertion {
     ActiveProcesses,
 }
 
+/// Diagnostic classification only, never an image trust or admission decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InheritedJobImage {
+    Driver,
+    Pi,
+    Conhost,
+    Other,
+    Unreadable,
+}
+
 /// Advisory metadata only: no process identifiers or handles are disclosed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1154,6 +1166,8 @@ pub struct InheritedJobObservation {
     pub total_processes: Option<u32>,
     pub total_terminated_processes: Option<u32>,
     pub current_job_policy_matches: Option<bool>,
+    #[serde(default)]
+    pub images: [Option<InheritedJobImage>; 7],
 }
 
 #[derive(Debug)]
@@ -1214,12 +1228,81 @@ fn job_mismatch(
         total_processes: Some(accounting.TotalProcesses),
         total_terminated_processes: Some(accounting.TotalTerminatedProcesses),
         current_job_policy_matches: Some(policy_matches),
+        images: [None; 7],
     })
 }
 
 fn process_in_any_job(process: *mut c_void) -> Option<bool> {
     let mut present = 0;
     (unsafe { IsProcessInJob(process, null_mut(), &mut present) } != 0).then_some(present != 0)
+}
+
+fn classify_system_image(image: &str, windows: &str) -> InheritedJobImage {
+    let image = image.strip_prefix(r"\\?\").unwrap_or(image);
+    let expected = format!(
+        r"{}\System32\conhost.exe",
+        windows.trim_end_matches(std::path::MAIN_SEPARATOR)
+    );
+    if image.eq_ignore_ascii_case(&expected) {
+        InheritedJobImage::Conhost
+    } else {
+        InheritedJobImage::Other
+    }
+}
+
+fn job_images(ids: &JobProcessIds, driver: u32, child: u32) -> [Option<InheritedJobImage>; 7] {
+    let mut result = [None; 7];
+    let mut windows = vec![0u16; 32768];
+    let size = unsafe { GetWindowsDirectoryW(windows.as_mut_ptr(), windows.len() as u32) } as usize;
+    let windows = if size > 0 && size < windows.len() {
+        String::from_utf16(&windows[..size]).ok()
+    } else {
+        None
+    };
+    for (index, pid) in ids
+        .ids
+        .iter()
+        .take((ids.returned as usize).min(ids.ids.len()))
+        .enumerate()
+    {
+        let classification = if *pid == driver as usize {
+            InheritedJobImage::Driver
+        } else if *pid == child as usize {
+            InheritedJobImage::Pi
+        } else if let Ok(pid) = u32::try_from(*pid) {
+            let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+            if process.is_null() {
+                InheritedJobImage::Unreadable
+            } else {
+                let process = unsafe { OwnedHandle::from_raw_handle(process) };
+                let mut image = vec![0u16; 32768];
+                let mut length = image.len() as u32;
+                if unsafe {
+                    QueryFullProcessImageNameW(
+                        process.as_raw_handle(),
+                        0,
+                        image.as_mut_ptr(),
+                        &mut length,
+                    )
+                } == 0
+                    || length as usize >= image.len()
+                {
+                    InheritedJobImage::Unreadable
+                } else if let (Some(windows), Ok(image)) = (
+                    windows.as_deref(),
+                    String::from_utf16(&image[..length as usize]),
+                ) {
+                    classify_system_image(&image, windows)
+                } else {
+                    InheritedJobImage::Other
+                }
+            }
+        } else {
+            InheritedJobImage::Unreadable
+        };
+        result[index] = Some(classification);
+    }
+    result
 }
 
 pub fn inherited_spawn_diagnostic(error: &anyhow::Error) -> InheritedSpawnDiagnostic {
@@ -1560,6 +1643,7 @@ pub fn spawn_inherited(
         }
         observation.driver_in_any_job = process_in_any_job(unsafe { GetCurrentProcess() });
         observation.child_in_any_job = process_in_any_job(child.process.as_raw_handle());
+        observation.images = job_images(&ids, unsafe { GetCurrentProcessId() }, info.dwProcessId);
         return Err(InheritedJobMismatch(observation).into());
     }
     ensure!(
@@ -1572,6 +1656,31 @@ pub fn spawn_inherited(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn job_image_classification_is_allowlisted_without_paths_or_pid_metadata() {
+        assert_eq!(
+            classify_system_image(r"C:\Windows\System32\conhost.exe", r"C:\Windows"),
+            InheritedJobImage::Conhost
+        );
+        assert_eq!(
+            classify_system_image(r"\\?\C:\WINDOWS\System32\CONHOST.EXE", r"C:\Windows"),
+            InheritedJobImage::Conhost
+        );
+        for image in [
+            r"C:\private\conhost.exe",
+            r"C:\Windows\System32\not-conhost.exe",
+            r"D:\Windows\System32\conhost.exe",
+        ] {
+            assert_eq!(
+                classify_system_image(image, r"C:\Windows"),
+                InheritedJobImage::Other
+            );
+        }
+        assert_eq!(
+            serde_json::to_string(&InheritedJobImage::Conhost).expect("fixed classification"),
+            "\"conhost\""
+        );
+    }
     #[test]
     fn inherited_spawn_diagnostic_preserves_stage_and_os_code_without_error_text() {
         let error = anyhow::Error::from(std::io::Error::from_raw_os_error(5))
