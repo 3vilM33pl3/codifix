@@ -103,6 +103,7 @@ try{
         $folders=Get-CoreInstallKnownFolderEnvironment
         if($folders.ProgramData -cne [Environment]::GetFolderPath('CommonApplicationData') -or
             $folders.ALLUSERSPROFILE -cne $folders.ProgramData){throw 'Known CommonApplicationData was not bound explicitly'}
+        if($folders.SystemDrive -cne [IO.Path]::GetPathRoot([Environment]::GetFolderPath('Windows')).TrimEnd('\')){throw 'Known Windows system drive was not bound explicitly'}
     }
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}
 Write-Output 'Core installation parser and pure helpers passed; SCM/native execution was not attempted.'
