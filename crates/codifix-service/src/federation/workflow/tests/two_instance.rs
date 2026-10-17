@@ -192,7 +192,7 @@ pub(super) async fn app(
         sync,
     });
     *state.federation.write().unwrap() = Some(runtime.clone());
-    let (tasks, process) = if std::env::var("MEMORY_FEDERATION_E_CLIENTS").as_deref() == Ok("1") {
+    let (tasks, process) = if std::env::var("CODIFIX_FEDERATION_E_CLIENTS").as_deref() == Ok("1") {
         let directory = std::env::temp_dir().join(format!("memory-e-service-{}", Uuid::new_v4()));
         crate::test_private_files::directory(&directory);
         let config_path = directory.join("config.toml");
@@ -351,7 +351,7 @@ async fn e_two_instance_http_workflow() {
         security,
         url,
     });
-    let pds = std::env::var("MEMORY_FEDERATION_PDS_FIXTURE")
+    let pds = std::env::var("CODIFIX_FEDERATION_PDS_FIXTURE")
         .ok()
         .map(|path| {
             let f: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
@@ -396,7 +396,7 @@ async fn e_two_instance_http_workflow() {
         origin: authority,
         canonical,
     };
-    if std::env::var("MEMORY_FEDERATION_E_CLIENTS").as_deref() == Ok("1") {
+    if std::env::var("CODIFIX_FEDERATION_E_CLIENTS").as_deref() == Ok("1") {
         assert!(pds.is_some(), "client E gate must use the real pinned PDS");
         let stop = Arc::new(AtomicBool::new(false));
         let mut workers = Vec::new();

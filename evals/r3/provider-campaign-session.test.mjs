@@ -10,10 +10,10 @@ import { openProviderCampaignSession } from './provider-campaign-session.mjs';
 import { createProviderBindings } from './provider-profile.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const names = ['CODIFIX_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_CLI_BIN', 'MEMORY_R3_BUDGET_BIN',
-  'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN'];
+const names = ['CODIFIX_TEST_DATABASE_URL', 'CODIFIX_R3_SNAPSHOT_BIN', 'CODIFIX_R3_CLI_BIN', 'CODIFIX_R3_BUDGET_BIN',
+  'CODIFIX_R3_TEST_IMAGE', 'CODIFIX_R3_RUST_IMAGE', 'CODIFIX_R3_SCORE_BIN', 'CODIFIX_R3_RETRIEVER_BIN'];
 const available = names.every(name => process.env[name]);
-if (process.env.MEMORY_R3_REQUIRE_PROVIDER_SESSION === '1' && !available) throw Error('required provider-session configuration missing');
+if (process.env.CODIFIX_R3_REQUIRE_PROVIDER_SESSION === '1' && !available) throw Error('required provider-session configuration missing');
 
 for (const seconds of [120, 300]) test(`live ${seconds === 120 ? 'window' : 'reduced call allocation'} exhaustion is explicit negative evidence`, { skip: !available, timeout: 180000 }, async t => {
   const f = await setup(t), manifest = f.manifest;
@@ -76,10 +76,10 @@ async function setup(t) {
   };
   return { root, manifest, directoryFor, options: {
     offline: true, split: 'development', databaseUrl: process.env.CODIFIX_TEST_DATABASE_URL,
-    snapshotBinary: process.env.MEMORY_R3_SNAPSHOT_BIN ?? '/unused/snapshot', memoryBinary: process.env.MEMORY_R3_CLI_BIN ?? '/unused/memory',
-    configuration: { root, manifestSha256: 'a'.repeat(64), budgetBinary: process.env.MEMORY_R3_BUDGET_BIN ?? '/unused/budget',
-      scoreBinary: process.env.MEMORY_R3_SCORE_BIN, retrieverBinary: process.env.MEMORY_R3_RETRIEVER_BIN,
-      nodeImage: process.env.MEMORY_R3_TEST_IMAGE, rustImage: process.env.MEMORY_R3_RUST_IMAGE,
+    snapshotBinary: process.env.CODIFIX_R3_SNAPSHOT_BIN ?? '/unused/snapshot', memoryBinary: process.env.CODIFIX_R3_CLI_BIN ?? '/unused/memory',
+    configuration: { root, manifestSha256: 'a'.repeat(64), budgetBinary: process.env.CODIFIX_R3_BUDGET_BIN ?? '/unused/budget',
+      scoreBinary: process.env.CODIFIX_R3_SCORE_BIN, retrieverBinary: process.env.CODIFIX_R3_RETRIEVER_BIN,
+      nodeImage: process.env.CODIFIX_R3_TEST_IMAGE, rustImage: process.env.CODIFIX_R3_RUST_IMAGE,
       driverSha256: asset.sha256, configurationSha256: asset.sha256, serviceBuild: 'disposable-provider-session-test' } } };
 }
 
@@ -99,7 +99,7 @@ test('changed preparation assets poison the session before any provider or datab
 });
 
 test('invalid provider bindings fail preparation without creating a snapshot or invoking a model',
-  { skip: !process.env.MEMORY_R3_BUDGET_BIN }, async t => {
+  { skip: !process.env.CODIFIX_R3_BUDGET_BIN }, async t => {
     const f = await setup(t);
     let binds = 0;
     const owner = await openProviderCampaignSession({ ...f.options,

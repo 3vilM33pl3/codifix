@@ -302,7 +302,7 @@ async fn private_scratch_beneath_shared_nonsticky_ancestor_is_rejected() {
 fn parent_credentials_and_loader_overrides_are_not_inherited() {
     let output = std::process::Command::new(std::env::current_exe().unwrap())
         .args(["--exact", "tests::nested_environment_probe", "--nocapture"])
-        .env("MEMORY_PI_NESTED_ENVIRONMENT_TEST", "1")
+        .env("CODIFIX_PI_NESTED_ENVIRONMENT_TEST", "1")
         .env("OPENAI_API_KEY", "synthetic-private-key")
         .env(
             "CODIFIX__DATABASE__URL",
@@ -323,7 +323,7 @@ fn parent_credentials_and_loader_overrides_are_not_inherited() {
 
 #[tokio::test]
 async fn nested_environment_probe() {
-    if std::env::var_os("MEMORY_PI_NESTED_ENVIRONMENT_TEST").is_none() {
+    if std::env::var_os("CODIFIX_PI_NESTED_ENVIRONMENT_TEST").is_none() {
         return;
     }
     let fixture = Fixture::new("happy");
@@ -338,7 +338,7 @@ async fn nested_environment_probe() {
 #[ignore = "requires an independently prepared network-none/read-only container and official pinned artifact"]
 async fn sandboxed_real_credential_free_probe() {
     assert_eq!(
-        std::env::var("MEMORY_PI_SANDBOXED_PROBE").unwrap(),
+        std::env::var("CODIFIX_PI_SANDBOXED_PROBE").unwrap(),
         "network-none-read-only-root"
     );
     let architecture = if cfg!(target_arch = "x86_64") {
@@ -369,7 +369,7 @@ async fn sandboxed_real_credential_free_probe() {
 #[ignore = "requires verified network-none/read-only container; uses a fixed invalid non-secret local auth-presence token"]
 async fn sandboxed_real_synthetic_auth_control_probe() {
     assert_eq!(
-        std::env::var("MEMORY_PI_SANDBOXED_PROBE").unwrap(),
+        std::env::var("CODIFIX_PI_SANDBOXED_PROBE").unwrap(),
         "network-none-read-only-root"
     );
     let architecture = if cfg!(target_arch = "x86_64") {

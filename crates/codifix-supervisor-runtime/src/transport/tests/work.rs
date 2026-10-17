@@ -46,13 +46,13 @@ async fn operator_executes_one_real_pi_proposal_and_restart_only_observes_it() {
     let (dir, mut manifest, _) = manifest(&db, &fake).await;
     let driver = dir.path().join("driver");
     std::fs::copy(
-        std::env::var_os("MEMORY_PI_SANDBOX_DRIVER").expect("driver"),
+        std::env::var_os("CODIFIX_PI_SANDBOX_DRIVER").expect("driver"),
         &driver,
     )
     .expect("stage");
     std::fs::set_permissions(&driver, std::fs::Permissions::from_mode(0o500)).expect("private");
     manifest.sandbox = SandboxConfig {
-        pi: std::env::var_os("MEMORY_PI_PATCHED_ARTIFACT")
+        pi: std::env::var_os("CODIFIX_PI_PATCHED_ARTIFACT")
             .expect("pinned Pi")
             .into(),
         driver_sha256: format!(

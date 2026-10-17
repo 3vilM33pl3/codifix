@@ -6,8 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { runOfflineContainer, validateInput, validateResult } from './container.mjs';
 
-const image = process.env.MEMORY_R3_TEST_IMAGE;
-if (process.env.MEMORY_R3_REQUIRE_CONTAINER === '1' && !image) throw Error('required container test image missing');
+const image = process.env.CODIFIX_R3_TEST_IMAGE;
+if (process.env.CODIFIX_R3_REQUIRE_CONTAINER === '1' && !image) throw Error('required container test image missing');
 const valid = { image: `sha256:${'a'.repeat(64)}`, argv: ['/usr/local/bin/node', '-e', ''], files: { 'src/lib.rs': 'fixture' } };
 test('unsafe or excessive input fails before Docker dispatch', () => {
   assert.doesNotThrow(() => validateInput(valid));

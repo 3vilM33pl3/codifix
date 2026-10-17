@@ -13,7 +13,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  memory-service:
+  codifix-service:
     build:
       context: ../../..
       dockerfile: evals/docker/app-build-sequence/Dockerfile
@@ -36,20 +36,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      memory-service:
+      codifix-service:
         condition: service_started
     environment:
       CODEX_HOME: /codex-home
-      MEMORY_EVAL_SUITE: ${MEMORY_EVAL_SUITE:-/workspace/evals/suites/app-build-sequence-codex-v1}
+      CODIFIX_EVAL_SUITE: ${CODIFIX_EVAL_SUITE:-/workspace/evals/suites/app-build-sequence-codex-v1}
       CODIFIX_PROFILE: prod
       CODIFIX_CONFIG: /workspace/evals/docker/app-build-sequence/config.eval.toml
-      MEMORY_EVAL_CODEX_MODEL: ${MEMORY_EVAL_CODEX_MODEL:-gpt-5.4-mini}
-      MEMORY_EVAL_CODEX_WATCHDOG_SECONDS: ${MEMORY_EVAL_CODEX_WATCHDOG_SECONDS:-300}
+      CODIFIX_EVAL_CODEX_MODEL: ${CODIFIX_EVAL_CODEX_MODEL:-gpt-5.4-mini}
+      CODIFIX_EVAL_CODEX_WATCHDOG_SECONDS: ${CODIFIX_EVAL_CODEX_WATCHDOG_SECONDS:-300}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
     volumes:
       - ${CODEX_HOME:-${HOME}/.codex}:/codex-home-host:ro
-      - ../../../target/memory-evals-docker:/workspace/target/memory-evals
+      - ../../../target/codifix-evals-docker:/workspace/target/codifix-evals
     command: ["sh", "/workspace/evals/docker/app-build-sequence/run-eval.sh"]
 
 volumes:

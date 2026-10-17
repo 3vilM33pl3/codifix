@@ -319,17 +319,17 @@ five retrieval conditions and three-stage dispatch without proving native OS
 isolation or enabling paid R3 execution.
 
 The opt-in native prepared-service test requires a Windows Node process launched
-inside that trusted outer Job, `MEMORY_R3_NATIVE_EXECUTION` pointing to the exact
-execution-profile JSON, native `MEMORY_R3_SNAPSHOT_BIN`/`MEMORY_R3_CLI_BIN` paths,
+inside that trusted outer Job, `CODIFIX_R3_NATIVE_EXECUTION` pointing to the exact
+execution-profile JSON, native `CODIFIX_R3_SNAPSHOT_BIN`/`CODIFIX_R3_CLI_BIN` paths,
 and the explicit disposable `MEMORY_LAYER_TEST_DATABASE_URL`. Set
-`MEMORY_R3_REQUIRE_NATIVE_SERVICE=1` to fail when this fixture is unavailable, then
+`CODIFIX_R3_REQUIRE_NATIVE_SERVICE=1` to fail when this fixture is unavailable, then
 run `node --test evals/r3/isolation/service-session-native.test.mjs`. It exercises
 two scoped reads with unchanged snapshot fingerprints, without provider calls.
 
 The explicit native bootstrap currently prepares a reviewable pack with
 `node evals/r3/rehearse.mjs PROFILE_IO_ROOT/FRESH_UUID/pack --native --prepare-only`
 (optionally `--one-family-per-track`). It requires the same execution JSON,
-`MEMORY_R3_NATIVE_COMPILER` selecting its exact pinned `rustc.exe`, the four
+`CODIFIX_R3_NATIVE_COMPILER` selecting its exact pinned `rustc.exe`, the four
 explicit native first-party executable variables, and the disposable database
 settings above. Run the reviewed profile's Node inside its trusted outer Job;
 the helper verifies that Job and creates the private UUID parent before any
@@ -362,9 +362,9 @@ test-only environment settings (never a customer or existing dev database):
 
 - `MEMORY_LAYER_TEST_REQUIRE_DB=1` and `MEMORY_LAYER_TEST_DATABASE_URL` for a
   disposable PostgreSQL administrator capable of creating temporary databases.
-- Absolute `MEMORY_R3_CLI_BIN`, `MEMORY_R3_SNAPSHOT_BIN`, `MEMORY_R3_SCORE_BIN`
-  and `MEMORY_R3_RETRIEVER_BIN` paths to the built Memory and example executables.
-- Reviewed immutable local `MEMORY_R3_TEST_IMAGE` and `MEMORY_R3_RUST_IMAGE`
+- Absolute `CODIFIX_R3_CLI_BIN`, `CODIFIX_R3_SNAPSHOT_BIN`, `CODIFIX_R3_SCORE_BIN`
+  and `CODIFIX_R3_RETRIEVER_BIN` paths to the built Memory and example executables.
+- Reviewed immutable local `CODIFIX_R3_TEST_IMAGE` and `CODIFIX_R3_RUST_IMAGE`
   IDs from the isolation instructions. There are no automatic registry pulls.
 
 The bootstrap creates a new private pack, copies/hash-locks the actual controller
@@ -561,7 +561,7 @@ or uncertain receipts cannot permit another dispatch.
 
 The synthetic rehearsal supports this path through `--mediated`. Build
 `cargo build -p mem-eval --example r3_budget --locked`, then add
-`MEMORY_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget"` to the previously
+`CODIFIX_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget"` to the previously
 documented disposable rehearsal environment and append `--mediated` to its command.
 The one-family-per-track run executes 75 tasks with 180 simulated model callbacks:
 one per question, six per coding sequence, and 30 task-scoped query embeddings

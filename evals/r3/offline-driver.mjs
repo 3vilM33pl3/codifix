@@ -10,7 +10,7 @@ import { createWindowsHostJournal } from './windows-host-journal.mjs';
 import { requestWindowsDispatch } from './windows-dispatch-client.mjs';
 
 try {
-  if (process.env.MEMORY_R3_OFFLINE !== '1' || process.argv.length !== 3) throw Error('offline only');
+  if (process.env.CODIFIX_R3_OFFLINE !== '1' || process.argv.length !== 3) throw Error('offline only');
   const inputPath = path.resolve(process.argv[2]);
   if (inputPath !== path.join(process.cwd(), 'request.json')) throw Error('wrong request path');
   const input = await fs.readFile(inputPath);

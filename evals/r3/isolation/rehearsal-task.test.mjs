@@ -9,15 +9,15 @@ import { openPreparedSession } from './service-session.mjs';
 import { createRehearsalExecutor } from './rehearsal-task.mjs';
 import { syntheticServiceEmbedding } from '../synthetic-embedding.mjs';
 
-const snapshotBinary = process.env.MEMORY_R3_SNAPSHOT_BIN;
-const memoryBinary = process.env.MEMORY_R3_CLI_BIN;
+const snapshotBinary = process.env.CODIFIX_R3_SNAPSHOT_BIN;
+const memoryBinary = process.env.CODIFIX_R3_CLI_BIN;
 const databaseUrl = process.env.CODIFIX_TEST_DATABASE_URL;
-const nodeImage = process.env.MEMORY_R3_TEST_IMAGE;
-const rustImage = process.env.MEMORY_R3_RUST_IMAGE;
-const scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
-const retrieverBinary = process.env.MEMORY_R3_RETRIEVER_BIN;
+const nodeImage = process.env.CODIFIX_R3_TEST_IMAGE;
+const rustImage = process.env.CODIFIX_R3_RUST_IMAGE;
+const scoreBinary = process.env.CODIFIX_R3_SCORE_BIN;
+const retrieverBinary = process.env.CODIFIX_R3_RETRIEVER_BIN;
 const available = snapshotBinary && memoryBinary && databaseUrl && nodeImage && rustImage && scoreBinary && retrieverBinary;
-if (process.env.MEMORY_R3_REQUIRE_REHEARSAL_TASK === '1' && !available) throw Error('required rehearsal task configuration missing');
+if (process.env.CODIFIX_R3_REQUIRE_REHEARSAL_TASK === '1' && !available) throw Error('required rehearsal task configuration missing');
 
 function checkTiming(observation) {
   const timing = observation.timing;

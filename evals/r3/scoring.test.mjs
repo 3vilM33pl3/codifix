@@ -6,8 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const binary = process.env.MEMORY_R3_SCORE_BIN;
-if (process.env.MEMORY_R3_REQUIRE_SCORE === '1' && !binary) throw Error('required scoring binary missing');
+const binary = process.env.CODIFIX_R3_SCORE_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_SCORE === '1' && !binary) throw Error('required scoring binary missing');
 test('real blinded review utility: pending, human decisions, conflict and tamper rejection', { skip: !binary }, async t => {
   assert(path.isAbsolute(binary));
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-score-'));

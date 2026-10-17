@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-memory_cmd="${MEMORY_EVAL_MEMORY_CMD:-/usr/local/bin/memory --config /workspace/evals/docker/memory-improvement/config.eval.toml}"
+memory_cmd="${CODIFIX_EVAL_MEMORY_CMD:-/usr/local/bin/codifix --config /workspace/evals/docker/memory-improvement/config.eval.toml}"
 payload="/tmp/memory-improvement-seed.json"
 
 cat > "$payload" <<'JSON'
@@ -107,13 +107,13 @@ cat > "$payload" <<'JSON'
       "sources": [{"file_path": "docs/evaluation/hybrid-judge.md", "source_kind": "file", "excerpt": "evidence use reasoning quality consistency maintainability"}]
     },
     {
-      "canonical_text": "Benchmark artifacts should be written under target/memory-evals. Important files include run JSON artifacts, comparison.json, markdown reports, prompts, command output, Memory evidence, and token usage.",
-      "summary": "Benchmark artifacts live under target/memory-evals.",
+      "canonical_text": "Benchmark artifacts should be written under target/codifix-evals. Important files include run JSON artifacts, comparison.json, markdown reports, prompts, command output, Memory evidence, and token usage.",
+      "summary": "Benchmark artifacts live under target/codifix-evals.",
       "memory_type": "reference",
       "confidence": 0.95,
       "importance": 3,
       "tags": ["mi-deductive", "mi-artifacts"],
-      "sources": [{"file_path": "docs/evaluation/artifacts.md", "source_kind": "file", "excerpt": "target/memory-evals comparison.json"}]
+      "sources": [{"file_path": "docs/evaluation/artifacts.md", "source_kind": "file", "excerpt": "target/codifix-evals comparison.json"}]
     },
     {
       "canonical_text": "Run the Memory improvement benchmark in Docker with docker compose using the memory-improvement eval stack. It starts Postgres with pgvector, the service, seed memories, and the eval runner.",

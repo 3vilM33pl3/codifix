@@ -9,8 +9,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 
-const binary = process.env.MEMORY_R3_CLI_BIN;
-if (process.env.MEMORY_R3_REQUIRE_RUNNER === '1' && !binary) throw Error('required campaign binary missing');
+const binary = process.env.CODIFIX_R3_CLI_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_RUNNER === '1' && !binary) throw Error('required campaign binary missing');
 test('real campaign run and explicit resume preserve dispatch count, results and ambiguous attempts', { skip: !binary || process.platform === 'win32' }, async t => {
   assert(path.isAbsolute(binary));
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-runner-cli-'));

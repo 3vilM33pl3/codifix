@@ -14,9 +14,9 @@ import { dispatchModel } from './isolation/model-dispatch.mjs';
 import { taskTokenLimit } from './provider-profile.mjs';
 import { withApprovedCampaignSession } from './approved-campaign-session.mjs';
 
-const memory = process.env.MEMORY_R3_CLI_BIN, budget = process.env.MEMORY_R3_BUDGET_BIN;
+const memory = process.env.CODIFIX_R3_CLI_BIN, budget = process.env.CODIFIX_R3_BUDGET_BIN;
 const available = !!memory && !!budget;
-if (process.env.MEMORY_R3_REQUIRE_PROVIDER_OWNER === '1' && !available) throw Error('required provider owner binaries missing');
+if (process.env.CODIFIX_R3_REQUIRE_PROVIDER_OWNER === '1' && !available) throw Error('required provider owner binaries missing');
 const hash = value => createHash('sha256').update(value).digest('hex');
 async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-approved-provider-'));
@@ -177,21 +177,21 @@ test('already cancelled owner does not inspect configuration or read credentials
   await assert.rejects(withApprovedProvider({}, () => assert.fail('owner entered'), AbortSignal.abort()), /cancelled/);
 });
 
-const sessionNames = ['CODIFIX_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN',
-  'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE'];
+const sessionNames = ['CODIFIX_TEST_DATABASE_URL', 'CODIFIX_R3_SNAPSHOT_BIN', 'CODIFIX_R3_SCORE_BIN', 'CODIFIX_R3_RETRIEVER_BIN',
+  'CODIFIX_R3_TEST_IMAGE', 'CODIFIX_R3_RUST_IMAGE'];
 const sessionAvailable = available && process.env.CODIFIX_TEST_REQUIRE_DB === '1' && sessionNames.every(name => process.env[name]);
-if (process.env.MEMORY_R3_REQUIRE_APPROVED_SESSION === '1' && !sessionAvailable) throw Error('required approved-session configuration missing');
+if (process.env.CODIFIX_R3_REQUIRE_APPROVED_SESSION === '1' && !sessionAvailable) throw Error('required approved-session configuration missing');
 test('approved owner prepares a sealed service and executes knowledge and a complete coding sequence',
   { skip: !sessionAvailable, timeout: 300000 }, async t => {
     const calls = wire(t), f = await setup(t);
     const profile = f.manifest.provider_profile;
     const configuration = { root: f.pack, manifestSha256: f.options.manifestSha256, budgetBinary: budget,
-      nodeImage: process.env.MEMORY_R3_TEST_IMAGE, rustImage: process.env.MEMORY_R3_RUST_IMAGE,
-      scoreBinary: process.env.MEMORY_R3_SCORE_BIN, retrieverBinary: process.env.MEMORY_R3_RETRIEVER_BIN,
+      nodeImage: process.env.CODIFIX_R3_TEST_IMAGE, rustImage: process.env.CODIFIX_R3_RUST_IMAGE,
+      scoreBinary: process.env.CODIFIX_R3_SCORE_BIN, retrieverBinary: process.env.CODIFIX_R3_RETRIEVER_BIN,
       driverSha256: f.manifest.assets.find(a => a.path === 'private/approved-campaign-session.mjs').sha256,
       configurationSha256: profile.configuration_evidence.sha256, serviceBuild: 'synthetic-approved-session-test' };
     const session = { offline: false, split: 'development', configuration,
-      memoryBinary: memory, snapshotBinary: process.env.MEMORY_R3_SNAPSHOT_BIN, databaseUrl: process.env.CODIFIX_TEST_DATABASE_URL };
+      memoryBinary: memory, snapshotBinary: process.env.CODIFIX_R3_SNAPSHOT_BIN, databaseUrl: process.env.CODIFIX_TEST_DATABASE_URL };
     const contract = async (id, limits) => {
       const directory = path.join(f.pack, 'run', id, 'provider');
       await fs.mkdir(directory, { recursive: true, mode: 0o700 });

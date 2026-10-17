@@ -9,10 +9,10 @@ import { spawn } from 'node:child_process';
 import { preparedContext, runOfflineKnowledge } from './knowledge.mjs';
 import { bindCorpus, bindQuery, syntheticProfile } from '../embedding-evidence.mjs';
 
-const image = process.env.MEMORY_R3_TEST_IMAGE;
-const scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
-const retrieverBinary = process.env.MEMORY_R3_RETRIEVER_BIN;
-if (process.env.MEMORY_R3_REQUIRE_KNOWLEDGE === '1' && (!image || !scoreBinary || !retrieverBinary)) throw Error('required knowledge bridge configuration missing');
+const image = process.env.CODIFIX_R3_TEST_IMAGE;
+const scoreBinary = process.env.CODIFIX_R3_SCORE_BIN;
+const retrieverBinary = process.env.CODIFIX_R3_RETRIEVER_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_KNOWLEDGE === '1' && (!image || !scoreBinary || !retrieverBinary)) throw Error('required knowledge bridge configuration missing');
 const hash = value => createHash('sha256').update(value).digest('hex');
 const sources = [{ id: 'public/incident.md', text: 'The settlement committed before acknowledgement failed.' },
   { id: 'public/irrelevant.md', text: 'OTHER_CONTEXT_ONLY never copy this document when not selected.' }];

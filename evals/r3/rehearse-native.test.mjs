@@ -24,12 +24,12 @@ function fixture({ native = true, jobChange, ioChange, helperFailure, corruptCop
   const bytes = new Map([node, guest, helper, compiler, ...Object.values(bins)].map(pin => [pin.path, Buffer.from(paths.basename(pin.path))]));
   const executionFile = 'C:\\private\\execution.json'; bytes.set(executionFile, Buffer.from(JSON.stringify(execution)));
   const environment = { CODIFIX_TEST_REQUIRE_DB: '1', CODIFIX_TEST_DATABASE_URL: 'postgresql://PRIVATE_SECRET@localhost/disposable',
-    MEMORY_R3_CLI_BIN: bins.memory.path, MEMORY_R3_SNAPSHOT_BIN: bins.snapshot.path,
-    MEMORY_R3_SCORE_BIN: bins.score.path, MEMORY_R3_RETRIEVER_BIN: bins.retriever.path,
+    CODIFIX_R3_CLI_BIN: bins.memory.path, CODIFIX_R3_SNAPSHOT_BIN: bins.snapshot.path,
+    CODIFIX_R3_SCORE_BIN: bins.score.path, CODIFIX_R3_RETRIEVER_BIN: bins.retriever.path,
     SystemRoot: 'C:\\Windows', OPENAI_API_KEY: 'PROVIDER_SECRET', ANTHROPIC_API_KEY: 'PROVIDER_SECRET',
-    ...(native ? { MEMORY_R3_NATIVE_EXECUTION: executionFile, MEMORY_R3_NATIVE_COMPILER: compiler.path }
-      : { MEMORY_R3_TEST_IMAGE: `sha256:${hash('node-image')}`, MEMORY_R3_RUST_IMAGE: `sha256:${hash('rust-image')}` }) };
-  if (!native) for (const key of ['MEMORY_R3_CLI_BIN', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN']) {
+    ...(native ? { CODIFIX_R3_NATIVE_EXECUTION: executionFile, CODIFIX_R3_NATIVE_COMPILER: compiler.path }
+      : { CODIFIX_R3_TEST_IMAGE: `sha256:${hash('node-image')}`, CODIFIX_R3_RUST_IMAGE: `sha256:${hash('rust-image')}` }) };
+  if (!native) for (const key of ['CODIFIX_R3_CLI_BIN', 'CODIFIX_R3_SNAPSHOT_BIN', 'CODIFIX_R3_SCORE_BIN', 'CODIFIX_R3_RETRIEVER_BIN']) {
     const value = Buffer.from(key); environment[key] = '/reviewed/' + key; bytes.set(environment[key], value);
   }
   const writes = [], directories = [], copies = [], chmods = [], removals = [], runs = [], helpers = [], logs = [];
@@ -91,7 +91,7 @@ test('explicit native bootstrap locks executable .exe copies, Node sidecar and r
   assert.equal(config.images, undefined); assert.equal(config.socket, undefined); assert.equal(config.syntheticWire, false);
   assert(Object.values(config.binaries).every(pin => pin.path.startsWith(f.root + '\\private\\executables\\') && pin.path.endsWith('.exe')));
   assert.equal(config.nativeScorer.path, f.root + '\\private\\executables\\r3_score.exe');
-  assert.equal(config.compiler.path, f.environment.MEMORY_R3_NATIVE_COMPILER);
+  assert.equal(config.compiler.path, f.environment.CODIFIX_R3_NATIVE_COMPILER);
   assert.equal(config.execution.profile.node.path, config.binaries.node.path);
   assert.equal(config.execution.profile.guest.path, f.root + '\\private\\native-driver\\guest.mjs');
   assert.equal(config.execution.profile_sha256, nativeProfileHash(config.execution.profile));
@@ -129,8 +129,8 @@ test('native invalid profile, Job, I/O receipt and paid modes fail before output
   }
   for (const change of [
     f => { f.argv.push('--wire'); }, f => { f.argv.push('--mediated'); },
-    f => { f.environment.MEMORY_R3_NATIVE_COMPILER = 'C:\\unreviewed\\rustc.exe'; },
-    f => { f.environment.MEMORY_R3_TEST_IMAGE = `sha256:${hash('docker')}`; },
+    f => { f.environment.CODIFIX_R3_NATIVE_COMPILER = 'C:\\unreviewed\\rustc.exe'; },
+    f => { f.environment.CODIFIX_R3_TEST_IMAGE = `sha256:${hash('docker')}`; },
     f => { f.dependencies.platform = 'linux'; }, f => { f.dependencies.processExecutable = 'C:\\wrong\\node.exe'; },
     f => { f.argv[0] = 'C:\\public\\pack'; }, f => { f.argv.splice(f.argv.indexOf('--native'), 1); },
   ]) {

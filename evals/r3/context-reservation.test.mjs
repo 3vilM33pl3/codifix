@@ -10,8 +10,8 @@ import { createProviderBindings, validateProviderProfile, taskTokenLimit } from 
 import { openRequestMediator } from './request-mediator.mjs';
 import { dispatchModel } from './isolation/model-dispatch.mjs';
 
-const binary = process.env.MEMORY_R3_BUDGET_BIN;
-if (process.env.MEMORY_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
+const binary = process.env.CODIFIX_R3_BUDGET_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
 const source = await fs.readFile(new URL('./context-reservation.mjs', import.meta.url));
 function fixture() {
   const pin = { path: 'context-reservation.mjs', sha256: createHash('sha256').update(source).digest('hex') };

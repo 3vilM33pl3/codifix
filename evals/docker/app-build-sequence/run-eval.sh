@@ -2,7 +2,7 @@
 set -eu
 
 memory_cmd="/workspace/target/debug/codifix --config /workspace/evals/docker/app-build-sequence/config.eval.toml"
-eval_suite="${MEMORY_EVAL_SUITE:-/workspace/evals/suites/app-build-sequence-codex-v1}"
+eval_suite="${CODIFIX_EVAL_SUITE:-/workspace/evals/suites/app-build-sequence-codex-v1}"
 
 mkdir -p "$CODEX_HOME"
 if [ -d /codex-home-host ]; then

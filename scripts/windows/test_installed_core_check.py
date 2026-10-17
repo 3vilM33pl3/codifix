@@ -8,7 +8,7 @@ import unittest
 
 
 SCRIPT = Path(__file__).with_name("guest-installed-core-check.ps1")
-PWSH = os.environ.get("MEMORY_TEST_PWSH") or shutil.which("pwsh")
+PWSH = os.environ.get("CODIFIX_TEST_PWSH") or shutil.which("pwsh")
 
 
 class InstalledCoreCheckTests(unittest.TestCase):
@@ -72,9 +72,9 @@ class InstalledCoreCheckTests(unittest.TestCase):
     @unittest.skipUnless(PWSH, "PowerShell parser unavailable")
     def test_powershell_syntax_without_execution(self):
         command = ("$errors=$null; [Management.Automation.Language.Parser]::ParseFile("
-                   "$env:MEMORY_PS_PARSE_TARGET,[ref]$null,[ref]$errors) | Out-Null; "
+                   "$env:CODIFIX_PS_PARSE_TARGET,[ref]$null,[ref]$errors) | Out-Null; "
                    "if($errors){$errors | Out-String | Write-Error; exit 1}")
-        environment = dict(os.environ, MEMORY_PS_PARSE_TARGET=str(SCRIPT))
+        environment = dict(os.environ, CODIFIX_PS_PARSE_TARGET=str(SCRIPT))
         result = subprocess.run([PWSH, "-NoProfile", "-Command", command],
                                 text=True, capture_output=True, timeout=30, env=environment)
         self.assertEqual(result.returncode, 0, result.stderr)

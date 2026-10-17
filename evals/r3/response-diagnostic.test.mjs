@@ -10,10 +10,10 @@ import { prepareResponseDiagnostic } from './prepare-response-diagnostic.mjs';
 import { runResponseDiagnostic } from './response-diagnostic.mjs';
 import { runPaidCampaign } from './launch-paid.mjs';
 
-const names=['MEMORY_R3_CLI_BIN','MEMORY_R3_BUDGET_BIN','MEMORY_R3_SNAPSHOT_BIN',
-  'MEMORY_R3_SCORE_BIN','MEMORY_R3_RETRIEVER_BIN','MEMORY_R3_TEST_IMAGE','MEMORY_R3_RUST_IMAGE'];
+const names=['CODIFIX_R3_CLI_BIN','CODIFIX_R3_BUDGET_BIN','CODIFIX_R3_SNAPSHOT_BIN',
+  'CODIFIX_R3_SCORE_BIN','CODIFIX_R3_RETRIEVER_BIN','CODIFIX_R3_TEST_IMAGE','CODIFIX_R3_RUST_IMAGE'];
 const available=names.every(n=>process.env[n]);
-if(process.env.MEMORY_R3_REQUIRE_DIAGNOSTIC==='1'&&!available)throw Error('diagnostic binaries/images required');
+if(process.env.CODIFIX_R3_REQUIRE_DIAGNOSTIC==='1'&&!available)throw Error('diagnostic binaries/images required');
 const payloadHash='503b22223ccc9d67669be07b86980fc5f6f131603aae7b2418a37353901e5a79';
 async function fixture(t){
   const directory=await fs.mkdtemp(path.join(os.tmpdir(),'r3-onecall-test-'));
@@ -21,10 +21,10 @@ async function fixture(t){
   const reads=path.join(directory,'reads'),bao=path.join(directory,'fake-bao');
   await fs.writeFile(bao,`#!${process.execPath}\nrequire('node:fs').appendFileSync(${JSON.stringify(reads)},'read\\n');process.stdout.write('synthetic-diagnostic-key');`,{mode:0o700});
   const inputs=path.join(directory,'inputs.json');
-  await fs.writeFile(inputs,JSON.stringify({binaries:{memory:process.env.MEMORY_R3_CLI_BIN,
-    budget:process.env.MEMORY_R3_BUDGET_BIN,snapshot:process.env.MEMORY_R3_SNAPSHOT_BIN,
-    score:process.env.MEMORY_R3_SCORE_BIN,retriever:process.env.MEMORY_R3_RETRIEVER_BIN,node:process.execPath,bao},
-    images:{node:process.env.MEMORY_R3_TEST_IMAGE,rust:process.env.MEMORY_R3_RUST_IMAGE}}));
+  await fs.writeFile(inputs,JSON.stringify({binaries:{memory:process.env.CODIFIX_R3_CLI_BIN,
+    budget:process.env.CODIFIX_R3_BUDGET_BIN,snapshot:process.env.CODIFIX_R3_SNAPSHOT_BIN,
+    score:process.env.CODIFIX_R3_SCORE_BIN,retriever:process.env.CODIFIX_R3_RETRIEVER_BIN,node:process.execPath,bao},
+    images:{node:process.env.CODIFIX_R3_TEST_IMAGE,rust:process.env.CODIFIX_R3_RUST_IMAGE}}));
   const source=path.join(directory,'source'),root=path.join(directory,'diagnostic');
   const built=spawnSync(process.execPath,['evals/r3/prepare-paid-calibration.mjs',source,inputs],{encoding:'utf8'});
   assert.equal(built.status,0,built.stderr);
@@ -39,7 +39,7 @@ async function fixture(t){
   const file=path.join(root,'campaign.json'),manifest=JSON.parse(await fs.readFile(file));
   manifest.label_status='reviewed'; // Synthetic fixture only, never real authority.
   await fs.writeFile(file,JSON.stringify(manifest));
-  const planned=spawnSync(process.env.MEMORY_R3_CLI_BIN,['eval','campaign','plan','--manifest',file],{encoding:'utf8'});
+  const planned=spawnSync(process.env.CODIFIX_R3_CLI_BIN,['eval','campaign','plan','--manifest',file],{encoding:'utf8'});
   assert.equal(planned.status,0,planned.stderr);
   const identity=JSON.parse(planned.stdout).manifest_sha256,approvals=[];
   for(const purpose of ['labels','development']){

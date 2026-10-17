@@ -10,15 +10,15 @@ import { preparedContext, runOfflineKnowledge } from './knowledge.mjs';
 import { createEmbeddingsPreparation } from '../embeddings-call.mjs';
 import { dispatchModel } from './model-dispatch.mjs';
 
-const snapshotBinary = process.env.MEMORY_R3_SNAPSHOT_BIN;
-const memoryBinary = process.env.MEMORY_R3_CLI_BIN;
+const snapshotBinary = process.env.CODIFIX_R3_SNAPSHOT_BIN;
+const memoryBinary = process.env.CODIFIX_R3_CLI_BIN;
 const databaseUrl = process.env.CODIFIX_TEST_DATABASE_URL;
-const image = process.env.MEMORY_R3_TEST_IMAGE;
-const scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
-const budgetBinary = process.env.MEMORY_R3_BUDGET_BIN;
+const image = process.env.CODIFIX_R3_TEST_IMAGE;
+const scoreBinary = process.env.CODIFIX_R3_SCORE_BIN;
+const budgetBinary = process.env.CODIFIX_R3_BUDGET_BIN;
 const available = snapshotBinary && memoryBinary && databaseUrl && image && scoreBinary;
-if (process.env.MEMORY_R3_REQUIRE_SERVICE_SESSION === '1' && !available) throw Error('required service-session configuration missing');
-if (process.env.MEMORY_R3_REQUIRE_BUDGETED_SERVICE === '1' && (!available || !budgetBinary)) throw Error('required budgeted service configuration missing');
+if (process.env.CODIFIX_R3_REQUIRE_SERVICE_SESSION === '1' && !available) throw Error('required service-session configuration missing');
+if (process.env.CODIFIX_R3_REQUIRE_BUDGETED_SERVICE === '1' && (!available || !budgetBinary)) throw Error('required budgeted service configuration missing');
 
 test('prepared embedding receipts seed and query the real isolated service with separate accounting', { skip: !available || !budgetBinary, timeout: 120000 }, async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-prepared-service-'));

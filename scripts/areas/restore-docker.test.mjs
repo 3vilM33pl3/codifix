@@ -21,7 +21,7 @@ function run(command, args, options = {}) {
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 
 test('real encrypted archive, sequence restore and descriptor-bound collectors stay isolated', {
-  skip: process.env.MEMORY_AREA_TEST_DOCKER !== '1', timeout: 180_000,
+  skip: process.env.CODIFIX_AREA_TEST_DOCKER !== '1', timeout: 180_000,
 }, async t => {
   const root = await mkdtemp(join(tmpdir(), 'memory-restore-rehearsal-'));
   const gnupg = join(root, 'gnupg'); await mkdir(gnupg, { mode: 0o700 });

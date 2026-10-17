@@ -92,8 +92,8 @@ test('mid-read changes, malformed keys and secret-store failures do not reach co
   }
 });
 
-const memoryBinary = process.env.MEMORY_R3_CLI_BIN;
-if (process.env.MEMORY_R3_REQUIRE_REVIEW === '1' && !memoryBinary) throw Error('required real CLI missing');
+const memoryBinary = process.env.CODIFIX_R3_CLI_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_REVIEW === '1' && !memoryBinary) throw Error('required real CLI missing');
 test('real CLI denies a missing campaign before the fake secret process starts', { skip: !memoryBinary }, async t => {
   const f = await fixture(t);
   f.options.memoryBinary = memoryBinary;

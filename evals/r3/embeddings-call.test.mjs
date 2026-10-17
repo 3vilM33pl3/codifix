@@ -17,8 +17,8 @@ const model = { provider: 'openai', resolved_id: 'synthetic-embedding-v1', reaso
 const tokenizer = { id: 'synthetic-counter', sha256: 'a'.repeat(64) };
 const wire = () => ({ object: 'list', model: model.resolved_id,
   data: [{ object: 'embedding', index: 0, embedding: [0.1, 1] }], usage: { prompt_tokens: 3, total_tokens: 3 } });
-const binary = process.env.MEMORY_R3_BUDGET_BIN;
-if (process.env.MEMORY_R3_REQUIRE_EMBEDDINGS === '1' && !binary) throw Error('required budget binary missing');
+const binary = process.env.CODIFIX_R3_BUDGET_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_EMBEDDINGS === '1' && !binary) throw Error('required budget binary missing');
 
 test('embedding codec binds one text, model, dimensions and complete input-only usage', () => {
   const codec = prepareEmbeddingsRequest({ model: model.resolved_id, dimensions: 2, input: 'synthetic text', maxInputTokens: 10 });

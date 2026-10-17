@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { gradeRustCase, validateRustCase } from './rust.mjs';
 import { runOfflineSequence } from './sequence.mjs';
 
-const image = process.env.MEMORY_R3_RUST_IMAGE;
-if (process.env.MEMORY_R3_REQUIRE_RUST === '1' && !image) throw Error('required Rust image missing');
+const image = process.env.CODIFIX_R3_RUST_IMAGE;
+if (process.env.CODIFIX_R3_REQUIRE_RUST === '1' && !image) throw Error('required Rust image missing');
 const files = {
   'src/main.rs': `mod policy;
 fn main() {

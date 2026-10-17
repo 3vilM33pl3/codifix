@@ -22,10 +22,10 @@ async fn patched_pi_reaches_durable_broker_only_through_private_socket() {
 async fn run(mode: Mode) {
     assert_eq!(std::env::var("CODIFIX_TEST_REQUIRE_DB").as_deref(), Ok("1"));
     let artifact = PathBuf::from(
-        std::env::var_os("MEMORY_PI_PATCHED_ARTIFACT").expect("explicit pinned artifact"),
+        std::env::var_os("CODIFIX_PI_PATCHED_ARTIFACT").expect("explicit pinned artifact"),
     );
     let driver = PathBuf::from(
-        std::env::var_os("MEMORY_PI_SANDBOX_DRIVER").expect("explicit freshly built driver"),
+        std::env::var_os("CODIFIX_PI_SANDBOX_DRIVER").expect("explicit freshly built driver"),
     );
     for path in [&artifact, &driver] {
         assert!(path.is_absolute() && path.is_file());

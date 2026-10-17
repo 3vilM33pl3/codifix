@@ -7,8 +7,8 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
-const binary = process.env.MEMORY_R3_CLI_BIN;
-if (process.env.MEMORY_R3_REQUIRE_REPRESENTATIVE_PACK === '1' && !binary) throw Error('required campaign CLI missing');
+const binary = process.env.CODIFIX_R3_CLI_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_REPRESENTATIVE_PACK === '1' && !binary) throw Error('required campaign CLI missing');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 test('calibration selects only the proposed whole development families without approving labels', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-calibration-families-'));

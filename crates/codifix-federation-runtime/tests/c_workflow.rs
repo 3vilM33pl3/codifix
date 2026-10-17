@@ -220,7 +220,7 @@ struct LivePds {
     signing_key: String,
 }
 async fn publisher(space: SpaceId) -> (PdsPublisher, tokio::task::JoinHandle<()>, Arc<AtomicBool>) {
-    let fixture = std::env::var_os("MEMORY_FEDERATION_PDS_FIXTURE")
+    let fixture = std::env::var_os("CODIFIX_FEDERATION_PDS_FIXTURE")
         .map(|path| serde_json::from_slice::<LivePds>(&std::fs::read(path).unwrap()).unwrap());
     let lost_reply = Arc::new(AtomicBool::new(true));
     let state = PdsFixture {
@@ -270,7 +270,7 @@ async fn publish_all(server: &GatewayServer, pds: &PdsPublisher) {
     panic!("unbounded publication");
 }
 
-/// With MEMORY_FEDERATION_PDS_FIXTURE this exact Rust pipeline runs against the
+/// With CODIFIX_FEDERATION_PDS_FIXTURE this exact Rust pipeline runs against the
 /// pinned upstream PDS. Without it, the same test uses an isolated fake XRPC edge.
 #[tokio::test]
 async fn c_source_gateway_pds_receiver_and_recovery_across_three_databases() {

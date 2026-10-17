@@ -388,14 +388,14 @@ async fn operator_run_next_uses_real_pi_with_fake_provider_and_restricted_databa
     let (dir, mut manifest, _) = super::work::manifest(&db, &fake).await;
     let driver = dir.path().join("driver");
     std::fs::copy(
-        std::env::var_os("MEMORY_PI_SANDBOX_DRIVER").expect("driver"),
+        std::env::var_os("CODIFIX_PI_SANDBOX_DRIVER").expect("driver"),
         &driver,
     )
     .expect("stage driver");
     std::fs::set_permissions(&driver, std::fs::Permissions::from_mode(0o500))
         .expect("private driver");
     manifest.sandbox = SandboxConfig {
-        pi: std::env::var_os("MEMORY_PI_PATCHED_ARTIFACT")
+        pi: std::env::var_os("CODIFIX_PI_PATCHED_ARTIFACT")
             .expect("pinned patched Pi")
             .into(),
         driver_sha256: format!(

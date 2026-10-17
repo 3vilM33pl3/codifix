@@ -95,14 +95,14 @@ foreach ($name in @('pds-server.mjs','http-stdio.mjs','probe-stdio.mjs')) {
 # hoisted tree. Test the actual installed dependency resolution before issuing a
 # receipt; stale elliptic or missing API patches must require a fresh staging
 # directory, never silently pass because the lock alone audits clean.
-$previousTestRoot = $env:MEMORY_PDS_TEST_ROOT
+$previousTestRoot = $env:CODIFIX_PDS_TEST_ROOT
 $previousLogEnabled = $env:LOG_ENABLED
 try {
-    $env:MEMORY_PDS_TEST_ROOT = $runtime
+    $env:CODIFIX_PDS_TEST_ROOT = $runtime
     $env:LOG_ENABLED = 'false'
     Run-Checked $node @('--test',(Join-Path $SourceRoot 'packaging\windows-pds\security.test.mjs'))
 } finally {
-    $env:MEMORY_PDS_TEST_ROOT = $previousTestRoot
+    $env:CODIFIX_PDS_TEST_ROOT = $previousTestRoot
     $env:LOG_ENABLED = $previousLogEnabled
 }
 $entries = @(Get-ChildItem -LiteralPath $runtime -Recurse -Force)

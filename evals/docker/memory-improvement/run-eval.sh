@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 set -eu
 
-memory_cmd="/usr/local/bin/memory --config /workspace/evals/docker/memory-improvement/config.eval.toml"
-eval_suite="${MEMORY_EVAL_SUITE:-/workspace/evals/suites/memory-improvement-v1}"
-repeat="${MEMORY_EVAL_REPEAT:-5}"
-conditions="${MEMORY_EVAL_CONDITIONS:-no-memory lexical semantic graph full-memory}"
+memory_cmd="/usr/local/bin/codifix --config /workspace/evals/docker/memory-improvement/config.eval.toml"
+eval_suite="${CODIFIX_EVAL_SUITE:-/workspace/evals/suites/memory-improvement-v1}"
+repeat="${CODIFIX_EVAL_REPEAT:-5}"
+conditions="${CODIFIX_EVAL_CONDITIONS:-no-memory lexical semantic graph full-memory}"
 judge_flag=""
 
 mkdir -p "$CODEX_HOME"
@@ -20,12 +20,12 @@ until $memory_cmd health >/tmp/memory-health.txt 2>/tmp/memory-health.err; do
   sleep 2
 done
 
-MEMORY_EVAL_MEMORY_CMD="$memory_cmd" sh /workspace/evals/docker/memory-improvement/seed-memory.sh
+CODIFIX_EVAL_MEMORY_CMD="$memory_cmd" sh /workspace/evals/docker/memory-improvement/seed-memory.sh
 
 $memory_cmd graph extract --project memory --text || true
 $memory_cmd eval doctor --suite "$eval_suite" --text
 
-if [ "${MEMORY_EVAL_LLM_JUDGE:-0}" = "1" ]; then
+if [ "${CODIFIX_EVAL_LLM_JUDGE:-0}" = "1" ]; then
   judge_flag="--llm-judge"
 fi
 

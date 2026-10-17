@@ -198,12 +198,12 @@ async fn terminal_answer(f: &Fixture, review: &Value, expected: &str) -> Value {
 /// never treat a membership as collection or onward-disclosure consent.
 #[tokio::test]
 async fn watched_agents_four_area_signed_pds_rehearsal() {
-    if std::env::var("MEMORY_FEDERATION_AGENT_INSTANCES").as_deref() != Ok("1") {
+    if std::env::var("CODIFIX_FEDERATION_AGENT_INSTANCES").as_deref() != Ok("1") {
         return;
     }
     let fixture: Value = serde_json::from_slice(
         &std::fs::read(
-            std::env::var("MEMORY_FEDERATION_PDS_FIXTURE").expect("private PDS fixture"),
+            std::env::var("CODIFIX_FEDERATION_PDS_FIXTURE").expect("private PDS fixture"),
         )
         .unwrap(),
     )
@@ -452,11 +452,11 @@ async fn watched_agents_four_area_signed_pds_rehearsal() {
 }
 #[tokio::test]
 async fn f1_independent_instances_answer_and_enroll_game() {
-    if std::env::var("MEMORY_FEDERATION_F1_INSTANCES").as_deref() != Ok("1") {
+    if std::env::var("CODIFIX_FEDERATION_F1_INSTANCES").as_deref() != Ok("1") {
         return;
     }
     assert_ne!(
-        std::env::var("MEMORY_FEDERATION_E_CLIENTS").as_deref(),
+        std::env::var("CODIFIX_FEDERATION_E_CLIENTS").as_deref(),
         Ok("1")
     );
     let admin = codifix_test_support::migrated_pool().await.unwrap();
@@ -465,7 +465,7 @@ async fn f1_independent_instances_answer_and_enroll_game() {
     let right_db = Database::new(&admin).await;
     let game_db = Database::new(&admin).await;
     let space = SpaceId::new(Uuid::new_v4()).unwrap();
-    let pds = std::env::var("MEMORY_FEDERATION_PDS_FIXTURE")
+    let pds = std::env::var("CODIFIX_FEDERATION_PDS_FIXTURE")
         .ok()
         .map(|path| {
             let f: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
@@ -569,7 +569,7 @@ async fn f1_independent_instances_answer_and_enroll_game() {
         assert!(text.contains("Reviewed synthetic evidence only"));
         assert!(text.contains(&responder.runtime.instance.as_uuid().to_string()));
     }
-    if std::env::var("MEMORY_FEDERATION_F1_CLIENTS").as_deref() == Ok("1") {
+    if std::env::var("CODIFIX_FEDERATION_F1_CLIENTS").as_deref() == Ok("1") {
         clients(&mut left, &right, left_collection, right_collection).await;
     }
     right_worker.1.abort();

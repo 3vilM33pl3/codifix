@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 # Seeds the deterministic fixture memories for memory-quality-v1.
-# Point MEMORY_EVAL_MEMORY_CMD at the CLI + config for the target stack,
+# Point CODIFIX_EVAL_MEMORY_CMD at the CLI + config for the target stack,
 # e.g. "cargo run --bin codifix --" for the dev profile.
 set -eu
 
-memory_cmd="${MEMORY_EVAL_MEMORY_CMD:-memory}"
+memory_cmd="${CODIFIX_EVAL_MEMORY_CMD:-memory}"
 payload="${TMPDIR:-/tmp}/memory-quality-seed.json"
 
 cat > "$payload" <<'JSON'

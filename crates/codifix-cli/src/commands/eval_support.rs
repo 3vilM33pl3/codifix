@@ -174,7 +174,7 @@ async fn reproduce_suite(args: EvalReproduceArgs, cwd: &Path, api: &ApiClient) -
         let current_exe = std::env::current_exe().context("resolve current executable")?;
         let status = std::process::Command::new("sh")
             .arg(&seed_script)
-            .env("MEMORY_EVAL_MEMORY_CMD", &current_exe)
+            .env("CODIFIX_EVAL_MEMORY_CMD", &current_exe)
             .status()
             .context("run suite seed script")?;
         anyhow::ensure!(status.success(), "suite seed script failed");
@@ -2666,33 +2666,33 @@ pub(crate) fn run_eval_shell_command(
         .current_dir(cwd)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env("MEMORY_EVAL_WORKSPACE", cwd)
-        .env("MEMORY_EVAL_TIMEOUT_SECONDS", timeout_seconds.to_string());
+        .env("CODIFIX_EVAL_WORKSPACE", cwd)
+        .env("CODIFIX_EVAL_TIMEOUT_SECONDS", timeout_seconds.to_string());
     if let Some(condition) = condition {
-        command_builder.env("MEMORY_EVAL_CONDITION", condition.to_string());
+        command_builder.env("CODIFIX_EVAL_CONDITION", condition.to_string());
         match condition {
             codifix_eval::EvalCondition::NoMemory => {
                 command_builder
-                    .env("MEMORY_EVAL_MEMORY_ENABLED", "0")
+                    .env("CODIFIX_EVAL_MEMORY_ENABLED", "0")
                     .env_remove("CODIFIX_API_TOKEN")
                     .env_remove("CODIFIX_AGENT_ID")
                     .env_remove("CODIFIX_PROJECT")
-                    .env_remove("MEMORY_CONFIG")
                     .env_remove("CODIFIX_CONFIG")
-                    .env_remove("MEMORY_BASE_URL");
+                    .env_remove("CODIFIX_CONFIG")
+                    .env_remove("CODIFIX_BASE_URL");
             }
             _ => {
-                command_builder.env("MEMORY_EVAL_MEMORY_ENABLED", "1");
+                command_builder.env("CODIFIX_EVAL_MEMORY_ENABLED", "1");
                 if let Some(project) = project {
                     command_builder.env("CODIFIX_PROJECT", project);
                 }
                 if let Some(context) = context {
                     command_builder
-                        .env("MEMORY_EVAL_MEMORY_COMMAND", &context.memory_command)
-                        .env("MEMORY_BASE_URL", &context.memory_base_url);
+                        .env("CODIFIX_EVAL_MEMORY_COMMAND", &context.memory_command)
+                        .env("CODIFIX_BASE_URL", &context.memory_base_url);
                     if let Some(config_path) = &context.memory_config_path {
                         command_builder
-                            .env("MEMORY_CONFIG", config_path)
+                            .env("CODIFIX_CONFIG", config_path)
                             .env("CODIFIX_CONFIG", config_path);
                         if config_path
                             .parent()
@@ -3059,7 +3059,7 @@ pub(crate) fn eval_memory_command() -> String {
 }
 
 pub(crate) fn eval_memory_config_path(cwd: &Path) -> Option<PathBuf> {
-    env::var_os("MEMORY_CONFIG")
+    env::var_os("CODIFIX_CONFIG")
         .map(PathBuf::from)
         .or_else(|| env::var_os("CODIFIX_CONFIG").map(PathBuf::from))
         .or_else(|| {

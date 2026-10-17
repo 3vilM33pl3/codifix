@@ -4,7 +4,7 @@ use codifix_federation_runtime::{GatewaySecurity, private_key, private_secret};
 use std::path::PathBuf;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("MEMORY_FEDERATION_ISOLATION_DISPOSABLE").as_deref() != Ok("1") {
+    if std::env::var("CODIFIX_FEDERATION_ISOLATION_DISPOSABLE").as_deref() != Ok("1") {
         return Err("fixture opt-in required".into());
     }
     let root = PathBuf::from(

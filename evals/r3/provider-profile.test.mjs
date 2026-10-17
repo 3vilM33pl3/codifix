@@ -8,8 +8,8 @@ import { createProviderBindings, validateProviderProfile, validateProviderBindin
 import { openRequestMediator } from './request-mediator.mjs';
 import { dispatchModel } from './isolation/model-dispatch.mjs';
 
-const binary = process.env.MEMORY_R3_BUDGET_BIN;
-if (process.env.MEMORY_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
+const binary = process.env.CODIFIX_R3_BUDGET_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
 function fixture() {
   const responses = { id: 'synthetic-response-counter', asset: { path: 'response-counter.mjs', sha256: 'a'.repeat(64) } };
   const embeddings = { id: 'synthetic-embedding-counter', asset: { path: 'embedding-counter.mjs', sha256: 'b'.repeat(64) } };

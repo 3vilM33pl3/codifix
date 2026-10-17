@@ -18,7 +18,7 @@ const id = n => `00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
 const clean = { PATH:'/usr/bin:/bin', LC_ALL:'C', LANG:'C', TZ:'UTC' };
 
 test('synthetic Trust restore uses trusted schema, exact data TOC and atomic fresh-target guard', {
-  skip:process.env.MEMORY_AREA_TEST_DOCKER!=='1', timeout:240_000,
+  skip:process.env.CODIFIX_AREA_TEST_DOCKER!=='1', timeout:240_000,
 }, async t => {
   const root=await mkdtemp(join(tmpdir(),'memory-trust-transfer-test-'));
   const socket=join(root,'socket');await mkdir(socket,{mode:0o777});
@@ -65,7 +65,7 @@ test('synthetic Trust restore uses trusted schema, exact data TOC and atomic fre
   const targetBytes=JSON.stringify({format_version:1,instance_id:id(90),area:'trust',
     connection:{kind:'unix',directory:socket,port:5432},database:source,username:'postgres',password:null});
   await writeFile(targetFile,targetBytes,{mode:0o600,flag:'wx'});
-  const binary=process.env.MEMORY_AREA_IMPORT_BINARY??new URL('../../target/debug/codifix-area-import',import.meta.url).pathname;
+  const binary=process.env.CODIFIX_AREA_IMPORT_BINARY??new URL('../../target/debug/codifix-area-import',import.meta.url).pathname;
   const plan=JSON.parse(run(binary,['schema-plan']));
   assert.equal(plan.schema_sha256,TRUST_SCHEMA);assert.equal(plan.migration_head,60);
   run(binary,['initialize-schema','--target',targetFile,'--target-sha256',hash(targetBytes),

@@ -16,10 +16,10 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const RUNNER = 'sha256:3dd0714e9d5b1fdb988447902fb33c42566274d8f00dc1ecceb20ef38d11dcd0';
 
 test('portable receiver inspects, restores, verifies and refuses replay', {
-  skip: process.env.MEMORY_AREA_TEST_RECEIVER !== '1', timeout: 300_000,
+  skip: process.env.CODIFIX_AREA_TEST_RECEIVER !== '1', timeout: 300_000,
 }, async t => {
-  const bundle = resolve(process.env.MEMORY_TRUST_RECEIVER_BUNDLE ?? '');
-  const manifestSha = process.env.MEMORY_TRUST_RECEIVER_MANIFEST_SHA256 ?? '';
+  const bundle = resolve(process.env.CODIFIX_TRUST_RECEIVER_BUNDLE ?? '');
+  const manifestSha = process.env.CODIFIX_TRUST_RECEIVER_MANIFEST_SHA256 ?? '';
   assert.match(manifestSha, /^[0-9a-f]{64}$/);
   const manifestBytes = await readFile(join(bundle, 'manifest.json'));
   assert.equal(hash(manifestBytes), manifestSha);

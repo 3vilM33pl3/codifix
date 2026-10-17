@@ -1,5 +1,5 @@
 [service]
-bind_addr = "memory-service:4250"
+bind_addr = "codifix-service:4250"
 api_token = "dev-memory-token"
 request_timeout = "600s"
 

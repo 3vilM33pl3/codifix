@@ -16,10 +16,10 @@ async fn production_launcher_delivers_revokes_accounts_and_cleans_up() {
 async fn run(mode: Mode, cancel: bool) {
     assert_eq!(std::env::var("CODIFIX_TEST_REQUIRE_DB").as_deref(), Ok("1"));
     let pi = PathBuf::from(
-        std::env::var_os("MEMORY_PI_PATCHED_ARTIFACT").expect("explicit pinned artifact"),
+        std::env::var_os("CODIFIX_PI_PATCHED_ARTIFACT").expect("explicit pinned artifact"),
     );
     let driver =
-        PathBuf::from(std::env::var_os("MEMORY_PI_SANDBOX_DRIVER").expect("fresh sandbox driver"));
+        PathBuf::from(std::env::var_os("CODIFIX_PI_SANDBOX_DRIVER").expect("fresh sandbox driver"));
     let driver_sha256 = format!(
         "{:x}",
         Sha256::digest(std::fs::read(&driver).expect("driver bytes"))

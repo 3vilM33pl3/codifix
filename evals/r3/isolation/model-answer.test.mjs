@@ -8,8 +8,8 @@ import { openRequestMediator } from '../request-mediator.mjs';
 import { runMediatedKnowledge } from './model-answer.mjs';
 import { createResponsesPreparation } from '../responses-call.mjs';
 
-const binary = process.env.MEMORY_R3_BUDGET_BIN, scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
-if (process.env.MEMORY_R3_REQUIRE_MODEL_ANSWER === '1' && (!binary || !scoreBinary)) throw Error('required mediated answer configuration missing');
+const binary = process.env.CODIFIX_R3_BUDGET_BIN, scoreBinary = process.env.CODIFIX_R3_SCORE_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_MODEL_ANSWER === '1' && (!binary || !scoreBinary)) throw Error('required mediated answer configuration missing');
 const sources = [{ id: 'public/one.md', text: 'Reconcile committed settlement before retry.' },
   { id: 'public/two.md', text: 'UNSELECTED_PRIVATE_SOURCE must not reach this model.' }];
 const rubric = { case_id: 'synthetic-question', question: 'What should precede retry?',

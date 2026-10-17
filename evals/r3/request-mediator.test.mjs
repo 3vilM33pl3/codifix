@@ -12,8 +12,8 @@ import { createProviderTransport } from './provider-transport.mjs';
 import { decodeResponsesReceipt } from './responses-receipt.mjs';
 import { providerFailure } from './provider-diagnostics.mjs';
 
-const binary = process.env.MEMORY_R3_BUDGET_BIN;
-if (process.env.MEMORY_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
+const binary = process.env.CODIFIX_R3_BUDGET_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
 const limits = { requests: 4, tokens: 100, microusd: 50, task_seconds: 10 };
 const taskLimits = { ...limits, requests: 2 };
 const allowance = { input_tokens: 10, output_tokens: 10, microusd: 10 };

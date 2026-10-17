@@ -2,8 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runOfflineSequence, validateSequence } from './sequence.mjs';
-const image = process.env.MEMORY_R3_TEST_IMAGE;
-if (process.env.MEMORY_R3_REQUIRE_CONTAINER === '1' && !image) throw Error('required container test image missing');
+const image = process.env.CODIFIX_R3_TEST_IMAGE;
+if (process.env.CODIFIX_R3_REQUIRE_CONTAINER === '1' && !image) throw Error('required container test image missing');
 
 function fixture(image) {
   return { image, initialFiles: { 'source.json': '{"count":0}', 'public.txt': 'Only increment the count once per step.' },

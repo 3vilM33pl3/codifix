@@ -1002,7 +1002,7 @@ mod tests {
 
     #[test]
     fn release_template_override_never_downloads_or_falls_back() {
-        const CHILD: &str = "MEMORY_SKILL_PIN_TEST_CHILD";
+        const CHILD: &str = "CODIFIX_SKILL_PIN_TEST_CHILD";
         if let Ok(mode) = env::var(CHILD) {
             let expected = PathBuf::from(env::var_os("CODIFIX_SKILL_TEMPLATE").unwrap());
             if mode == "valid" {

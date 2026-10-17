@@ -120,19 +120,19 @@ async fn supervisor_real_control_browser_cli_rehearsal() {
         .canonicalize()
         .expect("repository");
     assert!(root.join("web/dist/index.html").is_file());
-    let binary = std::env::var("MEMORY_SUPERVISOR_REHEARSAL_CLI").expect("explicit built CLI");
+    let binary = std::env::var("CODIFIX_SUPERVISOR_REHEARSAL_CLI").expect("explicit built CLI");
     assert!(std::path::Path::new(&binary).is_absolute());
     f.state.web_root = Some(root.join("web/dist"));
     let (url, server) = f.server(false).await;
     let result = tokio::process::Command::new("node")
         .arg(root.join("web/tests/supervisor-control-rehearsal.mjs"))
-        .env("MEMORY_SUPERVISOR_REHEARSAL_URL", url)
+        .env("CODIFIX_SUPERVISOR_REHEARSAL_URL", url)
         .env(
-            "MEMORY_SUPERVISOR_REHEARSAL_INSTANCE",
+            "CODIFIX_SUPERVISOR_REHEARSAL_INSTANCE",
             f.instance.to_string(),
         )
-        .env("MEMORY_SUPERVISOR_REHEARSAL_CLI", binary)
-        .env("MEMORY_SUPERVISOR_REHEARSAL_TOKEN", &f.admin_token)
+        .env("CODIFIX_SUPERVISOR_REHEARSAL_CLI", binary)
+        .env("CODIFIX_SUPERVISOR_REHEARSAL_TOKEN", &f.admin_token)
         .kill_on_drop(true)
         .output()
         .await;

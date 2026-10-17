@@ -57,7 +57,7 @@ pub(super) async fn run(
             .env("PATH", "/usr/local/bin:/usr/bin:/bin")
             .env("HOME", dir.join("home"))
             .env("CODIFIX_PROFILE", "prod")
-            .env("MEMORY_R3_OFFLINE", if offline { "1" } else { "0" })
+            .env("CODIFIX_R3_OFFLINE", if offline { "1" } else { "0" })
             .stdin(Stdio::null())
             .stdout(stdout)
             .stderr(stderr)
@@ -162,7 +162,7 @@ pub(super) async fn run(
             ),
             ("CODIFIX_PROFILE".into(), "prod".into()),
             (
-                "MEMORY_R3_OFFLINE".into(),
+                "CODIFIX_R3_OFFLINE".into(),
                 if offline { "1" } else { "0" }.into(),
             ),
         ];

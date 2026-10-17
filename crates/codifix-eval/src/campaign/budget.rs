@@ -568,7 +568,7 @@ mod tests {
 
     #[test]
     fn budget_crash_child() {
-        let Some(path) = std::env::var_os("MEMORY_R3_BUDGET_CRASH_PATH") else {
+        let Some(path) = std::env::var_os("CODIFIX_R3_BUDGET_CRASH_PATH") else {
             return;
         };
         let mut budget =
@@ -585,7 +585,7 @@ mod tests {
         let fixture = Fixture::new();
         let status = std::process::Command::new(std::env::current_exe().expect("test executable"))
             .args(["--exact", "campaign::budget::tests::budget_crash_child"])
-            .env("MEMORY_R3_BUDGET_CRASH_PATH", fixture.journal())
+            .env("CODIFIX_R3_BUDGET_CRASH_PATH", fixture.journal())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()

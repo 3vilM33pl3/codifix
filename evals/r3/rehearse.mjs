@@ -37,16 +37,16 @@ export async function rehearse(argv = process.argv.slice(2), environment = proce
   const root = path.resolve(destination);
   const databaseUrl = environment.CODIFIX_TEST_DATABASE_URL;
   const binaries = {
-    memory: environment.MEMORY_R3_CLI_BIN, snapshot: environment.MEMORY_R3_SNAPSHOT_BIN,
-    score: environment.MEMORY_R3_SCORE_BIN, retriever: environment.MEMORY_R3_RETRIEVER_BIN,
-    ...(mediated ? { budget: environment.MEMORY_R3_BUDGET_BIN } : {}),
+    memory: environment.CODIFIX_R3_CLI_BIN, snapshot: environment.CODIFIX_R3_SNAPSHOT_BIN,
+    score: environment.CODIFIX_R3_SCORE_BIN, retriever: environment.CODIFIX_R3_RETRIEVER_BIN,
+    ...(mediated ? { budget: environment.CODIFIX_R3_BUDGET_BIN } : {}),
   };
-  const images = { node: environment.MEMORY_R3_TEST_IMAGE, rust: environment.MEMORY_R3_RUST_IMAGE };
+  const images = { node: environment.CODIFIX_R3_TEST_IMAGE, rust: environment.CODIFIX_R3_RUST_IMAGE };
   if (!databaseUrl || environment.CODIFIX_TEST_REQUIRE_DB !== '1' || Object.values(binaries).some(value => !value || !path.isAbsolute(value))
       || (!native && Object.values(images).some(value => !/^sha256:[a-f0-9]{64}$/.test(value)))) throw Error('explicit disposable database, binaries and immutable images required');
   if (native && mediated) throw Error('native bootstrap supports deterministic zero-spend rehearsal only');
   if (native && Object.values(images).some(value => value !== undefined)) throw Error('native bootstrap cannot contain Linux images');
-  if (!native && (environment.MEMORY_R3_NATIVE_EXECUTION !== undefined || environment.MEMORY_R3_NATIVE_COMPILER !== undefined)) throw Error('native profile requires explicit --native selection');
+  if (!native && (environment.CODIFIX_R3_NATIVE_EXECUTION !== undefined || environment.CODIFIX_R3_NATIVE_COMPILER !== undefined)) throw Error('native profile requires explicit --native selection');
   let env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: os.tmpdir(), CODIFIX_PROFILE: 'prod' };
   const run = runProcess ?? ((binary, args, options = {}) => new Promise((resolve, reject) => {
     const child = spawn(binary, args, { env, stdio: 'inherit', shell: false, windowsHide: true, ...options });
@@ -73,12 +73,12 @@ export async function rehearse(argv = process.argv.slice(2), environment = proce
   let execution, compiler, nativeGuest, staging;
   if (native) {
     if (platform !== 'win32') throw Error('native bootstrap requires Windows; no Linux fallback');
-    if (!environment.MEMORY_R3_NATIVE_EXECUTION || !environment.MEMORY_R3_NATIVE_COMPILER) throw Error('explicit native execution JSON and compiler path required');
-    execution = JSON.parse(await fs.readFile(environment.MEMORY_R3_NATIVE_EXECUTION, 'utf8'));
+    if (!environment.CODIFIX_R3_NATIVE_EXECUTION || !environment.CODIFIX_R3_NATIVE_COMPILER) throw Error('explicit native execution JSON and compiler path required');
+    execution = JSON.parse(await fs.readFile(environment.CODIFIX_R3_NATIVE_EXECUTION, 'utf8'));
     validateExecutionInput({ execution, argv: [execution?.profile?.node?.path], files: {}, exportPaths: [] });
     const profile = execution.profile, inventory = profile.toolchains.flatMap(tree => tree.files);
     if (path.normalize(processExecutable).toLowerCase() !== path.normalize(profile.node.path).toLowerCase()) throw Error('native bootstrap requires its reviewed Node runtime');
-    compiler = inventory.find(file => file.path.toLowerCase() === environment.MEMORY_R3_NATIVE_COMPILER.toLowerCase());
+    compiler = inventory.find(file => file.path.toLowerCase() === environment.CODIFIX_R3_NATIVE_COMPILER.toLowerCase());
     if (!compiler || path.basename(compiler.path).toLowerCase() !== 'rustc.exe') throw Error('explicit pinned native compiler required');
     const parent = path.dirname(root), requestId = path.basename(parent);
     if (path.basename(root) !== 'pack' || requestId === '00000000-0000-0000-0000-000000000000'

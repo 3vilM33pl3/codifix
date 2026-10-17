@@ -87,8 +87,8 @@ try {
             private_runtime=$private;windows_artifacts=$evidence.artifact}
         $configPath=Join-Path $root 'config.json'
         [IO.File]::WriteAllText($configPath,($config | ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false))
-        $env:MEMORY_PI_WINDOWS_SANDBOX_CONFIG=$configPath
-        $env:MEMORY_PI_WINDOWS_SANDBOX_CONFIG_SHA256=(Get-FileHash $configPath).Hash.ToLowerInvariant()
+        $env:CODIFIX_PI_WINDOWS_SANDBOX_CONFIG=$configPath
+        $env:CODIFIX_PI_WINDOWS_SANDBOX_CONFIG_SHA256=(Get-FileHash $configPath).Hash.ToLowerInvariant()
     }
     $program=$cargo
     $arguments=if ($Scope -eq 'Service') { @('test','--locked','-p','codifix-service','--lib','--','--test-threads=1') }
@@ -125,7 +125,7 @@ try {
 } catch { $receipt.state='failed'; throw }
 finally {
     $env:CODIFIX_TEST_DATABASE_URL=$null; $env:CODIFIX_TEST_REQUIRE_DB=$null; $password=$null
-    $env:MEMORY_PI_WINDOWS_SANDBOX_CONFIG=$null; $env:MEMORY_PI_WINDOWS_SANDBOX_CONFIG_SHA256=$null
+    $env:CODIFIX_PI_WINDOWS_SANDBOX_CONFIG=$null; $env:CODIFIX_PI_WINDOWS_SANDBOX_CONFIG_SHA256=$null
     Pop-Location
     $receipt | ConvertTo-Json | Set-Content -LiteralPath $result -Encoding UTF8
 }

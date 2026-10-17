@@ -24,7 +24,8 @@ async fn supervisor_real_browser_cli_rehearsal() {
         root.join("web/dist/index.html").is_file(),
         "build Web assets first"
     );
-    let binary = std::env::var("MEMORY_SUPERVISOR_REHEARSAL_CLI").expect("explicit built lean CLI");
+    let binary =
+        std::env::var("CODIFIX_SUPERVISOR_REHEARSAL_CLI").expect("explicit built lean CLI");
     assert!(std::path::Path::new(&binary).is_absolute());
     let config=serde_json::from_value(json!({
         "service":{"bind_addr":"127.0.0.1:0","api_token":"synthetic-supervisor-rehearsal","read_only":true,"web_root":root.join("web/dist")},
@@ -71,9 +72,12 @@ async fn supervisor_real_browser_cli_rehearsal() {
     });
     let result = tokio::process::Command::new("node")
         .arg(root.join("web/tests/supervisor-real-rehearsal.mjs"))
-        .env("MEMORY_SUPERVISOR_REHEARSAL_URL", &url)
-        .env("MEMORY_SUPERVISOR_REHEARSAL_INSTANCE", instance.to_string())
-        .env("MEMORY_SUPERVISOR_REHEARSAL_CLI", binary)
+        .env("CODIFIX_SUPERVISOR_REHEARSAL_URL", &url)
+        .env(
+            "CODIFIX_SUPERVISOR_REHEARSAL_INSTANCE",
+            instance.to_string(),
+        )
+        .env("CODIFIX_SUPERVISOR_REHEARSAL_CLI", binary)
         .kill_on_drop(true)
         .output()
         .await;

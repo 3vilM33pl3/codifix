@@ -90,7 +90,7 @@ fn check_tools(
 /// mandatory. These extra checks catch accidental invocation on the host.
 fn require_sandbox() {
     assert_eq!(
-        std::env::var("MEMORY_PI_SANDBOXED_PROBE").unwrap(),
+        std::env::var("CODIFIX_PI_SANDBOXED_PROBE").unwrap(),
         "network-none-read-only-root"
     );
     assert_ne!(rustix::process::geteuid().as_raw(), 0);

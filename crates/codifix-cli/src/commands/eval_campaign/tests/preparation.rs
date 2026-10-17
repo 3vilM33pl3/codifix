@@ -3,7 +3,7 @@ use super::*;
 
 #[test]
 fn driver_child() {
-    let Some(path) = std::env::var_os("MEMORY_R3_PREPARATION_TEST_REQUEST") else {
+    let Some(path) = std::env::var_os("CODIFIX_R3_PREPARATION_TEST_REQUEST") else {
         return;
     };
     let request: serde_json::Value = bounded_json(Path::new(&path)).unwrap();

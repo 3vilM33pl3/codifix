@@ -6,8 +6,8 @@ import fs from 'node:fs/promises';
 import { gradeRustCase } from './isolation/rust.mjs';
 import { runOfflineSequence } from './isolation/sequence.mjs';
 
-const image = process.env.MEMORY_R3_RUST_IMAGE;
-if (process.env.MEMORY_R3_REQUIRE_RUST === '1' && !image) throw Error('required Rust image missing');
+const image = process.env.CODIFIX_R3_RUST_IMAGE;
+if (process.env.CODIFIX_R3_REQUIRE_RUST === '1' && !image) throw Error('required Rust image missing');
 
 for (const [family, modules, replacements] of [
   ['framed-stream', ['main', 'command', 'hex', 'frame', 'decoder'], ['decoder']],

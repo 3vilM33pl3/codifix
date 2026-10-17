@@ -6,13 +6,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 
-const names = ['CODIFIX_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_CLI_BIN',
-  'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN'];
-const wire = process.env.MEMORY_R3_WIRE === '1';
-const mediated = process.env.MEMORY_R3_MEDIATED === '1' || wire;
-if (mediated) names.push('MEMORY_R3_BUDGET_BIN');
+const names = ['CODIFIX_TEST_DATABASE_URL', 'CODIFIX_R3_SNAPSHOT_BIN', 'CODIFIX_R3_CLI_BIN',
+  'CODIFIX_R3_TEST_IMAGE', 'CODIFIX_R3_RUST_IMAGE', 'CODIFIX_R3_SCORE_BIN', 'CODIFIX_R3_RETRIEVER_BIN'];
+const wire = process.env.CODIFIX_R3_WIRE === '1';
+const mediated = process.env.CODIFIX_R3_MEDIATED === '1' || wire;
+if (mediated) names.push('CODIFIX_R3_BUDGET_BIN');
 const available = names.every(name => process.env[name]);
-if (process.env.MEMORY_R3_REQUIRE_REHEARSAL === '1' && !available) throw Error('required integrated rehearsal configuration missing');
+if (process.env.CODIFIX_R3_REQUIRE_REHEARSAL === '1' && !available) throw Error('required integrated rehearsal configuration missing');
 
 test('rehearsal bootstrap requires explicit disposable configuration before creating output', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-rehearsal-reject-'));
@@ -27,7 +27,7 @@ test(`existing campaign CLI completes a real 75-dispatch ${wire ? 'HTTP-mediated
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-rehearsal-cli-'));
   let verified = false;
   t.after(async () => {
-    if (verified && process.env.MEMORY_R3_KEEP_REHEARSAL !== '1') await fs.rm(directory, { recursive: true });
+    if (verified && process.env.CODIFIX_R3_KEEP_REHEARSAL !== '1') await fs.rm(directory, { recursive: true });
     else console.error(`${verified ? 'Verified' : 'Failed'} rehearsal diagnostics retained at ${directory}`);
   });
   const root = path.join(directory, 'pack');
@@ -54,7 +54,7 @@ test(`existing campaign CLI completes a real 75-dispatch ${wire ? 'HTTP-mediated
         replacedBuildOutput = true;
         // Replace only this test's copy of an upstream build artifact. Neither
         // the checkout's binaries nor the frozen runtime copy are modified.
-        replacement = fs.writeFile(env.MEMORY_R3_SCORE_BIN, 'Deliberately replaced test-owned build output.');
+        replacement = fs.writeFile(env.CODIFIX_R3_SCORE_BIN, 'Deliberately replaced test-owned build output.');
         replacement.catch(() => {});
       }
     });

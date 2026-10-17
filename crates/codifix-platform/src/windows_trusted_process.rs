@@ -254,7 +254,7 @@ mod tests {
     use super::*;
     #[test]
     fn native_process_helper() {
-        match std::env::var("MEMORY_TRUSTED_HELPER").as_deref() {
+        match std::env::var("CODIFIX_TRUSTED_HELPER").as_deref() {
             Ok("exit-seven") => std::process::exit(7),
             Ok("root") => {
                 // PATH is present in the test host but deliberately absent
@@ -269,7 +269,7 @@ mod tests {
                         "--nocapture",
                     ])
                     .env_clear()
-                    .env("MEMORY_TRUSTED_HELPER", "leaf")
+                    .env("CODIFIX_TRUSTED_HELPER", "leaf")
                     .spawn()
                     .unwrap();
                 std::fs::write("descendant.pid", child.id().to_string()).unwrap();
@@ -297,7 +297,7 @@ mod tests {
                 "--nocapture".into(),
             ],
             &root,
-            &[("MEMORY_TRUSTED_HELPER".into(), "root".into())],
+            &[("CODIFIX_TRUSTED_HELPER".into(), "root".into())],
             &stdout,
             &stderr,
         )
@@ -377,7 +377,7 @@ mod tests {
                 "--nocapture".into(),
             ],
             &root,
-            &[("MEMORY_TRUSTED_HELPER".into(), "exit-seven".into())],
+            &[("CODIFIX_TRUSTED_HELPER".into(), "exit-seven".into())],
             &output,
             &error,
         )

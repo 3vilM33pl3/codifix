@@ -16,10 +16,10 @@ async fn native_production_launcher_delivers_revokes_accounts_and_recovers() {
 fn configured() -> SandboxConfig {
     assert_eq!(std::env::var("CODIFIX_TEST_REQUIRE_DB").as_deref(), Ok("1"));
     let path = PathBuf::from(
-        std::env::var_os("MEMORY_PI_WINDOWS_SANDBOX_CONFIG")
+        std::env::var_os("CODIFIX_PI_WINDOWS_SANDBOX_CONFIG")
             .expect("explicit private synthetic sandbox config"),
     );
-    let digest = std::env::var("MEMORY_PI_WINDOWS_SANDBOX_CONFIG_SHA256")
+    let digest = std::env::var("CODIFIX_PI_WINDOWS_SANDBOX_CONFIG_SHA256")
         .expect("exact operator-reviewed sandbox config hash");
     let bytes =
         crate::private_files::read(&path, &digest).expect("protected hash-bound sandbox config");

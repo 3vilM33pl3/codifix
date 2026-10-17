@@ -9,8 +9,8 @@ import { syntheticEmbeddingModel, syntheticVector } from './synthetic-embedding.
 import { openRequestMediator } from './request-mediator.mjs';
 import { dispatchModel } from './isolation/model-dispatch.mjs';
 
-const binary = process.env.MEMORY_R3_BUDGET_BIN;
-if (process.env.MEMORY_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
+const binary = process.env.CODIFIX_R3_BUDGET_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
 const tokenizer = { id: 'synthetic-wire-counter-not-real-tokenizer-v1', asset: { path: 'counter.mjs', sha256: 'a'.repeat(64) } };
 const profile = () => ({ smoke_only: true, label_status: 'draft', limits: { microusd: 0 },
   assets: [{ ...tokenizer.asset, kind: 'configuration' }],

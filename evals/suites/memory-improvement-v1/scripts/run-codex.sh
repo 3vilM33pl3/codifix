@@ -7,16 +7,16 @@ run_dir="$3"
 final_file="$run_dir/codex-final.md"
 events_file="$run_dir/codex-events.jsonl"
 isolated_prompt="$run_dir/prompt-isolated.md"
-model="${MEMORY_EVAL_CODEX_MODEL:-gpt-5.4-mini}"
-sandbox="${MEMORY_EVAL_CODEX_SANDBOX:-danger-full-access}"
+model="${CODIFIX_EVAL_CODEX_MODEL:-gpt-5.4-mini}"
+sandbox="${CODIFIX_EVAL_CODEX_SANDBOX:-danger-full-access}"
 if [ "$sandbox" = "danger-full-access" ]; then
   sandbox_args="--dangerously-bypass-approvals-and-sandbox"
 else
   sandbox_args="--full-auto --sandbox $sandbox"
 fi
-watchdog_seconds="${MEMORY_EVAL_CODEX_WATCHDOG_SECONDS:-360}"
-if [ -n "${MEMORY_EVAL_TIMEOUT_SECONDS:-}" ] && [ "$watchdog_seconds" -ge "$MEMORY_EVAL_TIMEOUT_SECONDS" ]; then
-  watchdog_seconds=$((MEMORY_EVAL_TIMEOUT_SECONDS - 30))
+watchdog_seconds="${CODIFIX_EVAL_CODEX_WATCHDOG_SECONDS:-360}"
+if [ -n "${CODIFIX_EVAL_TIMEOUT_SECONDS:-}" ] && [ "$watchdog_seconds" -ge "$CODIFIX_EVAL_TIMEOUT_SECONDS" ]; then
+  watchdog_seconds=$((CODIFIX_EVAL_TIMEOUT_SECONDS - 30))
 fi
 if [ "$watchdog_seconds" -lt 30 ]; then
   watchdog_seconds=30

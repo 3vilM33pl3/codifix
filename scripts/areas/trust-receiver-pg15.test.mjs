@@ -22,7 +22,7 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const id = value => `00000000-0000-0000-0000-${String(value).padStart(12, '0')}`;
 
 test('PostgreSQL 17 Trust data restores atomically into the exact CA PostgreSQL 15.18 profile', {
-  skip: process.env.MEMORY_AREA_TEST_PG15 !== '1', timeout: 300_000,
+  skip: process.env.CODIFIX_AREA_TEST_PG15 !== '1', timeout: 300_000,
 }, async t => {
   const root = await mkdtemp(join(tmpdir(), 'memory-trust-pg15-receiver-'));
   const sourceSocket = join(root, 'source-socket'), targetSocket = join(root, 'target-socket');
@@ -30,7 +30,7 @@ test('PostgreSQL 17 Trust data restores atomically into the exact CA PostgreSQL 
   const run = (command, args, options = {}) => {
     const result = spawnSync(command, args, { env: clean, timeout: 120_000, maxBuffer: 64 * 1024 * 1024, ...options });
     if (result.status !== 0) {
-      if (process.env.MEMORY_AREA_TEST_DEBUG === '1') process.stderr.write(result.stderr ?? '');
+      if (process.env.CODIFIX_AREA_TEST_DEBUG === '1') process.stderr.write(result.stderr ?? '');
       throw new Error(`Trust receiver ${command} operation failed; diagnostics suppressed`);
     }
     return result.stdout;
@@ -79,7 +79,7 @@ test('PostgreSQL 17 Trust data restores atomically into the exact CA PostgreSQL 
     [target, ['memory_reference_trust', 'memory_trust']]]) {
     for (const database of databases) docker(container, ['createdb', '-U', 'postgres', database]);
   }
-  const binary = process.env.MEMORY_AREA_IMPORT_BINARY
+  const binary = process.env.CODIFIX_AREA_IMPORT_BINARY
     ?? new URL('../../target/debug/codifix-area-import', import.meta.url).pathname;
   const initialize = async (database, socket) => {
     const descriptor = join(root, `${database}.json`);

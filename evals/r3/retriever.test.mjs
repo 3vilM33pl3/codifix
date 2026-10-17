@@ -7,8 +7,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { bindCorpus, bindQuery, syntheticProfile, vectorDigest } from './embedding-evidence.mjs';
 
-const binary = process.env.MEMORY_R3_RETRIEVER_BIN;
-if (process.env.MEMORY_R3_REQUIRE_RETRIEVER === '1' && !binary) throw Error('required retriever binary missing');
+const binary = process.env.CODIFIX_R3_RETRIEVER_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_RETRIEVER === '1' && !binary) throw Error('required retriever binary missing');
 test('decimal float32 vectors preserve exact bindings across the JavaScript/Rust boundary', { skip: !binary }, async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-decimal-vectors-'));
   t.after(() => fs.rm(directory, { recursive: true }));

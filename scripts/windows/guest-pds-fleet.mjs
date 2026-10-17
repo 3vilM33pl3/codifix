@@ -223,8 +223,8 @@ try {
     const log = await fs.open(path.join(root, `${filter}.log`), 'wx');
     try {
       const cargo = tracked('C:\\Users\\memorylab\\.cargo\\bin\\cargo.exe', ['test','--locked','-p','codifix-service','--lib',filter,'--','--test-threads=1','--nocapture'], {
-        cwd: source, env: { ...process.env, MEMORY_FEDERATION_PDS_FIXTURE: path.join(root, 'fixture.json'),
-          MEMORY_FEDERATION_F1_INSTANCES: '1', MEMORY_FEDERATION_AGENT_INSTANCES: '1',
+        cwd: source, env: { ...process.env, CODIFIX_FEDERATION_PDS_FIXTURE: path.join(root, 'fixture.json'),
+          CODIFIX_FEDERATION_F1_INSTANCES: '1', CODIFIX_FEDERATION_AGENT_INSTANCES: '1',
           CARGO_TARGET_DIR: 'C:\\MemoryLab\\build\\product-msvc', CARGO_BUILD_TARGET: 'x86_64-pc-windows-msvc', CARGO_BUILD_JOBS: '2' }, stdio: ['ignore',log.fd,log.fd] });
       assert.equal((await once(cargo, 'exit'))[0], 0, `${filter} failed; inspect private log`);
     } finally { await log.close(); }

@@ -25,7 +25,7 @@ services:
     volumes:
       - ../../..:/workspace
       - ${CODEX_HOME:-$HOME/.codex}:/codex-home-host:ro
-    command: ["/usr/local/bin/memory", "--config", "/workspace/evals/docker/memory-improvement/config.service.toml", "service", "run"]
+    command: ["/usr/local/bin/codifix", "--config", "/workspace/evals/docker/memory-improvement/config.service.toml", "service", "run"]
   eval:
     build:
       context: ../../..
@@ -38,9 +38,9 @@ services:
       CODIFIX_PROFILE: prod
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
-      MEMORY_EVAL_REPEAT: ${MEMORY_EVAL_REPEAT:-5}
-      MEMORY_EVAL_LLM_JUDGE: ${MEMORY_EVAL_LLM_JUDGE:-0}
-      MEMORY_EVAL_CONDITIONS: ${MEMORY_EVAL_CONDITIONS:-no-memory lexical semantic graph full-memory}
+      CODIFIX_EVAL_REPEAT: ${CODIFIX_EVAL_REPEAT:-5}
+      CODIFIX_EVAL_LLM_JUDGE: ${CODIFIX_EVAL_LLM_JUDGE:-0}
+      CODIFIX_EVAL_CONDITIONS: ${CODIFIX_EVAL_CONDITIONS:-no-memory lexical semantic graph full-memory}
     volumes:
       - ../../..:/workspace
       - ${CODEX_HOME:-$HOME/.codex}:/codex-home-host:ro

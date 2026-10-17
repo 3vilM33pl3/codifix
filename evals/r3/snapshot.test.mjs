@@ -11,13 +11,13 @@ import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { preparedContext, runOfflineKnowledge } from './isolation/knowledge.mjs';
 
-const snapshot = process.env.MEMORY_R3_SNAPSHOT_BIN;
-const memory = process.env.MEMORY_R3_CLI_BIN;
+const snapshot = process.env.CODIFIX_R3_SNAPSHOT_BIN;
+const memory = process.env.CODIFIX_R3_CLI_BIN;
 const database = process.env.CODIFIX_TEST_DATABASE_URL;
-const image = process.env.MEMORY_R3_TEST_IMAGE;
-const scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
-if (process.env.MEMORY_R3_REQUIRE_SNAPSHOT === '1' && (!snapshot || !memory || !database)) throw Error('required snapshot/service configuration missing');
-if (process.env.MEMORY_R3_REQUIRE_SERVICE_ANSWER === '1' && (!snapshot || !memory || !database || !image || !scoreBinary)) throw Error('required service/answer configuration missing');
+const image = process.env.CODIFIX_R3_TEST_IMAGE;
+const scoreBinary = process.env.CODIFIX_R3_SCORE_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_SNAPSHOT === '1' && (!snapshot || !memory || !database)) throw Error('required snapshot/service configuration missing');
+if (process.env.CODIFIX_R3_REQUIRE_SERVICE_ANSWER === '1' && (!snapshot || !memory || !database || !image || !scoreBinary)) throw Error('required service/answer configuration missing');
 
 test('snapshot owner rejects arbitrary operations and unsafe source identifiers before database access', { skip: !snapshot }, () => {
   for (const input of [

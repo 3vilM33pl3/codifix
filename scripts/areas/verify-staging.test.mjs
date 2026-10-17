@@ -63,14 +63,14 @@ function io(rows,code=0){return {sent:[],aborted:false,async *lines(){for(const 
 function fake(rows,code=0){const x=io(rows,code);x.lines=x.lines();return x;}
 
 test('schema61 catalog extends the preserved schema60 catalog and matches the reviewed Rust allowlist',async()=>{
-  const code=(await readFile(new URL('../../crates/codifix-area/src/policy.rs',import.meta.url),'utf8')).split('pub(crate) const HISTORICAL_TABLES')[0];
+  const code=(await readFile(new URL('../../crates/codifix-area/src/policy.rs',import.meta.url),'utf8')).split('pub const ADDRESSED_EXPERTISE_TABLES_0062')[0];
   assert.deepEqual(SCHEMA61_TABLES,[...new Set([...code.matchAll(/"(public\.[a-z0-9_]+)"/g)].map(m=>m[1]))].sort());
   assert.equal(SCHEMA60_TABLES.length,114);
   assert.deepEqual(SCHEMA61_TABLES.filter(t=>!SCHEMA60_TABLES.includes(t)),['public.area_reconciliation_receipts']);
 });
 test('reviewed schema profiles bind every migration checksum and compatibility SQL',async()=>{
   const root=new URL('../../migrations/',import.meta.url);
-  const files=(await readdir(root)).filter(f=>/^\d{4}_[a-z0-9_]+\.sql$/.test(f)).sort();
+  const files=(await readdir(root)).filter(f=>/^\d{4}_[a-z0-9_]+\.sql$/.test(f)&&Number(f.slice(0,4))<=61).sort();
   const rust=await readFile(new URL('../../crates/codifix-area-ops/src/schema.rs',import.meta.url),'utf8');
   const compatibility=rust.match(/const VECTOR_COMPAT: &str = r#"([\s\S]*?)"#;/)[1];
   assert.equal(files.length,61);
@@ -201,7 +201,7 @@ test('private complete archive binds source identity and exact bytes; partial ar
 });
 
 test('real isolated PostgreSQL validates hashes without mutations and refuses activated runtime',{
-  skip:process.env.MEMORY_AREA_TEST_DOCKER!=='1',timeout:180_000,
+  skip:process.env.CODIFIX_AREA_TEST_DOCKER!=='1',timeout:180_000,
 },async t=>{
   const root=await mkdtemp(join(tmpdir(),'memory-staging-pg-'));
   const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!k.startsWith('PG')));
@@ -223,7 +223,7 @@ test('real isolated PostgreSQL validates hashes without mutations and refuses ac
   const f=fixture();f.target.connection.directory=socket;f.spec.container_id=container;f.spec.container_name=name;f.spec.image_id=image;
   run('docker',['exec',container,'createdb','-U','postgres',f.target.database]);
   const targetFile=join(root,'target.json'),targetBytes=JSON.stringify(f.target);await writeFile(targetFile,targetBytes,{mode:0o600});
-  const binary=process.env.MEMORY_AREA_IMPORT_BINARY??new URL('../../target/debug/codifix-area-import',import.meta.url).pathname;
+  const binary=process.env.CODIFIX_AREA_IMPORT_BINARY??new URL('../../target/debug/codifix-area-import',import.meta.url).pathname;
   const plan=JSON.parse(run(binary,['schema-plan']));
   const profile=schemaProfile(plan);
   run(binary,['initialize-schema','--target',targetFile,'--target-sha256',hash(targetBytes),'--schema-sha256',plan.schema_sha256,'--execute','--writers-stopped','--fresh-database']);

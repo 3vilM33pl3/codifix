@@ -7,9 +7,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
-const binary = process.env.MEMORY_R3_CLI_BIN;
-const scorer = process.env.MEMORY_R3_SCORE_BIN;
-if (process.env.MEMORY_R3_REQUIRE_REVIEW === '1' && (!binary || !scorer)) throw Error('required review binaries missing');
+const binary = process.env.CODIFIX_R3_CLI_BIN;
+const scorer = process.env.CODIFIX_R3_SCORE_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_REVIEW === '1' && (!binary || !scorer)) throw Error('required review binaries missing');
 test('campaign CLI exports blinded packets and applies synthetic ballots without rerunning execution', { skip: !binary || !scorer }, async t => {
   assert(path.isAbsolute(binary) && path.isAbsolute(scorer));
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-review-'));

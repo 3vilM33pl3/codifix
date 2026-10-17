@@ -11,17 +11,17 @@ import { packagePaidRuntime, verifyPaidRuntime, digest } from './paid-runtime.mj
 import { runPaidCampaign } from './launch-paid.mjs';
 import { inspectCampaignDispatch } from './campaign-dispatch.mjs';
 
-const memory = process.env.MEMORY_R3_CLI_BIN;
-const names = ['MEMORY_R3_BUDGET_BIN', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN',
-  'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE'];
+const memory = process.env.CODIFIX_R3_CLI_BIN;
+const names = ['CODIFIX_R3_BUDGET_BIN', 'CODIFIX_R3_SNAPSHOT_BIN', 'CODIFIX_R3_SCORE_BIN', 'CODIFIX_R3_RETRIEVER_BIN',
+  'CODIFIX_R3_TEST_IMAGE', 'CODIFIX_R3_RUST_IMAGE'];
 const available = !!memory && names.every(n => process.env[n]);
 const database = process.env.CODIFIX_TEST_DATABASE_URL;
 const integration = available && !!database && process.env.CODIFIX_TEST_REQUIRE_DB === '1';
-if (process.env.MEMORY_R3_REQUIRE_PAID_LAUNCHER === '1' && !integration) throw Error('required paid-launcher fixture configuration missing');
+if (process.env.CODIFIX_R3_REQUIRE_PAID_LAUNCHER === '1' && !integration) throw Error('required paid-launcher fixture configuration missing');
 async function fixture(t, reviewed = true) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-paid-'));
   let keep = false;
-  t.after(async () => { if (keep && process.env.MEMORY_R3_KEEP_REHEARSAL === '1') console.error(`Synthetic paid-path evidence retained at ${directory}`); else await fs.rm(directory, { recursive: true }); });
+  t.after(async () => { if (keep && process.env.CODIFIX_R3_KEEP_REHEARSAL === '1') console.error(`Synthetic paid-path evidence retained at ${directory}`); else await fs.rm(directory, { recursive: true }); });
   const root = path.join(directory, 'pack'), file = path.join(root, 'campaign.json');
   const built = spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', root, '--one-family-per-track'], { encoding: 'utf8' });
   assert.equal(built.status, 0, built.stderr);
@@ -44,9 +44,9 @@ async function fixture(t, reviewed = true) {
   const bao = path.join(directory, 'fake-bao'), secretRead = path.join(directory, 'secret-reads');
   await fs.writeFile(bao, `#!${process.execPath}\nrequire('node:fs').appendFileSync(${JSON.stringify(secretRead)}, 'read\\n');process.stdout.write('synthetic-paid-launcher');`, { mode: 0o700 });
   const runtime = await packagePaidRuntime(root, { binaries: { memory, bao, node: process.execPath,
-    budget: process.env.MEMORY_R3_BUDGET_BIN, snapshot: process.env.MEMORY_R3_SNAPSHOT_BIN,
-    score: process.env.MEMORY_R3_SCORE_BIN, retriever: process.env.MEMORY_R3_RETRIEVER_BIN },
-    images: { node: process.env.MEMORY_R3_TEST_IMAGE, rust: process.env.MEMORY_R3_RUST_IMAGE } });
+    budget: process.env.CODIFIX_R3_BUDGET_BIN, snapshot: process.env.CODIFIX_R3_SNAPSHOT_BIN,
+    score: process.env.CODIFIX_R3_SCORE_BIN, retriever: process.env.CODIFIX_R3_RETRIEVER_BIN },
+    images: { node: process.env.CODIFIX_R3_TEST_IMAGE, rust: process.env.CODIFIX_R3_RUST_IMAGE } });
   const locked = JSON.parse(await fs.readFile(file));
   // Test-only approval. Production packaging never changes this status or writes approvals.
   if (reviewed) { locked.label_status = 'reviewed'; await fs.writeFile(file, JSON.stringify(locked)); }

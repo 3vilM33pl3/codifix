@@ -340,27 +340,27 @@ pub fn run(file: &Path, expected: &str, output: &Path) -> Result<Receipt> {
             descriptor.database_url.clone().into(),
         ),
         (
-            "MEMORY_R3_NATIVE_EXECUTION".into(),
+            "CODIFIX_R3_NATIVE_EXECUTION".into(),
             descriptor.execution.path.as_os_str().to_owned(),
         ),
         (
-            "MEMORY_R3_NATIVE_COMPILER".into(),
+            "CODIFIX_R3_NATIVE_COMPILER".into(),
             descriptor.compiler.as_os_str().to_owned(),
         ),
         (
-            "MEMORY_R3_CLI_BIN".into(),
+            "CODIFIX_R3_CLI_BIN".into(),
             descriptor.binaries.memory.as_os_str().to_owned(),
         ),
         (
-            "MEMORY_R3_SNAPSHOT_BIN".into(),
+            "CODIFIX_R3_SNAPSHOT_BIN".into(),
             descriptor.binaries.snapshot.as_os_str().to_owned(),
         ),
         (
-            "MEMORY_R3_SCORE_BIN".into(),
+            "CODIFIX_R3_SCORE_BIN".into(),
             descriptor.binaries.score.as_os_str().to_owned(),
         ),
         (
-            "MEMORY_R3_RETRIEVER_BIN".into(),
+            "CODIFIX_R3_RETRIEVER_BIN".into(),
             descriptor.binaries.retriever.as_os_str().to_owned(),
         ),
     ];
@@ -511,13 +511,13 @@ mod tests {
     #[test]
     fn native_configured_bootstrap_prepares_through_real_helper_outer_job() {
         let names = [
-            "MEMORY_R3_BOOTSTRAP_HELPER",
-            "MEMORY_R3_BOOTSTRAP_DESCRIPTOR",
-            "MEMORY_R3_BOOTSTRAP_SHA256",
-            "MEMORY_R3_BOOTSTRAP_OUTPUT",
+            "CODIFIX_R3_BOOTSTRAP_HELPER",
+            "CODIFIX_R3_BOOTSTRAP_DESCRIPTOR",
+            "CODIFIX_R3_BOOTSTRAP_SHA256",
+            "CODIFIX_R3_BOOTSTRAP_OUTPUT",
         ];
         let configured = names.iter().all(|name| std::env::var_os(name).is_some());
-        if std::env::var("MEMORY_R3_REQUIRE_NATIVE_BOOTSTRAP").as_deref() == Ok("1") {
+        if std::env::var("CODIFIX_R3_REQUIRE_NATIVE_BOOTSTRAP").as_deref() == Ok("1") {
             assert!(configured, "required native bootstrap fixture missing");
         }
         if !configured {

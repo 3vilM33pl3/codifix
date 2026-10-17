@@ -270,7 +270,7 @@ fn absent_corrupt_and_changed_receipts_do_not_repeat_provider_or_refund() {
 
 #[test]
 fn result_crash_child() {
-    let Some(root) = std::env::var_os("MEMORY_R3_RESULT_CRASH") else {
+    let Some(root) = std::env::var_os("CODIFIX_R3_RESULT_CRASH") else {
         return;
     };
     let root = PathBuf::from(root);
@@ -309,7 +309,7 @@ fn complete_result_before_crash_recovers_explicitly_without_provider_execution()
             "--exact",
             "campaign::provider_results::tests::result_crash_child",
         ])
-        .env("MEMORY_R3_RESULT_CRASH", &f.0)
+        .env("CODIFIX_R3_RESULT_CRASH", &f.0)
         .stdout(std::process::Stdio::null())
         .status()
         .unwrap();

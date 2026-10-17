@@ -9,8 +9,8 @@ import { createModelAgent } from './model-agent.mjs';
 import { runOfflineSequence } from './sequence.mjs';
 import { createResponsesPreparation } from '../responses-call.mjs';
 
-const binary = process.env.MEMORY_R3_BUDGET_BIN, image = process.env.MEMORY_R3_TEST_IMAGE;
-if (process.env.MEMORY_R3_REQUIRE_MODEL_AGENT === '1' && (!binary || !image)) throw Error('required isolated model agent configuration missing');
+const binary = process.env.CODIFIX_R3_BUDGET_BIN, image = process.env.CODIFIX_R3_TEST_IMAGE;
+if (process.env.CODIFIX_R3_REQUIRE_MODEL_AGENT === '1' && (!binary || !image)) throw Error('required isolated model agent configuration missing');
 const model = { provider: 'synthetic', resolved_id: 'fake-command-v1', reasoning: 'none' };
 const allowance = { input_tokens: 100, output_tokens: 100, microusd: 10 };
 const usage = { input_tokens: 20, output_tokens: 10, microusd: 2 };

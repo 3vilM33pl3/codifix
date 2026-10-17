@@ -81,9 +81,9 @@ Success returns `memory-r3-native-bootstrap-prepare-result-v1` with
 `official_evidence: false`. This result confirms pack preparation only. Existing
 external reviewed toolchains remain dependencies of the prepared pack.
 
-Native fixture coverage is opt-in: set `MEMORY_R3_BOOTSTRAP_HELPER`,
-`MEMORY_R3_BOOTSTRAP_DESCRIPTOR`, `MEMORY_R3_BOOTSTRAP_SHA256`,
-`MEMORY_R3_BOOTSTRAP_OUTPUT`, and `MEMORY_R3_REQUIRE_NATIVE_BOOTSTRAP=1`, then run
+Native fixture coverage is opt-in: set `CODIFIX_R3_BOOTSTRAP_HELPER`,
+`CODIFIX_R3_BOOTSTRAP_DESCRIPTOR`, `CODIFIX_R3_BOOTSTRAP_SHA256`,
+`CODIFIX_R3_BOOTSTRAP_OUTPUT`, and `CODIFIX_R3_REQUIRE_NATIVE_BOOTSTRAP=1`, then run
 the `windows_evaluation_helper::bootstrap::tests::native_configured_bootstrap_prepares_through_real_helper_outer_job`
 test in the native `mem-platform` test binary. Each actual fixture invocation
 needs fresh descriptor/destination/output identities.

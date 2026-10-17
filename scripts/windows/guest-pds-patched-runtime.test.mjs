@@ -68,7 +68,7 @@ test('pinned package hardlinks are flattened without relaxing output or receipt 
 test('reviewed patch script pin matches the source actually imported', async () => {
   assert.equal(sha(await fs.readFile(new URL('../../packaging/windows-pds/windows-paths.mjs', import.meta.url))), patchSha256);
 });
-const sourceFixture = process.env.MEMORY_PDS_PATH_FIXTURES;
+const sourceFixture = process.env.CODIFIX_PDS_PATH_FIXTURES;
 test('complete pinned copy changes exactly two PDS files and leaves baseline untouched', { skip: !sourceFixture }, async () => fixture(async root => {
   const source = path.join(root, 'baseline'), destination = path.join(root, 'patched');
   const files = [await put(source, 'package.json', '{"version":"synthetic-wrapper"}')];

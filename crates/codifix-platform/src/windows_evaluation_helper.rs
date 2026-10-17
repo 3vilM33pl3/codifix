@@ -586,7 +586,7 @@ mod tests {
     }
     #[test]
     fn native_outer_job_fixture_process() {
-        match std::env::var("MEMORY_OUTER_JOB_FIXTURE").as_deref() {
+        match std::env::var("CODIFIX_OUTER_JOB_FIXTURE").as_deref() {
             Ok("root") => {
                 let status = std::process::Command::new(std::env::current_exe().unwrap())
                     .args([
@@ -595,14 +595,14 @@ mod tests {
                         "--nocapture",
                     ])
                     .env_clear()
-                    .env("MEMORY_OUTER_JOB_FIXTURE", "leaf")
-                    .env("MEMORY_OUTER_JOB_CALLER", std::process::id().to_string())
+                    .env("CODIFIX_OUTER_JOB_FIXTURE", "leaf")
+                    .env("CODIFIX_OUTER_JOB_CALLER", std::process::id().to_string())
                     .status()
                     .unwrap();
                 assert!(status.success());
             }
             Ok("leaf") => {
-                let caller = std::env::var("MEMORY_OUTER_JOB_CALLER")
+                let caller = std::env::var("CODIFIX_OUTER_JOB_CALLER")
                     .unwrap()
                     .parse()
                     .unwrap();
@@ -633,7 +633,7 @@ mod tests {
                 "--nocapture".into(),
             ],
             &base,
-            &[("MEMORY_OUTER_JOB_FIXTURE".into(), "root".into())],
+            &[("CODIFIX_OUTER_JOB_FIXTURE".into(), "root".into())],
             &stdout,
             &stderr,
         )

@@ -227,11 +227,11 @@ Docker/kernel/host administrators remain trusted; this is not a VM boundary.
 
 Pure validation tests require Node only; the live test is explicitly skipped
 unless an image is supplied. A required live gate must also set
-`MEMORY_R3_REQUIRE_CONTAINER=1`, which rejects missing image configuration.
+`CODIFIX_R3_REQUIRE_CONTAINER=1`, which rejects missing image configuration.
 
 ```bash
-MEMORY_R3_REQUIRE_CONTAINER=1 \
-MEMORY_R3_TEST_IMAGE=sha256:ae7d65bc9a8e0747b9d1a2e8aa8da051e1bb65dda859064657307c355e3dbdc7 \
+CODIFIX_R3_REQUIRE_CONTAINER=1 \
+CODIFIX_R3_TEST_IMAGE=sha256:ae7d65bc9a8e0747b9d1a2e8aa8da051e1bb65dda859064657307c355e3dbdc7 \
 node --test evals/r3/isolation/container.test.mjs
 ```
 
@@ -294,7 +294,7 @@ images. It copies no checkout, host configuration or assistant. Build with:
 ```bash
 docker build --network=none -f evals/r3/isolation/Dockerfile.rust -t memory-r3-rust:offline evals/r3/isolation
 r3_rust_image=$(docker image inspect --format '{{.Id}}' memory-r3-rust:offline)
-MEMORY_R3_RUST_IMAGE="$r3_rust_image" MEMORY_R3_REQUIRE_RUST=1 \
+CODIFIX_R3_RUST_IMAGE="$r3_rust_image" CODIFIX_R3_REQUIRE_RUST=1 \
   node --test evals/r3/isolation/rust.test.mjs
 ```
 
@@ -326,7 +326,7 @@ This provides black-box executable testing, not general Cargo unit-test support.
 Run all component tests with the same explicitly required image configuration:
 
 ```bash
-MEMORY_R3_REQUIRE_CONTAINER=1 \
-MEMORY_R3_TEST_IMAGE=sha256:ae7d65bc9a8e0747b9d1a2e8aa8da051e1bb65dda859064657307c355e3dbdc7 \
+CODIFIX_R3_REQUIRE_CONTAINER=1 \
+CODIFIX_R3_TEST_IMAGE=sha256:ae7d65bc9a8e0747b9d1a2e8aa8da051e1bb65dda859064657307c355e3dbdc7 \
 node --test evals/r3/isolation/*.test.mjs
 ```

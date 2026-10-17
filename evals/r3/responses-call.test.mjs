@@ -10,8 +10,8 @@ import { openRequestMediator } from './request-mediator.mjs';
 import { createResponsesPreparation } from './responses-call.mjs';
 import { createProviderTransport } from './provider-transport.mjs';
 import { dispatchModel } from './isolation/model-dispatch.mjs';
-const binary = process.env.MEMORY_R3_BUDGET_BIN;
-if (process.env.MEMORY_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
+const binary = process.env.CODIFIX_R3_BUDGET_BIN;
+if (process.env.CODIFIX_R3_REQUIRE_MEDIATOR === '1' && !binary) throw Error('required budget binary missing');
 const model = { provider: 'openai', resolved_id: 'synthetic-model-v1', reasoning: 'high', embedding_id: 'fake',
   max_input_tokens: 100, max_output_tokens: 20, input_microusd_per_million: 2000000,
   output_microusd_per_million: 4000000, cached_input_microusd_per_million: 500000 };

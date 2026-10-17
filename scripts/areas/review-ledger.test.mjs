@@ -216,7 +216,7 @@ test('SQL exports complete hashes but not raw support bodies; selectors cannot a
 });
 
 test('generated v2 projections and cross-project relations pass the independent Rust verifier', {
-  skip: process.env.MEMORY_AREA_TEST_RUST !== '1', timeout: 120_000,
+  skip: process.env.CODIFIX_AREA_TEST_RUST !== '1', timeout: 120_000,
 }, async t => {
   const root = await mkdtemp(join(tmpdir(), 'memory-ledger-rust-test-')); t.after(() => rm(root, { recursive: true, force: true }));
   const repo = fileURLToPath(new URL('../../', import.meta.url));

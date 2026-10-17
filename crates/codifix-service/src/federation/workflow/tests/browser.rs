@@ -7,7 +7,7 @@ use tokio::io::AsyncWriteExt;
 
 #[tokio::test]
 async fn f1_browser_collection_grants_and_queued_question() {
-    if std::env::var("MEMORY_FEDERATION_F1_BROWSER").as_deref() != Ok("1") {
+    if std::env::var("CODIFIX_FEDERATION_F1_BROWSER").as_deref() != Ok("1") {
         return;
     }
     let f = Fixture::with_expertise(true)
