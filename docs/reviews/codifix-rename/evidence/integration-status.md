@@ -33,7 +33,7 @@ still used the old tool name. That fixture was corrected. The final affected
 CLI/service/MCP/platform all-target rerun passed 665 tests across 9 targets,
 with 3 explicit ignores and no failures. The earlier unconstrained run
 exhausted the disposable PostgreSQL connection limit; no production database was
-involved. No remaining observed test failure is open.
+involved. No remaining observed local Rust test failure is open; hosted native gates are tracked separately below.
 
 Docs content (99 source files), local links, 16 image references, production docs
 build, architecture boundaries and five release asset-contract tests passed.
@@ -71,3 +71,24 @@ release status remain unchanged.
 CA SSH is deliberately disabled and must stay disabled. Its HTTPS health endpoint
 returned 200/ok; OpenBao TLS negotiation failed, leaving OpenBao health unverified.
 All host-local CA checks remain pending console results.
+
+
+## First hosted candidate attempt
+
+The branch at `95130a0cd029545efcb452bdd040ca0e3b20730a` was pushed and
+[run 39065798756](https://github.com/3vilM33pl3/memory/actions/runs/39065798756)
+was dispatched for `3.0.0-rc.1` with `publish=false`. Contract and source archive
+passed. Windows stopped before database startup because the release guard expected
+`codifix-windows-postgres-proof-v1`, while the shared manifest declared the old
+format. Commit `5b46abc5` aligns that manifest and both guest consumers, including
+the derived proof-result format. PostgreSQL/pgvector versions, URLs and upstream
+SHA-256 pins are unchanged. A regression checks the release guard against the
+actual shared manifest. Windows source validation now ran 72 tests with three
+native skips and no failures. Hosted Windows acceptance remains pending a new
+candidate run; the failed run cannot establish package acceptance.
+
+The private Monolith ledger records exact database/role/container/path mappings
+and bounded cold preparation commands. Its mappings still need instance-specific
+rehearsal and final client/privilege checks. Mac immutable runtime-journal rebinding
+is under separate review. Neither ledger preparation nor the six populated data
+rehearsals establishes the full operational cutover. No live cutover occurred.
