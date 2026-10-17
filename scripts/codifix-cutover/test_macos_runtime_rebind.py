@@ -205,6 +205,23 @@ class ColdRuntimeTests(unittest.TestCase):
     def assert_preserved(self):
         for path, contents in self.before.items():
             self.assertEqual(Path(path).read_bytes(), contents, path)
+    def test_legacy_role_check_parses_native_json_booleans(self):
+        payload = self.inspect()["payload"]
+        fixture_query = self.native.query
+        for present in (False, True):
+            def query(payload, database, statement, role="codifix_onboarding_admin"):
+                if database == "postgres" and "memory_onboarding_admin" in statement:
+                    self.assertIn("SELECT to_json(EXISTS", statement)
+                    output = "BEGIN\nSET\n" + json.dumps(present) + "\nROLLBACK\n"
+                    with patch.object(self.native, "sql", return_value=output):
+                        return rebind.Boundary.query(self.native, payload, database, statement, role)
+                return fixture_query(payload, database, statement, role)
+            with self.subTest(legacy_role_present=present), patch.object(self.native, "query", side_effect=query):
+                if present:
+                    with self.assertRaisesRegex(files.Refused, "old database role namespace remains"):
+                        self.native.database_identity(payload)
+                else:
+                    self.native.database_identity(payload)
     def test_populated_schema2_cold_bind_preserves_every_original_and_stays_inert(self):
         with patch.object(rebind.onboarding, "apply", side_effect=AssertionError("never apply")), \
              patch.object(rebind.onboarding.secrets, "token_hex", side_effect=AssertionError("never generate credentials")):
