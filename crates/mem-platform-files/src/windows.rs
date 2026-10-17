@@ -98,6 +98,32 @@ fn validate_path(path: &Path) -> io::Result<()> {
     Ok(())
 }
 
+// Raw Win32 creation calls do not receive Rust std's extended-length path
+// conversion. Rebuild only already-validated local drive paths; never turn a
+// relative, UNC, device, traversal or reserved-name path into an accepted one.
+fn creation_path(path: &Path) -> io::Result<Vec<u16>> {
+    validate_path(path)?;
+    let mut parts = path.components();
+    let drive = match parts.next() {
+        Some(Component::Prefix(prefix)) => match prefix.kind() {
+            Prefix::Disk(drive) | Prefix::VerbatimDisk(drive) => drive,
+            _ => return Err(denied()),
+        },
+        _ => return Err(denied()),
+    };
+    if parts.next() != Some(Component::RootDir) {
+        return Err(denied());
+    }
+    let mut extended = PathBuf::from(format!("\\\\?\\{}:\\", char::from(drive)));
+    for part in parts {
+        match part {
+            Component::Normal(name) => extended.push(name),
+            _ => return Err(denied()),
+        }
+    }
+    Ok(wide(extended.as_os_str()))
+}
+
 struct LocalAllocation(*mut c_void);
 impl Drop for LocalAllocation {
     fn drop(&mut self) {
@@ -747,7 +773,7 @@ pub fn create_private_directory(path: &Path) -> io::Result<()> {
         lpSecurityDescriptor: descriptor.0,
         bInheritHandle: 0,
     };
-    let path = wide(path.as_os_str());
+    let path = creation_path(path)?;
     // SAFETY: path and security buffers live for the synchronous creation call.
     if unsafe { CreateDirectoryW(path.as_ptr(), &attributes) } == 0 {
         return Err(io::Error::last_os_error());
@@ -777,7 +803,7 @@ fn create_file(path: &Path, lock: bool, existing: bool) -> io::Result<File> {
         lpSecurityDescriptor: descriptor.0,
         bInheritHandle: 0,
     };
-    let path = wide(path.as_os_str());
+    let path = creation_path(path)?;
     // SAFETY: path/security buffers live; CREATE_NEW cannot overwrite data.
     let raw = unsafe {
         CreateFileW(
@@ -967,6 +993,45 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         create_private_directory(&root.path().join("private")).unwrap();
         root
+    }
+
+    #[test]
+    fn creation_paths_extend_local_drives_without_accepting_other_namespaces() {
+        assert_eq!(
+            creation_path(Path::new(r"C:\private\file")).unwrap(),
+            creation_path(Path::new(r"\\?\C:\private\file")).unwrap()
+        );
+        for path in [
+            r"relative\file",
+            r"C:relative",
+            r"\\server\share\file",
+            r"\\.\pipe\name",
+            r"C:\private\..\other",
+            r"C:\private\NUL",
+            r"C:\private\file:stream",
+        ] {
+            assert!(creation_path(Path::new(path)).is_err(), "{path}");
+        }
+    }
+
+    #[test]
+    fn protected_creation_supports_paths_beyond_max_path() {
+        let root = private_root();
+        let mut directory = root.path().join("private");
+        while directory.as_os_str().encode_wide().count() <= 300 {
+            directory.push("reviewed-private-directory");
+            create_private_directory(&directory).unwrap();
+        }
+        let target = directory.join("long-owned-file.json");
+        let mut file = create_private_file(&target).unwrap();
+        file.write_all(b"synthetic").unwrap();
+        file.sync_all().unwrap();
+        drop(file);
+        assert_eq!(
+            Input::open(&target, 9).unwrap().read(9).unwrap(),
+            b"synthetic"
+        );
+        assert!(create_private_file(&target).is_err());
     }
 
     fn synthetic_service_acl(path: &Path, sid: &str, rights: &str) {

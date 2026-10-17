@@ -138,7 +138,9 @@ fn claude_preserves_all_other_values_and_generated_entry_is_secret_free() {
 }
 #[test]
 fn args_and_keys_bind_exact_agent_and_explicit_offline_choice() {
-    let mut i = inputs(PathBuf::from("/project"), CompanyAgentCaller::Codex);
+    let root = std::env::temp_dir();
+    let mut i = inputs(root.join("project"), CompanyAgentCaller::Codex);
+    i.command = root.join("memory.exe").to_str().unwrap().to_owned();
     let a = arguments(&i).unwrap();
     assert_eq!(&a[..3], ["projects", "agents", "mcp"]);
     assert_eq!(a.len(), 9);
