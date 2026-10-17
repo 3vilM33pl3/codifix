@@ -2,7 +2,8 @@
 # Required-database tests against the existing disposable native PG17 cluster.
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][string]$SourceRoot,
-      [Parameter(Mandatory=$true)][guid]$OperationId)
+      [Parameter(Mandatory=$true)][guid]$OperationId,
+      [ValidateSet('Area','Service')][string]$Scope='Area')
 $ErrorActionPreference='Stop'
 if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB' -or
     $OperationId -eq [guid]::Empty -or $SourceRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+$') { throw 'Explicit disposable native database source required' }
@@ -19,7 +20,8 @@ $head=(& $git -C $SourceRoot rev-parse HEAD)
 if ($LASTEXITCODE -or $head -cnotmatch '^[0-9a-f]{40}$') { throw 'Committed source required' }
 $changes=(& $git -C $SourceRoot status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -or $changes) { throw 'Clean database test source required' }
-$root=Join-Path 'C:\MemoryLab\runs' ($OperationId.ToString()+'\native-db')
+$label=if ($Scope -eq 'Service') { 'native-service-db' } else { 'native-db' }
+$root=Join-Path 'C:\MemoryLab\runs' ($OperationId.ToString()+'\'+$label)
 if (Test-Path -LiteralPath $root) { throw 'Retain existing database test evidence; use a new operation identity' }
 New-Item -ItemType Directory -Path $root | Out-Null
 $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -31,7 +33,7 @@ $compiler=(& $rustc -vV)
 if ($LASTEXITCODE -or ($compiler -join "`n") -notmatch '(?m)^host: x86_64-pc-windows-msvc\r?$') { throw 'Native MSVC compiler required' }
 $lock=Join-Path $SourceRoot 'Cargo.lock'; $lockHash=(Get-FileHash -LiteralPath $lock).Hash.ToLowerInvariant()
 $receipt=[ordered]@{format='memory-native-database-tests-v1';source_commit=$head;lock_sha256=$lockHash;compiler=($compiler -join "`n")
-    state='running';required_database=$true;native_database='PostgreSQL17/127.0.0.1:55471';scope='area-ops/area-store';workflow_verified=$false}
+    state='running';required_database=$true;native_database='PostgreSQL17/127.0.0.1:55471';scope=$Scope;workflow_verified=$false}
 $result=Join-Path $root 'result.json'; $receipt | ConvertTo-Json | Set-Content -LiteralPath $result -Encoding UTF8
 $secret=ConvertTo-SecureString (Get-Content -LiteralPath (Join-Path $pg 'test-password.dpapi') -Raw).Trim()
 $pointer=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
@@ -47,7 +49,9 @@ try {
     $env:CARGO_TARGET_DIR='C:\MemoryLab\build\product-msvc'
     $env:CARGO_BUILD_TARGET='x86_64-pc-windows-msvc'; $env:CARGO_BUILD_JOBS='2'
     $env:PATH=(Split-Path -Parent $cargo)+';'+$env:PATH
-    $process=Start-Process -FilePath $cargo -ArgumentList @('test','--locked','-p','mem-area-ops','-p','mem-area-store','--all-targets','--','--test-threads=1') -NoNewWindow -PassThru `
+    $arguments=if ($Scope -eq 'Service') { @('test','--locked','-p','mem-service','--lib','--','--test-threads=1') }
+        else { @('test','--locked','-p','mem-area-ops','-p','mem-area-store','--all-targets','--','--test-threads=1') }
+    $process=Start-Process -FilePath $cargo -ArgumentList $arguments -NoNewWindow -PassThru `
         -RedirectStandardOutput (Join-Path $root 'cargo.stdout.log') -RedirectStandardError (Join-Path $root 'cargo.stderr.log')
     $null=$process.Handle
     if (-not $process.WaitForExit(7200000)) {

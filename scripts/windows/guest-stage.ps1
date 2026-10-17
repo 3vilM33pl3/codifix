@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Start','Status','Execute')][string]$Action = 'Status',
-    [ValidateSet('BuildTools','PostgresPrepare','PostgresStart','PdsPrepare','PdsVerify','PiBuild','ProductCheck','ProductBuild','NativeDb','NativeApi','NativeEval')][string]$Stage = 'BuildTools',
+    [ValidateSet('BuildTools','PostgresPrepare','PostgresStart','PdsPrepare','PdsVerify','PiBuild','ProductCheck','ProductBuild','NativeDb','NativeServiceDb','NativeApi','NativeEval')][string]$Stage = 'BuildTools',
     [Parameter(Mandatory=$true)][guid]$OperationId,
     [string]$SourceRoot
 )
@@ -24,7 +24,7 @@ function Get-BoundFiles([string]$SelectedStage) {
         'PdsVerify' { @('guest-pds-stdio.ps1') }
         'PiBuild' { @('guest-native-pi.ps1','native-pi.json') }
         { $_ -in @('ProductCheck','ProductBuild') } { @('guest-native-product.ps1') }
-        'NativeDb' { @('guest-native-db.ps1') }
+        { $_ -in @('NativeDb','NativeServiceDb') } { @('guest-native-db.ps1') }
         'NativeEval' { @('guest-native-eval.ps1','guest-evaluation-proof.mjs','evaluation-helper.exe','r3_score.exe') }
         'NativeApi' {
             @('guest-native-api.ps1','native-api.json')
@@ -95,7 +95,7 @@ if ($Action -eq 'Start') {
     $actionSpec = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument $arguments
     # Product/API checks model an ordinary interactive user, not an elevated
     # installer. Only explicitly selected installer/dependency stages elevate.
-    $runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','ProductBuild','NativeDb','PdsVerify','NativeEval')) { 'Limited' } else { 'Highest' }
+    $runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','ProductBuild','NativeDb','NativeServiceDb','PdsVerify','NativeEval')) { 'Limited' } else { 'Highest' }
     $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel $runLevel
     $limit = if ($Stage -eq 'NativeApi') { New-TimeSpan -Minutes 20 } else { New-TimeSpan -Hours 3 }
     $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit $limit -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
@@ -124,7 +124,7 @@ foreach ($file in $inputRecord.files) {
 # repeated attempts of each family and all shared dependency mutations.
 $mutexName = switch ($Stage) {
     'PiBuild' { 'Local\MemoryLab-NativePiBuild' }
-    { $_ -in @('ProductCheck','ProductBuild','NativeDb') } { 'Local\MemoryLab-NativeProductBuild' }
+    { $_ -in @('ProductCheck','ProductBuild','NativeDb','NativeServiceDb') } { 'Local\MemoryLab-NativeProductBuild' }
     default { 'Local\MemoryLab-NativeBuildStage' }
 }
 $mutex = [Threading.Mutex]::new($false, $mutexName)
@@ -160,9 +160,10 @@ try {
                 $productAction=if ($Stage -eq 'ProductBuild') { 'Build' } else { 'Check' }
                 & (Join-Path $inputs 'guest-native-product.ps1') -SourceRoot $SourceRoot -OperationId $OperationId -Action $productAction
             }
-            'NativeDb' {
+            { $_ -in @('NativeDb','NativeServiceDb') } {
                 if (-not $SourceRoot) { throw 'Copied lab source is required' }
-                & (Join-Path $inputs 'guest-native-db.ps1') -SourceRoot $SourceRoot -OperationId $OperationId
+                $scope=if ($Stage -eq 'NativeServiceDb') { 'Service' } else { 'Area' }
+                & (Join-Path $inputs 'guest-native-db.ps1') -SourceRoot $SourceRoot -OperationId $OperationId -Scope $scope
             }
             'NativeEval' {
                 if (-not $SourceRoot) { throw 'Copied lab source is required' }

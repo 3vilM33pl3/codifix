@@ -92,7 +92,7 @@ class BuildToolsManifestTests(unittest.TestCase):
     def test_native_build_families_are_separate_but_each_is_serialized(self):
         script = (Path(__file__).parent / 'guest-stage.ps1').read_text()
         for required in ["'PiBuild' { 'Local\\MemoryLab-NativePiBuild' }",
-                         "{ $_ -in @('ProductCheck','ProductBuild','NativeDb') } { 'Local\\MemoryLab-NativeProductBuild' }",
+                         "{ $_ -in @('ProductCheck','ProductBuild','NativeDb','NativeServiceDb') } { 'Local\\MemoryLab-NativeProductBuild' }",
                          "default { 'Local\\MemoryLab-NativeBuildStage' }",'$mutex.WaitOne(0)']:
             self.assertIn(required,script)
 
@@ -145,7 +145,7 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn('Queued native proof file inventory changed', stage)
         self.assertIn('New-TimeSpan -Minutes 20', stage)
         self.assertIn('-LogonType Interactive', stage)
-        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','ProductBuild','NativeDb','PdsVerify','NativeEval')) { 'Limited' } else { 'Highest' }",stage)
+        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','ProductBuild','NativeDb','NativeServiceDb','PdsVerify','NativeEval')) { 'Limited' } else { 'Highest' }",stage)
         self.assertIn('-LogonType Interactive -RunLevel $runLevel',stage)
         script = (root / 'guest-native-api.ps1').read_text()
         for required in ['memory-windows-native-api-v1', 'Get-FileHash',

@@ -89,7 +89,7 @@ class GuestAgentTests(unittest.TestCase):
 
     def test_source_build_stages_are_limited_and_reject_missing_source(self):
         operation='11111111-1111-4111-8111-111111111111'
-        for stage in ['PiBuild','ProductCheck','ProductBuild','NativeDb','NativeEval']:
+        for stage in ['PiBuild','ProductCheck','ProductBuild','NativeDb','NativeServiceDb','NativeEval']:
             with self.subTest(stage=stage),patch.object(vm,'guest_exec',return_value={'pid':42}) as execute:
                 result=vm.guest_stage_start(Path('/unused'),stage,operation,r'C:\MemoryLab\source\reviewed-v1')
                 outer=base64.b64decode(execute.call_args.args[2][-1]).decode('utf-16-le')
