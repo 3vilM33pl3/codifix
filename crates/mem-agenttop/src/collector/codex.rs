@@ -552,6 +552,13 @@ pub fn collect_lightweight_sessions(
         .unwrap_or_default()
         .join(".codex")
         .join("sessions");
+    collect_lightweight_sessions_in(process_info, &sessions_dir)
+}
+
+fn collect_lightweight_sessions_in(
+    process_info: &HashMap<u32, ProcInfo>,
+    sessions_dir: &Path,
+) -> Vec<LightweightAgentSession> {
     if !sessions_dir.exists() {
         return Vec::new();
     }
@@ -643,7 +650,7 @@ pub fn collect_lightweight_sessions(
             .filter(|(_, info)| is_desktop_host(info))
             .map(|(pid, _)| *pid)
             .collect();
-        for (pid, observation) in windows::observed_rollouts(&desktop_pids, &sessions_dir) {
+        for (pid, observation) in windows::observed_rollouts(&desktop_pids, sessions_dir) {
             for path in &observation.paths {
                 if !observation.is_live() {
                     break;
@@ -1233,6 +1240,9 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn desktop_discovers_multiple_open_sessions_without_scanning_closed_history() {
+        // Hosted runners need not have a real Codex installation. Keep its
+        // discovery prerequisite local to this test, without changing HOME.
+        let sessions_dir = tempfile::tempdir().unwrap();
         let mut first = tempfile::Builder::new()
             .prefix("rollout-")
             .suffix(".jsonl")
@@ -1263,7 +1273,11 @@ mod tests {
                 command: "/usr/bin/codex app-server".to_string(),
             },
         )]);
-        let sessions = collect_lightweight_sessions(&processes);
+        assert!(
+            collect_lightweight_sessions_in(&processes, &sessions_dir.path().join("absent"))
+                .is_empty()
+        );
+        let sessions = collect_lightweight_sessions_in(&processes, sessions_dir.path());
         for id in ["sess-123", "sess-456"] {
             let matching = sessions
                 .iter()
@@ -1276,7 +1290,7 @@ mod tests {
         assert!(sessions.iter().any(|s| s.cwd == "/home/user/other"));
         let path = second.into_temp_path();
         assert!(
-            !collect_lightweight_sessions(&processes)
+            !collect_lightweight_sessions_in(&processes, sessions_dir.path())
                 .iter()
                 .any(|s| s.session_id == "sess-456")
         );
