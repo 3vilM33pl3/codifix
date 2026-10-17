@@ -50,7 +50,10 @@ try {
     $env:CARGO_BUILD_TARGET='x86_64-pc-windows-msvc'; $env:CARGO_BUILD_JOBS='2'
     $env:PATH=(Split-Path -Parent $cargo)+';'+$env:PATH
     if ($Scope -eq 'Supervisor') {
-        $build=Start-Process -FilePath $cargo -ArgumentList @('build','--locked','-p','mem-supervisor-pi','--bin','memory-pi-sandbox') -NoNewWindow -PassThru `
+        # This is an explicitly diagnostic, synthetic rehearsal, never the
+        # production artifact/package. Default driver builds remain silent.
+        $receipt.diagnostic_driver=$true
+        $build=Start-Process -FilePath $cargo -ArgumentList @('build','--locked','-p','mem-supervisor-pi','--bin','memory-pi-sandbox','--features','windows-native-diagnostics') -NoNewWindow -PassThru `
             -RedirectStandardOutput (Join-Path $root 'build.stdout.log') -RedirectStandardError (Join-Path $root 'build.stderr.log')
         $null=$build.Handle
         if (-not $build.WaitForExit(1800000)) { & "$env:SystemRoot\System32\taskkill.exe" /PID $build.Id /T /F | Out-Null; throw 'Owned supervisor build deadline' }
