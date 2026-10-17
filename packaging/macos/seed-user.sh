@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Invoked as the target user. Only create missing Memory-owned paths. Do not
+# Invoked as the target user. Only create missing Codifix-owned paths. Do not
 # chmod/chown existing data, follow relocated directories, or overwrite files.
 set -eu
 umask 077
@@ -13,10 +13,10 @@ for parent in "$USER_HOME" "$USER_HOME/Library" "$USER_HOME/Library/Application 
     exit 0
   fi
 done
-APP_SUPPORT="$USER_HOME/Library/Application Support/memory-layer"
+APP_SUPPORT="$USER_HOME/Library/Application Support/codifix"
 if [[ -e "$APP_SUPPORT" || -L "$APP_SUPPORT" ]]; then
   if [[ ! -d "$APP_SUPPORT" || -L "$APP_SUPPORT" || ! -w "$APP_SUPPORT" ]]; then
-    echo "Existing Memory Application Support is not writable; skipping defaults."
+    echo "Existing Codifix Application Support is not writable; skipping defaults."
     exit 0
   fi
 else
@@ -27,15 +27,15 @@ for directory in log run; do
   if [[ ! -e "$path" && ! -L "$path" ]]; then mkdir "$path" || true; fi
 done
 
-CONFIG="$APP_SUPPORT/memory-layer.toml"
-if [[ ! -e "$CONFIG" && ! -L "$CONFIG" && -f "$SHARE/memory-layer.toml.example" ]]; then
+CONFIG="$APP_SUPPORT/codifix.toml"
+if [[ ! -e "$CONFIG" && ! -L "$CONFIG" && -f "$SHARE/codifix.toml.example" ]]; then
   # noclobber also protects an existing file/symlink appearing after the check.
-  (set -C; cat "$SHARE/memory-layer.toml.example" > "$CONFIG") || true
+  (set -C; cat "$SHARE/codifix.toml.example" > "$CONFIG") || true
 fi
-ENV_FILE="$APP_SUPPORT/memory-layer.env"
+ENV_FILE="$APP_SUPPORT/codifix.env"
 if [[ ! -e "$ENV_FILE" && ! -L "$ENV_FILE" ]]; then
   (set -C; printf '%s\n' \
-    '# Shared secrets and overrides for Memory Layer CLI and background services.' \
+    '# Shared secrets and overrides for Codifix CLI and background services.' \
     '# Optional legacy setup provisions the service token; installation does not.' \
     '# Example: OPENAI_API_KEY=replace-me' > "$ENV_FILE") || true
 fi

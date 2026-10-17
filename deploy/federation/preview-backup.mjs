@@ -43,17 +43,17 @@ export function validate(c) {
   check(c.schema_version === 1 && /^[A-F0-9]{40}$/.test(c.recipient), 'invalid_contract');
   for (const p of [c.base, c.directory, c.nas_directory]) check(path.isAbsolute(p) && path.normalize(p) === p && p !== '/', 'absolute_paths_required');
   check(path.dirname(c.directory) === c.base && /^dependable-backup-[a-z0-9-]+$/.test(path.basename(c.directory)), 'dedicated_backup_required');
-  check(c.worker === 'memory-workshop-question-worker.service', 'unexpected_worker');
-  check(c.maintenance_worker === undefined || c.maintenance_worker === 'memory-pds-refresh-only.service', 'unexpected_maintenance_worker');
+  check(c.worker === 'codifix-workshop-question-worker.service', 'unexpected_worker');
+  check(c.maintenance_worker === undefined || c.maintenance_worker === 'codifix-pds-refresh-only.service', 'unexpected_maintenance_worker');
   check(Array.isArray(c.writers) && c.writers.length === 4 && Array.isArray(c.databases) && c.databases.length === 3, 'exact_preview_topology_required');
   const ids = new Set();
   for (const [index, container] of [...c.writers, ...c.databases].entries()) {
     exactKeys(container, index < 4 ? ['id', 'name'] : ['id', 'name', 'user', 'database', 'label']);
-    check(/^[a-f0-9]{64}$/.test(container.id) && !ids.has(container.id) && /^memory-(?:workshop-preview-|homelab-preview-|company-)/.test(container.name), 'invalid_preview_container'); ids.add(container.id);
+    check(/^[a-f0-9]{64}$/.test(container.id) && !ids.has(container.id) && /^codifix-(?:workshop-preview-|homelab-preview-|company-)/.test(container.name), 'invalid_preview_container'); ids.add(container.id);
     if (index >= 4) check(['workshop', 'homelab', 'gateway'].includes(container.label) && /^[a-z_][a-z_0-9]*$/.test(container.user) && /^[a-z_][a-z_0-9]*$/.test(container.database), 'invalid_database');
   }
   check(new Set(c.databases.map(d => d.label)).size === 3, 'duplicate_database_label');
-  check(Array.isArray(c.archive_paths) && c.archive_paths.length > 0 && c.archive_paths.every(p => typeof p === 'string' && /^(memory-company-20260919|memory-workshop-preview-20260918|memory-homelab-preview-20260919)\//.test(p) && !p.split('/').some(s => ['', '.', '..'].includes(s))), 'invalid_archive_path');
+  check(Array.isArray(c.archive_paths) && c.archive_paths.length > 0 && c.archive_paths.every(p => typeof p === 'string' && /^(codifix-company-20260919|codifix-workshop-preview-20260918|codifix-homelab-preview-20260919)\//.test(p) && !p.split('/').some(s => ['', '.', '..'].includes(s))), 'invalid_archive_path');
   return c;
 }
 function nas(c) {
@@ -102,7 +102,7 @@ export async function execute(c, phase, approval, effects = {}) {
       for (const container of [...c.writers, ...c.databases]) check(io.inspect(container).State.Running, 'preview_not_running');
       const worker = io.run('systemctl', ['--user', 'show', '-p', 'ActiveState', '--value', c.worker]).trim();
       check(['active', 'inactive', 'failed'].includes(worker), 'worker_transition_in_progress');
-      const maintenance = io.run('systemctl', ['--user', 'show', '-p', 'ActiveState', '--value', 'memory-pds-refresh-only.service']).trim();
+      const maintenance = io.run('systemctl', ['--user', 'show', '-p', 'ActiveState', '--value', 'codifix-pds-refresh-only.service']).trim();
       check(['active', 'inactive', 'failed'].includes(maintenance), 'maintenance_state_unavailable');
       check(maintenance !== 'active' || c.maintenance_worker, 'active_maintenance_must_be_explicitly_quiesced');
       fs.mkdirSync(c.directory, { mode: 0o700 });

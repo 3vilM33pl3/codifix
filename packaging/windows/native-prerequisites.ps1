@@ -19,16 +19,16 @@ try {
     # Require operator-protected input directories, and retain their handles
     # through validation/copy. Existing runtime/instance directories are never
     # treated as download caches or overwritten.
-    $manifestGuard = [MemoryLayer.ProtectedRelease]::OpenFile($ManifestPath)
+    $manifestGuard = [Codifix.ProtectedRelease]::OpenFile($ManifestPath)
     $manifestLength=(Get-Item -LiteralPath $ManifestPath).Length
     if ($manifestLength -gt 32MB) { throw 'Prerequisite manifest too large' }
     if ((Get-FileHash -LiteralPath $ManifestPath).Hash.ToLowerInvariant() -cne $ManifestSha256) { throw 'Prerequisite manifest differs from reviewed digest' }
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
     $plan = Get-NativePrerequisitePlan $manifest
     Assert-NativeRuntimeManifestSize $manifestLength $plan.kind
-    $treeEntryLimit=if($plan.kind -ceq 'memory-native-pds-runtime'){100000}else{40000}
-    $extendedPaths=$plan.kind -ceq 'memory-native-pds-runtime'
-    $packageGuard = [MemoryLayer.ProtectedRelease]::OpenFile($PackagePath)
+    $treeEntryLimit=if($plan.kind -ceq 'codifix-native-pds-runtime'){100000}else{40000}
+    $extendedPaths=$plan.kind -ceq 'codifix-native-pds-runtime'
+    $packageGuard = [Codifix.ProtectedRelease]::OpenFile($PackagePath)
     try {
         $package = [IO.File]::Open($PackagePath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
         if ($package.Length -gt 2GB) { throw 'Prerequisite ZIP too large' }
@@ -37,7 +37,7 @@ try {
         if ($hash -cne $plan.package_sha256) { throw 'Prerequisite package differs from manifest' }
         $package.Position = 0
         $identity = Get-NativeRuntimeIdentity $plan $ManifestSha256
-        $root = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Memory Layer\runtimes'
+        $root = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Codifix\runtimes'
         $release = Join-Path $root $identity
         $binding = [ordered]@{ schema_version=1; manifest_sha256=$ManifestSha256; plan=$plan; destination=$release }
         $digest = Get-NativeInputDigest $binding
@@ -63,7 +63,7 @@ try {
             $stage = Join-Path $root ($identity + '.staging-' + $OperationId)
             if (Test-Path -LiteralPath $stage) {
                 # Preserve partial/rejected input, never merge into an old tree.
-                $old = [MemoryLayer.ProtectedRelease]::Open($stage,$treeEntryLimit); $old.Dispose()
+                $old = [Codifix.ProtectedRelease]::Open($stage,$treeEntryLimit); $old.Dispose()
                 [IO.Directory]::Move($stage,($stage + '.retained-' + [guid]::NewGuid()))
             }
             Set-NativePrivateDirectory $stage
@@ -75,7 +75,7 @@ try {
             $archive = [IO.Compression.ZipArchive]::new($package,[IO.Compression.ZipArchiveMode]::Read,$true)
             try {
                 $ioStage=if($extendedPaths){Get-NativeExtendedPath $stage}else{$stage}
-                $entryLimit=if($plan.kind -ceq 'memory-native-pds-runtime'){100000}else{30000}
+                $entryLimit=if($plan.kind -ceq 'codifix-native-pds-runtime'){100000}else{30000}
                 if ($archive.Entries.Count -gt $entryLimit) { throw 'Prerequisite archive too many entries' }
                 $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase); $total=[int64]0
                 foreach ($entry in $archive.Entries) {
@@ -99,11 +99,11 @@ try {
                     } finally { $source.Dispose(); $output.Dispose() }
                 }
             } finally { $archive.Dispose() }
-            $guard=[MemoryLayer.ProtectedRelease]::Open($stage,$treeEntryLimit)
+            $guard=[Codifix.ProtectedRelease]::Open($stage,$treeEntryLimit)
             try { Assert-NativePayload $stage $plan.payload_files -ExtendedPaths:$extendedPaths } finally { $guard.Dispose(); $guard=$null }
             [IO.Directory]::Move($stage,$release)
         }
-        $guard=[MemoryLayer.ProtectedRelease]::Open($release,$treeEntryLimit)
+        $guard=[Codifix.ProtectedRelease]::Open($release,$treeEntryLimit)
         Assert-NativePayload $release $plan.payload_files -ExtendedPaths:$extendedPaths
         $journal.phase='verified'; Write-NativeJournal $receipt $journal
         [pscustomobject]@{ phase='verified'; runtime=$release; receipt=$receipt; input_sha256=$digest; native_execution_verified=$false; native_stack_bundled=$false } | ConvertTo-Json

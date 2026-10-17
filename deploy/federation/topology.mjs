@@ -21,7 +21,7 @@ export function topology({ gatewayImage, pdsImage, postgresImage, proxyImage, ro
       doc.services[`${part}_db_${id}`]={image:postgresImage,environment:{POSTGRES_USER:'fixture_admin',POSTGRES_DB:'memory_isolation',POSTGRES_PASSWORD_FILE:'/run/secrets/password'},
         volumes:[`${id}_${part}_db:/var/lib/postgresql/data`,`${root}/${id}/${part}-db-password:/run/secrets/password:ro`],networks:[network],security_opt:['no-new-privileges:true']};
     }
-    // Replace only this process with an independently configured Memory instance
+    // Replace only this process with an independently configured Codifix instance
     // for deployment. It gets its own DB and member token, never gateway secrets.
     doc.services[`member_${id}`]={image:pdsImage,...hardening,user:String(uid),entrypoint:['node','/probe/probe.cjs'],
       volumes:[`${root}/${id}/member:/member:ro`,`${root}/probe.cjs:/probe/probe.cjs:ro`],networks:['members',`${id}_local`]};

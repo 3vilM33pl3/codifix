@@ -10,7 +10,7 @@ operation. Configuration files/directories must be owned by the operator and
 private (0600/0700); do not put credentials in command arguments.
 
 If refresh-only maintenance is active, include the optional exact field
-`"maintenance_worker": "memory-pds-refresh-only.service"`. This changes the
+`"maintenance_worker": "codifix-pds-refresh-only.service"`. This changes the
 review hash and explicitly allows stopping that unit before stopping the preview
 writers. An active maintainer without this opt-in rejects the backup before any
 shutdown. Other units are not accepted. Include the approved maintenance state

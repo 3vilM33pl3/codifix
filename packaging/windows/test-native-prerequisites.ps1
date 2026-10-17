@@ -14,7 +14,7 @@ $required=@('pgsql/bin/postgres.exe','pgsql/bin/initdb.exe','pgsql/bin/pg_ctl.ex
     'pgsql/lib/pg_trgm.dll','pgsql/share/extension/vector.control','pgsql/share/extension/vector--0.8.7.sql',
     'pgsql/share/extension/pgcrypto.control','pgsql/share/extension/pg_trgm.control',
     'notices/postgresql.txt','notices/vector.txt','notices/crt.txt')
-$manifest=[pscustomobject]@{schema_version=1;kind='memory-native-postgres-runtime';platform='windows-x86_64';postgres_version='17.11';pgvector_version='0.8.7';crt_version='14.44.35211';package_sha256=$hash
+$manifest=[pscustomobject]@{schema_version=1;kind='codifix-native-postgres-runtime';platform='windows-x86_64';postgres_version='17.11';pgvector_version='0.8.7';crt_version='14.44.35211';package_sha256=$hash
     payload_files=@($required | ForEach-Object { [pscustomobject]@{name=$_;sha256=$hash} })
     components=@(
         [pscustomobject]@{name='postgresql';version='17.11';source_sha256=$hash;license='PostgreSQL';notice_path='notices/postgresql.txt'},
@@ -72,7 +72,7 @@ foreach($required in @('Open(string root) { return Open(root, 40000); }',
 }
 foreach($name in @('native-prerequisites.ps1','native-prerequisites-functions.ps1')){
     $source=Get-Content -LiteralPath (Join-Path $PSScriptRoot $name) -Raw
-    foreach($required in @('::OpenFile($ManifestPath)',"`$treeEntryLimit=if(`$plan.kind -ceq 'memory-native-pds-runtime'){100000}else{40000}")){
+    foreach($required in @('::OpenFile($ManifestPath)',"`$treeEntryLimit=if(`$plan.kind -ceq 'codifix-native-pds-runtime'){100000}else{40000}")){
         if(-not $source.Contains($required)){throw 'Prerequisite guards must retain exact files and kind-scoped tree bounds'}
     }
 }

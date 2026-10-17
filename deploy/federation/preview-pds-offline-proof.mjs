@@ -51,7 +51,7 @@ async function proof() {
     assert.deepEqual(keys, expected.deliveries.map(delivery => publicationKey(delivery.envelope)).sort());
     for (const record of records) {
       const decoded = cborBytesToRecord(blocks.get(parseCid(record.cid)));
-      assert.equal(record.collection, 'dev.memory-layer.unspecced.publication');
+      assert.equal(record.collection, 'dev.codifix.unspecced.publication');
       assert.equal(decoded.$type, record.collection);
       const delivery = expected.deliveries.find(value => publicationKey(value.envelope) === record.rkey);
       assert.ok(delivery); assert.equal(canonical(decoded.delivery), canonical(delivery));
@@ -67,7 +67,7 @@ async function proof() {
       assert.equal(receipt.claims.space, expected.space); assert.equal(receipt.claims.authority, expected.authority);
       assert.deepEqual(receipt.claims.previous, previous);
       const trusted = expected.receipt_keys[receipt.claims.key_generation - 1]; assert.ok(trusted);
-      const message = Buffer.concat([Buffer.from('memory-private-gateway-attestation-v1\0'), Buffer.from(canonical(receipt.claims))]);
+      const message = Buffer.concat([Buffer.from('codifix-private-gateway-attestation-v1\0'), Buffer.from(canonical(receipt.claims))]);
       assert.equal(await verifySignature(trusted.public_key, message, Uint8Array.from(receipt.signature)), true);
       assert.equal(await verifySignature(trusted.public_key, Buffer.from(canonical(receipt.claims)), Uint8Array.from(receipt.signature)), false);
       previous = { algorithm: 'sha256', hex: hash(canonical(receipt)) };

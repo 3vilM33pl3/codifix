@@ -59,7 +59,7 @@ async function main() {
     const bytes = patchPdsFile(name, await fs.readFile(file));
     files.push({ name, file, bytes });
   }
-  const receipt = { format: 'memory-windows-pds-path-patch-v1', upstream_version: '0.5.27',
+  const receipt = { format: 'codifix-windows-pds-path-patch-v1', upstream_version: '0.5.27',
     layout: 'windows-sha256-did-paths-v1', patch_sha256: sha(await fs.readFile(process.argv[1])),
     linux_paths_unchanged: true, wire_identity_unchanged: true, files: [] };
   for (const { name, file, bytes } of files) {

@@ -17,7 +17,7 @@ function jwt(policy, scope, expires, serial = 0) {
     scope: `com.atproto.${scope}`, exp: Math.floor(expires / 1000), jti: String(serial) })}.syntheticSignature`;
 }
 async function fixture(t, options = {}) {
-  const directory = await mkdtemp('/tmp/memory-pds-refresh-'); await chmod(directory, 0o700);
+  const directory = await mkdtemp('/tmp/codifix-pds-refresh-'); await chmod(directory, 0o700);
   t.after(() => rm(directory, { recursive: true, force: true }));
   const state = join(directory, 'state'); const output = join(directory, 'access');
   await mkdir(state, { mode: 0o700 }); await mkdir(output, { mode: 0o700 });
@@ -28,7 +28,7 @@ async function fixture(t, options = {}) {
   }
   await writeFile(join(directory, 'ca.pem'), certificate, { mode: 0o600 });
   const did = { id: 'did:web:space.company.test', reviewed: 'synthetic public identity fixture' };
-  const policy = { schema_version: 1, purpose: 'memory-private-pds-refresh-only-v1', policy_id: 'fdb89f7c-1bdb-4d70-9722-54fca59262f1', image: PDS_IMAGE,
+  const policy = { schema_version: 1, purpose: 'codifix-private-pds-refresh-only-v1', policy_id: 'fdb89f7c-1bdb-4d70-9722-54fca59262f1', image: PDS_IMAGE,
     enrollment_identity_sha256: 'a'.repeat(64), repository: 'did:web:space.company.test', handle: 'space.company.test',
     pds_origin: 'https://pds.company.test', operator_origin: 'https://operator.company.test:8443', service_did: 'did:web:pds.company.test',
     signing_key: `did:key:z${'4'.repeat(45)}`, did_document_sha256: hash(`${canonical(did)}\n`),

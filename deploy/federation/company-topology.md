@@ -8,7 +8,7 @@ memberships, publication reviews or collection consent. The existing
 `topology.mjs` isolation fixture is unchanged; its passing tests do not establish
 that this new installation has passed a deployment rehearsal.
 
-The initial members are `workshop` (Memory development) and `homelab`. Each has a
+The initial members are `workshop` (Codifix development) and `homelab`. Each has a
 distinct application, database, data volume and TLS edge. The gateway has its own
 database and reaches the PDS only through a separate fixed-upstream TLS proxy.
 No participant shares another participant's application or database network.
@@ -50,8 +50,8 @@ import { companyTopology } from './deploy/federation/company-topology.mjs';
 
 const result = companyTopology({
   schemaVersion: 1,
-  name: 'memory-company',
-  root: '/srv/memory-company',
+  name: 'codifix-company',
+  root: '/srv/codifix-company',
   domain: 'memory.company.internal',
   // Supply actual reviewed fully qualified image@sha256:<64 hex> references.
   images: reviewedImageDigests, // exact keys: app, gateway, postgres, pds, proxy
@@ -86,9 +86,9 @@ entries, never a space membership or access to another area's collection.
    this topology at existing databases or copy a live volume without a reviewed
    migration procedure.
 2. Review and pin all five image digests. The app image must contain a compatible
-   full service build at `/usr/local/bin/memory` and Web assets at
-   `/opt/memory/web`; the gateway binary is
-   `/usr/local/bin/memory-federation-gateway`. The proxy image must contain
+   full service build at `/usr/local/bin/codifix` and Web assets at
+   `/opt/codifix/web`; the gateway binary is
+   `/usr/local/bin/codifix-federation-gateway`. The proxy image must contain
    `/usr/bin/caddy`. PostgreSQL must support the current migrations and pgvector.
    This module does not build, download, scan or attest these images.
 3. Verify each image works with its explicit non-root UID/GID, read-only root,

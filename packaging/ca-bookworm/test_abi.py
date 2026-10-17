@@ -193,7 +193,7 @@ class ClosureTests(unittest.TestCase):
         base = Path(self.temp.name)
         self.root = base / "sysroot"
         (self.root / "lib").mkdir(parents=True)
-        self.artifact = base / "memory"
+        self.artifact = base / "codifix"
         self.artifact.write_bytes(b"trusted-test-artifact")
         self.data = {self.artifact: metadata(
             artifact=True, needed=["libc.so.6", "libstdc++.so.6"],

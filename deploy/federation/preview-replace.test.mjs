@@ -9,7 +9,7 @@ import { artifactHash, execute, validate, validateBoundary } from './preview-rep
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const oldId = 'a'.repeat(64), newId = 'b'.repeat(64), imageId = `sha256:${'c'.repeat(64)}`;
-function fixture(t, kind = 'memory-company-20260919-gateway-1') {
+function fixture(t, kind = 'codifix-company-20260919-gateway-1') {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'replace-preview-test-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const artifact = path.join(directory, 'new-config'), receipt = path.join(directory, 'backup-receipt.json');
@@ -75,7 +75,7 @@ function fixture(t, kind = 'memory-company-20260919-gateway-1') {
 }
 
 test('all exact preview styles preserve private addresses and pin image bytes without credential argv', t => {
-  for (const name of ['memory-company-20260919-gateway-1', 'memory-company-20260919-gateway_edge-1', 'memory-workshop-preview-app-20260918', 'memory-homelab-preview-app-20260919']) {
+  for (const name of ['codifix-company-20260919-gateway-1', 'codifix-company-20260919-gateway_edge-1', 'codifix-workshop-preview-app-20260918', 'codifix-homelab-preview-app-20260919']) {
     const { c, docker } = fixture(t, name); const review = execute(c, 'review', undefined, docker);
     assert.equal(review.image_id, imageId);
     const result = execute(c, 'replace', review.review, docker);
@@ -170,7 +170,7 @@ test('rc2 retained names remain narrowly scoped and bind the exact reviewed cont
 });
 
 test('Mac onboarding replacement has a distinct retained name and forbids post-start rollback', t => {
-  const { c, docker } = fixture(t, 'memory-homelab-preview-app-20260919');
+  const { c, docker } = fixture(t, 'codifix-homelab-preview-app-20260919');
   c.retained_name = `${c.name}-before-mac-onboarding-20261015`;
   const review = execute(c, 'review', undefined, docker);
   execute(c, 'replace', review.review, docker);
@@ -181,7 +181,7 @@ test('Mac onboarding replacement has a distinct retained name and forbids post-s
 });
 
 test('Mac project sync repair preserves the previous onboarding container and requires forward recovery', t => {
-  const { c, docker } = fixture(t, 'memory-workshop-preview-app-20260918');
+  const { c, docker } = fixture(t, 'codifix-workshop-preview-app-20260918');
   c.retained_name = `${c.name}-before-mac-project-sync-20261015`;
   const review = execute(c, 'review', undefined, docker);
   execute(c, 'replace', review.review, docker);

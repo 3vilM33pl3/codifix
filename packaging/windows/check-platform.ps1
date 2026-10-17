@@ -17,6 +17,6 @@ if ($env:OS -ne 'Windows_NT' -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
     throw 'This native smoke test requires Windows x64 (not WSL)'
 }
 # Early filesystem/platform coverage, not the full release acceptance gate.
-Invoke-Cargo -Arguments @('test', '-p', 'mem-platform-files', '-p', 'mem-platform', '--locked', '--all-targets')
-& cargo clippy -p mem-platform-files -p mem-platform --all-targets --locked --manifest-path (Join-Path $Root 'Cargo.toml') -- -D warnings
+Invoke-Cargo -Arguments @('test', '-p', 'codifix-platform-files', '-p', 'codifix-platform', '--locked', '--all-targets')
+& cargo clippy -p codifix-platform-files -p codifix-platform --all-targets --locked --manifest-path (Join-Path $Root 'Cargo.toml') -- -D warnings
 if ($LASTEXITCODE -ne 0) { throw 'Windows platform Clippy failed' }

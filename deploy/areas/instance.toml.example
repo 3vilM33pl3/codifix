@@ -5,8 +5,8 @@
 bind_addr = "127.0.0.1:4140" # REVIEW: unique loopback port on this host
 api_token = "" # REVIEW: independent, explicitly provisioned strong credential
 read_only = true
-# REVIEW: stage web assets from the same verified release alongside bin/memory.
-web_root = "/opt/memory-layer/instances/REVIEW/release/web"
+# REVIEW: stage web assets from the same verified release alongside bin/codifix.
+web_root = "/opt/codifix/instances/REVIEW/release/web"
 
 [database]
 url = "postgresql://REVIEW:REVIEW@127.0.0.1:5432/REVIEW"

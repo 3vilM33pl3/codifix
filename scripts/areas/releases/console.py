@@ -58,7 +58,7 @@ def privileged_bootstrap():
 
 
 privileged_bootstrap()
-SPEC = importlib.util.spec_from_file_location("memory_instance", Path(__file__).with_name("instance.py"))
+SPEC = importlib.util.spec_from_file_location("codifix_instance", Path(__file__).with_name("instance.py"))
 instance = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(instance)
 release = instance.release
@@ -172,14 +172,14 @@ def sync_directories(path):
 
 
 def staging_config(data, name, database):
-    """A narrow closed configuration, not an arbitrary Memory TOML validator."""
+    """A narrow closed configuration, not an arbitrary Codifix TOML validator."""
     try:
         value = tomllib.loads(data.decode("utf-8"))
         service = value["service"]
         require(set(service) == {"bind_addr", "api_token", "read_only", "web_root"},
                 "Unexpected staging service settings")
         require(service["read_only"] is True and
-                service["web_root"] == f"/opt/memory-layer/instances/{name}/release/web",
+                service["web_root"] == f"/opt/codifix/instances/{name}/release/web",
                 "Staging must be read-only and use the selected release Web root")
         require(isinstance(service["bind_addr"], str) and
                 re.fullmatch(r"127\.0\.0\.1:([1-9][0-9]{3,4})", service["bind_addr"]),
@@ -218,7 +218,7 @@ def staging_config(data, name, database):
 def native_header(prepared, report):
     architecture = {"aarch64": "arm64", "x86_64": "amd64"}.get(platform.machine())
     require(architecture == report["architecture"], "Release architecture does not match this host")
-    with release.open_regular(Path(prepared) / "release/bin/memory") as stream:
+    with release.open_regular(Path(prepared) / "release/bin/codifix") as stream:
         header = stream.read(64)
     require(len(header) == 64 and header[:6] == b"\x7fELF\x02\x01"
             and header[18:20] == (b"\xb7\x00" if architecture == "arm64" else b"\x3e\x00"),
@@ -226,7 +226,7 @@ def native_header(prepared, report):
 
 
 def check_systemd(name):
-    unit = f"memory-layer@{instance.instance_name(name)}.service"
+    unit = f"codifix@{instance.instance_name(name)}.service"
     fields = {"LoadState", "ActiveState", "SubState", "MainPID", "ControlPID", "Job",
               "Id", "Names", "FragmentPath", "DropInPaths", "Transient", "UnitFileState"}
     try:
@@ -251,13 +251,13 @@ def check_systemd(name):
             require(not values["FragmentPath"] and not values["UnitFileState"], "Unexpected missing-unit state")
         else:
             require(values["UnitFileState"] == "disabled" and values["FragmentPath"] in {
-                "/lib/systemd/system/memory-layer@.service", "/usr/lib/systemd/system/memory-layer@.service"},
+                "/lib/systemd/system/codifix@.service", "/usr/lib/systemd/system/codifix@.service"},
                 "First install requires the disabled reviewed template without overrides")
             # /lib may be Debian's root-owned usr-merge symlink. Resolve only
             # this fixed, allowlisted system file, not caller-controlled paths.
             fragment = Path(values["FragmentPath"]).resolve(strict=True)
-            require(str(fragment) in {"/lib/systemd/system/memory-layer@.service",
-                                      "/usr/lib/systemd/system/memory-layer@.service"},
+            require(str(fragment) in {"/lib/systemd/system/codifix@.service",
+                                      "/usr/lib/systemd/system/codifix@.service"},
                     "Unexpected systemd template location")
             require(checksum(protected_bytes(fragment, 16384, mode=0o644)) == UNIT_SHA256,
                     "Installed template differs from the reviewed activation-gated unit")
@@ -270,18 +270,18 @@ class Layout:
         # Library injection is for disposable tests. No corresponding CLI flag,
         # environment override or executable hook exists.
         self.root = root
-        self.release = root / "opt/memory-layer/instances"
+        self.release = root / "opt/codifix/instances"
         # A singleton's service-owned directories must never be ancestors of
         # root-trusted configuration or installer state. Named service state
         # lives under <name>/service in three separate systemd-managed roots.
-        self.config = root / "etc/memory-layer-instances"
-        self.journal = root / "var/lib/memory-layer-installations"
+        self.config = root / "etc/codifix-instances"
+        self.journal = root / "var/lib/codifix-installations"
         self.previous_state = [root / location for location in (
-            "var/lib/memory-layer-instances", "var/cache/memory-layer-instances", "run/memory-layer-instances")]
+            "var/lib/codifix-instances", "var/cache/codifix-instances", "run/codifix-instances")]
         self.legacy = [root / location for location in (
-            "etc/memory-layer/instances", "var/lib/memory-layer/instances",
-            "var/cache/memory-layer/instances", "run/memory-layer/instances",
-            "var/lib/memory-layer/installations")]
+            "etc/codifix/instances", "var/lib/codifix/instances",
+            "var/cache/codifix/instances", "run/codifix/instances",
+            "var/lib/codifix/installations")]
 
 
 def path_absent(path):
@@ -378,7 +378,7 @@ class Console:
     def events(self):
         all_names = os.listdir(self.root_fd)
         require(len(all_names) <= 512 and all(name in {"lock", "plan.json", "configuration.toml"}
-                or re.fullmatch(r"(?:\.pending-|memory-release-|trees-)[a-f0-9]{32}(?:\.json)?", name)
+                or re.fullmatch(r"(?:\.pending-|codifix-release-|trees-)[a-f0-9]{32}(?:\.json)?", name)
                 or re.fullmatch(r"event-[0-9]{4}\.json", name) for name in all_names),
                 "Unexpected or excessive installer journal entries")
         names = sorted(name for name in all_names if re.fullmatch(r"event-[0-9]{4}\.json", name))
@@ -411,7 +411,7 @@ class Console:
         self.plan = canonical_read(self.root / "plan.json")
         expected = {"format", "instance", "transaction", "snapshot", "signer", "schema_current_asserted",
                     "manifest_sha256", "config_sha256", "config_size", "database_name", "architecture"}
-        require(set(self.plan) == expected and self.plan["format"] == "memory-console-install-v1"
+        require(set(self.plan) == expected and self.plan["format"] == "codifix-console-install-v1"
                 and self.plan["instance"] == self.name and self.plan["signer"] == signer
                 and release.natural(self.plan["schema_current_asserted"])
                 and release.natural(self.plan["config_size"]) and self.plan["config_size"] <= CONFIG_LIMIT
@@ -420,7 +420,7 @@ class Console:
                 and re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]{0,62}", self.plan["database_name"])
                 and IDENTIFIER.fullmatch(self.plan["transaction"])
                 and isinstance(self.plan["snapshot"], str)
-                and re.fullmatch(r"memory-release-[a-f0-9]{32}", self.plan["snapshot"]), "Invalid installation plan")
+                and re.fullmatch(r"codifix-release-[a-f0-9]{32}", self.plan["snapshot"]), "Invalid installation plan")
         self.plan_digest = checksum(release.canonical(self.plan))
         self.snapshot = self.root / self.plan["snapshot"]
         os.close(trusted_directory(self.snapshot, private=True))
@@ -438,14 +438,14 @@ class Console:
         self.events()
 
     def inventory(self, role):
-        marker = release.canonical({"format": "memory-console-install-owner-v1", "plan_sha256": self.plan_digest})
-        values = {".memory-install.json": (marker, 0o600)}
+        marker = release.canonical({"format": "codifix-console-install-owner-v1", "plan_sha256": self.plan_digest})
+        values = {".codifix-install.json": (marker, 0o600)}
         if role == "release":
-            result = {"release/" + name: {**value, "mode": 0o755 if name == "bin/memory" else 0o644}
+            result = {"release/" + name: {**value, "mode": 0o755 if name == "bin/codifix" else 0o644}
                       for name, value in self.prepared["files"].items()}
         else:
-            values.update({"memory-layer.toml": (self.config, 0o600),
-                           "memory.sha256": ((self.prepared["files"]["bin/memory"]["sha256"] + "\n").encode(), 0o600)})
+            values.update({"codifix.toml": (self.config, 0o600),
+                           "codifix.sha256": ((self.prepared["files"]["bin/codifix"]["sha256"] + "\n").encode(), 0o600)})
             result = {}
         result.update({name: {"sha256": checksum(data), "size_bytes": len(data), "mode": mode}
                        for name, (data, mode) in values.items()})
@@ -628,7 +628,7 @@ class Console:
         self.append("installed", generation)
 
     def result(self, status):
-        return {"format": "memory-console-install-result-v1", "status": status, "instance": self.name,
+        return {"format": "codifix-console-install-result-v1", "status": status, "instance": self.name,
                 "transaction": self.plan["transaction"], "plan_sha256": self.plan_digest,
                 "manifest_sha256": self.plan["manifest_sha256"], "configuration_sha256": self.plan["config_sha256"],
                 "activation_authorized": False, "service_mutated": False, "database_contacted": False,
@@ -664,7 +664,7 @@ class Console:
         sync_directories(Path(copied["preparation_directory"]))
         os.fsync(self.root_fd)
         atomic_new(self.root_fd, "configuration.toml", config)
-        plan = {"format": "memory-console-install-v1", "instance": args.instance,
+        plan = {"format": "codifix-console-install-v1", "instance": args.instance,
             "transaction": secrets.token_hex(16), "snapshot": Path(copied["preparation_directory"]).name,
             "signer": args.trusted_signing_fingerprint, "schema_current_asserted": args.schema_current,
             "manifest_sha256": report["manifest_sha256"], "config_sha256": args.config_sha256,

@@ -14,7 +14,7 @@ children of the explicitly selected output parent; the operator chooses that
 parent, and privileged callers are not barred from choosing one under `/opt`
 or `/etc`.
 It does not prove host ABI compatibility, systemd enforcement, CA isolation or
-database rollback. Keep existing CA, OpenBao and Memory services untouched.
+database rollback. Keep existing CA, OpenBao and Codifix services untouched.
 
 For the subsequent, separately approved first installation, see
 [console.py](console-README.md). It reauthenticates the preparation under its
@@ -23,16 +23,16 @@ into proof of a live upgrade, native CA sandbox or database rollback.
 
 ## Release input contract
 
-The separately authenticated `memory-release-v1` manifest must list an `archive`
+The separately authenticated `codifix-release-v1` manifest must list an `archive`
 for the selected architecture. Its tar or gzip-tar contents are narrowly scoped:
 
 ```text
-bin/memory
+bin/codifix
 web/index.html
 web/assets/...
 ```
 
-Both the Memory binary and index must be nonempty. All remaining files belong
+Both the Codifix binary and index must be nonempty. All remaining files belong
 under `web/`. Directory entries are optional. Absolute paths, traversal,
 noncanonical paths, duplicate/case-colliding names, links, devices, sparse files,
 special permission bits and installer hooks are rejected. The tool imposes
@@ -56,16 +56,16 @@ These variable values are operator inputs, not defaults or deployment approval:
 
 ```bash
 python3 -I -S scripts/areas/releases/instance.py prepare \
-  --manifest "$MEMORY_RELEASE_INPUT/manifest.json" \
-  --signature "$MEMORY_RELEASE_INPUT/manifest.sig" \
-  --public-key "$MEMORY_RELEASE_INPUT/signing-public-key.asc" \
-  --trusted-signing-fingerprint "$MEMORY_RELEASE_SIGNER" \
+  --manifest "$CODIFIX_RELEASE_INPUT/manifest.json" \
+  --signature "$CODIFIX_RELEASE_INPUT/manifest.sig" \
+  --public-key "$CODIFIX_RELEASE_INPUT/signing-public-key.asc" \
+  --trusted-signing-fingerprint "$CODIFIX_RELEASE_SIGNER" \
   --architecture arm64 \
-  --schema-current "$MEMORY_OBSERVED_SCHEMA" \
-  --artifacts-dir "$MEMORY_RELEASE_INPUT" \
-  --staging-parent "$MEMORY_PRIVATE_STAGING_PARENT" \
+  --schema-current "$CODIFIX_OBSERVED_SCHEMA" \
+  --artifacts-dir "$CODIFIX_RELEASE_INPUT" \
+  --staging-parent "$CODIFIX_PRIVATE_STAGING_PARENT" \
   --instance trust \
-  --release-archive "$MEMORY_SIGNED_RELEASE_ARCHIVE_NAME"
+  --release-archive "$CODIFIX_SIGNED_RELEASE_ARCHIVE_NAME"
 ```
 
 The existing release verifier authenticates the manifest and copies all signed
@@ -77,7 +77,7 @@ The schema input is labeled `schema_current_asserted`, with
 `database_schema_verified: false`: this offline tool does not establish the
 actual database schema, even when the caller supplies a previously observed value.
 It contains an **unexecuted review plan** naming only
-`memory-layer@trust.service`, its concrete release path and digest-credential
+`codifix@trust.service`, its concrete release path and digest-credential
 path, with explicit stop/fence/switch/health/rollback gates.
 
 Success is `inactive_preparation_only`, with `installation_authorized: false`.
@@ -99,13 +99,13 @@ Trust/permission classifications remain visible and still need separate review.
 
 ```bash
 python3 -I -S scripts/areas/releases/instance.py rehearse \
-  --previous "$MEMORY_PREVIOUS_PREPARATION" \
-  --prepared "$MEMORY_CANDIDATE_PREPARATION" \
-  --previous-trusted-signing-fingerprint "$MEMORY_PREVIOUS_SIGNER" \
-  --trusted-signing-fingerprint "$MEMORY_RELEASE_SIGNER" \
-  --schema-current "$MEMORY_OBSERVED_SCHEMA" \
+  --previous "$CODIFIX_PREVIOUS_PREPARATION" \
+  --prepared "$CODIFIX_CANDIDATE_PREPARATION" \
+  --previous-trusted-signing-fingerprint "$CODIFIX_PREVIOUS_SIGNER" \
+  --trusted-signing-fingerprint "$CODIFIX_RELEASE_SIGNER" \
+  --schema-current "$CODIFIX_OBSERVED_SCHEMA" \
   --instance trust \
-  --output-parent "$MEMORY_PRIVATE_REHEARSAL_PARENT"
+  --output-parent "$CODIFIX_PRIVATE_REHEARSAL_PARENT"
 ```
 
 The tool reauthenticates both manifests, derives the expected inventory from

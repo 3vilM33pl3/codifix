@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Explicit, journaled native provisioning. No downloads, builds or legacy service control.
 
-Python 3.11+, installed reviewed Memory/PG/pgvector and native Mac acceptance are
+Python 3.11+, installed reviewed Codifix/PG/pgvector and native Mac acceptance are
 prerequisites, not silently satisfied by this operator. Tests use Native fakes.
 """
 import argparse
@@ -84,11 +84,11 @@ def metadata(value):
     for key in ["company", "project", "owner", "space"]:
         identifier(scope[key])
     if not isinstance(bootstrap["receipt_keys"], list) or not 1 <= len(bootstrap["receipt_keys"]) <= 16:
-        raise Refused("bounded owner receipt keys required (Memory validates cryptographic contents)")
+        raise Refused("bounded owner receipt keys required (Codifix validates cryptographic contents)")
 
 
 def make_plan(source, *, prerequisites_only=False):
-    exact(source, {"schema_version", "root", "memory", "postgres", "pg_port", "areas", "subscriptions"} | ({"curated_sync", "repositories"} if source.get("schema_version") == 2 else set()))
+    exact(source, {"schema_version", "root", "codifix", "postgres", "pg_port", "areas", "subscriptions"} | ({"curated_sync", "repositories"} if source.get("schema_version") == 2 else set()))
     if type(source["schema_version"]) is not int or source["schema_version"] not in {1, 2}:
         raise Refused("unsupported operator schema")
     if source["schema_version"] == 2:
@@ -110,10 +110,10 @@ def make_plan(source, *, prerequisites_only=False):
         raise Refused("operator data path cannot contain SQL quote characters")
     if not re.fullmatch("[A-Za-z0-9_-]{1,64}", root.name):
         raise Refused("new operator root needs a bounded ASCII name")
-    memory = source["memory"]
+    memory = source["codifix"]
     exact(memory, {"path", "sha256", "version"})
     if not isinstance(memory["version"], str) or not 1 <= len(memory["version"]) <= 128 or any(ord(c) < 32 for c in memory["version"]):
-        raise Refused("exact installed Memory version required")
+        raise Refused("exact installed Codifix version required")
     pins = [{"path": str(files.path(memory["path"])), "sha256": pin(memory["sha256"]), "kind": "mach-o"}]
     pg = source["postgres"]
     exact(pg, {"bin_dir", "major", "tool_sha256", "vector_library", "vector_library_sha256", "vector_control", "vector_control_sha256", "vector_version", "vector_sql"})
@@ -193,7 +193,7 @@ def inspect(journal):
     if rebuilt != value["plan"]:
         raise Refused("subscription/operator/prerequisite input changed; review a new plan, never overwrite")
     root = Path(value["plan"]["input"]["root"])
-    for file in [Path(journal), Path(str(journal) + ".memory-lock")]:
+    for file in [Path(journal), Path(str(journal) + ".codifix-lock")]:
         files.outside(file, root)
     return value
 
@@ -203,7 +203,7 @@ def prepare(source, journal, native):
     plan = make_plan(source)
     native.preflight(plan)
     journal = files.path(journal)
-    for file in [journal, Path(str(journal) + ".memory-lock")]:
+    for file in [journal, Path(str(journal) + ".codifix-lock")]:
         files.outside(file, Path(source["root"]))
     with files.Lock(journal):
         if journal.exists():
@@ -259,9 +259,9 @@ def plist(value, label, arguments, interval=None):
     if ".sync." in label:
         # macOS attributes a launchd agent's LAN access to this visible app.
         # It requests consent without ever reading device/server credentials.
-        job["AssociatedBundleIdentifiers"] = ["dev.memory-layer.network-access"]
-        for application in (Path("/Applications/Memory Network Access.app"), Path.home() / "Applications/Memory Network Access.app"):
-            helper = application / "Contents/MacOS/memory-network-access"
+        job["AssociatedBundleIdentifiers"] = ["dev.codifix.network-access"]
+        for application in (Path("/Applications/Codifix Network Access.app"), Path.home() / "Applications/Codifix Network Access.app"):
+            helper = application / "Contents/MacOS/codifix-network-access"
             if helper.is_file() and value["plan"]["input"]["schema_version"] == 2:
                 # Keep the granted, bundled app responsible for the child.
                 # Retain the complete verified run-sync wrapper under the app.
@@ -274,7 +274,7 @@ def plist(value, label, arguments, interval=None):
 
 
 def job(value, native, kind, identifier, arguments, interval=None):
-    label = f"com.memory-layer.onboarding.{value['request_id']}.{kind}.{identifier}"
+    label = f"dev.codifix.onboarding.{value['request_id']}.{kind}.{identifier}"
     directory = files.path(Path.home() / "Library/LaunchAgents")
     if not directory.exists():
         # Called only from confirmed apply. A clean Mac may not have any user
@@ -349,7 +349,7 @@ api_key_env = ""
 model = ""
 [cluster]
 enabled = false
-service_id = "memory-onboarding-{area['instance_id']}"
+service_id = "codifix-onboarding-{area['instance_id']}"
 [mcp]
 enabled = false
 http_enabled = false
@@ -376,7 +376,7 @@ def routing(value):
 
 
 def client_launcher(value):
-    command = [value["plan"]["input"]["memory"]["path"], "--area-routing", str(state_root(value) / "area-routing.json")]
+    command = [value["plan"]["input"]["codifix"]["path"], "--area-routing", str(state_root(value) / "area-routing.json")]
     return ("#!/bin/sh\nexec " + " ".join(shlex.quote(a) for a in command) + ' "$@"\n').encode()
 
 
@@ -404,7 +404,7 @@ def verify_files(value):
     secret = secrets_at(value)
     if value["plan"]["input"]["schema_version"] == 2 and files.read(root / "area-routing.json") != routing(value):
         raise Refused("selected repository routing changed; no fallback")
-    if value["plan"]["input"]["schema_version"] == 2 and files.bytes_at(root / "bin/memory") != client_launcher(value):
+    if value["plan"]["input"]["schema_version"] == 2 and files.bytes_at(root / "bin/codifix") != client_launcher(value):
         raise Refused("owned routed client changed; preserve and inspect")
     for area in value["plan"]["input"]["areas"]:
         if files.bytes_at(root / (area["name"] + ".toml")) != area_config(value, area, secret["areas"][area["name"]]):
@@ -462,8 +462,8 @@ def apply(journal, digest, confirm, native):
             if plan["input"]["schema_version"] == 2:
                 files.missing(root / "area-routing.json", files.encoded(routing(value)))
                 files.directory(root / "bin")
-                files.missing(root / "bin/memory", client_launcher(value))
-                (root / "bin/memory").chmod(0o700)
+                files.missing(root / "bin/codifix", client_launcher(value))
+                (root / "bin/codifix").chmod(0o700)
             for selection in plan["selections"]:
                 profile = local_profile(value, selection["metadata"], secret["areas"])
                 files.missing(root / "profiles" / (profile["subscription"] + ".json"), files.encoded(profile))
@@ -508,7 +508,7 @@ def apply(journal, digest, confirm, native):
         for selection in plan["selections"]:
             subscription = selection["metadata"]["subscription"]
             if plan["input"]["schema_version"] == 2:
-                stage(journal, value, "initial_sync:" + subscription, lambda: native.command([plan["input"]["memory"]["path"], "projects", "sync", "--profile", str(root / "profiles" / (subscription + ".json"))], timeout=120))
+                stage(journal, value, "initial_sync:" + subscription, lambda: native.command([plan["input"]["codifix"]["path"], "projects", "sync", "--profile", str(root / "profiles" / (subscription + ".json"))], timeout=120))
             interval = None if plan["input"]["schema_version"] == 2 else 300
             stage(journal, value, "sync_agent:" + subscription, lambda: job(value, native, "sync", subscription, wrapper(value, "run-sync", "--journal", str(journal), "--subscription", subscription), interval), always=True)
         if plan["input"]["schema_version"] == 2:
@@ -530,18 +530,18 @@ def run_job(journal, mode, selected, native):
     elif mode == "run-service":
         if selected not in {a["name"] for a in plan["input"]["areas"]}:
             raise Refused("area not in exact prepared plan")
-        args = [plan["input"]["memory"]["path"], "--config", str(root / (selected + ".toml")), "service", "run"]
+        args = [plan["input"]["codifix"]["path"], "--config", str(root / (selected + ".toml")), "service", "run"]
     elif mode == "run-watcher":
         if plan["input"]["schema_version"] != 2:
             raise Refused("legacy read-only onboarding cannot activate watchers")
         if not isinstance(selected, str) or not selected.isdigit() or int(selected) >= len(plan["input"]["repositories"]):
             raise Refused("watcher repository is not in exact selected plan")
         route = plan["input"]["repositories"][int(selected)]
-        args = [plan["input"]["memory"]["path"], "--config", str(root / (route["area"] + ".toml")), "watcher", "run", "--project", route["project"], "--repo-root", route["repository"]]
+        args = [plan["input"]["codifix"]["path"], "--config", str(root / (route["area"] + ".toml")), "watcher", "run", "--project", route["project"], "--repo-root", route["repository"]]
     else:
         if selected not in {s["metadata"]["subscription"] for s in plan["selections"]}:
             raise Refused("subscription not in exact prepared plan")
-        args = [plan["input"]["memory"]["path"], "projects", "sync", "--profile", str(root / "profiles" / (selected + ".json"))]
+        args = [plan["input"]["codifix"]["path"], "projects", "sync", "--profile", str(root / "profiles" / (selected + ".json"))]
         if plan["input"]["schema_version"] == 2:
             args.append("--watch")
     os.execve(args[0], args, clean_env())
@@ -564,7 +564,7 @@ def main():
     commands.add_parser("journey-status").add_argument("--journal", required=True, type=Path)
     first = commands.add_parser("first-run", help="sign in and select projects using a reviewed bundled runtime; no installer JSON needed")
     first.add_argument("--runtime", required=True, type=Path, help="exact installed runtime-prerequisites.json")
-    first.add_argument("--memory", type=Path, default=Path("/usr/local/bin/memory"))
+    first.add_argument("--codifix", type=Path, default=Path("/usr/local/bin/codifix"))
     first.add_argument("--company", required=True)
     first.add_argument("--name", required=True)
     first.add_argument("--state", required=True, type=Path, help="private new/resumable state outside repositories")
@@ -588,7 +588,7 @@ def main():
     try:
         if args.command == "first-run":
             import onboarding_first_run
-            onboarding_first_run.run(company=args.company, name=args.name, runtime=args.runtime, memory=args.memory,
+            onboarding_first_run.run(company=args.company, name=args.name, runtime=args.runtime, memory=args.codifix,
                 state=args.state, workspace_parent=args.workspace_parent, native=Native(), no_browser=args.no_browser,
                 allow_loopback=args.allow_loopback_development, pg_port=args.pg_port, api_base_port=args.api_base_port,
                 prepare_only=args.prepare_only, curated_sync=args.curated_sync)

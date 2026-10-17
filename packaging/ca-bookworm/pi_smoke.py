@@ -5,7 +5,7 @@
 Run only inside an independently configured network-none/read-only/non-root
 container. No Docker daemon, real credentials, model endpoint, or candidate path
 can be supplied here. The explicit SHA binds this disposable compatibility test;
-it never changes mem-supervisor-pi's production pins.
+it never changes codifix-supervisor-pi's production pins.
 """
 
 import argparse
@@ -91,7 +91,7 @@ def readonly_mount(path, mountinfo):
 
 
 def sandbox_check():
-    require(os.environ.get("MEMORY_PI_SANDBOXED_PROBE") ==
+    require(os.environ.get("CODIFIX_PI_SANDBOXED_PROBE") ==
             "network-none-read-only-root", "sandbox_marker_missing")
     require(os.geteuid() != 0, "root_forbidden")
     require(Path("/.dockerenv").is_file(), "container_marker_missing")
@@ -434,7 +434,7 @@ def main():
     parser.add_argument("--candidate-sha256", required=True,
                         help="Exact separately reviewed compatibility candidate hash; not a production pin")
     args = parser.parse_args()
-    report = {"schema": "memory.ca-bookworm.pi-smoke.v1", "limitation": LIMITATION,
+    report = {"schema": "codifix.ca-bookworm.pi-smoke.v1", "limitation": LIMITATION,
               "real_provider_calls": 0, "real_credentials": False,
               "production_pins_changed": False, "native_ca_sandbox_proven": False}
     try:

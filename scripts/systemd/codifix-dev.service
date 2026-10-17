@@ -1,0 +1,19 @@
+[Unit]
+Description=Codifix development service
+After=network.target
+ConditionFileIsExecutable=%h/Projects/codifix/target/debug/codifix
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Projects/codifix
+Environment=CODIFIX_PROFILE=dev
+UnsetEnvironment=CODIFIX_AREA CODIFIX_AREA_ROUTING CODIFIX_CONFIG CODIFIX_CLIENT_TOKEN
+ExecStart=%h/Projects/codifix/target/debug/codifix service run
+Restart=no
+KillMode=control-group
+TimeoutStopSec=30
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target

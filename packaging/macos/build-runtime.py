@@ -111,7 +111,7 @@ def smoke_postgres_extensions(pg, vector_version, env):
     required_postgres_extensions(pg)
     env = {key: value for key, value in env.items() if not key.startswith("PG")}
     # A short /private/tmp socket path avoids Darwin's Unix socket path limit.
-    with tempfile.TemporaryDirectory(prefix="memory-pg-probe-", dir="/private/tmp") as temporary:
+    with tempfile.TemporaryDirectory(prefix="codifix-pg-probe-", dir="/private/tmp") as temporary:
         probe = Path(temporary)
         data = probe / "data"
         run([pg / "bin/initdb", "-D", data, "-U", "memory_runtime_probe_admin", "--auth-local=trust", "--auth-host=reject", "--no-locale"], probe, env)
@@ -273,7 +273,7 @@ def produce(args):
                 raise ValueError("pgvector installation did not produce native files at the exact staged prefix")
         else:
             # This is an operator runtime, not a network Python distribution.
-            # Memory owns HTTPS. Do not autodiscover Homebrew OpenSSL or ship
+            # Codifix owns HTTPS. Do not autodiscover Homebrew OpenSSL or ship
             # extensions whose loader paths require a build-host installation.
             (source / "Modules/Setup.local").write_text("*disabled*\n_ssl\n_hashlib\n")
             run(["./configure", f"--prefix={prefix}/python", "--without-ensurepip", "--disable-test-modules"], source, env)

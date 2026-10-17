@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Native/elevated disposable test. Creates two temporary SCM virtual identities,
-# never existing Memory instances. Not evidence until run on Windows.
+# never existing Codifix instances. Not evidence until run on Windows.
 [CmdletBinding()]
 param([Parameter(Mandatory = $true)][string]$ServiceHostPath,
     [Parameter(Mandatory = $true)][string]$IsolationProbePath)
@@ -10,8 +10,8 @@ if ($env:OS -ne 'Windows_NT') { throw 'Native Windows required' }
 if (-not ([Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Elevated disposable VM test required' }
 . (Join-Path $PSScriptRoot 'native-instance-functions.ps1')
 $suffix = [guid]::NewGuid().ToString('N')
-$root = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) "MemoryLayer-layout-test-$suffix"
-$names = @("MemoryLayer-test-a-$suffix", "MemoryLayer-test-b-$suffix")
+$root = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) "Codifix-layout-test-$suffix"
+$names = @("Codifix-test-a-$suffix", "Codifix-test-b-$suffix")
 $sc = Join-Path $env:SystemRoot 'System32\sc.exe'
 $created = @()
 $passed = $false
@@ -19,8 +19,8 @@ function Invoke-TestSc([string[]]$Values) { $null = & $sc @Values; if ($LASTEXIT
 try {
     Set-NativePrivateDirectory $root -SharedAncestor
     foreach ($part in @('instances', 'configurations', 'bin')) { Set-NativePrivateDirectory (Join-Path $root $part) -SharedAncestor }
-    $hostPath = Join-Path $root 'bin\memory-windows-service.exe'
-    $probePath = Join-Path $root 'bin\memory-windows-isolation-probe.exe'
+    $hostPath = Join-Path $root 'bin\codifix-windows-service.exe'
+    $probePath = Join-Path $root 'bin\codifix-windows-isolation-probe.exe'
     Copy-Item -LiteralPath $ServiceHostPath -Destination $hostPath
     Copy-Item -LiteralPath $IsolationProbePath -Destination $probePath
     for ($index = 0; $index -lt 2; $index++) {

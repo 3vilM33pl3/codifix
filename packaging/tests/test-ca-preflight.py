@@ -33,9 +33,9 @@ class InventoryTests(unittest.TestCase):
             program = arguments[0]
             if scenario == "timeout":
                 raise subprocess.TimeoutExpired(arguments, 6, stderr=SECRET)
-            if program == "memory":
-                self.assertEqual(arguments, ["memory", "--version"])
-                output = SECRET if scenario == "malformed" else "memory 2.1.0-rc.1\n"
+            if program == "codifix":
+                self.assertEqual(arguments, ["codifix", "--version"])
+                output = SECRET if scenario == "malformed" else "codifix 3.0.0-rc.1\n"
             elif program == "systemctl":
                 if arguments == ["systemctl", "--version"]:
                     output = "systemd 252 (252.31-1)\n+PAM +SECCOMP +BPF_FRAMEWORK\n"
@@ -71,7 +71,7 @@ class InventoryTests(unittest.TestCase):
                     name = "host=remote password=" + SECRET if scenario == "connection_string" else "memory_trust"
                     output = json.dumps([{"name": name, "size_bytes": 12345}])
                 elif "pg_catalog.pg_class" in query:
-                    output = json.dumps([] if scenario == "not_memory" else table_names)
+                    output = json.dumps([] if scenario == "not_codifix" else table_names)
                 elif "pg_catalog.pg_stat_activity" in query:
                     for forbidden in ("query", "usename", "application_name"):
                         self.assertNotIn(forbidden, query)
@@ -154,7 +154,7 @@ class InventoryTests(unittest.TestCase):
         report, commands = self.inventory()
         self.assertEqual(report["host"]["architecture"], "aarch64")
         self.assertEqual(report["host"]["os"]["id"], "debian")
-        self.assertEqual(report["memory"]["version"], "2.1.0-rc.1")
+        self.assertEqual(report["codifix"]["version"], "3.0.0-rc.1")
         database = report["postgresql"]["database_inventory"]["clusters"][0]["databases"][0]
         self.assertEqual(database["name"], "memory_trust")
         self.assertEqual(database["counts"]["tables"]["memory_entries"], 12)
@@ -162,12 +162,12 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(report["database_binding"]["status"], "unknown")
         self.assertFalse(report["postgresql"]["local_data_absence_proven"])
         self.assertEqual(len([args for args in commands if args[0] == "runuser"]), 5)
-        self.assertEqual(report["format"], "memory-ca-preflight-v2")
+        self.assertEqual(report["format"], "codifix-ca-preflight-v2")
         self.assertEqual(report["host"]["libc"], {"status": "ok", "family": "glibc", "version": "2.36"})
         self.assertEqual(database["client_activity"]["counts"]["client_backends"], 2)
         self.assertFalse(database["client_activity"]["memory_client_identity_proven"])
         binding = report["database_binding"]
-        self.assertEqual(binding["local_memory_schema_candidates"][0]["database"], "memory_trust")
+        self.assertEqual(binding["local_codifix_schema_candidates"][0]["database"], "memory_trust")
         self.assertFalse(binding["process_connection_identity_proven"])
         self.assertFalse(binding["shared_vs_unique_proven"])
 
@@ -208,8 +208,8 @@ class InventoryTests(unittest.TestCase):
                 self.assertEqual(report["postgresql"]["database_inventory"]["status"], status)
                 self.assertFalse(any(args[0] == "runuser" for args in commands))
 
-    def test_non_memory_database_is_not_treated_as_empty(self):
-        report, _ = self.inventory(scenario="not_memory")
+    def test_non_codifix_database_is_not_treated_as_empty(self):
+        report, _ = self.inventory(scenario="not_codifix")
         database = report["postgresql"]["database_inventory"]["clusters"][0]["databases"][0]
         self.assertEqual(database["memory_schema"]["status"], "not_identified")
         self.assertEqual(database["counts"]["status"], "unknown")
@@ -222,17 +222,17 @@ class InventoryTests(unittest.TestCase):
 
     def test_unexpected_metadata_and_command_errors_are_redacted(self):
         report, _ = self.inventory(scenario="malformed")
-        self.assertEqual(report["memory"]["status"], "unavailable")
+        self.assertEqual(report["codifix"]["status"], "unavailable")
         database = report["postgresql"]["database_inventory"]["clusters"][0]["databases"][0]
         self.assertEqual(database["counts"]["status"], "unavailable")
         self.assertEqual(report["postgresql"]["database_inventory"]["status"], "partial")
         report, _ = self.inventory(scenario="timeout")
-        self.assertEqual(report["memory"]["reason"], "check_timed_out")
+        self.assertEqual(report["codifix"]["reason"], "check_timed_out")
 
     def test_total_time_budget_stops_later_commands(self):
         report, commands = self.inventory(scenario="budget")
         self.assertEqual(commands, [])
-        self.assertEqual(report["memory"]["reason"], "inventory_time_budget_exhausted")
+        self.assertEqual(report["codifix"]["reason"], "inventory_time_budget_exhausted")
         self.assertEqual(report["database_binding"]["status"], "unknown")
 
     def test_verified_arm64_metadata_blocks_old_libc_without_executing_artifacts(self):
@@ -248,7 +248,7 @@ class InventoryTests(unittest.TestCase):
                 self.assertFalse(pi["artifact_executed"])
                 self.assertFalse(pi["local_artifact_inspected"])
                 self.assertFalse(pi["activation_authorized"])
-                self.assertTrue(all(args[0] in ("systemctl", "memory", "ss", "runuser") for args in commands))
+                self.assertTrue(all(args[0] in ("systemctl", "codifix", "ss", "runuser") for args in commands))
 
     def test_wrong_architecture_and_unknown_libc_never_pass_native_check(self):
         report, _ = self.inventory(architecture="armv7l", libc="glibc 2.43")
@@ -280,7 +280,7 @@ class InventoryTests(unittest.TestCase):
             else:
                 self.assertEqual(report["runtime"]["namespaces"]["max_user_namespaces"]["value"], 0)
 
-    def test_bad_activity_is_partial_and_never_establishes_memory_binding(self):
+    def test_bad_activity_is_partial_and_never_establishes_codifix_binding(self):
         report, _ = self.inventory(scenario="bad_activity")
         self.assertEqual(report["postgresql"]["database_inventory"]["status"], "partial")
         self.assertEqual(report["database_binding"]["status"], "unknown")

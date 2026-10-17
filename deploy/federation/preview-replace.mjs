@@ -11,13 +11,13 @@ import { pathToFileURL } from 'node:url';
 const check = (v, code) => { if (!v) throw Error(code); };
 const hash = value => createHash('sha256').update(value).digest('hex');
 const hex = /^[a-f0-9]{64}$/;
-const names = /^memory-(?:company-20260919-(?:gateway-1|gateway_edge-1)|(?:workshop-preview-app-20260918|homelab-preview-app-20260919))$/;
+const names = /^codifix-(?:company-20260919-(?:gateway-1|gateway_edge-1)|(?:workshop-preview-app-20260918|homelab-preview-app-20260919))$/;
 function run(args) {
   const r = spawnSync('docker', args, { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 55000 });
   check(r.status === 0, 'scoped_container_operation_unconfirmed'); return r.stdout.trim();
 }
-const label = 'dev.memory-layer.preview-replace.review';
-const oldLabel = 'dev.memory-layer.preview-replace.old-id';
+const label = 'dev.codifix.preview-replace.review';
+const oldLabel = 'dev.codifix.preview-replace.old-id';
 // Both schema-changing upgrades require forward recovery after start intent.
 const rc2 = c => c.retained_name === `${c.name}-before-rc2`
   || c.retained_name === `${c.name}-before-mac-onboarding-20261015`
@@ -97,7 +97,7 @@ function snapshot(c, docker) {
   restart(v.HostConfig);
   for (const m of c.mounts) if (m.preserve) {
     if (m.destination === '/gateway-access/current') {
-      check(c.name === 'memory-company-20260919-gateway-1' && !m.writable && m.source === '/home/olivier/.local/state/memory-company-20260919/refresh-maintenance/access', 'access_only_mount_required'); dir(m.source);
+      check(c.name === 'codifix-company-20260919-gateway-1' && !m.writable && m.source === '/home/olivier/.local/state/codifix-company-20260919/refresh-maintenance/access', 'access_only_mount_required'); dir(m.source);
     } else check(v.Mounts.some(old => old.Source === m.source && old.Destination === m.destination && old.RW === m.writable), 'preserved_mount_changed');
   }
   const networks = Object.entries(v.NetworkSettings.Networks).sort(([a], [b]) => a.localeCompare(b)).map(([name, n]) => {

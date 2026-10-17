@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build a macOS .pkg installer for Memory Layer.
+# Build a macOS .pkg installer for Codifix.
 # Usage:
 #   ./packaging/build-pkg.sh
 #   ./packaging/build-pkg.sh --arch x86_64
@@ -18,8 +18,8 @@ set -euo pipefail
 #     --notarize --notary-profile "<profile>"
 #
 # The resulting .pkg installs:
-#   /usr/local/bin/memory          (+ mem-cli and memory-layer symlinks)
-#   /usr/local/share/memory-layer/ (web UI, skill templates, example config)
+#   /usr/local/bin/codifix
+#   /usr/local/share/codifix/ (web UI, skill templates, example config)
 #   /usr/local/share/*             (bash, zsh, and fish completion scripts)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -237,10 +237,10 @@ fi
 # /private/var. Canonicalize only this build-owned temporary parent before
 # creating a new stage; installed/user data path validation stays unchanged.
 STAGE_PARENT="$(cd "$STAGE_PARENT" && pwd -P)"
-STAGE_DIR="$(mktemp -d "${STAGE_PARENT%/}/memory-layer-macos-pkg.XXXXXXXX")"
+STAGE_DIR="$(mktemp -d "${STAGE_PARENT%/}/codifix-macos-pkg.XXXXXXXX")"
 # Only clean the private directory returned by mktemp, never a workspace stage.
 case "$STAGE_DIR" in
-  /*/memory-layer-macos-pkg.????????) ;;
+  /*/codifix-macos-pkg.????????) ;;
   *) echo "Unexpected temporary staging path; refusing cleanup." >&2; exit 1 ;;
 esac
 cleanup() {
@@ -255,26 +255,26 @@ cleanup() {
 trap cleanup EXIT
 PAYLOAD="$STAGE_DIR/payload"
 SCRIPTS="$STAGE_DIR/scripts"
-PKG_PATH="$ROOT_DIR/target/memory-layer-${VERSION}-macos-${PKG_ARCH}.pkg"
-PKG_IDENTIFIER="com.memory-layer.pkg"
+PKG_PATH="$ROOT_DIR/target/codifix-${VERSION}-macos-${PKG_ARCH}.pkg"
+PKG_IDENTIFIER="dev.codifix.pkg"
 if [[ -n "$RUNTIME_BUNDLE" ]]; then
   # Immutable runtime generations must not obsolete earlier receipt payloads.
   # Preinstall separately refuses overwriting an existing bundle prefix.
-  PKG_IDENTIFIER="com.memory-layer.runtime.${RUNTIME_MANIFEST_SHA256}"
+  PKG_IDENTIFIER="dev.codifix.runtime.${RUNTIME_MANIFEST_SHA256}"
 fi
 if [[ "$APPLICATION_UPDATE" -eq 1 ]]; then
-  PKG_PATH="$ROOT_DIR/target/memory-layer-${VERSION}-macos-${PKG_ARCH}-application-update.pkg"
-  PKG_IDENTIFIER="com.memory-layer.application"
+  PKG_PATH="$ROOT_DIR/target/codifix-${VERSION}-macos-${PKG_ARCH}-application-update.pkg"
+  PKG_IDENTIFIER="dev.codifix.application"
 fi
-BINARY_PATH="$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory"
+BINARY_PATH="$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix"
 
 mkdir -p \
   "$ROOT_DIR/target" \
   "$PAYLOAD/usr/local/bin" \
-  "$PAYLOAD/usr/local/share/memory-layer/skill-template" \
-  "$PAYLOAD/usr/local/share/memory-layer/web" \
-  "$PAYLOAD/usr/local/share/memory-layer/onboarding/.codex/agents" \
-  "$PAYLOAD/usr/local/share/memory-layer/onboarding/operator" \
+  "$PAYLOAD/usr/local/share/codifix/skill-template" \
+  "$PAYLOAD/usr/local/share/codifix/web" \
+  "$PAYLOAD/usr/local/share/codifix/onboarding/.codex/agents" \
+  "$PAYLOAD/usr/local/share/codifix/onboarding/operator" \
   "$PAYLOAD/usr/local/share/bash-completion/completions" \
   "$PAYLOAD/usr/local/share/zsh/site-functions" \
   "$PAYLOAD/usr/local/share/fish/vendor_completions.d" \
@@ -299,7 +299,7 @@ if [[ "$SKIP_BUILD" -eq 1 ]]; then
   }
 else
   echo "Building release binary for $PKG_ARCH ($RUST_TARGET)..."
-  cargo build --locked --release --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory --target "$RUST_TARGET"
+  cargo build --locked --release --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin codifix --target "$RUST_TARGET"
   echo "Building web UI..."
   npm --prefix "$ROOT_DIR/web" ci
   npm --prefix "$ROOT_DIR/web" run build
@@ -320,34 +320,34 @@ else
     install -m 0755 "$ROOT_DIR/packaging/macos/preinstall-lightweight.sh" "$SCRIPTS/preinstall"
   fi
 fi
-install -m 0755 "$BINARY_PATH" "$PAYLOAD/usr/local/bin/memory"
+install -m 0755 "$BINARY_PATH" "$PAYLOAD/usr/local/bin/codifix"
 mkdir -p "$PAYLOAD/Applications"
-bash "$ROOT_DIR/packaging/macos/build-network-access.sh" "$PAYLOAD/Applications/Memory Network Access.app" "$PKG_ARCH"
+bash "$ROOT_DIR/packaging/macos/build-network-access.sh" "$PAYLOAD/Applications/Codifix Network Access.app" "$PKG_ARCH"
 
 if [[ -n "$APP_SIGN_IDENTITY" ]]; then
   echo "Signing binary with Developer ID Application certificate..."
-  codesign --force --sign "$APP_SIGN_IDENTITY" --options runtime --timestamp "$PAYLOAD/usr/local/bin/memory"
-  codesign --verify --verbose=2 "$PAYLOAD/usr/local/bin/memory"
-  codesign --force --sign "$APP_SIGN_IDENTITY" --options runtime --timestamp "$PAYLOAD/Applications/Memory Network Access.app"
-  codesign --verify --strict "$PAYLOAD/Applications/Memory Network Access.app"
+  codesign --force --sign "$APP_SIGN_IDENTITY" --options runtime --timestamp "$PAYLOAD/usr/local/bin/codifix"
+  codesign --verify --verbose=2 "$PAYLOAD/usr/local/bin/codifix"
+  codesign --force --sign "$APP_SIGN_IDENTITY" --options runtime --timestamp "$PAYLOAD/Applications/Codifix Network Access.app"
+  codesign --verify --strict "$PAYLOAD/Applications/Codifix Network Access.app"
 fi
 
-ln -sf memory "$PAYLOAD/usr/local/bin/mem-cli"
-ln -sf memory "$PAYLOAD/usr/local/bin/memory-layer"
-"$PAYLOAD/usr/local/bin/memory" completion bash > "$PAYLOAD/usr/local/share/bash-completion/completions/memory"
-"$PAYLOAD/usr/local/bin/memory" completion zsh > "$PAYLOAD/usr/local/share/zsh/site-functions/_memory"
-"$PAYLOAD/usr/local/bin/memory" completion fish > "$PAYLOAD/usr/local/share/fish/vendor_completions.d/memory.fish"
+ln -sf codifix "$PAYLOAD/usr/local/bin/codifix-cli"
+ln -sf codifix "$PAYLOAD/usr/local/bin/codifix"
+"$PAYLOAD/usr/local/bin/codifix" completion bash > "$PAYLOAD/usr/local/share/bash-completion/completions/codifix"
+"$PAYLOAD/usr/local/bin/codifix" completion zsh > "$PAYLOAD/usr/local/share/zsh/site-functions/_codifix"
+"$PAYLOAD/usr/local/bin/codifix" completion fish > "$PAYLOAD/usr/local/share/fish/vendor_completions.d/codifix.fish"
 
-cp -R "$ROOT_DIR/.agents/skills/." "$PAYLOAD/usr/local/share/memory-layer/skill-template/"
-find "$PAYLOAD/usr/local/share/memory-layer/skill-template" -type f -name '*.sh' -exec chmod 0755 {} +
+cp -R "$ROOT_DIR/.agents/skills/." "$PAYLOAD/usr/local/share/codifix/skill-template/"
+find "$PAYLOAD/usr/local/share/codifix/skill-template" -type f -name '*.sh' -exec chmod 0755 {} +
 
-install -m 0644 "$ROOT_DIR/memory-layer.toml.example" "$PAYLOAD/usr/local/share/memory-layer/memory-layer.toml.example"
-install -m 0644 "$ROOT_DIR/README.md" "$PAYLOAD/usr/local/share/memory-layer/README.md"
-cp -R "$ROOT_DIR/web/dist/." "$PAYLOAD/usr/local/share/memory-layer/web/"
-install -m 0444 "$ROOT_DIR/.codex/config.toml" "$PAYLOAD/usr/local/share/memory-layer/onboarding/.codex/config.toml"
-install -m 0444 "$ROOT_DIR/.codex/agents/astra_adviser.toml" "$PAYLOAD/usr/local/share/memory-layer/onboarding/.codex/agents/astra_adviser.toml"
+install -m 0644 "$ROOT_DIR/codifix.toml.example" "$PAYLOAD/usr/local/share/codifix/codifix.toml.example"
+install -m 0644 "$ROOT_DIR/README.md" "$PAYLOAD/usr/local/share/codifix/README.md"
+cp -R "$ROOT_DIR/web/dist/." "$PAYLOAD/usr/local/share/codifix/web/"
+install -m 0444 "$ROOT_DIR/.codex/config.toml" "$PAYLOAD/usr/local/share/codifix/onboarding/.codex/config.toml"
+install -m 0444 "$ROOT_DIR/.codex/agents/astra_adviser.toml" "$PAYLOAD/usr/local/share/codifix/onboarding/.codex/agents/astra_adviser.toml"
 for operator_file in onboard.py onboarding_files.py onboarding_native.py onboarding_journey.py onboarding_agents.py onboarding_first_run.py runtime_bundle.py operator-README.md; do
-  install -m 0444 "$ROOT_DIR/packaging/macos/$operator_file" "$PAYLOAD/usr/local/share/memory-layer/onboarding/operator/$operator_file"
+  install -m 0444 "$ROOT_DIR/packaging/macos/$operator_file" "$PAYLOAD/usr/local/share/codifix/onboarding/operator/$operator_file"
 done
 # The operator is an explicit later step. No Python/PostgreSQL execution,
 # device login or service activation is executed by the package lifecycle.

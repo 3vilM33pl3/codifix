@@ -188,4 +188,4 @@ generation tests. The separate [disposable runtime rehearsal](../../tests/compan
 checks the actual pinned parser's served bytes, TLS rejection, IPv4 firewall
 denials, non-root startup and optional real PDS bootstrap/handoff/activation.
 Re-run that gate for the reviewed target engine/images before deployment; it
-does not prove Memory application authorization or activate existing services.
+does not prove Codifix application authorization or activate existing services.

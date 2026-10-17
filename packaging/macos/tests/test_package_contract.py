@@ -18,7 +18,7 @@ MACOS = REPO / "packaging/macos"
 
 class PackageContract(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="memory-pkg-contract-")
+        self.temp = tempfile.TemporaryDirectory(prefix="codifix-pkg-contract-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
         self.tools = self.root / "tools"
@@ -49,16 +49,16 @@ class PackageContract(unittest.TestCase):
         shutil.copy2(MACOS / "network-access.m", repo / "packaging/macos/network-access.m")
         # The real AppKit compilation is checked on the Mac, not this Linux fixture.
         (repo / "packaging/macos/build-network-access.sh").write_text(
-            '#!/bin/bash\nset -eu\nmkdir -p "$1/Contents/MacOS"\nprintf "synthetic-app-%s" "$2" > "$1/Contents/MacOS/memory-network-access"\n')
+            '#!/bin/bash\nset -eu\nmkdir -p "$1/Contents/MacOS"\nprintf "synthetic-app-%s" "$2" > "$1/Contents/MacOS/codifix-network-access"\n')
         for name in ("config.toml", "agents/astra_adviser.toml"):
             shutil.copy2(REPO / ".codex" / name, repo / ".codex" / name)
         (repo / "Cargo.toml").write_text('version = "0.0.0-test"\n')
         (repo / "Cargo.lock").write_text('# fixture lock\n')
         (repo / "README.md").write_text("Fixture only\n")
-        (repo / "memory-layer.toml.example").write_text("# fixture config\n")
+        (repo / "codifix.toml.example").write_text("# fixture config\n")
         (repo / "web/dist/index.html").write_text("fixture\n")
         (repo / "target/macos-pkg/keep").write_text("existing workspace staging\n")
-        binary = repo / "target/x86_64-apple-darwin/release/memory"
+        binary = repo / "target/x86_64-apple-darwin/release/codifix"
         binary.write_text('#!/bin/bash\n[[ "$1" == completion ]] || exit 99\necho fixture-completion\n')
         binary.chmod(0o755)
         trace = self.root / "build-trace"
@@ -146,12 +146,12 @@ touch "$output"
         repo, trace = self.fixture()
         result = self.run_script(repo / "packaging/build-pkg.sh", "--application-update")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("--identifier com.memory-layer.application", trace.read_text())
-        self.assertTrue((repo / "target/memory-layer-0.0.0-test-macos-x86_64-application-update.pkg").exists())
+        self.assertIn("--identifier dev.codifix.application", trace.read_text())
+        self.assertTrue((repo / "target/codifix-0.0.0-test-macos-x86_64-application-update.pkg").exists())
         capture = Path(self.env["CAPTURE"])
         self.assertEqual((capture / "scripts/preinstall").read_bytes(), (MACOS / "preinstall-application-update.sh").read_bytes())
-        self.assertFalse((capture / "payload/usr/local/share/memory-layer/runtime").exists())
-        self.assertFalse((capture / "payload/usr/local/bin/memory-onboard").exists())
+        self.assertFalse((capture / "payload/usr/local/share/codifix/runtime").exists())
+        self.assertFalse((capture / "payload/usr/local/bin/codifix-onboard").exists())
 
     def test_application_update_rejects_runtime_before_build(self):
         repo, trace = self.fixture()
@@ -186,9 +186,9 @@ touch "$output"
         guard.write_text((MACOS / "preinstall-application-update.sh").read_text().replace("/usr/local", str(prefix)))
         self.assertNotEqual(self.run_script(guard, "fixture.pkg", "/", "/").returncode, 0)
         (prefix / "bin").mkdir(parents=True)
-        (prefix / "bin/memory").write_text("existing")
+        (prefix / "bin/codifix").write_text("existing")
         self.assertEqual(self.run_script(guard, "fixture.pkg", "/", "/").returncode, 0)
-        self.assertEqual((prefix / "bin/memory").read_text(), "existing")
+        self.assertEqual((prefix / "bin/codifix").read_text(), "existing")
         self.assertNotEqual(self.run_script(guard, "fixture.pkg", "/", "/Volumes/Other").returncode, 0)
 
     def test_optional_runtime_stages_exact_read_only_tree_without_running_it(self):
@@ -213,7 +213,7 @@ touch "$output"
         self.assertIn("--locked", trace.read_text())
         import hashlib
         manifest_hash = hashlib.sha256(runtime.manifest.read_bytes()).hexdigest()
-        self.assertIn(f"--identifier com.memory-layer.runtime.{manifest_hash}", trace.read_text())
+        self.assertIn(f"--identifier dev.codifix.runtime.{manifest_hash}", trace.read_text())
 
     def test_failed_build_cleans_private_stage_only(self):
         repo, _ = self.fixture()
@@ -232,11 +232,11 @@ touch "$output"
         self.assertTrue((repo / "target/macos-pkg/keep").exists())
         capture = Path(self.env["CAPTURE"])
         for name in ("config.toml", "agents/astra_adviser.toml"):
-            staged = capture / "payload/usr/local/share/memory-layer/onboarding/.codex" / name
+            staged = capture / "payload/usr/local/share/codifix/onboarding/.codex" / name
             self.assertEqual(staged.read_bytes(), (REPO / ".codex" / name).read_bytes())
             self.assertEqual(stat.S_IMODE(staged.stat().st_mode), 0o444)
         for name in ("onboard.py", "onboarding_files.py", "onboarding_native.py", "onboarding_journey.py", "onboarding_agents.py", "onboarding_first_run.py", "runtime_bundle.py", "operator-README.md"):
-            staged = capture / "payload/usr/local/share/memory-layer/onboarding/operator" / name
+            staged = capture / "payload/usr/local/share/codifix/onboarding/operator" / name
             self.assertEqual(staged.read_bytes(), (MACOS / name).read_bytes())
             self.assertEqual(stat.S_IMODE(staged.stat().st_mode), 0o444)
         self.assertNotIn("python", trace.read_text())
@@ -255,7 +255,7 @@ touch "$output"
         result = self.run_script(guard, "fixture.pkg", "/", "/")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(prefix.exists())
-        for relative in ["share/memory-layer/runtime", "bin/memory-onboard"]:
+        for relative in ["share/codifix/runtime", "bin/codifix-onboard"]:
             installed = prefix / relative
             installed.parent.mkdir(parents=True, exist_ok=True)
             for kind in ["directory", "file", "dangling_link"]:
@@ -285,15 +285,15 @@ touch "$output"
         support.mkdir(parents=True)
         share = self.root / "share"
         share.mkdir()
-        (share / "memory-layer.toml.example").write_text("# packaged defaults\n")
-        return home, support / "memory-layer", share
+        (share / "codifix.toml.example").write_text("# packaged defaults\n")
+        return home, support / "codifix", share
 
     def test_seed_only_missing_files_and_keeps_existing_read_only_metadata(self):
         home, app, share = self.seed_fixture()
         app.mkdir(mode=0o751)
         (app / "log").mkdir(mode=0o711)
         (app / "assets").mkdir()
-        config = app / "memory-layer.toml"
+        config = app / "codifix.toml"
         config.write_text("# retained private settings\n")
         config.chmod(0o400)
         existing = [app, app / "log", app / "assets", config]
@@ -303,19 +303,19 @@ touch "$output"
         self.assertEqual(config.read_text(), "# retained private settings\n")
         self.assertEqual(before, [(p.stat().st_mode, p.stat().st_uid, p.stat().st_gid) for p in existing])
         self.assertTrue((app / "run").is_dir())
-        self.assertEqual(stat.S_IMODE((app / "memory-layer.env").stat().st_mode), 0o600)
-        (app / "memory-layer.env").write_text("# retained env\n")
-        (app / "memory-layer.env").chmod(0o400)
+        self.assertEqual(stat.S_IMODE((app / "codifix.env").stat().st_mode), 0o600)
+        (app / "codifix.env").write_text("# retained env\n")
+        (app / "codifix.env").chmod(0o400)
         self.run_script(MACOS / "seed-user.sh", str(home), str(share))
-        self.assertEqual((app / "memory-layer.env").read_text(), "# retained env\n")
-        self.assertEqual(stat.S_IMODE((app / "memory-layer.env").stat().st_mode), 0o400)
+        self.assertEqual((app / "codifix.env").read_text(), "# retained env\n")
+        self.assertEqual(stat.S_IMODE((app / "codifix.env").stat().st_mode), 0o400)
         self.assertFalse((home / ".codex").exists())
 
     def test_seed_preserves_dangling_file_and_relocated_directory(self):
         home, app, share = self.seed_fixture()
         app.mkdir()
-        (app / "memory-layer.toml").symlink_to(self.root / "unavailable-config")
-        (app / "memory-layer.env").symlink_to(self.root / "unavailable-env")
+        (app / "codifix.toml").symlink_to(self.root / "unavailable-config")
+        (app / "codifix.env").symlink_to(self.root / "unavailable-env")
         result = self.run_script(MACOS / "seed-user.sh", str(home), str(share))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.root / "unavailable-config").exists())
@@ -332,16 +332,16 @@ touch "$output"
         home, app, share = self.seed_fixture()
         result = self.run_script(MACOS / "seed-user.sh", str(home), str(share))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((app / "memory-layer.toml").read_bytes(), (share / "memory-layer.toml.example").read_bytes())
+        self.assertEqual((app / "codifix.toml").read_bytes(), (share / "codifix.toml.example").read_bytes())
         self.assertEqual(stat.S_IMODE(app.stat().st_mode), 0o700)
-        self.assertEqual(stat.S_IMODE((app / "memory-layer.toml").stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE((app / "codifix.toml").stat().st_mode), 0o600)
         empty_home = self.root / "other-user"
         empty_home.mkdir()
         result = self.run_script(MACOS / "seed-user.sh", str(empty_home), str(share))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(list(empty_home.iterdir()), [])
 
-    def test_postinstall_without_user_never_runs_memory_or_sudo(self):
+    def test_postinstall_without_user_never_runs_codifix_or_sudo(self):
         self.script("stat", "echo root\n")
         self.script("sudo", "exit 99\n")
         result = self.run_script(MACOS / "postinstall.sh")
@@ -359,7 +359,7 @@ touch "$output"
         self.assertEqual(result.returncode, 0, result.stderr)
         args = Path(self.env["TRACE"]).read_text().splitlines()
         self.assertEqual(args[:4], ["-u", "operator", "--", "/bin/bash"])
-        self.assertEqual(args[-2:], [str(home), "/usr/local/share/memory-layer"])
+        self.assertEqual(args[-2:], [str(home), "/usr/local/share/codifix"])
         self.assertIn("existing settings were preserved", result.stdout)
         self.assertIn("no services were started or restarted", result.stdout)
 
@@ -383,7 +383,7 @@ touch "$output"
             self.assertNotIn("restart-all", text)
             self.assertNotIn("launchctl", text)
             self.assertNotIn("chown", "\n".join(line for line in text.splitlines() if not line.startswith("#")))
-            self.assertNotIn("/usr/local/bin/memory", text)
+            self.assertNotIn("/usr/local/bin/codifix", text)
             self.assertNotIn(".codex", text)
             result = subprocess.run(["/bin/bash", "-n", str(MACOS / name)], capture_output=True)
             self.assertEqual(result.returncode, 0)

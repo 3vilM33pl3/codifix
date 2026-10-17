@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).absolute().parent))
 from onboarding_files import Refused, encoded, opened, parent_descriptor, path
 
 TOOLS = {"postgres", "initdb", "pg_ctl", "psql", "pg_config", "pg_controldata"}
-BASE = "/usr/local/share/memory-layer/runtime"
+BASE = "/usr/local/share/codifix/runtime"
 DESCRIPTOR = "runtime-prerequisites.json"
 MANIFEST = "runtime-manifest.json"
 MAX_FILES = 32768
@@ -303,7 +303,7 @@ def preinstall_guard(value):
     return ("#!/bin/bash\nset -eu\n"
             "if [[ ${3:-} != / ]]; then\n"
             "  echo 'Runtime package requires the current startup volume (/).' >&2\n  exit 1\nfi\n"
-            "for ancestor in /usr /usr/local /usr/local/share /usr/local/share/memory-layer /usr/local/share/memory-layer/runtime; do\n"
+            "for ancestor in /usr /usr/local /usr/local/share /usr/local/share/codifix /usr/local/share/codifix/runtime; do\n"
             "  if [[ -L $ancestor ]]; then\n"
             "    echo 'Symlinked runtime installation ancestor refused; existing paths preserved.' >&2\n    exit 1\n  fi\ndone\n"
             f"runtime_prefix='{value['install_prefix']}'\n"
@@ -317,7 +317,7 @@ def runtime_launcher(value):
     prefix = value["install_prefix"]
     return ("#!/bin/bash\nset -eu\n"
             f"runtime_python='{prefix}/{value['python']['path']}'\n"
-            "operator='/usr/local/share/memory-layer/onboarding/operator/onboard.py'\n"
+            "operator='/usr/local/share/codifix/onboarding/operator/onboard.py'\n"
             f"runtime_descriptor='{prefix}/{DESCRIPTOR}'\n"
             "if [[ ${1:-} == first-run ]]; then\n"
             # Appending the fixed option prevents a caller's earlier --runtime
@@ -342,7 +342,7 @@ def stage_launcher(payload, value):
         trusted_directory(bin_fd)
         if created:
             os.fchmod(bin_fd, 0o755)
-        fd = os.open("memory-onboard", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o700, dir_fd=bin_fd)
+        fd = os.open("codifix-onboard", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o700, dir_fd=bin_fd)
         with os.fdopen(fd, "wb") as stream:
             stream.write(runtime_launcher(value))
             stream.flush()

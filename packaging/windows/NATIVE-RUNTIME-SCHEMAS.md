@@ -18,7 +18,7 @@ including public library test/example fixtures; filename filtering is not a
 secret detector or permission to add live credentials. Retain third-party terms; this
 operator does not establish redistribution rights.
 
-## Node/PDS: `memory-native-pds-runtime`
+## Node/PDS: `codifix-native-pds-runtime`
 
 The descriptor requires `node_version: 24.18.1`, `pds_version: 0.5.27`,
 `pds_source_revision`, `pds_image_digest`, `pds_package_sha256`,
@@ -37,7 +37,7 @@ Payload layout:
   the native `better_sqlite3.node`. Every `.node` has an exact matching
   `native_addons` name/hash entry; no install-time compilation occurs.
 - `notices/*.txt`, with exactly five component entries: `node`, `pds`,
-  `locked-dependencies`, `memory-pds-adapter`, `msvc-crt`. Each has exact
+  `locked-dependencies`, `codifix-pds-adapter`, `msvc-crt`. Each has exact
   `name`, `version`, `source_sha256`, `license`, `notice_path` fields.
 
 No `.env`, credentials, database, repository storage or PDS identity belongs in
@@ -61,14 +61,14 @@ No new wire identity, DID/CID format or upstream version is introduced.
 
 The lab-only `scripts/windows/guest-runtime-pack.ps1 -Kind Pds` accepts
 `-PdsProfilePath` plus `-PdsProfileSha256` to select the existing
-`memory-native-pds-profile-v1` descriptor. Its exact preparation digest, original
+`codifix-native-pds-profile-v1` descriptor. Its exact preparation digest, original
 preparation receipt, complete inventory and two-file delta are checked before
 packaging. Changed unrelated files, altered patch metadata or an invalid selected
 profile fail closed; they never fall back to the original runtime. No PDS is
 started. A runtime package/installer receipt still does not prove account or
 federation operation.
 
-## Pi: `memory-native-pi-runtime`
+## Pi: `codifix-native-pi-runtime`
 
 The descriptor requires `pi_version: 0.5.1`, the complete Windows `artifact`
 provenance object, `source_archive_sha256`, `upstream_lock_sha256`,
@@ -83,7 +83,7 @@ Payload layout:
 - `source/pi-source.tar`, `no-tools-1.patch`, `windows-broker-1.patch`,
   `windows-broker-safe-handle-1.patch`, `windows-pipe-helper/Cargo.toml`,
   `windows-pipe-helper/src/lib.rs`, and the patched `Cargo.lock`.
-- Component notices for `pi`, `memory-windows-pipe`, `msvc-crt`.
+- Component notices for `pi`, `codifix-windows-pipe`, `msvc-crt`.
   `notices/pi.txt` must be the exact full pinned upstream licence, including
   its OpenAI/Anthropic rider; the descriptor labels it
   `MIT-with-OpenAI-Anthropic-Rider`, not plain MIT. The local helper is

@@ -72,7 +72,7 @@ class FakeNative:
 
 class OperatorContract(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="memory-native-operator-")
+        self.temp = tempfile.TemporaryDirectory(prefix="codifix-native-operator-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
         self.home = self.root / "home"
@@ -105,8 +105,8 @@ class OperatorContract(unittest.TestCase):
             file.write_bytes(b"synthetic Mach-O fixture, never executed: " + name.encode())
             file.chmod(0o500)
             tool_pins[name] = files.sha(file)
-        self.memory = self.tools / "memory"
-        self.memory.write_bytes(b"synthetic Memory fixture, never executed")
+        self.memory = self.tools / "codifix"
+        self.memory.write_bytes(b"synthetic Codifix fixture, never executed")
         self.memory.chmod(0o500)
         control, library, sql = [self.pg / name for name in ["vector.control", "vector.so", "vector--0.8.0.sql"]]
         for file in [control, library, sql]:
@@ -116,7 +116,7 @@ class OperatorContract(unittest.TestCase):
         self.metadata = self.subscription("workshop")
         self.write(self.metadata_file, self.metadata)
         self.input = {"schema_version": 1, "root": str(self.parent / "selected-installation"),
-                      "memory": {"path": str(self.memory), "sha256": files.sha(self.memory), "version": "memory fixture"},
+                      "codifix": {"path": str(self.memory), "sha256": files.sha(self.memory), "version": "codifix fixture"},
                       "postgres": {"bin_dir": str(self.pg), "major": 16, "tool_sha256": tool_pins,
                                    "vector_library": str(library), "vector_library_sha256": files.sha(library),
                                    "vector_control": str(control), "vector_control_sha256": files.sha(control),
@@ -148,13 +148,13 @@ class OperatorContract(unittest.TestCase):
         self.assertNotIn("local_database_url", json.dumps(value))
 
     def curated_input(self):
-        repository = self.root / "memory-repository"
+        repository = self.root / "codifix-repository"
         repository.mkdir(mode=0o700)
         self.metadata["replication_mode"] = "curated_project_v1"
         self.metadata["manifest_sha256"] = "a" * 64
         self.write(self.metadata_file, self.metadata)
         self.input.update(schema_version=2, curated_sync=True, repositories=[
-            {"area": "workshop", "repository": str(repository), "project": "memory", "project_id": self.metadata["bootstrap"]["scope"]["project"]}])
+            {"area": "workshop", "repository": str(repository), "project": "codifix", "project_id": self.metadata["bootstrap"]["scope"]["project"]}])
         self.write(self.input_file, self.input)
 
     def test_curated_workflow_is_writable_scoped_and_recoverable(self):
@@ -169,13 +169,13 @@ class OperatorContract(unittest.TestCase):
         route = files.read(root / "area-routing.json")
         self.assertEqual(route["routes"], [{k: r[k] for k in ["area", "project", "repository"]} for r in self.input["repositories"]])
         self.assertIsNone(route["areas"]["general"]["config"])
-        self.assertEqual(stat.S_IMODE((root / "bin/memory").stat().st_mode), 0o700)
-        self.assertIn(b'"$@"', (root / "bin/memory").read_bytes())
+        self.assertEqual(stat.S_IMODE((root / "bin/codifix").stat().st_mode), 0o700)
+        self.assertIn(b'"$@"', (root / "bin/codifix").read_bytes())
         watchers = [j for j in self.fake.bootstraps if ".watcher." in j["Label"]]
         self.assertEqual(len(watchers), 1)
         self.assertIn("run-watcher", watchers[0]["ProgramArguments"])
         sync = next(j for j in self.fake.bootstraps if ".sync." in j["Label"])
-        self.assertEqual(sync["AssociatedBundleIdentifiers"], ["dev.memory-layer.network-access"])
+        self.assertEqual(sync["AssociatedBundleIdentifiers"], ["dev.codifix.network-access"])
         before = len(self.fake.bootstraps)
         self.apply(value)
         self.assertEqual(len(self.fake.bootstraps), before)
@@ -186,21 +186,21 @@ class OperatorContract(unittest.TestCase):
 
     def test_sync_uses_responsible_bundle_without_bypassing_verified_operator(self):
         self.curated_input()
-        application = self.home / "Applications/Memory Network Access.app/Contents/MacOS"
+        application = self.home / "Applications/Codifix Network Access.app/Contents/MacOS"
         application.mkdir(parents=True)
-        (application / "memory-network-access").write_text("synthetic native helper")
+        (application / "codifix-network-access").write_text("synthetic native helper")
         self.apply()
         sync = next(j for j in self.fake.bootstraps if ".sync." in j["Label"])
         self.assertEqual(sync["ProgramArguments"], [
-            str(application / "memory-network-access"), "--sync", "--python", str(Path(sys.executable).resolve()),
+            str(application / "codifix-network-access"), "--sync", "--python", str(Path(sys.executable).resolve()),
             "--python-sha256", files.sha(Path(sys.executable).resolve()), "--operator", str(operator.__file__),
             "--operator-sha256", files.sha(operator.__file__), "--journal", str(self.journal),
             "--subscription", self.metadata["subscription"]])
 
     def test_legacy_periodic_sync_stays_periodic_when_network_app_is_installed(self):
-        application = self.home / "Applications/Memory Network Access.app/Contents/MacOS"
+        application = self.home / "Applications/Codifix Network Access.app/Contents/MacOS"
         application.mkdir(parents=True)
-        (application / "memory-network-access").write_text("synthetic native helper")
+        (application / "codifix-network-access").write_text("synthetic native helper")
         self.apply()
         sync = next(j for j in self.fake.bootstraps if ".sync." in j["Label"])
         self.assertEqual(sync["StartInterval"], 300)
@@ -222,7 +222,7 @@ class OperatorContract(unittest.TestCase):
             operator.run_job(self.journal, "run-watcher", "0", self.fake)
             args = execute.call_args.args[1]
             self.assertEqual(args, [str(self.memory), "--config", str(Path(self.input["root"]) / "workshop.toml"),
-                                    "watcher", "run", "--project", "memory", "--repo-root", self.input["repositories"][0]["repository"]])
+                                    "watcher", "run", "--project", "codifix", "--repo-root", self.input["repositories"][0]["repository"]])
             with self.assertRaises(files.Refused):
                 operator.run_job(self.journal, "run-watcher", "1", self.fake)
             self.assertEqual(execute.call_count, 1)
@@ -318,7 +318,7 @@ class OperatorContract(unittest.TestCase):
         legacy = self.home / "custom-config"
         legacy.write_text("read-only existing config")
         legacy.chmod(0o400)
-        self.fake.labels.add("com.memory-layer.mem-service")
+        self.fake.labels.add("dev.codifix.service")
         for index, area in enumerate(["homelab", "general"], 1):
             file = self.root / (area + ".json")
             self.write(file, self.subscription(area))
@@ -412,7 +412,7 @@ class OperatorContract(unittest.TestCase):
         self.assertEqual(target.stat().st_nlink, 1)
         files.missing(target, data)
         self.assertEqual(files.bytes_at(target), data)
-        self.assertEqual(list(self.root.glob(".memory-new-*")), [])
+        self.assertEqual(list(self.root.glob(".codifix-new-*")), [])
         with self.assertRaises(files.Refused):
             files.missing(target, b"changed inputs")
     def test_atomic_publish_cannot_replace_a_concurrently_created_file(self):

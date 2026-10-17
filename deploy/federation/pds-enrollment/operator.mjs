@@ -93,7 +93,7 @@ export class EnrollmentOperator {
   async preview(phase) {
     const state = await this.state(); phase ??= nextPhase(state);
     check(PHASES.includes(phase) && allowed(state, phase), 'phase_requires_reconciliation');
-    const review = { purpose: 'memory-private-pds-enrollment-v1', config_sha256: digest(this.config),
+    const review = { purpose: 'codifix-private-pds-enrollment-v1', config_sha256: digest(this.config),
       identity_sha256: identityDigest(this.config), journal_sha256: digest(state), phase,
       repository: this.config.repository, pds_origin: this.config.pds_origin, operator_origin: this.config.operator_origin,
       review_not_before: this.config.review_not_before, review_expires_at: this.config.review_expires_at,

@@ -12,12 +12,12 @@ id() { log_command "id $*"; return "${PACKAGING_TEST_ID_STATUS:-0}"; }
 useradd() { log_command "useradd $*"; }
 install() { log_command "install $*"; }
 systemctl() { log_command "systemctl $*"; return "${PACKAGING_TEST_SYSTEMCTL_STATUS:-0}"; }
-memory() { log_command "FORBIDDEN memory $*"; return 99; }
-export -f log_command id useradd install systemctl memory
+codifix() { log_command "FORBIDDEN codifix $*"; return 99; }
+export -f log_command id useradd install systemctl codifix
 
 # Fail before executing an old hook with an absolute memory path: the test must
 # never fall through to a real installed CLI with access to host credentials.
-if grep -Eq '/usr/(local/)?bin/memory|ensure-api-token|restart-all|rotate-placeholder' \
+if grep -Eq '/usr/(local/)?bin/codifix|ensure-api-token|restart-all|rotate-placeholder' \
     "$repo_root/packaging/debian/postinst"; then
     fail "postinst includes an implicit credential or global lifecycle action"
 fi
@@ -33,7 +33,7 @@ done
 
 : > "$PACKAGING_TEST_LOG"
 PACKAGING_TEST_ID_STATUS=1 bash "$repo_root/packaging/debian/postinst" configure >/dev/null
-grep -qx 'useradd --system --home /var/lib/memory-layer --shell /usr/sbin/nologin memory-layer' \
+grep -qx 'useradd --system --home /var/lib/codifix --shell /usr/sbin/nologin codifix' \
     "$PACKAGING_TEST_LOG" || fail "fresh setup did not create the legacy user"
 
 # A container/chroot without a running systemd is still a valid staging target.
@@ -53,31 +53,31 @@ done
 for action in remove deconfigure; do
     : > "$PACKAGING_TEST_LOG"
     bash "$repo_root/packaging/debian/prerm" "$action" >/dev/null
-    [[ "$(< "$PACKAGING_TEST_LOG")" == 'systemctl stop memory-watch.service memory-layer.service' ]] ||
+    [[ "$(< "$PACKAGING_TEST_LOG")" == 'systemctl stop codifix-watch.service codifix.service' ]] ||
         fail "prerm $action selected anything except legacy system units"
 done
 PACKAGING_TEST_SYSTEMCTL_STATUS=1 bash "$repo_root/packaging/debian/prerm" remove
 
-unit="$repo_root/packaging/debian/memory-layer@.service"
+unit="$repo_root/packaging/debian/codifix@.service"
 for required in \
     'DynamicUser=true' \
     'StateDirectoryMode=0700' \
-    'ConditionPathExists=/etc/memory-layer-instances/%i/activation-reviewed' \
-    'LoadCredential=memory-layer.toml:/etc/memory-layer-instances/%i/memory-layer.toml' \
-    'StateDirectory=memory-layer-instances/%i/service' \
-    'CacheDirectory=memory-layer-instances/%i/service' \
-    'RuntimeDirectory=memory-layer-instances/%i/service' \
-    'ExecStartPre=/usr/bin/env -i PATH=/usr/bin:/bin /usr/libexec/memory-layer/verify-instance-release %i %d/memory.sha256' \
-    'ExecStart=/usr/libexec/memory-layer/run-instance %i %d' \
+    'ConditionPathExists=/etc/codifix-instances/%i/activation-reviewed' \
+    'LoadCredential=codifix.toml:/etc/codifix-instances/%i/codifix.toml' \
+    'StateDirectory=codifix-instances/%i/service' \
+    'CacheDirectory=codifix-instances/%i/service' \
+    'RuntimeDirectory=codifix-instances/%i/service' \
+    'ExecStartPre=/usr/bin/env -i PATH=/usr/bin:/bin /usr/libexec/codifix/verify-instance-release %i %d/codifix.sha256' \
+    'ExecStart=/usr/libexec/codifix/run-instance %i %d' \
     'ProtectSystem=strict' \
     'ProtectHome=true' \
     'IPAddressDeny=any'; do
     grep -Fxq "$required" "$unit" || fail "missing named-instance boundary: $required"
 done
-if grep -Eq 'EnvironmentFile=|ExecStart=.*/usr/bin/memory|ReadWritePaths=.*/etc' "$unit"; then
+if grep -Eq 'EnvironmentFile=|ExecStart=.*/usr/bin/codifix|ReadWritePaths=.*/etc' "$unit"; then
     fail "named instance inherits mutable global executable/configuration"
 fi
-if grep -Eq '^(StateDirectory|CacheDirectory|RuntimeDirectory)=memory-layer/instances|^(LoadCredential|WorkingDirectory|ConditionPathExists)=.*/(etc|var/lib|var/cache|run)/memory-layer/instances' "$unit"; then
+if grep -Eq '^(StateDirectory|CacheDirectory|RuntimeDirectory)=codifix/instances|^(LoadCredential|WorkingDirectory|ConditionPathExists)=.*/(etc|var/lib|var/cache|run)/codifix/instances' "$unit"; then
     fail "named instance depends on a legacy service-owned directory"
 fi
 
@@ -92,21 +92,21 @@ if bash "$repo_root/packaging/debian/verify-instance-release" trust /dev/null 2>
     fail "accepted missing release digest"
 fi
 
-unset -f id useradd install systemctl memory
+unset -f id useradd install systemctl codifix
 export -f log_command
 
 # Exercise the verifier against a private filesystem tree. Rebase only the
 # hard-coded installation prefix; root ownership is simulated, while real file
 # modes, symlinks, executable bits and SHA-256 verification remain in force.
-release_fixture="$test_root/opt/memory-layer/instances/trust/release"
+release_fixture="$test_root/opt/codifix/instances/trust/release"
 mkdir -p "$release_fixture/bin"
-chmod 0755 "$test_root/opt" "$test_root/opt/memory-layer" \
-    "$test_root/opt/memory-layer/instances" "$test_root/opt/memory-layer/instances/trust" \
+chmod 0755 "$test_root/opt" "$test_root/opt/codifix" \
+    "$test_root/opt/codifix/instances" "$test_root/opt/codifix/instances/trust" \
     "$release_fixture" "$release_fixture/bin"
-printf '#!/usr/bin/env bash\nexit 0\n' > "$release_fixture/bin/memory"
-chmod 0755 "$release_fixture/bin/memory"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$release_fixture/bin/codifix"
+chmod 0755 "$release_fixture/bin/codifix"
 sed "s|/opt|$test_root/opt|g" "$repo_root/packaging/debian/verify-instance-release" > "$test_root/verifier"
-sha256sum "$release_fixture/bin/memory" | cut -d ' ' -f 1 > "$test_root/digest"
+sha256sum "$release_fixture/bin/codifix" | cut -d ' ' -f 1 > "$test_root/digest"
 stat() {
     if [[ "$1" == -c && "$2" == %u ]]; then
         printf '%s\n' "${PACKAGING_TEST_OWNER:-0}"
@@ -124,18 +124,18 @@ if bash "$test_root/verifier" trust "$test_root/digest" 2>/dev/null; then
     fail "accepted group-writable release directory"
 fi
 chmod 0755 "$release_fixture/bin"
-printf '# modified\n' >> "$release_fixture/bin/memory"
+printf '# modified\n' >> "$release_fixture/bin/codifix"
 if bash "$test_root/verifier" trust "$test_root/digest" 2>/dev/null; then
     fail "accepted executable with incorrect digest"
 fi
-sha256sum "$release_fixture/bin/memory" | cut -d ' ' -f 1 > "$test_root/digest"
-mv "$release_fixture/bin/memory" "$release_fixture/bin/real-memory"
-ln -s real-memory "$release_fixture/bin/memory"
+sha256sum "$release_fixture/bin/codifix" | cut -d ' ' -f 1 > "$test_root/digest"
+mv "$release_fixture/bin/codifix" "$release_fixture/bin/real-memory"
+ln -s real-codifix "$release_fixture/bin/codifix"
 if bash "$test_root/verifier" trust "$test_root/digest" 2>/dev/null; then
     fail "accepted symlink executable"
 fi
-rm "$release_fixture/bin/memory"
-mv "$release_fixture/bin/real-memory" "$release_fixture/bin/memory"
+rm "$release_fixture/bin/codifix"
+mv "$release_fixture/bin/real-memory" "$release_fixture/bin/codifix"
 mv "$release_fixture/bin" "$release_fixture/real-bin"
 ln -s real-bin "$release_fixture/bin"
 if bash "$test_root/verifier" trust "$test_root/digest" 2>/dev/null; then
@@ -147,39 +147,39 @@ if command -v systemd-analyze >/dev/null; then
     mkdir -p "$test_root/units"
     # Syntax verification is read-only. Substitute only executable locations,
     # because this test deliberately never installs either production file.
-    sed -E 's|^ExecStart(Pre)?=.*|ExecStart\1=/usr/bin/true|' "$unit" > "$test_root/units/memory-layer@.service"
-    systemd-analyze verify --man=no "$test_root/units/memory-layer@.service"
+    sed -E 's|^ExecStart(Pre)?=.*|ExecStart\1=/usr/bin/true|' "$unit" > "$test_root/units/codifix@.service"
+    systemd-analyze verify --man=no "$test_root/units/codifix@.service"
 fi
 
 # Build a small fixture repository and run the actual package builder with
 # cargo/npm/dpkg-deb stubbed. Nothing is built, installed, published or started.
 fixture="$test_root/repo"
 mkdir -p "$fixture/packaging" "$fixture/deploy/areas" "$fixture/.agents/skills" \
-    "$fixture/crates/mem-area-ops" "$fixture/scripts/areas/releases" \
+    "$fixture/crates/codifix-area-ops" "$fixture/scripts/areas/releases" \
     "$fixture/web/dist" "$fixture/target/debian" "$test_root/binaries/x86_64-unknown-linux-gnu/release"
 cp "$repo_root/packaging/build-deb.sh" "$fixture/packaging/"
 cp -R "$repo_root/packaging/debian" "$fixture/packaging/"
 cp "$repo_root/deploy/areas/README.md" "$repo_root/deploy/areas/instance.toml.example" "$fixture/deploy/areas/"
 cp "$repo_root/deploy/areas/ca-preflight.sh" "$repo_root/deploy/areas/CA-CONSOLE-HANDOFF.md" "$fixture/deploy/areas/"
-cp "$repo_root/crates/mem-area-ops/README.md" "$fixture/crates/mem-area-ops/"
+cp "$repo_root/crates/codifix-area-ops/README.md" "$fixture/crates/codifix-area-ops/"
 cp "$repo_root/scripts/areas/releases/release.py" "$repo_root/scripts/areas/releases/README.md" "$fixture/scripts/areas/releases/"
 cp "$repo_root/scripts/areas/releases/instance.py" "$repo_root/scripts/areas/releases/console.py" \
     "$repo_root/scripts/areas/releases/upgrade.py" "$repo_root/scripts/areas/releases/upgrade-README.md" \
     "$repo_root/scripts/areas/releases/console-README.md" "$fixture/scripts/areas/releases/"
-printf '[workspace.package]\nversion = "2.1.0-rc.1"\n' > "$fixture/Cargo.toml"
+printf '[workspace.package]\nversion = "3.0.0-rc.1"\n' > "$fixture/Cargo.toml"
 printf 'Fixture README\n' > "$fixture/README.md"
-printf '[service]\n' > "$fixture/memory-layer.toml.example"
+printf '[service]\n' > "$fixture/codifix.toml.example"
 printf 'Fixture\n' > "$fixture/.agents/skills/SKILL.md"
 printf 'Fixture\n' > "$fixture/web/dist/index.html"
-printf '#!/usr/bin/env bash\nprintf "fixture completion\\n"\n' > "$test_root/binaries/x86_64-unknown-linux-gnu/release/memory"
-chmod +x "$test_root/binaries/x86_64-unknown-linux-gnu/release/memory"
-for operator in memory-area memory-area-import memory-federation-gateway; do
+printf '#!/usr/bin/env bash\nprintf "fixture completion\\n"\n' > "$test_root/binaries/x86_64-unknown-linux-gnu/release/codifix"
+chmod +x "$test_root/binaries/x86_64-unknown-linux-gnu/release/codifix"
+for operator in codifix-area codifix-area-import codifix-federation-gateway; do
     printf '#!/usr/bin/env bash\nexit 99 # package build must never execute an importer\n' > "$test_root/binaries/x86_64-unknown-linux-gnu/release/$operator"
     chmod +x "$test_root/binaries/x86_64-unknown-linux-gnu/release/$operator"
 done
 mkdir "$test_root/unrelated-build"
 printf 'preserve\n' > "$test_root/unrelated-build/evidence"
-ln -s "$test_root/unrelated-build" "$fixture/target/debian/memory-layer-amd64"
+ln -s "$test_root/unrelated-build" "$fixture/target/debian/codifix-amd64"
 
 cargo() { log_command "cargo $*"; }
 npm() { log_command "npm $*"; }
@@ -228,7 +228,7 @@ dpkg-deb() {
         arm64) rust_target=aarch64-unknown-linux-gnu ;;
         *) return 90 ;;
     esac
-    grep -Fxq 'Version: 2.1.0~rc.1' "$staging/DEBIAN/control" || return 90
+    grep -Fxq 'Version: 3.0.0~rc.1' "$staging/DEBIAN/control" || return 90
     if [[ "$architecture" == arm64 && "${PACKAGING_TEST_BOOKWORM:-0}" == 1 ]]; then
         grep -Fxq 'Depends: libc6:arm64 (>= 2.34), libgcc-s1:arm64 (>= 3.0), libstdc++6:arm64 (>= 12.2.0-14), python3 (>= 3.11), gpg' "$staging/DEBIAN/control" || return 90
     elif [[ "$architecture" == arm64 ]]; then
@@ -237,32 +237,32 @@ dpkg-deb() {
         grep -Fxq 'Depends: libc6 (>= 2.39), libgcc-s1 (>= 4.2), libstdc++6 (>= 14), python3 (>= 3.11), gpg' "$staging/DEBIAN/control" || return 90
     fi
     grep -Fxq 'Suggests: postgresql' "$staging/DEBIAN/control" || return 90
-    [[ -f "$staging/lib/systemd/system/memory-layer@.service" ]] || return 91
-    [[ -x "$staging/usr/libexec/memory-layer/verify-instance-release" ]] || return 92
-    [[ -x "$staging/usr/libexec/memory-layer/run-instance" ]] || return 92
+    [[ -f "$staging/lib/systemd/system/codifix@.service" ]] || return 91
+    [[ -x "$staging/usr/libexec/codifix/verify-instance-release" ]] || return 92
+    [[ -x "$staging/usr/libexec/codifix/run-instance" ]] || return 92
     for release_tool in release.py instance.py console.py upgrade.py; do
-        [[ -f "$staging/usr/libexec/memory-layer/releases/$release_tool" ]] || return 92
-        [[ "$(stat -c %a "$staging/usr/libexec/memory-layer/releases/$release_tool")" == 644 ]] || return 92
+        [[ -f "$staging/usr/libexec/codifix/releases/$release_tool" ]] || return 92
+        [[ "$(stat -c %a "$staging/usr/libexec/codifix/releases/$release_tool")" == 644 ]] || return 92
     done
-    [[ -f "$staging/usr/share/doc/memory-layer/areas/console-first-install.md" ]] || return 92
-    [[ -f "$staging/usr/share/doc/memory-layer/areas/instance.toml.example" ]] || return 93
-    [[ ! -e "$staging/opt/memory-layer" ]] || return 94
-    [[ ! -e "$staging/etc/memory-layer/instances" ]] || return 95
-    [[ ! -e "$staging/etc/memory-layer-instances" ]] || return 95
-    [[ ! -e "$staging/var/lib/memory-layer" ]] || return 96
-    [[ ! -e "$staging/var/lib/memory-layer-instances" ]] || return 96
-    [[ ! -e "$staging/var/lib/memory-layer-installations" ]] || return 96
-    for operator in memory memory-area memory-area-import memory-federation-gateway; do
+    [[ -f "$staging/usr/share/doc/codifix/areas/console-first-install.md" ]] || return 92
+    [[ -f "$staging/usr/share/doc/codifix/areas/instance.toml.example" ]] || return 93
+    [[ ! -e "$staging/opt/codifix" ]] || return 94
+    [[ ! -e "$staging/etc/codifix/instances" ]] || return 95
+    [[ ! -e "$staging/etc/codifix-instances" ]] || return 95
+    [[ ! -e "$staging/var/lib/codifix" ]] || return 96
+    [[ ! -e "$staging/var/lib/codifix-instances" ]] || return 96
+    [[ ! -e "$staging/var/lib/codifix-installations" ]] || return 96
+    for operator in codifix codifix-area codifix-area-import codifix-federation-gateway; do
         [[ -x "$staging/usr/bin/$operator" ]] || return 97
         cmp "$staging/usr/bin/$operator" "$CARGO_TARGET_DIR/$rust_target/release/$operator" || return 97
     done
-    for completion in bash-completion/completions/memory zsh/vendor-completions/_memory fish/vendor_completions.d/memory.fish; do
+    for completion in bash-completion/completions/codifix zsh/vendor-completions/_codifix fish/vendor_completions.d/codifix.fish; do
         [[ "$(< "$staging/usr/share/$completion")" == 'fixture completion' ]] || return 97
     done
-    [[ -x "$staging/usr/libexec/memory-layer/ca-preflight" ]] || return 98
-    [[ -f "$staging/usr/libexec/memory-layer/area-release.py" ]] || return 98
+    [[ -x "$staging/usr/libexec/codifix/ca-preflight" ]] || return 98
+    [[ -f "$staging/usr/libexec/codifix/area-release.py" ]] || return 98
     for guide in CA-CONSOLE-HANDOFF.md area-import.md release-staging.md; do
-        [[ -s "$staging/usr/share/doc/memory-layer/areas/$guide" ]] || return 98
+        [[ -s "$staging/usr/share/doc/codifix/areas/$guide" ]] || return 98
     done
     printf 'fixture deb\n' > "$4"
     log_command "dpkg-deb $*"
@@ -272,14 +272,14 @@ export CARGO_TARGET_DIR="$test_root/binaries"
 : > "$PACKAGING_TEST_LOG"
 (umask 077; bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null)
 [[ "$(< "$test_root/unrelated-build/evidence")" == preserve ]] || fail "build deleted unrelated staging files"
-[[ -L "$fixture/target/debian/memory-layer-amd64" ]] || fail "build replaced an unrelated staging symlink"
-if compgen -G "$fixture/target/debian/.memory-layer-amd64.*" >/dev/null; then
+[[ -L "$fixture/target/debian/codifix-amd64" ]] || fail "build replaced an unrelated staging symlink"
+if compgen -G "$fixture/target/debian/.codifix-amd64.*" >/dev/null; then
     fail "private build staging directory was not cleaned up"
 fi
 grep -q '^dpkg-deb ' "$PACKAGING_TEST_LOG" || fail "builder did not assemble the expected package"
-grep -q '^cargo build --release --locked -p mem-area -p mem-area-ops .*--target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "operators were not built with locked dependencies and selected architecture"
-grep -q '^cargo build --release --locked -p mem-federation-runtime .*--bin memory-federation-gateway --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "gateway was not built with locked dependencies and selected architecture"
-if grep -q 'cargo build --locked -p mem-cli' "$PACKAGING_TEST_LOG"; then
+grep -q '^cargo build --release --locked -p codifix-area -p codifix-area-ops .*--target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "operators were not built with locked dependencies and selected architecture"
+grep -q '^cargo build --release --locked -p codifix-federation-runtime .*--bin codifix-federation-gateway --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "gateway was not built with locked dependencies and selected architecture"
+if grep -q 'cargo build --locked -p codifix-cli' "$PACKAGING_TEST_LOG"; then
     fail "native packaging unnecessarily rebuilt a lean CLI"
 fi
 : > "$PACKAGING_TEST_LOG"
@@ -287,24 +287,24 @@ if bash "$fixture/packaging/build-deb.sh" --arch amd64 >/dev/null 2>&1; then
     fail "builder overwrote an existing release artifact"
 fi
 [[ ! -s "$PACKAGING_TEST_LOG" ]] || fail "existing artifact triggered a build"
-[[ "$(< "$fixture/target/debian/memory-layer_2.1.0-rc.1_amd64.deb")" == 'fixture deb' ]] ||
+[[ "$(< "$fixture/target/debian/codifix_3.0.0-rc.1_amd64.deb")" == 'fixture deb' ]] ||
     fail "existing artifact contents changed"
 
 # Model a non-executable ARM64 target: running it for completions fails the test.
 # Only the separately built host CLI may execute. Explicit output stays off root.
 mkdir -p "$test_root/binaries/aarch64-unknown-linux-gnu/release" "$test_root/binaries/x86_64-unknown-linux-gnu/debug"
-cp "$test_root/binaries/x86_64-unknown-linux-gnu/release/memory" "$test_root/binaries/x86_64-unknown-linux-gnu/debug/memory"
-for operator in memory memory-area memory-area-import memory-federation-gateway; do
+cp "$test_root/binaries/x86_64-unknown-linux-gnu/release/codifix" "$test_root/binaries/x86_64-unknown-linux-gnu/debug/codifix"
+for operator in codifix codifix-area codifix-area-import codifix-federation-gateway; do
     printf '#!/usr/bin/env bash\nexit 99 # target binaries must not execute during cross packaging\n' > "$test_root/binaries/aarch64-unknown-linux-gnu/release/$operator"
     chmod +x "$test_root/binaries/aarch64-unknown-linux-gnu/release/$operator"
 done
 : > "$PACKAGING_TEST_LOG"
 (umask 077; bash "$fixture/packaging/build-deb.sh" --arch arm64 --output-dir "$test_root/release output" >/dev/null)
-[[ -s "$test_root/release output/memory-layer_2.1.0-rc.1_arm64.deb" ]] || fail "cross package missing from explicit output directory"
-grep -q '^cargo build --locked -p mem-cli --no-default-features --features tui .*--bin memory --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross completions did not build the host-native lean CLI"
-grep -q '^cargo build --release --locked -p mem-federation-runtime .*--target aarch64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross gateway targeted the wrong architecture"
-dpkg --compare-versions 2.1.0~rc.1 lt 2.1.0 || fail "Debian candidate does not sort before stable"
-dpkg --compare-versions 2.1.0~rc.1 gt 2.0.0 || fail "Debian candidate does not sort after the prior stable"
+[[ -s "$test_root/release output/codifix_3.0.0-rc.1_arm64.deb" ]] || fail "cross package missing from explicit output directory"
+grep -q '^cargo build --locked -p codifix-cli --no-default-features --features tui .*--bin codifix --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross completions did not build the host-native lean CLI"
+grep -q '^cargo build --release --locked -p codifix-federation-runtime .*--target aarch64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "cross gateway targeted the wrong architecture"
+dpkg --compare-versions 3.0.0~rc.1 lt 3.0.0 || fail "Debian candidate does not sort before stable"
+dpkg --compare-versions 3.0.0~rc.1 gt 2.0.0 || fail "Debian candidate does not sort after the prior stable"
 
 if PACKAGING_TEST_SHLIB_STATUS=1 bash "$fixture/packaging/build-deb.sh" --output-dir "$test_root/missing-dependencies" >/dev/null 2>&1; then
     fail "builder ignored missing runtime metadata"

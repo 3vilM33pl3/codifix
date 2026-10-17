@@ -12,7 +12,7 @@ function Get-NativePostgresPlan {
         Assert-NativeArchiveName $path.Substring(3).Replace('\','/')
     }
     $expected = $StateRoot + '\databases\' + $Name
-    if (-not [string]::Equals($ClusterPath,$expected,[StringComparison]::OrdinalIgnoreCase)) { throw 'Cluster must be the selected Memory-owned named database directory' }
+    if (-not [string]::Equals($ClusterPath,$expected,[StringComparison]::OrdinalIgnoreCase)) { throw 'Cluster must be the selected Codifix-owned named database directory' }
     if ($PasswordFile.StartsWith($ClusterPath + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Initialization password must remain outside database state' }
     if ($PasswordFile.StartsWith($StateRoot + '\postgres-operations\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Initialization password input must remain outside managed temporary operation files' }
     if ($PasswordFile.StartsWith($RuntimeBinding.runtime_directory + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Initialization password must not be part of the immutable redistributable runtime' }
@@ -21,10 +21,10 @@ function Get-NativePostgresPlan {
         $RuntimeBinding.verification_scope -cne 'protected_payload_only' -or
         $RuntimeBinding.database_readiness_verified -ne $false -or
         [guid]$RuntimeBinding.operation_id -eq [guid]::Empty) { throw 'Verified exact native runtime binding required' }
-    $service = 'MemoryLayerPostgres-' + $Name
+    $service = 'CodifixPostgres-' + $Name
     $bin = $RuntimeBinding.runtime_directory + '\pgsql\bin'
     return [pscustomobject][ordered]@{
-        schema_version=1; kind='memory-native-postgres-provisioning'; name=$Name
+        schema_version=1; kind='codifix-native-postgres-provisioning'; name=$Name
         operation_id=$OperationId.ToString(); recovery_reference=$RecoveryReference
         cluster_directory=$expected; service_name=$service; service_account=('NT SERVICE\' + $service)
         runtime=$RuntimeBinding; host='127.0.0.1'; port=$Port; superuser='memory_admin'
@@ -56,9 +56,9 @@ function Open-NativePostgresReview {
     $review=[pscustomobject]@{runtime=$null;guard=$null;file=$null;password_bytes=$null;plan=$null;input_sha256=$null}
     try {
         $review.runtime=Open-NativePrerequisiteLease $RuntimeManifestPath $RuntimeManifestSha256 $RuntimeOperationId
-        $root=Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'MemoryLayer'
+        $root=Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Codifix'
         $review.plan=Get-NativePostgresPlan $Name $Port $ClusterPath $root $PasswordFile $review.runtime.binding $OperationId $RecoveryReference
-        $review.guard=[MemoryLayer.ProtectedRelease]::Open([IO.Path]::GetDirectoryName($PasswordFile))
+        $review.guard=[Codifix.ProtectedRelease]::Open([IO.Path]::GetDirectoryName($PasswordFile))
         $review.file=[IO.File]::Open($PasswordFile,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
         if ($review.file.Length -lt 32 -or $review.file.Length -gt 4096) { throw 'Initialization password must be 32-4096 UTF-8 bytes' }
         $allowed=@('S-1-5-18','S-1-5-32-544',[Security.Principal.WindowsIdentity]::GetCurrent().User.Value)

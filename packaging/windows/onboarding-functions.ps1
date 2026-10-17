@@ -11,17 +11,17 @@ function Assert-OnboardingHash([string]$Hash) {
     if ($Hash -cnotmatch '^[0-9a-f]{64}$') { throw 'Exact lowercase SHA-256 required' }
 }
 function Get-OnboardingPlan {
-    param([string]$Stage, [string]$Memory, [string]$MemorySha256, [string]$ReleaseRoot,
+    param([string]$Stage, [string]$Codifix, [string]$CodifixSha256, [string]$ReleaseRoot,
         [string]$Config, [string]$ConfigSha256, [string]$Company, [string]$DeviceName,
         [string]$Area, [guid]$Owner, [guid]$Project, [long]$Revision,
         [string]$Workspace, [string]$Journal, [string]$WorkspacePlanSha256,
         [string]$SubscriptionOutput, [string]$BootstrapSha256,
         [string]$Profile, [string]$ProfileSha256, $ProfileScope, [string]$CallerSid)
     if ($Stage -cnotin @('Login','Catalog','Prepare','Apply','SubscriptionReview','SubscriptionConfirm','SyncOnce','SyncStatus','EnableSync')) { throw 'Unsupported fixed onboarding stage' }
-    foreach ($path in @($Memory, $ReleaseRoot, $Config)) { Assert-OnboardingPath $path }
-    foreach ($hash in @($MemorySha256, $ConfigSha256)) { Assert-OnboardingHash $hash }
-    if (-not $Memory.StartsWith($ReleaseRoot + '\', [StringComparison]::OrdinalIgnoreCase) -or
-        [IO.Path]::GetExtension($Config) -ine '.toml' -or $Memory -notmatch '(?i)\\memory\.exe$') { throw 'Pinned immutable Memory release and explicit TOML configuration required' }
+    foreach ($path in @($Codifix, $ReleaseRoot, $Config)) { Assert-OnboardingPath $path }
+    foreach ($hash in @($CodifixSha256, $ConfigSha256)) { Assert-OnboardingHash $hash }
+    if (-not $Codifix.StartsWith($ReleaseRoot + '\', [StringComparison]::OrdinalIgnoreCase) -or
+        [IO.Path]::GetExtension($Config) -ine '.toml' -or $Codifix -notmatch '(?i)\\codifix\.exe$') { throw 'Pinned immutable Codifix release and explicit TOML configuration required' }
     $uri = $null
     if (-not [uri]::TryCreate($Company, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -cne 'https' -or
         -not $uri.Host -or $uri.UserInfo -or $uri.Query -or $uri.Fragment -or $uri.AbsolutePath -cne '/' -or
@@ -66,13 +66,13 @@ function Get-OnboardingPlan {
     $task = $null
     if ($Stage -ceq 'EnableSync') {
         $identity = Get-NativeInputDigest ([ordered]@{sid=$CallerSid;scope=$ProfileScope;config=$Config.ToLowerInvariant()})
-        $task = [ordered]@{name=('MemoryLayer-DeviceSync-' + $identity.Substring(0,24));user_sid=$CallerSid;logon='Interactive';run_level='Limited';start='logon_and_now';interval='existing_cli_watch_300_seconds'}
+        $task = [ordered]@{name=('Codifix-DeviceSync-' + $identity.Substring(0,24));user_sid=$CallerSid;logon='Interactive';run_level='Limited';start='logon_and_now';interval='existing_cli_watch_300_seconds'}
     }
-    return [pscustomobject][ordered]@{schema_version=1;kind='memory-windows-onboarding-stage';stage=$Stage
-        memory=$Memory;memory_sha256=$MemorySha256;release_root=$ReleaseRoot;config=$Config;config_sha256=$ConfigSha256
+    return [pscustomobject][ordered]@{schema_version=1;kind='codifix-windows-onboarding-stage';stage=$Stage
+        memory=$Codifix;memory_sha256=$CodifixSha256;release_root=$ReleaseRoot;config=$Config;config_sha256=$ConfigSha256
         company=$Company;area=$Area;owner=$Owner.ToString();project=$Project.ToString();profile=$Profile;profile_sha256=$ProfileSha256;profile_scope=$ProfileScope
         arguments=$arguments;task=$task;prerequisites='already_provisioned_user_config_and_local_services'
-        provisions_database=$false;creates_memory_service=$false;enables_paid_models=$false;onboarding_acceptance_verified=$false}
+        provisions_database=$false;creates_codifix_service=$false;enables_paid_models=$false;onboarding_acceptance_verified=$false}
 }
 
 function Get-OnboardingProfileScope($Profile) {
@@ -156,7 +156,7 @@ function Get-OnboardingTaskPolicy($Task, [string]$ExpectedSid, [scriptblock]$Res
 }
 function Assert-OnboardingTask($Task, $Plan, [string]$PowerShell, [string]$Arguments, [string]$Digest, $ExpectedTask,
     [scriptblock]$ResolveUser = { param($User) ([Security.Principal.NTAccount]::new($User)).Translate([Security.Principal.SecurityIdentifier]).Value }) {
-    if ($Task.Description -cne ('Memory Layer reviewed device sync ' + $Digest) -or $Task.TaskName -cne $Plan.task.name -or
+    if ($Task.Description -cne ('Codifix reviewed device sync ' + $Digest) -or $Task.TaskName -cne $Plan.task.name -or
         (Resolve-OnboardingTriggerSid $Task.Principal.UserId $Plan.task.user_sid $ResolveUser) -cne $Plan.task.user_sid -or [string]$Task.Principal.LogonType -cnotin @('Interactive','3') -or
         [string]$Task.Principal.RunLevel -cnotin @('Limited','0') -or @($Task.Actions).Count -ne 1 -or
         $Task.Actions[0].Execute -ine $PowerShell -or $Task.Actions[0].Arguments -cne $Arguments -or

@@ -7,7 +7,7 @@ on:
         description: Stable application version
         type: string
         required: true
-        default: 2.1.0
+        default: 3.0.0
       publish:
         description: Publish the verified stable release (otherwise build candidate only)
         type: boolean
@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: memory-release
+  group: codifix-release
   cancel-in-progress: false
 
 env:
@@ -163,8 +163,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p target/source
-          git archive --format=tar.gz --prefix="memory-$VERSION/" --output="target/source/memory-$VERSION.tar.gz" "$GITHUB_SHA"
-          (cd target/source && sha256sum "memory-$VERSION.tar.gz" > "memory-$VERSION.tar.gz.sha256")
+          git archive --format=tar.gz --prefix="codifix-$VERSION/" --output="target/source/codifix-$VERSION.tar.gz" "$GITHUB_SHA"
+          (cd target/source && sha256sum "codifix-$VERSION.tar.gz" > "codifix-$VERSION.tar.gz.sha256")
       - uses: actions/upload-artifact@v4
         with:
           name: source-release
@@ -184,14 +184,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Prepare private build directory
-        run: mkdir -p "$RUNNER_TEMP/memory-linux-build" && chmod 700 "$RUNNER_TEMP/memory-linux-build"
+        run: mkdir -p "$RUNNER_TEMP/codifix-linux-build" && chmod 700 "$RUNNER_TEMP/codifix-linux-build"
       - uses: actions/cache/restore@v4
         id: build-cache
         with:
           path: |
-            ${{ runner.temp }}/memory-linux-build/memory-cargo
-            ${{ runner.temp }}/memory-linux-build/memory-target
-            ${{ runner.temp }}/memory-linux-build/npm-cache
+            ${{ runner.temp }}/codifix-linux-build/codifix-cargo
+            ${{ runner.temp }}/codifix-linux-build/codifix-target
+            ${{ runner.temp }}/codifix-linux-build/npm-cache
           key: release-bookworm-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'web/package-lock.json', 'packaging/ca-bookworm/Dockerfile') }}-${{ github.sha }}
           restore-keys: release-bookworm-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'web/package-lock.json', 'packaging/ca-bookworm/Dockerfile') }}-
       - name: Build ABI-constrained packages from frozen source
@@ -203,20 +203,20 @@ jobs:
           if [[ "$ARCH" == amd64 ]]; then
             python3 scripts/areas/releases/test_console_cli.py --image "$(cat "$RUNNER_TEMP/bookworm-image-id")" --evidence-parent "$RUNNER_TEMP"
           fi
-          bash packaging/ca-bookworm/release.sh "$GITHUB_SHA" "$RUNNER_TEMP/memory-linux-build" "$(cat "$RUNNER_TEMP/bookworm-image-id")" "$ARCH"
+          bash packaging/ca-bookworm/release.sh "$GITHUB_SHA" "$RUNNER_TEMP/codifix-linux-build" "$(cat "$RUNNER_TEMP/bookworm-image-id")" "$ARCH"
       - name: Preserve reusable Bookworm cache after package checks
         uses: actions/cache/save@v4
         if: ${{ always() && !cancelled() && steps.build-cache.outputs.cache-hit != 'true' && steps.build-cache.outputs.cache-primary-key != '' }}
         with:
           path: |
-            ${{ runner.temp }}/memory-linux-build/memory-cargo
-            ${{ runner.temp }}/memory-linux-build/memory-target
-            ${{ runner.temp }}/memory-linux-build/npm-cache
+            ${{ runner.temp }}/codifix-linux-build/codifix-cargo
+            ${{ runner.temp }}/codifix-linux-build/codifix-target
+            ${{ runner.temp }}/codifix-linux-build/npm-cache
           key: ${{ steps.build-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
-          path: ${{ runner.temp }}/memory-linux-build/output/*
+          path: ${{ runner.temp }}/codifix-linux-build/output/*
           if-no-files-found: error
 
   linux-install:
@@ -244,8 +244,8 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          package="$(realpath "target/linux-package/memory-layer_${VERSION}_${ARCH}.deb")"
-          sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env MEMORY_HOSTED_INSTALL_TEST=yes bash packaging/ca-bookworm/install-test.sh "$package"
+          package="$(realpath "target/linux-package/codifix_${VERSION}_${ARCH}.deb")"
+          sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env CODIFIX_HOSTED_INSTALL_TEST=yes bash packaging/ca-bookworm/install-test.sh "$package"
 
   macos-release:
     name: Build and install macOS ${{ matrix.arch }} variants
@@ -294,8 +294,8 @@ jobs:
           VERSION: ${{ needs.contract.outputs.version }}
         run: |
           set -euo pipefail
-          standard="target/memory-layer-$VERSION-macos-$ARCH.pkg"
-          update="target/memory-layer-$VERSION-macos-$ARCH-application-update.pkg"
+          standard="target/codifix-$VERSION-macos-$ARCH.pkg"
+          update="target/codifix-$VERSION-macos-$ARCH-application-update.pkg"
           bash packaging/macos/check-release.sh "$ARCH" "$VERSION" "$standard" "$update"
           for package in "$standard" "$update"; do
             (cd target && shasum -a 256 "$(basename "$package")") > "$package.sha256"
@@ -303,10 +303,10 @@ jobs:
           node <<'NODE'
           const fs = require('fs'), crypto = require('crypto'), cp = require('child_process');
           const {ARCH:architecture, VERSION:application_version, GITHUB_SHA:source_commit} = process.env;
-          const packages = [`memory-layer-${application_version}-macos-${architecture}.pkg`, `memory-layer-${application_version}-macos-${architecture}-application-update.pkg`];
+          const packages = [`codifix-${application_version}-macos-${architecture}.pkg`, `codifix-${application_version}-macos-${architecture}-application-update.pkg`];
           const artifacts = Object.fromEntries(packages.map(name => [name, crypto.createHash('sha256').update(fs.readFileSync(`target/${name}`)).digest('hex')]));
           const command = (name,args=[]) => cp.execFileSync(name,args,{encoding:'utf8'}).trim();
-          fs.writeFileSync(`target/memory-layer-${application_version}-macos-${architecture}-build.json`,JSON.stringify({format:'memory-macos-build-v1',application_version,architecture,source_commit,signing_status:'unsigned',notarized:false,native_package_acceptance:true,runtime_preservation_check:'sentinel-files-only',runtime_bundled:false,artifacts,toolchains:{rustc:command('rustc',['-vV']),node:process.version,npm:command('npm',['--version']),macos:command('sw_vers',['-productVersion']),xcode:command('xcodebuild',['-version'])}},null,2)+'\n');
+          fs.writeFileSync(`target/codifix-${application_version}-macos-${architecture}-build.json`,JSON.stringify({format:'codifix-macos-build-v1',application_version,architecture,source_commit,signing_status:'unsigned',notarized:false,native_package_acceptance:true,runtime_preservation_check:'sentinel-files-only',runtime_bundled:false,artifacts,toolchains:{rustc:command('rustc',['-vV']),node:process.version,npm:command('npm',['--version']),macos:command('sw_vers',['-productVersion']),xcode:command('xcodebuild',['-version'])}},null,2)+'\n');
           NODE
       - name: Preserve reusable Mac build cache after package checks
         uses: actions/cache/save@v4
@@ -321,9 +321,9 @@ jobs:
         with:
           name: macos-${{ matrix.arch }}
           path: |
-            target/memory-layer-*-macos-${{ matrix.arch }}*.pkg
-            target/memory-layer-*-macos-${{ matrix.arch }}*.pkg.sha256
-            target/memory-layer-*-macos-${{ matrix.arch }}-build.json
+            target/codifix-*-macos-${{ matrix.arch }}*.pkg
+            target/codifix-*-macos-${{ matrix.arch }}*.pkg.sha256
+            target/codifix-*-macos-${{ matrix.arch }}-build.json
           if-no-files-found: error
 
   windows-release:
@@ -375,13 +375,13 @@ jobs:
         env:
           VERSION: ${{ needs.contract.outputs.version }}
         run: |
-          ./packaging/windows/check-release.ps1 -DistDir "target/windows/dist/windows-v$($env:VERSION)-build.1" -ExpectedVersion $env:VERSION -ExpectedCommit $env:GITHUB_SHA -TestDatabaseUrl $env:MEMORY_RELEASE_TEST_DATABASE_URL
+          ./packaging/windows/check-release.ps1 -DistDir "target/windows/dist/windows-v$($env:VERSION)-build.1" -ExpectedVersion $env:VERSION -ExpectedCommit $env:GITHUB_SHA -TestDatabaseUrl $env:CODIFIX_RELEASE_TEST_DATABASE_URL
       - name: Stop only the disposable test cluster
         if: always()
         shell: pwsh
         run: |
-          if ($env:MEMORY_RELEASE_PGBIN -and $env:MEMORY_RELEASE_PGDATA) {
-            & "$env:MEMORY_RELEASE_PGBIN\pg_ctl.exe" -D $env:MEMORY_RELEASE_PGDATA -m fast -w stop
+          if ($env:CODIFIX_RELEASE_PGBIN -and $env:CODIFIX_RELEASE_PGDATA) {
+            & "$env:CODIFIX_RELEASE_PGBIN\pg_ctl.exe" -D $env:CODIFIX_RELEASE_PGDATA -m fast -w stop
             if ($LASTEXITCODE -ne 0) { throw 'Disposable PostgreSQL shutdown failed' }
           }
       - name: Preserve reusable Windows build cache after package checks
@@ -463,8 +463,8 @@ jobs:
           fi
           # No replacement, clobbering, retagging or automatic release deletion.
           mapfile -d '' release_files < <(find target/release-assets -maxdepth 1 -type f -print0)
-          gh release create "$tag" "${release_files[@]}" --draft --verify-tag --title "Memory Layer $tag" --notes-file "docs/releases/$VERSION.md"
-          download="$(mktemp -d "$RUNNER_TEMP/memory-published-assets.XXXXXXXX")"
+          gh release create "$tag" "${release_files[@]}" --draft --verify-tag --title "Codifix $tag" --notes-file "docs/releases/$VERSION.md"
+          download="$(mktemp -d "$RUNNER_TEMP/codifix-published-assets.XXXXXXXX")"
           gh release download "$tag" --dir "$download"
           cmp target/release-assets/SHA256SUMS "$download/SHA256SUMS"
           (cd "$download" && sha256sum -c SHA256SUMS)

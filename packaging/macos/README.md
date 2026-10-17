@@ -1,17 +1,17 @@
 # macOS Packaging
 
-Memory Layer now supports a native macOS service model:
+Codifix now supports a native macOS service model:
 
 - Homebrew for installation
 - `launchd` LaunchAgents for the shared backend and per-project watchers
-- `~/Library/Application Support/memory-layer/` for shared config, env, runtime, and logs
+- `~/Library/Application Support/codifix/` for shared config, env, runtime, and logs
 
 ## Current layout
 
-- Shared config: `~/Library/Application Support/memory-layer/memory-layer.toml`
-- Shared env: `~/Library/Application Support/memory-layer/memory-layer.env`
+- Shared config: `~/Library/Application Support/codifix/codifix.toml`
+- Shared env: `~/Library/Application Support/codifix/codifix.env`
 - LaunchAgents: `~/Library/LaunchAgents/`
-- Logs: `~/Library/Application Support/memory-layer/log/`
+- Logs: `~/Library/Application Support/codifix/log/`
 
 ## Native .pkg installer
 
@@ -29,7 +29,7 @@ dependencies. The selected Rust target must match the package architecture:
 ./packaging/build-pkg.sh \
   --sign-app "Developer ID Application: ..." \
   --sign-pkg "Developer ID Installer: ..." \
-  --notarize --notary-profile "memory-notary"
+  --notarize --notary-profile "codifix-notary"
 ```
 
 The build uses `cargo --locked` and a private temporary staging directory,
@@ -59,7 +59,7 @@ preserve, but do not upgrade, an already installed runtime.
 The `.pkg` installs to `/usr/local/`. Post-installation starts or restarts **no
 services**. When a non-root console user and their existing Application Support
 directory can be verified, defaults are seeded as that user: only a missing
-Memory directory, `log/`, `run/`, config and env file are created. Existing
+Codifix directory, `log/`, `run/`, config and env file are created. Existing
 configuration, secrets, assets, settings, ownership and permissions are retained,
 including read-only files and symlinked/relocated paths. If no suitable user or
 writable directory exists, per-user seeding is skipped; there is no root-home
@@ -67,8 +67,8 @@ fallback or recursive ownership change.
 
 Exact project-scoped Codex templates are installed read-only at:
 
-- `/usr/local/share/memory-layer/onboarding/.codex/config.toml`
-- `/usr/local/share/memory-layer/onboarding/.codex/agents/astra_adviser.toml`
+- `/usr/local/share/codifix/onboarding/.codex/config.toml`
+- `/usr/local/share/codifix/onboarding/.codex/agents/astra_adviser.toml`
 
 They are packaged references, not activated global user settings. Installation
 does not overwrite `~/.codex/`, deploy project templates, clone repositories or
@@ -76,10 +76,10 @@ grant company access.
 
 The package also includes the first-party explicit provisioning operator and
 its read-only helper modules under
-`/usr/local/share/memory-layer/onboarding/operator/`. It is not invoked by
+`/usr/local/share/codifix/onboarding/operator/`. It is not invoked by
 postinstall. [Operator inputs, private local provisioning and recovery](operator-README.md)
 describe the prerequisite-based candidate: installed Python 3.11+, reviewed
-installed PostgreSQL/pgvector and the full architecture-matched Memory binary
+installed PostgreSQL/pgvector and the full architecture-matched Codifix binary
 are required. No prerequisites are silently downloaded or source-built, and a
 self-contained dependency distribution/native Mac acceptance is not complete.
 
@@ -94,13 +94,13 @@ PostgreSQL/pgvector tree can be included without downloads or laptop source buil
 ```
 
 `runtime_bundle.py` schema v1 requires an exact architecture and versioned prefix
-`/usr/local/share/memory-layer/runtime/<bundle_id>`, explicit producer assertion
+`/usr/local/share/codifix/runtime/<bundle_id>`, explicit producer assertion
 that the tree was built for that prefix, exact Python/PG/vector versions,
 redistribution notices and an exhaustive SHA-256/mode inventory. Input files must
 be `0444` or `0555`; links, traversal, extra files and case aliases are rejected.
 Ordinary leading-underscore CPython modules are supported. Files are copied
 byte-identically, not patched or codesigned after hashing. Producers must supply
-any required signed nested binaries; the Memory binary's separate signing does
+any required signed nested binaries; the Codifix binary's separate signing does
 not sign the runtime. Manifest bytes are pinned across the build interval.
 
 The optional preinstall is read-only: it rejects another target volume, symlinked
@@ -109,7 +109,7 @@ overwrites a runtime in use. A changed bundle needs a new ID; interrupted packag
 extraction or same-ID repair requires operator inspection, not automatic deletion.
 Postinstall still performs no dependency execution, login or service activation.
 
-Optional packages also include `memory-onboard`, which runs their exact Python
+Optional packages also include `codifix-onboard`, which runs their exact Python
 with isolated imports and the fixed first-party operator. `first-run` binds the
 installed descriptor, asks for company login/projects/repository locations and
 generates private resumable inputs; no hand-written JSON is needed. See the
@@ -121,8 +121,8 @@ need observed native validation; a producer assertion or hashes cannot prove
 them. The original lightweight package remains available without these options.
 
 Do not install a lightweight package over a bundled-runtime installation. Both
-variants use `com.memory-layer.pkg`; macOS Installer can delete previously
-receipted runtime and `memory-onboard` files omitted from the replacement payload.
+variants use `dev.codifix.pkg`; macOS Installer can delete previously
+receipted runtime and `codifix-onboard` files omitted from the replacement payload.
 New lightweight packages refuse this replacement in preinstall when either the
 runtime directory or launcher is present, before payload changes.
 Older lightweight packages lack this protection and must not be used for such
@@ -130,8 +130,8 @@ an update. This guard does not implement runtime upgrades or repair missing file
 
 For application-only updates of an existing native installation, build with
 `./packaging/build-pkg.sh --arch aarch64 --application-update` (or `x86_64`).
-This creates `memory-layer-<version>-macos-<arch>-application-update.pkg` with
-the separate `com.memory-layer.application` receipt. It updates Memory, Web
+This creates `codifix-<version>-macos-<arch>-application-update.pkg` with
+the separate `dev.codifix.application` receipt. It updates Codifix, Web
 assets and onboarding helpers without taking ownership of or omitting files
 from the original runtime receipt. It requires an existing non-symlinked native
 installation on the startup volume and cannot include runtime inputs. It does
@@ -140,7 +140,7 @@ application and existing runtime after installation; package contract tests
 alone do not prove macOS Installer behavior.
 
 New runtime-containing packages use a manifest-digest-specific
-`com.memory-layer.runtime.<sha256>` receipt. Each new bundle ID is installed
+`dev.codifix.runtime.<sha256>` receipt. Each new bundle ID is installed
 side by side; Installer must not obsolete the earlier runtime. The launcher
 selects the new generation for new setup. Existing services retain their pinned
 paths and require an explicit migration/review; installing does not switch them.
@@ -155,8 +155,8 @@ recorded progress; none of these commands is native Mac acceptance evidence.
 
 Outputs:
 
-- `target/memory-layer-<version>-macos-x86_64.pkg`
-- `target/memory-layer-<version>-macos-aarch64.pkg`
+- `target/codifix-<version>-macos-x86_64.pkg`
+- `target/codifix-<version>-macos-aarch64.pkg`
 
 ## Official signing and notarization
 
@@ -170,7 +170,7 @@ For a proper public macOS distribution:
 One-time credential setup:
 
 ```bash
-xcrun notarytool store-credentials "memory-notary" \
+xcrun notarytool store-credentials "codifix-notary" \
   --apple-id "<apple-id>" \
   --team-id "<team-id>" \
   --password "<app-specific-password>"
@@ -182,51 +182,51 @@ Then build, sign, notarize, and staple in one pass:
 ./packaging/build-pkg.sh \
   --sign-app "Developer ID Application: <name> (<team-id>)" \
   --sign-pkg "Developer ID Installer: <name> (<team-id>)" \
-  --notarize --notary-profile "memory-notary"
+  --notarize --notary-profile "codifix-notary"
 ```
 
 Validation:
 
 ```bash
-pkgutil --check-signature target/memory-layer-<version>-macos-<arch>.pkg
-xcrun stapler validate target/memory-layer-<version>-macos-<arch>.pkg
-spctl -a -vv -t install target/memory-layer-<version>-macos-<arch>.pkg
-codesign --verify --verbose=2 /usr/local/bin/memory
+pkgutil --check-signature target/codifix-<version>-macos-<arch>.pkg
+xcrun stapler validate target/codifix-<version>-macos-<arch>.pkg
+spctl -a -vv -t install target/codifix-<version>-macos-<arch>.pkg
+codesign --verify --verbose=2 /usr/local/bin/codifix
 ```
 
 ## Homebrew formula
 
-The canonical Homebrew formula now lives in `../../Formula/memory-layer.rb`.
+The canonical Homebrew formula now lives in `../../Formula/codifix.rb`.
 
 Install from the tap:
 
 ```bash
-brew tap 3vilM33pl3/memory https://github.com/3vilM33pl3/memory
-brew install 3vilM33pl3/memory/memory-layer
+brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix
+brew install 3vilM33pl3/codifix/codifix
 ```
 
 For unreleased `main` branch changes:
 
 ```bash
-brew install --HEAD 3vilM33pl3/memory/memory-layer
+brew install --HEAD 3vilM33pl3/codifix/codifix
 ```
 
-Release tags publish `memory-<version>.tar.gz` as the Homebrew source archive.
-Refresh `Formula/memory-layer.rb` only after that archive exists on the GitHub
+Release tags publish `codifix-<version>.tar.gz` as the Homebrew source archive.
+Refresh `Formula/codifix.rb` only after that archive exists on the GitHub
 release and its SHA256 has been verified.
 
 For optional legacy local setup after installation, run these explicitly:
 
 ```bash
-memory wizard
-memory service enable
-memory watcher enable --project <slug>
+codifix wizard
+codifix service enable
+codifix watcher enable --project <slug>
 ```
 
-`memory service enable` provisions the shared service API token automatically if it is missing or still set to the development placeholder.
+`codifix service enable` provisions the shared service API token automatically if it is missing or still set to the development placeholder.
 
 This legacy wizard is not the company onboarding installer journey. Company
-device login (`memory auth login --company https://<company-origin>`) and browser
+device login (`codifix auth login --company https://<company-origin>`) and browser
 approval are separate foundations; native macOS Keychain/installer acceptance
 remains unverified. Reviewed project inventory alone does not clone repositories,
 activate named services, deliver offline data or perform selective sync; the
@@ -253,5 +253,5 @@ operation still require a separate macOS acceptance run.
 
 ## Service labels
 
-- Backend: `com.memory-layer.mem-service`
-- Watcher: `com.memory-layer.memory-watch.<project>`
+- Backend: `dev.codifix.service`
+- Watcher: `dev.codifix.watch.<project>`

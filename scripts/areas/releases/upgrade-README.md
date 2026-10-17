@@ -1,6 +1,6 @@
 # Upgrade an existing named instance
 
-`upgrade.py` upgrades one existing `memory-layer@NAME.service`. It is separate
+`upgrade.py` upgrades one existing `codifix@NAME.service`. It is separate
 from the inactive first installer and leaves its first-install restrictions
 intact. It does not modify singleton installations, containers, other units,
 configuration, enrollment, sandbox drop-ins, or signing keys.
@@ -20,7 +20,7 @@ operator checks the observed database head after health succeeds.
   Both require valid signatures from the supplied enrolled signing fingerprint.
   The installed binary/Web bytes must exactly match the previous release. The
   candidate must be strictly newer on the same native architecture. Supported
-  `2.1.0-rc.N` versions order numerically; stable `2.1.0` follows every supported
+  `3.0.0-rc.N` versions order numerically; stable `3.0.0` follows every supported
   candidate. Equal versions and stable-to-candidate downgrades are rejected.
   Signed versions and existing canonical manifest bytes are never rewritten.
 - The signed candidate schema interval must include the current observed head;
@@ -41,16 +41,16 @@ operator checks the observed database head after health succeeds.
 ## Upgrade
 
 ```bash
-sudo python3 -I -S /usr/libexec/memory-layer/releases/upgrade.py upgrade \
-  --instance trust --operation "$MEMORY_UPGRADE_OPERATION" \
-  --previous "$MEMORY_PREVIOUS_PREPARATION" \
-  --prepared "$MEMORY_CANDIDATE_PREPARATION" \
-  --trusted-signing-fingerprint "$MEMORY_RELEASE_SIGNING_FINGERPRINT" \
-  --config-sha256 "$MEMORY_REVIEWED_CONFIGURATION_SHA256" \
-  --schema-current "$MEMORY_OBSERVED_SCHEMA"
+sudo python3 -I -S /usr/libexec/codifix/releases/upgrade.py upgrade \
+  --instance trust --operation "$CODIFIX_UPGRADE_OPERATION" \
+  --previous "$CODIFIX_PREVIOUS_PREPARATION" \
+  --prepared "$CODIFIX_CANDIDATE_PREPARATION" \
+  --trusted-signing-fingerprint "$CODIFIX_RELEASE_SIGNING_FINGERPRINT" \
+  --config-sha256 "$CODIFIX_REVIEWED_CONFIGURATION_SHA256" \
+  --schema-current "$CODIFIX_OBSERVED_SCHEMA"
 ```
 
-The private journal is `/var/lib/memory-layer-upgrades/NAME/OPERATION/`. It holds
+The private journal is `/var/lib/codifix-upgrades/NAME/OPERATION/`. It holds
 reauthenticated release snapshots, the exact configuration and previous digest
 backup, configuration/systemd hashes, and a hash-chained durable event sequence.
 It contains credentials in the protected configuration backup: never publish
@@ -71,12 +71,12 @@ requests without proxies or redirects and must report the candidate version.
 ## Inspect and recover
 
 ```bash
-sudo python3 -I -S /usr/libexec/memory-layer/releases/upgrade.py inspect \
-  --instance trust --operation "$MEMORY_UPGRADE_OPERATION" \
-  --trusted-signing-fingerprint "$MEMORY_RELEASE_SIGNING_FINGERPRINT"
-sudo python3 -I -S /usr/libexec/memory-layer/releases/upgrade.py recover \
-  --instance trust --operation "$MEMORY_UPGRADE_OPERATION" \
-  --trusted-signing-fingerprint "$MEMORY_RELEASE_SIGNING_FINGERPRINT" \
+sudo python3 -I -S /usr/libexec/codifix/releases/upgrade.py inspect \
+  --instance trust --operation "$CODIFIX_UPGRADE_OPERATION" \
+  --trusted-signing-fingerprint "$CODIFIX_RELEASE_SIGNING_FINGERPRINT"
+sudo python3 -I -S /usr/libexec/codifix/releases/upgrade.py recover \
+  --instance trust --operation "$CODIFIX_UPGRADE_OPERATION" \
+  --trusted-signing-fingerprint "$CODIFIX_RELEASE_SIGNING_FINGERPRINT" \
   --action finish
 ```
 

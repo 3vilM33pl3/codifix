@@ -15,9 +15,9 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Resolve-Path (Join-Path $ScriptDir '..\..')
 $RootDir = $RootDir.Path
 $Target = 'x86_64-pc-windows-msvc'
-$Executables = @('memory.exe', 'memory-windows-service.exe', 'memory-area.exe',
-    'memory-area-import.exe', 'memory-gateway-schema.exe', 'memory-federation-gateway.exe',
-    'memory-federation-enroll.exe', 'memory-pds-pipe.exe', 'memory-workshop-worker.exe', 'memory-pi-sandbox.exe')
+$Executables = @('codifix.exe', 'codifix-windows-service.exe', 'codifix-area.exe',
+    'codifix-area-import.exe', 'codifix-gateway-schema.exe', 'codifix-federation-gateway.exe',
+    'codifix-federation-enroll.exe', 'codifix-pds-pipe.exe', 'codifix-workshop-worker.exe', 'codifix-pi-sandbox.exe')
 $CargoTargetDir = if ($env:CARGO_TARGET_DIR) {
     [System.IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)
 } else {
@@ -39,7 +39,7 @@ $BuildRoot = Join-Path $RootDir 'target\windows'
 $BuildReceiptPath = Join-Path $BuildRoot 'client-build-receipt.json'
 $StageDir = Join-Path $BuildRoot 'stage'
 $DistDir = Join-Path $BuildRoot "dist\$($Identity.release_identity)"
-$WxsPath = Join-Path $BuildRoot 'memory-layer.wxs'
+$WxsPath = Join-Path $BuildRoot 'codifix.wxs'
 $ZipPath = Join-Path $DistDir "$($Identity.asset_prefix).zip"
 $MsiPath = Join-Path $DistDir "$($Identity.asset_prefix).msi"
 $ServerToolsMsiPath = Join-Path $DistDir "$($Identity.asset_prefix)-server-tools.msi"
@@ -192,11 +192,11 @@ function New-WixDirectoryXml([string]$DirectoryPath, [string]$DirectoryId, [arra
 
     $cleanupId = "cleanup_$DirectoryId"
     $removeId = "remove_$DirectoryId"
-    $cleanupGuid = Get-DeterministicGuid "Memory Layer|component|$cleanupId"
+    $cleanupGuid = Get-DeterministicGuid "Codifix|component|$cleanupId"
     $ComponentRefs.Value += $cleanupId
     $xml += "$indent  <Component Id=`"$cleanupId`" Guid=`"{$cleanupGuid}`">"
     $xml += "$indent    <RemoveFolder Id=`"$removeId`" On=`"uninstall`" />"
-    $xml += "$indent    <RegistryValue Root=`"HKCU`" Key=`"Software\Memory Layer\Components`" Name=`"$cleanupId`" Type=`"integer`" Value=`"1`" KeyPath=`"yes`" />"
+    $xml += "$indent    <RegistryValue Root=`"HKCU`" Key=`"Software\Codifix\Components`" Name=`"$cleanupId`" Type=`"integer`" Value=`"1`" KeyPath=`"yes`" />"
     $xml += "$indent  </Component>"
 
     $files = $AllFiles | Where-Object { (Split-Path -Parent $_.FullName) -eq $DirectoryPath } | Sort-Object FullName
@@ -205,11 +205,11 @@ function New-WixDirectoryXml([string]$DirectoryPath, [string]$DirectoryId, [arra
         $idBase = Safe-Id($relative)
         $componentId = "cmp_$idBase"
         $fileId = "fil_$idBase"
-        $componentGuid = Get-DeterministicGuid "Memory Layer|component|$componentId"
+        $componentGuid = Get-DeterministicGuid "Codifix|component|$componentId"
         $ComponentRefs.Value += $componentId
         $xml += "$indent  <Component Id=`"$componentId`" Guid=`"{$componentGuid}`">"
         $xml += "$indent    <File Id=`"$fileId`" Source=`"$(Xml-Escape $file.FullName)`" />"
-        $xml += "$indent    <RegistryValue Root=`"HKCU`" Key=`"Software\Memory Layer\Components`" Name=`"$componentId`" Type=`"integer`" Value=`"1`" KeyPath=`"yes`" />"
+        $xml += "$indent    <RegistryValue Root=`"HKCU`" Key=`"Software\Codifix\Components`" Name=`"$componentId`" Type=`"integer`" Value=`"1`" KeyPath=`"yes`" />"
         $xml += "$indent  </Component>"
     }
 
@@ -239,9 +239,9 @@ if (-not $SkipBuild) {
         $env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = '16'
     }
     Write-Host "Using Windows Cargo release overrides: LTO=$env:CARGO_PROFILE_RELEASE_LTO CODEGEN_UNITS=$env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS"
-    cargo build --release --locked --features full --bin memory --target $Target --manifest-path (Join-Path $RootDir 'Cargo.toml')
-    if ($LASTEXITCODE -ne 0) { throw 'Memory build failed' }
-    cargo build --release --locked -p mem-platform -p mem-area -p mem-area-ops -p mem-federation-runtime -p mem-supervisor-runtime -p mem-supervisor-pi --bins --target $Target --manifest-path (Join-Path $RootDir 'Cargo.toml')
+    cargo build --release --locked --features full --bin codifix --target $Target --manifest-path (Join-Path $RootDir 'Cargo.toml')
+    if ($LASTEXITCODE -ne 0) { throw 'Codifix build failed' }
+    cargo build --release --locked -p codifix-platform -p codifix-area -p codifix-area-ops -p codifix-federation-runtime -p codifix-supervisor-runtime -p codifix-supervisor-pi --bins --target $Target --manifest-path (Join-Path $RootDir 'Cargo.toml')
     if ($LASTEXITCODE -ne 0) { throw 'First-party native operators build failed' }
     New-Item -ItemType Directory -Force -Path $BuildRoot | Out-Null
     [ordered]@{
@@ -278,7 +278,7 @@ if (Test-Path -LiteralPath $DistDir) { throw "Candidate output already exists; u
 Remove-Item -Recurse -Force $StageDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $StageDir, $DistDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'bin') | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\memory-layer') | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\codifix') | Out-Null
 
 foreach ($executable in $Executables) {
     $ExePath = Join-Path $CargoTargetDir "$Target\release\$executable"
@@ -286,20 +286,20 @@ foreach ($executable in $Executables) {
     Copy-Item -Force $ExePath (Join-Path $StageDir "bin\$executable")
 }
 Copy-Item -Force (Join-Path $RootDir 'README.md') (Join-Path $StageDir 'README.md')
-Copy-Item -Force (Join-Path $RootDir 'memory-layer.toml.example') (Join-Path $StageDir 'memory-layer.toml.example')
-Copy-Item -Force (Join-Path $RootDir 'packaging\windows\postgres.compose.yaml') (Join-Path $StageDir 'share\memory-layer\postgres.compose.yaml')
-Copy-Tree (Join-Path $RootDir 'web\dist') (Join-Path $StageDir 'share\memory-layer\web')
-Copy-Tree (Join-Path $RootDir '.agents\skills') (Join-Path $StageDir 'share\memory-layer\skill-template')
-Copy-Tree (Join-Path $RootDir 'packaging\windows-pds') (Join-Path $StageDir 'share\memory-layer\windows-pds')
-New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\memory-layer\operators') | Out-Null
+Copy-Item -Force (Join-Path $RootDir 'codifix.toml.example') (Join-Path $StageDir 'codifix.toml.example')
+Copy-Item -Force (Join-Path $RootDir 'packaging\windows\postgres.compose.yaml') (Join-Path $StageDir 'share\codifix\postgres.compose.yaml')
+Copy-Tree (Join-Path $RootDir 'web\dist') (Join-Path $StageDir 'share\codifix\web')
+Copy-Tree (Join-Path $RootDir '.agents\skills') (Join-Path $StageDir 'share\codifix\skill-template')
+Copy-Tree (Join-Path $RootDir 'packaging\windows-pds') (Join-Path $StageDir 'share\codifix\windows-pds')
+New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\codifix\operators') | Out-Null
 foreach ($operator in @('native-instance.ps1', 'native-instance-functions.ps1', 'release-identity.ps1',
     'native-prerequisites.ps1', 'native-prerequisites-functions.ps1',
     'native-postgres.ps1', 'native-postgres-preview.ps1', 'native-postgres-functions.ps1')) {
-    Copy-Item -LiteralPath (Join-Path $ScriptDir $operator) -Destination (Join-Path $StageDir "share\memory-layer\operators\$operator")
+    Copy-Item -LiteralPath (Join-Path $ScriptDir $operator) -Destination (Join-Path $StageDir "share\codifix\operators\$operator")
 }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'completions') | Out-Null
-& (Join-Path $StageDir 'bin\memory.exe') completion powershell | Out-File -Encoding utf8 (Join-Path $StageDir 'completions\memory.ps1')
+& (Join-Path $StageDir 'bin\codifix.exe') completion powershell | Out-File -Encoding utf8 (Join-Path $StageDir 'completions\codifix.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'PowerShell completion generation failed' }
 
 $fixedTimestamp = [datetime]::SpecifyKind([datetime]'2000-01-01T00:00:00', [System.DateTimeKind]::Utc)
@@ -316,19 +316,19 @@ foreach ($file in $rootFiles) {
     $idBase = Safe-Id($relative)
     $componentId = "cmp_$idBase"
     $fileId = "fil_$idBase"
-    $componentGuid = Get-DeterministicGuid "Memory Layer|component|$componentId"
+    $componentGuid = Get-DeterministicGuid "Codifix|component|$componentId"
     [void]$componentRefs.Add($componentId)
     $directoryXml += "        <Component Id=`"$componentId`" Guid=`"{$componentGuid}`">"
     $directoryXml += "          <File Id=`"$fileId`" Source=`"$(Xml-Escape $file.FullName)`" />"
-    $directoryXml += "          <RegistryValue Root=`"HKCU`" Key=`"Software\Memory Layer\Components`" Name=`"$componentId`" Type=`"integer`" Value=`"1`" KeyPath=`"yes`" />"
+    $directoryXml += "          <RegistryValue Root=`"HKCU`" Key=`"Software\Codifix\Components`" Name=`"$componentId`" Type=`"integer`" Value=`"1`" KeyPath=`"yes`" />"
     $directoryXml += "        </Component>"
 }
 
 [void]$componentRefs.Add('cmp_InstallFolderCleanup')
-$installCleanupGuid = Get-DeterministicGuid 'Memory Layer|component|cmp_InstallFolderCleanup'
+$installCleanupGuid = Get-DeterministicGuid 'Codifix|component|cmp_InstallFolderCleanup'
 $directoryXml += "        <Component Id=`"cmp_InstallFolderCleanup`" Guid=`"{$installCleanupGuid}`">"
 $directoryXml += '          <RemoveFolder Id="remove_InstallFolder" On="uninstall" />'
-$directoryXml += '          <RegistryValue Root="HKCU" Key="Software\Memory Layer\Components" Name="cmp_InstallFolderCleanup" Type="integer" Value="1" KeyPath="yes" />'
+$directoryXml += '          <RegistryValue Root="HKCU" Key="Software\Codifix\Components" Name="cmp_InstallFolderCleanup" Type="integer" Value="1" KeyPath="yes" />'
 $directoryXml += '        </Component>'
 
 foreach ($dir in (Get-ChildItem -LiteralPath $StageDir -Directory | Sort-Object FullName)) {
@@ -339,32 +339,32 @@ foreach ($dir in (Get-ChildItem -LiteralPath $StageDir -Directory | Sort-Object 
 $componentRefs += 'cmp_ProgramsFolderCleanup'
 
 $featureRefs = $componentRefs | Sort-Object | ForEach-Object { "      <ComponentRef Id=`"$_`" />" }
-$upgradeCode = '7E6D7DA0-7D74-43F0-B816-E422B9E01B82'
-$productCode = Get-DeterministicGuid "Memory Layer|$($Identity.release_identity)|x64|perUser"
-$packageCode = Get-DeterministicGuid "Memory Layer|package|$($Identity.release_identity)|$SourceCommit|x64|perUser"
-$programsCleanupGuid = Get-DeterministicGuid 'Memory Layer|component|cmp_ProgramsFolderCleanup'
-$userPathGuid = Get-DeterministicGuid 'Memory Layer|component|cmp_UserPath'
+$upgradeCode = 'C956DBF2-EE64-5A94-B05E-77D35B330F67'
+$productCode = Get-DeterministicGuid "Codifix|$($Identity.release_identity)|x64|perUser"
+$packageCode = Get-DeterministicGuid "Codifix|package|$($Identity.release_identity)|$SourceCommit|x64|perUser"
+$programsCleanupGuid = Get-DeterministicGuid 'Codifix|component|cmp_ProgramsFolderCleanup'
+$userPathGuid = Get-DeterministicGuid 'Codifix|component|cmp_UserPath'
 $wxs = @"
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package ProductCode="{$productCode}" Name="Memory Layer" Manufacturer="Memory Layer" Version="$MsiVersion" UpgradeCode="{$upgradeCode}" Scope="perUser">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Memory Layer is already installed." />
+  <Package ProductCode="{$productCode}" Name="Codifix" Manufacturer="Codifix" Version="$MsiVersion" UpgradeCode="{$upgradeCode}" Scope="perUser">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Codifix is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsFolder" Name="Programs">
         <Component Id="cmp_ProgramsFolderCleanup" Guid="{$programsCleanupGuid}">
           <RemoveFolder Id="remove_ProgramsFolder" On="uninstall" />
-          <RegistryValue Root="HKCU" Key="Software\Memory Layer\Components" Name="cmp_ProgramsFolderCleanup" Type="integer" Value="1" KeyPath="yes" />
+          <RegistryValue Root="HKCU" Key="Software\Codifix\Components" Name="cmp_ProgramsFolderCleanup" Type="integer" Value="1" KeyPath="yes" />
         </Component>
-        <Directory Id="INSTALLFOLDER" Name="Memory Layer">
+        <Directory Id="INSTALLFOLDER" Name="Codifix">
 $($directoryXml -join "`n")
           <Component Id="cmp_UserPath" Guid="{$userPathGuid}">
             <Environment Id="env_UserPath" Name="PATH" Value="[INSTALLFOLDER]bin" Action="set" Part="last" System="no" />
-            <RegistryValue Root="HKCU" Key="Software\Memory Layer" Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+            <RegistryValue Root="HKCU" Key="Software\Codifix" Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
           </Component>
         </Directory>
       </Directory>
     </StandardDirectory>
-    <Feature Id="Main" Title="Memory Layer" Level="1">
+    <Feature Id="Main" Title="Codifix" Level="1">
 $($featureRefs -join "`n")
       <ComponentRef Id="cmp_UserPath" />
     </Feature>
@@ -383,23 +383,23 @@ Normalize-Msi -Path $MsiPath -PackageCode $packageCode
 # Separate machine-level tools scaffold. It neither provisions third-party
 # dependencies nor starts services/custom actions under an installer identity.
 # State and immutable service releases remain outside the MSI-owned directory.
-$serverUpgradeCode = 'B209C344-2641-4F0C-BEAF-37A9C827C243'
-$serverProductCode = Get-DeterministicGuid "Memory Layer|server-tools|$($Identity.release_identity)|x64"
-$serverPackageCode = Get-DeterministicGuid "Memory Layer|server-tools-package|$($Identity.release_identity)|$SourceCommit|x64"
-$serverDirectoryXml = ($directoryXml -join "`n").Replace('Root="HKCU"', 'Root="HKLM"').Replace('Software\Memory Layer\Components', 'Software\Memory Layer Native Server Tools\Components')
+$serverUpgradeCode = '356D7E23-5C49-5D9B-BE8E-D6BB9A02F958'
+$serverProductCode = Get-DeterministicGuid "Codifix|server-tools|$($Identity.release_identity)|x64"
+$serverPackageCode = Get-DeterministicGuid "Codifix|server-tools-package|$($Identity.release_identity)|$SourceCommit|x64"
+$serverDirectoryXml = ($directoryXml -join "`n").Replace('Root="HKCU"', 'Root="HKLM"').Replace('Software\Codifix\Components', 'Software\Codifix Native Server Tools\Components')
 $serverDirectoryXml = [regex]::Replace($serverDirectoryXml, 'Guid="\{([A-Fa-f0-9-]+)\}"', {
     param($match)
-    'Guid="{' + (Get-DeterministicGuid "Memory Layer|server-tools-component|$($match.Groups[1].Value)") + '}"'
+    'Guid="{' + (Get-DeterministicGuid "Codifix|server-tools-component|$($match.Groups[1].Value)") + '}"'
 })
 $serverFeatureRefs = $componentRefs | Where-Object { $_ -ne 'cmp_ProgramsFolderCleanup' } | Sort-Object | ForEach-Object { "      <ComponentRef Id=`"$_`" />" }
-$serverWxsPath = Join-Path $BuildRoot 'memory-layer-server-tools.wxs'
+$serverWxsPath = Join-Path $BuildRoot 'codifix-server-tools.wxs'
 $serverWxs = @"
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package ProductCode="{$serverProductCode}" Name="Memory Layer Native Server Tools" Manufacturer="Memory Layer" Version="$MsiVersion" UpgradeCode="{$serverUpgradeCode}" Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer Memory Layer server tools build is installed." />
+  <Package ProductCode="{$serverProductCode}" Name="Codifix Native Server Tools" Manufacturer="Codifix" Version="$MsiVersion" UpgradeCode="{$serverUpgradeCode}" Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer Codifix server tools build is installed." />
     <MediaTemplate EmbedCab="yes" />
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="Memory Layer Native Server Tools">
+      <Directory Id="INSTALLFOLDER" Name="Codifix Native Server Tools">
 $serverDirectoryXml
       </Directory>
     </StandardDirectory>

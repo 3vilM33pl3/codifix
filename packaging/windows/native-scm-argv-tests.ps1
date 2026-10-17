@@ -3,12 +3,12 @@
 $ErrorActionPreference='Stop'
 if($env:OS -ne 'Windows_NT'){throw 'Native Windows argv parser required'}
 . (Join-Path $PSScriptRoot 'native-instance-functions.ps1')
-if(-not ('MemoryLayer.NativeScmArgvFixture' -as [type])){
+if(-not ('Codifix.NativeScmArgvFixture' -as [type])){
     Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-namespace MemoryLayer {
+namespace Codifix {
     public static class NativeScmArgvFixture {
         [DllImport("shell32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
         private static extern IntPtr CommandLineToArgvW(string command, out int count);
@@ -29,18 +29,18 @@ namespace MemoryLayer {
 }
 '@
 }
-$serviceValues=@('C:\Program Files\Memory Layer\bin\memory-windows-service.exe','--name','MemoryLayer-synthetic',
-    '--directory','C:\ProgramData\MemoryLayer\instances\synthetic','--','C:\Program Files\Memory Layer\bin\memory.exe',
-    '--config','C:\ProgramData\MemoryLayer\configurations\synthetic\memory-layer.toml','service','run')
+$serviceValues=@('C:\Program Files\Codifix\bin\codifix-windows-service.exe','--name','Codifix-synthetic',
+    '--directory','C:\ProgramData\Codifix\instances\synthetic','--','C:\Program Files\Codifix\bin\codifix.exe',
+    '--config','C:\ProgramData\Codifix\configurations\synthetic\codifix.toml','service','run')
 $binaryPath=($serviceValues | ForEach-Object {ConvertTo-NativeCommandArgument $_}) -join ' '
-$scValues=@('create','MemoryLayer-synthetic','binPath=',$binaryPath,'start=','demand','obj=','NT SERVICE\MemoryLayer-synthetic')
+$scValues=@('create','Codifix-synthetic','binPath=',$binaryPath,'start=','demand','obj=','NT SERVICE\Codifix-synthetic')
 $encoded=($scValues | ForEach-Object {ConvertTo-NativeCommandArgument $_}) -join ' '
-$observed=[MemoryLayer.NativeScmArgvFixture]::Parse('sc.exe '+$encoded)
+$observed=[Codifix.NativeScmArgvFixture]::Parse('sc.exe '+$encoded)
 if($observed.Count -ne ($scValues.Count+1)){throw 'SCM argv boundary count changed'}
 for($index=0;$index -lt $scValues.Count;$index++){
     if($observed[$index+1] -cne $scValues[$index]){throw 'SCM argument boundary or embedded binaryPath quotes changed'}
 }
-$child=[MemoryLayer.NativeScmArgvFixture]::Parse($observed[4])
+$child=[Codifix.NativeScmArgvFixture]::Parse($observed[4])
 if($child.Count -ne $serviceValues.Count){throw 'Stored service command argument count changed'}
 for($index=0;$index -lt $serviceValues.Count;$index++){
     if($child[$index] -cne $serviceValues[$index]){throw 'Stored service command argument changed'}

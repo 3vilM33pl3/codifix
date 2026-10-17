@@ -146,7 +146,7 @@ def missing(file, data):
         if bytes_at(file) != data:
             raise Refused("existing operator file differs; preserve it and inspect, never overwrite")
         return
-    temporary = ".memory-new-" + uuid.uuid4().hex
+    temporary = ".codifix-new-" + uuid.uuid4().hex
     parent = parent_descriptor(file)
     try:
         fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=parent)
@@ -191,7 +191,7 @@ def save(file, journal):
     previous = read(file)
     if previous["request_id"] != journal["request_id"] or previous["plan_sha256"] != journal["plan_sha256"]:
         raise Refused("journal changed; no replacement")
-    temporary = ".memory-journal-" + uuid.uuid4().hex
+    temporary = ".codifix-journal-" + uuid.uuid4().hex
     parent = parent_descriptor(file)
     try:
         fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=parent)
@@ -211,7 +211,7 @@ def save(file, journal):
 
 class Lock:
     def __init__(self, file):
-        self.file = path(str(file) + ".memory-lock")
+        self.file = path(str(file) + ".codifix-lock")
     def __enter__(self):
         parent = parent_descriptor(self.file)
         try:

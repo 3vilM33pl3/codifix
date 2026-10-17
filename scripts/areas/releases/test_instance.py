@@ -31,7 +31,7 @@ FIXTURE = load("test_release")
 
 def archive(path, files=None, members=None):
     with tarfile.open(path, "w:gz") as stream:
-        for name, data in (files or {"bin/memory": b"synthetic never executable", "web/index.html": b"<p>fixture</p>",
+        for name, data in (files or {"bin/codifix": b"synthetic never executable", "web/index.html": b"<p>fixture</p>",
                                    "web/assets/main.js": b"fixture javascript"}).items():
             info = tarfile.TarInfo(name)
             info.size = len(data)
@@ -43,7 +43,7 @@ def archive(path, files=None, members=None):
 
 class ArchiveTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="memory-instance-archive-test-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="codifix-instance-archive-test-")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.path = self.root / "release.tar.gz"
@@ -55,14 +55,14 @@ class ArchiveTests(unittest.TestCase):
     def test_complete_hashes_and_normalized_modes(self):
         archive(self.path)
         files = self.inspect()
-        self.assertEqual(set(files), {"bin/memory", "web/index.html", "web/assets/main.js"})
-        self.assertEqual(files["bin/memory"]["mode"], 0o500)
+        self.assertEqual(set(files), {"bin/codifix", "web/index.html", "web/assets/main.js"})
+        self.assertEqual(files["bin/codifix"]["mode"], 0o500)
         self.assertEqual(files["web/index.html"]["mode"], 0o400)
 
     def test_path_traversal_absolute_and_hook_paths_rejected(self):
         for name in ("../escape", "/etc/passwd", "web/../escape", "web//x", "web/./x", "postinst", "bin/pi"):
             with self.subTest(name=name):
-                archive(self.path, {"bin/memory": b"x", "web/index.html": b"x", name: b"x"})
+                archive(self.path, {"bin/codifix": b"x", "web/index.html": b"x", name: b"x"})
                 with self.assertRaises(TOOL.release.ReleaseError):
                     self.inspect()
 
@@ -188,7 +188,7 @@ class SignedPreparationTests(unittest.TestCase):
         cls.addClassCleanup(FIXTURE.SignatureTests.tearDownClass)
 
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="memory-instance-signed-test-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="codifix-instance-signed-test-")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         for name in ("stages", "rehearsals"):
@@ -197,21 +197,21 @@ class SignedPreparationTests(unittest.TestCase):
     def bundle(self, version=1, schema=60, **changes):
         source = self.root / ("bundle-" + str(version))
         source.mkdir(mode=0o700)
-        archive(source / "memory-arm64.tar.gz", {"bin/memory": f"never executed {version}".encode(),
+        archive(source / "codifix-arm64.tar.gz", {"bin/codifix": f"never executed {version}".encode(),
                                                 "web/index.html": f"<p>{version}</p>".encode()})
-        (source / "memory-amd64").write_bytes(b"unselected synthetic artifact")
+        (source / "codifix-amd64").write_bytes(b"unselected synthetic artifact")
         (source / "signing-public-key.asc").write_bytes(FIXTURE.SignatureTests.public)
-        release_version = version if isinstance(version, str) else f"2.1.0-rc.{version}"
+        release_version = version if isinstance(version, str) else f"3.0.0-rc.{version}"
         args = FIXTURE.creator(source, version=release_version, schema_floor=schema, schema_head=schema,
-                               artifact=[f"amd64:binary:{source}/memory-amd64",
-                                         f"arm64:archive:{source}/memory-arm64.tar.gz"], **changes)
+                               artifact=[f"amd64:binary:{source}/codifix-amd64",
+                                         f"arm64:archive:{source}/codifix-arm64.tar.gz"], **changes)
         TOOL.release.create(args)
         FIXTURE.SignatureTests.command(["--local-user", FIXTURE.SignatureTests.signer + "!", "--digest-algo", "SHA256",
                                        "--output", str(source / "manifest.sig"), "--detach-sign", str(source / "manifest.json")])
         return argparse.Namespace(manifest=str(source / "manifest.json"), signature=str(source / "manifest.sig"),
             public_key=str(source / "signing-public-key.asc"), trusted_signing_fingerprint=FIXTURE.SignatureTests.signer,
             architecture="arm64", schema_current=schema, artifacts_dir=str(source), staging_parent=str(self.root / "stages"),
-            instance="trust", release_archive="memory-arm64.tar.gz")
+            instance="trust", release_archive="codifix-arm64.tar.gz")
 
     def prepare(self, version=1, schema=60, **changes):
         return TOOL.prepare(self.bundle(version, schema, **changes))
@@ -232,14 +232,14 @@ class SignedPreparationTests(unittest.TestCase):
         self.assertFalse(first["installation_authorized"])
         self.assertFalse(first["artifact_execution_tested"])
         self.assertFalse(first["database_schema_verified"])
-        self.assertEqual(first["plan"]["unit"], "memory-layer@trust.service")
+        self.assertEqual(first["plan"]["unit"], "codifix@trust.service")
         verified = TOOL.verify_prepared(first["preparation_directory"], args.trusted_signing_fingerprint, "trust", 60)
         self.assertEqual(verified["manifest_sha256"], first["manifest_sha256"])
         with self.assertRaises(TOOL.release.ReleaseError):
             TOOL.verify_prepared(first["preparation_directory"], args.trusted_signing_fingerprint, "general", 60)
 
     def test_signed_candidate_to_stable_and_equal_or_reverse_rejection(self):
-        prior, stable = self.prepare(999999), self.prepare("2.1.0")
+        prior, stable = self.prepare(999999), self.prepare("3.0.0")
         result = self.rehearsal(prior, stable)
         self.assertFalse(result["installation_authorized"])
         for previous, candidate in ((stable, prior), (stable, stable), (prior, prior)):
@@ -254,7 +254,7 @@ class SignedPreparationTests(unittest.TestCase):
         self.assertTrue(result["prepared_sources_unchanged"])
         self.assertFalse(result["service_or_binary_executed"])
         root = Path(result["rehearsal_directory"])
-        self.assertEqual((root / "trust/release/bin/memory").read_bytes(), b"never executed 1")
+        self.assertEqual((root / "trust/release/bin/codifix").read_bytes(), b"never executed 1")
         self.assertEqual((root / "trust/retained-candidate/web/index.html").read_bytes(), b"<p>2</p>")
         self.assertEqual(sorted(path.name for path in root.iterdir()), ["result.json", "scope.json", "trust"])
 
@@ -272,7 +272,7 @@ class SignedPreparationTests(unittest.TestCase):
     def test_unsigned_tampered_manifest_and_wrong_archive_selection_fail(self):
         args = self.bundle()
         changed = copy.copy(args)
-        changed.release_archive = "memory-amd64"
+        changed.release_archive = "codifix-amd64"
         with self.assertRaises(TOOL.release.ReleaseError):
             TOOL.prepare(changed)
         manifest = Path(args.manifest)
@@ -293,7 +293,7 @@ class SignedPreparationTests(unittest.TestCase):
         with self.assertRaises(TOOL.release.ReleaseError):
             TOOL.verify_prepared(root, signer, "trust", 60)
         (root / TOOL.PREPARATION).write_bytes(original)
-        binary = root / "release/bin/memory"
+        binary = root / "release/bin/codifix"
         os.chmod(binary, 0o700)
         with self.assertRaises(TOOL.release.ReleaseError):
             TOOL.verify_prepared(root, signer, "trust", 60)
@@ -316,7 +316,7 @@ class SignedPreparationTests(unittest.TestCase):
         with self.assertRaises(TOOL.release.ReleaseError):
             TOOL.verify_prepared(root, FIXTURE.SignatureTests.signer, "trust", 60)
         web.unlink()
-        web.symlink_to(root / "release/bin/memory")
+        web.symlink_to(root / "release/bin/codifix")
         with self.assertRaises(TOOL.release.ReleaseError):
             TOOL.verify_prepared(root, FIXTURE.SignatureTests.signer, "trust", 60)
 

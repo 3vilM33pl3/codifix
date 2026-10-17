@@ -27,32 +27,32 @@ const lockedAppEnvironment = Object.freeze({
   XDG_DATA_HOME: '/state/data',
   XDG_CACHE_HOME: '/state/cache',
   XDG_STATE_HOME: '/state/local-state',
-  MEMORY_LAYER_PROFILE: 'prod',
-  MEMORY_LAYER__SERVICE__BIND_ADDR: '0.0.0.0:4040',
-  MEMORY_LAYER__SERVICE__WEB_ROOT: '/opt/memory/web',
-  MEMORY_LAYER__DATABASE__MIGRATIONS: 'verify_only',
-  MEMORY_LAYER__OFFLINE__ENABLED: 'false',
-  MEMORY_LAYER__CLUSTER__ENABLED: 'false',
-  MEMORY_LAYER__BACKGROUND_WORK__ENABLED: 'false',
-  MEMORY_LAYER__BACKGROUND_WORK__INTERNAL_AUTOMATION: 'false',
-  MEMORY_LAYER__AUTOMATION__ENABLED: 'false',
-  MEMORY_LAYER__FEATURES__LLM_CURATION: 'false',
-  MEMORY_LAYER__EMBEDDINGS__ENABLED: 'false',
-  MEMORY_LAYER__EMBEDDINGS__CREATE_ENABLED: 'false',
-  MEMORY_LAYER__CONSOLIDATION__ENABLED: 'false',
-  MEMORY_LAYER__CONSOLIDATION__AUTO_TRIGGER: 'false',
-  MEMORY_LAYER__REINFORCEMENT__VALIDATION_ENABLED: 'false',
-  MEMORY_LAYER__PROVENANCE__REVERIFY_ENABLED: 'false',
-  MEMORY_LAYER__TELEMETRY__ENABLED: 'false',
-  MEMORY_LAYER__LLM_AUDIT__ENABLED: 'false',
-  MEMORY_LAYER__MCP__ENABLED: 'false',
-  MEMORY_LAYER__MCP__HTTP_ENABLED: 'false',
+  CODIFIX_PROFILE: 'prod',
+  CODIFIX__SERVICE__BIND_ADDR: '0.0.0.0:4040',
+  CODIFIX__SERVICE__WEB_ROOT: '/opt/codifix/web',
+  CODIFIX__DATABASE__MIGRATIONS: 'verify_only',
+  CODIFIX__OFFLINE__ENABLED: 'false',
+  CODIFIX__CLUSTER__ENABLED: 'false',
+  CODIFIX__BACKGROUND_WORK__ENABLED: 'false',
+  CODIFIX__BACKGROUND_WORK__INTERNAL_AUTOMATION: 'false',
+  CODIFIX__AUTOMATION__ENABLED: 'false',
+  CODIFIX__FEATURES__LLM_CURATION: 'false',
+  CODIFIX__EMBEDDINGS__ENABLED: 'false',
+  CODIFIX__EMBEDDINGS__CREATE_ENABLED: 'false',
+  CODIFIX__CONSOLIDATION__ENABLED: 'false',
+  CODIFIX__CONSOLIDATION__AUTO_TRIGGER: 'false',
+  CODIFIX__REINFORCEMENT__VALIDATION_ENABLED: 'false',
+  CODIFIX__PROVENANCE__REVERIFY_ENABLED: 'false',
+  CODIFIX__TELEMETRY__ENABLED: 'false',
+  CODIFIX__LLM_AUDIT__ENABLED: 'false',
+  CODIFIX__MCP__ENABLED: 'false',
+  CODIFIX__MCP__HTTP_ENABLED: 'false',
   // No provider credentials are mounted. Empty model plus a closed loopback
   // endpoint prevents an ordinary query from choosing an external fallback.
-  MEMORY_LAYER__LLM__MODEL: '',
-  MEMORY_LAYER__LLM__BASE_URL: 'http://127.0.0.1:9/v1',
-  MEMORY_LAYER__LLM__API_KEY_ENV: 'MEMORY_COMPANY_MODEL_DISABLED',
-  MEMORY_COMPANY_MODEL_DISABLED: '',
+  CODIFIX__LLM__MODEL: '',
+  CODIFIX__LLM__BASE_URL: 'http://127.0.0.1:9/v1',
+  CODIFIX__LLM__API_KEY_ENV: 'CODIFIX_COMPANY_MODEL_DISABLED',
+  CODIFIX_COMPANY_MODEL_DISABLED: '',
   OPENAI_API_KEY: '',
   ANTHROPIC_API_KEY: '',
 });
@@ -127,13 +127,13 @@ export function companyTopology(input) {
     const env = { ...lockedAppEnvironment };
     const mounts = [bind(`members/${id}/app.toml`, '/config/app.toml', app, true)];
     if (federationEnabled) {
-      env.MEMORY_LAYER_FEDERATION_CONFIG = '/config/federation.json';
+      env.CODIFIX_FEDERATION_CONFIG = '/config/federation.json';
       mounts.push(bind(`members/${id}/federation.json`, '/config/federation.json', app, true),
         bind(`members/${id}/gateway-token`, '/run/secrets/gateway-token', app, true), bind('tls/ca.pem', '/run/trust/ca.pem', app));
     }
     compose.volumes[`${id}_app_state`] = {};
     mounts.push({ type: 'volume', source: `${id}_app_state`, target: '/state' });
-    compose.services[app] = { ...base('app'), entrypoint: ['/usr/local/bin/memory'], command: ['--config', '/config/app.toml', 'service', 'run'],
+    compose.services[app] = { ...base('app'), entrypoint: ['/usr/local/bin/codifix'], command: ['--config', '/config/app.toml', 'service', 'run'],
       environment: env, volumes: mounts, networks: [local, db, link] };
     database(`${id}_db`, db, `members/${id}/database`, `memory_${id.replaceAll('-', '_')}`);
     proxy(`${id}_edge`, `members/${id}/tls`, `${id}.${input.domain}`, `${app}:4040`, ['/', '/assets/*', '/v1/*', '/ws'], { [local]: {}, [ingress]: { aliases: [`${id}.${input.domain}`] } });
@@ -141,7 +141,7 @@ export function companyTopology(input) {
     gatewayMounts.push(bind(`gateway/member-tokens/${id}`, `/run/secrets/member-${id}-token`, 'gateway', true));
     endpoints.members[id] = { url: `https://${id}.${input.domain}:8443`, ingressNetwork: `${input.name}_${ingress}`, database: `memory_${id.replaceAll('-', '_')}` };
   }
-  compose.services.gateway = { ...base('gateway'), entrypoint: ['/usr/local/bin/memory-federation-gateway'], command: ['/config/gateway.json'],
+  compose.services.gateway = { ...base('gateway'), entrypoint: ['/usr/local/bin/codifix-federation-gateway'], command: ['/config/gateway.json'],
     volumes: gatewayMounts, networks: ['gateway_api', 'gateway_database', 'pds_client'] };
   database('gateway_db', 'gateway_database', 'gateway/database', 'memory_gateway');
   proxy('gateway_edge', 'gateway/tls', `gateway.${input.domain}`, 'gateway:4055', ['/v1/accept', '/v1/pull', '/v1/retention', '/v1/status', ...(expertiseRoutes ? ['/v1/expertise'] : [])], edgeNetworks);

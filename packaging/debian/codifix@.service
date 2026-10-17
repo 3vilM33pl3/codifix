@@ -1,30 +1,30 @@
 [Unit]
-Description=Memory Layer instance %i
-Documentation=file:/usr/share/doc/memory-layer/areas/README.md
+Description=Codifix instance %i
+Documentation=file:/usr/share/doc/codifix/areas/README.md
 After=network.target postgresql.service
 # Configuration, executable and approval marker are staged by the operator.
 # Installing a package neither creates these files nor enables this unit.
-ConditionPathExists=/etc/memory-layer-instances/%i/activation-reviewed
-ConditionPathExists=/opt/memory-layer/instances/%i/release/bin/memory
+ConditionPathExists=/etc/codifix-instances/%i/activation-reviewed
+ConditionPathExists=/opt/codifix/instances/%i/release/bin/codifix
 
 [Service]
 Type=simple
 DynamicUser=true
-User=memory-area-%i
-Group=memory-area-%i
-StateDirectory=memory-layer-instances/%i/service
+User=codifix-area-%i
+Group=codifix-area-%i
+StateDirectory=codifix-instances/%i/service
 StateDirectoryMode=0700
-CacheDirectory=memory-layer-instances/%i/service
+CacheDirectory=codifix-instances/%i/service
 CacheDirectoryMode=0700
-RuntimeDirectory=memory-layer-instances/%i/service
+RuntimeDirectory=codifix-instances/%i/service
 RuntimeDirectoryMode=0700
-WorkingDirectory=/var/lib/memory-layer-instances/%i/service
-LoadCredential=memory-layer.toml:/etc/memory-layer-instances/%i/memory-layer.toml
-LoadCredential=memory.sha256:/etc/memory-layer-instances/%i/memory.sha256
+WorkingDirectory=/var/lib/codifix-instances/%i/service
+LoadCredential=codifix.toml:/etc/codifix-instances/%i/codifix.toml
+LoadCredential=codifix.sha256:/etc/codifix-instances/%i/codifix.sha256
 # A finite environment is built by the launcher. Partial UnsetEnvironment lists
-# cannot prevent arbitrary MEMORY_LAYER__ overrides or inherited federation.
-ExecStartPre=/usr/bin/env -i PATH=/usr/bin:/bin /usr/libexec/memory-layer/verify-instance-release %i %d/memory.sha256
-ExecStart=/usr/libexec/memory-layer/run-instance %i %d
+# cannot prevent arbitrary CODIFIX__ overrides or inherited federation.
+ExecStartPre=/usr/bin/env -i PATH=/usr/bin:/bin /usr/libexec/codifix/verify-instance-release %i %d/codifix.sha256
+ExecStart=/usr/libexec/codifix/run-instance %i %d
 Restart=on-failure
 RestartSec=5
 UMask=0077
@@ -58,7 +58,7 @@ IPAddressAllow=localhost
 # Source credentials are loaded by the service manager before this namespace.
 # CA-specific deployments must additionally deny every locally inventoried
 # signing/OpenBao storage path; this template is not a CA activation approval.
-InaccessiblePaths=-/etc/memory-layer-instances -/var/lib/memory-layer-installations -/etc/memory-layer -/var/lib/memory-layer -/var/cache/memory-layer -/run/memory-layer -/etc/step-ca -/var/lib/step-ca -/etc/openbao -/var/lib/openbao -/etc/vault -/var/lib/vault -/run/docker.sock -/run/podman/podman.sock
+InaccessiblePaths=-/etc/codifix-instances -/var/lib/codifix-installations -/etc/codifix -/var/lib/codifix -/var/cache/codifix -/run/codifix -/etc/step-ca -/var/lib/step-ca -/etc/openbao -/var/lib/openbao -/etc/vault -/var/lib/vault -/run/docker.sock -/run/podman/podman.sock
 
 [Install]
 WantedBy=multi-user.target

@@ -39,7 +39,7 @@ class Interrupted(BaseException):
 
 class SystemdTests(unittest.TestCase):
     def state(self, **changes):
-        unit = "memory-layer@trust.service"
+        unit = "codifix@trust.service"
         value = dict(LoadState="not-found", ActiveState="inactive", SubState="dead", MainPID="0",
             ControlPID="0", Job="", Id=unit, Names=unit, FragmentPath="", DropInPaths="",
             Transient="no", UnitFileState="")
@@ -54,7 +54,7 @@ class SystemdTests(unittest.TestCase):
             TOOL.check_systemd("trust")
         command = run.call_args.args[0]
         self.assertEqual(command[:3], ["/usr/bin/systemctl", "show", "--no-pager"])
-        self.assertEqual(command[-2:], ["--", "memory-layer@trust.service"])
+        self.assertEqual(command[-2:], ["--", "codifix@trust.service"])
         self.assertEqual(run.call_args.kwargs["env"],
                          {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "SYSTEMD_PAGER": ""})
         self.assertEqual(run.call_args.kwargs["timeout"], 15)
@@ -62,8 +62,8 @@ class SystemdTests(unittest.TestCase):
     def test_systemctl_rejects_active_pending_alias_override_and_malformed_state(self):
         invalid = [self.state(ActiveState="active"), self.state(MainPID="123"), self.state(ControlPID="123"),
                    self.state(Job="17 /org/freedesktop/systemd1/job/17"), self.state(Transient="yes"),
-                   self.state(Names="memory-layer@trust.service other.service"),
-                   self.state(DropInPaths="/etc/systemd/system/memory-layer@trust.service.d/override.conf"),
+                   self.state(Names="codifix@trust.service other.service"),
+                   self.state(DropInPaths="/etc/systemd/system/codifix@trust.service.d/override.conf"),
                    self.state(UnitFileState="enabled"), self.state().replace(b"ControlPID=0\n", b""),
                    self.state() + b"MainPID=0\n", self.state() + b"malformed\n"]
         for index, output in enumerate(invalid):
@@ -73,10 +73,10 @@ class SystemdTests(unittest.TestCase):
                     TOOL.check_systemd("trust")
 
     def test_reviewed_unit_digest_matches_repository_and_loaded_unit(self):
-        template = Path(__file__).resolve().parents[3] / "packaging/debian/memory-layer@.service"
+        template = Path(__file__).resolve().parents[3] / "packaging/debian/codifix@.service"
         contents = template.read_bytes()
         self.assertEqual(TOOL.checksum(contents), TOOL.UNIT_SHA256)
-        fragment = Path("/usr/lib/systemd/system/memory-layer@.service")
+        fragment = Path("/usr/lib/systemd/system/codifix@.service")
         result = mock.Mock(stdout=self.state(LoadState="loaded", UnitFileState="disabled",
                           FragmentPath=str(fragment)), stderr=b"", returncode=0)
         with mock.patch.object(TOOL.subprocess, "run", return_value=result), \
@@ -103,7 +103,7 @@ class ConsoleTests(unittest.TestCase):
         self.addCleanup(os.umask, previous_umask)
         # The production trust walk permits root-owned sticky /tmp; the host's
         # ambient TMPDIR can be a user-owned shared directory and is untrusted.
-        self.temporary = tempfile.TemporaryDirectory(prefix="memory-console-test-", dir="/tmp")
+        self.temporary = tempfile.TemporaryDirectory(prefix="codifix-console-test-", dir="/tmp")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.layout = TOOL.Layout(self.root / "host")
@@ -118,16 +118,16 @@ class ConsoleTests(unittest.TestCase):
         binary[:6] = b"\x7fELF\x02\x01"
         binary[18:20] = b"\x3e\x00" if ARCHITECTURE == "amd64" else b"\xb7\x00"
         self.binary = bytes(binary) + b"synthetic fixture, never executed"
-        self.files = {"bin/memory": self.binary, "web/index.html": b"<p>signed fixture</p>",
+        self.files = {"bin/codifix": self.binary, "web/index.html": b"<p>signed fixture</p>",
                       "web/assets/deep/main.js": b"/* signed synthetic asset */"}
-        archive = f"memory-{ARCHITECTURE}.tar.gz"
+        archive = f"codifix-{ARCHITECTURE}.tar.gz"
         FIXTURE.archive(source / archive, self.files)
         other = "arm64" if ARCHITECTURE == "amd64" else "amd64"
-        (source / ("memory-" + other)).write_bytes(b"unselected synthetic artifact")
+        (source / ("codifix-" + other)).write_bytes(b"unselected synthetic artifact")
         (source / "signing-public-key.asc").write_bytes(FIXTURE.FIXTURE.SignatureTests.public)
         TOOL.release.create(FIXTURE.FIXTURE.creator(source, schema_floor=60, schema_head=60,
             artifact=[f"{ARCHITECTURE}:archive:{source / archive}",
-                      f"{other}:binary:{source / ('memory-' + other)}"]))
+                      f"{other}:binary:{source / ('codifix-' + other)}"]))
         FIXTURE.FIXTURE.SignatureTests.command(["--local-user", FIXTURE.FIXTURE.SignatureTests.signer + "!", "--digest-algo", "SHA256",
             "--output", str(source / "manifest.sig"), "--detach-sign", str(source / "manifest.json")])
         prepared = TOOL.instance.prepare(argparse.Namespace(manifest=str(source / "manifest.json"),
@@ -194,9 +194,9 @@ class ConsoleTests(unittest.TestCase):
         for name, contents in self.files.items():
             path = self.layout.release / "trust/release" / name
             self.assertEqual(path.read_bytes(), contents)
-            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o755 if name == "bin/memory" else 0o644)
-        self.assertEqual((self.layout.config / "trust/memory-layer.toml").read_bytes(), self.config.encode())
-        self.assertEqual((self.layout.config / "trust/memory.sha256").read_text(),
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o755 if name == "bin/codifix" else 0o644)
+        self.assertEqual((self.layout.config / "trust/codifix.toml").read_bytes(), self.config.encode())
+        self.assertEqual((self.layout.config / "trust/codifix.sha256").read_text(),
                          TOOL.checksum(self.binary) + "\n")
         self.assertEqual(stat.S_IMODE((self.layout.config / "trust").stat().st_mode), 0o700)
         self.assertEqual(self.recover("inspect")["status"], "installed")
@@ -259,12 +259,12 @@ class ConsoleTests(unittest.TestCase):
 
     def test_layout_is_separate_from_singleton_service_roots(self):
         self.assertEqual(self.layout.config.relative_to(self.layout.root).as_posix(),
-                         "etc/memory-layer-instances")
+                         "etc/codifix-instances")
         self.assertEqual(self.layout.journal.relative_to(self.layout.root).as_posix(),
-                         "var/lib/memory-layer-installations")
+                         "var/lib/codifix-installations")
         self.assertEqual([p.relative_to(self.layout.root).as_posix() for p in self.layout.previous_state],
-                         ["var/lib/memory-layer-instances", "var/cache/memory-layer-instances",
-                          "run/memory-layer-instances"])
+                         ["var/lib/codifix-instances", "var/cache/codifix-instances",
+                          "run/codifix-instances"])
 
     def test_every_old_layout_instance_or_journal_refuses_before_creation(self):
         for index in range(5):
@@ -302,13 +302,13 @@ class ConsoleTests(unittest.TestCase):
                         with self.assertRaisesRegex(TOOL.release.ReleaseError, "Existing legacy"):
                             self.recover(action)
                     self.assertEqual((self.layout.journal / "trust/plan.json").read_bytes(), before)
-                    self.assertEqual((self.layout.config / "trust/memory-layer.toml").read_bytes(),
+                    self.assertEqual((self.layout.config / "trust/codifix.toml").read_bytes(),
                                      self.config.encode())
                 finally:
                     existing.rmdir()
 
     def test_legacy_path_probe_refuses_symlinked_or_unreadable_ancestors(self):
-        legacy = self.layout.root / "var/lib/memory-layer"
+        legacy = self.layout.root / "var/lib/codifix"
         TOOL.ensure_directory(legacy.parent, 0o755)
         elsewhere = self.root / "unrelated"
         elsewhere.mkdir(mode=0o700)
@@ -364,7 +364,7 @@ class ConsoleTests(unittest.TestCase):
         args.trusted_signing_fingerprint = "A" * 40
         with self.assertRaises(ERRORS):
             self.install(args)
-        binary = self.prepared / "release/bin/memory"
+        binary = self.prepared / "release/bin/codifix"
         binary.chmod(0o600)
         binary.write_bytes(self.binary[:-1] + b"X")
         binary.chmod(0o500)
@@ -389,8 +389,8 @@ class ConsoleTests(unittest.TestCase):
                 result = self.recover()
                 self.assertEqual(result["status"], "installed_inactive")
                 self.assert_inactive(result)
-                self.assertEqual((self.layout.release / "trust/release/bin/memory").read_bytes(), self.binary)
-                self.assertEqual((self.layout.config / "trust/memory-layer.toml").read_bytes(), self.config.encode())
+                self.assertEqual((self.layout.release / "trust/release/bin/codifix").read_bytes(), self.binary)
+                self.assertEqual((self.layout.config / "trust/codifix.toml").read_bytes(), self.config.encode())
                 self.assertEqual(self.recover()["transaction"], result["transaction"])
 
     @unittest.skipUnless(hasattr(os, "fork"), "Fork required for actual SIGKILL recovery evidence")
@@ -425,8 +425,8 @@ class ConsoleTests(unittest.TestCase):
                 result = self.recover()
                 self.assertEqual(result["status"], "installed_inactive")
                 self.assert_inactive(result)
-                self.assertEqual((self.layout.release / "trust/release/bin/memory").read_bytes(), self.binary)
-                self.assertEqual((self.layout.config / "trust/memory-layer.toml").read_bytes(), self.config.encode())
+                self.assertEqual((self.layout.release / "trust/release/bin/codifix").read_bytes(), self.binary)
+                self.assertEqual((self.layout.config / "trust/codifix.toml").read_bytes(), self.config.encode())
 
     def test_interrupted_copy_preserves_old_stage_and_can_finish(self):
         self.interrupt("copy_file")

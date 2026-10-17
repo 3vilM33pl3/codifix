@@ -11,14 +11,14 @@ Build from a clean committed checkout. Outputs are written to
 `target/windows/dist/windows-v<version>-build.<n>/`; existing candidate directories
 are never replaced:
 
-- `memory-layer-<version>-windows-x86_64-build.<n>.zip`
-- `memory-layer-<version>-windows-x86_64-build.<n>.msi`
-- `memory-layer-<version>-windows-x86_64-build.<n>-server-tools.msi`
+- `codifix-<version>-windows-x86_64-build.<n>.zip`
+- `codifix-<version>-windows-x86_64-build.<n>.msi`
+- `codifix-<version>-windows-x86_64-build.<n>-server-tools.msi`
 - a matching versioned `.manifest.json` with source commit, installer identity,
   artifact hashes, sizes, signing status and explicitly bundled capabilities
 - matching `.sha256` files
 
-The unsigned per-user MSI installs under `%LOCALAPPDATA%\Programs\Memory Layer`, adds its `bin` directory to the user `PATH`, and bundles the web UI, skill templates, README, example config, PowerShell completion, first-party operators and a legacy localhost PostgreSQL + pgvector Compose template. Native instance installation does not use that template or fall back to Docker/WSL.
+The unsigned per-user MSI installs under `%LOCALAPPDATA%\Programs\Codifix`, adds its `bin` directory to the user `PATH`, and bundles the web UI, skill templates, README, example config, PowerShell completion, first-party operators and a legacy localhost PostgreSQL + pgvector Compose template. Native instance installation does not use that template or fall back to Docker/WSL.
 
 The portable ZIP uses the same `bin`/`share` layout. Add the extracted `bin` directory to `PATH` before running `memory`.
 
@@ -26,7 +26,7 @@ Both ZIP and MSI variants require the **Microsoft Visual C++ v14 x64
 Redistributable**, installed separately. Use the latest supported x64 package
 from [Microsoft](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist);
 its version must be at least as recent as the MSVC build tools used for the
-application. Memory's installers do not download or install it. Visual Studio
+application. Codifix's installers do not download or install it. Visual Studio
 itself is not an end-user prerequisite.
 
 The Windows release manifest records each packaged executable's actual direct
@@ -39,10 +39,10 @@ the redistributable. Run `test-runtime-dependencies.ps1` for parser contracts.
 with unchanged executable and Web asset hashes. A failed compiler/build tool
 does not silently package an older executable.
 
-### Stable 2.1.0 preview acceptance
+### Stable 3.0.0 preview acceptance
 
-The stable application release uses `-InstallerBuild 1`, MSI version `2.1.1`
-and `windows-v2.1.0-build.1` artifact identities. These packages remain a
+The stable application release uses `-InstallerBuild 2`, MSI version `3.0.2`
+and `windows-v3.0.0-build.2` artifact identities. These packages remain a
 Windows **preview**, not complete native-stack parity. Private lab installer
 builds 60000/60001 are intentionally not downgraded in place.
 
@@ -51,12 +51,12 @@ PostgreSQL/pgvector database, run:
 
 ```powershell
 ./packaging/windows/check-release.ps1 `
-  -DistDir target/windows/dist/windows-v2.1.0-build.1 `
-  -ExpectedVersion 2.1.0 -ExpectedCommit $env:GITHUB_SHA `
-  -TestDatabaseUrl $env:MEMORY_LAYER_RELEASE_DATABASE_URL
+  -DistDir target/windows/dist/windows-v3.0.0-build.2 `
+  -InstallerBuild 2 -ExpectedVersion 3.0.0 -ExpectedCommit $env:GITHUB_SHA `
+  -TestDatabaseUrl $env:CODIFIX_RELEASE_DATABASE_URL
 ```
 
-The exact loopback database must be named `memory_release_*`. The check verifies
+The exact loopback database must be named `codifix_release_*`. The check verifies
 manifest/payload hashes, native capture/replay, curation, lexical search, Web
 serving and restart, then installs, repairs and removes both MSI variants while
 preserving a user-data sentinel. It starts no installed services and makes no
@@ -65,17 +65,17 @@ full-stack provisioning or the remaining Windows parity checklist.
 
 ## Native service adapter
 
-The bundle includes `memory-windows-service.exe`, an SCM-aware host for one
-foreground Memory/gateway/operator process:
+The bundle includes `codifix-windows-service.exe`, an SCM-aware host for one
+foreground Codifix/gateway/operator process:
 
 ```text
-memory-windows-service --name MemoryLayer-<instance> --directory <absolute-state-directory> -- <absolute-executable> [arguments]
+codifix-windows-service --name Codifix-<instance> --directory <absolute-state-directory> -- <absolute-executable> [arguments]
 ```
 
 This command is an SCM service entry point, **not** an interactive launcher or
 service installer. A machine operator must separately provision the service
 identity, protected immutable executable tree, exact instance configuration and
-state ACLs. Do not register `memory service run` directly as an SCM executable.
+state ACLs. Do not register `codifix service run` directly as an SCM executable.
 The adapter starts its child suspended, binds it to a kill-on-close Job Object,
 then resumes it. STOP/shutdown cancel the process tree; normal durable leases and
 intents handle interrupted work. SCM `Running` means the process was launched,
@@ -86,7 +86,7 @@ perform migrations or implement a complete machine-level installer.
 Windows-only adapter argument tests compile with the platform package:
 
 ```powershell
-cargo test -p mem-platform --all-targets --locked
+cargo test -p codifix-platform --all-targets --locked
 ```
 
 Service registration, stop/restart and descendant cancellation still require a
@@ -94,8 +94,8 @@ native VM acceptance test; Linux cross-compilation is not that evidence.
 
 ## Journaled named-instance operator (native acceptance pending)
 
-`native-instance.ps1` installs or upgrades one **Memory or federation gateway service**. It is bundled
-with the helper scripts in `share/memory-layer/operators`. It is not an all-stack
+`native-instance.ps1` installs or upgrades one **Codifix or federation gateway service**. It is bundled
+with the helper scripts in `share/codifix/operators`. It is not an all-stack
 installer: provision native PostgreSQL/pgvector and a private exact-instance
 configuration separately. PDS/supervisor installation remains separate. Both
 supported service paths still require native VM acceptance.
@@ -114,9 +114,9 @@ supported service paths still require native VM acceptance.
    The adapter performs **no database backup**.
 3. Reuse the exact operation ID and inputs after interruption. Changed inputs
    fail closed; completed retries do not restart a service. Journals and observed
-   phase history live under `%ProgramData%\MemoryLayer\operations\<operation-id>`.
+   phase history live under `%ProgramData%\Codifix\operations\<operation-id>`.
 
-For a gateway, additionally select `-ExecutableName memory-federation-gateway.exe`.
+For a gateway, additionally select `-ExecutableName codifix-federation-gateway.exe`.
 Use `-ExpectedInstanceId` for the configured **authority**, add `-ExpectedSpaceId`
 and `-StatusAudienceId` for an existing enrolled instance with current Pull
 membership, and omit `-HealthUri`. Supply the private gateway **JSON** configuration
@@ -137,11 +137,11 @@ repository-integrity or model/supervisor health check; a running SCM service
 alone is insufficient. No public readiness endpoint is added.
 
 Releases are hash-verified against the reviewed ZIP and full payload manifest,
-then retained under `%ProgramFiles%\Memory Layer\releases\<release-identity>`.
-One virtual account `NT SERVICE\MemoryLayer-<name>` receives modify access only
-to `%ProgramData%\MemoryLayer\instances\<name>`, plus read/execute access to its
+then retained under `%ProgramFiles%\Codifix\releases\<release-identity>`.
+One virtual account `NT SERVICE\Codifix-<name>` receives modify access only
+to `%ProgramData%\Codifix\instances\<name>`, plus read/execute access to its
 release. Configuration is administrator-owned under
-`%ProgramData%\MemoryLayer\configurations\<name>` and read-only to that exact
+`%ProgramData%\Codifix\configurations\<name>` and read-only to that exact
 service. Shared ancestors carry non-inheriting, exact-service read/control ACEs;
 adding another instance preserves these grants without opening sibling data.
 Admins and SYSTEM retain operational control. The adapter checks paths,
@@ -150,7 +150,7 @@ state. The existing configuration must match on upgrade, and only a strictly
 newer installer build is accepted. Unrelated services, instances and user data
 are not stopped, replaced or deleted.
 
-The elevated gateway probe adds `--service-name MemoryLayer-<name>`. It resolves
+The elevated gateway probe adds `--service-name Codifix-<name>`. It resolves
 the exact virtual account through SCM and uses an operation-scoped read-only
 exception for that SID on protected configuration and its selected audience
 token. The exception cannot authorize service ownership, writing, deletion or
@@ -161,8 +161,8 @@ operations after this immutable-configuration layout change: their former
 command paths intentionally do not match the new operation digest.
 
 Native identity/layout testing (elevated disposable VM only) is available as
-`native-instance-layout-tests.ps1 -ServiceHostPath <memory-windows-service.exe>
--IsolationProbePath <memory-windows-isolation-probe.exe>` (build the latter with
+`native-instance-layout-tests.ps1 -ServiceHostPath <codifix-windows-service.exe>
+-IsolationProbePath <codifix-windows-isolation-probe.exe>` (build the latter with
 the `windows-native-tests` feature; it is never a release executable).
 It creates two temporary virtual service accounts and verifies their own
 read/write state, immutable authority, sibling denial and first-instance access
@@ -193,18 +193,20 @@ SCM deployment, AppContainer isolation or the full onboarding journey.
 
 ## Installer identity and upgrades
 
-Keep `memory --version` at the application semver (for example `2.1.0-rc.5`).
+Keep `codifix --version` at the application semver (for example `3.0.0-rc.5`).
 Allocate a new `InstallerBuild` for each published Windows candidate. The MSI
 version is `<application-major>.<application-minor>.<InstallerBuild>`, so RC-to-RC
 updates increase even when the application semver stays unchanged. Increase this
 build number across application patch releases within the same major/minor; do
 not restart it at a patch boundary. Each field uses Windows Installer bounds.
 
-The existing per-user UpgradeCode stays `7E6D7DA0-7D74-43F0-B816-E422B9E01B82`.
+The Codifix per-user UpgradeCode is `C956DBF2-EE64-5A94-B05E-77D35B330F67`.
 ProductCode includes the application version and build number; PackageCode also
 includes the exact source commit. Do not republish different bytes under one
-candidate identity. The first new build (`2.1.1` as an MSI version) supersedes the
-older `2.1.0` MSI, but is still application `2.1.0-rc.5`.
+candidate identity. The candidate `3.0.0-rc.1` build 1 has MSI version `3.0.1`; stable
+`3.0.0` must use a later installer build, such as `3.0.2`. Codifix does not
+upgrade the old Memory Layer product. Back up and uninstall that product before
+installing Codifix; restore state only through the reviewed cutover procedure.
 
 These packages contain the client, SCM adapter and first-party operator
 executables, not a complete native Windows server stack. Operator compilation
@@ -215,9 +217,9 @@ a successful MSI build. No signing or public release is performed by this script
 
 The **server-tools MSI is a machine-level scaffold**, not the completed local
 stack installer. It installs the same first-party tools/assets under
-`%ProgramFiles%\Memory Layer Native Server Tools`, without changing system PATH,
+`%ProgramFiles%\Codifix Native Server Tools`, without changing system PATH,
 provisioning dependencies, adding accounts, starting services or changing data.
-Its separate stable UpgradeCode is `B209C344-2641-4F0C-BEAF-37A9C827C243`; it does
+Its separate stable UpgradeCode is `356D7E23-5C49-5D9B-BE8E-D6BB9A02F958`; it does
 not replace the per-user installer identity. Removing this MSI removes only its
 tools directory. Named service releases, configuration and databases created
 through the explicit operator are retained and must be retired separately.
@@ -235,7 +237,7 @@ remains false.
 
 Supply a ZIP and a digest-pinned JSON manifest from an operator-protected input
 directory. Manifest fields are `schema_version: 1`,
-`kind: memory-native-postgres-runtime`, `platform: windows-x86_64`,
+`kind: codifix-native-postgres-runtime`, `platform: windows-x86_64`,
 `postgres_version`, `pgvector_version`, `crt_version`, `package_sha256`, complete
 `payload_files` (`name`, `sha256`) and exactly three `components`:
 `postgresql`, `pgvector`, `msvc-crt`. Each component has `version`,
@@ -249,7 +251,7 @@ Run `-Action Preview -OperationId UUID -PackagePath ZIP -ManifestPath JSON
 -ManifestSha256 SHA256`. Review its destination/input digest, then repeat with
 `-Action Install -ExpectedInputSha256 DIGEST` from an elevated operator shell.
 Installed runtimes are immutable, hash-identified directories under
-`%ProgramFiles%\Memory Layer\runtimes`; operation receipts and interrupted
+`%ProgramFiles%\Codifix\runtimes`; operation receipts and interrupted
 staging remain there for recovery. Repeating the same operation verifies rather
 than replacing the runtime; changed inputs require a new reviewed operation.
 Service-account access is a separate explicit service-installation concern.
@@ -257,7 +259,7 @@ Successful file installation is **not native execution or clean-Windows
 acceptance evidence**. Run `test-native-prerequisites.ps1` for portable descriptor
 tests; the full clean Windows runtime still requires observed testing.
 
-To bind a named Memory/gateway installation to these exact local runtime bytes,
+To bind a named Codifix/gateway installation to these exact local runtime bytes,
 pass `-NativeRuntimeManifestPath`, `-NativeRuntimeManifestSha256` and
 `-NativeRuntimeOperationId` to `native-instance.ps1` in both Preview and execution.
 The operation ID is the successful prerequisite-install receipt, not the named
@@ -268,7 +270,7 @@ upgrade cannot silently omit an existing binding. Without these optional fields,
 the existing externally managed database installation path is unchanged.
 This proves only protected runtime bytes, not PostgreSQL process/database
 readiness. Database provisioning/service operation remains separate, and normal
-Memory or signed-gateway readiness is still required. It does not grant a Memory
+Codifix or signed-gateway readiness is still required. It does not grant a Codifix
 participant access to database credentials or runtime files.
 
 ### Fresh native database provisioning (native acceptance pending)
@@ -278,7 +280,7 @@ its loopback-only port, exact virtual service account and pinned native runtime.
 It accepts the verified runtime manifest/digest/operation, a new provisioning
 operation UUID, `-Name`, `-Port`, `-ClusterPath`, `-PasswordFile` and
 `-RecoveryReference`. The cluster must be exactly
-`%ProgramData%\MemoryLayer\databases\<name>` and must not exist. Existing services
+`%ProgramData%\Codifix\databases\<name>` and must not exist. Existing services
 and databases are not adopted, upgraded or stopped.
 
 The initialization password is read from an operator-private file outside the
@@ -302,5 +304,5 @@ password source.
 This source implementation still needs **native provisioning/recovery acceptance**.
 It is not a completed local-stack installer. PostgreSQL is registered for manual
 start; full-stack activation must own reboot policy. Application databases,
-non-superuser Memory credentials, PDS and Pi installation remain separate.
+non-superuser Codifix credentials, PDS and Pi installation remain separate.
 `test-native-postgres-plan.ps1` verifies portable policy/recovery decisions only.

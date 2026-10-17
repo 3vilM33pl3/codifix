@@ -21,12 +21,12 @@ SPEC.loader.exec_module(TOOL)
 
 
 def creator(root, **overrides):
-    values = dict(version="2.1.0-rc.1", source_revision="a" * 40, schema_floor=52, schema_head=52,
+    values = dict(version="3.0.0-rc.1", source_revision="a" * 40, schema_floor=52, schema_head=52,
                   classification="maintenance", migrations=False, trust_changes=False, permission_changes=False,
                   pi_source_url=f"{TOOL.PI_SOURCE_REPOSITORY}/commit/{TOOL.PI_SOURCE_REVISION}",
                   pi_source_revision=TOOL.PI_SOURCE_REVISION,
                   pi_source_sha256=None, pi_artifact_sha256=[],
-                  artifact=[f"amd64:binary:{root}/memory-amd64", f"arm64:binary:{root}/memory-arm64"],
+                  artifact=[f"amd64:binary:{root}/codifix-amd64", f"arm64:binary:{root}/codifix-arm64"],
                   output=str(root / "manifest.json"))
     values.update(overrides)
     return argparse.Namespace(**values)
@@ -34,11 +34,11 @@ def creator(root, **overrides):
 
 class ManifestTests(unittest.TestCase):
     def setUp(self):
-        self.directory = tempfile.TemporaryDirectory(prefix="memory-release-test-")
+        self.directory = tempfile.TemporaryDirectory(prefix="codifix-release-test-")
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        (self.root / "memory-amd64").write_bytes(b"amd64 artifact fixture")
-        (self.root / "memory-arm64").write_bytes(b"arm64 artifact fixture")
+        (self.root / "codifix-amd64").write_bytes(b"amd64 artifact fixture")
+        (self.root / "codifix-arm64").write_bytes(b"arm64 artifact fixture")
         TOOL.create(creator(self.root))
         self.manifest, self.data = TOOL.load_manifest(self.root / "manifest.json")
 
@@ -51,27 +51,27 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(result["status"], "unsigned_manifest_created")
 
     def test_stable_and_candidate_precedence_without_rewriting_signed_bytes(self):
-        self.assertLess(TOOL.version_precedence("2.1.0-rc.9"), TOOL.version_precedence("2.1.0-rc.10"))
-        self.assertLess(TOOL.version_precedence("2.1.0-rc.999999"), TOOL.version_precedence("2.1.0"))
-        for version in ("2.1.0-rc.1", "2.1.0-rc.999999", "2.1.0"):
+        self.assertLess(TOOL.version_precedence("3.0.0-rc.9"), TOOL.version_precedence("3.0.0-rc.10"))
+        self.assertLess(TOOL.version_precedence("3.0.0-rc.999999"), TOOL.version_precedence("3.0.0"))
+        for version in ("3.0.0-rc.1", "3.0.0-rc.999999", "3.0.0"):
             changed = copy.deepcopy(self.manifest)
             changed["release_version"] = version
             before = TOOL.canonical(changed)
             TOOL.validate(changed)
             self.assertEqual(TOOL.canonical(changed), before)
-        for version in ("2.1.0-rc.0", "2.1.0-rc.01", "2.1.0-rc.1000000", "v2.1.0", "2.1.0+build.1", "2.2.0", None):
+        for version in ("3.0.0-rc.0", "3.0.0-rc.01", "3.0.0-rc.1000000", "v3.0.0", "3.0.0+build.1", "2.2.0", None):
             with self.subTest(version=version), self.assertRaises(TOOL.ReleaseError):
                 TOOL.version_precedence(version)
 
     def test_refuses_existing_output_and_symlink_inputs(self):
         with self.assertRaises(FileExistsError):
             TOOL.create(creator(self.root))
-        (self.root / "alias").symlink_to(self.root / "memory-amd64")
+        (self.root / "alias").symlink_to(self.root / "codifix-amd64")
         with self.assertRaises(OSError):
             TOOL.measure(self.root / "alias")
         (self.root / "alias-dir").symlink_to(self.root, target_is_directory=True)
         with self.assertRaises(OSError):
-            TOOL.measure(self.root / "alias-dir" / "memory-amd64")
+            TOOL.measure(self.root / "alias-dir" / "codifix-amd64")
         self.assertEqual((self.root / "manifest.json").read_bytes(), self.data)
 
     def test_unknown_fields_duplicate_keys_and_noncanonical_json_rejected(self):
@@ -135,7 +135,7 @@ class ManifestTests(unittest.TestCase):
 class SignatureTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.keys = tempfile.TemporaryDirectory(prefix="memory-release-fixture-keyring-")
+        cls.keys = tempfile.TemporaryDirectory(prefix="codifix-release-fixture-keyring-")
         cls.keyring = Path(cls.keys.name)
         os.chmod(cls.keyring, 0o700)
         cls.command(["--quick-generate-key", "Disposable Release Fixture <release-fixture@example.invalid>", "ed25519", "cert", "0"])
@@ -162,11 +162,11 @@ class SignatureTests(unittest.TestCase):
         cls.keys.cleanup()
 
     def setUp(self):
-        self.directory = tempfile.TemporaryDirectory(prefix="memory-release-signed-test-")
+        self.directory = tempfile.TemporaryDirectory(prefix="codifix-release-signed-test-")
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        (self.root / "memory-amd64").write_bytes(b"amd64 fixture release")
-        (self.root / "memory-arm64").write_bytes(b"arm64 fixture release")
+        (self.root / "codifix-amd64").write_bytes(b"amd64 fixture release")
+        (self.root / "codifix-arm64").write_bytes(b"arm64 fixture release")
         (self.root / "key.asc").write_bytes(self.public)
         (self.root / "staging").mkdir(mode=0o700)
         TOOL.create(creator(self.root))
@@ -194,17 +194,17 @@ class SignatureTests(unittest.TestCase):
     def test_exact_signing_subkey_and_selected_architecture_are_staged(self):
         report = TOOL.verify_stage(self.arguments())
         stage = Path(report["staging_directory"])
-        self.assertEqual(report["selected_artifacts"], ["memory-arm64"])
-        self.assertEqual((stage / "memory-arm64").read_bytes(), b"arm64 fixture release")
-        self.assertFalse((stage / "memory-amd64").exists())
+        self.assertEqual(report["selected_artifacts"], ["codifix-arm64"])
+        self.assertEqual((stage / "codifix-arm64").read_bytes(), b"arm64 fixture release")
+        self.assertFalse((stage / "codifix-amd64").exists())
         self.assertFalse(report["installation_authorized"])
         self.assertFalse(report["archives_unpacked"])
         self.assertFalse(report["unselected_architecture_bytes_verified"])
         self.assertEqual(stat.S_IMODE(stage.stat().st_mode), 0o700)
-        self.assertEqual(stat.S_IMODE((stage / "memory-arm64").stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE((stage / "codifix-arm64").stat().st_mode), 0o600)
         again = TOOL.verify_stage(self.arguments())
         self.assertNotEqual(again["staging_directory"], str(stage))
-        self.assertEqual((stage / "memory-arm64").read_bytes(), b"arm64 fixture release")
+        self.assertEqual((stage / "codifix-arm64").read_bytes(), b"arm64 fixture release")
 
     def test_primary_fingerprint_is_not_a_substitute_for_signing_subkey(self):
         self.assert_rejected_without_stage(trusted_signing_fingerprint=self.primary)
@@ -216,14 +216,14 @@ class SignatureTests(unittest.TestCase):
         self.assert_rejected_without_stage(schema_current=51)
         self.assert_rejected_without_stage(schema_current=53)
         # AMD64 files are never a fallback when the requested ARM64 file is absent.
-        (self.root / "memory-arm64").unlink()
+        (self.root / "codifix-arm64").unlink()
         self.assert_rejected_without_stage()
 
     def test_tampered_manifest_signature_and_artifact_are_rejected(self):
         path = self.root / "manifest.json"
         original = path.read_bytes()
         value = json.loads(original)
-        value["release_version"] = "2.1.0-rc.2"
+        value["release_version"] = "3.0.0-rc.2"
         path.write_bytes(TOOL.canonical(value))
         self.assert_rejected_without_stage()
         path.write_bytes(original)
@@ -232,7 +232,7 @@ class SignatureTests(unittest.TestCase):
         signature.write_bytes(original_signature[:-1] + bytes([original_signature[-1] ^ 1]))
         self.assert_rejected_without_stage()
         signature.write_bytes(original_signature)
-        (self.root / "memory-arm64").write_bytes(b"tampr fixture release")
+        (self.root / "codifix-arm64").write_bytes(b"tampr fixture release")
         self.assert_rejected_without_stage()
 
     def test_unsigned_and_private_key_inputs_are_rejected(self):
@@ -243,7 +243,7 @@ class SignatureTests(unittest.TestCase):
         self.assert_rejected_without_stage()
 
     def test_selected_artifact_and_staging_parent_symlinks_are_rejected(self):
-        artifact = self.root / "memory-arm64"
+        artifact = self.root / "codifix-arm64"
         artifact.rename(self.root / "real-arm64")
         artifact.symlink_to(self.root / "real-arm64")
         self.assert_rejected_without_stage()
@@ -278,7 +278,7 @@ class SignatureTests(unittest.TestCase):
             self.assert_rejected_without_stage()
 
     def test_substituted_directory_before_open_preserves_unrelated_sentinel(self):
-        stage_name = "memory-release-" + "c" * 32
+        stage_name = "codifix-release-" + "c" * 32
         parent = self.root / "staging"
         unrelated = self.root / "unrelated-directory"
         unrelated.mkdir(mode=0o700)
@@ -303,19 +303,19 @@ class SignatureTests(unittest.TestCase):
         self.assertEqual(list((parent / "original-created-directory").iterdir()), [])
 
     def test_substituted_directory_during_copy_is_not_cleaned_by_name(self):
-        stage_name = "memory-release-" + "d" * 32
+        stage_name = "codifix-release-" + "d" * 32
         parent = self.root / "staging"
         stage = parent / stage_name
         unrelated = self.root / "late-unrelated-directory"
         unrelated.mkdir(mode=0o700)
         (unrelated / "sentinel").write_text("preserved late substitution")
-        (self.root / "memory-arm64").write_bytes(b"tampr fixture release")
+        (self.root / "codifix-arm64").write_bytes(b"tampr fixture release")
         original_fsync = os.fsync
         substituted = False
 
         def substitute(descriptor):
             nonlocal substituted
-            artifact = stage / "memory-arm64"
+            artifact = stage / "codifix-arm64"
             if not substituted and artifact.exists() and os.fstat(descriptor).st_ino == artifact.stat().st_ino:
                 substituted = True
                 stage.rename(parent / "original-copied-directory")
@@ -328,18 +328,18 @@ class SignatureTests(unittest.TestCase):
                 TOOL.verify_stage(self.arguments())
         self.assertTrue(substituted)
         self.assertEqual((stage / "sentinel").read_text(), "preserved late substitution")
-        self.assertEqual((parent / "original-copied-directory" / "memory-arm64").read_bytes(), b"tampr fixture release")
+        self.assertEqual((parent / "original-copied-directory" / "codifix-arm64").read_bytes(), b"tampr fixture release")
 
     def test_cleanup_preserves_replaced_and_untracked_files(self):
-        stage_name = "memory-release-" + "e" * 32
+        stage_name = "codifix-release-" + "e" * 32
         stage = self.root / "staging" / stage_name
-        (self.root / "memory-arm64").write_bytes(b"tampr fixture release")
+        (self.root / "codifix-arm64").write_bytes(b"tampr fixture release")
         original_fsync = os.fsync
         replaced = False
 
         def replace(descriptor):
             nonlocal replaced
-            artifact = stage / "memory-arm64"
+            artifact = stage / "codifix-arm64"
             if not replaced and artifact.exists() and os.fstat(descriptor).st_ino == artifact.stat().st_ino:
                 replaced = True
                 artifact.rename(self.root / "original-copied-artifact")
@@ -352,7 +352,7 @@ class SignatureTests(unittest.TestCase):
             with self.assertRaisesRegex(TOOL.ReleaseError, "signed digest"):
                 TOOL.verify_stage(self.arguments())
         self.assertTrue(replaced)
-        self.assertEqual((stage / "memory-arm64").read_text(), "replacement evidence")
+        self.assertEqual((stage / "codifix-arm64").read_text(), "replacement evidence")
         self.assertEqual((stage / "untracked-sentinel").read_text(), "untracked evidence")
 
 

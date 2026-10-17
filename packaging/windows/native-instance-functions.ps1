@@ -48,24 +48,24 @@ function Get-NativeInstancePlan {
         [guid]$ExpectedSpaceId = [guid]::Empty, [guid]$StatusAudienceId = [guid]::Empty)
     if ($Name -cnotmatch '^[a-z][a-z0-9-]{0,47}$') { throw 'Use a lowercase instance name, maximum 48 characters' }
     if ($ReleaseIdentity -notmatch '^windows-v\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?-build\.\d+$') { throw 'Invalid Windows release identity' }
-    if ($ExecutableName -notin @('memory.exe', 'memory-federation-gateway.exe','memory-pds-pipe.exe')) { throw 'Unsupported service executable' }
+    if ($ExecutableName -notin @('codifix.exe', 'codifix-federation-gateway.exe','codifix-pds-pipe.exe')) { throw 'Unsupported service executable' }
     if ($ExpectedInstanceId -eq [guid]::Empty) { throw 'An exact expected instance UUID is required' }
-    if($ExecutableName -ceq 'memory-pds-pipe.exe'){
+    if($ExecutableName -ceq 'codifix-pds-pipe.exe'){
         if($HealthUri -or $ExpectedSpaceId -ne [guid]::Empty -or $StatusAudienceId -ne [guid]::Empty){throw 'Native PDS readiness uses its protected local pipe, not HTTP/gateway bindings'}
-        return [pscustomobject][ordered]@{service_name="MemoryLayer-$Name";account="NT SERVICE\MemoryLayer-$Name";name=$Name
+        return [pscustomobject][ordered]@{service_name="Codifix-$Name";account="NT SERVICE\Codifix-$Name";name=$Name
             release_identity=$ReleaseIdentity;executable_name=$ExecutableName;health_uri=$null
             expected_instance_id=$ExpectedInstanceId.ToString();readiness_mode='native_pipe_public_xrpc_v1'}
     }
-    if ($ExecutableName -eq 'memory-federation-gateway.exe') {
-        if ($HealthUri -or $ExpectedSpaceId -eq [guid]::Empty -or $StatusAudienceId -eq [guid]::Empty) { throw 'Gateway needs exact space/authority/audience, not a Memory health URL' }
+    if ($ExecutableName -eq 'codifix-federation-gateway.exe') {
+        if ($HealthUri -or $ExpectedSpaceId -eq [guid]::Empty -or $StatusAudienceId -eq [guid]::Empty) { throw 'Gateway needs exact space/authority/audience, not a Codifix health URL' }
         return [pscustomobject][ordered]@{
-            service_name = "MemoryLayer-$Name"; account = "NT SERVICE\MemoryLayer-$Name"; name = $Name
+            service_name = "Codifix-$Name"; account = "NT SERVICE\Codifix-$Name"; name = $Name
             release_identity = $ReleaseIdentity; executable_name = $ExecutableName; health_uri = $null
             expected_instance_id = $ExpectedInstanceId.ToString(); expected_space_id = $ExpectedSpaceId.ToString()
             status_audience_id = $StatusAudienceId.ToString(); readiness_mode = 'signed_loopback_status_v1'
         }
     }
-    if ($ExpectedSpaceId -ne [guid]::Empty -or $StatusAudienceId -ne [guid]::Empty) { throw 'Gateway bindings do not apply to a Memory service' }
+    if ($ExpectedSpaceId -ne [guid]::Empty -or $StatusAudienceId -ne [guid]::Empty) { throw 'Gateway bindings do not apply to a Codifix service' }
     $uri = [uri]$HealthUri
     if (-not $uri.IsAbsoluteUri -or $uri.Scheme -ne 'http' -or -not $uri.IsLoopback -or
         $uri.UserInfo -or $uri.Query -or $uri.Fragment -or $uri.AbsolutePath -cne '/healthz') {
@@ -73,8 +73,8 @@ function Get-NativeInstancePlan {
     }
     if ($ExpectedInstanceId -eq [guid]::Empty) { throw 'An exact expected instance UUID is required' }
     return [pscustomobject][ordered]@{
-        service_name = "MemoryLayer-$Name"
-        account = "NT SERVICE\MemoryLayer-$Name"
+        service_name = "Codifix-$Name"
+        account = "NT SERVICE\Codifix-$Name"
         name = $Name
         release_identity = $ReleaseIdentity
         executable_name = $ExecutableName
@@ -84,9 +84,9 @@ function Get-NativeInstancePlan {
 }
 
 function Get-NativeServiceArguments([string]$ExecutableName, [string]$ConfigPath) {
-    if ($ExecutableName -eq 'memory.exe') { return @('--config', $ConfigPath, 'service', 'run') }
-    if ($ExecutableName -eq 'memory-federation-gateway.exe') { return @($ConfigPath) }
-    if ($ExecutableName -eq 'memory-pds-pipe.exe') { return @($ConfigPath) }
+    if ($ExecutableName -eq 'codifix.exe') { return @('--config', $ConfigPath, 'service', 'run') }
+    if ($ExecutableName -eq 'codifix-federation-gateway.exe') { return @($ConfigPath) }
+    if ($ExecutableName -eq 'codifix-pds-pipe.exe') { return @($ConfigPath) }
     throw 'Unsupported service executable'
 }
 
@@ -94,8 +94,8 @@ function Assert-NativePdsServiceConfig($Config,$Runtime,$RuntimePlan,[string]$Na
     Assert-NativeRuntimeFields $Config @('schema_version','pipe','node','node_sha256','entry','entry_sha256','helper_sha256','environment')
     Assert-NativeRuntimeFields $Config.pipe @('name','server_sid','client_sid')
     Assert-NativeRuntimeFields $Config.environment @('path','sha256')
-    if($Config.schema_version -ne 1 -or $Runtime.runtime_kind -cne 'memory-native-pds-runtime' -or
-        $Config.pipe.name -cne "\\.\pipe\memory-pds-$Name" -or
+    if($Config.schema_version -ne 1 -or $Runtime.runtime_kind -cne 'codifix-native-pds-runtime' -or
+        $Config.pipe.name -cne "\\.\pipe\codifix-pds-$Name" -or
         $Config.pipe.server_sid -cnotmatch '^S-1-5-80-(?:\d+-){4}\d+$' -or
         $Config.pipe.client_sid -cnotmatch '^S-1-5-80-(?:\d+-){4}\d+$' -or $Config.pipe.server_sid -ceq $Config.pipe.client_sid -or
         $Config.node -cne $Runtime.node_executable -or $Config.entry -cne $Runtime.pds_entrypoint -or
@@ -267,7 +267,7 @@ function Assert-NativePayload([string]$Root, $PayloadFiles, [switch]$ExtendedPat
 }
 
 function Initialize-NativeReleaseGuard {
-    if ('MemoryLayer.ProtectedRelease' -as [type]) { return }
+    if ('Codifix.ProtectedRelease' -as [type]) { return }
     # Handle-held validation prevents file replacement/content writes between
     # inspection, hashing and SCM startup. This is not pathname-only Get-Acl.
     Add-Type -TypeDefinition @'
@@ -279,7 +279,7 @@ using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using Microsoft.Win32.SafeHandles;
-namespace MemoryLayer {
+namespace Codifix {
     public sealed class ProtectedRelease : IDisposable {
         readonly List<SafeFileHandle> handles = new List<SafeFileHandle>();
         readonly string caller = WindowsIdentity.GetCurrent().User.Value;

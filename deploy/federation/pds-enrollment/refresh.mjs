@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { absolute, canonical, check, digest, directoryHandle, hash, OperatorError, parseJson, privateRead, safeFile, StateFiles, strict } from './files.mjs';
 import { EnrollmentOperator, PDS_IMAGE, validateEnrolledJournal } from './operator.mjs';
 
-const PURPOSE = 'memory-private-pds-refresh-only-v1';
+const PURPOSE = 'codifix-private-pds-refresh-only-v1';
 const HEX = /^[a-f0-9]{64}$/u;
 const POLICY_KEYS = ['schema_version', 'purpose', 'policy_id', 'image', 'enrollment_identity_sha256',
   'repository', 'handle', 'pds_origin', 'operator_origin', 'service_did', 'signing_key', 'did_document_sha256',
@@ -152,7 +152,7 @@ export class RefreshMaintainer {
   async recoveryPreview() {
     await this.owner(); const state = await this.state(); const maintenance = await this.maintenance();
     check(maintenance.state === 'intervention' && maintenance.recovery_generation < 9999, 'intervention_recovery_required');
-    const review = { purpose: 'memory-private-pds-refresh-recovery-v1', policy_sha256: digest(this.policy),
+    const review = { purpose: 'codifix-private-pds-refresh-recovery-v1', policy_sha256: digest(this.policy),
       repository: this.policy.repository, journal_sha256: digest(state), maintenance_sha256: digest(maintenance),
       recovery_generation: maintenance.recovery_generation + 1, prior_attempts: maintenance.attempts, prior_reason: maintenance.reason,
       bounded_attempts: REFRESH_DEFAULTS.max_attempts, changes_identity_or_grace_window: false };
@@ -198,7 +198,7 @@ export class RefreshMaintainer {
     check(evidence, 'tls_pre_http_failure_evidence_required');
     const resolved = { ...state, revision: state.revision + 1, phase: 'active', resume_phase: null,
       pending_started_at: null, resume_pending_started_at: null };
-    const review = { purpose: 'memory-private-pds-tls-refresh-recovery-v1', policy_sha256: digest(this.policy),
+    const review = { purpose: 'codifix-private-pds-tls-refresh-recovery-v1', policy_sha256: digest(this.policy),
       repository: this.policy.repository, journal_sha256: digest(state), resolved_journal_sha256: digest(resolved),
       maintenance_sha256: digest(maintenance), evidence,
       recovery_generation: maintenance.recovery_generation + 1, prior_reason: maintenance.reason,

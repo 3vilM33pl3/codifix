@@ -4,22 +4,22 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'native-instance-functions.ps1')
 . (Join-Path $PSScriptRoot 'native-postgres-functions.ps1')
 $runtime=[pscustomobject]@{schema_version=1;manifest_sha256=('a'*64);input_sha256=('b'*64)
-    operation_id='11111111-1111-4111-8111-111111111111';runtime_directory='C:\Program Files\Memory Layer\runtimes\pinned'
+    operation_id='11111111-1111-4111-8111-111111111111';runtime_directory='C:\Program Files\Codifix\runtimes\pinned'
     verification_scope='protected_payload_only';database_readiness_verified=$false}
-$arguments=@{Name='workshop';Port=55471;ClusterPath='C:\ProgramData\MemoryLayer\databases\workshop'
-    StateRoot='C:\ProgramData\MemoryLayer';PasswordFile='C:\Private\initdb.password'
+$arguments=@{Name='workshop';Port=55471;ClusterPath='C:\ProgramData\Codifix\databases\workshop'
+    StateRoot='C:\ProgramData\Codifix';PasswordFile='C:\Private\initdb.password'
     RuntimeBinding=$runtime;OperationId=[guid]'22222222-2222-4222-8222-222222222222';RecoveryReference='synthetic-backup-receipt'}
 $plan=Get-NativePostgresPlan @arguments
-if ($plan.host -cne '127.0.0.1' -or $plan.service_account -cne 'NT SERVICE\MemoryLayerPostgres-workshop' -or
+if ($plan.host -cne '127.0.0.1' -or $plan.service_account -cne 'NT SERVICE\CodifixPostgres-workshop' -or
     -not $plan.provisioning_implemented -or $plan.native_execution_verified -or $plan.mutates_existing_database) { throw 'Invalid provisioning scope' }
 if ($plan.initdb_arguments -notcontains '--pwfile' -or $plan.initdb_arguments -contains '--auth=trust' -or
     $plan.pg_hba_conf.Contains(' trust') -or $plan.postgresql_conf.Contains("'*'")) { throw 'Unsafe initialization policy' }
 $original=Get-NativeInputDigest $plan
 foreach ($change in @(@{Name='../outside'},@{Port=543},@{Port=65536},@{ClusterPath='D:\Live'},
-    @{ClusterPath='C:\ProgramData\MemoryLayer\databases\workshop\..\homelab'},
-    @{PasswordFile='C:\ProgramData\MemoryLayer\databases\workshop\password'},
-    @{PasswordFile='C:\ProgramData\MemoryLayer\postgres-operations\private.password'},
-    @{PasswordFile='C:\Program Files\Memory Layer\runtimes\pinned\private.password'},
+    @{ClusterPath='C:\ProgramData\Codifix\databases\workshop\..\homelab'},
+    @{PasswordFile='C:\ProgramData\Codifix\databases\workshop\password'},
+    @{PasswordFile='C:\ProgramData\Codifix\postgres-operations\private.password'},
+    @{PasswordFile='C:\Program Files\Codifix\runtimes\pinned\private.password'},
     @{PasswordFile='C:\Private\password:alternate'},@{OperationId=[guid]::Empty},@{RecoveryReference=''})) {
     $copy=$arguments.Clone(); foreach ($key in $change.Keys) { $copy[$key]=$change[$key] }
     $rejected=$false; try { $null=Get-NativePostgresPlan @copy } catch { $rejected=$true }

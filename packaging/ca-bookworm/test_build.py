@@ -16,8 +16,8 @@ class BuildCommands(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.work = self.root / "work"
         self.work.mkdir(mode=0o700)
-        (self.work / "memory").mkdir()
-        (self.work / "memory" / "Cargo.lock").touch()
+        (self.work / "codifix").mkdir()
+        (self.work / "codifix" / "Cargo.lock").touch()
         self.bin = self.root / "bin"
         self.bin.mkdir()
         docker = self.bin / "docker"
@@ -34,8 +34,8 @@ class BuildCommands(unittest.TestCase):
         return subprocess.run(["bash", str(SCRIPT), phase, str(work or self.work), image, *extra],
                               env=self.env, text=True, capture_output=True, timeout=10)
 
-    def test_memory_is_offline_unprivileged_and_resource_bounded(self):
-        result = self.run_build("memory")
+    def test_codifix_is_offline_unprivileged_and_resource_bounded(self):
+        result = self.run_build("codifix")
         self.assertEqual(result.returncode, 0, result.stderr)
         args = json.loads(result.stdout.splitlines()[-1])
         for flag, value in [("--network", "none"), ("--cap-drop", "ALL"),
@@ -49,14 +49,14 @@ class BuildCommands(unittest.TestCase):
         self.assertNotIn("--env-file", args)
 
     def test_mutable_image_and_unknown_phase_fail(self):
-        self.assertNotEqual(self.run_build("memory", image="rust:latest").returncode, 0)
+        self.assertNotEqual(self.run_build("codifix", image="rust:latest").returncode, 0)
         self.assertNotEqual(self.run_build("activate").returncode, 0)
 
     def test_explicit_architectures_match_build_and_package(self):
         for architecture, target in (("amd64", "x86_64-unknown-linux-gnu"),
                                      ("arm64", "aarch64-unknown-linux-gnu")):
             with self.subTest(architecture=architecture):
-                result = self.run_build("memory", extra=(architecture,))
+                result = self.run_build("codifix", extra=(architecture,))
                 self.assertEqual(result.returncode, 0, result.stderr)
                 args = json.loads(result.stdout.splitlines()[-1])
                 self.assertEqual(args[args.index("--target") + 1], target)
@@ -66,7 +66,7 @@ class BuildCommands(unittest.TestCase):
                 self.assertEqual(args[args.index("--arch") + 1], architecture)
 
     def test_architecture_never_becomes_an_arbitrary_argument(self):
-        for phase in ("memory", "package"):
+        for phase in ("codifix", "package"):
             for extra in (("riscv64",), ("--privileged",), ("amd64", "arm64")):
                 self.assertNotEqual(self.run_build(phase, extra=extra).returncode, 0)
         self.assertNotEqual(self.run_build("web", extra=("amd64",)).returncode, 0)
@@ -79,14 +79,14 @@ class BuildCommands(unittest.TestCase):
 
     def test_shared_directory_symlink_and_mount_separator_fail(self):
         self.work.chmod(0o755)
-        self.assertNotEqual(self.run_build("memory").returncode, 0)
+        self.assertNotEqual(self.run_build("codifix").returncode, 0)
         self.work.chmod(0o700)
         link = self.root / "link"
         link.symlink_to(self.work)
-        self.assertNotEqual(self.run_build("memory", work=link).returncode, 0)
+        self.assertNotEqual(self.run_build("codifix", work=link).returncode, 0)
         unsafe = self.root / "work,dst=elsewhere"
         unsafe.mkdir(mode=0o700)
-        self.assertNotEqual(self.run_build("memory", work=unsafe).returncode, 0)
+        self.assertNotEqual(self.run_build("codifix", work=unsafe).returncode, 0)
 
     def test_pi_requires_explicit_toolchain(self):
         self.assertNotEqual(self.run_build("pi").returncode, 0)

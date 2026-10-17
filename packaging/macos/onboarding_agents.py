@@ -64,7 +64,7 @@ def status(journal, value=None):
     return result
 
 
-class Memory(journey.Memory):
+class Codifix(journey.Codifix):
     def public(self, args):
         _, text = self.native.command(self.args(args))
         try:
@@ -150,7 +150,7 @@ def configuration(value, source, slot, prepared, subscription, profile, allow_of
         expected_args.append("--allow-loopback")
     if allow_offline:
         expected_args.append("--allow-offline")
-    if value["schema_version"] != 1 or value["agent_id"] != prepared["agent_id"] or value["caller"] != caller or value["provider_id"] != CALLERS[caller] or value["device_id"] != prepared["device_id"] or value["scope"] != subscription["bootstrap"]["scope"] or value["workspace"] != slot["workspace"] or value["settings_path"] != expected_path or value["args"] != expected_args or Path(value["command"]).resolve(strict=True) != Path(source["native"]["memory"]["path"]).resolve(strict=True) or value["allow_offline"] is not allow_offline or value["preserves_other_settings"] is not True or value["contains_credentials"] is not False:
+    if value["schema_version"] != 1 or value["agent_id"] != prepared["agent_id"] or value["caller"] != caller or value["provider_id"] != CALLERS[caller] or value["device_id"] != prepared["device_id"] or value["scope"] != subscription["bootstrap"]["scope"] or value["workspace"] != slot["workspace"] or value["settings_path"] != expected_path or value["args"] != expected_args or Path(value["command"]).resolve(strict=True) != Path(source["native"]["codifix"]["path"]).resolve(strict=True) or value["allow_offline"] is not allow_offline or value["preserves_other_settings"] is not True or value["contains_credentials"] is not False:
         raise Refused("agent settings preview differs from the exact command/scope/disclosure plan")
     for flag in ["already_configured", "committed", "replayed"]:
         if type(value[flag]) is not bool:
@@ -182,12 +182,12 @@ def run(journal, native, *, allow_offline=False, renew_grant=None, memory=None, 
     operator.verify_files(native_value)
     if memory is None and (not sys.stdin.isatty() or not sys.stdout.isatty()):
         raise Refused("agent setup requires interactive human browser and settings review")
-    memory = memory or Memory(source)
+    memory = memory or Codifix(source)
     output = Path(str(journal) + ".agents.json")
     journey.private_parent(output)
     for root in [Path(source["native"]["root"]), *[Path(p["workspace"]) for p in source["projects"]]]:
         files.outside(output, root)
-        files.outside(Path(str(output) + ".memory-lock"), root)
+        files.outside(Path(str(output) + ".codifix-lock"), root)
     binding = binding_for(value, allow_offline)
     with files.Lock(output):
         if output.exists():

@@ -22,13 +22,13 @@ members/containers are rejected. Example adoption shape (IDs are placeholders):
 const adoption = {
   schemaVersion: 1,
   members: [
-    { member: 'workshop', containerName: 'memory-workshop-preview-app', containerId: '1'.repeat(64) },
-    { member: 'homelab', containerName: 'memory-homelab-preview-app', containerId: '2'.repeat(64) },
+    { member: 'workshop', containerName: 'codifix-workshop-preview-app', containerId: '1'.repeat(64) },
+    { member: 'homelab', containerName: 'codifix-homelab-preview-app', containerId: '2'.repeat(64) },
   ],
   inventory: {
     containers: [
-      { name: 'memory-workshop-preview-app', id: '1'.repeat(64), networks: ['workshop-preview'] },
-      { name: 'memory-homelab-preview-app', id: '2'.repeat(64), networks: ['homelab-preview'] },
+      { name: 'codifix-workshop-preview-app', id: '1'.repeat(64), networks: ['workshop-preview'] },
+      { name: 'codifix-homelab-preview-app', id: '2'.repeat(64), networks: ['homelab-preview'] },
     ],
     networks: ['workshop-preview', 'homelab-preview'],
     volumes: [],
@@ -68,19 +68,19 @@ the rest of the stack. The one allowed staged-backend descriptor is optional:
 
 ```js
 adoption.preparedGatewayDatabase = {
-  containerName: 'memory-company-gateway_db-1',
+  containerName: 'codifix-company-gateway_db-1',
   containerId: 'd'.repeat(64), // replace with the exact inspected ID
-  networkName: 'memory-company_gateway_database',
+  networkName: 'codifix-company_gateway_database',
   alias: 'gateway_db',
 };
 adoption.inventory.containers.push({
-  name: 'memory-company-gateway_db-1', id: 'd'.repeat(64),
-  networks: ['memory-company_gateway_database'],
-  networkAliases: { 'memory-company_gateway_database': ['gateway_db', 'memory-company-gateway_db-1'] },
+  name: 'codifix-company-gateway_db-1', id: 'd'.repeat(64),
+  networks: ['codifix-company_gateway_database'],
+  networkAliases: { 'codifix-company_gateway_database': ['gateway_db', 'codifix-company-gateway_db-1'] },
 });
-adoption.inventory.networks.push('memory-company_gateway_database');
+adoption.inventory.networks.push('codifix-company_gateway_database');
 // Include the actual occupied volume inventory, even though this plan will not own it.
-adoption.inventory.volumes.push('memory-company_gateway_db_data');
+adoption.inventory.volumes.push('codifix-company_gateway_db_data');
 ```
 
 The container and network names must be the exact generated names for this

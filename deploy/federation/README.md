@@ -30,7 +30,7 @@ it does not replace application deployment or authorization gates.
   the gateway is its only member-facing client. No participant receives its token,
   key, raw volume, repository interface or Docker socket.
 - Each participant has its own local database network and local credentials.
-  The member test process is replaced by an independently configured Memory
+  The member test process is replaced by an independently configured Codifix
   instance for installation; never attach its general HTTP/MCP service to gateway
   private networks. The test uses two space authorities to check cross-space denial.
 - No service publishes a host port. An approved installation connects only the
@@ -46,9 +46,9 @@ enabled IP family, orchestrator ingress, host firewall and production topology.
 
 ## Packaging and installation contract
 
-Build `cargo build --release -p mem-federation-runtime --bin memory-federation-gateway --locked`.
+Build `cargo build --release -p codifix-federation-runtime --bin codifix-federation-gateway --locked`.
 `Dockerfile` packages only this binary, with explicitly supplied, reviewed,
-digest-pinned compatible Rust/OS images. It does not build or mount the Memory
+digest-pinned compatible Rust/OS images. It does not build or mount the Codifix
 app, watchers, model providers or private captures. The fixture builds a separate
 debug image from local binary/libraries; that image is not a release artifact.
 Review/scanning of release images, certificate renewal, host hardening and
@@ -57,7 +57,7 @@ operator onboarding remain pilot-readiness tasks.
 For a previously built and reviewed pair of local release binaries,
 `Prebuilt.Dockerfile` packages the gateway and separate enrollment operator without
 another Cargo build. Use a fresh build context containing only that Dockerfile,
-`memory-federation-gateway`, and `memory-federation-enroll`; verify their SHA-256
+`codifix-federation-gateway`, and `codifix-federation-enroll`; verify their SHA-256
 digests before copying and pass those exact values as `GATEWAY_SHA256` and
 `ENROLL_SHA256`. Supply a compatible digest-pinned `GATEWAY_RUNTIME_IMAGE`, build
 with `--network none --pull=false`, and record the resulting immutable local image
@@ -71,13 +71,13 @@ Provision a **new dedicated** PostgreSQL database as a separate schema owner, th
 use the production [gateway schema operator](gateway-schema.md):
 
 ```sh
-memory-gateway-schema /private/company/gateway-schema.json
-memory-gateway-schema execute /private/company/gateway-schema.json EXACT_REVIEW_SHA256 \
+codifix-gateway-schema /private/company/gateway-schema.json
+codifix-gateway-schema execute /private/company/gateway-schema.json EXACT_REVIEW_SHA256 \
   --writers-stopped --fresh-database
 ```
 
 The default is offline review; explicit execution applies the exact compiled
-schema without Memory bootstrap, jobs, listeners, credentials or grants. Existing
+schema without Codifix bootstrap, jobs, listeners, credentials or grants. Existing
 published history without receipts deliberately fails
 enrollment; it requires a separately approved revalidation/migration exercise.
 The production operator reuses the existing fresh-schema dimensionless-vector
@@ -95,7 +95,7 @@ the expiring mailbox, delivery challenges and metadata journal; publication/audi
 be deleted. Collection snapshots, consent and service grants remain origin-only.
 The executable rejects superuser/create-role/create-database/replication/bypass-RLS
 roles, database ownership and read access to local memories/principals. The source
-and receiver use their own ordinary Memory databases and local authorization.
+and receiver use their own ordinary Codifix databases and local authorization.
 
 Mount each space's configuration and secrets read-only under its own unprivileged
 UID. Tokens/database URLs and 64-hex-character audit private scalars must be private

@@ -14,7 +14,7 @@ import sys
 import tarfile
 
 sys.dont_write_bytecode = True
-SPEC = importlib.util.spec_from_file_location("memory_release", Path(__file__).with_name("release.py"))
+SPEC = importlib.util.spec_from_file_location("codifix_release", Path(__file__).with_name("release.py"))
 release = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release)
 require = release.require
@@ -76,8 +76,8 @@ def member_path(member):
             "Unsafe archive path")
     require(member.isfile() or member.isdir(), "Archive links, devices and special files are forbidden")
     require(not member.sparse, "Sparse archive files are forbidden")
-    allowed = (name in ("bin", "web") if member.isdir() else name == "bin/memory") or name.startswith("web/")
-    require(allowed, "Archive may contain only bin/memory and web files")
+    allowed = (name in ("bin", "web") if member.isdir() else name == "bin/codifix") or name.startswith("web/")
+    require(allowed, "Archive may contain only bin/codifix and web files")
     require(not (member.mode & 0o7000), "Archive special permission bits are forbidden")
     return name
 
@@ -144,7 +144,7 @@ def unpack(archive_path, artifact, output_fd=None):
                                     require(written > 0, "Short release file write")
                                     view = view[written:]
                         require(size == member.size, "Truncated archive member")
-                        mode = 0o500 if name == "bin/memory" else 0o400
+                        mode = 0o500 if name == "bin/codifix" else 0o400
                         if destination is not None:
                             os.fchmod(destination, mode)
                             os.fsync(destination)
@@ -160,7 +160,7 @@ def unpack(archive_path, artifact, output_fd=None):
             raise release.ReleaseError("Invalid release-tree tar archive") from error
         source.seek(0)
         require(hashlib.file_digest(source, "sha256").hexdigest() == checksum, "Archive changed during preparation")
-    require("bin/memory" in files and files["bin/memory"]["size_bytes"] > 0
+    require("bin/codifix" in files and files["bin/codifix"]["size_bytes"] > 0
             and "web/index.html" in files and files["web/index.html"]["size_bytes"] > 0,
             "Archive must include a nonempty memory binary and web/index.html")
     require(not any(any(other.startswith(name + "/") for other in files) for name in files),
@@ -178,7 +178,7 @@ def selected_archive(manifest, architecture, name):
 def preparation(manifest, manifest_bytes, signer, instance, architecture, schema, artifact, files):
     require(release.natural(schema) and manifest["schema"]["floor"] <= schema <= manifest["schema"]["head"],
             "Schema outside signed compatibility interval; no downgrade is permitted")
-    return {"format": "memory-instance-preparation-v1", "status": "inactive_preparation_only",
+    return {"format": "codifix-instance-preparation-v1", "status": "inactive_preparation_only",
             "instance": instance_name(instance), "architecture": architecture, "schema_current_asserted": schema,
             "database_schema_verified": False,
             "schema_compatibility": manifest["schema"], "upgrade": manifest["upgrade"],
@@ -186,9 +186,9 @@ def preparation(manifest, manifest_bytes, signer, instance, architecture, schema
             "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(), "signing_fingerprint": signer,
             "archive": artifact, "files": files, "installation_authorized": False,
             "pi_included": False, "artifact_execution_tested": False, "host_sandbox_tested": False,
-            "plan": {"unit": f"memory-layer@{instance}.service",
-                     "concrete_release": f"/opt/memory-layer/instances/{instance}/release",
-                     "binary_digest_credential": f"/etc/memory-layer-instances/{instance}/memory.sha256",
+            "plan": {"unit": f"codifix@{instance}.service",
+                     "concrete_release": f"/opt/codifix/instances/{instance}/release",
+                     "binary_digest_credential": f"/etc/codifix-instances/{instance}/codifix.sha256",
                      "before_switch": ["separate operator approval and verified backup/restore",
                                        "verify actual host ABI and sandbox independently",
                                        "confirm fresh target schema and fence every old writer",
@@ -358,14 +358,14 @@ def rehearse(arguments):
             "Filesystem rollback rehearsal requires two unchanged-schema releases; migration rollback is not implemented")
     parent = Path(arguments.output_parent)
     parent_fd = private_directory(parent)
-    name = "memory-instance-rehearsal-" + secrets.token_hex(16)
+    name = "codifix-instance-rehearsal-" + secrets.token_hex(16)
     root_fd = new_directory(parent_fd, name)
     root = parent / name
     try:
         # Write only new private children of the explicit output parent. Live
         # /opt release and /etc credential paths in the plan are never targeted.
         release.write_new(root_fd, "scope.json", release.canonical({"instance": instance,
-            "format": "memory-filesystem-rehearsal-v1", "installation_authorized": False}))
+            "format": "codifix-filesystem-rehearsal-v1", "installation_authorized": False}))
         instance_fd = new_directory(root_fd, instance)
         try:
             for child, source, report in (("release", arguments.previous, prior),
@@ -387,7 +387,7 @@ def rehearse(arguments):
             verify_tree(root / instance / "retained-candidate", candidate["files"])
         finally:
             os.close(instance_fd)
-        result = {"format": "memory-filesystem-rehearsal-v1", "status": "filesystem_switch_and_rollback_verified",
+        result = {"format": "codifix-filesystem-rehearsal-v1", "status": "filesystem_switch_and_rollback_verified",
                   "instance": instance, "schema_current_asserted": arguments.schema_current,
                   "database_schema_verified": False,
                   "previous_manifest_sha256": prior["manifest_sha256"],

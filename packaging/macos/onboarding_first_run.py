@@ -100,12 +100,12 @@ def prerequisite(runtime, memory, native):
     memory = files.path(memory)
     with files.opened(memory, protected=False) as stream:
         if os.fstat(stream.fileno()).st_uid not in {0, os.getuid()}:
-            raise Refused("installed Memory ownership is untrusted")
+            raise Refused("installed Codifix ownership is untrusted")
     pin = files.sha(memory)
     native.command(["/usr/bin/lipo", "-verify_arch", "arm64" if arch == "aarch64" else "x86_64", memory])
     version = native.command([memory, "--version"])[1]
-    if files.sha(memory) != pin or not isinstance(version, str) or not re.fullmatch(r"memory [A-Za-z0-9_.+\-]{1,120}", version):
-        raise Refused("installed Memory changed or returned unsupported version metadata")
+    if files.sha(memory) != pin or not isinstance(version, str) or not re.fullmatch(r"codifix [A-Za-z0-9_.+\-]{1,120}", version):
+        raise Refused("installed Codifix changed or returned unsupported version metadata")
     return descriptor, {"path": str(memory), "sha256": pin, "version": version}
 
 
@@ -121,7 +121,7 @@ def bindings(company, name, no_browser, allow_loopback, runtime, memory, state, 
     if pg_port in range(api_base_port, api_base_port + 3):
         raise Refused("PostgreSQL and possible area ports must be distinct")
     return {"company": company, "name": name, "no_browser": no_browser, "allow_loopback_development": allow_loopback,
-            "runtime": str(files.path(runtime)), "memory": str(files.path(memory)), "state": str(files.path(state)),
+            "runtime": str(files.path(runtime)), "codifix": str(files.path(memory)), "state": str(files.path(state)),
             "workspace_parent": str(files.path(workspace_parent)), "pg_port": pg_port, "api_base_port": api_base_port}
 
 
@@ -134,7 +134,7 @@ def native_user():
 
 def run(*, company, name, runtime, memory, state, workspace_parent, native, no_browser=False,
         allow_loopback=False, pg_port=55432, api_base_port=55440, prepare_only=False, question=ask,
-        memory_factory=journey.Memory, journey_runner=journey.run, curated_sync=False):
+        memory_factory=journey.Codifix, journey_runner=journey.run, curated_sync=False):
     # Test dependencies are Python-only injections. The command-line has no
     # platform/Keychain/architecture bypass flag and no arbitrary executable hook.
     native_user()
@@ -151,20 +151,20 @@ def run(*, company, name, runtime, memory, state, workspace_parent, native, no_b
     with files.Lock(receipt_path):
         if receipt_path.exists():
             receipt = files.read(receipt_path)
-            operator.exact(receipt, {"schema_version", "request_id", "plan_sha256", "bindings", "descriptor_digest", "memory", "input_digest", "prepared_input"})
-            if type(receipt["schema_version"]) is not int or receipt["schema_version"] != 1 or receipt["bindings"] != bound or receipt["descriptor_digest"] != files.digest(descriptor) or receipt["memory"] != installed:
+            operator.exact(receipt, {"schema_version", "request_id", "plan_sha256", "bindings", "descriptor_digest", "codifix", "input_digest", "prepared_input"})
+            if type(receipt["schema_version"]) is not int or receipt["schema_version"] != 1 or receipt["bindings"] != bound or receipt["descriptor_digest"] != files.digest(descriptor) or receipt["codifix"] != installed:
                 raise Refused("first-run inputs/runtime changed; retain state and review a separate installation")
             operator.identifier(receipt["request_id"])
         else:
             if input_path.exists() or journal.exists() or (state / "native").exists():
                 raise Refused("first-run does not adopt existing installations or unbound journals")
             receipt = {"schema_version": 1, "request_id": str(uuid.uuid4()), "bindings": bound,
-                       "descriptor_digest": files.digest(descriptor), "memory": installed, "input_digest": None, "prepared_input": None}
-            receipt["plan_sha256"] = files.digest({k: receipt[k] for k in ["bindings", "descriptor_digest", "memory"]})
+                       "descriptor_digest": files.digest(descriptor), "codifix": installed, "input_digest": None, "prepared_input": None}
+            receipt["plan_sha256"] = files.digest({k: receipt[k] for k in ["bindings", "descriptor_digest", "codifix"]})
             files.missing(receipt_path, files.encoded(receipt))
-        if receipt["plan_sha256"] != files.digest({k: receipt[k] for k in ["bindings", "descriptor_digest", "memory"]}):
+        if receipt["plan_sha256"] != files.digest({k: receipt[k] for k in ["bindings", "descriptor_digest", "codifix"]}):
             raise Refused("first-run immutable prerequisite binding changed")
-        native_input = {"schema_version": 1, "root": str(state / "native"), "memory": installed,
+        native_input = {"schema_version": 1, "root": str(state / "native"), "codifix": installed,
                         "postgres": descriptor["postgres"], "pg_port": pg_port,
                         "areas": [{"name": "workshop", "instance_id": receipt["request_id"], "api_port": api_base_port}]}
         skeleton = {"schema_version": 2, "company": company, "name": name, "no_browser": no_browser,
@@ -178,7 +178,7 @@ def run(*, company, name, runtime, memory, state, workspace_parent, native, no_b
             for key in ["company", "name", "no_browser", "allow_loopback_development"]:
                 if source[key] != skeleton[key]:
                     raise Refused("saved first-run input differs from original bindings")
-            if source["native"]["memory"] != installed or source["native"]["postgres"] != descriptor["postgres"] or source["native"]["root"] != native_input["root"] or source["native"]["pg_port"] != pg_port:
+            if source["native"]["codifix"] != installed or source["native"]["postgres"] != descriptor["postgres"] or source["native"]["root"] != native_input["root"] or source["native"]["pg_port"] != pg_port:
                 raise Refused("saved native prerequisite inputs changed")
             if input_path.exists() and files.read(input_path, 64 * 1024) != source:
                 raise Refused("saved first-run selection changed")

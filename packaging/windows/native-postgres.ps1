@@ -46,7 +46,7 @@ function Restore-PgRuntimeAccess {
     if (-not (Test-Path -LiteralPath $runtimeAccessPath)) { return }
     if ((Get-Item -LiteralPath $runtimeAccessPath).Length -gt 32MB) { throw 'Runtime ACL recovery receipt exceeds bound' }
     $record=Get-Content -LiteralPath $runtimeAccessPath -Raw | ConvertFrom-Json
-    if ($record.kind -cne 'memory-native-pg-runtime-access-v1' -or $record.operation_id -cne $OperationId.ToString() -or
+    if ($record.kind -cne 'codifix-native-pg-runtime-access-v1' -or $record.operation_id -cne $OperationId.ToString() -or
         $record.input_sha256 -cne $review.input_sha256 -or $record.phase -notin @('pending','restored')) { throw 'Foreign runtime ACL recovery receipt' }
     if ($record.phase -ceq 'restored') { return }
     $expected=@(Runtime-Paths | Sort-Object)
@@ -69,7 +69,7 @@ function Grant-PgRuntimeOperatorRead([string]$Sid) {
         $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($Sid),'ReadAndExecute','Allow'))
         [pscustomobject]@{path=$path;before=$before;granted=$acl.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access)}
     })
-    $record=[ordered]@{kind='memory-native-pg-runtime-access-v1';operation_id=$OperationId.ToString();input_sha256=$review.input_sha256;phase='pending';entries=$entries}
+    $record=[ordered]@{kind='codifix-native-pg-runtime-access-v1';operation_id=$OperationId.ToString();input_sha256=$review.input_sha256;phase='pending';entries=$entries}
     Write-NativeJournal $runtimeAccessPath $record
     foreach ($entry in $entries) {
         $acl=Get-Acl -LiteralPath $entry.path
@@ -132,7 +132,7 @@ $review=$null; $lock=$null; $initPassword=$null; $passFile=$null; $journal=$null
 try {
     $review=Open-NativePostgresReview $Name $Port $ClusterPath $PasswordFile $OperationId $RuntimeManifestPath $RuntimeManifestSha256 $RuntimeOperationId $RecoveryReference
     $plan=$review.plan
-    $root=Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'MemoryLayer'
+    $root=Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Codifix'
     $journals=Join-Path $root 'postgres-operations'; $operationRoot=Join-Path $journals $OperationId.ToString()
     $journalPath=Join-Path $operationRoot 'journal.json'
     $runtimeAccessPath=Join-Path $operationRoot 'runtime-access.json'
@@ -153,7 +153,7 @@ try {
     # erase a concurrent installer's legitimate service-reader grant.
     $lock=[IO.File]::Open((Join-Path $root 'operator.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
     if (Test-Path -LiteralPath $journalPath) {
-        $receiptGuard=[MemoryLayer.ProtectedRelease]::Open($operationRoot)
+        $receiptGuard=[Codifix.ProtectedRelease]::Open($operationRoot)
         try {
             if ((Get-Item -LiteralPath $journalPath).Length -gt 1MB) { throw 'Provisioning receipt exceeds bound' }
             $journal=Get-Content -LiteralPath $journalPath -Raw | ConvertFrom-Json

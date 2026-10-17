@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --help|-h)
       cat <<'HELP'
-Build a Memory Layer Debian package.
+Build a Codifix Debian package.
 
 Usage:
   ./packaging/build-deb.sh [--arch amd64|arm64] [--target <rust-target>] [--output-dir <directory>]
@@ -89,84 +89,84 @@ esac
 # predictable path: it might contain another build or be an operator symlink.
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd -P)"
-DEB_PATH="$OUTPUT_DIR/memory-layer_${VERSION}_${DEB_ARCH}.deb"
+DEB_PATH="$OUTPUT_DIR/codifix_${VERSION}_${DEB_ARCH}.deb"
 if [[ -e "$DEB_PATH" || -L "$DEB_PATH" ]]; then
   echo "Refusing to overwrite an existing release artifact: $DEB_PATH" >&2
   echo "Preserve or explicitly remove that exact artifact before rebuilding." >&2
   exit 1
 fi
-BUILD_ROOT="$(mktemp -d "$OUTPUT_DIR/.memory-layer-$DEB_ARCH.XXXXXX")"
+BUILD_ROOT="$(mktemp -d "$OUTPUT_DIR/.codifix-$DEB_ARCH.XXXXXX")"
 trap 'rm -rf -- "$BUILD_ROOT"' EXIT
 PKG_ROOT="$BUILD_ROOT/package"
-BIN_PATH="$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory"
+BIN_PATH="$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix"
 
 mkdir -p \
   "$PKG_ROOT/DEBIAN" \
   "$PKG_ROOT/usr/bin" \
-  "$PKG_ROOT/usr/libexec/memory-layer" \
-  "$PKG_ROOT/usr/libexec/memory-layer/releases" \
-  "$PKG_ROOT/etc/memory-layer" \
+  "$PKG_ROOT/usr/libexec/codifix" \
+  "$PKG_ROOT/usr/libexec/codifix/releases" \
+  "$PKG_ROOT/etc/codifix" \
   "$PKG_ROOT/lib/systemd/system" \
-  "$PKG_ROOT/usr/share/doc/memory-layer" \
-  "$PKG_ROOT/usr/share/doc/memory-layer/areas" \
-  "$PKG_ROOT/usr/share/memory-layer/skill-template" \
-  "$PKG_ROOT/usr/share/memory-layer/web" \
+  "$PKG_ROOT/usr/share/doc/codifix" \
+  "$PKG_ROOT/usr/share/doc/codifix/areas" \
+  "$PKG_ROOT/usr/share/codifix/skill-template" \
+  "$PKG_ROOT/usr/share/codifix/web" \
   "$PKG_ROOT/usr/share/bash-completion/completions" \
   "$PKG_ROOT/usr/share/zsh/vendor-completions" \
   "$PKG_ROOT/usr/share/fish/vendor_completions.d"
 
 echo "Building release binary for $DEB_ARCH ($RUST_TARGET)..."
-cargo build --release --locked -p mem-cli --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory --target "$RUST_TARGET"
+cargo build --release --locked -p codifix-cli --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin codifix --target "$RUST_TARGET"
 echo "Building explicit offline area migration operators..."
-cargo build --release --locked -p mem-area -p mem-area-ops --manifest-path "$ROOT_DIR/Cargo.toml" --bins --target "$RUST_TARGET"
+cargo build --release --locked -p codifix-area -p codifix-area-ops --manifest-path "$ROOT_DIR/Cargo.toml" --bins --target "$RUST_TARGET"
 echo "Building the opt-in private federation gateway..."
-cargo build --release --locked -p mem-federation-runtime --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory-federation-gateway --target "$RUST_TARGET"
+cargo build --release --locked -p codifix-federation-runtime --manifest-path "$ROOT_DIR/Cargo.toml" --bin codifix-federation-gateway --target "$RUST_TARGET"
 COMPLETION_BIN="$BIN_PATH"
 if [[ "$HOST_TARGET" != "$RUST_TARGET" ]]; then
   echo "Building a host-native lean CLI for shell completions ($HOST_TARGET)..."
-  cargo build --locked -p mem-cli --no-default-features --features tui --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory --target "$HOST_TARGET"
-  COMPLETION_BIN="$CARGO_TARGET_ROOT/$HOST_TARGET/debug/memory"
+  cargo build --locked -p codifix-cli --no-default-features --features tui --manifest-path "$ROOT_DIR/Cargo.toml" --bin codifix --target "$HOST_TARGET"
+  COMPLETION_BIN="$CARGO_TARGET_ROOT/$HOST_TARGET/debug/codifix"
 fi
 echo "Building web UI..."
 npm --prefix "$ROOT_DIR/web" ci
 npm --prefix "$ROOT_DIR/web" run build
 
-install -m 0755 "$BIN_PATH" "$PKG_ROOT/usr/bin/memory"
-install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory-area" "$PKG_ROOT/usr/bin/memory-area"
-install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory-area-import" "$PKG_ROOT/usr/bin/memory-area-import"
-install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/memory-federation-gateway" "$PKG_ROOT/usr/bin/memory-federation-gateway"
-"$COMPLETION_BIN" completion bash > "$PKG_ROOT/usr/share/bash-completion/completions/memory"
-"$COMPLETION_BIN" completion zsh > "$PKG_ROOT/usr/share/zsh/vendor-completions/_memory"
-"$COMPLETION_BIN" completion fish > "$PKG_ROOT/usr/share/fish/vendor_completions.d/memory.fish"
-install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer.service" "$PKG_ROOT/lib/systemd/system/memory-layer.service"
-install -m 0644 "$ROOT_DIR/packaging/debian/memory-watch.service" "$PKG_ROOT/lib/systemd/system/memory-watch.service"
-install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer@.service" "$PKG_ROOT/lib/systemd/system/memory-layer@.service"
-install -m 0755 "$ROOT_DIR/packaging/debian/verify-instance-release" "$PKG_ROOT/usr/libexec/memory-layer/verify-instance-release"
-install -m 0755 "$ROOT_DIR/packaging/debian/run-instance" "$PKG_ROOT/usr/libexec/memory-layer/run-instance"
-install -m 0755 "$ROOT_DIR/deploy/areas/ca-preflight.sh" "$PKG_ROOT/usr/libexec/memory-layer/ca-preflight"
-install -m 0644 "$ROOT_DIR/scripts/areas/releases/release.py" "$PKG_ROOT/usr/libexec/memory-layer/area-release.py"
+install -m 0755 "$BIN_PATH" "$PKG_ROOT/usr/bin/codifix"
+install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix-area" "$PKG_ROOT/usr/bin/codifix-area"
+install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix-area-import" "$PKG_ROOT/usr/bin/codifix-area-import"
+install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix-federation-gateway" "$PKG_ROOT/usr/bin/codifix-federation-gateway"
+"$COMPLETION_BIN" completion bash > "$PKG_ROOT/usr/share/bash-completion/completions/codifix"
+"$COMPLETION_BIN" completion zsh > "$PKG_ROOT/usr/share/zsh/vendor-completions/_codifix"
+"$COMPLETION_BIN" completion fish > "$PKG_ROOT/usr/share/fish/vendor_completions.d/codifix.fish"
+install -m 0644 "$ROOT_DIR/packaging/debian/codifix.service" "$PKG_ROOT/lib/systemd/system/codifix.service"
+install -m 0644 "$ROOT_DIR/packaging/debian/codifix-watch.service" "$PKG_ROOT/lib/systemd/system/codifix-watch.service"
+install -m 0644 "$ROOT_DIR/packaging/debian/codifix@.service" "$PKG_ROOT/lib/systemd/system/codifix@.service"
+install -m 0755 "$ROOT_DIR/packaging/debian/verify-instance-release" "$PKG_ROOT/usr/libexec/codifix/verify-instance-release"
+install -m 0755 "$ROOT_DIR/packaging/debian/run-instance" "$PKG_ROOT/usr/libexec/codifix/run-instance"
+install -m 0755 "$ROOT_DIR/deploy/areas/ca-preflight.sh" "$PKG_ROOT/usr/libexec/codifix/ca-preflight"
+install -m 0644 "$ROOT_DIR/scripts/areas/releases/release.py" "$PKG_ROOT/usr/libexec/codifix/area-release.py"
 for release_tool in release.py instance.py console.py upgrade.py; do
-  install -m 0644 "$ROOT_DIR/scripts/areas/releases/$release_tool" "$PKG_ROOT/usr/libexec/memory-layer/releases/$release_tool"
+  install -m 0644 "$ROOT_DIR/scripts/areas/releases/$release_tool" "$PKG_ROOT/usr/libexec/codifix/releases/$release_tool"
 done
-install -m 0644 "$ROOT_DIR/packaging/debian/memory-layer.env" "$PKG_ROOT/etc/memory-layer/memory-layer.env"
-install -m 0644 "$ROOT_DIR/memory-layer.toml.example" "$PKG_ROOT/etc/memory-layer/memory-layer.toml"
-install -m 0644 "$ROOT_DIR/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/README.md"
-install -m 0644 "$ROOT_DIR/deploy/areas/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/README.md"
-install -m 0644 "$ROOT_DIR/deploy/areas/instance.toml.example" "$PKG_ROOT/usr/share/doc/memory-layer/areas/instance.toml.example"
-install -m 0644 "$ROOT_DIR/deploy/areas/CA-CONSOLE-HANDOFF.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/CA-CONSOLE-HANDOFF.md"
-install -m 0644 "$ROOT_DIR/crates/mem-area-ops/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/area-import.md"
-install -m 0644 "$ROOT_DIR/scripts/areas/releases/README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/release-staging.md"
-install -m 0644 "$ROOT_DIR/scripts/areas/releases/console-README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/console-first-install.md"
-install -m 0644 "$ROOT_DIR/scripts/areas/releases/upgrade-README.md" "$PKG_ROOT/usr/share/doc/memory-layer/areas/instance-upgrade.md"
-cp -R "$ROOT_DIR/.agents/skills/." "$PKG_ROOT/usr/share/memory-layer/skill-template/"
-find "$PKG_ROOT/usr/share/memory-layer/skill-template" -type f -name '*.sh' -exec chmod 0755 {} +
-cp -R "$ROOT_DIR/web/dist/." "$PKG_ROOT/usr/share/memory-layer/web/"
+install -m 0644 "$ROOT_DIR/packaging/debian/codifix.env" "$PKG_ROOT/etc/codifix/codifix.env"
+install -m 0644 "$ROOT_DIR/codifix.toml.example" "$PKG_ROOT/etc/codifix/codifix.toml"
+install -m 0644 "$ROOT_DIR/README.md" "$PKG_ROOT/usr/share/doc/codifix/README.md"
+install -m 0644 "$ROOT_DIR/deploy/areas/README.md" "$PKG_ROOT/usr/share/doc/codifix/areas/README.md"
+install -m 0644 "$ROOT_DIR/deploy/areas/instance.toml.example" "$PKG_ROOT/usr/share/doc/codifix/areas/instance.toml.example"
+install -m 0644 "$ROOT_DIR/deploy/areas/CA-CONSOLE-HANDOFF.md" "$PKG_ROOT/usr/share/doc/codifix/areas/CA-CONSOLE-HANDOFF.md"
+install -m 0644 "$ROOT_DIR/crates/codifix-area-ops/README.md" "$PKG_ROOT/usr/share/doc/codifix/areas/area-import.md"
+install -m 0644 "$ROOT_DIR/scripts/areas/releases/README.md" "$PKG_ROOT/usr/share/doc/codifix/areas/release-staging.md"
+install -m 0644 "$ROOT_DIR/scripts/areas/releases/console-README.md" "$PKG_ROOT/usr/share/doc/codifix/areas/console-first-install.md"
+install -m 0644 "$ROOT_DIR/scripts/areas/releases/upgrade-README.md" "$PKG_ROOT/usr/share/doc/codifix/areas/instance-upgrade.md"
+cp -R "$ROOT_DIR/.agents/skills/." "$PKG_ROOT/usr/share/codifix/skill-template/"
+find "$PKG_ROOT/usr/share/codifix/skill-template" -type f -name '*.sh' -exec chmod 0755 {} +
+cp -R "$ROOT_DIR/web/dist/." "$PKG_ROOT/usr/share/codifix/web/"
 
 # Derive ABI dependencies from every shipped executable, without running it.
 # PostgreSQL provisioning is separate: installing a client package must not pull
 # in and start a database server as an implicit dependency.
 mkdir -p "$BUILD_ROOT/debian"
-{ printf 'Source: memory-layer\n\n'; cat "$ROOT_DIR/packaging/debian/control"; } > "$BUILD_ROOT/debian/control"
+{ printf 'Source: codifix\n\n'; cat "$ROOT_DIR/packaging/debian/control"; } > "$BUILD_ROOT/debian/control"
 case "$DEB_ARCH" in
   amd64) GNU_TARGET=x86_64-linux-gnu ;;
   arm64) GNU_TARGET=aarch64-linux-gnu ;;
@@ -177,7 +177,7 @@ SHLIB_ARGS=(-O)
 if [[ "$HOST_TARGET" != "$RUST_TARGET" ]]; then
   SHLIB_ARGS+=("-l/usr/$GNU_TARGET/lib")
 fi
-for executable in memory memory-area memory-area-import memory-federation-gateway; do
+for executable in codifix codifix-area codifix-area-import codifix-federation-gateway; do
   SHLIB_ARGS+=("-e$PKG_ROOT/usr/bin/$executable")
 done
 DEPENDENCY_LINE="$(cd "$BUILD_ROOT"; DEB_HOST_ARCH="$DEB_ARCH" DEB_HOST_GNU_TYPE="$GNU_TARGET" dpkg-shlibdeps "${SHLIB_ARGS[@]}")"
@@ -244,7 +244,7 @@ find "$PKG_ROOT" -type d -exec chmod 0755 {} +
 find "$PKG_ROOT" -type f ! -perm /111 -exec chmod 0644 {} +
 find "$PKG_ROOT" -type f -perm /111 -exec chmod 0755 {} +
 
-BUILT_DEB="$BUILD_ROOT/memory-layer.deb"
+BUILT_DEB="$BUILD_ROOT/codifix.deb"
 dpkg-deb --root-owner-group --build "$PKG_ROOT" "$BUILT_DEB"
 # Publish without following or overwriting an existing output path, even if one
 # appeared while the build was running. Both files are on the same filesystem.

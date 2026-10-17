@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic Memory/native commands only; no Mac/provider/network acceptance."""
+"""Synthetic Codifix/native commands only; no Mac/provider/network acceptance."""
 import copy
 import hashlib
 import importlib
@@ -177,7 +177,7 @@ class JourneyContract(unittest.TestCase):
         self.assertEqual(selected["manifest"], original)
         self.assertEqual(selected["manifest_sha256"], "b" * 64)
         self.assertEqual(selected["plan_digest"], files.digest(files.read(self.source["projects"][0]["journal"])["plan"]))
-        cli = journey.Memory(self.source)
+        cli = journey.Codifix(self.source)
         args = cli.subscription_args(selected, "output.json")
         self.assertEqual(args[args.index("--owner-instance") + 1], manifest["owner_instance_id"])
         self.run_journey()
@@ -364,8 +364,8 @@ class JourneyContract(unittest.TestCase):
         self.assertEqual(custom.stat().st_mode & 0o777, 0o400)
         self.assertEqual(self.memory.clones, 0)
 
-    def test_memory_boundary_fixed_arguments_suppressed_batch_output_and_cli_digest(self):
-        memory = journey.Memory(self.source)
+    def test_codifix_boundary_fixed_arguments_suppressed_batch_output_and_cli_digest(self):
+        memory = journey.Codifix(self.source)
         captured = []
         def execute(args, **kwargs):
             captured.append((args, kwargs))
@@ -415,7 +415,7 @@ class JourneyContract(unittest.TestCase):
 
     def test_v2_fixed_prepare_arguments_and_strict_schema(self):
         self.select_v2()
-        memory = journey.Memory(self.source)
+        memory = journey.Codifix(self.source)
         with patch.object(memory, "execute") as execute:
             memory.select(self.source["projects"][0])
         args = execute.call_args.args[0]

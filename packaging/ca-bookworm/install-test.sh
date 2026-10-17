@@ -2,66 +2,67 @@
 # Real native dpkg lifecycle on a fresh disposable GitHub-hosted Linux runner.
 # Never invoke on Monolith, the CA, a self-hosted runner or another installation.
 set -euo pipefail
-if [[ $# != 1 || "$1" != /* || ! -f "$1" || -L "$1" || ${GITHUB_ACTIONS:-} != true || ${RUNNER_OS:-} != Linux || ${RUNNER_ENVIRONMENT:-} != github-hosted || ${MEMORY_HOSTED_INSTALL_TEST:-} != yes || $(id -u) != 0 ]]; then
+if [[ $# != 1 || "$1" != /* || ! -f "$1" || -L "$1" || ${GITHUB_ACTIONS:-} != true || ${RUNNER_OS:-} != Linux || ${RUNNER_ENVIRONMENT:-} != github-hosted || ${CODIFIX_HOSTED_INSTALL_TEST:-} != yes || $(id -u) != 0 ]]; then
   echo 'Requires an explicitly disposable GitHub-hosted Linux runner and root.' >&2
-  echo 'Usage: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env MEMORY_HOSTED_INSTALL_TEST=yes bash install-test.sh ABSOLUTE_CANDIDATE_DEB' >&2
+  echo 'Usage: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env CODIFIX_HOSTED_INSTALL_TEST=yes bash install-test.sh ABSOLUTE_CANDIDATE_DEB' >&2
   exit 2
 fi
 package=$1
 arch=$(dpkg-deb -f "$package" Architecture)
 version=$(dpkg-deb -f "$package" Version)
 [[ $(dpkg --print-architecture) == "$arch" ]]
-[[ $version == 2.1.0 ]]
-[[ ! -e /usr/bin/memory && ! -e /etc/memory-layer && ! -e /var/lib/memory-layer ]]
-[[ -z $(dpkg-query -W -f='${Version}' memory-layer 2>/dev/null || true) ]]
-work=$(mktemp -d /tmp/memory-debian-install.XXXXXXXX)
+[[ $version =~ ^3\.0\.0(~rc\.[1-9][0-9]{0,5})?$ ]]
+application_version=${version/~/-}
+[[ ! -e /usr/bin/codifix && ! -e /etc/codifix && ! -e /var/lib/codifix ]]
+[[ -z $(dpkg-query -W -f='${Version}' codifix 2>/dev/null || true) ]]
+work=$(mktemp -d /tmp/codifix-debian-install.XXXXXXXX)
 mkdir "$work/bin"
 # Real dpkg and native package hooks run, but no service manager is contacted.
-printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "$MEMORY_SERVICE_CALLS"\ncase "$1" in daemon-reload|stop) exit 0;; *) exit 99;; esac\n' > "$work/bin/systemctl"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "$CODIFIX_SERVICE_CALLS"\ncase "$1" in daemon-reload|stop) exit 0;; *) exit 99;; esac\n' > "$work/bin/systemctl"
 chmod 755 "$work/bin/systemctl"
-export MEMORY_SERVICE_CALLS="$work/systemctl-calls"
+export CODIFIX_SERVICE_CALLS="$work/systemctl-calls"
 export PATH="$work/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export DEBIAN_FRONTEND=noninteractive
 check_binary() {
-  [[ $(/usr/bin/memory --version) == 'memory 2.1.0' ]]
-  for executable in memory memory-area memory-area-import; do
+  [[ $(/usr/bin/codifix --version) == "codifix $application_version" ]]
+  for executable in codifix codifix-area codifix-area-import; do
     "/usr/bin/$executable" --help > /dev/null
   done
   # Gateway has positional private-config arguments, not general --help flags.
   local gateway_status=0 gateway_output
-  gateway_output=$(timeout 15s /usr/bin/memory-federation-gateway 2>&1) || gateway_status=$?
+  gateway_output=$(timeout 15s /usr/bin/codifix-federation-gateway 2>&1) || gateway_status=$?
   [[ $gateway_status == 1 && $gateway_output == 'Error: "expected private gateway configuration file"' ]]
-  test -s /usr/share/memory-layer/web/index.html
-  test -s /usr/libexec/memory-layer/releases/release.py
+  test -s /usr/share/codifix/web/index.html
+  test -s /usr/libexec/codifix/releases/release.py
 }
 # Fresh candidate installation on the native runner, no dependency bypasses.
 dpkg -i "$package"
 check_binary
-dpkg --purge memory-layer
-mkdir -p "$work/prior/DEBIAN" "$work/prior/usr/bin" "$work/prior/etc/memory-layer"
+dpkg --purge codifix
+mkdir -p "$work/prior/DEBIAN" "$work/prior/usr/bin" "$work/prior/etc/codifix"
 dpkg-deb -e "$package" "$work/candidate-control"
-printf 'Package: memory-layer\nVersion: 2.0.1\nArchitecture: %s\nMaintainer: Synthetic acceptance fixture <nobody@example.invalid>\nDescription: synthetic prior-version lifecycle fixture, not a historic released artifact\n' "$arch" > "$work/prior/DEBIAN/control"
+printf 'Package: codifix\nVersion: 2.0.1\nArchitecture: %s\nMaintainer: Synthetic acceptance fixture <nobody@example.invalid>\nDescription: synthetic prior-version lifecycle fixture, not a historic released artifact\n' "$arch" > "$work/prior/DEBIAN/control"
 cp "$work/candidate-control/postinst" "$work/candidate-control/prerm" "$work/prior/DEBIAN/"
-printf '/etc/memory-layer/memory-layer.toml\n' > "$work/prior/DEBIAN/conffiles"
-printf '#!/bin/sh\necho synthetic-prior-version\n' > "$work/prior/usr/bin/memory"
-chmod 755 "$work/prior/usr/bin/memory"
-printf '# preserved operator configuration\n[service]\nbind_addr = "127.0.0.1:18371"\n' > "$work/prior/etc/memory-layer/memory-layer.toml"
+printf '/etc/codifix/codifix.toml\n' > "$work/prior/DEBIAN/conffiles"
+printf '#!/bin/sh\necho synthetic-prior-version\n' > "$work/prior/usr/bin/codifix"
+chmod 755 "$work/prior/usr/bin/codifix"
+printf '# preserved operator configuration\n[service]\nbind_addr = "127.0.0.1:18371"\n' > "$work/prior/etc/codifix/codifix.toml"
 dpkg-deb --root-owner-group --build "$work/prior" "$work/prior.deb"
 dpkg -i "$work/prior.deb"
-printf '\n# operator changed this after installing the prior package\n' >> /etc/memory-layer/memory-layer.toml
-printf 'retain local runtime data\n' > /var/lib/memory-layer/acceptance-sentinel
-before=$(sha256sum /etc/memory-layer/memory-layer.toml /var/lib/memory-layer/acceptance-sentinel)
+printf '\n# operator changed this after installing the prior package\n' >> /etc/codifix/codifix.toml
+printf 'retain local runtime data\n' > /var/lib/codifix/acceptance-sentinel
+before=$(sha256sum /etc/codifix/codifix.toml /var/lib/codifix/acceptance-sentinel)
 dpkg --force-confold -i "$package"
-[[ $(dpkg-query -W -f='${Version}' memory-layer) == "$version" ]]
-[[ $(sha256sum /etc/memory-layer/memory-layer.toml /var/lib/memory-layer/acceptance-sentinel) == "$before" ]]
+[[ $(dpkg-query -W -f='${Version}' codifix) == "$version" ]]
+[[ $(sha256sum /etc/codifix/codifix.toml /var/lib/codifix/acceptance-sentinel) == "$before" ]]
 check_binary
 # Repair the exact installed version without replacing operator state.
 dpkg --force-confold -i "$package"
-[[ $(sha256sum /etc/memory-layer/memory-layer.toml /var/lib/memory-layer/acceptance-sentinel) == "$before" ]]
-dpkg -r memory-layer
-[[ ! -e /usr/bin/memory ]]
-[[ $(sha256sum /etc/memory-layer/memory-layer.toml /var/lib/memory-layer/acceptance-sentinel) == "$before" ]]
-if grep -Ev '^(daemon-reload|stop memory-watch.service memory-layer.service)$' "$MEMORY_SERVICE_CALLS"; then
+[[ $(sha256sum /etc/codifix/codifix.toml /var/lib/codifix/acceptance-sentinel) == "$before" ]]
+dpkg -r codifix
+[[ ! -e /usr/bin/codifix ]]
+[[ $(sha256sum /etc/codifix/codifix.toml /var/lib/codifix/acceptance-sentinel) == "$before" ]]
+if grep -Ev '^(daemon-reload|stop codifix-watch.service codifix.service)$' "$CODIFIX_SERVICE_CALLS"; then
   echo 'Unexpected service activation during installation or repair' >&2
   exit 1
 fi

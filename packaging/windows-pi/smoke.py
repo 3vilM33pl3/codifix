@@ -40,7 +40,7 @@ def candidate_check(path, expected):
 def protocol_library(path, expected):
     if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
         raise ValueError("shared protocol library differs")
-    spec = importlib.util.spec_from_file_location("memory_pi_strict_protocol", path)
+    spec = importlib.util.spec_from_file_location("codifix_pi_strict_protocol", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -135,7 +135,7 @@ def main():
         raise ValueError("disposable native AMD64 Windows lab required")
     candidate_check(args.candidate, args.candidate_sha256)
     shared = protocol_library(args.protocol_library, args.protocol_sha256)
-    report = {"format": "memory-windows-pi-smoke-v1", "binary_sha256": args.candidate_sha256,
+    report = {"format": "codifix-windows-pi-smoke-v1", "binary_sha256": args.candidate_sha256,
               "real_provider_calls": 0, "real_credentials": False, "native_sandbox_verified": False,
               "inherited_broker_verified": False, "deployed_supervisor_verified": False}
     report["cases"] = asyncio.run(run_all(shared, args.candidate, args.scratch, windows_root()))

@@ -40,7 +40,7 @@ static int synchronize(int argc, const char *argv[]) {
         child = [NSTask new];
         child.executableURL = [NSURL fileURLWithPath:executable];
         // Preserve the operator's journal, profile, executable and permission
-        // validation before it execs the existing authenticated Memory path.
+        // validation before it execs the existing authenticated Codifix path.
         child.arguments = @[@"-I", @"-S", @"-B", operator, @"run-sync", @"--journal", journal, @"--subscription", subscription];
         child.terminationHandler = ^(NSTask *finished) {
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -49,7 +49,7 @@ static int synchronize(int argc, const char *argv[]) {
         };
         NSError *error = nil;
         if (![child launchAndReturnError:&error]) {
-            fputs("Memory synchronization could not start; retrying.\n", stderr);
+            fputs("Codifix synchronization could not start; retrying.\n", stderr);
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC), dispatch_get_main_queue(), weakStart);
         }
     };
@@ -89,8 +89,8 @@ int main(int argc, const char *argv[]) {
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
         NSAlert *alert = [NSAlert new];
-        alert.messageText = @"Enable Memory synchronization";
-        alert.informativeText = @"Allow local-network access when macOS asks. Memory needs this to synchronize your selected projects with your company server.";
+        alert.messageText = @"Enable Codifix synchronization";
+        alert.informativeText = @"Allow local-network access when macOS asks. Codifix needs this to synchronize your selected projects with your company server.";
         [alert addButtonWithTitle:@"Close"];
         __block BOOL connected = NO;
         __block BOOL pending = NO;
@@ -106,7 +106,7 @@ int main(int argc, const char *argv[]) {
                     pending = NO;
                     if (response && !error) {
                         connected = YES;
-                        alert.messageText = @"Memory can reach your company server";
+                        alert.messageText = @"Codifix can reach your company server";
                         alert.informativeText = @"Local-network access is ready. You can close this window; synchronization runs in the background.";
                     }
                 });

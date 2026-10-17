@@ -5,16 +5,16 @@ set -euo pipefail
 # may mutate credentials or start a service.
 case "${1:-}" in
     configure)
-        id -u memory-layer >/dev/null 2>&1 || useradd --system --home /var/lib/memory-layer --shell /usr/sbin/nologin memory-layer
+        id -u codifix >/dev/null 2>&1 || useradd --system --home /var/lib/codifix --shell /usr/sbin/nologin codifix
         # Keep the legacy singleton available, without changing an existing
         # installation's configuration, credentials or directory ownership.
-        for directory in /etc/memory-layer /var/lib/memory-layer /var/log/memory-layer; do
+        for directory in /etc/codifix /var/lib/codifix /var/log/codifix; do
             if [[ ! -e "$directory" && ! -L "$directory" ]]; then
-                install -d -m 0750 -o memory-layer -g memory-layer "$directory"
+                install -d -m 0750 -o codifix -g codifix "$directory"
             fi
         done
         systemctl daemon-reload || true
-        echo "Memory Layer installed without starting or restarting services."
+        echo "Codifix installed without starting or restarting services."
         echo "Review configuration and credentials, then explicitly restart only the intended service."
         ;;
 esac

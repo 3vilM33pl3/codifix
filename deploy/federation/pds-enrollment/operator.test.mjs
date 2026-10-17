@@ -21,7 +21,7 @@ function jwt(config, scope, expires, serial = 0) {
 async function fixture(t, options = {}) {
   // The Linux operator deliberately rejects permissive non-root-owned TMPDIR
   // ancestors. Tests use the root-owned sticky /tmp, never chmod shared paths.
-  const directory = await mkdtemp('/tmp/memory-pds-operator-');
+  const directory = await mkdtemp('/tmp/codifix-pds-operator-');
   await chmod(directory, 0o700);
   t.after(async () => { await rm(directory, { recursive: true, force: true }); });
   const write = (name, contents) => writeFile(join(directory, name), contents, { mode: 0o600 });
@@ -353,7 +353,7 @@ test('exclusive lock refuses another operator without network or credential read
 
 test('adopted refresh-only state refuses every legacy enrollment execution', async t => {
   const f = await fixture(t); await f.ready(); const before = f.calls.length;
-  await f.files.write('refresh-owner.json', { schema_version: 1, purpose: 'memory-private-pds-refresh-only-v1', policy_sha256: 'c'.repeat(64) });
+  await f.files.write('refresh-owner.json', { schema_version: 1, purpose: 'codifix-private-pds-refresh-only-v1', policy_sha256: 'c'.repeat(64) });
   await assert.rejects(f.run('refresh'), /refresh_only_maintenance_owns_session/u);
   assert.equal(f.calls.length, before);
 });

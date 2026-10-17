@@ -6,7 +6,7 @@ import { companyBootstrapTopology } from './company-bootstrap-topology.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 function company() {
-  return { schemaVersion: 1, name: 'memory-company', root: '/srv/memory-company', domain: 'memory.company.internal',
+  return { schemaVersion: 1, name: 'codifix-company', root: '/srv/codifix-company', domain: 'memory.company.internal',
     images: Object.fromEntries(['app', 'gateway', 'postgres', 'pds', 'proxy'].map((key, index) => [key, `registry.company.internal/${key}@sha256:${String(index + 1).repeat(64)}`])),
     users: { app: '65532:65532', gateway: '65532:65532', proxy: '65532:65532', pds: '1000:1000', postgres: '999:999' } };
 }
@@ -110,7 +110,7 @@ test('DID revision handoff uses a dedicated readonly config directory and a PDS-
   const input = bootstrap();
   const result = companyBootstrapTopology(company(), input);
   const host = result.compose.services.repository_did;
-  assert.deepEqual(host.volumes[0], { type: 'bind', source: '/srv/memory-company/bootstrap/repository/config', target: '/config', read_only: true, bind: { create_host_path: false } });
+  assert.deepEqual(host.volumes[0], { type: 'bind', source: '/srv/codifix-company/bootstrap/repository/config', target: '/config', read_only: true, bind: { create_host_path: false } });
   assert.equal(host.volumes.filter(m => m.source.endsWith('/key.pem')).length, 1);
   assert.equal(result.requiredFiles.filter(f => f.path.endsWith('/bootstrap/repository/tls/key.pem')).length, 1);
   const pds = result.compose.services.pds;

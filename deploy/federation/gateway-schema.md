@@ -1,20 +1,20 @@
 # Dedicated gateway schema preparation
 
-`memory-gateway-schema` is a one-shot schema-owner operation, built from
-`mem-area-ops`. It reuses the vetted fresh-schema migrator used by area migration;
-it is not an area import, the Memory app, the gateway service or a test fixture.
+`codifix-gateway-schema` is a one-shot schema-owner operation, built from
+`codifix-area-ops`. It reuses the vetted fresh-schema migrator used by area migration;
+it is not an area import, the Codifix app, the gateway service or a test fixture.
 The federation runtime does not depend on area migration tooling.
 
 It supports only a **new, empty, dedicated local PostgreSQL database**. It creates
 no database, login, credential, grant, gateway identity, publication, membership,
 job or listener. It does not upgrade an existing database or repair lost history.
-Do not use `isolation-admin` or start the Memory service to initialize a gateway.
+Do not use `isolation-admin` or start the Codifix service to initialize a gateway.
 
 ## Review first
 
 ```sh
-cargo build --release -p mem-area-ops --bin memory-gateway-schema --locked
-memory-gateway-schema /private/company/gateway-schema.json
+cargo build --release -p codifix-area-ops --bin codifix-gateway-schema --locked
+codifix-gateway-schema /private/company/gateway-schema.json
 ```
 
 The single-path default is equivalent to `review /private/company/gateway-schema.json`.
@@ -67,7 +67,7 @@ fence. Keep all application/gateway clients stopped and prevent new connections.
 The command does not terminate clients or establish a durable cluster-wide fence.
 
 ```sh
-memory-gateway-schema execute /private/company/gateway-schema.json EXACT_REVIEW_SHA256 \
+codifix-gateway-schema execute /private/company/gateway-schema.json EXACT_REVIEW_SHA256 \
   --writers-stopped --fresh-database
 ```
 
@@ -118,10 +118,10 @@ out of the running gateway and participant containers.
 ## Verification
 
 ```sh
-MEMORY_LAYER_TEST_REQUIRE_DB=1 cargo test -p mem-area-ops --all-targets --locked -- --test-threads=1
+CODIFIX_TEST_REQUIRE_DB=1 cargo test -p codifix-area-ops --all-targets --locked -- --test-threads=1
 ```
 
-Set `MEMORY_LAYER_TEST_DATABASE_URL` to an authorized disposable PostgreSQL server
+Set `CODIFIX_TEST_DATABASE_URL` to an authorized disposable PostgreSQL server
 with pgvector and test database/role creation privileges. Tests create uniquely
 named temporary databases and roles. Coverage includes offline/redacted preview,
 exact digest confirmation, private file/environment rejection, actual owner

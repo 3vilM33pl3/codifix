@@ -5,7 +5,7 @@ set -euo pipefail
 # Root-console checks must not execute a program selected by an inherited PATH.
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 if ! command -v python3 >/dev/null 2>&1; then
-    printf '%s\n' '{"format":"memory-ca-preflight-v2","status":"unavailable","reason":"python3_missing","database_binding":{"status":"unknown","reason":"not_inspected"}}'
+    printf '%s\n' '{"format":"codifix-ca-preflight-v2","status":"unavailable","reason":"python3_missing","database_binding":{"status":"unknown","reason":"not_inspected"}}'
     exit 1
 fi
 exec python3 -I -S - <<'PYTHON_PREFLIGHT'
@@ -81,10 +81,10 @@ def run(arguments, timeout=6):
 
 
 def version():
-    status, reason, output = run(["memory", "--version"])
+    status, reason, output = run(["codifix", "--version"])
     if status != "ok":
         return outcome(status, reason)
-    match = re.fullmatch(r"memory ([0-9][A-Za-z0-9.+_~-]{0,95})\s*", output)
+    match = re.fullmatch(r"codifix ([0-9][A-Za-z0-9.+_~-]{0,95})\s*", output)
     return outcome("ok", version=match[1]) if match else outcome("unavailable", "unexpected_version_output")
 
 
@@ -186,7 +186,7 @@ def host():
         os_result = outcome("unavailable", "os_metadata_missing")
     disks = {}
     # Labels identify the purpose, without publishing filesystem/mount paths.
-    for label, location in (("root", "/"), ("memory_data", "/var/lib/memory-layer"),
+    for label, location in (("root", "/"), ("memory_data", "/var/lib/codifix"),
                             ("postgres_data", "/var/lib/postgresql")):
         try:
             info = os.statvfs(location)
@@ -268,7 +268,7 @@ def sql(port, database, query):
     # different database/server, password/service file, or startup script.
     arguments = ["runuser", "--user", "postgres", "--", "env", "-i", f"PATH={PATH}", "LC_ALL=C",
                  "PGPASSFILE=/dev/null", "PGSERVICEFILE=/dev/null", "PGSYSCONFDIR=/nonexistent",
-                 "PGCONNECT_TIMEOUT=2", "PGAPPNAME=memory-ca-readonly-preflight",
+                 "PGCONNECT_TIMEOUT=2", "PGAPPNAME=codifix-ca-readonly-preflight",
                  "PGOPTIONS=-c default_transaction_read_only=on -c statement_timeout=4000 -c lock_timeout=1000 -c search_path=pg_catalog",
                  "psql", "--no-psqlrc", "--no-password", "--tuples-only", "--no-align",
                  "--set=ON_ERROR_STOP=1", "--host=/run/postgresql", f"--port={port}",
@@ -294,8 +294,8 @@ def inspect_database(port, database):
     if not isinstance(relations, list) or any(name not in TABLES for name in relations):
         return {"memory_schema": outcome("unavailable", "unexpected_database_metadata")}
     if not {"projects", "memory_entries"}.issubset(relations):
-        return {"memory_schema": outcome("not_identified", "expected_public_memory_tables_missing"),
-                "counts": outcome("unknown", "not_a_verified_memory_schema")}
+        return {"memory_schema": outcome("not_identified", "expected_public_codifix_tables_missing"),
+                "counts": outcome("unknown", "not_a_verified_codifix_schema")}
     result = {"memory_schema": outcome("candidate", "table_names_only_not_application_binding")}
     # ONLY prevents an unexpected inherited/foreign child from causing remote
     # access. Views, foreign tables and partitioned replacements are not accepted.
@@ -402,24 +402,24 @@ def database_binding(postgresql):
                 candidates.append({"local_socket_port": cluster["port"], "database": database["name"],
                                    "schema_head": database.get("schema_head", outcome("unknown")),
                                    "client_activity": database.get("client_activity", outcome("unknown"))})
-    return outcome("unknown", "cannot_bind_running_memory_to_database_without_separate_review",
-                   local_memory_schema_candidates=candidates, configuration_inspected=False,
+    return outcome("unknown", "cannot_bind_running_codifix_to_database_without_separate_review",
+                   local_codifix_schema_candidates=candidates, configuration_inspected=False,
                    process_connection_identity_proven=False, shared_vs_unique_proven=False,
                    no_data_proven=False)
 
 
 host_metadata = host()
 report = {
-    "format": "memory-ca-preflight-v2",
+    "format": "codifix-ca-preflight-v2",
     "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     "status": "inventory_only_activation_not_approved",
     "command_time_budget_seconds": 60,
     "host": host_metadata,
     "runtime": runtime_metadata(),
     "pi_arm64": pi_compatibility(host_metadata),
-    "memory": version(),
+    "codifix": version(),
     "services": {unit: service(unit) for unit in
-                 ("memory-layer.service", "memory-layer@trust.service", "step-ca.service", "openbao.service", "sshd.service", "ssh.service", "postgresql.service", "docker.service", "containerd.service", "podman.socket")},
+                 ("codifix.service", "codifix@trust.service", "step-ca.service", "openbao.service", "sshd.service", "ssh.service", "postgresql.service", "docker.service", "containerd.service", "podman.socket")},
     "network": listeners(),
     "dataset_coverage": {
         "status": "unknown_requires_operator_reconciliation",

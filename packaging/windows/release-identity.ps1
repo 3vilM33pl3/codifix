@@ -15,7 +15,7 @@ function Get-WindowsReleaseIdentity {
     # The release ledger must increase build across patches/RCs within major.minor.
     return [pscustomobject][ordered]@{
         release_identity = "windows-v$ApplicationVersion-build.$InstallerBuild"
-        asset_prefix = "memory-layer-$ApplicationVersion-windows-x86_64-build.$InstallerBuild"
+        asset_prefix = "codifix-$ApplicationVersion-windows-x86_64-build.$InstallerBuild"
         installer_version = "$major.$minor.$InstallerBuild"
     }
 }

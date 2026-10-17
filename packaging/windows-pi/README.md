@@ -1,6 +1,6 @@
 # Native Pi lab proof preparation
 
-The lab adapter reuses `crates/mem-supervisor-pi/scripts/build-windows.ps1`.
+The lab adapter reuses `crates/codifix-supervisor-pi/scripts/build-windows.ps1`.
 `scripts/windows/native-pi.json` binds the original source archive, lockfile,
 compiler, existing no-tools correction, Windows broker patch and strict proof
 inputs. The original source and Linux artifacts are not modified.

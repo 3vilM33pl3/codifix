@@ -10,13 +10,13 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or
 }
 $manifestPath = Join-Path $PSScriptRoot '..\..\scripts\windows\native-postgres.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.format -ne 'memory-windows-postgres-proof-v1' -or
+if ($manifest.format -ne 'codifix-windows-postgres-proof-v1' -or
     $manifest.postgres_version -ne '17.11' -or $manifest.pgvector_version -ne '0.8.7' -or
     $manifest.postgres.sha256 -ne '6eabdf00d2893713b75db4336a23c3fdf505f056e217ec6e2e95d901750cfea3' -or
     $manifest.pgvector.sha256 -ne 'cac0b10c360f05b2d521200105ba3697e773d4cd3731f5a915a7e37ebe0bea85') {
     throw 'Unexpected native release-test dependency pins'
 }
-$root = Join-Path $env:RUNNER_TEMP ('memory-release-postgres-' + [guid]::NewGuid())
+$root = Join-Path $env:RUNNER_TEMP ('codifix-release-postgres-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $root | Out-Null
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 & "$env:SystemRoot\System32\icacls.exe" $root /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
@@ -104,7 +104,7 @@ $password = [guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')
 $passwordFile = Join-Path $root 'initdb-password.private'
 [IO.File]::WriteAllText($passwordFile, $password + "`n", [Text.Encoding]::ASCII)
 try {
-    Run-Checked (Join-Path $bin 'initdb.exe') @('-D', $data, '-U', 'memory_release', '--auth-host=scram-sha-256', '--auth-local=scram-sha-256', '--encoding=UTF8', '--pwfile', $passwordFile)
+    Run-Checked (Join-Path $bin 'initdb.exe') @('-D', $data, '-U', 'codifix_release', '--auth-host=scram-sha-256', '--auth-local=scram-sha-256', '--encoding=UTF8', '--pwfile', $passwordFile)
 } finally { Remove-Item -LiteralPath $passwordFile -ErrorAction SilentlyContinue }
 $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
 $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
@@ -114,13 +114,13 @@ try {
     Run-Checked (Join-Path $bin 'pg_ctl.exe') @('-D', $data, '-l', (Join-Path $root 'postgres.log'), '-o', "-h 127.0.0.1 -p $port", '-w', 'start')
     $started = $true
     $env:PGPASSWORD = $password
-    Run-Checked (Join-Path $bin 'createdb.exe') @('-h', '127.0.0.1', '-p', "$port", '-U', 'memory_release', 'memory_release_smoke')
-    Run-Checked (Join-Path $bin 'psql.exe') @('-h', '127.0.0.1', '-p', "$port", '-U', 'memory_release', '-d', 'memory_release_smoke', '-v', 'ON_ERROR_STOP=1', '-c', 'CREATE EXTENSION vector; CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_trgm;')
-    $url = "postgresql://memory_release:${password}@127.0.0.1:$port/memory_release_smoke"
+    Run-Checked (Join-Path $bin 'createdb.exe') @('-h', '127.0.0.1', '-p', "$port", '-U', 'codifix_release', 'codifix_release_smoke')
+    Run-Checked (Join-Path $bin 'psql.exe') @('-h', '127.0.0.1', '-p', "$port", '-U', 'codifix_release', '-d', 'codifix_release_smoke', '-v', 'ON_ERROR_STOP=1', '-c', 'CREATE EXTENSION vector; CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_trgm;')
+    $url = "postgresql://codifix_release:${password}@127.0.0.1:$port/codifix_release_smoke"
     # Only synthetic runner credentials, still mask them from accidental logs.
     Write-Output "::add-mask::$password"
     Write-Output "::add-mask::$url"
-    @("MEMORY_RELEASE_TEST_DATABASE_URL=$url", "MEMORY_RELEASE_PGDATA=$data", "MEMORY_RELEASE_PGBIN=$bin") |
+    @("CODIFIX_RELEASE_TEST_DATABASE_URL=$url", "CODIFIX_RELEASE_PGDATA=$data", "CODIFIX_RELEASE_PGBIN=$bin") |
         Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
     [ordered]@{
         postgres_version = $pgVersion
@@ -128,7 +128,7 @@ try {
         pgvector_version = $manifest.pgvector_version
         pgvector_source_sha256 = $manifest.pgvector.sha256
         vector_dll_sha256 = (Get-FileHash -LiteralPath (Join-Path $pg 'lib\vector.dll')).Hash.ToLowerInvariant()
-        host = '127.0.0.1'; port = $port; database = 'memory_release_smoke'; production = $false
+        host = '127.0.0.1'; port = $port; database = 'codifix_release_smoke'; production = $false
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'receipt.json') -Encoding utf8
     Write-Host "Native PostgreSQL/pgvector test cluster ready; metadata: $root\receipt.json"
 } catch {

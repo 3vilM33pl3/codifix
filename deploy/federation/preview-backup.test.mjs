@@ -9,13 +9,13 @@ import { once } from 'node:events';
 import { validate, execute, operationLock } from './preview-backup.mjs';
 const fixture = () => ({ schema_version: 1, base: '/private/state', directory: '/private/state/dependable-backup-test',
   nas_directory: '/nas/encrypted', nas_mount: '/nas //example/share cifs', recipient: 'A'.repeat(40),
-  worker: 'memory-workshop-question-worker.service',
-  writers: ['workshop-preview-app', 'homelab-preview-app', 'company-gateway', 'company-pds'].map((s, i) => ({ id: String(i).repeat(64), name: `memory-${s}` })),
-  databases: ['workshop', 'homelab', 'gateway'].map((label, i) => ({ id: String(i + 4).repeat(64), name: `memory-company-${label}-db`, user: 'postgres', database: 'synthetic', label })),
-  archive_paths: ['memory-company-20260919/gateway/gateway.json'] });
+  worker: 'codifix-workshop-question-worker.service',
+  writers: ['workshop-preview-app', 'homelab-preview-app', 'company-gateway', 'company-pds'].map((s, i) => ({ id: String(i).repeat(64), name: `codifix-${s}` })),
+  databases: ['workshop', 'homelab', 'gateway'].map((label, i) => ({ id: String(i + 4).repeat(64), name: `codifix-company-${label}-db`, user: 'postgres', database: 'synthetic', label })),
+  archive_paths: ['codifix-company-20260919/gateway/gateway.json'] });
 test('explicit preview-only contract accepts a bounded complete topology', () => assert.equal(validate(fixture()).writers.length, 4));
 test('unsafe scope, duplicate identities and path escapes are rejected', () => {
-  for (const mutate of [c => { c.archive_paths = ['memory-company-20260919/../unrelated']; }, c => { c.archive_paths = ['/etc']; },
+  for (const mutate of [c => { c.archive_paths = ['codifix-company-20260919/../unrelated']; }, c => { c.archive_paths = ['/etc']; },
     c => { c.writers[0].name = 'production-db'; }, c => { c.writers[0].id = c.databases[0].id; },
     c => { c.directory = '/'; }, c => { c.worker = 'unrelated.service'; }, c => { c.extra = true; },
     c => { c.maintenance_worker = 'unrelated.service'; },
@@ -25,7 +25,7 @@ test('unsafe scope, duplicate identities and path escapes are rejected', () => {
 });
 
 function sandbox(t) {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-backup-test-')); fs.chmodSync(base, 0o700);
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'codifix-backup-test-')); fs.chmodSync(base, 0o700);
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const c = { ...fixture(), base, directory: `${base}/dependable-backup-test`, nas_directory: `${base}/nas` };
   const calls = [];
@@ -36,7 +36,7 @@ function sandbox(t) {
 function privateJson(file, value) { fs.writeFileSync(file, JSON.stringify(value), { mode: 0o600 }); }
 async function interrupted(t, maintenance = false) {
   const s = sandbox(t);
-  if (maintenance) s.c.maintenance_worker = 'memory-pds-refresh-only.service';
+  if (maintenance) s.c.maintenance_worker = 'codifix-pds-refresh-only.service';
   const { review } = await execute(s.c, 'plan', null, s.io);
   const fail = { ...s.io, run: (cmd, args) => {
     s.calls.push([cmd, args]);
@@ -46,7 +46,7 @@ async function interrupted(t, maintenance = false) {
   // Without an explicitly enrolled maintainer, it is inactive in this fixture.
   if (!maintenance) {
     const run = fail.run;
-    fail.run = (cmd, args) => args.includes('show') && args.at(-1) === 'memory-pds-refresh-only.service' ? 'inactive' : run(cmd, args);
+    fail.run = (cmd, args) => args.includes('show') && args.at(-1) === 'codifix-pds-refresh-only.service' ? 'inactive' : run(cmd, args);
   }
   await assert.rejects(execute(s.c, 'preserve', review, fail), /simulated_interruption/);
   assert.ok(fs.existsSync(`${s.c.directory}/intent.json`));
@@ -57,7 +57,7 @@ async function interrupted(t, maintenance = false) {
 test('interrupted shutdown recovers only exact writers, with NAS offline and no successful-backup claim', async t => {
   const { c, calls, io, review } = await interrupted(t, true);
   const intent = JSON.parse(fs.readFileSync(`${c.directory}/intent.json`));
-  assert.equal(intent.maintenance_worker, 'memory-pds-refresh-only.service');
+  assert.equal(intent.maintenance_worker, 'codifix-pds-refresh-only.service');
   assert.equal(intent.maintenance_was_active, true);
   const result = await execute(c, 'recover-shutdown', review, { ...io, nas: () => { throw Error('NAS offline'); } });
   assert.equal(result.backup_verified, false);

@@ -5,10 +5,10 @@ const name = 'dependable-backup-test';
 const required = ['intent.json', 'workshop.dump', 'homelab.dump', 'gateway.dump', 'workshop.roles.sql', 'homelab.roles.sql', 'gateway.roles.sql'];
 const listing = extra => [...required.map(file => `${name}/${file}`), ...extra].map(file => `-rw------- 1000/1000 1 2026-09-19 22:00 ${file}`).join('\n');
 test('archive validator allows only complete explicit regular-file scope', () => {
-  assert.equal(allowedArchiveEntries(listing(['memory-company-20260919/pds/data']), ['memory-company-20260919/pds/data'], name).length, 8);
-  for (const changed of ['../escape', '/etc/passwd', 'memory-company-20260919/pds/data/../escape', 'memory-company-20260919/unreviewed'])
-    assert.throws(() => allowedArchiveEntries(listing([changed]), ['memory-company-20260919/pds/data'], name));
-  assert.throws(() => allowedArchiveEntries(listing([]), ['memory-company-20260919/pds/data'], name));
+  assert.equal(allowedArchiveEntries(listing(['codifix-company-20260919/pds/data']), ['codifix-company-20260919/pds/data'], name).length, 8);
+  for (const changed of ['../escape', '/etc/passwd', 'codifix-company-20260919/pds/data/../escape', 'codifix-company-20260919/unreviewed'])
+    assert.throws(() => allowedArchiveEntries(listing([changed]), ['codifix-company-20260919/pds/data'], name));
+  assert.throws(() => allowedArchiveEntries(listing([]), ['codifix-company-20260919/pds/data'], name));
   assert.throws(() => allowedArchiveEntries(listing([`${name}/intent.json`]), [], name), /archive_duplicate_path/u);
   assert.throws(() => allowedArchiveEntries(listing([]).replace('-rw-------', 'lrwxrwxrwx'), [], name), /archive_non_regular/u);
 });

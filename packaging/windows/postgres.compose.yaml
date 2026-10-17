@@ -4,12 +4,12 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: memory
-      POSTGRES_PASSWORD: ${MEMORY_LAYER_POSTGRES_PASSWORD:?set MEMORY_LAYER_POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${CODIFIX_POSTGRES_PASSWORD:?set CODIFIX_POSTGRES_PASSWORD in .env}
       POSTGRES_DB: memory
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - memory-layer-postgres-data:/var/lib/postgresql/data
+      - codifix-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U memory -d memory"]
       interval: 3s
@@ -17,4 +17,4 @@ services:
       retries: 20
 
 volumes:
-  memory-layer-postgres-data:
+  codifix-postgres-data:

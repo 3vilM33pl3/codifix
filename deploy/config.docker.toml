@@ -1,24 +1,24 @@
 # Baseline configuration for the bundled Docker Compose stack.
 #
 # The compose file layers connection details on top of this via
-# MEMORY_LAYER__SECTION__KEY environment overrides (database URL, bind address,
+# CODIFIX__SECTION__KEY environment overrides (database URL, bind address,
 # API token), so the only things pinned here are the container-local defaults
 # that make the stack keyless and self-contained out of the box.
 
 [service]
 bind_addr = "0.0.0.0:4040"
-api_token = "memory-local-token"
+api_token = "codifix-local-token"
 request_timeout = "600s"
 # The image copies the built web UI here; pin it so the browser UI is served
 # regardless of the working directory.
-web_root = "/usr/share/memory-layer/web"
+web_root = "/usr/share/codifix/web"
 
 [database]
 url = "postgresql://memory:memory@postgres:5432/memory"
 
 [cluster]
 enabled = false
-service_id = "memory-layer-docker"
+service_id = "codifix-docker"
 
 # Keyless by default: lexical retrieval works with no API keys. Set the
 # OPENAI_API_KEY/embedding envs and flip these on to add LLM curation and

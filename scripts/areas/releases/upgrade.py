@@ -41,7 +41,7 @@ def bootstrap():
 
 
 bootstrap()
-SPEC = importlib.util.spec_from_file_location("memory_console", Path(__file__).with_name("console.py"))
+SPEC = importlib.util.spec_from_file_location("codifix_console", Path(__file__).with_name("console.py"))
 console = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(console)
 instance, release = console.instance, console.release
@@ -71,7 +71,7 @@ def config_binding(data, name):
                 and re.fullmatch(r"/[A-Za-z_][A-Za-z0-9_]{0,62}", url.path),
                 "Upgrade requires an explicit loopback PostgreSQL database")
         service = config["service"]
-        require(service["web_root"] == f"/opt/memory-layer/instances/{name}/release/web",
+        require(service["web_root"] == f"/opt/codifix/instances/{name}/release/web",
                 "Web root must belong to the selected named instance")
         bind = service["bind_addr"]
         require(isinstance(bind, str) and re.fullmatch(r"127\.0\.0\.1:[0-9]{4,5}", bind)
@@ -85,7 +85,7 @@ def config_binding(data, name):
 
 class Host:
     def unit(self, name):
-        return f"memory-layer@{instance.instance_name(name)}.service"
+        return f"codifix@{instance.instance_name(name)}.service"
 
     def inspect(self, name):
         fields = {"Id", "Names", "LoadState", "ActiveState", "SubState", "MainPID", "ControlPID",
@@ -100,8 +100,8 @@ class Host:
                 and state["LoadState"] == "loaded" and state["Transient"] == "no",
                 "Expected one existing concrete named service")
         paths = [state["FragmentPath"], *state["DropInPaths"].split()]
-        require(paths[0] in {"/lib/systemd/system/memory-layer@.service",
-                             "/usr/lib/systemd/system/memory-layer@.service"}, "Unexpected selected service template")
+        require(paths[0] in {"/lib/systemd/system/codifix@.service",
+                             "/usr/lib/systemd/system/codifix@.service"}, "Unexpected selected service template")
         bindings = {}
         for value in paths:
             path = Path(value).resolve(strict=True)
@@ -194,7 +194,7 @@ def tree_files(root):
 
 
 def expected_files(report):
-    return {key: {**value, "mode": 0o755 if key == "bin/memory" else 0o644}
+    return {key: {**value, "mode": 0o755 if key == "bin/codifix" else 0o644}
             for key, value in report["files"].items()}
 
 
@@ -230,7 +230,7 @@ class Upgrade:
         self.name = instance.instance_name(name)
         require(isinstance(operation, str) and console.IDENTIFIER.fullmatch(operation), "Expected 32-hex operation ID")
         self.operation = operation
-        parent = self.layout.root / "var/lib/memory-layer-upgrades" / name
+        parent = self.layout.root / "var/lib/codifix-upgrades" / name
         console.ensure_directory(parent)
         parent_fd = console.trusted_directory(parent, private=True)
         try:
@@ -290,7 +290,7 @@ class Upgrade:
 
     def begin(self, args):
         self.open(args.instance, args.operation, create=True)
-        config = console.protected_bytes(self.config_dir / "memory-layer.toml", console.CONFIG_LIMIT)
+        config = console.protected_bytes(self.config_dir / "codifix.toml", console.CONFIG_LIMIT)
         require(checksum(config) == args.config_sha256, "Existing configuration differs from reviewed digest")
         config_binding(config, self.name)
         schema = self.host.database(config, self.name, False)
@@ -301,13 +301,13 @@ class Upgrade:
                 "Upgrade requires a strictly newer release")
         require(prior["architecture"] == candidate["architecture"], "Architecture changed")
         require(tree_files(self.active) == expected_files(prior), "Installed tree differs from signed previous release")
-        digest = console.protected_bytes(self.config_dir / "memory.sha256", 128)
-        require(digest == (prior["files"]["bin/memory"]["sha256"] + "\n").encode(), "Previous digest credential differs")
+        digest = console.protected_bytes(self.config_dir / "codifix.sha256", 128)
+        require(digest == (prior["files"]["bin/codifix"]["sha256"] + "\n").encode(), "Previous digest credential differs")
         state, bindings = self.host.inspect(self.name)
         require(state["ActiveState"] in {"active", "inactive", "failed"}, "Selected service is transitioning")
         console.atomic_new(self.fd, "configuration.toml", config)
-        console.atomic_new(self.fd, "previous-memory.sha256", digest)
-        plan = {"format": "memory-instance-upgrade-v1", "instance": self.name, "operation": self.operation,
+        console.atomic_new(self.fd, "previous-codifix.sha256", digest)
+        plan = {"format": "codifix-instance-upgrade-v1", "instance": self.name, "operation": self.operation,
                 "signer": args.trusted_signing_fingerprint, "schema_before": schema,
                 "previous": prior_path, "candidate": next_path, "config_sha256": checksum(config),
                 "unit_files": bindings, "initial_state": state["ActiveState"]}
@@ -320,12 +320,12 @@ class Upgrade:
         self.plan = console.canonical_read(self.root / "plan.json")
         require(set(self.plan) == {"format", "instance", "operation", "signer", "schema_before", "previous",
                                   "candidate", "config_sha256", "unit_files", "initial_state"}
-                and self.plan["format"] == "memory-instance-upgrade-v1" and self.plan["instance"] == self.name
+                and self.plan["format"] == "codifix-instance-upgrade-v1" and self.plan["instance"] == self.name
                 and self.plan["operation"] == self.operation and self.plan["signer"] == signer,
                 "Invalid selected upgrade plan")
         self.plan_digest = checksum(release.canonical(self.plan))
         for key in ("previous", "candidate"):
-            require(re.fullmatch(r"memory-release-[a-f0-9]{32}", self.plan[key]), "Invalid authenticated snapshot")
+            require(re.fullmatch(r"codifix-release-[a-f0-9]{32}", self.plan[key]), "Invalid authenticated snapshot")
             report = instance.verify_prepared(self.root / self.plan[key], signer, self.name, self.plan["schema_before"])
             console.native_header(self.root / self.plan[key], report)
             setattr(self, key, report)
@@ -335,7 +335,7 @@ class Upgrade:
         self.events()
 
     def guard(self):
-        require(console.protected_bytes(self.config_dir / "memory-layer.toml", console.CONFIG_LIMIT) == self.config,
+        require(console.protected_bytes(self.config_dir / "codifix.toml", console.CONFIG_LIMIT) == self.config,
                 "Instance configuration changed during upgrade")
         _, bindings = self.host.inspect(self.name)
         require(bindings == self.plan["unit_files"], "Service template or sandbox drop-in changed during upgrade")
@@ -386,14 +386,14 @@ class Upgrade:
             self.fault("exchanged")
         parent = console.trusted_directory(self.config_dir)
         try:
-            current = console.protected_bytes(self.config_dir / "memory.sha256", 128)
-            allowed = [(report["files"]["bin/memory"]["sha256"] + "\n").encode()
+            current = console.protected_bytes(self.config_dir / "codifix.sha256", 128)
+            allowed = [(report["files"]["bin/codifix"]["sha256"] + "\n").encode()
                        for report in (self.previous, self.candidate)]
             require(current in allowed, "Digest credential changed unexpectedly")
             report = self.candidate if forward else self.previous
             temporary = ".upgrade-digest-" + secrets.token_hex(16)
-            release.write_new(parent, temporary, (report["files"]["bin/memory"]["sha256"] + "\n").encode())
-            os.replace(temporary, "memory.sha256", src_dir_fd=parent, dst_dir_fd=parent)
+            release.write_new(parent, temporary, (report["files"]["bin/codifix"]["sha256"] + "\n").encode())
+            os.replace(temporary, "codifix.sha256", src_dir_fd=parent, dst_dir_fd=parent)
             os.fsync(parent)
         finally:
             os.close(parent)
@@ -441,8 +441,8 @@ class Upgrade:
             if phase == "switched":
                 self.host.stopped(self.name)
             require(tree_files(self.active) == expected_files(self.candidate), "Candidate bytes changed")
-            require(console.protected_bytes(self.config_dir / "memory.sha256", 128) ==
-                    (self.candidate["files"]["bin/memory"]["sha256"] + "\n").encode(), "Candidate digest changed")
+            require(console.protected_bytes(self.config_dir / "codifix.sha256", 128) ==
+                    (self.candidate["files"]["bin/codifix"]["sha256"] + "\n").encode(), "Candidate digest changed")
             schema = self.host.database(self.config, self.name, phase == "switched")
             bounds = self.candidate["schema_compatibility"]
             require(bounds["floor"] <= schema <= bounds["head"], "Database outside candidate signed compatibility")
@@ -462,7 +462,7 @@ class Upgrade:
         return self.result("complete")
 
     def result(self, phase):
-        return {"format": "memory-instance-upgrade-result-v1", "instance": self.name, "operation": self.operation,
+        return {"format": "codifix-instance-upgrade-result-v1", "instance": self.name, "operation": self.operation,
                 "status": phase, "release_version": self.candidate["release_version"],
                 "manifest_sha256": self.candidate["manifest_sha256"], "config_sha256": self.plan["config_sha256"],
                 "journal_directory": str(self.root), "rollback_permitted": not any(

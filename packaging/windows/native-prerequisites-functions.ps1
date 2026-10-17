@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Pure descriptor validation; no network, service or database side effects.
 function Get-NativePrerequisitePlan($Manifest) {
-    if ($Manifest.kind -cne 'memory-native-postgres-runtime') { return Get-NativeAdditionalRuntimePlan $Manifest }
-    if ($Manifest.schema_version -ne 1 -or $Manifest.kind -cne 'memory-native-postgres-runtime' -or
+    if ($Manifest.kind -cne 'codifix-native-postgres-runtime') { return Get-NativeAdditionalRuntimePlan $Manifest }
+    if ($Manifest.schema_version -ne 1 -or $Manifest.kind -cne 'codifix-native-postgres-runtime' -or
         $Manifest.platform -cne 'windows-x86_64' -or $Manifest.postgres_version -cne '17.11' -or
         $Manifest.pgvector_version -cne '0.8.7' -or $Manifest.crt_version -notmatch '^\d+(\.\d+){1,3}$' -or
         $Manifest.package_sha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'Unsupported or unpinned native prerequisite descriptor' }
@@ -36,7 +36,7 @@ function Get-NativePrerequisitePlan($Manifest) {
 }
 
 function Get-NativePrerequisiteBinding($Plan, [string]$ManifestSha256, [guid]$OperationId, [string]$RuntimeRoot, $Receipt,
-    [ValidateSet('memory-native-postgres-runtime','memory-native-pds-runtime','memory-native-pi-runtime')][string]$ExpectedKind='memory-native-postgres-runtime') {
+    [ValidateSet('codifix-native-postgres-runtime','codifix-native-pds-runtime','codifix-native-pi-runtime')][string]$ExpectedKind='codifix-native-postgres-runtime') {
     if ($ManifestSha256 -cnotmatch '^[0-9a-f]{64}$' -or $OperationId -eq [guid]::Empty) { throw 'Exact prerequisite manifest and operation identities required' }
     if ($Plan.kind -cne $ExpectedKind) { throw 'Runtime kind does not match this consumer' }
     $destination=Join-Path $RuntimeRoot (Get-NativeRuntimeIdentity $Plan $ManifestSha256)
@@ -48,10 +48,10 @@ function Get-NativePrerequisiteBinding($Plan, [string]$ManifestSha256, [guid]$Op
     $binding=[ordered]@{schema_version=1;manifest_sha256=$ManifestSha256;operation_id=$OperationId.ToString()
         input_sha256=$input;runtime_directory=$destination;postgres_bin=(Join-Path $destination 'pgsql/bin')
         verification_scope='protected_payload_only';database_readiness_verified=$false}
-    if ($ExpectedKind -ceq 'memory-native-postgres-runtime') { return [pscustomobject]$binding }
+    if ($ExpectedKind -ceq 'codifix-native-postgres-runtime') { return [pscustomobject]$binding }
     $binding.Remove('postgres_bin'); $binding.Remove('database_readiness_verified')
     $binding.runtime_kind=$ExpectedKind; $binding.native_execution_verified=$false
-    if ($ExpectedKind -ceq 'memory-native-pds-runtime') {
+    if ($ExpectedKind -ceq 'codifix-native-pds-runtime') {
         $binding.node_executable=Join-Path $destination 'node/node.exe';$binding.pds_entrypoint=Join-Path $destination 'pds/pds-server.mjs'
     } else { $binding.pi_executable=Join-Path $destination 'pi/pi.exe';$binding.artifact=$Plan.artifact }
     return [pscustomobject]$binding
@@ -62,26 +62,26 @@ function Close-NativePrerequisiteLease($Lease) {
 }
 
 function Open-NativePrerequisiteLease([string]$ManifestPath, [string]$ManifestSha256, [guid]$OperationId,
-    [ValidateSet('memory-native-postgres-runtime','memory-native-pds-runtime','memory-native-pi-runtime')][string]$ExpectedKind='memory-native-postgres-runtime') {
+    [ValidateSet('codifix-native-postgres-runtime','codifix-native-pds-runtime','codifix-native-pi-runtime')][string]$ExpectedKind='codifix-native-postgres-runtime') {
     Initialize-NativeReleaseGuard
     $guards=[Collections.Generic.List[IDisposable]]::new()
     try {
-        $guards.Add([MemoryLayer.ProtectedRelease]::OpenFile($ManifestPath))
+        $guards.Add([Codifix.ProtectedRelease]::OpenFile($ManifestPath))
         $manifestLength=(Get-Item -LiteralPath $ManifestPath).Length
         if ($manifestLength -gt 32MB -or
             (Get-FileHash -LiteralPath $ManifestPath).Hash.ToLowerInvariant() -cne $ManifestSha256) { throw 'Prerequisite manifest differs from pinned input' }
         $plan=Get-NativePrerequisitePlan (Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json)
         Assert-NativeRuntimeManifestSize $manifestLength $plan.kind
-        $root=Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Memory Layer\runtimes'
+        $root=Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Codifix\runtimes'
         $journals=Join-Path $root 'operations'
-        $guards.Add([MemoryLayer.ProtectedRelease]::Open($journals))
+        $guards.Add([Codifix.ProtectedRelease]::Open($journals))
         $receiptPath=Join-Path $journals ($OperationId.ToString() + '.json')
         if ((Get-Item -LiteralPath $receiptPath).Length -gt 1MB) { throw 'Prerequisite receipt too large' }
         $receipt=Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
         $binding=Get-NativePrerequisiteBinding $plan $ManifestSha256 $OperationId $root $receipt $ExpectedKind
-        $treeEntryLimit=if($plan.kind -ceq 'memory-native-pds-runtime'){100000}else{40000}
-        $guards.Add([MemoryLayer.ProtectedRelease]::Open($binding.runtime_directory,$treeEntryLimit))
-        Assert-NativePayload $binding.runtime_directory $plan.payload_files -ExtendedPaths:($plan.kind -ceq 'memory-native-pds-runtime')
+        $treeEntryLimit=if($plan.kind -ceq 'codifix-native-pds-runtime'){100000}else{40000}
+        $guards.Add([Codifix.ProtectedRelease]::Open($binding.runtime_directory,$treeEntryLimit))
+        Assert-NativePayload $binding.runtime_directory $plan.payload_files -ExtendedPaths:($plan.kind -ceq 'codifix-native-pds-runtime')
         return [pscustomobject]@{binding=$binding;guards=$guards;plan=$plan}
     } catch { foreach ($guard in $guards) { $guard.Dispose() }; throw }
 }
@@ -91,24 +91,24 @@ function Assert-NativeRuntimeFields($Value, [string[]]$Fields) {
     if ((($names | Sort-Object) -join ',') -cne (($Fields | Sort-Object) -join ',')) { throw 'Unexpected or missing native runtime fields' }
 }
 function Assert-NativeRuntimeManifestSize([long]$Length,[string]$Kind) {
-    $limit=if($Kind -ceq 'memory-native-pds-runtime'){32MB}else{8MB}
+    $limit=if($Kind -ceq 'codifix-native-pds-runtime'){32MB}else{8MB}
     if($Length -lt 1 -or $Length -gt $limit){throw 'Native runtime manifest exceeds kind-specific bound'}
 }
 function Get-NativeRuntimeIdentity($Plan,[string]$ManifestSha256) {
     if ($ManifestSha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'Exact runtime manifest digest required' }
     $prefix=switch -CaseSensitive ($Plan.kind) {
-        'memory-native-postgres-runtime' {'postgres-17.11-vector-0.8.7'}
-        'memory-native-pds-runtime' {'node-24.18.1-pds-0.5.27'}
-        'memory-native-pi-runtime' {'pi-0.5.1-no-tools-1-broker-1'}
+        'codifix-native-postgres-runtime' {'postgres-17.11-vector-0.8.7'}
+        'codifix-native-pds-runtime' {'node-24.18.1-pds-0.5.27'}
+        'codifix-native-pi-runtime' {'pi-0.5.1-no-tools-1-broker-1'}
         default {throw 'Unknown native runtime kind'}
     }
     return $prefix+'-'+$ManifestSha256
 }
 function Get-NativeAdditionalRuntimePlan($Manifest) {
     $common=@('schema_version','kind','platform','crt_version','package_sha256','payload_files','components')
-    $pds=$Manifest.kind -ceq 'memory-native-pds-runtime'
+    $pds=$Manifest.kind -ceq 'codifix-native-pds-runtime'
     if ($pds) { $extra=@('node_version','pds_version','pds_source_revision','pds_image_digest','pds_package_sha256','pds_lock_sha256','pnpm_version','better_sqlite3_version','sqlite_version','native_addons') }
-    elseif ($Manifest.kind -ceq 'memory-native-pi-runtime') { $extra=@('pi_version','artifact','source_archive_sha256','upstream_lock_sha256','rust_toolchain','rustc_commit','target') }
+    elseif ($Manifest.kind -ceq 'codifix-native-pi-runtime') { $extra=@('pi_version','artifact','source_archive_sha256','upstream_lock_sha256','rust_toolchain','rustc_commit','target') }
     else { throw 'Unknown native prerequisite kind' }
     $manifestFields=if($Manifest -is [Collections.IDictionary]){@($Manifest.Keys)}else{@($Manifest.PSObject.Properties.Name)}
     $patched=$pds -and $manifestFields -contains 'path_patch'
@@ -164,8 +164,8 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
                 -not $inventory.ContainsKey($addon.name) -or $addon.sha256 -cne $inventory[$addon.name]) { throw 'Native addon differs from complete prepared payload' }
         }
         if (@($inventory.Keys | Where-Object { $_ -match '\.node$' }).Count -ne $addons.Count) { throw 'Unrecorded native addon' }
-        $versions=[ordered]@{node='24.18.1';pds='0.5.27';'locked-dependencies'=$Manifest.pds_lock_sha256;'memory-pds-adapter'='stdio-v1';'msvc-crt'=$Manifest.crt_version}
-        if($patched){$versions['memory-pds-path-patch']='windows-sha256-did-paths-v1'}
+        $versions=[ordered]@{node='24.18.1';pds='0.5.27';'locked-dependencies'=$Manifest.pds_lock_sha256;'codifix-pds-adapter'='stdio-v1';'msvc-crt'=$Manifest.crt_version}
+        if($patched){$versions['codifix-pds-path-patch']='windows-sha256-did-paths-v1'}
         $binaryRoot='node'
     } else {
         if ($Manifest.pi_version -cne '0.5.1' -or
@@ -191,7 +191,7 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
         foreach($name in $inventory.Keys){
             if($name -cnotmatch '^(?:pi/(?:pi\.exe|vcruntime140(?:_1)?\.dll|msvcp140\.dll)|source/(?:pi-source\.tar|no-tools-1\.patch|windows-broker-1\.patch|windows-broker-safe-handle-1\.patch|Cargo\.lock|windows-pipe-helper/(?:Cargo\.toml|src/lib\.rs))|notices/[^/]+\.txt)$'){throw 'Unsupported Pi runtime path; no sessions/settings/credentials may be bundled'}
         }
-        $versions=[ordered]@{pi='0.5.1';'memory-windows-pipe'='0.1.0';'msvc-crt'=$Manifest.crt_version}
+        $versions=[ordered]@{pi='0.5.1';'codifix-windows-pipe'='0.1.0';'msvc-crt'=$Manifest.crt_version}
         $binaryRoot='pi'
     }
     foreach($name in @('vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll')){$required[$binaryRoot+'/'+$name]=$null}
@@ -209,12 +209,12 @@ function Get-NativeAdditionalRuntimePlan($Manifest) {
             $entry.notice_path -cnotmatch '^notices/[^/]+\.txt$' -or -not $inventory.ContainsKey($entry.notice_path)){throw 'Component version, source hash or notice missing'}
         if($pds -and (($name -ceq 'pds' -and $entry.source_sha256 -cne $Manifest.pds_image_digest.Substring(7)) -or
             ($name -ceq 'locked-dependencies' -and $entry.source_sha256 -cne $Manifest.pds_lock_sha256) -or
-            ($name -ceq 'memory-pds-adapter' -and $entry.source_sha256 -cne $required['pds/pds-server.mjs']))){throw 'PDS component provenance contradicts fixed input pins'}
-        if($pds -and $patched -and $name -ceq 'memory-pds-path-patch' -and
+            ($name -ceq 'codifix-pds-adapter' -and $entry.source_sha256 -cne $required['pds/pds-server.mjs']))){throw 'PDS component provenance contradicts fixed input pins'}
+        if($pds -and $patched -and $name -ceq 'codifix-pds-path-patch' -and
             ($entry.source_sha256 -cne $Manifest.path_patch.patch_sha256 -or $entry.license -cne 'AGPL-3.0-or-later')){throw 'PDS path patch provenance or licence differs'}
         if(-not $pds -and (($name -ceq 'pi' -and ($entry.source_sha256 -cne $Manifest.source_archive_sha256 -or
             $entry.notice_path -cne 'notices/pi.txt' -or $entry.license -cne 'MIT-with-OpenAI-Anthropic-Rider')) -or
-            ($name -ceq 'memory-windows-pipe' -and ($entry.source_sha256 -cne $Manifest.artifact.helper_source_sha256 -or
+            ($name -ceq 'codifix-windows-pipe' -and ($entry.source_sha256 -cne $Manifest.artifact.helper_source_sha256 -or
             $entry.license -cne 'AGPL-3.0-or-later')))) {throw 'Pi component provenance or licence description contradicts pinned source'}
     }
     $plan=[ordered]@{}

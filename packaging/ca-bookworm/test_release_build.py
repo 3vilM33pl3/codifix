@@ -22,8 +22,8 @@ class ReleaseBuildTests(unittest.TestCase):
         self.work.mkdir(mode=0o700)
         helper = self.repo / "packaging/ca-bookworm/build.sh"
         helper.parent.mkdir(parents=True)
-        (self.repo / "Cargo.toml").write_text('[workspace.package]\nversion = "2.1.0"\n')
-        helper.write_text('#!/bin/bash\nprintf fixture > "$2/output/memory-layer_2.1.0_$4.deb"\n')
+        (self.repo / "Cargo.toml").write_text('[workspace.package]\nversion = "3.0.0"\n')
+        helper.write_text('#!/bin/bash\nprintf fixture > "$2/output/codifix_3.0.0_$4.deb"\n')
         self.git("init", "-q")
         self.git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "add", ".")
         self.git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture")
@@ -52,10 +52,10 @@ class ReleaseBuildTests(unittest.TestCase):
         self.assertTrue((self.work / "source.tar").is_file())
         metadata = json.loads((self.work / "output/build-amd64.json").read_text())
         self.assertEqual(metadata["source_commit"], self.revision)
-        self.assertEqual(metadata["application_version"], "2.1.0")
+        self.assertEqual(metadata["application_version"], "3.0.0")
         self.assertEqual(metadata["builder_image"], IMAGE)
         self.assertFalse(metadata["installed_on_host"])
-        package = self.work / "output/memory-layer_2.1.0_amd64.deb"
+        package = self.work / "output/codifix_3.0.0_amd64.deb"
         self.assertEqual(metadata["artifacts"][package.name], hashlib.sha256(package.read_bytes()).hexdigest())
         preparation = json.loads((self.work / "dependency-preparation.log").read_text())
         self.assertNotIn("--network", preparation)

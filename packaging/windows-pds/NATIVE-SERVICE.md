@@ -1,7 +1,7 @@
 # Native private PDS service
 
-`native-instance.ps1` can install `memory-pds-pipe.exe` through the existing
-`memory-windows-service.exe` SCM wrapper. Node is its unprivileged child; no PDS
+`native-instance.ps1` can install `codifix-pds-pipe.exe` through the existing
+`codifix-windows-service.exe` SCM wrapper. Node is its unprivileged child; no PDS
 TCP listener, Docker, WSL or registry environment secrets are introduced.
 Portable policy tests and Windows cross-compilation are not native installation
 acceptance. Account creation, signed repositories and federation remain separate
@@ -10,7 +10,7 @@ checks from the public-XRPC readiness probe.
 ## Prepare the exact inputs
 
 Use an elevated Windows PowerShell session and the checksummed candidate ZIP and
-manifest. First install a `memory-native-pds-runtime` prerequisite bundle using
+manifest. First install a `codifix-native-pds-runtime` prerequisite bundle using
 `packaging/windows/native-prerequisites.ps1`; retain its completed operation UUID,
 manifest and digest. The service requires the separately recorded
 `windows-sha256-did-paths-v1` patch. An unpatched runtime is not accepted. Keep
@@ -18,13 +18,13 @@ actual Node/PDS/native-library notices with that bundle.
 
 For instance `company-pds`, the fixed paths are:
 
-- State: `%ProgramData%\MemoryLayer\instances\company-pds`
-- Configuration: `%ProgramData%\MemoryLayer\configurations\company-pds`
-- Pipe: `\\.\pipe\memory-pds-company-pds`
-- SCM account: `NT SERVICE\MemoryLayer-company-pds`
+- State: `%ProgramData%\Codifix\instances\company-pds`
+- Configuration: `%ProgramData%\Codifix\configurations\company-pds`
+- Pipe: `\\.\pipe\codifix-pds-company-pds`
+- SCM account: `NT SERVICE\Codifix-company-pds`
 
-Obtain the service SID with `sc.exe showsid MemoryLayer-company-pds`, and the
-distinct gateway SID with `sc.exe showsid MemoryLayer-company-gateway`. These
+Obtain the service SID with `sc.exe showsid Codifix-company-pds`, and the
+distinct gateway SID with `sc.exe showsid Codifix-company-gateway`. These
 are deterministic named-service identities, not user-provided area labels.
 Installation verifies the actual configured SCM account before starting it.
 
@@ -47,7 +47,7 @@ PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX = existing approved key
 
 Additional bounded `PDS_*` strings are allowed; unrelated provider variables are
 not. Compute SHA-256 over the exact JSON bytes. The installed copy is
-`%ProgramData%\MemoryLayer\configurations\company-pds\pds-environment.json`,
+`%ProgramData%\Codifix\configurations\company-pds\pds-environment.json`,
 readable by this PDS account but not the gateway or participant accounts.
 
 Prepare broker JSON with `schema_version: 1`, `pipe` containing the exact name,
@@ -74,7 +74,7 @@ $inputs = @{
     Name = 'company-pds'; OperationId = $operationId
     PackagePath = $candidateZip; ManifestPath = $candidateManifest
     ManifestSha256 = $candidateManifestHash
-    ConfigPath = $brokerConfig; ExecutableName = 'memory-pds-pipe.exe'
+    ConfigPath = $brokerConfig; ExecutableName = 'codifix-pds-pipe.exe'
     ExpectedInstanceId = $installationId
     NativeRuntimeManifestPath = $pdsManifest
     NativeRuntimeManifestSha256 = $pdsManifestHash
@@ -95,7 +95,7 @@ operator performs no database backup or rollback. The selected runtime is
 read-execute only for PDS, and only this service state is writable.
 
 Retry an interrupted operation with the same UUID and exact inputs. Journals
-remain under `%ProgramData%\MemoryLayer\operations`; do not delete them or
+remain under `%ProgramData%\Codifix\operations`; do not delete them or
 restore old PDS bytes over accepted writes. Existing environment bytes must
 match; this slice does not silently replace credentials or adopt foreign SCM
 services. For upgrades, use `Preview -PreviewAction Upgrade` then `Upgrade` with
@@ -104,8 +104,8 @@ a strictly newer installer build and the newly reviewed digest.
 An elevated operator can run:
 
 ```powershell
-memory-pds-pipe.exe check-status $installedBrokerConfig `
-    --service-name MemoryLayer-company-pds
+codifix-pds-pipe.exe check-status $installedBrokerConfig `
+    --service-name Codifix-company-pds
 ```
 
 It checks the protected config, exact pipe peer SID/DACL and bounded

@@ -1,7 +1,7 @@
 # Local release manifests and authenticated staging
 
-`release.py` creates a deterministic, unsigned `memory-release-v1` JSON manifest
-for `2.1.0-rc.<positive number>` releases. It can also authenticate a detached GPG
+`release.py` creates a deterministic, unsigned `codifix-release-v1` JSON manifest
+for `3.0.0-rc.<positive number>` releases. It can also authenticate a detached GPG
 signature and stage the selected Linux architecture's local files. It never
 downloads, extracts archives, executes artifacts, installs a package, uses sudo,
 controls a service, reads a live private key, or grants installation permission.
@@ -26,8 +26,8 @@ source path enters the signed manifest. Identical inputs produce identical bytes
 
 | Field | Meaning |
 | --- | --- |
-| `format` | Exactly `memory-release-v1` |
-| `release_version` | `2.1.0` or a supported `2.1.0-rc.N` version, without a leading `v`; N is 1–999999 without leading zeroes |
+| `format` | Exactly `codifix-release-v1` |
+| `release_version` | `3.0.0` or a supported `3.0.0-rc.N` version, without a leading `v`; N is 1–999999 without leading zeroes |
 | `source_revision` | Full lowercase 40- or 64-digit Git object ID |
 | `platform` | Exactly `linux` |
 | `schema` | Integer `floor` and `head`, defining the supported database interval |
@@ -69,15 +69,15 @@ revision, key, source repository, artifact download or `latest` lookup.
 
 ```bash
 python3 scripts/areas/releases/release.py create \
-  --version 2.1.0-rc.1 \
-  --source-revision "$MEMORY_RELEASE_REVISION" \
+  --version 3.0.0-rc.1 \
+  --source-revision "$CODIFIX_RELEASE_REVISION" \
   --schema-floor 52 --schema-head 52 \
   --classification approval-required --trust-changes --permission-changes \
   --pi-source-url "$PI_REVIEWED_SOURCE_URL" \
   --pi-source-revision "$PI_REVIEWED_SOURCE_REVISION" \
   --pi-source-sha256 "$PI_REVIEWED_SOURCE_SHA256" \
-  --artifact "amd64:debian-package:$RELEASE_INPUT_DIR/memory-layer_2.1.0-rc.1_amd64.deb" \
-  --artifact "arm64:debian-package:$RELEASE_INPUT_DIR/memory-layer_2.1.0-rc.1_arm64.deb" \
+  --artifact "amd64:debian-package:$RELEASE_INPUT_DIR/codifix_3.0.0-rc.1_amd64.deb" \
+  --artifact "arm64:debian-package:$RELEASE_INPUT_DIR/codifix_3.0.0-rc.1_arm64.deb" \
   --output "$RELEASE_INPUT_DIR/manifest.json"
 ```
 
@@ -106,19 +106,19 @@ These commands belong to the operator's explicit release-signing action; they
 are not run during manifest generation or verification:
 
 ```bash
-/usr/bin/gpg --no-options --homedir "$MEMORY_RELEASE_GNUPGHOME" \
+/usr/bin/gpg --no-options --homedir "$CODIFIX_RELEASE_GNUPGHOME" \
   --batch --no-tty --pinentry-mode ask \
-  --local-user "${MEMORY_RELEASE_SIGNING_FINGERPRINT}!" \
+  --local-user "${CODIFIX_RELEASE_SIGNING_FINGERPRINT}!" \
   --digest-algo SHA256 \
   --output "$RELEASE_INPUT_DIR/manifest.sig" \
   --detach-sign "$RELEASE_INPUT_DIR/manifest.json"
-/usr/bin/gpg --no-options --homedir "$MEMORY_RELEASE_GNUPGHOME" \
+/usr/bin/gpg --no-options --homedir "$CODIFIX_RELEASE_GNUPGHOME" \
   --batch --no-tty --armor \
   --output "$RELEASE_INPUT_DIR/signing-public-key.asc" \
-  --export "$MEMORY_RELEASE_PRIMARY_FINGERPRINT"
+  --export "$CODIFIX_RELEASE_PRIMARY_FINGERPRINT"
 ```
 
-Set `MEMORY_RELEASE_GNUPGHOME` to the absolute, independently reviewed signing
+Set `CODIFIX_RELEASE_GNUPGHOME` to the absolute, independently reviewed signing
 keyring directory; never select a keyring or signing key implicitly. The
 [internal key setup record](../../../docs/reviews/four-area-network/release-signing-setup.md)
 identifies the dedicated local keyring and public fingerprints. Key creation does
@@ -151,7 +151,7 @@ python3 scripts/areas/releases/release.py verify-stage \
   --manifest "$RELEASE_INPUT_DIR/manifest.json" \
   --signature "$RELEASE_INPUT_DIR/manifest.sig" \
   --public-key "$RELEASE_INPUT_DIR/signing-public-key.asc" \
-  --trusted-signing-fingerprint "$MEMORY_RELEASE_SIGNING_FINGERPRINT" \
+  --trusted-signing-fingerprint "$CODIFIX_RELEASE_SIGNING_FINGERPRINT" \
   --architecture arm64 --schema-current 52 \
   --artifacts-dir "$RELEASE_INPUT_DIR" \
   --staging-parent "$RELEASE_STAGING_PARENT"
@@ -193,7 +193,7 @@ installer must reverify bytes under its own trust and file-access boundary.
 
 For an additional signed release-tree archive, the separate
 [selected-instance preparation and filesystem rehearsal](instance-README.md)
-binds the complete Memory binary/Web tree and tests a reversible directory switch
+binds the complete Codifix binary/Web tree and tests a reversible directory switch
 inside a fresh disposable root. It still does not install, fence services,
 switch credentials, verify a live database or implement migration rollback.
 

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { companyTopology } from './company-topology.mjs';
 
 function settings() {
-  return { schemaVersion: 1, name: 'memory-company', root: '/srv/memory-company', domain: 'memory.company.internal',
-    images: Object.fromEntries(['app', 'gateway', 'postgres', 'pds', 'proxy'].map((key, index) => [key, `registry.company.internal/memory/${key}@sha256:${String(index + 1).repeat(64)}`])),
+  return { schemaVersion: 1, name: 'codifix-company', root: '/srv/codifix-company', domain: 'memory.company.internal',
+    images: Object.fromEntries(['app', 'gateway', 'postgres', 'pds', 'proxy'].map((key, index) => [key, `registry.company.internal/codifix/${key}@sha256:${String(index + 1).repeat(64)}`])),
     users: { app: '65532:65532', gateway: '65532:65532', proxy: '65532:65532', pds: '1000:1000', postgres: '999:999' } };
 }
 const networks = service => Array.isArray(service.networks) ? service.networks : Object.keys(service.networks);
@@ -35,12 +35,12 @@ test('default blueprint is offline, uninstalled, bounded and has no publication/
   assert.equal(result.posture.installed, false);
   for (const id of ['workshop', 'homelab']) {
     const app = doc.services[`${id}_app`];
-    assert.equal(app.environment.MEMORY_LAYER_FEDERATION_CONFIG, undefined);
-    assert.equal(app.environment.MEMORY_LAYER__BACKGROUND_WORK__ENABLED, 'false');
-    assert.equal(app.environment.MEMORY_LAYER__AUTOMATION__ENABLED, 'false');
-    assert.equal(app.environment.MEMORY_LAYER__DATABASE__MIGRATIONS, 'verify_only');
-    assert.equal(app.environment.MEMORY_LAYER__OFFLINE__ENABLED, 'false');
-    assert.equal(app.environment.MEMORY_LAYER__LLM__MODEL, '');
+    assert.equal(app.environment.CODIFIX_FEDERATION_CONFIG, undefined);
+    assert.equal(app.environment.CODIFIX__BACKGROUND_WORK__ENABLED, 'false');
+    assert.equal(app.environment.CODIFIX__AUTOMATION__ENABLED, 'false');
+    assert.equal(app.environment.CODIFIX__DATABASE__MIGRATIONS, 'verify_only');
+    assert.equal(app.environment.CODIFIX__OFFLINE__ENABLED, 'false');
+    assert.equal(app.environment.CODIFIX__LLM__MODEL, '');
     assert.equal(app.environment.OPENAI_API_KEY, '');
     assert.equal(app.env_file, undefined);
     assert.equal(app.environment.HOME, '/state');
@@ -73,9 +73,9 @@ test('explicit federation mounts only member-specific credentials; a third membe
   assert.ok(!adjacent(s.game_app, s.homelab_db));
   for (const id of input.members) {
     const mounts = s[`${id}_app`].volumes.filter(m => m.type === 'bind');
-    assert.equal(s[`${id}_app`].environment.MEMORY_LAYER_FEDERATION_CONFIG, '/config/federation.json');
-    assert.ok(mounts.some(m => m.source === `/srv/memory-company/members/${id}/gateway-token`));
-    assert.ok(mounts.every(m => m.source.startsWith(`/srv/memory-company/members/${id}/`) || m.source === '/srv/memory-company/tls/ca.pem'));
+    assert.equal(s[`${id}_app`].environment.CODIFIX_FEDERATION_CONFIG, '/config/federation.json');
+    assert.ok(mounts.some(m => m.source === `/srv/codifix-company/members/${id}/gateway-token`));
+    assert.ok(mounts.every(m => m.source.startsWith(`/srv/codifix-company/members/${id}/`) || m.source === '/srv/codifix-company/tls/ca.pem'));
     assert.ok(!mounts.some(m => /audit-key|pds-token|owner-password|authority-token/.test(m.source)));
   }
   assert.ok(result.proxyFiles['gateway/tls/Caddyfile'].includes('/v1/expertise'));
@@ -108,7 +108,7 @@ test('TLS edges expose fixed paths only and private keys/passwords stay with the
     assert.equal(file.mode, '0600');
     assert.equal(result.requiredFiles.filter(other => other.path === file.path).length, 1);
   }
-  assert.deepEqual(services.pds.env_file, ['/srv/memory-company/pds/pds.env']);
+  assert.deepEqual(services.pds.env_file, ['/srv/codifix-company/pds/pds.env']);
   for (const [name, service] of Object.entries(services)) if (name !== 'pds') assert.equal(service.env_file, undefined);
   assert.equal(services.pds.environment.PDS_DEV_MODE, 'false');
   assert.equal(services.pds.environment.PDS_DISABLE_SSRF_PROTECTION, 'false');

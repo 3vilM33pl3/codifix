@@ -12,7 +12,7 @@ import { canonical } from './pds-enrollment/files.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const check = (value, reason) => { if (!value) throw Error(reason); };
-const ROOT = '/home/olivier/.local/state/memory-workshop-preview-20260918';
+const ROOT = '/home/olivier/.local/state/codifix-workshop-preview-20260918';
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
 const APPROVED_SOURCES = ['44e45bda-d0e3-4b92-b699-0835fc297d2d', '4fa476fd-6b78-48de-a196-c0a76160bcc2', '5ba41d65-3d5d-4de2-af67-500ffd8dfd79'];
 export function renewal(oldManifest, now) {
@@ -105,8 +105,8 @@ export async function prepare(stageName, now = new Date().toISOString()) {
   await fs.copyFile(path.join(oldStage, 'worker'), path.join(nextStage, 'worker'), constants.COPYFILE_EXCL); await fs.chmod(path.join(nextStage, 'worker'), 0o700);
   const nextArtifacts = { worker_sha256: worker.sha256, manifest_sha256: result.sha256, service_config_sha256: hash(nextConfig) };
   await put('artifact.json', `${JSON.stringify(nextArtifacts)}\n`);
-  const unit = `[Unit]\nDescription=Workshop explicitly confirmed private question worker\nAfter=memory-workshop-preview-relay.service\nRequires=memory-workshop-preview-relay.service\n\n[Service]\nType=simple\nExecStart=/usr/bin/node ${nextStage}/queue.mjs serve\nWorkingDirectory=${ROOT}\nRestart=no\nKillMode=control-group\nTimeoutStopSec=420\nNoNewPrivileges=yes\nUMask=0077\n\n[Install]\nWantedBy=default.target\n`;
-  await put('memory-workshop-question-worker.service', unit);
+  const unit = `[Unit]\nDescription=Workshop explicitly confirmed private question worker\nAfter=codifix-workshop-preview-relay.service\nRequires=codifix-workshop-preview-relay.service\n\n[Service]\nType=simple\nExecStart=/usr/bin/node ${nextStage}/queue.mjs serve\nWorkingDirectory=${ROOT}\nRestart=no\nKillMode=control-group\nTimeoutStopSec=420\nNoNewPrivileges=yes\nUMask=0077\n\n[Install]\nWantedBy=default.target\n`;
+  await put('codifix-workshop-question-worker.service', unit);
   const args = ['run-next', path.join(nextStage, 'work.json'), result.sha256, grant.instance_id];
   const preflight = spawnSync(path.join(nextStage, 'worker'), [...args, path.join(nextStage, 'app.toml'), hash(nextConfig)],
     { env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8' });

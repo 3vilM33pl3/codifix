@@ -1,4 +1,4 @@
-"""Prerequisite-based native journey; device secrets remain in Memory's Keychain.
+"""Prerequisite-based native journey; device secrets remain in Codifix's Keychain.
 
 No prerequisite downloads, builds, global config overlay or legacy service
 control. Public CLI metadata is validated; batch process output is suppressed.
@@ -51,10 +51,10 @@ def plan(source, journal):
         raise Refused("bounded public device name without controls required")
     if not isinstance(source["projects"], list) or not 1 <= len(source["projects"]) <= 8:
         raise Refused("one to eight explicit project output slots required")
-    operator.exact(source["native"], {"schema_version", "root", "memory", "postgres", "pg_port", "areas"} | ({"curated_sync", "repositories"} if source["native"].get("schema_version") == 2 else set()))
+    operator.exact(source["native"], {"schema_version", "root", "codifix", "postgres", "pg_port", "areas"} | ({"curated_sync", "repositories"} if source["native"].get("schema_version") == 2 else set()))
     journal = files.path(journal)
     private_parent(journal)
-    outputs, workspaces = [journal, Path(str(journal) + ".memory-lock")], []
+    outputs, workspaces = [journal, Path(str(journal) + ".codifix-lock")], []
     for slot in source["projects"]:
         operator.exact(slot, {"workspace", "journal", "subscription_output"} | ({"selection"} if source["schema_version"] == 2 else set()))
         if source["schema_version"] == 2:
@@ -68,7 +68,7 @@ def plan(source, journal):
             if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", file.name):
                 raise Refused("journal/metadata leaves require bounded ASCII names")
             private_parent(file)
-            outputs.extend([file, Path(str(file) + ".memory-lock")])
+            outputs.extend([file, Path(str(file) + ".codifix-lock")])
     native_input = dict(source["native"], subscriptions=[s["subscription_output"] for s in source["projects"]])
     prerequisite_plan = operator.make_plan(native_input, prerequisites_only=True)
     workspaces.append(Path(native_input["root"]))
@@ -131,16 +131,16 @@ def inspect(journal):
     return value
 
 
-class Memory:
+class Codifix:
     """Only fixed first-party commands, with a checked installed binary pin."""
     def __init__(self, source):
         self.source = source
-        self.binary = source["native"]["memory"]
+        self.binary = source["native"]["codifix"]
         self.native = Native()
 
     def args(self, args):
         if files.sha(self.binary["path"]) != self.binary["sha256"]:
-            raise Refused("installed Memory changed; no command executed")
+            raise Refused("installed Codifix changed; no command executed")
         return [self.binary["path"], *[str(a) for a in args]]
 
     def execute(self, args, *, interactive=False):
@@ -149,9 +149,9 @@ class Memory:
                                     stdout=None if interactive else subprocess.DEVNULL,
                                     stderr=subprocess.DEVNULL, timeout=2400, check=False)
         except (OSError, subprocess.TimeoutExpired):
-            raise Refused("Memory operation unconfirmed; exact journals retained (output suppressed)") from None
+            raise Refused("Codifix operation unconfirmed; exact journals retained (output suppressed)") from None
         if result.returncode != 0:
-            raise Refused("Memory operation denied/unconfirmed; inspect retained journals (output suppressed)")
+            raise Refused("Codifix operation denied/unconfirmed; inspect retained journals (output suppressed)")
 
     def company(self):
         return ["--company", self.source["company"], *(["--allow-loopback"] if self.source["allow_loopback_development"] else [])]
@@ -375,7 +375,7 @@ def run(input_file, journal, native, *, memory=None, prompt=confirm):
         raise Refused("journey requires an interactive terminal; no enrollment/native effects")
     prepared = plan(source, journal)
     native.preflight(prepared["prerequisites"])  # Pins/platform only, no scope implied.
-    memory = memory or Memory(source)
+    memory = memory or Codifix(source)
     with files.Lock(journal):
         if journal.exists():
             value = inspect(journal)
@@ -434,7 +434,7 @@ def run(input_file, journal, native, *, memory=None, prompt=confirm):
         if len({e["subscription"]["bootstrap"]["scope"]["company"] for e in value["projects"]}) != 1:
             raise Refused("subscription company identities disagree; no native effects")
         native_input, native_journal = native_paths(journal, value)
-        for output in [native_input, native_journal, Path(str(native_journal) + ".memory-lock")]:
+        for output in [native_input, native_journal, Path(str(native_journal) + ".codifix-lock")]:
             for root in [Path(source["native"]["root"]), *[Path(s["workspace"]) for s in source["projects"]]]:
                 files.outside(output, root)
         files.missing(native_input, files.encoded(dict(source["native"], subscriptions=[s["subscription_output"] for s in source["projects"]])))

@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 
-FORMAT = "memory-release-v1"
+FORMAT = "codifix-release-v1"
 ARCHITECTURES = {"amd64", "arm64"}
 KINDS = {"binary", "debian-package", "archive"}
 MAX_ARTIFACT_BYTES = 16 * 1024**3
@@ -64,16 +64,16 @@ def unique_object(pairs):
 
 
 def version_precedence(value):
-    """Order the supported 2.1.0 candidates before the stable release.
+    """Order the supported 3.0.0 candidates before the stable release.
 
     Validation only: the version stored in a signed manifest is never rewritten.
     Keep this finite grammar shared by preparation and live upgrade operators.
     """
-    require(isinstance(value, str), "Expected a supported v2.1.0 version")
-    if value == "2.1.0":
+    require(isinstance(value, str), "Expected a supported v3.0.0 version")
+    if value == "3.0.0":
         return (1, 0)
-    candidate = re.fullmatch(r"2\.1\.0-rc\.([1-9][0-9]{0,5})", value)
-    require(candidate is not None, "Expected 2.1.0 or a supported v2.1.0 release candidate version")
+    candidate = re.fullmatch(r"3\.0\.0-rc\.([1-9][0-9]{0,5})", value)
+    require(candidate is not None, "Expected 3.0.0 or a supported v3.0.0 release candidate version")
     return (0, int(candidate.group(1)))
 
 
@@ -253,7 +253,7 @@ def authenticate(manifest_bytes, signature, public_key, trusted_fingerprint):
         require(len(key_bytes) <= 1024 * 1024, "Public key exceeds size limit")
     signature_bytes = read_small(signature, 64 * 1024)
     require(signature_bytes, "Detached signature is required")
-    with tempfile.TemporaryDirectory(prefix="memory-release-keyring-") as directory:
+    with tempfile.TemporaryDirectory(prefix="codifix-release-keyring-") as directory:
         home = Path(directory)
         os.chmod(home, 0o700)
         descriptor = open_directory(home)
@@ -341,7 +341,7 @@ def verify_stage(arguments):
     os.close(open_directory(artifacts_dir))
     parent, _ = absolute_parts(arguments.staging_parent)
     parent_fd = open_directory(parent)
-    name = "memory-release-" + secrets.token_hex(16)
+    name = "codifix-release-" + secrets.token_hex(16)
     selected = [item for item in manifest["artifacts"] if item["architecture"] == arguments.architecture]
     stage_fd = None
     stage_identity = None
@@ -375,7 +375,7 @@ def verify_stage(arguments):
                     os.fsync(output.fileno())
             require(copied == expected_size and checksum.hexdigest() == artifact["sha256"],
                     "Artifact content differs from the signed digest")
-        report = {"format": "memory-release-verification-v1", "status": "authenticated_and_staged",
+        report = {"format": "codifix-release-verification-v1", "status": "authenticated_and_staged",
                   "release_version": manifest["release_version"], "source_revision": manifest["source_revision"],
                   "architecture": arguments.architecture, "schema_current": arguments.schema_current,
                   "manifest_sha256": hashlib.sha256(data).hexdigest(), "signing_fingerprint": arguments.trusted_signing_fingerprint,

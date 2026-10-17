@@ -5,19 +5,22 @@ param(
     [Parameter(Mandatory = $true)][string]$DistDir,
     [Parameter(Mandatory = $true)][string]$ExpectedVersion,
     [Parameter(Mandatory = $true)][string]$ExpectedCommit,
-    [Parameter(Mandatory = $true)][string]$TestDatabaseUrl
+    [Parameter(Mandatory = $true)][string]$TestDatabaseUrl,
+    [ValidateRange(1,65535)][int]$InstallerBuild = 1
 )
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') {
     throw 'Refusing MSI installation outside a disposable GitHub Windows runner'
 }
+. (Join-Path $PSScriptRoot 'release-identity.ps1')
+$expectedIdentity = Get-WindowsReleaseIdentity -ApplicationVersion $ExpectedVersion -InstallerBuild $InstallerBuild
 $DistDir = (Resolve-Path -LiteralPath $DistDir).Path
 $manifests = @(Get-ChildItem -LiteralPath $DistDir -Filter '*.manifest.json')
 if ($manifests.Count -ne 1) { throw 'Expected exactly one Windows release manifest' }
 $manifest = Get-Content -LiteralPath $manifests[0].FullName -Raw | ConvertFrom-Json
 if ($manifest.application_version -ne $ExpectedVersion -or $manifest.source_commit -ne $ExpectedCommit -or
-    $manifest.native_stack_bundled -ne $false -or $manifest.installer_build -ne 1 -or
-    $manifest.installer_version -ne '2.1.1' -or $manifest.signing_status -ne 'unsigned') {
+    $manifest.native_stack_bundled -ne $false -or $manifest.installer_build -ne $InstallerBuild -or
+    $manifest.installer_version -ne $expectedIdentity.installer_version -or $manifest.signing_status -ne 'unsigned') {
     throw 'Unexpected stable Windows preview identity or capability claim'
 }
 foreach ($artifact in $manifest.artifacts) {
@@ -26,7 +29,7 @@ foreach ($artifact in $manifest.artifacts) {
     if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $artifact.sha256 -or
         (Get-Item -LiteralPath $path).Length -ne $artifact.bytes) { throw 'Artifact checksum/length mismatch' }
 }
-$stage = Join-Path $env:RUNNER_TEMP ('memory-release-check-' + [guid]::NewGuid())
+$stage = Join-Path $env:RUNNER_TEMP ('codifix-release-check-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $stage | Out-Null
 $zip = @($manifest.artifacts | Where-Object { $_.name.EndsWith('.zip') })
 if ($zip.Count -ne 1) { throw 'Expected one portable ZIP' }
@@ -38,26 +41,26 @@ foreach ($file in $manifest.payload_files) {
         throw 'Extracted payload mismatch'
     }
 }
-function Check-Memory([string]$Binary) {
+function Check-Codifix([string]$Binary) {
     $version = & $Binary --version
-    if ($LASTEXITCODE -ne 0 -or $version -cne "memory $ExpectedVersion") { throw 'Wrong packaged version' }
+    if ($LASTEXITCODE -ne 0 -or $version -cne "codifix $ExpectedVersion") { throw 'Wrong packaged version' }
     foreach ($arguments in @(@('--help'), @('federation', '--help'), @('auth', '--help'), @('urls', '--help'))) {
         & $Binary @arguments | Out-Null
         if ($LASTEXITCODE -ne 0) { throw 'Packaged CLI help failed' }
     }
 }
-Check-Memory (Join-Path $stage 'bin\memory.exe')
+Check-Codifix (Join-Path $stage 'bin\codifix.exe')
 # Exact disposable native PostgreSQL database, provisioned by the caller. Do not
 # discover server credentials or use an installed application's configuration.
 $database = [uri]$TestDatabaseUrl
 if ($database.Scheme -notin @('postgres', 'postgresql') -or $database.Host -notin @('127.0.0.1', 'localhost') -or
-    $database.AbsolutePath -notmatch '^/memory_release_[a-z0-9_]+$') { throw 'Explicit disposable loopback database required' }
+    $database.AbsolutePath -notmatch '^/codifix_release_[a-z0-9_]+$') { throw 'Explicit disposable loopback database required' }
 $token = [guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')
 $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
 $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
 $origin = "http://127.0.0.1:$port"
 $config = Join-Path $stage 'test-config.toml'
-$webRoot = Join-Path $stage 'share\memory-layer\web'
+$webRoot = Join-Path $stage 'share\codifix\web'
 @"
 [service]
 bind_addr = '127.0.0.1:$port'
@@ -97,7 +100,7 @@ function Request([string]$Path, $Body = $null) {
     if ($null -eq $Body) { return Invoke-RestMethod -Uri ($origin + $Path) -Headers $headers -TimeoutSec 15 }
     return Invoke-RestMethod -Uri ($origin + $Path) -Headers $headers -Method Post -ContentType 'application/json' -Body ($Body | ConvertTo-Json -Depth 12) -TimeoutSec 30
 }
-$binary = Join-Path $stage 'bin\memory.exe'
+$binary = Join-Path $stage 'bin\codifix.exe'
 for ($generation = 1; $generation -le 2; $generation++) {
     $service = Start-Process -FilePath $binary -ArgumentList @('--config', "`"$config`"", 'service', 'run') -PassThru -NoNewWindow `
         -RedirectStandardOutput (Join-Path $stage "service-$generation.stdout.log") -RedirectStandardError (Join-Path $stage "service-$generation.stderr.log")
@@ -136,18 +139,18 @@ function Invoke-Msi([string[]]$Arguments) {
 foreach ($artifact in @($manifest.artifacts | Where-Object { $_.name.EndsWith('.msi') })) {
     $package = Join-Path $DistDir $artifact.name
     $install = if ($artifact.name.EndsWith('-server-tools.msi')) {
-        Join-Path $env:ProgramFiles 'Memory Layer Native Server Tools'
-    } else { Join-Path $env:LOCALAPPDATA 'Programs\Memory Layer' }
+        Join-Path $env:ProgramFiles 'Codifix Native Server Tools'
+    } else { Join-Path $env:LOCALAPPDATA 'Programs\Codifix' }
     # User-created data is outside the package component inventory and must
     # survive both repair and uninstall; no database or service is activated.
     Invoke-Msi @('/i', "`"$package`"", '/qn', '/norestart', '/l*v', "`"$stage\install-$($artifact.name).log`"")
-    Check-Memory (Join-Path $install 'bin\memory.exe')
+    Check-Codifix (Join-Path $install 'bin\codifix.exe')
     $sentinel = Join-Path $install 'release-user-data-sentinel.txt'
     [IO.File]::WriteAllText($sentinel, 'preserved user data')
     Invoke-Msi @('/fa', "`"$package`"", '/qn', '/norestart')
-    Check-Memory (Join-Path $install 'bin\memory.exe')
+    Check-Codifix (Join-Path $install 'bin\codifix.exe')
     Invoke-Msi @('/x', "`"$package`"", '/qn', '/norestart')
     if ([IO.File]::ReadAllText($sentinel) -cne 'preserved user data') { throw 'MSI removed user data' }
-    if (Test-Path -LiteralPath (Join-Path $install 'bin\memory.exe')) { throw 'MSI executable remained after uninstall' }
+    if (Test-Path -LiteralPath (Join-Path $install 'bin\codifix.exe')) { throw 'MSI executable remained after uninstall' }
 }
 Write-Host "Portable ZIP, per-user MSI and server-tools MSI checks passed; logs: $stage"

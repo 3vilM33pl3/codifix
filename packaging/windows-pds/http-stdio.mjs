@@ -4,7 +4,7 @@ import http from 'node:http';
 import { Duplex } from 'node:stream';
 
 export const MAX_FRAME = 16 * 1024 * 1024 + 64 * 1024;
-export const READY = Buffer.from('memory-pds-stdio-v1');
+export const READY = Buffer.from('codifix-pds-stdio-v1');
 
 export function dispatch(app, request, timeoutMs = 20_000) {
   if (!Buffer.isBuffer(request) || request.length > MAX_FRAME) {

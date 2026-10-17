@@ -11,7 +11,7 @@ from onboarding_files import Refused, read, sha
 
 def clean_env():
     # Do not inherit company/server DB credentials, model keys, config overlays,
-    # DYLD injection, psql startup routing or global Memory service settings.
+    # DYLD injection, psql startup routing or global Codifix service settings.
     return {"HOME": str(Path.home()), "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
             "LANG": "en_US.UTF-8", "LC_ALL": "C", "PGCONNECT_TIMEOUT": "5"}
 
@@ -41,9 +41,9 @@ class Native:
                 raise Refused("installed prerequisite changed from reviewed SHA-256")
             if pin["kind"] == "mach-o":
                 self.command(["/usr/bin/lipo", "-verify_arch", arch, pin["path"]])
-        memory = plan["input"]["memory"]
+        memory = plan["input"]["codifix"]
         if self.command([memory["path"], "--version"])[1] != memory["version"]:
-            raise Refused("installed Memory version differs from reviewed prerequisite")
+            raise Refused("installed Codifix version differs from reviewed prerequisite")
         pg = plan["input"]["postgres"]
         for tool in ["postgres", "initdb", "pg_ctl", "psql", "pg_config", "pg_controldata"]:
             version = self.command([Path(pg["bin_dir"]) / tool, "--version"])[1]
@@ -58,7 +58,7 @@ class Native:
         for selected in plan["selections"]:
             value = selected["metadata"]
             scope = value["bootstrap"]["scope"]
-            args = [plan["input"]["memory"]["path"], "projects", "subscription",
+            args = [plan["input"]["codifix"]["path"], "projects", "subscription",
                     "--company", value["company"], "--project", scope["project"],
                     "--area", scope["area"], "--owner-instance", scope["owner"],
                     "--revision", str(value["bootstrap"]["catalog_revision"]),
@@ -116,7 +116,7 @@ class Native:
                     value = json.loads(body)
                     # instance_id is a random boot ID in the existing service;
                     # service_id is the explicitly configured durable local tag.
-                    if isinstance(value, dict) and value.get("status") == "ok" and value.get("database") == "up" and value.get("role") == "primary" and value.get("service_id") == "memory-onboarding-" + area["instance_id"]:
+                    if isinstance(value, dict) and value.get("status") == "ok" and value.get("database") == "up" and value.get("role") == "primary" and value.get("service_id") == "codifix-onboarding-" + area["instance_id"]:
                         return
             except (OSError, ValueError, http.client.HTTPException):
                 pass

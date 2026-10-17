@@ -30,7 +30,7 @@ class FirstRunContract(unittest.TestCase):
         helper.write_bytes((MACOS / "onboarding_journey.py").read_bytes())
         helper.chmod(0o400)
         patches = [patch.object(journey, "__file__", str(helper)), patch.object(first, "native_user")]
-        self.installed = self.fixture.input["memory"]
+        self.installed = self.fixture.input["codifix"]
         self.descriptor = {"schema_version": 1, "postgres": self.fixture.input["postgres"], "acceptance_pending": ["native_macos_architecture"]}
         patches.append(patch.object(first, "prerequisite", return_value=(self.descriptor, self.installed)))
         for value in patches:
@@ -49,7 +49,7 @@ class FirstRunContract(unittest.TestCase):
                          native=self.native, memory_factory=self.memory, journey_runner=self.execute_journey)
 
     def memory(self, source):
-        cli = journey.Memory(source)
+        cli = journey.Codifix(source)
         cli.login = lambda: setattr(self, "logins", self.logins + 1)
         return cli
 
@@ -175,7 +175,7 @@ class FirstRunContract(unittest.TestCase):
         self.assertEqual(self.executions, [])
         self.assertFalse((self.state / "journey-input.json").exists())
 
-    def test_modified_inputs_runtime_or_memory_block_resume_without_effects(self):
+    def test_modified_inputs_runtime_or_codifix_block_resume_without_effects(self):
         self.invoke(prepare_only=True)
         with self.assertRaises(files.Refused):
             self.invoke(name="Changed name")
@@ -223,22 +223,22 @@ class FirstRunContract(unittest.TestCase):
         with patch("builtins.input", side_effect=EOFError), self.assertRaisesRegex(files.Refused, "cancelled"):
             first.ask("no")
 
-    def test_reviewed_runtime_python_and_memory_version_pins_before_login(self):
+    def test_reviewed_runtime_python_and_codifix_version_pins_before_login(self):
         descriptor = dict(self.descriptor, python={"path": str(Path(sys.executable).absolute()),
                            "version": ".".join(str(n) for n in sys.version_info[:3])})
         with patch.object(first.runtime_bundle, "verify_installed", return_value=descriptor), \
-             patch.object(self.native, "command", return_value=(0, "memory 2.1.0-fixture")) as command:
-            _, installed = real_prerequisite(self.args["runtime"], self.args["memory"], self.native)
+             patch.object(self.native, "command", return_value=(0, "codifix 3.0.0-fixture")) as command:
+            _, installed = real_prerequisite(self.args["runtime"], self.args["codifix"], self.native)
             self.assertEqual(installed["sha256"], files.sha(self.fixture.memory))
             self.assertEqual(command.call_args_list[0].args[0][:2], ["/usr/bin/lipo", "-verify_arch"])
             self.assertEqual(command.call_args_list[1].args[0], [self.fixture.memory, "--version"])
             descriptor["python"]["version"] = "3.11.999"
             with self.assertRaisesRegex(files.Refused, "Python"):
-                real_prerequisite(self.args["runtime"], self.args["memory"], self.native)
+                real_prerequisite(self.args["runtime"], self.args["codifix"], self.native)
         descriptor["python"]["version"] = ".".join(str(n) for n in sys.version_info[:3])
         with patch.object(first.runtime_bundle, "verify_installed", return_value=descriptor), \
              patch.object(self.native, "command", return_value=(0, "unexpected output")), self.assertRaises(files.Refused):
-            real_prerequisite(self.args["runtime"], self.args["memory"], self.native)
+            real_prerequisite(self.args["runtime"], self.args["codifix"], self.native)
 
 
 if __name__ == "__main__":

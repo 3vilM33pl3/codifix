@@ -6,8 +6,8 @@ import { companyBootstrapTopology } from './company-bootstrap-topology.mjs';
 import { companyPreviewAdoption } from './company-preview-adoption.mjs';
 
 function fixture(extraMembers = []) {
-  const company = { schemaVersion: 1, name: 'memory-company', root: '/srv/memory-company', domain: 'company.example.com',
-    images: Object.fromEntries(['app', 'gateway', 'postgres', 'pds', 'proxy'].map((key, index) => [key, `registry.example.com/memory/${key}@sha256:${String(index + 1).repeat(64)}`])),
+  const company = { schemaVersion: 1, name: 'codifix-company', root: '/srv/codifix-company', domain: 'company.example.com',
+    images: Object.fromEntries(['app', 'gateway', 'postgres', 'pds', 'proxy'].map((key, index) => [key, `registry.example.com/codifix/${key}@sha256:${String(index + 1).repeat(64)}`])),
     users: { app: '1000:1000', gateway: '1000:1000', proxy: '1000:1000', pds: '1000:1000', postgres: '999:999' },
     members: ['workshop', 'homelab', ...extraMembers], federationEnabled: true, expertiseRoutes: true };
   const did = 'did:web:space.company.example.com';
@@ -18,22 +18,22 @@ function fixture(extraMembers = []) {
   const bootstrap = { schemaVersion: 1, repositoryHostname: 'space.company.example.com', repositoryDid: did,
     accountHandle: 'space.company.example.com', operatorHostname: 'operator.company.example.com',
     didDocument: bytes, didDocumentSha256: createHash('sha256').update(bytes).digest('hex'), caCertificateSha256: 'f'.repeat(64) };
-  const members = company.members.map((member, index) => ({ member, containerName: `memory-${member}-preview-app`, containerId: String(index + 1).repeat(64) }));
+  const members = company.members.map((member, index) => ({ member, containerName: `codifix-${member}-preview-app`, containerId: String(index + 1).repeat(64) }));
   const adoption = { schemaVersion: 1, members, inventory: {
-    containers: members.map(member => ({ name: member.containerName, id: member.containerId, networks: [`memory-${member.member}-preview`] })),
-    networks: members.map(member => `memory-${member.member}-preview`), volumes: ['unrelated-existing-volume'] } };
+    containers: members.map(member => ({ name: member.containerName, id: member.containerId, networks: [`codifix-${member.member}-preview`] })),
+    networks: members.map(member => `codifix-${member.member}-preview`), volumes: ['unrelated-existing-volume'] } };
   return { company, bootstrap, adoption };
 }
 const plan = ({ company, bootstrap, adoption }) => companyPreviewAdoption(company, bootstrap, adoption);
 const networksOf = service => Array.isArray(service.networks) ? service.networks : Object.keys(service.networks);
 function withPreparedDatabase() {
   const input = fixture();
-  const database = { containerName: 'memory-company-gateway_db-1', containerId: 'd'.repeat(64), networkName: 'memory-company_gateway_database', alias: 'gateway_db' };
+  const database = { containerName: 'codifix-company-gateway_db-1', containerId: 'd'.repeat(64), networkName: 'codifix-company_gateway_database', alias: 'gateway_db' };
   input.adoption.preparedGatewayDatabase = database;
   input.adoption.inventory.containers.push({ name: database.containerName, id: database.containerId, networks: [database.networkName],
     networkAliases: { [database.networkName]: ['gateway_db', database.containerName] } });
   input.adoption.inventory.networks.push(database.networkName);
-  input.adoption.inventory.volumes.push('memory-company_gateway_db_data');
+  input.adoption.inventory.volumes.push('codifix-company_gateway_db_data');
   return input;
 }
 
@@ -58,9 +58,9 @@ test('each existing app gets its own new internal network with only TLS gateway,
   const input = fixture(); const result = plan(input);
   for (const attachment of result.adoption.attachments) {
     assert.deepEqual(attachment.command, ['docker', 'network', 'connect', attachment.network, attachment.containerId]);
-    assert.deepEqual(attachment.currentNetworks, [`memory-${attachment.member}-preview`]);
+    assert.deepEqual(attachment.currentNetworks, [`codifix-${attachment.member}-preview`]);
     const local = `${attachment.member}_federation`;
-    assert.deepEqual(result.compose.networks[local], { internal: true, enable_ipv6: false, name: `memory-company_${local}` });
+    assert.deepEqual(result.compose.networks[local], { internal: true, enable_ipv6: false, name: `codifix-company_${local}` });
     const peers = Object.entries(result.compose.services).filter(([, service]) => networksOf(service).includes(local)).map(([name]) => name);
     assert.deepEqual(peers, ['gateway_edge']);
   }
@@ -113,13 +113,13 @@ test('missing, duplicate, invented, ambiguous and stale identity/network claims 
     input => { input.adoption.inventory.containers[0].networks = ['absent']; },
     input => { input.adoption.inventory.containers[1].networks = [...input.adoption.inventory.containers[0].networks]; },
     input => { input.adoption.inventory.containers[1].id = input.adoption.inventory.containers[0].id; },
-    input => { input.adoption.inventory.networks.push('memory-company_workshop_federation'); },
-    input => { input.adoption.inventory.networks.push('memory-company_gateway_database'); },
-    input => { input.adoption.inventory.volumes.push('memory-company_gateway_db_data'); },
-    input => { input.adoption.inventory.volumes.push('memory-company_pds_data'); },
+    input => { input.adoption.inventory.networks.push('codifix-company_workshop_federation'); },
+    input => { input.adoption.inventory.networks.push('codifix-company_gateway_database'); },
+    input => { input.adoption.inventory.volumes.push('codifix-company_gateway_db_data'); },
+    input => { input.adoption.inventory.volumes.push('codifix-company_pds_data'); },
     input => { input.adoption.inventory.containers[0].id = [input.adoption.inventory.containers[0].id]; },
-    input => { input.adoption.inventory.containers.push({ name: 'memory-company-gateway-1', id: 'a'.repeat(64), networks: [] }); },
-    input => { input.adoption.inventory.containers.push({ name: 'memory-company_pds_1', id: 'a'.repeat(64), networks: [] }); },
+    input => { input.adoption.inventory.containers.push({ name: 'codifix-company-gateway-1', id: 'a'.repeat(64), networks: [] }); },
+    input => { input.adoption.inventory.containers.push({ name: 'codifix-company_pds_1', id: 'a'.repeat(64), networks: [] }); },
     input => { input.adoption.members[0].containerName = 'gateway'; input.adoption.inventory.containers[0].name = 'gateway'; },
     input => { input.adoption.members[1].containerName = input.adoption.members[0].containerName; input.adoption.members[1].containerId = input.adoption.members[0].containerId; },
     input => { input.adoption.inventory.networks.push('bridge'); input.adoption.inventory.containers[0].networks = ['bridge']; },
@@ -137,7 +137,7 @@ test('explicit staged gateway DB stays outside Compose ownership and is reachabl
   assert.deepEqual(input, original);
   assert.equal(result.compose.services.gateway_db, undefined);
   assert.deepEqual(Object.keys(result.compose.volumes), ['pds_data']);
-  assert.deepEqual(result.compose.networks.gateway_database, { external: true, name: 'memory-company_gateway_database' });
+  assert.deepEqual(result.compose.networks.gateway_database, { external: true, name: 'codifix-company_gateway_database' });
   assert.ok(result.requiredFiles.every(file => file.service !== 'gateway_db' && !file.path.endsWith('/gateway/database/owner-password')));
   assert.deepEqual(Object.entries(result.compose.services).filter(([, service]) => networksOf(service).includes('gateway_database')).map(([name]) => name), ['gateway']);
   for (const [name, network] of Object.entries(result.compose.networks)) if (name !== 'gateway_database') {
@@ -163,22 +163,22 @@ test('prepared DB exception rejects wrong identity, aliases, extra peers and bro
     input => { input.adoption.preparedGatewayDatabase = null; },
     input => { input.adoption.preparedGatewayDatabase.containerId = 'e'.repeat(64); },
     input => { input.adoption.preparedGatewayDatabase.containerName = input.adoption.members[0].containerName; },
-    input => { input.adoption.preparedGatewayDatabase.networkName = 'memory-workshop-preview'; },
+    input => { input.adoption.preparedGatewayDatabase.networkName = 'codifix-workshop-preview'; },
     input => { input.adoption.preparedGatewayDatabase.alias = 'postgres'; },
     input => { input.adoption.preparedGatewayDatabase.allowAnyExistingNetwork = true; },
     input => { delete input.adoption.inventory.containers.at(-1).networkAliases; },
     input => { input.adoption.inventory.containers.at(-1).networkAliases.memory_company_other = ['gateway_db']; },
-    input => { input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'] = 'gateway_db'; },
+    input => { input.adoption.inventory.containers.at(-1).networkAliases['codifix-company_gateway_database'] = 'gateway_db'; },
     input => { input.adoption.inventory.containers.at(-1).networkAliases = null; },
-    input => { input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'].push('gateway_db'); },
-    input => { input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'] = ['other']; },
+    input => { input.adoption.inventory.containers.at(-1).networkAliases['codifix-company_gateway_database'].push('gateway_db'); },
+    input => { input.adoption.inventory.containers.at(-1).networkAliases['codifix-company_gateway_database'] = ['other']; },
     input => { input.adoption.inventory.containers.at(-1).networks.push(input.adoption.inventory.networks[0]); },
-    input => { input.adoption.inventory.containers[0].networks.push('memory-company_gateway_database'); },
-    input => { input.adoption.inventory.containers.push({ name: 'unexpected', id: 'e'.repeat(64), networks: ['memory-company_gateway_database'] }); },
-    input => { input.adoption.inventory.networks.push('memory-company_pds_client'); },
-    input => { input.adoption.inventory.networks.push('memory-company_workshop_federation'); },
-    input => { input.adoption.inventory.volumes.push('memory-company_pds_data'); },
-    input => { input.adoption.inventory.containers.push({ name: 'memory-company-gateway-1', id: 'e'.repeat(64), networks: [] }); },
+    input => { input.adoption.inventory.containers[0].networks.push('codifix-company_gateway_database'); },
+    input => { input.adoption.inventory.containers.push({ name: 'unexpected', id: 'e'.repeat(64), networks: ['codifix-company_gateway_database'] }); },
+    input => { input.adoption.inventory.networks.push('codifix-company_pds_client'); },
+    input => { input.adoption.inventory.networks.push('codifix-company_workshop_federation'); },
+    input => { input.adoption.inventory.volumes.push('codifix-company_pds_data'); },
+    input => { input.adoption.inventory.containers.push({ name: 'codifix-company-gateway-1', id: 'e'.repeat(64), networks: [] }); },
   ];
   for (const change of changes) { const input = withPreparedDatabase(); change(input); assert.throws(() => plan(input)); }
 });
@@ -190,9 +190,9 @@ test('staged DB ID and alias inventory changes are review-bound, not silently re
   input.adoption.inventory.containers.at(-1).id = 'e'.repeat(64);
   assert.notEqual(plan(input).reviewSha256, before.reviewSha256);
   const changed = plan(input);
-  input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'].reverse();
+  input.adoption.inventory.containers.at(-1).networkAliases['codifix-company_gateway_database'].reverse();
   assert.deepEqual(plan(input), changed);
-  input.adoption.inventory.containers.at(-1).networkAliases['memory-company_gateway_database'].push('another-reviewed-alias');
+  input.adoption.inventory.containers.at(-1).networkAliases['codifix-company_gateway_database'].push('another-reviewed-alias');
   assert.notEqual(plan(input).reviewSha256, changed.reviewSha256);
 });
 

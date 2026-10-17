@@ -4,7 +4,7 @@
 set -euo pipefail
 
 usage() {
-  echo 'Usage: build.sh memory|package PRIVATE_WORKDIR sha256:IMAGE_ID [amd64|arm64]'
+  echo 'Usage: build.sh codifix|package PRIVATE_WORKDIR sha256:IMAGE_ID [amd64|arm64]'
   echo '       build.sh pi PRIVATE_WORKDIR sha256:IMAGE_ID PI_TOOLCHAIN'
   echo '       build.sh web PRIVATE_WORKDIR sha256:IMAGE_ID'
   echo 'Source/cache preparation and exact pins: packaging/ca-bookworm/README.md'
@@ -17,7 +17,7 @@ build_image="$3"
 build_arch=arm64
 rust_target=aarch64-unknown-linux-gnu
 case "$phase" in
-  memory|package)
+  codifix|package)
     build_arch="${4:-arm64}"
     case "$build_arch" in
       amd64) rust_target=x86_64-unknown-linux-gnu ;;
@@ -27,7 +27,7 @@ case "$phase" in
     ;;
   web) [[ $# == 3 ]] || { usage >&2; exit 2; } ;;
 esac
-if [[ ! "$phase" =~ ^(memory|pi|web|package)$ ]] ||
+if [[ ! "$phase" =~ ^(codifix|pi|web|package)$ ]] ||
    [[ ! "$build_image" =~ ^sha256:[a-f0-9]{64}$ ]] ||
    [[ "$build_work" != /* || "$build_work" == / || "$build_work" == /tmp || "$build_work" == /data || "$build_work" == *,* || "$build_work" == *$'\n'* ]] ||
    [[ ! -d "$build_work" || -L "$build_work" ]] ||
@@ -48,10 +48,10 @@ build_args=(--rm --init --pull never --user "$(id -u):$(id -g)"
   --env CARGO_NET_OFFLINE=true --env CARGO_BUILD_JOBS=4
   --env npm_config_cache=/work/npm-cache --env npm_config_offline=true)
 case "$phase" in
-  memory|package|web)
-    [[ -f "$build_work/memory/Cargo.lock" ]] || { usage >&2; exit 2; }
-    build_args+=(--workdir /work/memory --env CARGO_HOME=/work/memory-cargo
-      --env CARGO_TARGET_DIR=/work/memory-target)
+  codifix|package|web)
+    [[ -f "$build_work/codifix/Cargo.lock" ]] || { usage >&2; exit 2; }
+    build_args+=(--workdir /work/codifix --env CARGO_HOME=/work/codifix-cargo
+      --env CARGO_TARGET_DIR=/work/codifix-target)
     ;;
   pi)
     [[ $# == 4 && "$4" == /* && -x "$4/bin/rustc" && -x "$4/bin/cargo" ]] || { usage >&2; exit 2; }
@@ -62,11 +62,11 @@ case "$phase" in
     ;;
 esac
 case "$phase" in
-  memory)
+  codifix)
     build_command=(cargo build --release --frozen --target "$rust_target"
-      -p mem-cli --features full --bin memory -p mem-area --bin memory-area
-      -p mem-area-ops --bin memory-area-import
-      -p mem-federation-runtime --bin memory-federation-gateway)
+      -p codifix-cli --features full --bin codifix -p codifix-area --bin codifix-area
+      -p codifix-area-ops --bin codifix-area-import
+      -p codifix-federation-runtime --bin codifix-federation-gateway)
     ;;
   pi)
     build_command=(/pi-toolchain/bin/cargo build --release --frozen --bin pi

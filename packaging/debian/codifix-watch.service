@@ -1,0 +1,23 @@
+[Unit]
+Description=Codifix Watcher
+After=network.target codifix.service
+Requires=codifix.service
+PartOf=codifix.service
+
+[Service]
+Type=simple
+User=codifix
+Group=codifix
+EnvironmentFile=/etc/codifix/codifix.env
+WorkingDirectory=/var/lib/codifix
+ExecStart=/usr/bin/codifix --config /etc/codifix/codifix.toml watcher run
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/codifix /var/log/codifix /etc/codifix
+
+[Install]
+WantedBy=multi-user.target

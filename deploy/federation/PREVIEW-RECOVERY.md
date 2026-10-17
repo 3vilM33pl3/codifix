@@ -9,7 +9,7 @@ disaster recovery or perform a cutover.
 
 Use the same private configuration and immutable receipt as
 `preview-backup.mjs`, an explicit approved SHA-256, and a fresh directory directly
-under `/data/tmp` named `memory-preview-recovery-<unique-suffix>`:
+under `/data/tmp` named `codifix-preview-recovery-<unique-suffix>`:
 
 ```sh
 node deploy/federation/preview-restore.mjs extract BACKUP_CONFIG RECEIPT NEW_RECOVERY_DIRECTORY APPROVED_ARCHIVE_SHA256
@@ -75,7 +75,7 @@ private keys, credentials, prompts or answer bodies are printed.
 
 NAS backup SHA-256:
 `c0ad3dbe68367de400e9881af2745fd5df462cb1ef28a60f4a5f4e65d73b772d`.
-Recovery directory: `/data/tmp/memory-preview-recovery-20260919t2225`.
+Recovery directory: `/data/tmp/codifix-preview-recovery-20260919t2225`.
 The original backup receipt remains unchanged with `restored: false`; separate
 `database-recovery.json` and `operational-recovery.json` record this recovery.
 

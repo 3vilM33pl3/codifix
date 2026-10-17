@@ -11,7 +11,7 @@ bash packaging/ca-bookworm/release.sh FULL_COMMIT /absolute/build-volume/linux-a
 ```
 
 Use a separate private work directory for `arm64`. CI may restore only the
-`memory-cargo`, `memory-target` and `npm-cache` subdirectories to reuse matching
+`codifix-cargo`, `codifix-target` and `npm-cache` subdirectories to reuse matching
 inputs; source and output directories must be new. The helper archives the exact
 Git object, fetches public dependencies in a separate container without host
 credentials, then compiles offline. It emits Debian packages, source/builder
@@ -24,11 +24,11 @@ The release workflow runs the Debian package lifecycle separately on native
 GitHub-hosted AMD64 and ARM64 Linux runners, never the active Monolith or CA:
 
 ```sh
-sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env MEMORY_HOSTED_INSTALL_TEST=yes \
-  bash packaging/ca-bookworm/install-test.sh /absolute/path/memory-layer_2.1.0_amd64.deb
+sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env CODIFIX_HOSTED_INSTALL_TEST=yes \
+  bash packaging/ca-bookworm/install-test.sh /absolute/path/codifix_3.0.0_amd64.deb
 ```
 
-This requires a clean runner without an existing Memory installation and a
+This requires a clean runner without an existing Codifix installation and a
 matching native architecture. It exercises fresh install, upgrade from an
 explicitly synthetic `2.0.1` package, same-version repair and removal, preserving
 configuration/data sentinels. Package hooks run against an observed `systemctl`
@@ -58,23 +58,23 @@ Prepare a new mode-0700 directory on the build volume containing:
 
 | Directory | Contents |
 | --- | --- |
-| `memory/` | `git archive` of the exact clean reviewed Memory commit |
+| `codifix/` | `git archive` of the exact clean reviewed Codifix commit |
 | `pi/` | archive of `7c018475d54d4e09c907691e47a520f1f09e3288`, with only `no-tools-1.patch` applied |
-| `memory-cargo/`, `pi-cargo/` | private copies of the matching public Cargo `registry/` and `git/` caches only |
-| `npm-cache/` | npm cache populated from the Memory `web/package-lock.json` |
+| `codifix-cargo/`, `pi-cargo/` | private copies of the matching public Cargo `registry/` and `git/` caches only |
+| `npm-cache/` | npm cache populated from the Codifix `web/package-lock.json` |
 | `output/` | initially empty output directory |
 
 Keep the two original source archives and their SHA-256s. Verify all tracked
 source files against them, except Pi's exact reviewed patch. Its unchanged
-lockfile and full license must match the [recorded hashes](../../crates/mem-supervisor-pi/patches/README.md).
+lockfile and full license must match the [recorded hashes](../../crates/codifix-supervisor-pi/patches/README.md).
 The first candidate additionally uses the separately recorded Debian packaging
 fix from commit `d8d390fa756cde35e9c2763ae5961ac8ce83801b`; preserve its exact
-`packaging/build-deb.sh` diff and verify it as the only Memory source difference.
+`packaging/build-deb.sh` diff and verify it as the only Codifix source difference.
 New builds should use a clean commit containing that fix rather than an
 unrecorded local change.
 Do not copy full Cargo homes, npm configuration, project configuration, provider
 keys, user homes, offline stores or databases. Use a separately prepared pinned
-Pi nightly toolchain, `nightly-2026-08-31`, mounted read-only. The Memory image
+Pi nightly toolchain, `nightly-2026-08-31`, mounted read-only. The Codifix image
 contains Rust 1.98.1 and the ARM64 standard library; Pi's toolchain must also
 contain its ARM64 standard library.
 
@@ -83,7 +83,7 @@ example, an isolated container may run `npm --prefix web ci --ignore-scripts
 --no-audit --no-fund` with `npm_config_cache=/work/npm-cache`; no model endpoint
 is used. Source compilation, Web tests, packaging and runtime checks then run
 with **network none**, a read-only container root, non-root UID, no capabilities,
-no new privileges, bounded CPU/memory/PIDs and only private build inputs mounted.
+no new privileges, bounded CPU/codifix/PIDs and only private build inputs mounted.
 Do not repair a missing cache by adding host credentials or network to compilation.
 
 ## Repeat the phases
@@ -95,14 +95,14 @@ a fresh log; previous logs/artifacts are not overwritten. Build outputs remain
 under the private work directory, never installed over a running executable.
 
 ```sh
-bash packaging/ca-bookworm/build.sh memory "$CA_BUILD_WORK" "$CA_BUILD_IMAGE"
+bash packaging/ca-bookworm/build.sh codifix "$CA_BUILD_WORK" "$CA_BUILD_IMAGE"
 bash packaging/ca-bookworm/build.sh pi "$CA_BUILD_WORK" "$CA_BUILD_IMAGE" "$CA_PI_TOOLCHAIN"
 bash packaging/ca-bookworm/build.sh web "$CA_BUILD_WORK" "$CA_BUILD_IMAGE"
 bash packaging/ca-bookworm/build.sh package "$CA_BUILD_WORK" "$CA_BUILD_IMAGE"
 ```
 
-For a coherent two-architecture Memory release, use the **same clean source
-revision** and captured builder for both targets. `memory` and `package` accept
+For a coherent two-architecture Codifix release, use the **same clean source
+revision** and captured builder for both targets. `codifix` and `package` accept
 an optional fourth argument `amd64` or `arm64`; omission retains the original
 ARM64 default. Pi's fourth argument is still its explicit nightly toolchain.
 
@@ -116,7 +116,7 @@ Both packages get newly verified source-bound provenance, even when Cargo reuses
 matching compiled inputs. Do not relabel the preserved older candidate, mix old
 AMD64 artifacts into a new manifest or assume a completed build is a signature.
 
-Run memory and Pi builds concurrently only with separate target/cache paths as
+Run Codifix and Pi builds concurrently only with separate target/cache paths as
 above. Wait for cache copying to finish before starting either build. The package
 phase reuses ARM64 outputs and builds a host-native lean CLI for completions;
 it never executes an ARM64 binary implicitly. Existing Debian output is refused.
@@ -152,7 +152,7 @@ itself uses only older numeric GLIBC symbols.
 - Run explicit `qemu-aarch64 -L /usr/aarch64-linux-gnu` checks in a fresh
   network-none/non-root/read-only container; mount only the selected candidates,
   test tools and private scratch, not the build tree or production state.
-- Memory smoke checks are `--version`, operator help and offline `schema-plan`.
+- Codifix smoke checks are `--version`, operator help and offline `schema-plan`.
   Do not run a service against any existing database to test binary launch.
 - Pi checks use only synthetic text and an invalid token against loopback fake
   responses. No arbitrary model endpoint or production pin override is supplied.

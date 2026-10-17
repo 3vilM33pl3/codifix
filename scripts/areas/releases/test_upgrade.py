@@ -23,7 +23,7 @@ TOOL, FIXTURE = load("upgrade"), load("test_console")
 class FakeHost:
     def __init__(self):
         self.active, self.schema, self.target_schema = True, 60, 60
-        self.bindings = {"/etc/systemd/system/memory-layer@trust.service.d/ca.conf": "a" * 64}
+        self.bindings = {"/etc/systemd/system/codifix@trust.service.d/ca.conf": "a" * 64}
         self.calls, self.peers, self.healthy = [], 0, True
 
     def inspect(self, name):
@@ -52,7 +52,7 @@ class FakeHost:
 class HostTests(unittest.TestCase):
     def test_command_finite_environment_and_no_shell(self):
         with mock.patch.object(TOOL.subprocess, "run", return_value=mock.Mock(returncode=0, stdout=b"ok")) as run:
-            TOOL.command(["/usr/bin/systemctl", "stop", "--", "memory-layer@trust.service"])
+            TOOL.command(["/usr/bin/systemctl", "stop", "--", "codifix@trust.service"])
         self.assertNotIn("shell", run.call_args.kwargs)
         self.assertEqual(run.call_args.kwargs["env"], TOOL.ENV)
         self.assertEqual(run.call_args.kwargs["timeout"], 30)
@@ -60,7 +60,7 @@ class HostTests(unittest.TestCase):
     def test_psql_uses_no_password_in_arguments_and_checks_writers(self):
         config = (b'[database]\nurl="postgresql://fixture:secret@127.0.0.1:5433/memory_trust"\n'
                   b'[service]\nbind_addr="127.0.0.1:8091"\n'
-                  b'web_root="/opt/memory-layer/instances/trust/release/web"\n')
+                  b'web_root="/opt/codifix/instances/trust/release/web"\n')
         with mock.patch.object(TOOL, "command", return_value=b"60|0|0\n") as run:
             self.assertEqual(TOOL.Host().database(config, "trust", True), 60)
         self.assertNotIn("secret", str(run.call_args.args[0]))
@@ -74,7 +74,7 @@ class HostTests(unittest.TestCase):
         for url, root in (("postgresql://u:p@example.com/db", "trust"),
                           ("postgresql://u:p@127.0.0.1/db?sslmode=disable", "trust"),
                           ("postgresql://u:p@127.0.0.1/db", "other")):
-            config = f'[database]\nurl="{url}"\n[service]\nbind_addr="127.0.0.1:8091"\nweb_root="/opt/memory-layer/instances/{root}/release/web"\n'
+            config = f'[database]\nurl="{url}"\n[service]\nbind_addr="127.0.0.1:8091"\nweb_root="/opt/codifix/instances/{root}/release/web"\n'
             with self.assertRaises(TOOL.release.ReleaseError):
                 TOOL.config_binding(config.encode(), "trust")
 
@@ -100,7 +100,7 @@ class UpgradeTests(unittest.TestCase):
         other = "arm64" if FIXTURE.ARCHITECTURE == "amd64" else "amd64"
         (source / "other-binary").write_bytes(b"unused fixture")
         (source / "signing-public-key.asc").write_bytes(FIXTURE.FIXTURE.FIXTURE.SignatureTests.public)
-        TOOL.release.create(FIXTURE.FIXTURE.FIXTURE.creator(source, version=getattr(self, "candidate_version", "2.1.0-rc.2"), schema_floor=60, schema_head=61,
+        TOOL.release.create(FIXTURE.FIXTURE.FIXTURE.creator(source, version=getattr(self, "candidate_version", "3.0.0-rc.2"), schema_floor=60, schema_head=61,
             classification="approval-required", migrations=True,
             artifact=[f"{FIXTURE.ARCHITECTURE}:archive:{source / archive}", f"{other}:binary:{source / 'other-binary'}"]))
         FIXTURE.FIXTURE.FIXTURE.SignatureTests.command(["--local-user", self.signer + "!", "--digest-algo", "SHA256",
@@ -141,13 +141,13 @@ class UpgradeTests(unittest.TestCase):
             self.begin(fault)
 
     def test_upgrade_preserves_config_dropins_and_retains_previous_release(self):
-        config = self.layout.config / "trust/memory-layer.toml"
+        config = self.layout.config / "trust/codifix.toml"
         before = config.read_bytes()
         result = self.begin()
         self.assertEqual(result["status"], "complete")
         self.assertFalse(result["rollback_permitted"])
         self.assertEqual(config.read_bytes(), before)
-        self.assertEqual(self.host.bindings, {"/etc/systemd/system/memory-layer@trust.service.d/ca.conf": "a" * 64})
+        self.assertEqual(self.host.bindings, {"/etc/systemd/system/codifix@trust.service.d/ca.conf": "a" * 64})
         old = self.layout.release / "trust" / ("release-upgrade-" + self.args.operation)
         self.assertEqual((old / "web/index.html").read_bytes(), self.files["web/index.html"])
         self.assertTrue(all(call[1] == "trust" for call in self.host.calls))
@@ -173,10 +173,10 @@ class UpgradeTests(unittest.TestCase):
                 self.layout = original_layout
 
     def test_pre_start_rollback_restores_binary_web_and_digest_stopped(self):
-        before = (self.layout.config / "trust/memory.sha256").read_bytes()
+        before = (self.layout.config / "trust/codifix.sha256").read_bytes()
         self.interrupt("digest_replaced")
         self.assertEqual(self.recover("rollback")["status"], "rolled_back_stopped")
-        self.assertEqual((self.layout.config / "trust/memory.sha256").read_bytes(), before)
+        self.assertEqual((self.layout.config / "trust/codifix.sha256").read_bytes(), before)
         self.assertEqual((self.layout.release / "trust/release/web/index.html").read_bytes(), self.files["web/index.html"])
         self.assertFalse(self.host.active)
         self.assertEqual(self.recover("rollback")["status"], "rolled_back_stopped")
@@ -206,7 +206,7 @@ class UpgradeTests(unittest.TestCase):
         with self.assertRaisesRegex(TOOL.release.ReleaseError, "Candidate bytes changed"):
             self.recover()
         web.write_bytes(b"<p>new fixture</p>")
-        path = self.layout.root / "var/lib/memory-layer-upgrades/trust" / self.args.operation / "event-0000.json"
+        path = self.layout.root / "var/lib/codifix-upgrades/trust" / self.args.operation / "event-0000.json"
         event = TOOL.console.canonical_read(path)
         event["previous"] = "b" * 64
         path.write_bytes(TOOL.release.canonical(event))
@@ -231,11 +231,11 @@ class UpgradeTests(unittest.TestCase):
 
     def test_changed_config_or_sandbox_blocks_recovery(self):
         self.interrupt("journal_switched")
-        self.host.bindings["/etc/systemd/system/memory-layer@trust.service.d/ca.conf"] = "b" * 64
+        self.host.bindings["/etc/systemd/system/codifix@trust.service.d/ca.conf"] = "b" * 64
         with self.assertRaisesRegex(TOOL.release.ReleaseError, "drop-in"):
             self.recover()
-        self.host.bindings["/etc/systemd/system/memory-layer@trust.service.d/ca.conf"] = "a" * 64
-        path = self.layout.config / "trust/memory-layer.toml"
+        self.host.bindings["/etc/systemd/system/codifix@trust.service.d/ca.conf"] = "a" * 64
+        path = self.layout.config / "trust/codifix.toml"
         path.write_bytes(path.read_bytes() + b"\n# changed")
         with self.assertRaisesRegex(TOOL.release.ReleaseError, "configuration changed"):
             self.recover()
@@ -278,7 +278,7 @@ class UpgradeTests(unittest.TestCase):
 @unittest.skipUnless(shutil.which("gpg") and FIXTURE.ARCHITECTURE, "Disposable signature fixture unavailable")
 class StableUpgradeTests(unittest.TestCase):
     """Exercise an actual signed RC-to-stable operation, not a mocked comparator."""
-    candidate_version = "2.1.0"
+    candidate_version = "3.0.0"
     setUpClass = classmethod(UpgradeTests.setUpClass.__func__)
     setUp = UpgradeTests.setUp
     write_config = UpgradeTests.write_config
@@ -286,11 +286,11 @@ class StableUpgradeTests(unittest.TestCase):
     begin = UpgradeTests.begin
 
     def test_signed_stable_upgrade_preserves_existing_configuration(self):
-        before = (self.layout.config / "trust/memory-layer.toml").read_bytes()
+        before = (self.layout.config / "trust/codifix.toml").read_bytes()
         result = self.begin()
         self.assertEqual(result["status"], "complete")
-        self.assertIn(("health", "trust", "2.1.0"), self.host.calls)
-        self.assertEqual((self.layout.config / "trust/memory-layer.toml").read_bytes(), before)
+        self.assertIn(("health", "trust", "3.0.0"), self.host.calls)
+        self.assertEqual((self.layout.config / "trust/codifix.toml").read_bytes(), before)
 
 
 if __name__ == "__main__":

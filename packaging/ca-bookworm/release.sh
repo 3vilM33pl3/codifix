@@ -14,15 +14,15 @@ release_root="$(git rev-parse --show-toplevel)"
 [[ "$(realpath -e "$release_work")" == "$release_work" && "$(stat -c '%u:%a' "$release_work")" == "$(id -u):700" ]]
 [[ "$(docker image inspect --format '{{.Id}}' "$release_image")" == "$release_image" ]]
 # Cache directories may be restored by CI; source and published artifacts may not.
-[[ ! -e "$release_work/memory" && ! -e "$release_work/source.tar" && ! -e "$release_work/output" ]]
-mkdir -p "$release_work/memory" "$release_work/memory-cargo" "$release_work/memory-target" "$release_work/npm-cache" "$release_work/output"
+[[ ! -e "$release_work/codifix" && ! -e "$release_work/source.tar" && ! -e "$release_work/output" ]]
+mkdir -p "$release_work/codifix" "$release_work/codifix-cargo" "$release_work/codifix-target" "$release_work/npm-cache" "$release_work/output"
 git -C "$release_root" archive "$release_revision" > "$release_work/source.tar"
-tar -xf "$release_work/source.tar" -C "$release_work/memory"
+tar -xf "$release_work/source.tar" -C "$release_work/codifix"
 printf '%s\n' "$release_revision" > "$release_work/source-revision.txt"
 common=(--rm --init --pull never --user "$(id -u):$(id -g)" --read-only --cap-drop ALL
   --security-opt no-new-privileges --pids-limit 512 --cpus 4 --memory 14g
   --tmpfs /tmp:rw,nosuid,nodev,size=2g --mount "type=bind,src=$release_work,dst=/work"
-  --workdir /work/memory --env HOME=/tmp --env CARGO_HOME=/work/memory-cargo
+  --workdir /work/codifix --env HOME=/tmp --env CARGO_HOME=/work/codifix-cargo
   --env npm_config_cache=/work/npm-cache --env npm_config_registry=https://registry.npmjs.org/)
 # Separate public dependency preparation. No host HOME, credentials or config is
 # mounted; compilation below is offline. Git credentials are never forwarded.
@@ -30,14 +30,14 @@ docker run "${common[@]}" "$release_image" bash -euc '
   cargo fetch --locked --target x86_64-unknown-linux-gnu --target aarch64-unknown-linux-gnu
   npm --prefix web ci --ignore-scripts --no-audit --no-fund
 ' 2>&1 | tee "$release_work/dependency-preparation.log"
-bash "$release_work/memory/packaging/ca-bookworm/build.sh" package "$release_work" "$release_image" "$release_arch"
+bash "$release_work/codifix/packaging/ca-bookworm/build.sh" package "$release_work" "$release_image" "$release_arch"
 docker run "${common[@]}" --network none --tmpfs /candidate:rw,nosuid,nodev,exec,size=1g "$release_image" bash -euc '
   arch=$1
   package=$(find /work/output -maxdepth 1 -name "*_${arch}.deb" -print)
   test -n "$package"
   mkdir /candidate/package
   dpkg-deb -x "$package" /candidate/package
-  binaries=(/candidate/package/usr/bin/memory /candidate/package/usr/bin/memory-area /candidate/package/usr/bin/memory-area-import /candidate/package/usr/bin/memory-federation-gateway)
+  binaries=(/candidate/package/usr/bin/codifix /candidate/package/usr/bin/codifix-area /candidate/package/usr/bin/codifix-area-import /candidate/package/usr/bin/codifix-federation-gateway)
   if [[ "$arch" == amd64 ]]; then
     mkdir -p /tmp/sysroot/lib/x86_64-linux-gnu /tmp/sysroot/lib64
     for library in libc.so.6 libm.so.6 libgcc_s.so.1 libstdc++.so.6 libpthread.so.0 libdl.so.2 librt.so.1 libresolv.so.2; do
@@ -58,8 +58,8 @@ docker run "${common[@]}" --network none --tmpfs /candidate:rw,nosuid,nodev,exec
   gateway_status=0
   gateway_output=$(timeout 15s "${runner[@]}" "${binaries[3]}" 2>&1) || gateway_status=$?
   [[ $gateway_status == 1 && $gateway_output == "Error: \"expected private gateway configuration file\"" ]]
-  test -s /candidate/package/usr/share/memory-layer/web/index.html
-  test -s /candidate/package/usr/libexec/memory-layer/releases/release.py
+  test -s /candidate/package/usr/share/codifix/web/index.html
+  test -s /candidate/package/usr/libexec/codifix/releases/release.py
   dpkg-deb -f "$package" Package Version Architecture Depends
   rustc -vV
   node --version
@@ -72,8 +72,8 @@ def sha(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 files = sorted(p for p in (work / 'output').iterdir() if p.is_file())
-metadata = {'format': 'memory-linux-build-v1', 'architecture': arch,
-            'application_version': tomllib.loads((work / 'memory/Cargo.toml').read_text())['workspace']['package']['version'],
+metadata = {'format': 'codifix-linux-build-v1', 'architecture': arch,
+            'application_version': tomllib.loads((work / 'codifix/Cargo.toml').read_text())['workspace']['package']['version'],
             'source_commit': (work / 'source-revision.txt').read_text().strip(),
             'source_archive_sha256': sha(work / 'source.tar'), 'builder_image': image,
             'signing_status': 'unsigned', 'installed_on_host': False,

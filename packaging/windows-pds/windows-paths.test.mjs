@@ -11,7 +11,7 @@ test('unknown or altered PDS sources fail before transformation', () => {
   assert.throws(() => patchPdsFile('other.js', Buffer.from('unreviewed')), /exact reviewed/);
   for (const name of Object.keys(originalFiles)) assert.throws(() => patchPdsFile(name, Buffer.from('changed')), /exact reviewed/);
 });
-const fixture = process.env.MEMORY_PDS_PATH_FIXTURES;
+const fixture = process.env.CODIFIX_PDS_PATH_FIXTURES;
 const hash = value => createHash('sha256').update(value).digest('hex');
 async function exercise(text, kind, platform) {
   const files = new Map(), removed = [];

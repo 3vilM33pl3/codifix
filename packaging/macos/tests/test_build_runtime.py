@@ -23,7 +23,7 @@ class RuntimeProducer(unittest.TestCase):
     def test_macho_bundle_dependencies_become_relative_before_signing_and_replay(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            prefix = "/usr/local/share/memory-layer/runtime/fixture-v3"
+            prefix = "/usr/local/share/codifix/runtime/fixture-v3"
             executable, library = root / "postgres/bin/initdb", root / "postgres/lib/libpq.5.dylib"
             for file in (executable, library):
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -60,7 +60,7 @@ class RuntimeProducer(unittest.TestCase):
             executable = root / "bin/program"
             executable.parent.mkdir(parents=True)
             executable.write_bytes(b"\xcf\xfa\xed\xfe" + b"fixture")
-            prefix = "/usr/local/share/memory-layer/runtime/fixture-v3"
+            prefix = "/usr/local/share/codifix/runtime/fixture-v3"
             outside = root.parent / "outside.dylib"
             outside.write_bytes(b"outside")
             for dependency in ["/opt/homebrew/lib/libcrypto.dylib", prefix + "/missing.dylib", prefix + "/../outside.dylib"]:
@@ -98,7 +98,7 @@ class RuntimeProducer(unittest.TestCase):
         self.assertNotIn("no-threads", commands[0])
         self.assertNotIn("no-async", commands[0])
         self.assertEqual(commands[-1], ["make", "install_dev"])
-        prefix = "/usr/local/share/memory-layer/runtime/fixture-v2"
+        prefix = "/usr/local/share/codifix/runtime/fixture-v2"
         stage = Path("/private/build/stage")
         commands = producer.postgres_commands(prefix, stage, dependency, 4)
         self.assertIn("--with-ssl=openssl", commands[0])
@@ -157,7 +157,7 @@ class RuntimeProducer(unittest.TestCase):
                 self.assertTrue(all("PGHOST" not in env and "PGOPTIONS" not in env for _, _, env in calls))
 
     def test_vector_destdir_is_applied_once(self):
-        prefix = "/usr/local/share/memory-layer/runtime/fixture"
+        prefix = "/usr/local/share/codifix/runtime/fixture"
         stage = Path("/private/build/stage")
         pg = stage / prefix.lstrip("/") / "postgres"
         build, install = producer.vector_commands(pg, prefix, stage, 4)

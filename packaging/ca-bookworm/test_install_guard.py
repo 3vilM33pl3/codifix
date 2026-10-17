@@ -14,7 +14,7 @@ class InstallerGuardTests(unittest.TestCase):
             package = Path(directory) / "candidate.deb"
             package.write_bytes(b"not a package; guard must reject before dpkg")
             environment = dict(os.environ, GITHUB_ACTIONS="false", RUNNER_OS="Linux",
-                               RUNNER_ENVIRONMENT="self-hosted", MEMORY_HOSTED_INSTALL_TEST="no")
+                               RUNNER_ENVIRONMENT="self-hosted", CODIFIX_HOSTED_INSTALL_TEST="no")
             for arguments in ([], [str(package)], [str(package), "unexpected"]):
                 with self.subTest(arguments=arguments):
                     result = subprocess.run(["bash", str(SCRIPT), *arguments], env=environment,

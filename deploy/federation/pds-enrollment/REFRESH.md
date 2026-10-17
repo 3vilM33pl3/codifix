@@ -20,7 +20,7 @@ create-account, activate, key-discovery, identity-change or login fallback paths
 ```json
 {
   "schema_version": 1,
-  "purpose": "memory-private-pds-refresh-only-v1",
+  "purpose": "codifix-private-pds-refresh-only-v1",
   "policy_id": "fdb89f7c-1bdb-4d70-9722-54fca59262f1",
   "image": "ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12",
   "enrollment_identity_sha256": "REPLACE_WITH_EXISTING_JOURNAL_IDENTITY_SHA256",
@@ -31,10 +31,10 @@ create-account, activate, key-discovery, identity-change or login fallback paths
   "service_did": "did:web:pds.company.example",
   "signing_key": "REPLACE_WITH_EXISTING_ENROLLED_PUBLIC_DID_KEY",
   "did_document_sha256": "REPLACE_WITH_EXISTING_DID_FILE_SHA256",
-  "tls_ca_file": "/var/lib/memory-pds-refresh/ca.pem",
+  "tls_ca_file": "/var/lib/codifix-pds-refresh/ca.pem",
   "tls_ca_sha256": "REPLACE_WITH_EXACT_CA_FILE_SHA256",
-  "state_directory": "/var/lib/memory-pds-refresh/enrollment",
-  "output_directory": "/var/lib/memory-pds-access",
+  "state_directory": "/var/lib/codifix-pds-refresh/enrollment",
+  "output_directory": "/var/lib/codifix-pds-access",
   "not_before": 1789826400
 }
 ```
@@ -71,7 +71,7 @@ node deploy/federation/pds-enrollment/refresh-cli.mjs once /private/refresh-poli
 node deploy/federation/pds-enrollment/refresh-cli.mjs run /private/refresh-policy.json
 ```
 
-The [systemd template](memory-pds-refresh.service.example) needs concrete paths,
+The [systemd template](codifix-pds-refresh.service.example) needs concrete paths,
 UID and operator-edge connectivity. It is not installed automatically. Node and
 Linux `/usr/bin/flock` are required; no npm packages, pinned signer or provider
 key are needed. The image field binds the reviewed PDS version, not an attestation

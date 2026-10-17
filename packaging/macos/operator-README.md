@@ -8,11 +8,11 @@ still pending.
 
 ## macOS local-network permission
 
-Packages include **Memory Network Access.app**. Open it once with the configured
+Packages include **Codifix Network Access.app**. Open it once with the configured
 company origin, for example:
 
 ```bash
-open -a 'Memory Network Access' --args https://company.example
+open -a 'Codifix Network Access' --args https://company.example
 ```
 
 Allow the macOS local-network prompt. The helper checks HTTPS reachability without
@@ -20,7 +20,7 @@ reading credentials; its success message does not claim successful synchronizati
 Schema-v2 synchronization LaunchAgents run their existing verified operator under
 this application so macOS attributes background network access consistently.
 The helper pins Python and operator bytes, and the operator still verifies its
-journal, Memory executable, profiles and current permissions. Startup failures
+journal, Codifix executable, profiles and current permissions. Startup failures
 retry after 30 seconds; stopping the job terminates its child with a five-second
 grace period. Legacy schema-v1 periodic jobs retain their original lifecycle.
 
@@ -32,7 +32,7 @@ Developer ID identity when configured. No system-wide network exception is added
 ## Prerequisites
 
 Run as a non-root logged-in Mac user. Supply an already installed Python 3.11+
-runtime, the installed full Memory binary (embedded PostgreSQL service and
+runtime, the installed full Codifix binary (embedded PostgreSQL service and
 `project-sync` support), and one reviewed installed PostgreSQL 16, 17 or 18
 distribution with pgvector. These bounds are operator policy, not a claim that
 all native distribution/version combinations were tested.
@@ -42,7 +42,7 @@ lists native distributions. [Postgres.app documents bundled pgvector](https://po
 and its [command-line tool locations](https://postgresapp.com/documentation/cli-tools.html);
 its [downloads](https://postgresapp.com/downloads.html) identify universal Mac
 packages. No release version/hash is assumed by this operator. It does not run
-Homebrew, fetch an installer, mount a DMG, compile Memory or build extensions.
+Homebrew, fetch an installer, mount a DMG, compile Codifix or build extensions.
 An optional reviewed runtime-bundle packaging path now exists (see below).
 Producing and verifying its real native dependency binaries remains unfinished.
 
@@ -70,7 +70,7 @@ including `_ctypes`, loader behavior and PostgreSQL/pgvector before acceptance.
 Use explicit real paths, not `latest`/Homebrew symlinks. Installed executables,
 extension library/control/SQL files and the operator/Python runtime are SHA-256
 pinned. They and their ancestors must not be group/world-writable (a system
-sticky temporary ancestor is permitted). Memory, PostgreSQL tools and vector
+sticky temporary ancestor is permitted). Codifix, PostgreSQL tools and vector
 library must contain the current Mac execution architecture, checked with
 `lipo` before executing them. Missing prerequisites, changed pins, port conflicts
 and unsupported layouts fail without changing an existing installation.
@@ -84,20 +84,20 @@ is performed.
 
 ## Guided first-run with an optional runtime bundle
 
-Packages built with the reviewed runtime option include `memory-onboard` bound
+Packages built with the reviewed runtime option include `codifix-onboard` bound
 to their exact bundled Python and prerequisite descriptor. They do not depend on
 an unpinned system Python or ask you to write installer JSON. After installation,
-with an existing repository parent and Memory Application Support directory:
+with an existing repository parent and Codifix Application Support directory:
 
 ```bash
-memory-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
+codifix-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
   --name "Olivier Mac" --workspace-parent "$HOME/Projects" \
-  --state "$HOME/Library/Application Support/memory-layer/onboarding"
+  --state "$HOME/Library/Application Support/codifix/onboarding"
 ```
 
 The state directory is created private if missing; existing public or relocated
 state is not adopted or repaired. First-run validates the exact installed runtime
-inventory, Python, architecture and Memory before login. It shows authorized
+inventory, Python, architecture and Codifix before login. It shows authorized
 projects, accepts up to eight explicit selections and lets you reuse an existing
 repository path. Trust is displayed as remote-only and cannot be selected for
 offline installation. Equal names at different owners remain separate.
@@ -117,8 +117,8 @@ the existing joined journey rather than introducing a different installation
 engine. Check progress and separately approve Codex/Claude disclosure with:
 
 ```bash
-memory-onboard journey-status --journal "$HOME/Library/Application Support/memory-layer/onboarding/journey.json"
-memory-onboard journey-agents --journal "$HOME/Library/Application Support/memory-layer/onboarding/journey.json"
+codifix-onboard journey-status --journal "$HOME/Library/Application Support/codifix/onboarding/journey.json"
+codifix-onboard journey-agents --journal "$HOME/Library/Application Support/codifix/onboarding/journey.json"
 ```
 
 The builder/runtime hash tests use synthetic files. No usable native dependency
@@ -137,13 +137,13 @@ Schema 2 enables local capture and the offline queue in each selected area and
 installs one named watcher LaunchAgent per selected repository. These jobs use
 the exact area configuration and repository path; they do not discover or start
 watchers for unrelated repositories. The private `area-routing.json` is under
-the native state root and can be used with `memory --area-routing PATH` for
+the native state root and can be used with `codifix --area-routing PATH` for
 interactive commands. Missing General remains unavailable rather than routing
 unknown work to Workshop or Homelab. Paid curation and model execution remain
 disabled until separately configured through the normal application settings.
-An installation-owned `bin/memory` launcher also supplies this routing argument;
+An installation-owned `bin/codifix` launcher also supplies this routing argument;
 invoke it from a selected repository or add this installation's `bin` directory
-to your PATH. It does not replace an existing global Memory command.
+to your PATH. It does not replace an existing global Codifix command.
 Curated profiles bind the reviewed manifest digest and the local repository to
 the exact remote project ID. Selecting this workflow requires writer access and
 the company browser approval must explicitly permit curated contributions.
@@ -171,7 +171,7 @@ must still verify capture, curated contributions, restart and offline replay.
 ## Inputs and preview
 
 First enroll the device and produce credential-free, current reviewed selections
-with `memory projects subscription`. Its confirmed create-only metadata contains
+with `codifix projects subscription`. Its confirmed create-only metadata contains
 the stable company/area/owner/project/space, reviewed revision, authority receipt
 keys, device and subscription UUID. It contains no database URL or company
 credential. Exact replay retains its subscription UUID.
@@ -184,10 +184,10 @@ this example is not an executable default installer profile:
 {
   "schema_version": 1,
   "root": "/Users/YOU/PrivateMemoryInstalls/selected-installation",
-  "memory": {
-    "path": "/usr/local/bin/memory",
+  "codifix": {
+    "path": "/usr/local/bin/codifix",
     "sha256": "ACTUAL_LOWERCASE_SHA256",
-    "version": "ACTUAL_MEMORY_VERSION_OUTPUT"
+    "version": "ACTUAL_CODIFIX_VERSION_OUTPUT"
   },
   "postgres": {
     "bin_dir": "/Applications/Postgres.app/Contents/Versions/16/bin",
@@ -228,11 +228,11 @@ The new local area UUID is not the remote owner's UUID.
 Using the explicit installed Python prerequisite:
 
 ```bash
-/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+/ABS/PYTHON3 -I -S -B /usr/local/share/codifix/onboarding/operator/onboard.py \
   prepare --input /ABS/PRIVATE/input.json --journal /ABS/PRIVATE/native-plan.json
-/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+/ABS/PYTHON3 -I -S -B /usr/local/share/codifix/onboarding/operator/onboard.py \
   apply --journal /ABS/PRIVATE/native-plan.json --plan-sha256 EXACT_PREVIEW_SHA256 --confirm
-/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+/ABS/PYTHON3 -I -S -B /usr/local/share/codifix/onboarding/operator/onboard.py \
   status --journal /ABS/PRIVATE/native-plan.json
 ```
 
@@ -263,7 +263,7 @@ not in process arguments, logs or the metadata journal. The private local
 profiles add their own loopback database URL for the scoped replica client.
 
 Each area gets a distinct `memory_laptop_<area>` database and non-superuser login,
-a distinct loopback API port and a new local area identity. Its installed Memory
+a distinct loopback API port and a new local area identity. Its installed Codifix
 service applies the existing embedded migration inventory, not duplicated SQL
 migrations. Background work, reinforcement (including validation), consolidation,
 embedding automation, discovery and MCP are explicitly disabled. Model settings
@@ -275,14 +275,14 @@ registering workers; unknown/unready responses do not count as success.
 
 Labels are namespaced by the installation journal's request UUID:
 
-- `com.memory-layer.onboarding.<request>.postgres.cluster`
-- `com.memory-layer.onboarding.<request>.area.<area>`
-- `com.memory-layer.onboarding.<request>.sync.<subscription>`
+- `dev.codifix.onboarding.<request>.postgres.cluster`
+- `dev.codifix.onboarding.<request>.area.<area>`
+- `dev.codifix.onboarding.<request>.sync.<subscription>`
 
 Workers use launchd `RunAtLoad` and `StartInterval=300` for one guarded
-`memory projects sync --profile ...` invocation. They retry at a subsequent
+`codifix projects sync --profile ...` invocation. They retry at a subsequent
 interval after connection failure; registration is not proof of successful sync.
-Inspect `memory projects sync-status --profile ...` and explicit offline search
+Inspect `codifix projects sync-status --profile ...` and explicit offline search
 for committed progress/citations. [Apple documents timed per-user LaunchAgents](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html).
 Every launch runs the pinned operator wrapper, which rechecks private files and
 installed prerequisite pins; a changed installed binary blocks execution until
@@ -295,7 +295,7 @@ same journal/request, verifies existing state and does not initialize/launch a
 duplicate. A partial cluster without a valid version/control file is retained
 for manual inspection, never cleared or automatically recreated.
 
-Existing shared Memory services, clusters, config/env files, repositories,
+Existing shared Codifix services, clusters, config/env files, repositories,
 custom Codex/Claude settings and user installations remain untouched. This native
 provisioning step alone does not clone repositories or provision agent identities.
 The joined journey and explicit agent stage below reuse it; neither grants company
@@ -304,7 +304,7 @@ membership or marks the full onboarding plan complete.
 ## Joined login and workspace journey
 
 `onboard.py journey --input /ABS/PRIVATE/journey-input.json --journal
-/ABS/PRIVATE/journey.json` joins login, project selection, cloning/approved Memory
+/ABS/PRIVATE/journey.json` joins login, project selection, cloning/approved Codifix
 skills, public subscription metadata and the native operator. Its schema-v1 input
 contains `company`, `name`, `no_browser`, `allow_loopback_development`, the native
 prerequisites above (without `subscriptions`) and one to eight output slots:
@@ -329,9 +329,9 @@ Git uses the user's own credentials. No arbitrary repository setup hook executes
 After the native journey finishes:
 
 ```bash
-/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+/ABS/PYTHON3 -I -S -B /usr/local/share/codifix/onboarding/operator/onboard.py \
   journey-agents --journal /ABS/PRIVATE/journey.json
-/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+/ABS/PYTHON3 -I -S -B /usr/local/share/codifix/onboarding/operator/onboard.py \
   journey-status --journal /ABS/PRIVATE/journey.json
 ```
 
@@ -340,7 +340,7 @@ owning OIDC human must confirm separate Codex/OpenAI and Claude/Anthropic projec
 disclosure grants. If signed out, sign in and import the displayed public JSON
 into Access → Devices → Agent access. Tokens remain in Keychain; the Python
 operator and public approval URL never receive them. The project manifest must
-permit each destination. Only then confirm the generated Memory MCP settings
+permit each destination. Only then confirm the generated Codifix MCP settings
 changes, which preserve custom agent settings and Claude's independent model.
 
 The bridge provides only exact-project read-only cache status/search. It enables
@@ -353,7 +353,7 @@ fenced; server errors do not silently enable offline disclosure. Grants expire
 within 24 hours. To replace an expired or denied grant, repeat `journey-agents`
 with `--renew-grant OLD_AGENT_UUID` (and the original offline flag, if selected).
 This retains old history, creates independent new credentials, and requests fresh
-browser consent; no automatic consent extension occurs. Remove expired Memory
+browser consent; no automatic consent extension occurs. Remove expired Codifix
 MCP entries manually if desired; they cannot be revived by renewal.
 
 The separate `.agents.json` journal contains public metadata/digests only.

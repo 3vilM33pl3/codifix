@@ -6,6 +6,6 @@ set -euo pipefail
 # package hook. The legacy singleton alone depends on the removed /usr/bin file.
 case "${1:-}" in
     remove|deconfigure)
-        systemctl stop memory-watch.service memory-layer.service || true
+        systemctl stop codifix-watch.service codifix.service || true
         ;;
 esac

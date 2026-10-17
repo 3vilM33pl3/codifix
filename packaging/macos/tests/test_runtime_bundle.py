@@ -21,7 +21,7 @@ from onboarding_files import Refused
 
 class RuntimeBundle(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="memory-runtime-fixture-")
+        self.temp = tempfile.TemporaryDirectory(prefix="codifix-runtime-fixture-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
         self.source = self.root / "runtime"
@@ -297,12 +297,12 @@ class RuntimeBundle(unittest.TestCase):
         scripts = self.root / "scripts"
         scripts.mkdir(mode=0o755)
         bundle.stage_bundle(self.source, self.manifest, "x86_64", self.payload, scripts=scripts)
-        launcher = self.payload / "usr/local/bin/memory-onboard"
+        launcher = self.payload / "usr/local/bin/codifix-onboard"
         self.assertEqual(stat.S_IMODE(launcher.stat().st_mode), 0o755)
         text = launcher.read_text()
         self.assertIn(f"runtime_python='{self.value['install_prefix']}/python/bin/python3'", text)
         self.assertIn(f"runtime_descriptor='{self.value['install_prefix']}/{bundle.DESCRIPTOR}'", text)
-        self.assertIn("operator='/usr/local/share/memory-layer/onboarding/operator/onboard.py'", text)
+        self.assertIn("operator='/usr/local/share/codifix/onboarding/operator/onboard.py'", text)
         self.assertIn('if [[ ${1:-} == first-run ]]; then\n  set -- "$@" --runtime "$runtime_descriptor"\nfi', text)
         self.assertIn('"$runtime_python" -I -S -B "$operator" "$@"', text)
         self.assertIn('exec /usr/bin/env -i HOME="${HOME:?HOME is required}"', text)
@@ -317,7 +317,7 @@ class RuntimeBundle(unittest.TestCase):
         (self.payload / "usr/local/bin").mkdir(parents=True, mode=0o755)
         for directory in [self.payload / "usr", self.payload / "usr/local", self.payload / "usr/local/bin"]:
             directory.chmod(0o755)
-        existing = self.payload / "usr/local/bin/memory-onboard"
+        existing = self.payload / "usr/local/bin/codifix-onboard"
         existing.write_text("existing launcher")
         with self.assertRaises(FileExistsError):
             bundle.stage_launcher(self.payload, self.value)
@@ -327,11 +327,11 @@ class RuntimeBundle(unittest.TestCase):
         existing.parent.symlink_to(self.root, target_is_directory=True)
         with self.assertRaises(OSError):
             bundle.stage_launcher(self.payload, self.value)
-        self.assertFalse((self.root / "memory-onboard").exists())
+        self.assertFalse((self.root / "codifix-onboard").exists())
 
     def test_lightweight_staging_does_not_add_runtime_launcher(self):
         bundle.stage_bundle(self.source, self.manifest, "x86_64", self.payload)
-        self.assertFalse((self.payload / "usr/local/bin/memory-onboard").exists())
+        self.assertFalse((self.payload / "usr/local/bin/codifix-onboard").exists())
 
 
 if __name__ == "__main__":

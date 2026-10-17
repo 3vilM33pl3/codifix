@@ -31,7 +31,7 @@ Repeat the checks with claims stopped immediately before deployment.
 ## Prepared renewal —2026-09-19
 
 Private stage:
-`/home/olivier/.local/state/memory-workshop-preview-20260918/questions-renewed-20260919-grant7d`.
+`/home/olivier/.local/state/codifix-workshop-preview-20260918/questions-renewed-20260919-grant7d`.
 
 - Prepared `2026-09-19T22:42:47.500Z`; expires `2026-09-26T22:42:47.500Z`.
 - Manifest SHA-256: `14ad9f571699ff391580864151090111c0929eda0b54580e3e42230c2b41e306`.
@@ -61,7 +61,7 @@ no database changes, claims or paid calls.
    recreating the reviewed application container. Do not enable
    `[supervisor.model_work]`, add provider credentials to the application or alter
    the database policy/budget.
-3. Install the prepared `memory-workshop-question-worker.service` only after
+3. Install the prepared `codifix-workshop-question-worker.service` only after
    validating its exact new queue path and artifact hashes. The copied queue
    still checks the **live** application-config hash and uses the previously
    approved normal credential location; no key is copied into this stage and

@@ -25,13 +25,13 @@ import unittest
 sys.dont_write_bytecode = True
 SOURCE_FILES = ("console.py", "instance.py", "release.py", "test_instance.py",
                 "test_release.py", "test_console_cli.py")
-LEGACY_ROOTS = ("/etc/memory-layer", "/var/lib/memory-layer", "/var/cache/memory-layer",
-                "/run/memory-layer")
+LEGACY_ROOTS = ("/etc/codifix", "/var/lib/codifix", "/var/cache/codifix",
+                "/run/codifix")
 LEGACY_INSTANCE_PARENTS = (*(path + "/instances" for path in LEGACY_ROOTS),
-                           "/var/lib/memory-layer/installations")
-PRIVATE_ROOTS = ("/etc/memory-layer-instances", "/var/lib/memory-layer-installations")
-SERVICE_ROOTS = ("/var/lib/memory-layer-instances", "/var/cache/memory-layer-instances",
-                 "/run/memory-layer-instances")
+                           "/var/lib/codifix/installations")
+PRIVATE_ROOTS = ("/etc/codifix-instances", "/var/lib/codifix-installations")
+SERVICE_ROOTS = ("/var/lib/codifix-instances", "/var/cache/codifix-instances",
+                 "/run/codifix-instances")
 FIELDS = ("ActiveState", "ControlPID", "DropInPaths", "FragmentPath", "Id", "Job",
           "LoadState", "MainPID", "Names", "SubState", "Transient", "UnitFileState")
 FAKE_SYSTEMCTL = '''#!/usr/bin/python3 -I
@@ -46,7 +46,7 @@ with Path("/scratch/systemctl-calls.jsonl").open("a") as stream:
     stream.write(json.dumps(arguments) + "\\n")
 if (len(arguments) != 5 or arguments[:3] != ["show", "--no-pager",
         "--property=" + ",".join(fields)] or arguments[3] != "--" or
-        not re.fullmatch(r"memory-layer@[a-z][a-z0-9-]{0,18}\\.service", arguments[4])):
+        not re.fullmatch(r"codifix@[a-z][a-z0-9-]{0,18}\\.service", arguments[4])):
     sys.stderr.write("The fixture permits only an exact read-only systemctl show query\\n")
     sys.exit(77)
 state_file = Path("/scratch/systemctl-state.json")
@@ -98,7 +98,7 @@ def check_container():
         mounts[parts[4]] = (set(parts[5].split(",")), right.split()[0])
     if "ro" not in mounts["/"][0]:
         raise RuntimeError("The container root must be read-only")
-    for path in ("/scratch", "/tmp", "/opt/memory-layer", *PRIVATE_ROOTS, *SERVICE_ROOTS,
+    for path in ("/scratch", "/tmp", "/opt/codifix", *PRIVATE_ROOTS, *SERVICE_ROOTS,
                  *LEGACY_ROOTS, *LEGACY_INSTANCE_PARENTS):
         if path not in mounts or mounts[path][1] != "tmpfs":
             raise RuntimeError("Every writable rehearsal path must be a disposable tmpfs")
@@ -162,14 +162,14 @@ class ConsoleCliTests(unittest.TestCase):
         cls.binary[18:20] = b"\x3e\x00" if cls.architecture == "amd64" else b"\xb7\x00"
         # ET_NONE, no program headers or instructions. No artifact is executed.
         cls.binary = bytes(cls.binary) + b"synthetic CLI fixture; never executed"
-        cls.files = {"bin/memory": cls.binary, "web/index.html": b"<p>offline CLI fixture</p>",
+        cls.files = {"bin/codifix": cls.binary, "web/index.html": b"<p>offline CLI fixture</p>",
                      "web/assets/deep/main.js": b"/* synthetic CLI fixture */"}
         cls.bundle = Path("/scratch/bundle")
         cls.bundle.mkdir(mode=0o700)
-        cls.archive = "memory-" + cls.architecture + ".tar.gz"
+        cls.archive = "codifix-" + cls.architecture + ".tar.gz"
         cls.fixture.archive(cls.bundle / cls.archive, cls.files)
         other = "arm64" if cls.architecture == "amd64" else "amd64"
-        other_path = cls.bundle / ("memory-" + other)
+        other_path = cls.bundle / ("codifix-" + other)
         other_path.write_bytes(b"unselected synthetic architecture fixture")
         (cls.bundle / "signing-public-key.asc").write_bytes(cls.signing.public)
         cls.fixture.TOOL.release.create(cls.fixture.FIXTURE.creator(cls.bundle,
@@ -204,8 +204,8 @@ class ConsoleCliTests(unittest.TestCase):
         self.config_path = self.work / "configuration.toml"
         self.config_path.write_text(self.config)
         self.config_path.chmod(0o600)
-        self.release_root = Path("/opt/memory-layer/instances") / self.name
-        self.config_root = Path("/etc/memory-layer-instances") / self.name
+        self.release_root = Path("/opt/codifix/instances") / self.name
+        self.config_root = Path("/etc/codifix-instances") / self.name
         self.set_systemd("inactive")
 
     def tearDown(self):
@@ -255,13 +255,13 @@ class ConsoleCliTests(unittest.TestCase):
         for name, contents in self.files.items():
             path = release_root / "release" / name
             self.assertEqual(path.read_bytes(), contents)
-            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o755 if name == "bin/memory" else 0o644)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o755 if name == "bin/codifix" else 0o644)
             self.assertEqual(path.stat().st_uid, 0)
         for path in [release_root, *(p for p in release_root.rglob("*") if p.is_dir())]:
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o755)
         self.assertEqual(stat.S_IMODE(config_root.stat().st_mode), 0o700)
-        for name, data in (("memory-layer.toml", self.config.encode()),
-                           ("memory.sha256", (sha256(self.binary) + "\n").encode())):
+        for name, data in (("codifix.toml", self.config.encode()),
+                           ("codifix.sha256", (sha256(self.binary) + "\n").encode())):
             path = config_root / name
             self.assertEqual(path.read_bytes(), data)
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
@@ -312,7 +312,7 @@ class ConsoleCliTests(unittest.TestCase):
 
     def test_wrong_signer_and_changed_prepared_bytes_refused(self):
         self.cli(self.install_arguments(trusted_signing_fingerprint="A" * 40), "rejected")
-        binary = self.prepared / "release/bin/memory"
+        binary = self.prepared / "release/bin/codifix"
         binary.chmod(0o600)
         binary.write_bytes(self.binary[:-1] + b"X")
         binary.chmod(0o500)
@@ -337,7 +337,7 @@ class ConsoleCliTests(unittest.TestCase):
     def test_legacy_owned_singleton_roots_do_not_block_named_install_and_recovery(self):
         before = legacy_inventory()
         result = self.cli(self.install_arguments(), "installed_inactive")
-        self.assertEqual(result["journal_directory"], "/var/lib/memory-layer-installations/" + self.name)
+        self.assertEqual(result["journal_directory"], "/var/lib/codifix-installations/" + self.name)
         self.assert_tree()
         self.cli(self.recovery_arguments(), "installed")
         self.cli(self.recovery_arguments("finish"), "installed_inactive")
@@ -362,7 +362,7 @@ class ConsoleCliTests(unittest.TestCase):
                     self.assertEqual(legacy_inventory(), before)
                     self.assertFalse(self.release_root.exists())
                     self.assertFalse(self.config_root.exists())
-                    self.assertFalse((Path("/var/lib/memory-layer-installations") / self.name).exists())
+                    self.assertFalse((Path("/var/lib/codifix-installations") / self.name).exists())
                 finally:
                     # Remove only this test's known synthetic files; the
                     # service-owned roots and mounted sentinels are untouched.
@@ -377,7 +377,7 @@ class ConsoleCliTests(unittest.TestCase):
             self.cli(self.recovery_arguments(), "rejected")
             self.cli(self.recovery_arguments("retain"), "rejected")
             self.assertEqual(marker.read_bytes(), b"synthetic refusal fixture")
-            self.assertEqual((self.config_root / "memory-layer.toml").read_bytes(), self.config.encode())
+            self.assertEqual((self.config_root / "codifix.toml").read_bytes(), self.config.encode())
         finally:
             # Remove only this test's deliberately injected synthetic marker.
             marker.unlink()
@@ -402,7 +402,7 @@ def inside_container():
     calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
     only_show = bool(calls) and all(call[:3] == ["show", "--no-pager", "--property=" + ",".join(FIELDS)]
                                   and len(call) == 5 and call[3] == "--" for call in calls)
-    markers = [p for root in ("/etc/memory-layer", "/etc/memory-layer-instances")
+    markers = [p for root in ("/etc/codifix", "/etc/codifix-instances")
                for p in Path(root).rglob("activation-reviewed")]
     passed = result.wasSuccessful() and only_show and not markers
     emit("summary", status="passed" if passed else "failed", tests_run=result.testsRun,
@@ -427,7 +427,7 @@ def host_run(args):
     for path in inputs.values():
         if not path.is_file() or path.is_symlink():
             raise RuntimeError("Expected a regular rehearsal source file: " + str(path))
-    evidence = Path(tempfile.mkdtemp(prefix="memory-console-cli-", dir=args.evidence_parent))
+    evidence = Path(tempfile.mkdtemp(prefix="codifix-console-cli-", dir=args.evidence_parent))
     stub = evidence / "systemctl-fixture.py"
     stub.write_text(FAKE_SYSTEMCTL)
     stub.chmod(0o555)
@@ -444,7 +444,7 @@ def host_run(args):
                "--ulimit=nofile=256:256", "--ipc=none", "--workdir=/", "--env=LC_ALL=C",
                "--env=PATH=/usr/bin:/bin", "--env=TMPDIR=/tmp", "--entrypoint=/usr/bin/python3"]
     for target, mode, size in (("/tmp", "1777", "128m"), ("/scratch", "0700", "128m"),
-                               ("/opt/memory-layer", "0755", "64m"),
+                               ("/opt/codifix", "0755", "64m"),
                                (PRIVATE_ROOTS[0], "0755", "64m"),
                                (PRIVATE_ROOTS[1], "0700", "64m"),
                                *((path, "0755", "64m") for path in SERVICE_ROOTS),

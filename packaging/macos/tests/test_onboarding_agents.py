@@ -75,7 +75,7 @@ class FakeAgents:
                  "scope": subscription["bootstrap"]["scope"], "workspace": slot["workspace"],
                  "settings_path": str(Path(slot["workspace"]) / (".codex/config.toml" if caller == "codex" else ".mcp.json")),
                  "before_sha256": after if self.configured.get(agent_id) else None, "after_sha256": after,
-                 "command": self.source["native"]["memory"]["path"], "args": args, "allow_offline": allow_offline,
+                 "command": self.source["native"]["codifix"]["path"], "args": args, "allow_offline": allow_offline,
                  "preserves_other_settings": True, "contains_credentials": False, "already_configured": bool(self.configured.get(agent_id)), "committed": False, "replayed": False}
         if self.changed_settings:
             value["after_sha256"] = "f" * 64
@@ -242,7 +242,7 @@ class AgentJourneyContract(unittest.TestCase):
         with self.assertRaises(files.Refused): agents.approval(public, selected, "codex")
 
     def test_fixed_commands_use_public_ids_only_not_parent_or_provider_tokens(self):
-        memory = agents.Memory(self.fixture.source)
+        memory = agents.Codifix(self.fixture.source)
         calls = []
         class Commands:
             def command(self, args):

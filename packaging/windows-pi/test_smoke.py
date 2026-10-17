@@ -44,7 +44,7 @@ class NativeSmokeTests(unittest.TestCase):
         self.assertEqual(manifest['target'],'x86_64-pc-windows-msvc')
         paths=[item['path'] for item in manifest['inputs']]
         self.assertEqual(len(paths),len(set(paths)))
-        self.assertEqual(paths[0],'crates/mem-supervisor-pi/scripts/build-windows.ps1')
+        self.assertEqual(paths[0],'crates/codifix-supervisor-pi/scripts/build-windows.ps1')
         for item in manifest['inputs']:
             self.assertEqual(hashlib.sha256((root/item['path']).read_bytes()).hexdigest(),item['sha256'])
         stage=(root/'scripts/windows/guest-native-pi.ps1').read_text()

@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'runtime-dependencies.ps1')
 $dlls = @(ConvertFrom-DumpbinDependencies -Lines @(
     '',
-    'Dump of file C:\build\memory.exe',
+    'Dump of file C:\build\codifix.exe',
     '  Image has the following dependencies:',
     '    KERNEL32.dll',
     '    VCRUNTIME140.dll',

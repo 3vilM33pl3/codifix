@@ -11,8 +11,8 @@ import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { dispatch } from './http-stdio.mjs';
 
-const require = createRequire(process.env.MEMORY_PDS_TEST_ROOT
-  ? path.join(path.resolve(process.env.MEMORY_PDS_TEST_ROOT), 'package.json')
+const require = createRequire(process.env.CODIFIX_PDS_TEST_ROOT
+  ? path.join(path.resolve(process.env.CODIFIX_PDS_TEST_ROOT), 'package.json')
   : new URL('./upstream/package.json', import.meta.url));
 const importDependency = name => import(pathToFileURL(require.resolve(name)));
 const pdsRoot = path.dirname(path.dirname(require.resolve('@atproto/pds')));
@@ -87,7 +87,7 @@ test('nodemailer upgrade retains PDS template and html-to-text delivery without 
 
 test('security overlay initializes real PDS databases and serves private HTTP without a listener', async () => {
   const { PDS } = await importDependency('@atproto/pds');
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-pds-security-test-'));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'codifix-pds-security-test-'));
   let pds;
   try {
     pds = await PDS.fromEnv({ hostname: 'pds.example.invalid',

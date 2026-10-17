@@ -74,7 +74,7 @@ async function config(file, receiptPath, output, expectedSha) {
   const receipt = (await privateInput(receiptPath, 1024 * 1024, true)).value;
   check(receipt.sha256 === expectedSha && receipt.review === sha(JSON.stringify(c))
     && receipt.copy === path.join(c.nas_directory, `${path.basename(c.directory)}.tar.gpg`), 'backup_receipt_binding_mismatch');
-  check(path.dirname(output) === '/data/tmp' && /^memory-preview-recovery-[a-z0-9-]+$/u.test(path.basename(output)), 'dedicated_recovery_directory_required');
+  check(path.dirname(output) === '/data/tmp' && /^codifix-preview-recovery-[a-z0-9-]+$/u.test(path.basename(output)), 'dedicated_recovery_directory_required');
   const parent = await fs.lstat('/data/tmp'); check(parent.isDirectory() && [0, process.getuid()].includes(parent.uid)
     && (!(parent.mode & 0o022) || (parent.mode & 0o1000)), 'unsafe_recovery_parent');
   return { c, receipt, output };
@@ -112,7 +112,7 @@ async function inventory(command, args) {
 const psql = (id, database, sql) => run('docker', ['exec', id, 'psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', database, '-c', sql]).trim();
 async function restoreDatabase(c, output, label, suffix, resume) {
   const source = c.databases.find(db => db.label === label), sourceRoot = path.join(output, 'extracted', path.basename(c.directory));
-  const container = `memory-four-area-restore-preview-${suffix}-${label}`, volume = `${container}-data`;
+  const container = `codifix-four-area-restore-preview-${suffix}-${label}`, volume = `${container}-data`;
   const exists = spawnSync('docker', ['container', 'inspect', container], { stdio: 'ignore' });
   const volumeExists = spawnSync('docker', ['volume', 'inspect', volume], { stdio: 'ignore' });
   let id;
@@ -125,9 +125,9 @@ async function restoreDatabase(c, output, label, suffix, resume) {
   } else {
     check(exists.status !== 0 && volumeExists.status !== 0, 'recovery_target_already_exists');
     await write(path.join(output, `${label}-intent.json`), { container, volume, image, database: source.database, source_database_container_id: source.id });
-    run('docker', ['volume', 'create', '--label', `memory.preview.restore=${suffix}`, volume]);
+    run('docker', ['volume', 'create', '--label', `codifix.preview.restore=${suffix}`, volume]);
     id = run('docker', ['run', '-d', '--name', container, '--network', 'none', '--read-only', '--security-opt', 'no-new-privileges',
-      '--restart', 'no', '--label', `memory.preview.restore=${suffix}`, '--mount', `type=volume,source=${volume},target=/var/lib/postgresql/data`,
+      '--restart', 'no', '--label', `codifix.preview.restore=${suffix}`, '--mount', `type=volume,source=${volume},target=/var/lib/postgresql/data`,
       '--tmpfs', '/tmp:rw,noexec,nosuid', '--tmpfs', '/var/run/postgresql:rw,noexec,nosuid', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', image]).trim();
     await write(path.join(output, `${label}-container.json`), { container, id, volume, image });
   }
@@ -188,7 +188,7 @@ export async function verify(file, receiptPath, output, expectedSha, resume = fa
   const extraction = (await privateInput(path.join(output, 'extraction.json'), 4 * 1024 * 1024, true)).value;
   check(extraction.archive_sha256 === expectedSha, 'extraction_binding_mismatch');
   for (const entry of extraction.files) check(await fileHash(path.join(output, 'extracted', entry.name)) === entry.sha256, 'extracted_artifact_changed');
-  const suffix = path.basename(output).slice('memory-preview-recovery-'.length);
+  const suffix = path.basename(output).slice('codifix-preview-recovery-'.length);
   const reports = [];
   for (const label of ['workshop', 'homelab', 'gateway']) reports.push(await restoreDatabase(c, output, label, suffix, resume));
   const result = { schema_version: 1, archive_sha256: expectedSha, completed_at: new Date().toISOString(), databases: reports.map(report => ({ label: report.label,
@@ -203,7 +203,7 @@ export async function operationalProof(file, receiptPath, output, expectedSha) {
   const recovery = (await privateInput(path.join(output, 'database-recovery.json'), 4 * 1024 * 1024, true)).value;
   check(extraction.archive_sha256 === expectedSha && recovery.archive_sha256 === expectedSha, 'recovery_binding_mismatch');
   for (const entry of extraction.files) check(await fileHash(path.join(output, 'extracted', entry.name)) === entry.sha256, 'extracted_artifact_changed');
-  const root = path.join(output, 'extracted', 'memory-company-20260919');
+  const root = path.join(output, 'extracted', 'codifix-company-20260919');
   const gateway = JSON.parse(await fs.readFile(path.join(root, 'gateway/gateway.json'), 'utf8'));
   const snapshot = {};
   for (const db of recovery.databases) {
@@ -241,7 +241,7 @@ export async function operationalProof(file, receiptPath, output, expectedSha) {
       receipt_keys_match: true, unsettled_model_attempts: 0, retained_answers: actual.answers.length,
       retained_answer_hashes: actual.answers.map(answer => ({ request_id: answer.request_id, sha256: answer.answer_sha256 })) });
   }
-  const sqliteEntries = extraction.files.filter(entry => /^memory-company-20260919\/pds\/data\/.+\.sqlite$/u.test(entry.name));
+  const sqliteEntries = extraction.files.filter(entry => /^codifix-company-20260919\/pds\/data\/.+\.sqlite$/u.test(entry.name));
   check(sqliteEntries.length >= 4, 'pds_sqlite_backup_incomplete');
   for (const entry of sqliteEntries) {
     const uri = `file:${path.join(output, 'extracted', entry.name)}?mode=ro&immutable=1`;
@@ -249,7 +249,7 @@ export async function operationalProof(file, receiptPath, output, expectedSha) {
   }
   const actorEntries = sqliteEntries.filter(entry => entry.name.includes('/actors/') && entry.name.endsWith('/store.sqlite'));
   check(actorEntries.length === 1, 'single_reviewed_actor_required');
-  const actorPath = path.posix.dirname(actorEntries[0].name.slice('memory-company-20260919/pds/data/'.length));
+  const actorPath = path.posix.dirname(actorEntries[0].name.slice('codifix-company-20260919/pds/data/'.length));
   const enrolled = JSON.parse(await fs.readFile(path.join(root, 'pds/inputs/config.json'), 'utf8'));
   const journal = JSON.parse(await fs.readFile(path.join(root, 'pds/state/journal.json'), 'utf8'));
   check(gateway.repository === enrolled.repository && gateway.signing_key === journal.signing_key, 'pds_gateway_enrollment_mismatch');

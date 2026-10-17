@@ -1,7 +1,7 @@
 # Native Windows onboarding coordinator
 
 `onboard.ps1` supplies explicit native stages for **already provisioned** local
-databases, user configuration, Memory services and curated sync profiles. It
+databases, user configuration, Codifix services and curated sync profiles. It
 does not install dependencies, generate profiles, provision services or complete
 the first-run installer. It is not macOS/Windows acceptance evidence.
 
@@ -14,7 +14,7 @@ repository data. Existing protected-release guards retain reviewed identities.
 
 ## Stages
 
-Every invocation requires exact `-Memory`, `-MemorySha256`, `-ReleaseRoot`,
+Every invocation requires exact `-Codifix`, `-CodifixSha256`, `-ReleaseRoot`,
 `-Config`, `-ConfigSha256` and canonical HTTPS `-Company` inputs. First omit
 `-Execute` to print a metadata-only plan and `review_sha256`. Repeat with
 `-Execute -ApprovalSha256 <that exact digest>` to perform that stage.

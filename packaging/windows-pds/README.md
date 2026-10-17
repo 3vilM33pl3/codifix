@@ -11,7 +11,7 @@ Add an operator-owned field to the gateway JSON configuration:
 {
   "pds": "https://pds.company.example",
   "pds_named_pipe": {
-    "name": "\\\\.\\pipe\\memory-pds-company",
+    "name": "\\\\.\\pipe\\codifix-pds-company",
     "server_sid": "S-1-5-21-100-200-300-1001",
     "client_sid": "S-1-5-21-100-200-300-1002"
   }
@@ -42,7 +42,7 @@ Unknown access-control ACE forms and broad principals are rejected. It disables
 impersonation beyond identification, rejects remote/ambiguous pipe paths, bounds
 the entire exchange to 20 seconds and caps bodies at the signed-CAR limit.
 
-`memory-pds-pipe.exe` supplies the native listener. It creates the protected ACL
+`codifix-pds-pipe.exe` supplies the native listener. It creates the protected ACL
 before the first connection, grants the gateway data-write rather than
 pipe-instance-creation rights, and launches Node using private length-framed
 stdin/stdout. It never opens a PDS TCP listener. Requests execute serially, with
@@ -55,13 +55,13 @@ an in-memory duplex connection. It does not call `PDS.start()` or `listen()`.
 This matches the inspected initialization preceding the pinned upstream listen;
 the same 90-second keep-alive setting is applied and `pds.destroy()` runs on EOF.
 
-Supply a private operator JSON file to `memory-pds-pipe.exe`:
+Supply a private operator JSON file to `codifix-pds-pipe.exe`:
 
 ```json
 {
   "schema_version": 1,
   "pipe": {
-    "name": "\\\\.\\pipe\\memory-pds-company",
+    "name": "\\\\.\\pipe\\codifix-pds-company",
     "server_sid": "S-1-5-21-100-200-300-1001",
     "client_sid": "S-1-5-21-100-200-300-1002"
   },
@@ -97,10 +97,10 @@ and hashes separately rather than downloading an unpinned latest package.
 Observed on the Linux host for this transport slice:
 
 ```sh
-cargo test --locked -p mem-federation-runtime --lib
-cargo test --locked -p mem-federation-runtime --test http_contract
-cargo check --locked -p mem-federation-runtime --tests --target x86_64-pc-windows-gnu
-cargo clippy --locked -p mem-federation-runtime --lib --bins --target x86_64-pc-windows-gnu -- -D warnings
+cargo test --locked -p codifix-federation-runtime --lib
+cargo test --locked -p codifix-federation-runtime --test http_contract
+cargo check --locked -p codifix-federation-runtime --tests --target x86_64-pc-windows-gnu
+cargo clippy --locked -p codifix-federation-runtime --lib --bins --target x86_64-pc-windows-gnu -- -D warnings
 ```
 
 The first two passed 37 and 7 tests respectively. Cross-check and library/binary
@@ -111,7 +111,7 @@ from cross-compilation.
 Run these in the Windows VM to exercise the actual Windows pipe/ACL APIs:
 
 ```powershell
-cargo test --locked -p mem-federation-runtime --lib pds_pipe::native::tests
+cargo test --locked -p codifix-federation-runtime --lib pds_pipe::native::tests
 ```
 
 The native tests create isolated random-name pipes, preserve non-UTF-8 binary
