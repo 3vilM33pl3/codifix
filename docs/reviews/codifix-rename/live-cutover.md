@@ -29,11 +29,19 @@ returned 401. The runtime retirement-marker privilege fix is committed as
 privilege check accepted marker SELECT and rejected marker UPDATE and unrelated
 project-table SELECT. Private evidence: `gateway-live-evidence.md`.
 
+Ordinary renewal of four existing service leaves under the unchanged preview
+issuer restored PDS session refresh. Twelve fresh membership records are
+published and signature-verified. Workshop, Homelab and General are reconnected,
+each at cursor 12 with zero sync failures; original retired cursor 23 and local
+permissions remain preserved. There were zero source subscriptions before and
+after, and no knowledge was republished. Evidence: `nonca-reconnected-smoke.json`.
+
 ## Remaining work
 
-- Complete fresh non-CA federation enrolment after expired PDS/operator TLS
-  leaves and the rotating PDS session are renewed. Gateway is already running.
-  No CA change or Trust re-enrolment has been performed.
+- Renew the local preview issuer certificate before its 19 October 2026
+  11:28:57 UTC expiry, subject to the pending explicit approval. The prepared
+  scope preserves its key/identity and existing trust permissions. The separate
+  ca.metatao.net host and Trust enrolment remain untouched.
 - Install the native Mac candidate when its build artifact becomes available;
   finish native client wiring and publish the release packages.
 - Refresh running client sessions. Codifix desktop plugin is installed/enabled;
@@ -60,8 +68,12 @@ approval before deletion. These retained objects do not run the old application.
 
 The current area binary SHA-256 is
 `94e50052aed58b3d5e227f2cafb801805a19114b81e95347e14c479166d3f8c3`.
-The website production source is `79186b2f494c9ca92de5c42dc79dd86fbe20bbd7`.
+Website behavior was verified at source `79186b2f494c9ca92de5c42dc79dd86fbe20bbd7`.
 Source validation, Linux candidate builds and both Linux installation acceptance
 jobs passed. Mac/Windows builds continue separately. Candidate run 39068603586
 predates the gateway fix; final public packages must include it. These builds
 do not gate the running Monolith applications.
+
+Corrected unpublished candidate run `39073102523` is queued at source
+`66c2d1ecc4ca9b0c052e1d854f71a0703f998b71`, including the gateway fix. No public
+release or tag has been published.
