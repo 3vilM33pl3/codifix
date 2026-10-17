@@ -85,7 +85,9 @@ try {
     }
     $program=$cargo
     $arguments=if ($Scope -eq 'Service') { @('test','--locked','-p','mem-service','--lib','--','--test-threads=1') }
-        elseif ($Scope -eq 'Workspace') { @('test','--workspace','--all-targets','--locked','--','--test-threads=1') }
+        # Gather every failing test binary in one consolidated pass instead of
+        # repeatedly stopping at the first crate and rebuilding to find the next.
+        elseif ($Scope -eq 'Workspace') { @('test','--workspace','--all-targets','--locked','--no-fail-fast','--','--test-threads=1') }
         elseif ($Scope -eq 'Supervisor') { @('test','--locked','-p','mem-supervisor-runtime','--lib',
             'transport::tests::broker::launcher_windows::native_production_launcher_delivers_revokes_accounts_and_recovers','--','--ignored','--exact','--test-threads=1','--nocapture') }
         elseif ($Scope -eq 'Fleet') {
