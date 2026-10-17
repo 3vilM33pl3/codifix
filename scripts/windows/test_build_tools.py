@@ -7,6 +7,18 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_native_onboarding_task_proof_never_runs_a_sync_or_adopts_a_task(self):
+        script=(Path(__file__).parent/'guest-onboarding-task.ps1').read_text()
+        for required in ['Get-OnboardingPlan -Stage EnableSync', 'Assert-OnboardingTask',
+                         '-LogonType Interactive -RunLevel Limited', 'Get-OnboardingTaskPolicy',
+                         'Foreign task exists; no adoption', 'Unregister-ScheduledTask',
+                         'task_started=$false', 'onboarding_verified=$false',
+                         '$current.Actions[0].Arguments -cne $arguments']:
+            self.assertIn(required,script)
+        self.assertNotIn('Start-ScheduledTask',script)
+        self.assertNotIn('Start-Service',script)
+        self.assertNotIn('Invoke-Expression',script)
+
     def test_lab_ancestor_is_private_without_recursive_or_host_permission_changes(self):
         root = Path(__file__).parent
         for name in ['guest-bootstrap.ps1','guest-protect-lab.ps1']:
