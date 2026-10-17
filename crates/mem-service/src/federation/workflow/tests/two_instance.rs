@@ -356,7 +356,7 @@ async fn e_two_instance_http_workflow() {
         .map(|path| {
             let f: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
             PdsPublisher::new(
-                Endpoint::new(f["base"].as_str().unwrap(), true).unwrap(),
+                fixture_pds_endpoint(&f),
                 f["repository"].as_str().unwrap().into(),
                 f["token"].as_str().unwrap().into(),
                 f["signing_key"].as_str().unwrap().into(),

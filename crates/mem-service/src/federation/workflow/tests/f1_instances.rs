@@ -265,7 +265,7 @@ async fn watched_agents_four_area_signed_pds_rehearsal() {
         url,
     };
     let pds = mem_federation_runtime::PdsPublisher::new(
-        Endpoint::new(fixture["base"].as_str().unwrap(), true).unwrap(),
+        fixture_pds_endpoint(&fixture),
         fixture["repository"].as_str().unwrap().into(),
         fixture["token"].as_str().unwrap().into(),
         fixture["signing_key"].as_str().unwrap().into(),
@@ -470,7 +470,7 @@ async fn f1_independent_instances_answer_and_enroll_game() {
         .map(|path| {
             let f: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
             mem_federation_runtime::PdsPublisher::new(
-                Endpoint::new(f["base"].as_str().unwrap(), true).unwrap(),
+                fixture_pds_endpoint(&f),
                 f["repository"].as_str().unwrap().into(),
                 f["token"].as_str().unwrap().into(),
                 f["signing_key"].as_str().unwrap().into(),

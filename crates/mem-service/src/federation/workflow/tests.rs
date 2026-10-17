@@ -21,6 +21,23 @@ mod status_health;
 mod synchronization;
 mod two_instance;
 
+/// Private test provisioning may select the actual Windows pipe transport.
+/// Never silently turn a pipe fixture into a TCP request on another platform.
+fn fixture_pds_endpoint(fixture: &Value) -> Endpoint {
+    if let Some(pipe) = fixture.get("pds_named_pipe") {
+        #[cfg(windows)]
+        {
+            return Endpoint::new(fixture["base"].as_str().unwrap(), false)
+                .unwrap()
+                .with_pds_named_pipe(serde_json::from_value(pipe.clone()).unwrap())
+                .unwrap();
+        }
+        #[cfg(not(windows))]
+        panic!("native PDS pipe fixture requires Windows: {pipe}");
+    }
+    Endpoint::new(fixture["base"].as_str().unwrap(), true).unwrap()
+}
+
 struct Fixture {
     process: Option<two_instance::ServiceProcess>,
     state: AppState,
