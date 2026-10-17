@@ -46,15 +46,16 @@ use windows_sys::Win32::{
     System::{
         Com::CoTaskMemFree,
         JobObjects::{
-            AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_CPU_RATE_CONTROL_ENABLE,
-            JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP, JOB_OBJECT_LIMIT_ACTIVE_PROCESS,
-            JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION, JOB_OBJECT_LIMIT_JOB_MEMORY,
-            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_PROCESS_MEMORY,
-            JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_CPU_RATE_CONTROL_INFORMATION,
-            JOBOBJECT_CPU_RATE_CONTROL_INFORMATION_0, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-            JobObjectBasicAccountingInformation, JobObjectBasicProcessIdList,
-            JobObjectCpuRateControlInformation, JobObjectExtendedLimitInformation,
-            QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
+            AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob,
+            JOB_OBJECT_CPU_RATE_CONTROL_ENABLE, JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP,
+            JOB_OBJECT_LIMIT_ACTIVE_PROCESS, JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION,
+            JOB_OBJECT_LIMIT_JOB_MEMORY, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            JOB_OBJECT_LIMIT_PROCESS_MEMORY, JOBOBJECT_BASIC_ACCOUNTING_INFORMATION,
+            JOBOBJECT_CPU_RATE_CONTROL_INFORMATION, JOBOBJECT_CPU_RATE_CONTROL_INFORMATION_0,
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectBasicAccountingInformation,
+            JobObjectBasicProcessIdList, JobObjectCpuRateControlInformation,
+            JobObjectExtendedLimitInformation, QueryInformationJobObject, SetInformationJobObject,
+            TerminateJobObject,
         },
         Pipes::{CreatePipe, GetNamedPipeInfo},
         SystemInformation::GetWindowsDirectoryW,
@@ -1123,6 +1124,74 @@ pub enum InheritedSpawnPhase {
 pub struct InheritedSpawnDiagnostic {
     pub phase: InheritedSpawnPhase,
     pub raw_os_error: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub job: Option<InheritedJobObservation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InheritedJobAssertion {
+    Count,
+    Membership,
+}
+
+/// Advisory metadata only: no process identifiers or handles are disclosed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InheritedJobObservation {
+    pub assertion: InheritedJobAssertion,
+    pub assigned: u32,
+    pub returned: u32,
+    pub driver_present: bool,
+    pub child_present: bool,
+    pub driver_in_any_job: Option<bool>,
+    pub child_in_any_job: Option<bool>,
+    pub current_job_process_limit: Option<u32>,
+}
+
+#[derive(Debug)]
+struct InheritedJobMismatch(InheritedJobObservation);
+impl std::fmt::Display for InheritedJobMismatch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("Pi did not inherit admitted driver job")
+    }
+}
+impl std::error::Error for InheritedJobMismatch {}
+
+#[repr(C)]
+#[derive(Default)]
+struct JobProcessIds {
+    assigned: u32,
+    returned: u32,
+    ids: [usize; 7],
+}
+
+fn job_mismatch(ids: &JobProcessIds, driver: u32, child: u32) -> Option<InheritedJobObservation> {
+    let present = &ids.ids[..(ids.returned as usize).min(ids.ids.len())];
+    let driver_present = present.contains(&(driver as usize));
+    let child_present = present.contains(&(child as usize));
+    let assertion = if ids.assigned != 2 || ids.returned != 2 {
+        InheritedJobAssertion::Count
+    } else if !driver_present || !child_present || driver == child {
+        InheritedJobAssertion::Membership
+    } else {
+        return None;
+    };
+    Some(InheritedJobObservation {
+        assertion,
+        assigned: ids.assigned,
+        returned: ids.returned,
+        driver_present,
+        child_present,
+        driver_in_any_job: None,
+        child_in_any_job: None,
+        current_job_process_limit: None,
+    })
+}
+
+fn process_in_any_job(process: *mut c_void) -> Option<bool> {
+    let mut present = 0;
+    (unsafe { IsProcessInJob(process, null_mut(), &mut present) } != 0).then_some(present != 0)
 }
 
 pub fn inherited_spawn_diagnostic(error: &anyhow::Error) -> InheritedSpawnDiagnostic {
@@ -1181,6 +1250,11 @@ pub fn inherited_spawn_diagnostic(error: &anyhow::Error) -> InheritedSpawnDiagno
     InheritedSpawnDiagnostic {
         phase,
         raw_os_error,
+        job: error.chain().find_map(|cause| {
+            cause
+                .downcast_ref::<InheritedJobMismatch>()
+                .map(|error| error.0)
+        }),
     }
 }
 
@@ -1394,30 +1468,40 @@ pub fn spawn_inherited(
     verify_token(&child.process, app_sid)?;
     // NULL denotes the driver's current inner job. Its exact process list must
     // contain both driver and the newly created Pi; an unrelated job is not enough.
-    let mut ids = [0usize; 8];
+    let mut ids = JobProcessIds::default();
     ok(
         unsafe {
             QueryInformationJobObject(
                 null_mut(),
                 JobObjectBasicProcessIdList,
-                ids.as_mut_ptr().cast(),
+                (&mut ids as *mut JobProcessIds).cast(),
                 size_of_val(&ids) as u32,
                 null_mut(),
             )
         },
         "verify inherited Pi job",
     )?;
-    let header = ids.as_ptr().cast::<u32>();
-    let count = unsafe { *header.add(1) } as usize;
-    ensure!(count <= 2, "unexpected inherited job process count");
-    let process_ids = unsafe {
-        std::slice::from_raw_parts((ids.as_ptr().cast::<u8>()).add(8).cast::<usize>(), count)
-    };
-    ensure!(
-        process_ids.contains(&(info.dwProcessId as usize))
-            && process_ids.contains(&(unsafe { GetCurrentProcessId() } as usize)),
-        "Pi did not inherit admitted driver job"
-    );
+    if let Some(mut observation) =
+        job_mismatch(&ids, unsafe { GetCurrentProcessId() }, info.dwProcessId)
+    {
+        observation.driver_in_any_job = process_in_any_job(unsafe { GetCurrentProcess() });
+        observation.child_in_any_job = process_in_any_job(child.process.as_raw_handle());
+        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        if unsafe {
+            QueryInformationJobObject(
+                null_mut(),
+                JobObjectExtendedLimitInformation,
+                (&mut limits as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                size_of_val(&limits) as u32,
+                null_mut(),
+            )
+        } != 0
+        {
+            observation.current_job_process_limit =
+                Some(limits.BasicLimitInformation.ActiveProcessLimit);
+        }
+        return Err(InheritedJobMismatch(observation).into());
+    }
     ensure!(
         unsafe { ResumeThread(thread.as_raw_handle()) } == 1,
         "could not resume admitted Pi"
@@ -1452,6 +1536,43 @@ mod tests {
                 serde_json::json!({"phase":"pipe_creation","raw_os_error":5,"stderr":"private"})
             )
             .is_err()
+        );
+    }
+    #[test]
+    fn inherited_job_process_list_layout_and_rejection_metadata() {
+        assert_eq!(std::mem::offset_of!(JobProcessIds, ids), 8);
+        assert_eq!(size_of::<JobProcessIds>(), 8 + 7 * size_of::<usize>());
+        let mut ids = JobProcessIds {
+            assigned: 2,
+            returned: 2,
+            ids: [111, 222, 0, 0, 0, 0, 0],
+        };
+        assert!(job_mismatch(&ids, 111, 222).is_none());
+        let missing = job_mismatch(&ids, 111, 333).expect("foreign child rejected");
+        assert_eq!(missing.assertion, InheritedJobAssertion::Membership);
+        assert!(missing.driver_present);
+        assert!(!missing.child_present);
+        let diagnostic =
+            inherited_spawn_diagnostic(&anyhow::Error::new(InheritedJobMismatch(missing)));
+        assert_eq!(diagnostic.phase, InheritedSpawnPhase::JobVerification);
+        let serialized = serde_json::to_string(&diagnostic).expect("safe metadata");
+        assert!(!serialized.contains("111"));
+        assert!(!serialized.contains("222"));
+        assert!(!serialized.contains("333"));
+        assert_eq!(diagnostic.job, Some(missing));
+        ids.assigned = 3;
+        assert_eq!(
+            job_mismatch(&ids, 111, 222)
+                .expect("extra process")
+                .assertion,
+            InheritedJobAssertion::Count
+        );
+        ids.returned = u32::MAX;
+        assert_eq!(
+            job_mismatch(&ids, 111, 222)
+                .expect("oversized returned count")
+                .assertion,
+            InheritedJobAssertion::Count
         );
     }
     use std::io::Write;
