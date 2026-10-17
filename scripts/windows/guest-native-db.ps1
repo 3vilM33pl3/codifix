@@ -48,7 +48,14 @@ try {
     $env:MEMORY_LAYER_TEST_REQUIRE_DB='1'
     $env:CARGO_TARGET_DIR='C:\MemoryLab\build\product-msvc'
     $env:CARGO_BUILD_TARGET='x86_64-pc-windows-msvc'; $env:CARGO_BUILD_JOBS='2'
-    $env:PATH=(Split-Path -Parent $cargo)+';'+$env:PATH
+    # Portable Git is a pinned lab prerequisite, not a machine-wide install.
+    # Repository/watcher tests must exercise it rather than fail before launch.
+    if(-not(Test-Path -LiteralPath $git)){throw 'Prepared native Git required'}
+    $gitVersion=(& $git --version)
+    if($LASTEXITCODE -or $gitVersion -cnotmatch '^git version [0-9.]+\.windows\.[0-9]+$'){throw 'Native Git prerequisite unavailable'}
+    $receipt.git_version=$gitVersion
+    $receipt.git_sha256=(Get-FileHash -LiteralPath $git).Hash.ToLowerInvariant()
+    $env:PATH=(Split-Path -Parent $cargo)+';'+(Split-Path -Parent $git)+';'+$env:PATH
     if ($Scope -eq 'Supervisor') {
         # This is an explicitly diagnostic, synthetic rehearsal, never the
         # production artifact/package. Default driver builds remain silent.
