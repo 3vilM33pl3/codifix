@@ -15,7 +15,10 @@ function completeFixture(dir, commit = 'a'.repeat(40)) {
   for (const name of files) writeFileSync(path.join(dir, name), name);
   writeFileSync(path.join(dir, `${win}.manifest.json`), JSON.stringify({ application_version: version, source_commit: commit, native_stack_bundled: false, artifacts }));
   for (const name of ['build-amd64.json', 'build-arm64.json', ...['x86_64', 'aarch64'].map(arch => `memory-layer-${version}-macos-${arch}-build.json`)]) {
-    writeFileSync(path.join(dir, name), JSON.stringify({ application_version: version, source_commit: commit }));
+    const arch = name.match(/^build-(amd64|arm64)\.json$/)?.[1];
+    const selected = arch ? [`memory-layer_${version}_${arch}.deb`] : files.filter(file => file.startsWith(name.replace('-build.json', '')) && file.endsWith('.pkg'));
+    const digests = Object.fromEntries(selected.map(file => [file, createHash('sha256').update(readFileSync(path.join(dir, file))).digest('hex')]));
+    writeFileSync(path.join(dir, name), JSON.stringify({ application_version: version, source_commit: commit, architecture: arch, artifacts: digests }));
   }
 }
 
@@ -47,6 +50,15 @@ test('a changed platform source commit blocks publication', () => {
   try {
     completeFixture(dir);
     writeFileSync(path.join(dir, 'build-arm64.json'), JSON.stringify({ application_version: '2.1.0', source_commit: 'b'.repeat(40) }));
+    assert.throws(() => prepareAssets(dir, '2.1.0', 'a'.repeat(40)), /build-arm64.json/);
+  } finally { rmSync(dir, { recursive: true }); }
+});
+
+test('package substitution cannot reuse a valid build receipt', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'memory-release-assets-'));
+  try {
+    completeFixture(dir);
+    writeFileSync(path.join(dir, 'memory-layer_2.1.0_arm64.deb'), 'stale or changed package');
     assert.throws(() => prepareAssets(dir, '2.1.0', 'a'.repeat(40)), /build-arm64.json/);
   } finally { rmSync(dir, { recursive: true }); }
 });

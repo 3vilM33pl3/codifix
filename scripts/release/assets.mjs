@@ -47,6 +47,16 @@ export function prepareAssets(directory, version, commit) {
     const build = JSON.parse(readFileSync(path.join(root, name), 'utf8'));
     assert.equal(build.source_commit, commit, name);
     assert.equal(build.application_version ?? build.version, version, name);
+    const linuxArch = name.match(/^build-(amd64|arm64)\.json$/)?.[1];
+    if (linuxArch) assert.equal(build.architecture, linuxArch, name);
+    assert(build.artifacts && !Array.isArray(build.artifacts), `missing artifact digests: ${name}`);
+    const packages = linuxArch ? [`memory-layer_${version}_${linuxArch}.deb`] : required.filter(file => file.startsWith(name.replace('-build.json', '')) && file.endsWith('.pkg'));
+    for (const file of packages) assert.equal(build.artifacts[file], hash(file), `${name}: ${file}`);
+    for (const [file, digest] of Object.entries(build.artifacts)) {
+      assert.equal(path.basename(file), file, 'unsafe build artifact name');
+      assert(names.has(file), `build artifact missing: ${file}`);
+      assert.equal(hash(file), digest, `${name}: ${file}`);
+    }
   }
   const payloads = [...names].filter(name => !name.endsWith('.sha256') && !name.startsWith('SHA256SUMS')).sort();
   const artifacts = payloads.map(name => ({ name, size_bytes: lstatSync(path.join(root, name)).size, sha256: hash(name) }));
