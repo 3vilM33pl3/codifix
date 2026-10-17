@@ -173,7 +173,7 @@ try {
     results.push({ filter, passed: true });
   }
   assert.equal(expired, false, 'fleet deadline invalidates operation');
-  await fs.writeFile(path.join(root, 'result.json'), JSON.stringify({ format: 'memory-native-pds-fleet-proof-v1', state: 'succeeded',
+  await fs.writeFile(path.join(root, 'fleet-proof.json'), JSON.stringify({ format: 'memory-native-pds-fleet-proof-v1', state: 'succeeded',
     results, native_pds_pipe: true, byod_provisioned: true, plc_used: false, ssrf_disabled: false,
     real_provider_requests: 0, c_workflow_verified: false, cross_os_verified: false,
     installed_services_verified: false, signing_key: signingKey, repository: did, broker_sha256: await digest(binary) }), { flag: 'wx' });
