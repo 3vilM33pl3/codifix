@@ -193,10 +193,8 @@ pub(super) async fn app(
     });
     *state.federation.write().unwrap() = Some(runtime.clone());
     let (tasks, process) = if std::env::var("MEMORY_FEDERATION_E_CLIENTS").as_deref() == Ok("1") {
-        use std::os::unix::fs::PermissionsExt;
         let directory = std::env::temp_dir().join(format!("memory-e-service-{}", Uuid::new_v4()));
-        std::fs::create_dir(&directory).unwrap();
-        std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
+        crate::test_private_files::directory(&directory);
         let config_path = directory.join("config.toml");
         let runtime_path = directory.join("federation.json");
         let token_path = directory.join("gateway-token");
@@ -214,23 +212,27 @@ pub(super) async fn app(
         let config = format!(
             "{config}[auth.oidc]\nissuer_url=\"http://127.0.0.1:9/disposable-issuer\"\nclient_id=\"disposable-e-fixture\"\n"
         );
-        std::fs::write(&config_path, config).unwrap();
-        std::fs::write(&token_path, token).unwrap();
-        std::fs::write(&runtime_path,serde_json::to_vec(&json!({"role":"instance","space":n.space,"authority":n.authority,"instance":instance,"project":project,"principal":writer_id,"gateway":n.url,"token_file":token_path,"receipt_keys":n.security.trust().keys(),"disposable_test_mode":true})).unwrap()).unwrap();
-        for path in [&config_path, &token_path, &runtime_path] {
-            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
-        }
-        let child = std::process::Command::new(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../target/debug/memory"
-        ))
-        .args(["--config", config_path.to_str().unwrap(), "service", "run"])
-        .env("MEMORY_LAYER_PROFILE", "prod")
-        .env("MEMORY_LAYER_FEDERATION_CONFIG", runtime_path)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .unwrap();
+        crate::test_private_files::write(&config_path, config.as_bytes());
+        crate::test_private_files::write(&token_path, token.as_bytes());
+        crate::test_private_files::write(&runtime_path,&serde_json::to_vec(&json!({"role":"instance","space":n.space,"authority":n.authority,"instance":instance,"project":project,"principal":writer_id,"gateway":n.url,"token_file":token_path,"receipt_keys":n.security.trust().keys(),"disposable_test_mode":true})).unwrap());
+        // The integration binary is in <profile>/deps; honor CARGO_TARGET_DIR,
+        // release profiles and the native executable suffix rather than a
+        // hard-coded source-checkout target/debug path.
+        let executable = std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join(format!("memory{}", std::env::consts::EXE_SUFFIX));
+        let child = std::process::Command::new(executable)
+            .args(["--config", config_path.to_str().unwrap(), "service", "run"])
+            .env("MEMORY_LAYER_PROFILE", "prod")
+            .env("MEMORY_LAYER_FEDERATION_CONFIG", runtime_path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
         let process = ServiceProcess { child, directory };
         let client = reqwest::Client::new();
         let mut ready = false;

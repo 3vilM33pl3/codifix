@@ -15,10 +15,7 @@ use mem_test_support::IsolatedDatabase;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::ConnectOptions;
-use std::{
-    os::unix::fs::PermissionsExt,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 mod question_tests;
 
@@ -155,9 +152,8 @@ impl Fixture {
             )
             .await
             .unwrap();
-        use std::os::unix::fs::DirBuilderExt;
         let dir = std::env::temp_dir().join(format!("supervisor-profile-{}", Uuid::new_v4()));
-        std::fs::DirBuilder::new().mode(0o700).create(&dir).unwrap();
+        crate::test_private_files::directory(&dir);
         let file = dir.join("profile.json");
         let manifest = WorkManifest {
             schema_version: 1,
@@ -175,20 +171,7 @@ impl Fixture {
             },
         };
         let bytes = serde_json::to_vec(&manifest).unwrap();
-        use std::io::Write;
-        use std::os::unix::fs::OpenOptionsExt;
-        std::fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .mode(0o600)
-            .open(&file)
-            .unwrap()
-            .write_all(&bytes)
-            .unwrap();
-        assert_eq!(
-            std::fs::metadata(&file).unwrap().permissions().mode() & 0o777,
-            0o600
-        );
+        crate::test_private_files::write(&file, &bytes);
         state.config.supervisor.as_mut().unwrap().interaction =
             Some(mem_config::SupervisorModelWorkConfig {
                 manifest: file.clone(),

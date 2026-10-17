@@ -51,4 +51,6 @@ pub(crate) use runtime_status::*;
 pub(crate) use state::*;
 
 #[cfg(test)]
+mod test_private_files;
+#[cfg(test)]
 mod tests;
