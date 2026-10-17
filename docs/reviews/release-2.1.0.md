@@ -159,7 +159,7 @@ both resolve the same updated formula. Both pass Ruby syntax checks and a
 stubbed, non-installing metadata-load assertion. No `brew install`, live service
 restart or existing installation upgrade was performed.
 
-The published [release instructions](../../releases/2.1.0.md) retain package
+The published [release instructions](../releases/2.1.0.md) retain package
 prerequisites, migration/recovery guidance, unsigned/notarization status, the RSA
 limitation and Windows-preview/unbundled-stack boundaries. Full Windows parity,
 clean-PC runtime acceptance, paid R3 evaluation and live upgrades remain separate.
