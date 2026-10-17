@@ -1,0 +1,19 @@
+# SQLx migration checksums and pinned source/fixture hashes must not change
+# when Windows Git enables core.autocrlf. This changes checkout policy only;
+# applied migrations and their committed bytes remain untouched.
+* text=auto eol=lf
+
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.gif -text
+*.ico -text
+*.woff -text
+*.woff2 -text
+*.zip -text
+*.gz -text
+*.tar -text
+*.exe -text
+*.dll -text
+*.msi -text
+*.pdf -text
