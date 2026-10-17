@@ -144,14 +144,14 @@ pub(super) fn bundle(bytes: &[u8]) -> Result<Bundle> {
         };
         let selected = &parts[offset + 2..];
         if selected.is_empty()
-            || !codifix_skills::MEMORY_SKILL_NAMES
+            || !codifix_skills::CODIFIX_SKILL_NAMES
                 .iter()
                 .any(|name| name.eq_ignore_ascii_case(selected[0]))
         {
             continue;
         }
         if parts[offset..offset + 2] != [".agents", "skills"]
-            || !codifix_skills::MEMORY_SKILL_NAMES.contains(&selected[0])
+            || !codifix_skills::CODIFIX_SKILL_NAMES.contains(&selected[0])
         {
             bail!("archive skill root has a case alias");
         }
@@ -199,7 +199,7 @@ pub(super) fn bundle(bytes: &[u8]) -> Result<Bundle> {
             bail!("duplicate skill archive entry");
         }
     }
-    for name in codifix_skills::MEMORY_SKILL_NAMES {
+    for name in codifix_skills::CODIFIX_SKILL_NAMES {
         if !files
             .get(*name)
             .is_some_and(|files| files.contains_key("SKILL.md"))

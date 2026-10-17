@@ -1,14 +1,14 @@
 {
-  "name": "memory-layer",
+  "name": "codifix",
   "interface": {
-    "displayName": "Memory Layer"
+    "displayName": "Codifix"
   },
   "plugins": [
     {
-      "name": "memory-layer",
+      "name": "codifix",
       "source": {
         "source": "local",
-        "path": "./plugins/memory-layer"
+        "path": "./plugins/codifix"
       },
       "policy": {
         "installation": "AVAILABLE",

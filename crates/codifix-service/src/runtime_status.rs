@@ -183,7 +183,7 @@ pub(crate) const GLOBAL_TUI_RESTART_MARKER: &str =
 pub(crate) const GLOBAL_TUI_RESTART_MARKER: &str =
     "/usr/local/var/memory-layer/tui-restart-required.json";
 
-pub(crate) const MEMORY_SKILL_NAMES: &[&str] = &[
+pub(crate) const CODIFIX_SKILL_NAMES: &[&str] = &[
     "memory-direct-task-start",
     "memory-github-init",
     "memory-layer",
@@ -219,7 +219,7 @@ impl RuntimeSkillFilter {
     fn skills(self) -> &'static [&'static str] {
         match self {
             Self::MemoryLayer => DEFAULT_RUNTIME_SKILL_FILTER,
-            Self::All => MEMORY_SKILL_NAMES,
+            Self::All => CODIFIX_SKILL_NAMES,
         }
     }
 }
@@ -485,7 +485,7 @@ pub(crate) fn required_repo_root(value: Option<&str>) -> Result<PathBuf, ApiErro
 }
 
 pub(crate) fn validate_known_skill_name(skill_name: &str) -> Result<(), ApiError> {
-    if codifix_skills::MEMORY_SKILL_NAMES.contains(&skill_name) {
+    if codifix_skills::CODIFIX_SKILL_NAMES.contains(&skill_name) {
         return Ok(());
     }
     Err(ApiError::validation(ValidationError::new(format!(

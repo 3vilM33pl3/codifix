@@ -18,19 +18,19 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use zip::ZipArchive;
 
-pub const MEMORY_SKILL_NAMES: &[&str] = &[
-    "memory-layer",
-    "memory-project-init",
-    "memory-github-init",
-    "memory-review-proposals",
-    "memory-query-resume",
-    "memory-plan-execution",
-    "memory-direct-task-start",
-    "memory-remember",
+pub const CODIFIX_SKILL_NAMES: &[&str] = &[
+    "codifix",
+    "codifix-project-init",
+    "codifix-github-init",
+    "codifix-review-proposals",
+    "codifix-query-resume",
+    "codifix-plan-execution",
+    "codifix-direct-task-start",
+    "codifix-remember",
 ];
 
 const GITHUB_SKILL_TEMPLATE_ARCHIVE_URL: &str =
-    "https://github.com/3vilM33pl3/memory/archive/refs/heads/main.zip";
+    "https://github.com/3vilM33pl3/codifix/archive/refs/heads/main.zip";
 const GITHUB_SKILL_TEMPLATE_TIMEOUT: Duration = Duration::from_secs(10);
 const GITHUB_ARCHIVE_ENV: &str = "CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL";
 
@@ -137,7 +137,7 @@ pub enum SkillUpgradeAction {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SkillInventoryFilter {
-    MemoryLayer,
+    Codifix,
     All,
 }
 
@@ -145,21 +145,21 @@ impl SkillInventoryFilter {
     pub fn from_query(value: Option<&str>) -> Self {
         match value.map(str::trim).filter(|value| !value.is_empty()) {
             Some("all") => Self::All,
-            _ => Self::MemoryLayer,
+            _ => Self::Codifix,
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::MemoryLayer => "memory-layer",
+            Self::Codifix => "codifix",
             Self::All => "all",
         }
     }
 
     pub fn skills(self) -> &'static [&'static str] {
         match self {
-            Self::MemoryLayer => &["memory-layer"],
-            Self::All => MEMORY_SKILL_NAMES,
+            Self::Codifix => &["codifix"],
+            Self::All => CODIFIX_SKILL_NAMES,
         }
     }
 }
@@ -213,7 +213,7 @@ pub struct SkillContentResponse {
 }
 
 pub fn missing_memory_skill_dirs<'a>(skill_root: &'a Path) -> impl Iterator<Item = PathBuf> + 'a {
-    MEMORY_SKILL_NAMES
+    CODIFIX_SKILL_NAMES
         .iter()
         .map(|name| skill_root.join(name))
         .filter(|path| !path.is_dir())
@@ -488,9 +488,9 @@ fn add_external_skill(
         .as_deref()
         .and_then(|path| read_skill_version(path).ok().flatten());
     let detail = if source_kind == SkillSourceKind::RepoMemory {
-        Some("Repo-local Memory skill is managed by Memory Layer repair.".to_string())
+        Some("Repo-local Memory skill is managed by Codifix repair.".to_string())
     } else {
-        Some("Skill is visible here but is not mutated by Memory Layer repair.".to_string())
+        Some("Skill is visible here but is not mutated by Codifix repair.".to_string())
     };
 
     skills.push(SkillVersionInfo {
@@ -520,7 +520,7 @@ fn normalized_path(path: &Path) -> String {
 }
 
 fn is_memory_skill_name(name: &str) -> bool {
-    MEMORY_SKILL_NAMES.contains(&name)
+    CODIFIX_SKILL_NAMES.contains(&name)
 }
 
 fn codex_home_dir() -> PathBuf {
@@ -672,7 +672,7 @@ pub fn discover_skill_template_dir() -> Option<PathBuf> {
     if let Ok(data_home) = env::var("XDG_DATA_HOME") {
         candidates.push(
             PathBuf::from(data_home)
-                .join("memory-layer")
+                .join("codifix")
                 .join("skill-template"),
         );
     }
@@ -683,18 +683,18 @@ pub fn discover_skill_template_dir() -> Option<PathBuf> {
         candidates.push(
             home.join(".local")
                 .join("share")
-                .join("memory-layer")
+                .join("codifix")
                 .join("skill-template"),
         );
     }
-    candidates.push(PathBuf::from("/usr/share/memory-layer/skill-template"));
+    candidates.push(PathBuf::from("/usr/share/codifix/skill-template"));
 
     candidates.into_iter().find(|path| path.is_dir())
 }
 
 pub fn sync_memory_skill_bundle(src_root: &Path, dest_root: &Path, force: bool) -> Result<()> {
     fs::create_dir_all(dest_root).with_context(|| format!("create {}", dest_root.display()))?;
-    for skill_name in MEMORY_SKILL_NAMES {
+    for skill_name in CODIFIX_SKILL_NAMES {
         let src = src_root.join(skill_name);
         if !src.is_dir() {
             anyhow::bail!("skill template is missing {}", src.display());
@@ -810,7 +810,7 @@ pub fn read_skill_content(
     max_bytes: usize,
     filter: SkillInventoryFilter,
 ) -> Result<SkillContentResponse> {
-    if !MEMORY_SKILL_NAMES.contains(&skill_name) {
+    if !CODIFIX_SKILL_NAMES.contains(&skill_name) {
         anyhow::bail!("unknown Memory skill `{skill_name}`");
     }
     let inventory = project_skill_inventory_filtered(repo_root, false, filter);
@@ -867,7 +867,7 @@ pub fn download_github_skill_template() -> Result<PathBuf> {
 fn read_http_url(url: &str) -> Result<Vec<u8>> {
     let response = reqwest::blocking::Client::builder()
         .timeout(GITHUB_SKILL_TEMPLATE_TIMEOUT)
-        .user_agent("memory-layer")
+        .user_agent("codifix")
         .build()
         .context("build GitHub skill template client")?
         .get(url)
@@ -918,7 +918,7 @@ fn extract_github_skill_template_archive(bytes: &[u8]) -> Result<PathBuf> {
         io::copy(&mut file, &mut output).with_context(|| format!("extract {}", out.display()))?;
     }
 
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         let skill = tmp.join(name);
         if !skill.join("SKILL.md").is_file() {
             anyhow::bail!(
@@ -949,7 +949,7 @@ fn skill_archive_relative_path(path: &Path) -> Option<PathBuf> {
         .position(|window| window == [".agents", "skills"])?;
     let relative = &components[(skills_index + 2)..];
     let skill_name = relative.first()?;
-    if !MEMORY_SKILL_NAMES.contains(skill_name) {
+    if !CODIFIX_SKILL_NAMES.contains(skill_name) {
         return None;
     }
     let mut path = PathBuf::new();
@@ -1037,10 +1037,10 @@ mod tests {
     }
 
     #[test]
-    fn skill_inventory_filter_defaults_to_memory_layer() {
+    fn skill_inventory_filter_defaults_to_codifix() {
         assert_eq!(
             SkillInventoryFilter::from_query(None),
-            SkillInventoryFilter::MemoryLayer
+            SkillInventoryFilter::Codifix
         );
         assert_eq!(
             SkillInventoryFilter::from_query(Some("all")),

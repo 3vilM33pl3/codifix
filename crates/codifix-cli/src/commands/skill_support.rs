@@ -20,22 +20,22 @@ use crate::commands::{
     runtime::default_global_config_path, status_support::default_global_config_path_label,
 };
 
-pub(crate) const MEMORY_SKILL_NAMES: &[&str] = &[
-    "memory-layer",
-    "memory-project-init",
-    "memory-github-init",
-    "memory-review-proposals",
-    "memory-query-resume",
-    "memory-plan-execution",
-    "memory-direct-task-start",
-    "memory-remember",
-    "memory-federation-expertise",
+pub(crate) const CODIFIX_SKILL_NAMES: &[&str] = &[
+    "codifix",
+    "codifix-project-init",
+    "codifix-github-init",
+    "codifix-review-proposals",
+    "codifix-query-resume",
+    "codifix-plan-execution",
+    "codifix-direct-task-start",
+    "codifix-remember",
+    "codifix-federation-expertise",
 ];
 
 const GITHUB_SKILL_TEMPLATE_ARCHIVE_URL: &str =
-    "https://github.com/3vilM33pl3/memory/archive/refs/heads/main.zip";
+    "https://github.com/3vilM33pl3/codifix/archive/refs/heads/main.zip";
 const GITHUB_SKILL_TEMPLATE_RAW_BASE: &str =
-    "https://raw.githubusercontent.com/3vilM33pl3/memory/main/.agents/skills";
+    "https://raw.githubusercontent.com/3vilM33pl3/codifix/main/.agents/skills";
 const GITHUB_SKILL_TEMPLATE_TIMEOUT: Duration = Duration::from_secs(10);
 const GITHUB_ARCHIVE_ENV: &str = "CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL";
 const GITHUB_RAW_BASE_ENV: &str = "CODIFIX_GITHUB_SKILL_TEMPLATE_RAW_BASE";
@@ -158,7 +158,7 @@ pub(crate) struct GitHubSkillVersionInfo {
 pub(crate) fn missing_memory_skill_dirs<'a>(
     skill_root: &'a Path,
 ) -> impl Iterator<Item = PathBuf> + 'a {
-    MEMORY_SKILL_NAMES
+    CODIFIX_SKILL_NAMES
         .iter()
         .map(|name| skill_root.join(name))
         .filter(|path| !path.is_dir())
@@ -174,7 +174,7 @@ pub(crate) fn project_skill_inventory_with_template(
     force: bool,
 ) -> SkillInventoryReport {
     let skill_root = repo_root.join(".agents").join("skills");
-    let skills: Vec<_> = MEMORY_SKILL_NAMES
+    let skills: Vec<_> = CODIFIX_SKILL_NAMES
         .iter()
         .map(|name| {
             let project_path = skill_root.join(name);
@@ -380,7 +380,7 @@ pub(crate) fn discover_skill_template_dir() -> Option<PathBuf> {
     if let Ok(data_home) = env::var("XDG_DATA_HOME") {
         candidates.push(
             PathBuf::from(data_home)
-                .join("memory-layer")
+                .join("codifix")
                 .join("skill-template"),
         );
     }
@@ -391,11 +391,11 @@ pub(crate) fn discover_skill_template_dir() -> Option<PathBuf> {
         candidates.push(
             home.join(".local")
                 .join("share")
-                .join("memory-layer")
+                .join("codifix")
                 .join("skill-template"),
         );
     }
-    candidates.push(PathBuf::from("/usr/share/memory-layer/skill-template"));
+    candidates.push(PathBuf::from("/usr/share/codifix/skill-template"));
 
     candidates.into_iter().find(|path| path.is_dir())
 }
@@ -406,7 +406,7 @@ pub(crate) fn sync_memory_skill_bundle(
     force: bool,
 ) -> Result<()> {
     fs::create_dir_all(dest_root).with_context(|| format!("create {}", dest_root.display()))?;
-    for skill_name in MEMORY_SKILL_NAMES {
+    for skill_name in CODIFIX_SKILL_NAMES {
         let src = src_root.join(skill_name);
         if !src.is_dir() {
             anyhow::bail!("skill template is missing {}", src.display());
@@ -554,7 +554,7 @@ pub(crate) fn print_skill_upgrade_report(report: &SkillUpgradeReport) {
     }
     if report.dry_run {
         println!(
-            "\nDry run only. Run `memory upgrade` to apply the listed install/replace actions."
+            "\nDry run only. Run `codifix upgrade` to apply the listed install/replace actions."
         );
     }
 }
@@ -590,7 +590,7 @@ pub(crate) fn github_skill_version_report(repo_root: &Path) -> Result<GitHubSkil
     let raw_base = github_raw_base_url();
     let skill_root = repo_root.join(".agents").join("skills");
     let mut skills = Vec::new();
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         let project_version = read_skill_version(&skill_root.join(name)).ok().flatten();
         let github_version = fetch_github_skill_version(&raw_base, name)
             .with_context(|| format!("fetch GitHub version for {name}"))?;
@@ -643,7 +643,7 @@ pub(crate) fn download_github_skill_template() -> Result<PathBuf> {
     }
     let archive_url = github_archive_url();
     let bytes = read_url_or_file(&archive_url)
-        .with_context(|| format!("download Memory Layer skill template from {archive_url}"))?;
+        .with_context(|| format!("download Codifix skill template from {archive_url}"))?;
     extract_github_skill_template_archive(&bytes)
 }
 
@@ -765,7 +765,7 @@ fn read_url_or_file(url: &str) -> Result<Vec<u8>> {
 fn read_http_url(url: &str) -> Result<Vec<u8>> {
     let response = reqwest::blocking::Client::builder()
         .timeout(GITHUB_SKILL_TEMPLATE_TIMEOUT)
-        .user_agent("memory-layer")
+        .user_agent("codifix")
         .build()
         .context("build GitHub skill template client")?
         .get(url)
@@ -816,7 +816,7 @@ fn extract_github_skill_template_archive(bytes: &[u8]) -> Result<PathBuf> {
         io::copy(&mut file, &mut output).with_context(|| format!("extract {}", out.display()))?;
     }
 
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         let skill = tmp.join(name);
         if !skill.join("SKILL.md").is_file() {
             anyhow::bail!(
@@ -847,7 +847,7 @@ fn skill_archive_relative_path(path: &Path) -> Option<PathBuf> {
         .position(|window| window == [".agents", "skills"])?;
     let relative = &components[(skills_index + 2)..];
     let skill_name = relative.first()?;
-    if !MEMORY_SKILL_NAMES.contains(skill_name) {
+    if !CODIFIX_SKILL_NAMES.contains(skill_name) {
         return None;
     }
     let mut path = PathBuf::new();
@@ -919,7 +919,7 @@ pub(crate) fn render_repo_config(
         r#"# User-local project overrides for this project.
 # Put shared defaults and secrets in the global config:
 #   {}
-# Shared LLM settings for `memory scan` should also live there under [llm].
+# Shared LLM settings for `codifix scan` should also live there under [llm].
 
 # Uncomment [service] to run a repo-local dev backend alongside the shared one.
 # Example dev endpoints:
@@ -956,7 +956,7 @@ pub(crate) fn render_agent_project_config(project: &str, repo_root: &Path) -> St
     let repo_root = render_toml_string(&repo_root.display().to_string());
     format!(
         r#"# Project-owned memory behavior.
-# Less technical users should customize Memory Layer here.
+# Less technical users should customize Codifix here.
 
 [project]
 slug = "{project}"
@@ -982,13 +982,13 @@ pub(crate) fn render_toml_string(value: &str) -> String {
     toml::Value::String(value.to_string()).to_string()
 }
 
-const CLAUDE_MD_MEMORY_MARKER: &str = "## Memory Layer workflows";
+const CLAUDE_MD_MEMORY_MARKER: &str = "## Codifix workflows";
 
 pub(crate) fn render_claude_md_memory_section(project: &str) -> String {
     format!(
-        r#"## Memory Layer workflows
+        r#"## Codifix workflows
 
-This project uses Memory Layer to persist durable project knowledge. The `memory` CLI
+This project uses Codifix to persist durable project knowledge. The `memory` CLI
 must be on PATH (or use `cargo run --bin codifix --` from the repo root).
 
 ### Shared invariants
@@ -1005,8 +1005,8 @@ must be on PATH (or use `cargo run --bin codifix --` from the repo root).
 Use when: the user asks a project-specific question or returns after an interruption.
 
 ```bash
-memory query --project {project} --question "<question>"
-memory resume --project {project}
+codifix query --project {project} --question "<question>"
+codifix resume --project {project}
 ```
 
 ### Plan execution
@@ -1014,12 +1014,12 @@ Use when: a planning session ends and the user approves execution.
 
 Save checkpoint and plan at execution start:
 ```bash
-memory checkpoint start-execution --project {project} --plan-file /tmp/approved-plan.md
+codifix checkpoint start-execution --project {project} --plan-file /tmp/approved-plan.md
 ```
 
 Verify all plan items are complete before claiming finished:
 ```bash
-memory checkpoint finish-execution --project {project}
+codifix checkpoint finish-execution --project {project}
 ```
 
 ### Remember completed work (mandatory post-task rule)
@@ -1030,7 +1030,7 @@ final response** unless one of these is true:
 - the user explicitly asked not to store memory
 
 ```bash
-memory remember --project {project} \
+codifix remember --project {project} \
   --title "<task title>" \
   --summary "<what changed>" \
   --note "<durable fact 1>" \
@@ -1046,7 +1046,7 @@ Use when: you answered a request to explain code, a file, a module, an architect
 After answering, store a distilled reusable memory when the explanation is durable and grounded in inspected code or existing memory. Do not store the full chat answer, speculative claims, duplicates, or trivial explanations. Do not use `--file-changed` unless files actually changed.
 
 ```bash
-memory remember --project {project} --type project \
+codifix remember --project {project} --type project \
   --title "Explained <file/module/codebase>" \
   --prompt "<user explanation request>" \
   --summary "<short explanation summary>" \
@@ -1057,14 +1057,14 @@ memory remember --project {project} --type project \
 Use when: you learn about the user's role, preferences, or expertise.
 
 ```bash
-memory remember --project {project} --type user --note "<what you learned>"
+codifix remember --project {project} --type user --note "<what you learned>"
 ```
 
 ### Store feedback
 Use when: the user corrects your approach or confirms a non-obvious choice.
 
 ```bash
-memory remember --project {project} --type feedback \
+codifix remember --project {project} --type feedback \
   --note "<rule or validated approach>" \
   --note "<why: reason or context>"
 ```
@@ -1073,7 +1073,7 @@ memory remember --project {project} --type feedback \
 Use when: you learn about goals, deadlines, or ongoing initiatives.
 
 ```bash
-memory remember --project {project} --type project \
+codifix remember --project {project} --type project \
   --note "<fact or decision>" \
   --note "<why: motivation or constraint>"
 ```
@@ -1082,7 +1082,7 @@ memory remember --project {project} --type project \
 Use when: you learn about resources tracked in external systems.
 
 ```bash
-memory remember --project {project} --type reference \
+codifix remember --project {project} --type reference \
   --note "<what the resource is and where to find it>"
 ```
 "#
@@ -1127,7 +1127,7 @@ pub(crate) fn render_init_summary(
         "7. Optional: enable the Codex-linked watcher manager:\n   memory watcher manager enable\n   Legacy per-repo watcher service: memory watcher enable --project ".to_string()
             + project;
     format!(
-        "{action} memory bootstrap for project `{project}` at {}.\n\nFiles:\n- {} (user-local project config)\n- {} (repo-local project marker)\n- {} (agent-visible project behavior)\n- {} (bundled memory skills)\n\nNext steps:\n1. Set shared values like `database.url`, `service.api_token`, and `[llm]` config in {}\n2. Use {} for project runtime overrides\n3. Use {} to customize agent-visible project memory behavior\n4. Start the shared backend if it is not already running:\n   memory service run --config {}\n5. Optional: configure project-local [service] overrides if you want a parallel dev backend for this project\n6. Optional: run a project scan:\n   memory scan --project {}\n{}\n8. Open the TUI:\n   memory tui --project {}\n9. Use the repo-local memory skill bundle from {} (umbrella skill at {}/memory-layer)",
+        "{action} memory bootstrap for project `{project}` at {}.\n\nFiles:\n- {} (user-local project config)\n- {} (repo-local project marker)\n- {} (agent-visible project behavior)\n- {} (bundled memory skills)\n\nNext steps:\n1. Set shared values like `database.url`, `service.api_token`, and `[llm]` config in {}\n2. Use {} for project runtime overrides\n3. Use {} to customize agent-visible project memory behavior\n4. Start the shared backend if it is not already running:\n   memory service run --config {}\n5. Optional: configure project-local [service] overrides if you want a parallel dev backend for this project\n6. Optional: run a project scan:\n   memory scan --project {}\n{}\n8. Open the TUI:\n   memory tui --project {}\n9. Use the repo-local memory skill bundle from {} (umbrella skill at {}/codifix)",
         repo_root.display(),
         config_path.display(),
         project_path.display(),

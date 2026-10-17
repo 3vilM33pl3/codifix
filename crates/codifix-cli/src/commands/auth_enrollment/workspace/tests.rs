@@ -274,7 +274,7 @@ async fn physical_containment_rejects_aliases_before_journal_or_locks() {
 }
 #[test]
 fn archive_aliases_and_prefix_conflicts_are_rejected_before_installation() {
-    let name = codifix_skills::MEMORY_SKILL_NAMES[0];
+    let name = codifix_skills::CODIFIX_SKILL_NAMES[0];
     let cases = vec![
         vec!["skill.md".to_string()],
         vec!["Scripts/other.sh".to_string()],
@@ -377,7 +377,7 @@ impl artifacts::Downloads for FakeDownloads {
 }
 fn bundle(version: &str) -> Vec<u8> {
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
-    for name in codifix_skills::MEMORY_SKILL_NAMES {
+    for name in codifix_skills::CODIFIX_SKILL_NAMES {
         writer
             .start_file(
                 format!("fixture/.agents/skills/{name}/SKILL.md"),

@@ -8,7 +8,7 @@ when repeated instructions or project knowledge should survive future sessions.
 
 - Use the Workshop API for durable project memory (queries, task starts, plans
   and completed work). The shared helper explicitly selects it through
-  [.agents/memory-layer-command.json](.agents/memory-layer-command.json).
+  [.agents/codifix-command.json](.agents/codifix-command.json).
 - Use the dev service and its separate database for backend testing. Test
   memories are disposable; they are not automatically synchronized to Workshop.
   See [dev recovery and routing](docs/developer/dev-stack.md#project-memory-routing-and-recovery).
@@ -21,13 +21,13 @@ when repeated instructions or project knowledge should survive future sessions.
 ## Memory Workflow
 
 - For direct no-plan implementation work, record the task start before edits
-  with `memory-direct-task-start` / `start-task-execution`.
+  with `codifix-direct-task-start` / `start-task-execution`.
 - For approved plans, use the plan execution workflow before editing and verify
   the plan before claiming completion.
 - Completed work should be remembered as `implementation`, or as `refactor` when
   the change intentionally reshapes code without functional behavior changes.
 - Repo-local skills live under `.agents/skills/`; the overview is in
-  [docs/developer/skills/memory-layer-skill.md](docs/developer/skills/memory-layer-skill.md).
+  [docs/developer/skills/codifix-skill.md](docs/developer/skills/codifix-skill.md).
 
 ## Model Routing
 
@@ -59,11 +59,11 @@ when repeated instructions or project knowledge should survive future sessions.
 
 | Need | Source of truth |
 | --- | --- |
-| CLI behavior or output contracts | [docs/user/cli/](docs/user/cli/) and `crates/mem-cli` |
-| Service routes, API behavior, or persistence | [docs/developer/architecture/](docs/developer/architecture/) and `crates/mem-service` / `crates/mem-api` |
-| Search, retrieval, or embeddings | [docs/developer/architecture/embeddings-and-search.md](docs/developer/architecture/embeddings-and-search.md) and `crates/mem-search` |
+| CLI behavior or output contracts | [docs/user/cli/](docs/user/cli/) and `crates/codifix-cli` |
+| Service routes, API behavior, or persistence | [docs/developer/architecture/](docs/developer/architecture/) and `crates/codifix-service` / `crates/codifix-api` |
+| Search, retrieval, or embeddings | [docs/developer/architecture/embeddings-and-search.md](docs/developer/architecture/embeddings-and-search.md) and `crates/codifix-search` |
 | Curation, provenance, or memory types | [docs/developer/architecture/memory-types.md](docs/developer/architecture/memory-types.md) |
-| TUI behavior | [docs/user/tui/](docs/user/tui/) and `crates/mem-cli/src/tui/` |
+| TUI behavior | [docs/user/tui/](docs/user/tui/) and `crates/codifix-cli/src/tui/` |
 | Browser UI behavior | [docs/user/web-ui.md](docs/user/web-ui.md) and `web/src/` |
 | Documentation site editing | [docs-site/README.md](docs-site/README.md) and [docs-site/EDITING.md](docs-site/EDITING.md) |
 | Evaluations | [docs/developer/evaluation.md](docs/developer/evaluation.md) and [docs/user/cli/eval.md](docs/user/cli/eval.md) |

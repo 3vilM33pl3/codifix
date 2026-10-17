@@ -522,7 +522,7 @@ fn llm_audit_toml_update_preserves_existing_limits() {
 #[test]
 fn runtime_skill_status_reports_memory_layer_skill_by_default() {
     let root = std::env::temp_dir().join(format!("memory-skill-status-{}", Uuid::new_v4()));
-    for skill in MEMORY_SKILL_NAMES {
+    for skill in CODIFIX_SKILL_NAMES {
         let dir = root.join(".agents").join("skills").join(skill);
         fs::create_dir_all(&dir).expect("create skill dir");
         fs::write(
@@ -574,7 +574,7 @@ fn runtime_skill_status_warns_on_outdated_or_missing_memory_layer_skill() {
 #[test]
 fn runtime_skill_status_ignores_focused_skill_versions_by_default() {
     let root = std::env::temp_dir().join(format!("memory-skill-status-{}", Uuid::new_v4()));
-    for skill in MEMORY_SKILL_NAMES {
+    for skill in CODIFIX_SKILL_NAMES {
         let dir = root.join(".agents").join("skills").join(skill);
         fs::create_dir_all(&dir).expect("create skill dir");
         let version = if *skill == "memory-layer" {
@@ -600,7 +600,7 @@ fn runtime_skill_status_ignores_focused_skill_versions_by_default() {
 #[test]
 fn runtime_skill_status_can_show_full_skill_bundle() {
     let root = std::env::temp_dir().join(format!("memory-skill-status-{}", Uuid::new_v4()));
-    for skill in MEMORY_SKILL_NAMES {
+    for skill in CODIFIX_SKILL_NAMES {
         let dir = root.join(".agents").join("skills").join(skill);
         fs::create_dir_all(&dir).expect("create skill dir");
         let version = if *skill == "memory-direct-task-start" {
@@ -620,7 +620,7 @@ fn runtime_skill_status_can_show_full_skill_bundle() {
     assert_eq!(status.status, "warn");
     assert_eq!(status.summary, "0 missing, 1 outdated");
     assert_eq!(status.filter, "all");
-    assert_eq!(status.details.len(), MEMORY_SKILL_NAMES.len());
+    assert_eq!(status.details.len(), CODIFIX_SKILL_NAMES.len());
     let outdated = status
         .details
         .iter()

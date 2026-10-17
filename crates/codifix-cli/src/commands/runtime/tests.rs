@@ -33,7 +33,7 @@ use crate::commands::{
         set_cluster_enabled_in_shared_config,
     },
     skill_support::{
-        MEMORY_SKILL_NAMES, SkillBundleStatus, SkillUpgradeAction, SkillVersionStatus,
+        CODIFIX_SKILL_NAMES, SkillBundleStatus, SkillUpgradeAction, SkillVersionStatus,
         download_github_skill_template, github_skill_version_report,
         project_skill_inventory_with_template, read_skill_version, render_agent_project_config,
         render_claude_md_memory_section, render_toml_string, resolve_repo_root,
@@ -168,7 +168,7 @@ fn windows_service_dry_runs_describe_task_scheduler_actions() {
 
 #[test]
 fn project_defaults_to_repo_metadata_when_present() {
-    let repo_root = unique_temp_dir("mem-cli-project-slug");
+    let repo_root = unique_temp_dir("codifix-cli-project-slug");
     fs::create_dir_all(repo_root.join(".codifix")).unwrap();
     fs::write(
         repo_root.join(".codifix").join("project.toml"),
@@ -607,7 +607,7 @@ fn health_and_watcher_flush_help_name_current_commands() {
 
     let flush = rendered_help(&["memory", "watcher", "flush", "--help"]);
     assert!(flush.contains("memory watcher flush --project memory --dry-run"));
-    assert!(flush.contains("Older documentation called this `memory automation flush`"));
+    assert!(flush.contains("Older documentation called this `codifix automation flush`"));
     assert!(!flush.contains("docs/user/cli/automation.md"));
 }
 
@@ -1936,37 +1936,37 @@ fn init_creates_repo_files_and_gitignore_entry() {
     assert!(repo_root.join(".agents/skills/codifix/SKILL.md").is_file());
     assert!(
         repo_root
-            .join(".agents/skills/memory-query-resume/SKILL.md")
+            .join(".agents/skills/codifix-query-resume/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-project-init/SKILL.md")
+            .join(".agents/skills/codifix-project-init/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-github-init/SKILL.md")
+            .join(".agents/skills/codifix-github-init/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-review-proposals/SKILL.md")
+            .join(".agents/skills/codifix-review-proposals/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-plan-execution/SKILL.md")
+            .join(".agents/skills/codifix-plan-execution/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-direct-task-start/SKILL.md")
+            .join(".agents/skills/codifix-direct-task-start/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-remember/SKILL.md")
+            .join(".agents/skills/codifix-remember/SKILL.md")
             .is_file()
     );
     assert!(
@@ -2129,32 +2129,32 @@ fn repair_repo_bootstrap_creates_missing_files() {
     assert!(repo_root.join(".agents/skills/codifix/SKILL.md").is_file());
     assert!(
         repo_root
-            .join(".agents/skills/memory-query-resume/SKILL.md")
+            .join(".agents/skills/codifix-query-resume/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-project-init/SKILL.md")
+            .join(".agents/skills/codifix-project-init/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-github-init/SKILL.md")
+            .join(".agents/skills/codifix-github-init/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-plan-execution/SKILL.md")
+            .join(".agents/skills/codifix-plan-execution/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-direct-task-start/SKILL.md")
+            .join(".agents/skills/codifix-direct-task-start/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-remember/SKILL.md")
+            .join(".agents/skills/codifix-remember/SKILL.md")
             .is_file()
     );
     assert!(!root_gitignore_contains_mem(&repo_root).unwrap());
@@ -2197,32 +2197,32 @@ fn init_preserves_existing_memory_skills_without_force() {
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-query-resume/SKILL.md")
+            .join(".agents/skills/codifix-query-resume/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-project-init/SKILL.md")
+            .join(".agents/skills/codifix-project-init/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-github-init/SKILL.md")
+            .join(".agents/skills/codifix-github-init/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-plan-execution/SKILL.md")
+            .join(".agents/skills/codifix-plan-execution/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-direct-task-start/SKILL.md")
+            .join(".agents/skills/codifix-direct-task-start/SKILL.md")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-remember/SKILL.md")
+            .join(".agents/skills/codifix-remember/SKILL.md")
             .is_file()
     );
 
@@ -2276,14 +2276,14 @@ fn init_copies_code_explanation_memory_rule_to_skills() {
 
     let umbrella = fs::read_to_string(repo_root.join(".agents/skills/codifix/SKILL.md")).unwrap();
     let github_init =
-        fs::read_to_string(repo_root.join(".agents/skills/memory-github-init/SKILL.md")).unwrap();
+        fs::read_to_string(repo_root.join(".agents/skills/codifix-github-init/SKILL.md")).unwrap();
     let query_resume =
-        fs::read_to_string(repo_root.join(".agents/skills/memory-query-resume/SKILL.md")).unwrap();
+        fs::read_to_string(repo_root.join(".agents/skills/codifix-query-resume/SKILL.md")).unwrap();
     let remember =
-        fs::read_to_string(repo_root.join(".agents/skills/memory-remember/SKILL.md")).unwrap();
+        fs::read_to_string(repo_root.join(".agents/skills/codifix-remember/SKILL.md")).unwrap();
 
     assert!(umbrella.contains("Code explanation memory rule"));
-    assert!(umbrella.contains("memory-github-init"));
+    assert!(umbrella.contains("codifix-github-init"));
     assert!(github_init.contains("Memory GitHub Init Skill"));
     assert!(github_init.contains("dry-run"));
     assert!(umbrella.contains("Store a distilled memory, not the whole chat answer"));
@@ -2994,19 +2994,19 @@ fn skill_inventory_marks_outdated_and_missing_skills() {
     let repo = unique_temp_dir("mem-skill-inventory");
     let project_root = repo.join("project");
     let template_root = repo.join("codifix/skill-template");
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         write_test_skill(&template_root.join(name), "0.2.0");
     }
     write_test_skill(
         &project_root
             .join(".agents/skills")
-            .join(MEMORY_SKILL_NAMES[0]),
+            .join(CODIFIX_SKILL_NAMES[0]),
         "0.1.0",
     );
     write_test_skill(
         &project_root
             .join(".agents/skills")
-            .join(MEMORY_SKILL_NAMES[1]),
+            .join(CODIFIX_SKILL_NAMES[1]),
         "0.2.0",
     );
 
@@ -3046,18 +3046,18 @@ fn visible_skill_inventory_classifies_repo_home_codex_and_plugin_skills() {
 
     let project_root = repo.join("project");
     let template_root = repo.join("codifix/skill-template");
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         write_test_skill(&template_root.join(name), "0.2.0");
     }
     write_test_skill(
         &project_root
             .join(".agents/skills")
-            .join(MEMORY_SKILL_NAMES[0]),
+            .join(CODIFIX_SKILL_NAMES[0]),
         "0.2.0",
     );
     write_test_skill(&project_root.join(".agents/skills/repo-custom"), "1.0.0");
     write_test_skill(
-        &home.join(".agents/skills").join(MEMORY_SKILL_NAMES[1]),
+        &home.join(".agents/skills").join(CODIFIX_SKILL_NAMES[1]),
         "0.2.0",
     );
     write_test_skill(&home.join(".agents/skills/home-custom"), "1.0.0");
@@ -3075,7 +3075,7 @@ fn visible_skill_inventory_classifies_repo_home_codex_and_plugin_skills() {
         .skills
         .iter()
         .find(|skill| {
-            skill.name == MEMORY_SKILL_NAMES[0]
+            skill.name == CODIFIX_SKILL_NAMES[0]
                 && skill.source_kind == SharedSkillSourceKind::RepoMemory
         })
         .expect("repo memory skill");
@@ -3093,7 +3093,7 @@ fn visible_skill_inventory_classifies_repo_home_codex_and_plugin_skills() {
     assert!(!repo_custom.repairable);
 
     assert!(inventory.skills.iter().any(|skill| {
-        skill.name == MEMORY_SKILL_NAMES[1]
+        skill.name == CODIFIX_SKILL_NAMES[1]
             && skill.source_kind == SharedSkillSourceKind::HomeMemory
     }));
     assert!(inventory.skills.iter().any(|skill| {
@@ -3121,13 +3121,13 @@ fn skill_upgrade_dry_run_does_not_replace_project_skill() {
     let repo = unique_temp_dir("mem-skill-upgrade-dry-run");
     let project_root = repo.join("project");
     let template_root = repo.join("codifix/skill-template");
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         write_test_skill(&template_root.join(name), "0.2.0");
         write_test_skill(&project_root.join(".agents/skills").join(name), "0.1.0");
     }
     let first_skill = project_root
         .join(".agents/skills")
-        .join(MEMORY_SKILL_NAMES[0])
+        .join(CODIFIX_SKILL_NAMES[0])
         .join("SKILL.md");
     let before = fs::read_to_string(&first_skill).unwrap();
 
@@ -3160,7 +3160,7 @@ fn skill_upgrade_replaces_outdated_skill_and_creates_backup() {
     }
     let project_root = repo.join("project");
     let template_root = repo.join("codifix/skill-template");
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         write_test_skill(&template_root.join(name), "0.2.0");
         write_test_skill(&project_root.join(".agents/skills").join(name), "0.1.0");
     }
@@ -3175,14 +3175,14 @@ fn skill_upgrade_replaces_outdated_skill_and_creates_backup() {
         read_skill_version(
             &project_root
                 .join(".agents/skills")
-                .join(MEMORY_SKILL_NAMES[0])
+                .join(CODIFIX_SKILL_NAMES[0])
         )
         .unwrap(),
         Some("0.2.0".to_string())
     );
     assert!(
         PathBuf::from(backup_root)
-            .join(MEMORY_SKILL_NAMES[0])
+            .join(CODIFIX_SKILL_NAMES[0])
             .join("SKILL.md")
             .is_file()
     );
@@ -3201,7 +3201,7 @@ fn skill_inventory_reports_ok_for_matching_bundle_version() {
     let repo = unique_temp_dir("mem-skill-bundle-ok");
     let project_root = repo.join("project");
     let template_root = repo.join("codifix/skill-template");
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         write_test_skill(&template_root.join(name), env!("CARGO_PKG_VERSION"));
         write_test_skill(
             &project_root.join(".agents/skills").join(name),
@@ -3226,7 +3226,7 @@ fn github_skill_version_report_detects_outdated_project_skills() {
     let project_root = repo.join("project");
     let github_root = repo.join("github-skills");
     let old_raw = std::env::var("CODIFIX_GITHUB_SKILL_TEMPLATE_RAW_BASE").ok();
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         write_test_skill(&github_root.join(name), "0.3.0");
         write_test_skill(&project_root.join(".agents/skills").join(name), "0.2.0");
     }
@@ -3268,7 +3268,7 @@ fn download_github_skill_template_extracts_archive_to_state_cache() {
     let template_root = download_github_skill_template().unwrap();
 
     assert!(template_root.ends_with("skill-template-github/main"));
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         assert_eq!(
             read_skill_version(&template_root.join(name)).unwrap(),
             Some("0.4.0".to_string())
@@ -3304,7 +3304,7 @@ fn write_test_skill_archive(path: &Path, version: &str) {
     let file = fs::File::create(path).unwrap();
     let mut zip = ZipWriter::new(file);
     let options = SimpleFileOptions::default();
-    for name in MEMORY_SKILL_NAMES {
+    for name in CODIFIX_SKILL_NAMES {
         zip.start_file(
             format!("memory-main/.agents/skills/{name}/SKILL.md"),
             options,

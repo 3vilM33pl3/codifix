@@ -344,7 +344,7 @@ pub(crate) fn first_non_empty_line(value: &str) -> Option<String> {
 
 pub(crate) fn print_cli_status_report(report: &CliStatusReport) {
     println!(
-        "Memory Layer status: {}",
+        "Codifix status: {}",
         doctor_status_label(report.summary.overall)
     );
     println!("Project: {}", report.project);
@@ -500,7 +500,7 @@ fn cli_path_check() -> DoctorCheckResult {
 
 pub(crate) fn repo_uses_go_skill_runtime(repo_root: &Path) -> bool {
     repo_root
-        .join(".agents/skills/memory-layer/scripts/go.mod")
+        .join(".agents/skills/codifix/scripts/go.mod")
         .is_file()
 }
 
@@ -803,7 +803,7 @@ fn skill_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<()> {
             None
         } else {
             Some(
-                "Run `memory doctor --fix` to download current skills from GitHub and repair repo-local copies, or preview with `memory upgrade --dry-run`."
+                "Run `codifix doctor --fix` to download current skills from GitHub and repair repo-local copies, or preview with `codifix upgrade --dry-run`."
                     .to_string(),
             )
         },
@@ -835,7 +835,7 @@ fn skill_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<()> {
                     None
                 } else {
                     Some(
-                        "Run `memory doctor --fix` to download current skills from GitHub and repair repo-local copies."
+                        "Run `codifix doctor --fix` to download current skills from GitHub and repair repo-local copies."
                             .to_string(),
                     )
                 },
@@ -848,7 +848,7 @@ fn skill_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<()> {
             "Skipped GitHub skill freshness check.",
             Some(error.to_string()),
             Some(
-                "Connect to GitHub and rerun `memory doctor`, or run `memory doctor --fix` when online."
+                "Connect to GitHub and rerun `codifix doctor`, or run `codifix doctor --fix` when online."
                     .to_string(),
             ),
             false,
@@ -1068,7 +1068,7 @@ async fn config_value_checks(
             || config.service.api_token == DEV_API_TOKEN
         {
             Some(
-                "Run `memory wizard --global` or `memory service ensure-api-token --rotate-placeholder` to provision a machine-local token."
+                "Run `codifix wizard --global` or `codifix service ensure-api-token --rotate-placeholder` to provision a machine-local token."
                     .to_string(),
             )
         } else {
@@ -1280,7 +1280,7 @@ async fn config_value_checks(
             None
         } else {
             Some(format!(
-                "Set [cluster].enabled = true in {} to allow this backend to discover and proxy to another Memory Layer backend when PostgreSQL is unavailable.",
+                "Set [cluster].enabled = true in {} to allow this backend to discover and proxy to another Codifix backend when PostgreSQL is unavailable.",
                 global_config_path
                     .as_ref()
                     .unwrap_or(&config_path)
@@ -1760,7 +1760,7 @@ async fn backend_checks(
                 Some(
                     if database_connect_error.is_some() && !config.cluster.enabled {
                         format!(
-                            "{} or enable relay discovery in {} and rerun `memory service enable`",
+                            "{} or enable relay discovery in {} and rerun `codifix service enable`",
                             backend_start_hint(&config_path),
                             global_config_path
                                 .as_ref()
@@ -1794,7 +1794,7 @@ async fn backend_checks(
             report.push(doctor_check(
                 "backend.http_endpoint",
                 http_status,
-                "Configured HTTP endpoint is not serving Memory Layer health.",
+                "Configured HTTP endpoint is not serving Codifix health.",
                 Some(http_details),
                 Some(format!(
                     "Start the intended backend for {} or change [service].bind_addr",
@@ -2037,9 +2037,7 @@ pub(crate) fn repair_repo_bootstrap(repo_root: &Path, project: &str) -> Result<(
     if missing_memory_skill_dirs(&skill_root).next().is_some() {
         let skill_template_dir = discover_skill_template_dir()
             .or_else(|| download_github_skill_template().ok())
-            .ok_or_else(|| {
-                anyhow::anyhow!("could not locate packaged memory-layer skill template")
-            })?;
+            .ok_or_else(|| anyhow::anyhow!("could not locate packaged codifix skill template"))?;
         sync_memory_skill_bundle(&skill_template_dir, &skill_root, false)?;
     }
     ensure_claude_md_memory_section(repo_root, project)?;

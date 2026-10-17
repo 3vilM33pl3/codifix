@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "codifix": {
+      "command": "codifix",
+      "args": [
+        "mcp",
+        "run"
+      ],
+      "env_vars": [
+        "CODIFIX_CLIENT_TOKEN"
+      ]
+    }
+  }
+}

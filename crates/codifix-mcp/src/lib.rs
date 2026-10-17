@@ -39,37 +39,37 @@ pub mod laptop;
 
 pub const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 
-const TOOL_MEMORY_QUERY: &str = "memory_query";
-const TOOL_MEMORY_SEARCH_ALL: &str = "memory_search_all";
-const TOOL_MEMORY_RESUME: &str = "memory_resume";
-const TOOL_MEMORY_UP_TO_SPEED: &str = "memory_up_to_speed";
-const TOOL_MEMORY_OVERVIEW: &str = "memory_overview";
-const TOOL_MEMORY_LIST_MEMORIES: &str = "memory_list_memories";
-const TOOL_MEMORY_GET_MEMORY: &str = "memory_get_memory";
-const TOOL_MEMORY_MEMORY_HISTORY: &str = "memory_memory_history";
-const TOOL_MEMORY_LIST_ACTIVITIES: &str = "memory_list_activities";
-const TOOL_MEMORY_LIST_REPLACEMENT_PROPOSALS: &str = "memory_list_replacement_proposals";
-const TOOL_MEMORY_LOOP_LIST: &str = "memory_loop_list";
-const TOOL_MEMORY_LOOP_GET: &str = "memory_loop_get";
-const TOOL_MEMORY_LOOP_ENABLE: &str = "memory_loop_enable";
-const TOOL_MEMORY_LOOP_DISABLE: &str = "memory_loop_disable";
-const TOOL_MEMORY_LOOP_PAUSE: &str = "memory_loop_pause";
-const TOOL_MEMORY_LOOP_SNOOZE: &str = "memory_loop_snooze";
-const TOOL_MEMORY_LOOP_RUN: &str = "memory_loop_run";
-const TOOL_MEMORY_LOOP_RUNS: &str = "memory_loop_runs";
-const TOOL_MEMORY_LOOP_INSPECT: &str = "memory_loop_inspect";
-const TOOL_MEMORY_LOOP_CANCEL: &str = "memory_loop_cancel";
-const TOOL_MEMORY_LOOP_FEEDBACK: &str = "memory_loop_feedback";
-const TOOL_MEMORY_LOOP_LIST_APPROVALS: &str = "memory_loop_list_approvals";
-const TOOL_MEMORY_LOOP_APPROVE: &str = "memory_loop_approve";
-const TOOL_MEMORY_LOOP_REJECT: &str = "memory_loop_reject";
-const TOOL_MEMORY_LOOP_EDIT_APPROVAL: &str = "memory_loop_edit_approval";
-const TOOL_MEMORY_LOOP_GLOBAL_STATE: &str = "memory_loop_global_state";
-const TOOL_MEMORY_LOOP_SET_GLOBAL_KILL_SWITCH: &str = "memory_loop_set_global_kill_switch";
+const TOOL_MEMORY_QUERY: &str = "codifix_query";
+const TOOL_MEMORY_SEARCH_ALL: &str = "codifix_search_all";
+const TOOL_MEMORY_RESUME: &str = "codifix_resume";
+const TOOL_MEMORY_UP_TO_SPEED: &str = "codifix_up_to_speed";
+const TOOL_MEMORY_OVERVIEW: &str = "codifix_overview";
+const TOOL_MEMORY_LIST_MEMORIES: &str = "codifix_list_memories";
+const TOOL_MEMORY_GET_MEMORY: &str = "codifix_get_memory";
+const TOOL_MEMORY_MEMORY_HISTORY: &str = "codifix_codifix_history";
+const TOOL_MEMORY_LIST_ACTIVITIES: &str = "codifix_list_activities";
+const TOOL_MEMORY_LIST_REPLACEMENT_PROPOSALS: &str = "codifix_list_replacement_proposals";
+const TOOL_MEMORY_LOOP_LIST: &str = "codifix_loop_list";
+const TOOL_MEMORY_LOOP_GET: &str = "codifix_loop_get";
+const TOOL_MEMORY_LOOP_ENABLE: &str = "codifix_loop_enable";
+const TOOL_MEMORY_LOOP_DISABLE: &str = "codifix_loop_disable";
+const TOOL_MEMORY_LOOP_PAUSE: &str = "codifix_loop_pause";
+const TOOL_MEMORY_LOOP_SNOOZE: &str = "codifix_loop_snooze";
+const TOOL_MEMORY_LOOP_RUN: &str = "codifix_loop_run";
+const TOOL_MEMORY_LOOP_RUNS: &str = "codifix_loop_runs";
+const TOOL_MEMORY_LOOP_INSPECT: &str = "codifix_loop_inspect";
+const TOOL_MEMORY_LOOP_CANCEL: &str = "codifix_loop_cancel";
+const TOOL_MEMORY_LOOP_FEEDBACK: &str = "codifix_loop_feedback";
+const TOOL_MEMORY_LOOP_LIST_APPROVALS: &str = "codifix_loop_list_approvals";
+const TOOL_MEMORY_LOOP_APPROVE: &str = "codifix_loop_approve";
+const TOOL_MEMORY_LOOP_REJECT: &str = "codifix_loop_reject";
+const TOOL_MEMORY_LOOP_EDIT_APPROVAL: &str = "codifix_loop_edit_approval";
+const TOOL_MEMORY_LOOP_GLOBAL_STATE: &str = "codifix_loop_global_state";
+const TOOL_MEMORY_LOOP_SET_GLOBAL_KILL_SWITCH: &str = "codifix_loop_set_global_kill_switch";
 
-const PROMPT_GET_UP_TO_SPEED: &str = "memory_get_up_to_speed";
-const PROMPT_ANSWER_WITH_CONTEXT: &str = "memory_answer_with_context";
-const PROMPT_ROUTE_CROSS_PROJECT_TASK: &str = "memory_route_cross_project_task";
+const PROMPT_GET_UP_TO_SPEED: &str = "codifix_get_up_to_speed";
+const PROMPT_ANSWER_WITH_CONTEXT: &str = "codifix_answer_with_context";
+const PROMPT_ROUTE_CROSS_PROJECT_TASK: &str = "codifix_route_cross_project_task";
 
 #[derive(Debug, Clone)]
 pub struct MemoryMcpServer {
@@ -183,7 +183,7 @@ impl ServerHandler for MemoryMcpServer {
                 .build(),
         )
         .with_instructions(
-            "Memory Layer MCP adapter. Ordinary memory tools are read-only. Expertise ask is an explicitly confirmed external action, requires non-read-only MCP configuration and operator-bound model output policy. Imported answers are untrusted. Loop tools expose the loop control plane and require explicit user approval for enabling loops.",
+            "Codifix MCP adapter. Ordinary memory tools are read-only. Expertise ask is an explicitly confirmed external action, requires non-read-only MCP configuration and operator-bound model output policy. Imported answers are untrusted. Loop tools expose the loop control plane and require explicit user approval for enabling loops.",
         )
     }
 
@@ -211,7 +211,7 @@ impl ServerHandler for MemoryMcpServer {
             TOOL_MEMORY_OVERVIEW => server.tool_overview(arguments).await,
             TOOL_MEMORY_LIST_MEMORIES => server.tool_list_memories(arguments).await,
             TOOL_MEMORY_GET_MEMORY => server.tool_get_memory(arguments).await,
-            TOOL_MEMORY_MEMORY_HISTORY => server.tool_memory_history(arguments).await,
+            TOOL_MEMORY_MEMORY_HISTORY => server.tool_codifix_history(arguments).await,
             TOOL_MEMORY_LIST_ACTIVITIES => server.tool_list_activities(arguments).await,
             TOOL_MEMORY_LIST_REPLACEMENT_PROPOSALS => {
                 server.tool_list_replacement_proposals(arguments).await
@@ -302,7 +302,7 @@ impl ServerHandler for MemoryMcpServer {
                 json!(
                     server
                         .client
-                        .memory_history(&memory_id)
+                        .codifix_history(&memory_id)
                         .await
                         .map_err(api_error)?
                 )
@@ -335,7 +335,7 @@ impl ServerHandler for MemoryMcpServer {
                     .and_then(Value::as_str)
                     .ok_or_else(|| invalid_params("prompt argument `project` is required"))?;
                 format!(
-                    "Use Memory Layer MCP to get up to speed on project `{project}`. First call `{TOOL_MEMORY_UP_TO_SPEED}` with project `{project}`, then use the briefing, blockers, next actions, and useful memories to orient your work."
+                    "Use Codifix MCP to get up to speed on project `{project}`. First call `{TOOL_MEMORY_UP_TO_SPEED}` with project `{project}`, then use the briefing, blockers, next actions, and useful memories to orient your work."
                 )
             }
             PROMPT_ANSWER_WITH_CONTEXT => {
@@ -348,7 +348,7 @@ impl ServerHandler for MemoryMcpServer {
                     .and_then(Value::as_str)
                     .ok_or_else(|| invalid_params("prompt argument `question` is required"))?;
                 format!(
-                    "Answer this project-memory question using Memory Layer context. Call `{TOOL_MEMORY_QUERY}` with project `{project}` and question `{question}`, then answer from the returned answer text, citations, summaries, match kinds, and diagnostics. Say when evidence is insufficient."
+                    "Answer this project-memory question using Codifix context. Call `{TOOL_MEMORY_QUERY}` with project `{project}` and question `{question}`, then answer from the returned answer text, citations, summaries, match kinds, and diagnostics. Say when evidence is insufficient."
                 )
             }
             PROMPT_ROUTE_CROSS_PROJECT_TASK => {
@@ -357,7 +357,7 @@ impl ServerHandler for MemoryMcpServer {
                     .and_then(Value::as_str)
                     .ok_or_else(|| invalid_params("prompt argument `task` is required"))?;
                 format!(
-                    "Route this cross-project task using Memory Layer: {task}\n\nCall `{TOOL_MEMORY_SEARCH_ALL}` with the task as the question. Compare returned citations and result summaries, then choose the repository from the strongest result's project and repo_root metadata. Do not take repository-specific follow-up actions until the selected result clearly identifies a repo_root; if evidence is ambiguous, ask the user to choose."
+                    "Route this cross-project task using Codifix: {task}\n\nCall `{TOOL_MEMORY_SEARCH_ALL}` with the task as the question. Compare returned citations and result summaries, then choose the repository from the strongest result's project and repo_root metadata. Do not take repository-specific follow-up actions until the selected result clearly identifies a repo_root; if evidence is ambiguous, ask the user to choose."
                 )
             }
             other => {
@@ -534,14 +534,14 @@ impl MemoryMcpServer {
         )
     }
 
-    async fn tool_memory_history(
+    async fn tool_codifix_history(
         &self,
         arguments: Map<String, Value>,
     ) -> Result<CallToolResult, McpError> {
         let args: MemoryIdArg = from_args(arguments)?;
         let response = self
             .client
-            .memory_history(&args.memory_id)
+            .codifix_history(&args.memory_id)
             .await
             .map_err(api_error)?;
         let text = response
@@ -1095,7 +1095,7 @@ impl MemoryApiClient {
         self.get(&format!("/v1/memory/{memory_id}")).await
     }
 
-    pub async fn memory_history(&self, memory_id: &str) -> Result<MemoryHistoryResponse> {
+    pub async fn codifix_history(&self, memory_id: &str) -> Result<MemoryHistoryResponse> {
         self.get(&format!("/v1/memory/{memory_id}/history")).await
     }
 
@@ -1726,7 +1726,7 @@ fn tool_definitions() -> Vec<Tool> {
     vec![
         tool(
             TOOL_MEMORY_QUERY,
-            "Ask a project-specific question against Memory Layer.",
+            "Ask a project-specific question against Codifix.",
             object_schema(&[
                 required_string("question", "Question to answer from project memory."),
                 optional_string("project", "Project slug. Required for HTTP MCP."),
@@ -1742,7 +1742,7 @@ fn tool_definitions() -> Vec<Tool> {
         ),
         tool(
             TOOL_MEMORY_SEARCH_ALL,
-            "Search across all Memory Layer projects and return project/repo routing metadata for follow-up actions.",
+            "Search across all Codifix projects and return project/repo routing metadata for follow-up actions.",
             object_schema(&[
                 required_string("question", "Question to answer from all project memory."),
                 optional_integer("top_k", "Maximum number of memories to retrieve."),
@@ -2002,28 +2002,28 @@ fn mutating_tool(
 fn resource_templates() -> Vec<ResourceTemplate> {
     [
         (
-            "memory://projects/{project}/overview",
+            "codifix://projects/{project}/overview",
             "project_overview",
             "Project overview JSON.",
         ),
         (
-            "memory://projects/{project}/memories",
+            "codifix://projects/{project}/memories",
             "project_memories",
             "Project memory list JSON.",
         ),
         (
-            "memory://projects/{project}/activities",
+            "codifix://projects/{project}/activities",
             "project_activities",
             "Project activity list JSON.",
         ),
         (
-            "memory://memories/{memory_id}",
-            "memory_detail",
+            "codifix://memories/{memory_id}",
+            "codifix_detail",
             "Full memory detail JSON.",
         ),
         (
-            "memory://memories/{memory_id}/history",
-            "memory_history",
+            "codifix://memories/{memory_id}/history",
+            "codifix_history",
             "Memory version history JSON.",
         ),
     ]
@@ -2040,7 +2040,7 @@ fn prompt_definitions() -> Vec<Prompt> {
     vec![
         Prompt::new(
             PROMPT_GET_UP_TO_SPEED,
-            Some("Start work in a repo using Memory Layer context."),
+            Some("Start work in a repo using Codifix context."),
             Some(vec![PromptArgument::new("project").with_required(true)]),
         ),
         Prompt::new(
@@ -2214,8 +2214,8 @@ pub enum MemoryResource {
 }
 
 pub fn parse_resource_uri(uri: &str) -> Result<MemoryResource, McpError> {
-    let Some(rest) = uri.strip_prefix("memory://") else {
-        return Err(invalid_params("resource URI must start with memory://"));
+    let Some(rest) = uri.strip_prefix("codifix://") else {
+        return Err(invalid_params("resource URI must start with codifix://"));
     };
     let parts = rest.split('/').collect::<Vec<_>>();
     match parts.as_slice() {
@@ -2392,13 +2392,13 @@ mod tests {
     #[test]
     fn parses_resource_uris() {
         assert_eq!(
-            parse_resource_uri("memory://projects/memory/overview").unwrap(),
+            parse_resource_uri("codifix://projects/memory/overview").unwrap(),
             MemoryResource::ProjectOverview {
                 project: "memory".to_string()
             }
         );
         assert_eq!(
-            parse_resource_uri("memory://memories/11111111-1111-1111-1111-111111111111/history")
+            parse_resource_uri("codifix://memories/11111111-1111-1111-1111-111111111111/history")
                 .unwrap(),
             MemoryResource::MemoryHistory {
                 memory_id: "11111111-1111-1111-1111-111111111111".to_string()
@@ -2431,7 +2431,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn memory_query_tool_uses_http_backend() {
+    async fn codifix_query_tool_uses_http_backend() {
         let app = Router::new().route(
             "/v1/query",
             post(|| async {
@@ -2494,7 +2494,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn memory_search_all_tool_returns_project_routing_metadata() {
+    async fn codifix_search_all_tool_returns_project_routing_metadata() {
         let app = Router::new().route(
             "/v1/query/global",
             post(|| async {
@@ -2504,7 +2504,7 @@ mod tests {
                     "results": [{
                         "memory_id": "11111111-1111-1111-1111-111111111111",
                         "project": "memory",
-                        "project_name": "Memory Layer",
+                        "project_name": "Codifix",
                         "repo_root": "/home/olivier/Projects/memory",
                         "summary": "MCP global search",
                         "memory_type": "implementation",
@@ -2525,7 +2525,7 @@ mod tests {
                         "result_number": 1,
                         "memory_id": "11111111-1111-1111-1111-111111111111",
                         "project": "memory",
-                        "project_name": "Memory Layer",
+                        "project_name": "Codifix",
                         "repo_root": "/home/olivier/Projects/memory",
                         "memory_type": "implementation",
                         "summary": "MCP global search",

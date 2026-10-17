@@ -21,10 +21,10 @@ Binaries detect their profile at startup:
   alongside a `Cargo.toml` runs as **dev**.
 - Installed binaries (systemd units, `~/.cargo/bin/`, packaged installs)
   run as **prod**.
-- Override with `MEMORY_LAYER_PROFILE=dev|prod` when needed.
+- Override with `CODIFIX_PROFILE=dev|prod` when needed.
 
 The dev profile ignores the global config entirely and overlays the user-local
-project `config.dev.toml` on `config.toml`. Legacy `.mem/` configuration is
+project `config.dev.toml` on `config.toml`. Legacy `.codifix/` configuration is
 migrated to those user-local paths. The dev service has its own port, socket and
 runtime directory; data isolation requires its own database URL. This checkout
 uses a dedicated dev database. The TUI header shows `[dev]` on the dev profile.
@@ -44,18 +44,18 @@ database URL + LLM/embedding endpoints into the overlay),
 `--no-copy-from-global` (skip the prompt), `--force` (overwrite an
 existing overlay), `--dry-run` (preview only).
 
-## Memory Layer workflows
+## Codifix workflows
 
-This project uses Memory Layer to persist durable project knowledge. The `memory` CLI
+This project uses Codifix to persist durable project knowledge. The `memory` CLI
 must be on PATH. Durable project knowledge belongs to Workshop's `memory` project;
-the shared Go helper explicitly selects `memory --area workshop` using
-`.agents/memory-layer-command.json`. Use that helper for queries, task starts,
+the shared Go helper explicitly selects `codifix --area workshop` using
+`.agents/codifix-command.json`. Use that helper for queries, task starts,
 plans and completed work. Direct installed CLI examples below should likewise use
-`memory --area workshop` explicitly.
+`codifix --area workshop` explicitly.
 
 The dev service/database is for backend tests, not a second durable knowledge
 store. To test a helper against dev, explicitly set
-`MEMCTL_BIN='cargo run --quiet --bin memory --'`. No request failure changes its
+`CODIFIX_BIN='cargo run --quiet --bin memory --'`. No request failure changes its
 destination. See [routing and recovery](docs/developer/dev-stack.md#project-memory-routing-and-recovery).
 
 ### Shared invariants
@@ -72,8 +72,8 @@ destination. See [routing and recovery](docs/developer/dev-stack.md#project-memo
 Use when: the user asks a project-specific question or returns after an interruption.
 
 ```bash
-memory query --project memory --question "<question>"
-memory resume --project memory
+codifix query --project memory --question "<question>"
+codifix resume --project memory
 ```
 
 ### Plan execution
@@ -81,12 +81,12 @@ Use when: a planning session ends and the user approves execution.
 
 Save checkpoint and plan at execution start:
 ```bash
-memory checkpoint start-execution --project memory --plan-file /tmp/approved-plan.md
+codifix checkpoint start-execution --project memory --plan-file /tmp/approved-plan.md
 ```
 
 Verify all plan items are complete before claiming finished:
 ```bash
-memory checkpoint finish-execution --project memory
+codifix checkpoint finish-execution --project memory
 ```
 
 ### Remember completed work (mandatory post-task rule)
@@ -97,7 +97,7 @@ final response** unless one of these is true:
 - the user explicitly asked not to store memory
 
 ```bash
-memory remember --project memory \
+codifix remember --project memory \
   --title "<task title>" \
   --summary "<what changed>" \
   --note "<durable fact 1>" \
@@ -113,7 +113,7 @@ Use when: you answered a request to explain code, a file, a module, an architect
 After answering, store a distilled reusable memory when the explanation is durable and grounded in inspected code or existing memory. Do not store the full chat answer, speculative claims, duplicates, or trivial explanations. Do not use `--file-changed` unless files actually changed.
 
 ```bash
-memory remember --project memory --type project \
+codifix remember --project memory --type project \
   --title "Explained <file/module/codebase>" \
   --prompt "<user explanation request>" \
   --summary "<short explanation summary>" \

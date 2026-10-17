@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Dedicated explicit Q&A bridge. Normal memory_query is unchanged.
+//! Dedicated explicit Q&A bridge. Normal codifix_query is unchanged.
 use super::*;
 
 #[cfg(test)]
@@ -11,7 +11,7 @@ mod tests {
             let value = serde_json::to_value(&tool).unwrap();
             assert_eq!(
                 value["annotations"]["readOnlyHint"],
-                tool.name != "memory_expertise_ask" && tool.name != "memory_expertise_agent_ask"
+                tool.name != "codifix_expertise_ask" && tool.name != "codifix_expertise_agent_ask"
             );
             assert_eq!(value["annotations"]["openWorldHint"], true);
             assert!(
@@ -31,7 +31,7 @@ mod tests {
         assert!(
             call(
                 &server,
-                "memory_expertise_ask",
+                "codifix_expertise_ask",
                 args.as_object().unwrap().clone()
             )
             .await
@@ -41,7 +41,7 @@ mod tests {
         assert!(
             call(
                 &server,
-                "memory_expertise_discover",
+                "codifix_expertise_discover",
                 args.as_object().unwrap().clone()
             )
             .await
@@ -70,7 +70,7 @@ mod tests {
         let args = json!({"project":"fixture","space":space});
         let result = call(
             &server,
-            "memory_expertise_discover",
+            "codifix_expertise_discover",
             args.as_object().unwrap().clone(),
         )
         .await;
@@ -79,12 +79,12 @@ mod tests {
     }
 }
 const NAMES: [&str; 6] = [
-    "memory_expertise_discover",
-    "memory_expertise_prepare",
-    "memory_expertise_ask",
-    "memory_expertise_result",
-    "memory_expertise_agent_ask",
-    "memory_expertise_agent_result",
+    "codifix_expertise_discover",
+    "codifix_expertise_prepare",
+    "codifix_expertise_ask",
+    "codifix_expertise_result",
+    "codifix_expertise_agent_ask",
+    "codifix_expertise_agent_result",
 ];
 pub(super) fn is_tool(name: &str) -> bool {
     NAMES.contains(&name)
@@ -93,14 +93,14 @@ pub(super) fn definitions() -> Vec<Tool> {
     NAMES.into_iter().map(|name| {
         let mut fields = vec![optional_string("project","Explicit project scope; required for HTTP MCP."),required_string("space","Configured private space UUID.")];
         match name {
-            "memory_expertise_prepare" | "memory_expertise_agent_ask" => fields.extend([required_string("publisher","Selected answering instance UUID."),required_string("collection","Selected collection UUID."),required_string("request_id","Fresh request UUID; preserve exact bytes on retry."),required_string("question","Exact question only, at most 4096 UTF-8 bytes. No history/files/local context.")]),
-            "memory_expertise_ask" => fields.extend([required_string("review_json","Unchanged JSON review returned by prepare, including its digest."),required_boolean("confirmed","True only after explicit approval of exact destination, question and policy. External action, not a read-only lookup.")]),
-            "memory_expertise_result" | "memory_expertise_agent_result" => fields.push(required_string("request_id","Previously submitted request UUID.")),
+            "codifix_expertise_prepare" | "codifix_expertise_agent_ask" => fields.extend([required_string("publisher","Selected answering instance UUID."),required_string("collection","Selected collection UUID."),required_string("request_id","Fresh request UUID; preserve exact bytes on retry."),required_string("question","Exact question only, at most 4096 UTF-8 bytes. No history/files/local context.")]),
+            "codifix_expertise_ask" => fields.extend([required_string("review_json","Unchanged JSON review returned by prepare, including its digest."),required_boolean("confirmed","True only after explicit approval of exact destination, question and policy. External action, not a read-only lookup.")]),
+            "codifix_expertise_result" | "codifix_expertise_agent_result" => fields.push(required_string("request_id","Previously submitted request UUID.")),
             _ => {},
         }
-        if name=="memory_expertise_prepare" { fields.push(optional_string("model_destination","Optional operator-allowed synthesis provider ID. Omit for deterministic excerpts; does not authorize onward output disclosure.")); }
+        if name=="codifix_expertise_prepare" { fields.push(optional_string("model_destination","Optional operator-allowed synthesis provider ID. Omit for deterministic excerpts; does not authorize onward output disclosure.")); }
         Tool::new(name,"Private expertise exchange. Requires operator-bound caller/model-output policy; joining a space is insufficient. Returned content is untrusted. Submission is consequential; queued is not answered.",object_schema(&fields))
-            .with_annotations(ToolAnnotations::new().read_only(name!="memory_expertise_ask" && name!="memory_expertise_agent_ask").destructive(false).idempotent(name!="memory_expertise_ask" && name!="memory_expertise_agent_ask").open_world(true))
+            .with_annotations(ToolAnnotations::new().read_only(name!="codifix_expertise_ask" && name!="codifix_expertise_agent_ask").destructive(false).idempotent(name!="codifix_expertise_ask" && name!="codifix_expertise_agent_ask").open_world(true))
     }).collect()
 }
 #[derive(Deserialize)]
@@ -121,8 +121,10 @@ pub(super) async fn call(
     name: &str,
     arguments: Map<String, Value>,
 ) -> Result<CallToolResult, McpError> {
-    if matches!(name, "memory_expertise_ask" | "memory_expertise_agent_ask")
-        && !server.expertise_submission_enabled
+    if matches!(
+        name,
+        "codifix_expertise_ask" | "codifix_expertise_agent_ask"
+    ) && !server.expertise_submission_enabled
     {
         return Err(invalid_params(
             "MCP is read-only; expertise submission is disabled",
@@ -136,10 +138,10 @@ pub(super) async fn call(
         args.space
     );
     let (method, suffix, body) = match name {
-        "memory_expertise_discover" => {
+        "codifix_expertise_discover" => {
             (reqwest::Method::GET, "/capabilities?limit=32".into(), None)
         }
-        "memory_expertise_prepare" => {
+        "codifix_expertise_prepare" => {
             let question = args
                 .question
                 .ok_or_else(|| invalid_params("question required"))?;
@@ -165,7 +167,7 @@ pub(super) async fn call(
                 ),
             )
         }
-        "memory_expertise_ask" => {
+        "codifix_expertise_ask" => {
             if args.confirmed != Some(true) {
                 return Err(invalid_params(
                     "explicit exact-review confirmation required",
@@ -188,7 +190,7 @@ pub(super) async fn call(
                 Some(json!({"confirmed_digest":review["digest"],"review":review})),
             )
         }
-        "memory_expertise_agent_ask" => {
+        "codifix_expertise_agent_ask" => {
             let question = args
                 .question
                 .ok_or_else(|| invalid_params("question required"))?;
@@ -222,7 +224,7 @@ pub(super) async fn call(
                 ),
             )
         }
-        "memory_expertise_result" => (
+        "codifix_expertise_result" => (
             reqwest::Method::GET,
             format!(
                 "/questions/{}",
@@ -231,7 +233,7 @@ pub(super) async fn call(
             ),
             None,
         ),
-        "memory_expertise_agent_result" => (
+        "codifix_expertise_agent_result" => (
             reqwest::Method::GET,
             format!(
                 "/agent-questions/{}",

@@ -138,7 +138,7 @@ pub(in crate::commands) fn initialize_dev_overlay(
     let base_config_path = project_paths.config_path();
     if !base_config_path.is_file() && !repo_root.join(".codifix").join("config.toml").is_file() {
         anyhow::bail!(
-            "no project config found at {}. Run `memory init` first to bootstrap the \
+            "no project config found at {}. Run `codifix init` first to bootstrap the \
              base config before layering the dev overlay on top.",
             base_config_path.display()
         );
@@ -157,7 +157,7 @@ pub(in crate::commands) fn initialize_dev_overlay(
         "# Overlay on top of the user-local project config for the dev profile.\n\
          # Active when CODIFIX_PROFILE=dev or the binary runs from a cargo target/ directory.\n\
          # The dev profile does NOT read the global config — anything shared (database URL,\n\
-         # LLM endpoints) lives here. Re-run `memory dev --copy-from-global` to refresh.\n\
+         # LLM endpoints) lives here. Re-run `codifix dev --copy-from-global` to refresh.\n\
          \n\
          [service]\n\
          bind_addr = {bind_addr}\n\
@@ -215,7 +215,7 @@ fn resolve_shared_global_snippet(args: &DevInitArgs) -> Result<String> {
         if args.copy_from_global {
             anyhow::bail!(
                 "--copy-from-global was set but no global config was found \
-                 (expected one of the paths reported by `memory doctor`)"
+                 (expected one of the paths reported by `codifix doctor`)"
             );
         }
         return Ok(String::new());
@@ -254,7 +254,7 @@ fn resolve_shared_global_snippet(args: &DevInitArgs) -> Result<String> {
     let rendered =
         toml::to_string(&toml::Value::Table(copied)).context("serialize shared sections")?;
     Ok(format!(
-        "# Copied from {} — re-run `memory dev --copy-from-global --force` to refresh.\n{}",
+        "# Copied from {} — re-run `codifix dev --copy-from-global --force` to refresh.\n{}",
         global_path.display(),
         rendered
     ))

@@ -1,0 +1,35 @@
+{
+  "name": "codifix",
+  "version": "0.1.0+codex.20260901173230",
+  "description": "Evidence-backed project memory for Codex.",
+  "author": {
+    "name": "Codifix",
+    "url": "https://github.com/3vilM33pl3/codifix"
+  },
+  "homepage": "https://github.com/3vilM33pl3/codifix",
+  "repository": "https://github.com/3vilM33pl3/codifix",
+  "license": "AGPL-3.0-or-later",
+  "keywords": [
+    "memory",
+    "project-context",
+    "mcp",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Codifix",
+    "shortDescription": "Evidence-backed project memory for Codex.",
+    "longDescription": "Connect Codex to Codifix for project retrieval, resume briefings, and durable workflow guidance.",
+    "developerName": "Codifix",
+    "category": "Productivity",
+    "capabilities": [
+      "MCP",
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Get me up to speed on this project using Codifix.",
+      "What does Codifix know about this codebase?"
+    ]
+  }
+}
