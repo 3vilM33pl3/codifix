@@ -26,6 +26,30 @@ The portable ZIP uses the same `bin`/`share` layout. Add the extracted `bin` dir
 with unchanged executable and Web asset hashes. A failed compiler/build tool
 does not silently package an older executable.
 
+### Stable 2.1.0 preview acceptance
+
+The stable application release uses `-InstallerBuild 1`, MSI version `2.1.1`
+and `windows-v2.1.0-build.1` artifact identities. These packages remain a
+Windows **preview**, not complete native-stack parity. Private lab installer
+builds 60000/60001 are intentionally not downgraded in place.
+
+On a disposable GitHub Windows runner, after provisioning a fresh native
+PostgreSQL/pgvector database, run:
+
+```powershell
+./packaging/windows/check-release.ps1 `
+  -DistDir target/windows/dist/windows-v2.1.0-build.1 `
+  -ExpectedVersion 2.1.0 -ExpectedCommit $env:GITHUB_SHA `
+  -TestDatabaseUrl $env:MEMORY_LAYER_RELEASE_DATABASE_URL
+```
+
+The exact loopback database must be named `memory_release_*`. The check verifies
+manifest/payload hashes, native capture/replay, curation, lexical search, Web
+serving and restart, then installs, repairs and removes both MSI variants while
+preserving a user-data sentinel. It starts no installed services and makes no
+provider calls. It refuses non-GitHub hosts and does not certify AppContainer,
+full-stack provisioning or the remaining Windows parity checklist.
+
 ## Native service adapter
 
 The bundle includes `memory-windows-service.exe`, an SCM-aware host for one

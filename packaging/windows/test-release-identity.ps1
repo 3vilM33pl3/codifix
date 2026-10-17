@@ -4,6 +4,9 @@ $ErrorActionPreference = 'Stop'
 $first = Get-WindowsReleaseIdentity -ApplicationVersion '2.1.0-rc.5' -InstallerBuild 1
 $next = Get-WindowsReleaseIdentity -ApplicationVersion '2.1.0-rc.5' -InstallerBuild 2
 $patch = Get-WindowsReleaseIdentity -ApplicationVersion '2.1.1' -InstallerBuild 3
+$stable = Get-WindowsReleaseIdentity -ApplicationVersion '2.1.0' -InstallerBuild 1
+if ($stable.installer_version -ne '2.1.1' -or $stable.release_identity -ne 'windows-v2.1.0-build.1') { throw 'Incorrect stable preview identity' }
+if ($stable.asset_prefix -eq $first.asset_prefix) { throw 'Stable package collides with the RC artifact' }
 if ($first.installer_version -ne '2.1.1') { throw 'RC installer version is not independent of semver' }
 if ([version]$next.installer_version -le [version]$first.installer_version) { throw 'MSI ordering regressed' }
 if ([version]$patch.installer_version -le [version]$next.installer_version) { throw 'Patch ordering regressed' }
