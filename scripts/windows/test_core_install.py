@@ -54,6 +54,20 @@ class CoreInstallTests(unittest.TestCase):
             self.assertIn(required, source)
         self.assertNotIn("Copy-CoreInstallFile (Join-Path $debug $file)", source)
 
+    def test_sanitized_installer_environment_preserves_fixed_windows_identity(self):
+        source = SCRIPT.read_text()
+        clear = source.index("$info.EnvironmentVariables.Clear()")
+        start = source.index("$null=$process.Start()", clear)
+        environment = source[clear:start]
+        for key, value in [("OS", "Windows_NT"), ("COMPUTERNAME", "MEMORY-WINLAB"),
+                           ("PROCESSOR_ARCHITECTURE", "AMD64")]:
+            self.assertIn(f"$info.EnvironmentVariables['{key}']='{value}'", environment)
+            self.assertNotIn(f"$info.EnvironmentVariables['{key}']=$env:", environment)
+        self.assertIn("$info.EnvironmentVariables['SystemRoot']=$env:SystemRoot", environment)
+        self.assertIn("$info.EnvironmentVariables['PATH']=$env:SystemRoot+'\\System32'", environment)
+        self.assertNotIn("GetEnvironmentVariables", environment)
+        self.assertNotIn("API_KEY", environment)
+
     def test_running_exact_virtual_identity_and_actual_http_proofs(self):
         source = SCRIPT.read_text()
         for required in ["Get-CimInstance Win32_Service", "$scm.StartName -ine $account", "GetOwnerSid",

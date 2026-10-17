@@ -126,6 +126,8 @@ function Invoke-CoreInstallerProcess([string]$Exe,[string[]]$Arguments,[string]$
     $info=[Diagnostics.ProcessStartInfo]::new();$info.FileName=$Exe;$info.Arguments=($Arguments | ForEach-Object {ConvertTo-NativeCommandArgument $_}) -join ' '
     $info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.WorkingDirectory=$root;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
     $info.EnvironmentVariables.Clear();$info.EnvironmentVariables['SystemRoot']=$env:SystemRoot;$info.EnvironmentVariables['WINDIR']=$env:SystemRoot
+    $info.EnvironmentVariables['OS']='Windows_NT';$info.EnvironmentVariables['COMPUTERNAME']='MEMORY-WINLAB'
+    $info.EnvironmentVariables['PROCESSOR_ARCHITECTURE']='AMD64'
     $info.EnvironmentVariables['PATH']=$env:SystemRoot+'\System32'
     foreach($key in @('HOME','USERPROFILE','APPDATA','LOCALAPPDATA','TEMP','TMP')){$info.EnvironmentVariables[$key]=$root}
     if($PgPassword){$info.EnvironmentVariables['PGPASSWORD']=$PgPassword}
