@@ -7,7 +7,7 @@ gateway branded bootstrap names. Guards extracted from the private ledger were
 rebound to the fixture catalog OIDs and cluster system identifiers; this does not
 claim a live OID match. The original ledger remained byte-identical.
 
-All 106 checks passed across Workshop, Homelab, General and gateway. Exact
+All 114 recorded checks passed across Workshop, Homelab, General and gateway. Exact
 primary/restorecheck DB names and General/gateway role names were renamed, with
 restorecheck connections remaining disabled. Generic postgres and neutral area/
 runtime roles were preserved. The temporary NOLOGIN SUPERUSER/session-authorization
@@ -36,12 +36,31 @@ the populated cold physical transfer, native service configuration, live clients
 final matched recovery, artifact acceptance or live cutover. Those operational
 gates remain open.
 
-## Private evidence bindings
+## Focused rejection-evidence correction
 
-| File | SHA-256 |
-| --- | --- |
-| `rehearse.py` | `1deac1933d52d23a8a9d8dfb90308236ee53b44cf9b3675aab895da3f4f8888d` |
-| `report.json` | `56a44fc298b1306ee8743c56159a12cc97257fadae6514ebd7714cfb559a845d` |
+The original 20 connection-refusal checks accepted any OperationalError, so that
+evidence was narrowed. Only those 20 negatives were rerun on the retained four
+fixtures. The new matcher requires the specific PostgreSQL SQLSTATE when the
+connection exception provides one; otherwise every diagnostic line must match
+the exact PostgreSQL 17 fixture FATAL message for password rejection, missing
+database, or a database not accepting connections. Unknown diagnostics and
+transport errors fail the check; exception text and credential values are never
+printed. A successful control connection follows each expected refusal.
 
-The source ledger and synthetic fixture credentials remain in the private local
-recovery directory. No credentials or SCRAM verifier bytes are included here.
+Four actual connection-refused probes against locally reserved, non-listening
+ports were rejected by every expected-PostgreSQL-error category and by the
+asserting matcher. They did not increment the accepted refusal counter. Four
+before/after snapshots confirmed that this focused rerun preserved role/database/
+table OIDs, exact SCRAM verifier bytes, ownership/grants, flags and content. All
+four exact fixtures were stopped afterward. No other original checks were rerun.
+
+The resulting 114 checks comprise 86 unaffected original checks, 20 strictly
+revalidated refusal checks, 4 transport-failure rejection proofs and 4 focused
+preservation checks. Prior private script/report/draft versions are retained.
+
+Private execution artifact SHA-256 values (metadata only):
+
+- `rehearse.py`: `477255a645532ed8bd637fdbd5aa20cbf013d4e74084aad6f9ffc6d429728301`
+- `connect_failure.py`: `67cd715ee98e1d3f91b5c3b8f5e0ad4a32a437fe5db272631515fabe797321da`
+- `revalidate_auth.py`: `8456d9b74e27ae7ef5b883a18a0d8a77f28c1569f0b01bea8932d8efcb39f571`
+- `report.json`: `66e936834bed8b94783f84adff0c4a7d113290c5e3d4c74b1477e65880513240`
