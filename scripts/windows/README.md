@@ -23,6 +23,12 @@ clean copied source directory. Its bound inputs are `guest-native-eval.ps1`,
 private guest inputs directory. It runs deterministic knowledge answers through
 the actual AppContainer helper, checks excluded-project/hidden-grader denials,
 and requires fabricated citations to fail while human judgments stay unresolved.
+It also drives a real native command/final-export loop with a fake model,
+verifies nested payload disclosure controls, and checks output/deadline failure
+receipts. No provider is invoked. The separate `guest-rust-evaluation.ps1` /
+`guest-rust-proof.mjs` diagnostic prepares an explicit private Rust/MSVC/library
+subset for actual positive, wrong-answer and broken-source compilation controls;
+its source alone is not execution evidence.
 Receipts retain exact source/tool hashes and private operation paths. This is not
 an official R3 campaign, a Rust grading pass or a hard disk-limit claim; it makes
 no model calls.

@@ -88,3 +88,20 @@ remain readable but cannot masquerade as Windows evidence or carry its approval.
 - [ ] Missing/mismatched native toolchain or backend metadata invalidates a run.
 
 This proves harness behavior, not measured product quality or paid R3 completion.
+
+## Observed bounded native execution — 17 October
+
+`NativeEval` operation `a3e52a7a-bc30-42ac-8b73-2e966f507cc6` passed actual
+AppContainer knowledge/citation checks, excluded-project/hidden-grader denials,
+a fake-model-mediated native command plus final export, and output/deadline
+failure controls. No provider calls were made; human rubric judgments remain
+unresolved. The Task Scheduler registration proof is separate from evaluation.
+
+Pinned Node starts with explicit preserve-symlink flags rather than drive-root
+ACL grants. Its child stdio uses private inherited scratch-file descriptors:
+pinned libuv's ordinary non-LOCAL pipe creation cannot run in this AppContainer.
+Native Rust grading uses that same explicit-descriptor technique. Its post-run
+output cap is not a continuous scratch-disk limit. Actual Rust compilation and
+campaign dispatch remain pending; the acceptance checkboxes above are not closed
+by deterministic knowledge/model checks alone. See the
+[full execution ledger](parity-20261016.md) for exact operations and limitations.
