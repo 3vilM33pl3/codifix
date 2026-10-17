@@ -9,7 +9,9 @@ use sqlx::{
 };
 use std::{borrow::Cow, path::PathBuf, time::Duration};
 
-const HEAD: i64 = 71;
+// Explicitly reviewed through the device-replica sync-health migration. Never
+// derive this from the current directory: new SQL requires a fresh-schema review.
+const HEAD: i64 = 84;
 // Same compatibility rule as mem-service::runtime and mem-test-support. Preserve
 // the applied checksum; migration 16 removes the obsolete dimensionless index.
 const VECTOR_COMPAT: &str = r#"
@@ -251,6 +253,10 @@ mod tests {
     fn compatibility_preserves_original_history_and_rejects_new_head() {
         let original = sqlx::migrate!("../../migrations");
         let compatible = migrations();
+        let plan = describe(&compatible).unwrap();
+        assert_eq!(plan.migration_head, 84);
+        assert_eq!(plan.migrations, 84);
+        assert!(!plan.creates_credentials && !plan.starts_services);
         for (original, actual) in original.iter().zip(compatible.iter()) {
             assert_eq!(original.checksum, actual.checksum);
             if original.version == 4 {
@@ -266,6 +272,11 @@ mod tests {
         changed.migrations.to_mut()[0].no_tx = false;
         changed.migrations.to_mut().pop();
         assert!(describe(&changed).is_err());
+        let mut future = migrations();
+        let mut next = future.iter().last().unwrap().clone();
+        next.version = 85;
+        future.migrations.to_mut().push(next);
+        assert!(describe(&future).is_err());
     }
 
     #[tokio::test]

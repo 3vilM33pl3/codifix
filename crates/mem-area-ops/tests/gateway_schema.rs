@@ -69,7 +69,7 @@ fn default_review_is_offline_exact_and_never_discloses_private_values() {
         review["status"],
         "gateway_schema_review_only_no_database_connection"
     );
-    assert_eq!(review["schema"]["migration_head"], 71);
+    assert_eq!(review["schema"]["migration_head"], 84);
     assert_eq!(review["database"], "not_connected");
     assert_eq!(review["owner"], "schema_owner");
     assert_eq!(review["enrolls_gateway"], false);
@@ -221,6 +221,12 @@ async fn initializes_exact_gateway_schema_without_app_bootstrap_and_refuses_repl
         "background_jobs",
         "supervisor_actions",
         "supervisor_instance_binding",
+        "onboarding_company_agents",
+        "onboarding_company_device_selections",
+        "laptop_curated_bindings",
+        "laptop_curated_outbox",
+        "device_replica_records",
+        "device_curated_contribution_receipts",
         "federation_gateway_spaces",
         "federation_accepted",
         "federation_publish_outbox",

@@ -24,9 +24,6 @@ impl Directory {
             .publish(partial, name, file)
             .map_err(|_| Failure::PrivateFiles)
     }
-    pub fn sync(&self) -> Result<()> {
-        self.0.sync().map_err(|_| Failure::PrivateFiles)
-    }
 }
 
 pub struct Input {

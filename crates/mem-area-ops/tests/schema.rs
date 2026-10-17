@@ -66,7 +66,7 @@ fn failure(output: Output, message: &str) {
 }
 fn request(fixture: &Fixture, dir: &std::path::Path) -> Command {
     let plan = success(command().arg("schema-plan").output().unwrap());
-    assert_eq!(plan["migration_head"], 71);
+    assert_eq!(plan["migration_head"], 84);
     let descriptor = json!({"format_version":1,"instance_id":Uuid::new_v4(),"area":"trust",
         "connection":{"kind":"loopback","port":fixture.options.get_port()},
         "database":fixture.name,"username":fixture.options.get_username(),
@@ -113,7 +113,7 @@ async fn cli_initializes_without_bootstrap_and_refuses_reinitialization() {
             .fetch_one(&mut connection)
             .await
             .unwrap(),
-        70
+        84
     );
     for table in [
         "projects",
@@ -122,6 +122,12 @@ async fn cli_initializes_without_bootstrap_and_refuses_reinitialization() {
         "background_jobs",
         "supervisor_actions",
         "supervisor_instance_binding",
+        "onboarding_company_agents",
+        "onboarding_company_device_selections",
+        "laptop_curated_bindings",
+        "laptop_curated_outbox",
+        "device_replica_records",
+        "device_curated_contribution_receipts",
     ] {
         assert_eq!(
             sqlx::query_scalar::<_, i64>(&format!("SELECT count(*) FROM {table}"))
