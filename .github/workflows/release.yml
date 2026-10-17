@@ -53,6 +53,8 @@ jobs:
           node scripts/release/contract.mjs "$version"
           test -f "docs/releases/$version.md"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Verify native dependency manifest bindings before package builds
+        run: python3 -m unittest discover -s scripts/windows -p test_build_tools.py
 
   validate-release:
     name: Validate frozen source and security overlays
