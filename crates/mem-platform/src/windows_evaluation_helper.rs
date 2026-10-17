@@ -176,7 +176,7 @@ impl Budget {
         Ok(())
     }
 }
-fn drain(mut pipe: File, budget: Arc<Budget>) -> Result<Vec<u8>> {
+fn drain(mut pipe: File, budget: Arc<Budget>, mut partial: File) -> Result<Vec<u8>> {
     let mut result = Vec::new();
     let mut buffer = [0; 4096];
     loop {
@@ -185,6 +185,10 @@ fn drain(mut pipe: File, budget: Arc<Budget>) -> Result<Vec<u8>> {
             return Ok(result);
         }
         budget.take(read)?;
+        // Private bounded diagnostics remain inspectable even if a later Job
+        // reap/cleanup error prevents final artifacts. These partial files are
+        // never returned as validated exports or described as completed output.
+        partial.write_all(&buffer[..read])?;
         result.extend_from_slice(&buffer[..read]);
     }
 }
@@ -329,14 +333,16 @@ fn execute(
     })?;
     drop((stdin_read, stdout_write, stderr_write));
     let budget = Arc::new(Budget::new(descriptor.max_output_bytes));
+    let stdout_partial = root.create("stdout.partial.bin")?;
+    let stderr_partial = root.create("stderr.partial.bin")?;
     let stdout_budget = budget.clone();
     let stdout = thread::Builder::new()
         .name("eval-stdout".into())
-        .spawn(move || drain(stdout_read, stdout_budget))?;
+        .spawn(move || drain(stdout_read, stdout_budget, stdout_partial))?;
     let stderr_budget = budget.clone();
     let stderr = thread::Builder::new()
         .name("eval-stderr".into())
-        .spawn(move || drain(stderr_read, stderr_budget))?;
+        .spawn(move || drain(stderr_read, stderr_budget, stderr_partial))?;
     let stdin = thread::Builder::new()
         .name("eval-stdin".into())
         .spawn(move || stdin_write.write_all(&input))?;
@@ -424,6 +430,32 @@ fn execute(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_partial_diagnostics_are_private_and_respect_the_shared_budget() {
+        for (limit, succeeds) in [(8, true), (5, false)] {
+            let path = std::env::temp_dir().join(format!("eval-drain-{}", uuid::Uuid::new_v4()));
+            create_private_directory(&path).unwrap();
+            let root = Directory::open(&path).unwrap();
+            let (reader, mut writer) = pipe().unwrap();
+            writer.write_all(b"abcdef").unwrap();
+            drop(writer);
+            let result = drain(
+                reader,
+                Arc::new(Budget::new(limit)),
+                root.create("partial.bin").unwrap(),
+            );
+            assert_eq!(result.is_ok(), succeeds);
+            let bytes = Input::open(&path.join("partial.bin"), 8)
+                .unwrap()
+                .read(8)
+                .unwrap();
+            assert_eq!(bytes, if succeeds { b"abcdef".as_slice() } else { b"" });
+            drop(root);
+            std::fs::remove_file(path.join("partial.bin")).unwrap();
+            std::fs::remove_dir(path).unwrap();
+        }
+    }
+
     #[test]
     fn native_output_budget_is_shared_and_never_wraps() {
         let budget = Arc::new(Budget::new(10));
