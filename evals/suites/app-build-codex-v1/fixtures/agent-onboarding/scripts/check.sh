@@ -9,7 +9,7 @@ grep -qi "activities" index.html
 grep -qi "graph context" index.html
 grep -qi "runbook" index.html
 
-if [ "${MEMORY_EVAL_CONDITION:-}" = "no-memory" ]; then
+if [ "${CODIFIX_EVAL_CONDITION:-}" = "no-memory" ]; then
   test ! -f memory-evidence.md
   test ! -f memory-evidence.json
   test ! -d .memory-eval

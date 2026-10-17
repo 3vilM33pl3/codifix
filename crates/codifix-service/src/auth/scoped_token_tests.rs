@@ -135,7 +135,7 @@ async fn single_user_scoped_tokens_http_mcp_and_browser() {
         .unwrap();
     assert!(response.status().is_success());
     for (id, project, allowed) in [(2, "allowed", true), (3, "other", false)] {
-        let response = client.post(format!("{base}/mcp")).bearer_auth(token).header("Accept","application/json, text/event-stream").header("mcp-session-id",&session).json(&json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":"memory_list_memories","arguments":{"project":project}}})).send().await.unwrap();
+        let response = client.post(format!("{base}/mcp")).bearer_auth(token).header("Accept","application/json, text/event-stream").header("mcp-session-id",&session).json(&json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":"codifix_list_memories","arguments":{"project":project}}})).send().await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.text().await.unwrap();
         let payload: Value = serde_json::from_str(&body).unwrap_or_else(|_| {

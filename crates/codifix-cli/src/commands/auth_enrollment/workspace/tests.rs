@@ -280,7 +280,7 @@ fn archive_aliases_and_prefix_conflicts_are_rejected_before_installation() {
         vec!["Scripts/other.sh".to_string()],
         vec!["file".to_string(), "file/child".to_string()],
         vec!["dir/child".to_string(), "dir".to_string()],
-        vec![".MEMORY-ONBOARDING-PIN.JSON".to_string()],
+        vec![".CODIFIX-ONBOARDING-PIN.JSON".to_string()],
         vec!["café.md".to_string()],
         vec!["scripts/./ambiguous".to_string()],
     ];
@@ -785,10 +785,10 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
         "custom skill",
     )
     .unwrap();
-    fs::create_dir_all(args.workspace.join(".claude/skills/memory-remember")).unwrap();
+    fs::create_dir_all(args.workspace.join(".claude/skills/codifix-remember")).unwrap();
     fs::write(
         args.workspace
-            .join(".claude/skills/memory-remember/SKILL.md"),
+            .join(".claude/skills/codifix-remember/SKILL.md"),
         "custom Claude skill",
     )
     .unwrap();
@@ -823,7 +823,7 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
     );
     assert!(
         args.workspace
-            .join(".agents/skills/memory-remember/SKILL.md")
+            .join(".agents/skills/codifix-remember/SKILL.md")
             .is_file()
     );
     assert!(
@@ -834,14 +834,14 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
     assert_eq!(
         fs::read_to_string(
             args.workspace
-                .join(".claude/skills/memory-remember/SKILL.md")
+                .join(".claude/skills/codifix-remember/SKILL.md")
         )
         .unwrap(),
         "custom Claude skill"
     );
     assert!(
         done.preserved_paths
-            .contains(&".claude/skills/memory-remember".into())
+            .contains(&".claude/skills/codifix-remember".into())
     );
     #[cfg(unix)]
     {
@@ -849,7 +849,7 @@ async fn pinned_skills_verify_versions_and_preserve_custom_skill_directories() {
         assert_eq!(
             fs::metadata(
                 args.workspace
-                    .join(".agents/skills/memory-remember/scripts/helper.sh")
+                    .join(".agents/skills/codifix-remember/scripts/helper.sh")
             )
             .unwrap()
             .permissions()

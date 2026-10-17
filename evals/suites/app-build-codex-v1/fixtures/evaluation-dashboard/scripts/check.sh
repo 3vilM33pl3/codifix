@@ -9,7 +9,7 @@ grep -Eqi "total[_ -]?score" index.html
 grep -qi "target/memory-evals" index.html
 grep -qi "dashboard" styles.css
 
-if [ "${MEMORY_EVAL_CONDITION:-}" = "no-memory" ]; then
+if [ "${CODIFIX_EVAL_CONDITION:-}" = "no-memory" ]; then
   test ! -f memory-evidence.md
   test ! -f memory-evidence.json
   test ! -d .memory-eval

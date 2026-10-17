@@ -115,7 +115,7 @@ async fn preparation_is_budgeted_before_tasks_and_verified_without_rerunning_on_
         .unwrap()
         .to_string_lossy()
         .replace('\'', "'\\''");
-    std::fs::write(&driver, format!("#!/bin/sh\nMEMORY_R3_PREPARATION_TEST_REQUEST=\"$1\" exec '{binary}' --exact commands::eval_campaign::tests::preparation::driver_child\n")).unwrap();
+    std::fs::write(&driver, format!("#!/bin/sh\nCODIFIX_R3_PREPARATION_TEST_REQUEST=\"$1\" exec '{binary}' --exact commands::eval_campaign::tests::preparation::driver_child\n")).unwrap();
     std::fs::set_permissions(&driver, std::fs::Permissions::from_mode(0o700)).unwrap();
     let driver_hash = c::digest(&std::fs::read(&driver).unwrap());
     manifest.assets.last_mut().unwrap().sha256 = driver_hash.clone();

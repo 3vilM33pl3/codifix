@@ -11,6 +11,7 @@ use Codifix. Do not run a blanket string replacement over the repository.
 | `memory-layer-local-owner`, `memory-layer-legacy-service-token` in principal tests | Assert that explicit preserved UUID constants equal the original branded derivation. |
 | `memory-layer:loop:{id}:{version}` | Existing durable loop execution identity must remain identical across the rename. |
 | `mem-area-materialized-partition-v1`, `mem-area-provenance-projection-v1` | Hash preimages authenticate existing preserved transfer/provenance artifacts. |
+| `memory_onboarding_operation` provider correlation attribute | Existing identity-provider objects retain their exact idempotency binding. |
 | `mem-analyze-v2` | Stored analyzer algorithm version; the rename does not change the analysis algorithm. |
 | Retired federation namespaces and signed-purpose strings | Accepted only by explicit historical readers pinned to archived evidence; active ingestion uses Codifix. |
 | Pinned Pi upstream patches, `memory-windows-pipe`, `MEMORY_BROKER_HANDLE`, `memory-broker.invalid` | Keep the reviewed third-party source/lock/patch baseline and its matching broker protocol unchanged. Product wrappers and packaging use Codifix. |

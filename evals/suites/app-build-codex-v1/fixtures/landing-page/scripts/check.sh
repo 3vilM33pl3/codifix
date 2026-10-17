@@ -9,7 +9,7 @@ grep -qi "graph-aware search" index.html
 grep -qi "automated evaluations" index.html
 grep -qi "linear-gradient" styles.css
 
-if [ "${MEMORY_EVAL_CONDITION:-}" = "no-memory" ]; then
+if [ "${CODIFIX_EVAL_CONDITION:-}" = "no-memory" ]; then
   test ! -f memory-evidence.md
   test ! -f memory-evidence.json
   test ! -d .memory-eval
