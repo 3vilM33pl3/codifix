@@ -73,6 +73,26 @@ On macOS, `memory service enable` manages the LaunchAgent.
 
 On Windows, `memory service enable` registers and starts the current-user, least-privilege `MemoryLayer-Backend` Task Scheduler task. It starts at sign-in and is configured to restart after failures. Use the same CLI commands to inspect, restart, or remove it; no administrator shell is required.
 
+Native named server instances are separate from that legacy per-user task.
+Select the exact installed configuration to inspect one:
+
+```powershell
+memory --config "C:\ProgramData\MemoryLayer\configurations\homelab\memory-layer.toml" service status
+```
+
+The actual installation root comes from Windows' native known folders. Status
+checks the protected installation registration and completed operation receipts,
+then compares the SCM command/account to that exact instance. It does not guess
+a service name from an area label, adopt an unrelated registration, or fall back
+to `MemoryLayer-Backend` when the selected instance is unavailable. Reading the
+protected receipts requires the installing operator's existing access.
+
+This is read-only SCM status—not an HTTP health check, configuration-content
+verification or a fresh binary-integrity check. Named-instance enable, disable
+and restart through these generic helpers remain unsupported and fail before
+token writes or legacy-task changes. Use the journaled native-instance operator
+for installation/upgrades; named start/stop integration is separate work.
+
 On Linux, the packaged service is usually managed with:
 
 ```bash

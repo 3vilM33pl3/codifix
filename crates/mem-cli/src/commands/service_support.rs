@@ -33,7 +33,18 @@ use crate::commands::{
     watch_support::{memory_binary_path, yes_no},
 };
 
+#[cfg(any(windows, test))]
+mod native_instances;
+
+pub(crate) fn ensure_backend_lifecycle_supported(config_path: &Path) -> Result<()> {
+    #[cfg(windows)]
+    native_instances::require_legacy_lifecycle(config_path)?;
+    let _ = config_path;
+    Ok(())
+}
+
 pub(crate) async fn enable_backend_service(config_path: &Path) -> Result<String> {
+    ensure_backend_lifecycle_supported(config_path)?;
     let config = AppConfig::load_from_path(Some(config_path.to_path_buf()))
         .context("load config for backend service enable")?;
     let startup_output = start_backend_service_once(config_path)?;
@@ -55,7 +66,7 @@ pub(crate) async fn enable_backend_service(config_path: &Path) -> Result<String>
                     ))?
                 {
                     set_cluster_enabled_in_shared_config(config_path, true)?;
-                    let _ = disable_backend_service();
+                    let _ = disable_backend_service(config_path);
                     let retry_output = start_backend_service_once(config_path)?;
                     let health = wait_for_backend_health(config_path).await?;
                     return Ok(format!(
@@ -76,6 +87,7 @@ pub(crate) async fn enable_backend_service(config_path: &Path) -> Result<String>
 }
 
 pub(crate) fn start_backend_service_once(config_path: &Path) -> Result<String> {
+    ensure_backend_lifecycle_supported(config_path)?;
     #[cfg(all(unix, not(target_os = "macos")))]
     let _ = config_path;
 
@@ -141,6 +153,9 @@ pub(crate) fn start_backend_service_once(config_path: &Path) -> Result<String> {
 }
 
 pub(crate) fn preview_enable_backend_service(config_path: &Path) -> String {
+    if let Err(error) = ensure_backend_lifecycle_supported(config_path) {
+        return format!("Dry run rejected: {error}");
+    }
     #[cfg(target_os = "macos")]
     {
         match backend_launch_agent_path() {
@@ -177,12 +192,14 @@ pub(crate) fn preview_enable_backend_service(config_path: &Path) -> String {
 
 pub(crate) async fn enable_relay_discovery_and_restart_backend() -> Result<String> {
     let config_path = discover_global_config_path().unwrap_or_else(default_global_config_path);
+    ensure_backend_lifecycle_supported(&config_path)?;
     set_cluster_enabled_in_shared_config(&config_path, true)?;
-    let _ = disable_backend_service();
+    let _ = disable_backend_service(&config_path);
     enable_backend_service(&config_path).await
 }
 
-pub(crate) fn disable_backend_service() -> Result<String> {
+pub(crate) fn disable_backend_service(config_path: &Path) -> Result<String> {
+    ensure_backend_lifecycle_supported(config_path)?;
     #[cfg(target_os = "macos")]
     {
         let plist_path = backend_launch_agent_path()?;
@@ -214,6 +231,9 @@ pub(crate) fn disable_backend_service() -> Result<String> {
 }
 
 pub(crate) fn preview_disable_backend_service(config_path: &Path) -> String {
+    if let Err(error) = ensure_backend_lifecycle_supported(config_path) {
+        return format!("Dry run rejected: {error}");
+    }
     #[cfg(target_os = "macos")]
     {
         match backend_launch_agent_path() {
@@ -249,6 +269,10 @@ pub(crate) fn preview_disable_backend_service(config_path: &Path) -> String {
 }
 
 pub(crate) fn backend_service_status(config_path: &Path) -> Result<String> {
+    #[cfg(windows)]
+    if let Some(status) = native_instances::status(config_path)? {
+        return Ok(status);
+    }
     #[cfg(target_os = "macos")]
     {
         let plist_path = backend_launch_agent_path()?;

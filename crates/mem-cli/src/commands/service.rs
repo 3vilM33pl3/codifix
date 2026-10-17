@@ -12,8 +12,8 @@ use crate::commands::{
     },
     service_support::{
         backend_service_status, disable_backend_service, enable_backend_service,
-        preview_disable_backend_service, preview_enable_backend_service,
-        restart_all_memory_services,
+        ensure_backend_lifecycle_supported, preview_disable_backend_service,
+        preview_enable_backend_service, restart_all_memory_services,
     },
 };
 
@@ -35,6 +35,7 @@ pub(super) async fn handle(args: &ServiceArgs, cli_config: Option<PathBuf>) -> R
             );
         }
         ServiceCommand::Enable(args) => {
+            ensure_backend_lifecycle_supported(&config_path)?;
             if args.dry_run {
                 println!("{}", preview_enable_backend_service(&config_path));
             } else {
@@ -47,14 +48,16 @@ pub(super) async fn handle(args: &ServiceArgs, cli_config: Option<PathBuf>) -> R
             }
         }
         ServiceCommand::Disable(args) => {
+            ensure_backend_lifecycle_supported(&config_path)?;
             if args.dry_run {
                 println!("{}", preview_disable_backend_service(&config_path));
             } else {
-                println!("{}", disable_backend_service()?);
+                println!("{}", disable_backend_service(&config_path)?);
             }
         }
         ServiceCommand::Status => println!("{}", backend_service_status(&config_path)?),
         ServiceCommand::RestartAll(args) => {
+            ensure_backend_lifecycle_supported(&config_path)?;
             let report = restart_all_memory_services(args.dry_run, args.mark_tui_restart)?;
             if args.json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
