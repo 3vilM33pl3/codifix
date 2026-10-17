@@ -141,3 +141,13 @@ original sync/watch functions. The old profile points at a separate source-dev
 backend, not the native cache. Sync reconnection and complete UI acceptance are
 not yet claimed. Private evidence: `mac-actual-evidence/`,
 `mac-actual-read-result.json` and `mac-actual-retirement-result.json`.
+
+The original Mac company origins initially returned 502 because application
+container recreation had omitted their internal onboarding network attachments.
+Restored Homelab at `192.168.64.3` and Workshop at `192.168.64.11` on their
+existing dedicated internal networks; saved recreation specs now include them.
+Both `https://memory.metatao.net/healthz` and
+`https://workshop.metatao.net/healthz` return the correct healthy Codifix areas.
+Existing credential origin bindings remain intact. No Caddy configuration, CA,
+firewall or public exposure change was made. Private evidence:
+`mac-origin-restoration/result.json`.
