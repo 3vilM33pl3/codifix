@@ -22,14 +22,26 @@ older rehearsal notes describe historical states, not the live deployment.
   Its path-keyed configuration/state/cache key is `codifix-6b784a8b3a7500a1`.
   The repository helper successfully resumes it through the Workshop API.
 
+The gateway is also live on a fresh Codifix space, retaining its original
+authority and history. Signed status returned 200; missing/invalid authentication
+returned 401. The runtime retirement-marker privilege fix is committed as
+`90c9805c`, built, deployed and independently reviewed by Astra. A rollback-only
+privilege check accepted marker SELECT and rejected marker UPDATE and unrelated
+project-table SELECT. Private evidence: `gateway-live-evidence.md`.
+
 ## Remaining work
 
-- Finish gateway deployment and fresh non-CA federation enrolment.
+- Complete fresh non-CA federation enrolment after expired PDS/operator TLS
+  leaves and the rotating PDS session are renewed. Gateway is already running.
+  No CA change or Trust re-enrolment has been performed.
 - Install the native Mac candidate when its build artifact becomes available;
   finish native client wiring and publish the release packages.
-- Refresh running client sessions. Watch manager, Workshop/Homelab watchers and
-  existing embedding bridges/timers have been restored. General retains an older
-  in-flight-operation latch pending narrow reconciliation.
+- Refresh running client sessions. Codifix desktop plugin is installed/enabled;
+  the legacy plugin is disabled with its cache retained. Primary MCP project
+  access and both scoped stdio wrappers passed. Watch manager, Workshop/Homelab
+  watchers and existing embedding bridges/timers are restored. The General latch
+  was confirmed stale and archived; normal scheduling resumed without a manual
+  provider call.
 - CA stays on its existing installation. Any change there requires Olivier's
   approval; SSH remains disabled. CA work does not block other participants.
 
@@ -49,5 +61,7 @@ approval before deletion. These retained objects do not run the old application.
 The current area binary SHA-256 is
 `94e50052aed58b3d5e227f2cafb801805a19114b81e95347e14c479166d3f8c3`.
 The website production source is `79186b2f494c9ca92de5c42dc79dd86fbe20bbd7`.
-Source validation and Linux candidate builds passed; native package acceptance
-continues separately and is not a prerequisite for these live deployments.
+Source validation, Linux candidate builds and both Linux installation acceptance
+jobs passed. Mac/Windows builds continue separately. Candidate run 39068603586
+predates the gateway fix; final public packages must include it. These builds
+do not gate the running Monolith applications.
