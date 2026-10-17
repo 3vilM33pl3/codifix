@@ -37,6 +37,25 @@ cleaned on exit. It never clears `target/macos-pkg`. Completions execute the
 selected binary during staging, so the build host must be able to run that
 architecture (a target installed in Rust alone is insufficient).
 
+Release builds create the standard package first, then reuse its exact native
+executable and Web assets for the runtime-preserving update:
+
+```bash
+./packaging/build-pkg.sh --arch aarch64
+./packaging/build-pkg.sh --arch aarch64 --application-update --skip-build
+```
+
+`--skip-build` requires a successful build receipt matching the source commit,
+Cargo manifests, binary and every Web asset. It refuses changed inputs rather
+than packaging stale output. Both architecture lanes use the same procedure.
+`packaging/macos/check-release.sh ARCH VERSION STANDARD.pkg UPDATE.pkg` verifies
+the native architecture/version and matching payloads, then installs both
+variants and checks preservation of independently owned runtime files. This
+installer check refuses non-disposable/non-GitHub hosts; it must not run on an
+active user's Mac. Published standard packages require separately installed
+Python/PostgreSQL/pgvector for local onboarding; application-update packages
+preserve, but do not upgrade, an already installed runtime.
+
 The `.pkg` installs to `/usr/local/`. Post-installation starts or restarts **no
 services**. When a non-root console user and their existing Application Support
 directory can be verified, defaults are seeded as that user: only a missing

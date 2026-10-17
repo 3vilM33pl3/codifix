@@ -53,6 +53,7 @@ class PackageContract(unittest.TestCase):
         for name in ("config.toml", "agents/astra_adviser.toml"):
             shutil.copy2(REPO / ".codex" / name, repo / ".codex" / name)
         (repo / "Cargo.toml").write_text('version = "0.0.0-test"\n')
+        (repo / "Cargo.lock").write_text('# fixture lock\n')
         (repo / "README.md").write_text("Fixture only\n")
         (repo / "memory-layer.toml.example").write_text("# fixture config\n")
         (repo / "web/dist/index.html").write_text("fixture\n")
@@ -65,6 +66,7 @@ class PackageContract(unittest.TestCase):
                         CARGO_TARGET_DIR=str(repo / "target"))
         self.script("uname", f'if [[ "$1" == -s ]]; then echo {"Darwin" if darwin else "Linux"}; else echo x86_64; fi\n')
         self.script("cargo", 'printf "%s\\n" "$@" >> "$TRACE"\n')
+        self.script("git", 'printf "%040d\\n" 1\n')
         self.script("npm", 'printf "npm %s\\n" "$*" >> "$TRACE"\n')
         self.script("python3", f'exec {shlex.quote(sys.executable)} "$@"\n')
         for tool in ("xcrun", "codesign", "plutil"):
@@ -155,6 +157,28 @@ touch "$output"
         repo, trace = self.fixture()
         result = self.assert_no_build(repo, trace, "--application-update", "--runtime-bundle", "/unused")
         self.assertIn("cannot contain or replace a runtime", result.stderr)
+
+    def test_application_update_reuses_exact_successful_build(self):
+        repo, trace = self.fixture()
+        first = self.run_script(repo / "packaging/build-pkg.sh")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        # The fixture copies package payloads to one capture directory.
+        shutil.rmtree(self.env["CAPTURE"])
+        before = trace.read_text().count("--locked")
+        update = self.run_script(repo / "packaging/build-pkg.sh", "--application-update", "--skip-build")
+        self.assertEqual(update.returncode, 0, update.stderr)
+        self.assertEqual(trace.read_text().count("--locked"), before)
+        (repo / "web/dist/index.html").write_text("changed assets")
+        changed = self.run_script(repo / "packaging/build-pkg.sh", "--application-update", "--skip-build")
+        self.assertNotEqual(changed.returncode, 0)
+        self.assertIn("changed since", changed.stderr)
+
+    def test_skip_build_requires_success_receipt(self):
+        repo, trace = self.fixture()
+        result = self.run_script(repo / "packaging/build-pkg.sh", "--application-update", "--skip-build")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Missing successful native build receipt", result.stderr)
+        self.assertFalse(trace.exists())
 
     def test_application_update_requires_existing_native_installation(self):
         prefix = self.root / "installed"

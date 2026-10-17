@@ -44,6 +44,7 @@ RUST_TARGET=""
 RUNTIME_BUNDLE=""
 RUNTIME_MANIFEST=""
 APPLICATION_UPDATE=0
+SKIP_BUILD=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --arch|--target|--sign|--sign-app|--sign-pkg|--notary-profile|--apple-id|--team-id|--apple-password|--runtime-bundle|--runtime-manifest)
@@ -54,6 +55,10 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
   case "$1" in
+    --skip-build)
+      SKIP_BUILD=1
+      shift
+      ;;
     --application-update)
       APPLICATION_UPDATE=1
       shift
@@ -171,7 +176,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "Building a macOS .pkg requires Darwin and Apple's packaging tools." >&2
   exit 1
 fi
-REQUIRED_TOOLS=(cargo npm pkgbuild mktemp install cp ln find chmod mkdir rm awk du cut xcrun codesign plutil)
+REQUIRED_TOOLS=(cargo npm pkgbuild mktemp install cp ln find chmod mkdir rm awk du cut xcrun codesign plutil git shasum sort cmp)
 if [[ -n "$RUNTIME_BUNDLE" ]]; then REQUIRED_TOOLS+=(python3); fi
 if [[ -n "$APP_SIGN_IDENTITY" ]]; then REQUIRED_TOOLS+=(codesign); fi
 if [[ "$NOTARIZE" -eq 1 ]]; then REQUIRED_TOOLS+=(xcrun); fi
@@ -276,12 +281,32 @@ mkdir -p \
   "$SCRIPTS"
 
 # --- Build -----------------------------------------------------------------
-echo "Building release binary for $PKG_ARCH ($RUST_TARGET)..."
-cargo build --locked --release --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory --target "$RUST_TARGET"
-
-echo "Building web UI..."
-npm --prefix "$ROOT_DIR/web" ci
-npm --prefix "$ROOT_DIR/web" run build
+BUILD_RECEIPT="$CARGO_TARGET_ROOT/macos-pkg-${PKG_ARCH}-build.sha256"
+# Bind reusable inputs to the frozen source and exact native executable/Web
+# bytes. Packaging another variant must not silently consume stale build output.
+build_inputs() {
+  git -C "$ROOT_DIR" rev-parse HEAD
+  shasum -a 256 "$ROOT_DIR/Cargo.toml" "$ROOT_DIR/Cargo.lock" "$BINARY_PATH"
+  find "$ROOT_DIR/web/dist" -type f -exec shasum -a 256 {} + | LC_ALL=C sort
+}
+if [[ "$SKIP_BUILD" -eq 1 ]]; then
+  [[ -f "$BUILD_RECEIPT" && -f "$ROOT_DIR/web/dist/index.html" ]] || {
+    echo 'Missing successful native build receipt; build without --skip-build first.' >&2; exit 1;
+  }
+  build_inputs > "$STAGE_DIR/current-build.sha256"
+  cmp -s "$BUILD_RECEIPT" "$STAGE_DIR/current-build.sha256" || {
+    echo 'Native binary, Web assets or source changed since the successful build.' >&2; exit 1;
+  }
+else
+  echo "Building release binary for $PKG_ARCH ($RUST_TARGET)..."
+  cargo build --locked --release --features full --manifest-path "$ROOT_DIR/Cargo.toml" --bin memory --target "$RUST_TARGET"
+  echo "Building web UI..."
+  npm --prefix "$ROOT_DIR/web" ci
+  npm --prefix "$ROOT_DIR/web" run build
+  [[ -f "$ROOT_DIR/web/dist/index.html" ]] || { echo 'Web build did not produce index.html.' >&2; exit 1; }
+  build_inputs > "$STAGE_DIR/current-build.sha256"
+  cp "$STAGE_DIR/current-build.sha256" "$BUILD_RECEIPT"
+fi
 
 # --- Stage payload ----------------------------------------------------------
 if [[ -n "$RUNTIME_BUNDLE" ]]; then
