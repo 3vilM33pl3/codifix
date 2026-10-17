@@ -92,6 +92,23 @@ function Get-PackInventory([string]$Root){
         [ordered]@{name=$_.FullName.Substring($Root.Length+1).Replace('\','/');sha256=(Get-PackHash $_.FullName)}
     })
 }
+function Get-PackPostgresInventory([string]$Runtime){
+    # Keep the complete server/runtime trees, not optional archive applications
+    # such as pgAdmin. Legal notices are selected separately from actual files.
+    Assert-PackPath $Runtime
+    $selected=[Collections.Generic.List[object]]::new()
+    foreach($name in @('bin','lib','share')){
+        $directory=Join-Path $Runtime ('pgsql/'+$name)
+        Assert-PackPath $directory
+        if(-not (Get-Item -LiteralPath $directory).PSIsContainer){throw 'Required PostgreSQL runtime root is not a directory'}
+        $members=@(Get-PackInventory $directory)
+        if($members.Count -eq 0){throw 'Required PostgreSQL runtime root is empty'}
+        foreach($member in $members){
+            $selected.Add([ordered]@{name=('pgsql/'+$name+'/'+$member.name);sha256=$member.sha256})
+        }
+    }
+    return $selected.ToArray()
+}
 function Write-PackJson([string]$Path,$Value){[IO.File]::WriteAllText($Path,($Value | ConvertTo-Json -Depth 32),[Text.UTF8Encoding]::new($false))}
 if($FunctionsOnly){return}
 if($env:OS -cne 'Windows_NT' -or $env:COMPUTERNAME -cne 'MEMORY-WINLAB'){throw 'Runtime packaging is restricted to the disposable native Windows lab'}
@@ -151,7 +168,7 @@ switch($Kind){
         $proofInputs.postgres_archive=[ordered]@{path=$pgArchive;sha256=$pgManifest.postgres.sha256}
         $proofInputs.pgvector_archive=[ordered]@{path=$vectorArchive;sha256=$pgManifest.pgvector.sha256}
         Assert-PackPostgresRuntime $pgBin (Join-Path $pgRoot 'runtime/pgsql/lib') $pgPrepared
-        $tree=Join-Path $pgRoot 'runtime';foreach($member in (Get-PackInventory $tree)){Copy-PackFile (Join-Path $tree $member.name) $member.name $member.sha256}
+        $tree=Join-Path $pgRoot 'runtime';foreach($member in (Get-PackPostgresInventory $tree)){Copy-PackFile (Join-Path $tree $member.name) $member.name $member.sha256}
         if(-not $PostgresNoticePath){throw 'Supply the actual PostgreSQL bundled licence/legal notice path; no fabricated notice fallback'}
         Copy-PackFile $PostgresNoticePath 'notices/postgresql.txt' (Get-PackHash $PostgresNoticePath)
         $vectorNotice=Join-Path $pgRoot 'source/pgvector-0.8.7/LICENSE'

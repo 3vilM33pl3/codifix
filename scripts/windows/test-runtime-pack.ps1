@@ -39,6 +39,22 @@ try{
     [IO.File]::WriteAllText((Join-Path $bin 'libssl-3-x64.dll'),'libssl-3-x64.dll')
     $prepared.extensions=$prepared.extensions[0..1]
     Reject-Pack {Assert-PackPostgresRuntime $bin $lib $prepared}
+    $pgTree=Join-Path $root 'postgres-runtime'
+    foreach($directory in @('bin','lib','share','pgAdmin 4')){
+        $path=Join-Path $pgTree ('pgsql/'+$directory)
+        $null=New-Item -ItemType Directory -Path $path -Force
+        [IO.File]::WriteAllText((Join-Path $path 'preserved.dat'),$directory)
+    }
+    $selected=@(Get-PackPostgresInventory $pgTree)
+    $expected=@('pgsql/bin/preserved.dat','pgsql/lib/preserved.dat','pgsql/share/preserved.dat')
+    if($selected.Count -ne 3 -or @(Compare-Object $expected @($selected | ForEach-Object name) -CaseSensitive).Count){throw 'PostgreSQL runtime roots incomplete or optional applications included'}
+    foreach($member in $selected){Assert-PackHash (Join-Path $pgTree $member.name) $member.sha256}
+    # Missing and empty required roots fail rather than producing a thin,
+    # apparently valid package without extension support or server share files.
+    Remove-Item -LiteralPath (Join-Path $pgTree 'pgsql/share/preserved.dat')
+    Reject-Pack {Get-PackPostgresInventory $pgTree}
+    Remove-Item -LiteralPath (Join-Path $pgTree 'pgsql/share')
+    Reject-Pack {Get-PackPostgresInventory $pgTree}
     $patch=[pscustomobject]@{layout='windows-sha256-did-paths-v1';patch_sha256='4ba316f92a401d8a9854fe96595232bb845dfe14fa33aefe51837aacc5efcef0';files=@(
         [pscustomobject]@{name='actor-store/actor-store.js';original_sha256='33ba4bcf0b0afb06868b80a4cb0025388a2a7e8006338ce80a70785d2079af4f';patched_sha256='c192431cb2de642bbe5c8256fbe30f0de6fe5dc23f3b20b8baec71e969909965'},
         [pscustomobject]@{name='disk-blobstore.js';original_sha256='cc18ec422b23ba3bc06baea321146e512ce9cb14608ec90ccfe5e9bc71359811';patched_sha256='9da2aa49a53b58826ae1b24fd7ba8d4fbbe7c9aaf9c7ee8a24c91c792b736f5a'})}
