@@ -292,6 +292,24 @@ promote partial or draft held-out material into official evidence.
 
 ### Integrated offline rehearsal
 
+The task executor also accepts an explicit `windows-native-v1` execution profile
+for deterministic draft, `smoke_only: true`, zero-spend rehearsal work. Its
+configuration must provide `execution`, a pinned `nativeScorer` (`r3_score.exe`)
+and a pinned `compiler` (`rustc.exe`) from the exact reviewed profile; Linux
+images, `scoreBinary`, mediated budgets and provider wiring are rejected. Excerpt
+and no-op commands use that profile's Node executable. Only selected public
+context enters the answer/agent; scoring and expected outputs stay on the host.
+Validated answer, agent, compiler-readiness and probe receipt identities are
+retained in result metadata as `native_execution` JSON strings. These receipts
+remain smoke evidence with `disk_hard_limit_enforced: false`.
+
+This bounded executor seam does not make the full campaign controller native:
+the bootstrap, IPC and prepared-service lifecycle still require a separate
+Windows integration pass. Native `createProviderExecutor` calls remain rejected,
+including offline mediated provider campaigns. Fake-adapter tests exercise the
+five retrieval conditions and three-stage dispatch without proving native OS
+isolation or enabling paid R3 execution.
+
 The complete development allocation has now executed all660 dispatches through
 this controller with valid execution evidence, unchanged snapshots and zero
 provider calls. Six hundred knowledge judgments remain pending; all60 no-op

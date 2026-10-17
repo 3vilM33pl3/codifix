@@ -6,8 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { preparedContext, runOfflineKnowledge } from './knowledge.mjs';
-import { runOfflineSequence } from './sequence.mjs';
+import { preparedContext, createKnowledgeRunner } from './knowledge.mjs';
+import { createSequenceRunner } from './sequence.mjs';
+import { validateExecutionInput } from './execution.mjs';
+import { validateRustCase } from './rust.mjs';
 import { bindCorpus, bindQuery, syntheticProfile } from '../embedding-evidence.mjs';
 import { openRequestMediator } from '../request-mediator.mjs';
 import { createModelAgent } from './model-agent.mjs';
@@ -34,8 +36,11 @@ const noOpAgent = ['/usr/local/bin/node', '-e', `
 
 function runRetriever(binary, configuration, request, directory) {
   return new Promise((resolve, reject) => {
+    const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
     const child = spawn(binary, [configuration], { cwd: directory,
-      env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory }, stdio: ['pipe', 'pipe', 'pipe'] });
+      env: process.platform === 'win32' ? { SystemRoot: systemRoot, WINDIR: systemRoot, PATH: '' }
+        : { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory },
+      shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     const timer = setTimeout(() => child.kill('SIGKILL'), 10000);
     child.stderr.resume();
@@ -51,36 +56,59 @@ function runRetriever(binary, configuration, request, directory) {
   });
 }
 
-export async function createRehearsalExecutor(options) {
-  return createExecutor(options, false);
+// These adapters are trusted host dependencies, never campaign/agent inputs.
+// Fake adapters can verify dispatch wiring without claiming native OS evidence.
+export function createRehearsalExecutorFactory({ runExecution, scoreNative, retrieve = runRetriever } = {}) {
+  if (typeof retrieve !== 'function') throw Error('invalid trusted retrieval adapter');
+  const runners = { knowledge: createKnowledgeRunner({ runExecution, scoreNative }),
+    sequence: createSequenceRunner({ runExecution }), retrieve };
+  return options => createExecutor(options, false, runners);
 }
+export const createRehearsalExecutor = createRehearsalExecutorFactory();
+const providerRunners = { knowledge: createKnowledgeRunner(), sequence: createSequenceRunner(), retrieve: runRetriever };
 
 // Trusted controller entrypoint. This does not grant authority to spend: the
 // owner must authorize the campaign before constructing its provider transport.
 export async function createProviderExecutor(options) {
   if (typeof options.offline !== 'boolean' || !['development', 'held_out'].includes(options.split)) throw Error('explicit provider execution mode and split required');
-  return createExecutor(options, true);
+  return createExecutor(options, true, providerRunners);
 }
 
-async function createExecutor(options, providerOnly) {
-  if (options.configuration?.execution !== undefined) throw Error('native campaign orchestration is not integrated; no Linux fallback');
+async function createExecutor(options, providerOnly, runners) {
   const offlineMode = !providerOnly || options.offline;
   const selectedSplit = options.split;
   const { root, manifestSha256, nodeImage, rustImage, scoreBinary, retrieverBinary,
-    driverSha256, configurationSha256, serviceBuild, budgetBinary } = structuredClone(options.configuration);
+    driverSha256, configurationSha256, serviceBuild, budgetBinary, execution, nativeScorer, compiler } = structuredClone(options.configuration);
+  const native = execution?.kind === 'windows-native-v1';
+  if (execution !== undefined && (!native || providerOnly)) throw Error('native provider campaign orchestration is not integrated; no Linux fallback');
+  if (native) {
+    if (nodeImage !== undefined || rustImage !== undefined || scoreBinary !== undefined || budgetBinary !== undefined
+        || options.wireProvider !== undefined) throw Error('native rehearsal requires deterministic commands only; no mixed backend or provider wiring');
+    validateExecutionInput({ execution, argv: [execution.profile?.node?.path], files: {}, exportPaths: [] });
+    if (!nativeScorer || Object.keys(nativeScorer).sort().join(',') !== 'path,sha256'
+        || typeof nativeScorer.path !== 'string' || path.win32.basename(nativeScorer.path).toLowerCase() !== 'r3_score.exe'
+        || !execution.profile.toolchains.flatMap(tree => tree.files).some(file =>
+          file.path.toLowerCase() === nativeScorer.path.toLowerCase() && file.sha256 === nativeScorer.sha256)) throw Error('explicit pinned native knowledge scorer required');
+    validateExecutionInput({ execution, argv: [nativeScorer.path], files: {}, exportPaths: [] });
+    validateRustCase({ execution, compiler, files: { 'src/main.rs': 'fn main() {}' },
+      probes: [{ id: 'binding', argv: [], stdin: '', expectedStdout: '' }] });
+  } else if (nativeScorer !== undefined || compiler !== undefined) throw Error('native tool bindings require an explicit native execution profile');
+  const answerArgv = native ? [execution.profile.node.path, ...excerptAgent.slice(1)] : excerptAgent;
+  const agentArgv = native ? [execution.profile.node.path, ...noOpAgent.slice(1)] : noOpAgent;
   const session = options.session; // Trusted host owner, never serialized to an agent.
   const baselineEmbeddings = options.baselineEmbeddings;
   const wireProvider = options.wireProvider;
-  if (!path.isAbsolute(root) || !path.isAbsolute(scoreBinary) || !path.isAbsolute(retrieverBinary)
+  if (!path.isAbsolute(root) || (!native && !path.isAbsolute(scoreBinary)) || !path.isAbsolute(retrieverBinary)
       || [manifestSha256, driverSha256, configurationSha256].some(value => !/^[a-f0-9]{64}$/.test(value))) throw Error('invalid rehearsal configuration');
   const manifestBytes = await fs.readFile(path.join(root, 'campaign.json'));
   const manifest = JSON.parse(manifestBytes);
+  if (native && manifest.provider_budget !== undefined) throw Error('native rehearsal cannot use mediated provider budgets');
   if (providerOnly) {
     validateProviderProfile(manifest);
     if (!wireProvider || !(baselineEmbeddings instanceof Map) || !baselineEmbeddings.size || !manifest.provider_budget || !manifest.preparation_budget
         || (offlineMode && manifest.limits.microusd !== 0)) throw Error('complete provider preparation required');
   } else {
-    if (!manifest.smoke_only || manifest.limits.microusd !== 0 || manifest.label_status !== 'draft'
+    if (manifest.smoke_only !== true || manifest.limits.microusd !== 0 || manifest.label_status !== 'draft'
         || session.preparation.official_evidence !== false) throw Error('only draft zero-spend offline rehearsals are supported');
     if (manifest.model.embedding_id !== syntheticEmbeddingModel) throw Error('synthetic embedding profile mismatch');
   }
@@ -173,7 +201,7 @@ async function createExecutor(options, providerOnly) {
               // Query embedding is execution, not corpus preparation. Plain
               // document/lexical conditions must not invoke an embedding model.
               const queryVector = selected.condition === 'vector' ? await queryEmbedding(question) : undefined;
-              retrieval = await runRetriever(retrieverBinary, file, { schema_version: 1, project, condition: 'external-retriever',
+              retrieval = await runners.retrieve(retrieverBinary, file, { schema_version: 1, project, condition: 'external-retriever',
                 query: question, limit: 8, item_id: item.id, context: { fixture_path: '', hidden_facts: [] },
                 ...(queryVector ? { query_embedding: queryVector, embedding_query: bindQuery(profile, question, queryVector) } : {}) }, temporary);
             } finally { await fs.rm(temporary, { recursive: true }); }
@@ -185,18 +213,19 @@ async function createExecutor(options, providerOnly) {
         if (item.track === 'knowledge') {
           const rubric = JSON.parse(await readAsset(`private/rubrics/${item.id}.json`));
           const context = await contextFor(rubric.question);
-          const answerOptions = { image: nodeImage, scoreBinary, sources, context, question: rubric.question,
-            rubric, manifestSha256, work: selected, argv: excerptAgent };
+          const answerOptions = { ...(native ? { execution, scoreExecutable: nativeScorer } : { image: nodeImage, scoreBinary }),
+            sources, context, question: rubric.question, rubric, manifestSha256, work: selected, argv: answerArgv };
           const answer = mediator ? await runMediatedKnowledge({ ...answerOptions, mediator, model, allowance,
             timeoutMs: Math.min(120000, manifest.limits.task_seconds * 1000),
             taskId: providerContract.task_id, requestId: 'answer', ...(wire ? { prepareRequest: wire.prepareRequest } : { invoke: async payload => {
               const source = payload.input.context[0];
               return { output: source ? { text: source.text, refused: false, citations: [{ source_id: source.id, quote: source.text }] }
                 : { text: 'Insufficient supplied evidence.', refused: true, citations: [] }, usage: fakeUsage };
-            } }) }) : await runOfflineKnowledge(answerOptions);
+            } }) }) : await runners.knowledge(answerOptions);
           return { success: answer.assessment.success, answer: answer.answer.text,
             knowledge_review: answer.evidence, unresolved_rubric: answer.assessment.unresolved,
             critical_failure: answer.assessment.critical_failure, diagnostics: [], input_sha256: answer.publicInputSha256,
+            ...(native ? { nativeExecution: { answer: answer.execution, scorer: answer.scorer } } : {}),
             providerUsage: { provider_requests: answer.providerRequests, ...answer.tokenUsage, microusd: answer.executionMicrousd },
             timing: { retrieval_ms: Math.ceil(retrievalMs), answer_or_agent_ms: Math.max(1,Math.ceil(answer.answerDurationMs)),
               grading_ms: Math.ceil(answer.adjudicationPreparationMs) } };
@@ -230,12 +259,13 @@ async function createExecutor(options, providerOnly) {
           ...(budgetedLive ? { deadlineMs: started + manifest.limits.task_seconds * 1000 - 100000 } : {}),
           ...(wire ? { prepareRequest: wire.prepareRequest } : {
             invoke: async payload => ({ output: payload.previous ? { kind: 'finish' } : { kind: 'command', argv: noOpAgent }, usage: fakeUsage }) }) })) : undefined;
-        const sequence = await runOfflineSequence({ image: rustImage, initialFiles, submissionPaths: family.submission_paths, runAgent,
-          timeoutMs: 30000, steps: stages.map((stage, index) => ({ id: `${family.id}-${stage.id}`, argv: noOpAgent,
+        const sequence = await runners.sequence({ ...(native ? { execution } : { image: rustImage }), initialFiles, submissionPaths: family.submission_paths, runAgent,
+          timeoutMs: 30000, steps: stages.map((stage, index) => ({ id: `${family.id}-${stage.id}`, argv: agentArgv,
             inputFiles: { 'task.json': JSON.stringify({ prompt: stage.prompt, context }) },
-            grader: { kind: 'rust-blackbox', probes: stages.slice(0, index + 1).flatMap(stage => stage.probes) } })) });
+            grader: { kind: 'rust-blackbox', ...(native ? { compiler } : {}), probes: stages.slice(0, index + 1).flatMap(stage => stage.probes) } })) });
         return { success: sequence.success, answer: null, knowledge_review: null,
           unresolved_rubric: false, critical_failure: false, diagnostics: sequence.steps, input_sha256: sequence.initialSha256,
+          ...(native ? { nativeExecution: { ...sequence.execution, compiler } } : {}),
           providerUsage: sequence.providerUsage,
           timing: { retrieval_ms: Math.ceil(retrievalMs), answer_or_agent_ms: sequence.steps.reduce((sum,step) => sum + Math.ceil(step.agentElapsedMs),0),
             grading_ms: sequence.steps.reduce((sum,step) => sum + Math.ceil(step.graderElapsedMs),0) } };
@@ -257,7 +287,8 @@ async function createExecutor(options, providerOnly) {
       const claim = offline ? 'offline-synthetic-not-quality' : 'provider-execution-pending-adjudication';
       const result = (id, success, duration, answer, sub_results = [], usage) => ({ item_id: id,
         eval_type: item.track === 'knowledge' ? 'grounded_answer' : 'agent_build_sequence', condition: legacyCondition,
-        metadata: { claim, reasoning_mode: manifest.model.reasoning },
+        metadata: { claim, reasoning_mode: manifest.model.reasoning,
+          ...(native ? { native_execution: JSON.stringify(value.nativeExecution) } : {}) },
         success, skipped: false, scores: {}, duration_ms: Math.max(1, Math.ceil(duration)), token_usage: tokenUsage(usage), answer,
         notes: [offline ? 'Offline synthetic agent; not measured model quality.' : 'Provider execution; quality requires independent adjudication.',
           `Prepared input SHA-256: ${value.input_sha256}`,
@@ -266,7 +297,9 @@ async function createExecutor(options, providerOnly) {
         timing: { version: 1, ...value.timing, executor_total_ms: 0 },
         result: result(item.id, value.success, value.timing.retrieval_ms + value.timing.answer_or_agent_ms, value.answer,
           value.diagnostics.map(step => ({ id: step.id, eval_type: 'agent_build_step',
-            metadata: { claim, reasoning_mode: manifest.model.reasoning, grading_duration_ms: String(Math.ceil(step.graderElapsedMs)) },
+            metadata: { claim, reasoning_mode: manifest.model.reasoning, grading_duration_ms: String(Math.ceil(step.graderElapsedMs)),
+              ...(native ? { native_execution: JSON.stringify({ agent: step.agentExecution, grader: step.graderExecution,
+                readiness: step.graderReadinessExecution, probes: step.graderProbes }) } : {}) },
             success: step.passed, skipped: false, scores: {},
             duration_ms: Math.max(1, Math.ceil(step.agentElapsedMs)), token_usage: tokenUsage(step.providerUsage),
             notes: [`Agent input SHA-256: ${step.agentInputSha256}`, `Private grader input SHA-256: ${step.graderInputSha256}`] })),value.providerUsage),

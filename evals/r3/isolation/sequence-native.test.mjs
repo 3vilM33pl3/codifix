@@ -7,7 +7,7 @@ import { createSequenceRunner, validateSequence } from './sequence.mjs';
 import { nativeProfileHash } from './native-windows.mjs';
 import { validateRustCase } from './rust.mjs';
 import { runOfflineKnowledge } from './knowledge.mjs';
-import { createRehearsalExecutor } from './rehearsal-task.mjs';
+import { createProviderExecutor } from './rehearsal-task.mjs';
 const sha = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 function fixture() {
@@ -80,7 +80,7 @@ test('native no-op and deleted source remain negative results despite later reco
   assert.equal(deleted.success, false);
 });
 
-test('native identity mismatch, unpinned Rust and unintegrated model/campaign paths fail closed', async () => {
+test('native identity mismatch, unpinned Rust and unintegrated model/provider campaign paths fail closed', async () => {
   await assert.rejects(executor({malformedIdentityAt:2}).run(fixture()), /native execution identity/);
   const value = fixture();
   value.steps[2].grader = {kind:'rust-blackbox', probes:[]};
@@ -91,5 +91,5 @@ test('native identity mismatch, unpinned Rust and unintegrated model/campaign pa
   assert.throws(() => validateSequence(model), /native commands/);
   assert.throws(() => validateRustCase({execution:fixture().execution}), /explicit pinned compiler/);
   await assert.rejects(runOfflineKnowledge({execution:fixture().execution}), /no Linux fallback/);
-  await assert.rejects(createRehearsalExecutor({configuration:{execution:fixture().execution}}), /native campaign orchestration/);
+  await assert.rejects(createProviderExecutor({offline:true,split:'development',configuration:{execution:fixture().execution}}), /native provider campaign orchestration/);
 });
