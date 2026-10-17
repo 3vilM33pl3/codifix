@@ -11,11 +11,13 @@ Claude, or human session can start with evidence instead of guesswork.
 It captures what happened, curates what matters, stores it in PostgreSQL with
 pgvector, and exposes it through a TUI, browser UI, and agent-friendly CLI.
 
-[Website](https://codifix.dev) · [Documentation](https://codifix.dev/docs) · [v2.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0)
+[Website](https://codifix.dev) · [Documentation](https://codifix.dev/docs) · [Latest stable release: v2.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0)
 
-The source tree is [v2.1.0](CHANGELOG.md). Windows packages are a preview of
-client/operator functionality, not a complete native server stack. Use
-`codifix urls` to inspect the configured application URLs.
+The source candidate is [v3.0.0-rc.1](CHANGELOG.md), in preparation and not yet
+published or installed. Its release and platform acceptance work is pending.
+Windows packages remain a preview of client/operator functionality, not a
+complete native server stack. Use `codifix urls` to inspect the configured
+application URLs.
 
 ![Codifix memories tab](docs/img/tui/memories-tab.png)
 

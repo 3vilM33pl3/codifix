@@ -1,5 +1,33 @@
 # Changelog
 
+## 3.0.0-rc.1 - Candidate preparation (unpublished)
+
+This source candidate is being prepared for release. It has not been published
+or installed; package, installation and platform acceptance remain pending.
+This section records the candidate identity, not a completed release.
+
+- **Breaking technical rename:** product-owned commands, package identities,
+  service names, configuration paths and federation enrolment identities use
+  Codifix names. Existing Memory Layer installations require an explicit
+  single-user reinstall and matched backup; the new packages do not upgrade
+  them in place or provide old command aliases. See the
+  [reinstall and recovery procedure](packaging/CODIFIX-3-REINSTALL.md).
+- Federation retirement fences old subscriptions and bindings, blocks
+  unfinished source/publication work and invalidates old leases. Canonical and
+  received knowledge, existing identifiers, content and signed federation
+  history remain preserved. Old queued, accepted and proposed payloads retain
+  their original bindings. Participating instances require fresh explicit
+  enrolment and sharing before federation resumes. See the
+  [federation cutover guide](scripts/codifix-cutover/README.md).
+- Existing area topology and canonical/auth/area identifiers remain intact;
+  database names and roles change only for the exact macOS onboarding names
+  listed in the reinstall procedure. Previously published releases and their
+  release records remain unchanged.
+- Windows remains a preview. Build 1 / MSI version `3.0.1` is the allocated
+  candidate identity, not evidence of an accepted package. Native macOS UI,
+  CA deployment, release hashes, installation and cross-platform acceptance
+  are not claimed here.
+
 ## 2.1.0 - 2026-10-17
 
 - Add the private ATProto federation profile, reviewed knowledge exchange and
