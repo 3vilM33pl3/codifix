@@ -68,6 +68,21 @@ class CoreInstallTests(unittest.TestCase):
         self.assertNotIn("GetEnvironmentVariables", environment)
         self.assertNotIn("API_KEY", environment)
 
+    def test_known_folders_are_explicit_and_private_diagnostics_exclude_bodies(self):
+        source = SCRIPT.read_text()
+        for name in ["ProgramData='CommonApplicationData'", "ALLUSERSPROFILE='CommonApplicationData'", "ProgramFiles='ProgramFiles'",
+                     "'ProgramFiles(x86)'='ProgramFilesX86'", "CommonProgramFiles='CommonProgramFiles'",
+                     "'CommonProgramFiles(x86)'='CommonProgramFilesX86'"]:
+            self.assertIn(name, source)
+        for required in ["[Environment]::GetFolderPath($folder)", "[IO.Path]::IsPathRooted($path)",
+                         "Required Windows known folder unavailable:", "$info.EnvironmentVariables[$key]=$knownFolders[$key]",
+                         "($_.InvocationInfo.PositionMessage,$_.ScriptStackTrace)", "$Label+'.failure.log'",
+                         "New-CoreInstallerDiagnosticCommand $Arguments", "[IO.FileMode]::CreateNew"]:
+            self.assertIn(required, source)
+        diagnostic = source.split("$catch=@'", 1)[1].split("'@", 1)[0]
+        for forbidden in ["Exception.Message", "ConfigPath", "Get-Content", "request", "Body"]:
+            self.assertNotIn(forbidden, diagnostic)
+
     def test_running_exact_virtual_identity_and_actual_http_proofs(self):
         source = SCRIPT.read_text()
         for required in ["Get-CimInstance Win32_Service", "$scm.StartName -ine $account", "GetOwnerSid",

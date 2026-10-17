@@ -66,6 +66,45 @@ function Set-CoreInstalledWeb([string]$Text,[string]$InstalledWeb){
     if([regex]::Matches($Text,$pattern).Count -ne 1 -or $InstalledWeb.Contains("'") -or $InstalledWeb.Contains("`n")){throw 'One explicit Web root required'}
     return [regex]::Replace($Text,$pattern,[Text.RegularExpressions.MatchEvaluator]{param($m)"web_root = '"+$InstalledWeb+"'"})
 }
+function Get-CoreInstallKnownFolderEnvironment{
+    $folders=@{ProgramData='CommonApplicationData';ALLUSERSPROFILE='CommonApplicationData';ProgramFiles='ProgramFiles';'ProgramFiles(x86)'='ProgramFilesX86'
+        CommonProgramFiles='CommonProgramFiles';'CommonProgramFiles(x86)'='CommonProgramFilesX86'}
+    $result=@{}
+    foreach($key in $folders.Keys){
+        $folder=[Enum]::Parse([Environment+SpecialFolder],$folders[$key]);$path=[Environment]::GetFolderPath($folder)
+        if(-not $path -or -not [IO.Path]::IsPathRooted($path) -or $path -cnotmatch '^[A-Za-z]:\\' -or
+            $path.Contains([char]0) -or $path.Contains("`r") -or $path.Contains("`n")){throw ('Required Windows known folder unavailable: '+$key)}
+        $result[$key]=$path
+    }
+    return $result
+}
+function New-CoreInstallerDiagnosticCommand([string[]]$Arguments,[string]$Diagnostic){
+    if($Arguments.Count -lt 6 -or ($Arguments[0..4] -join ' ') -cne '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File'){
+        throw 'Fixed installer PowerShell invocation required'
+    }
+    # Only these driver-owned switches become syntax. Every argument value is a
+    # single-quoted literal, including paths/recovery references containing '.
+    $valueParameters=@('-Name','-OperationId','-PackagePath','-ManifestPath','-ManifestSha256','-ConfigPath',
+        '-HealthUri','-ExpectedInstanceId','-RecoveryReference','-Action','-PreviewAction','-ExpectedInputSha256')
+    $command="& '"+$Arguments[5].Replace("'","''")+"'"
+    for($i=6;$i -lt $Arguments.Count;$i++){
+        $parameter=$Arguments[$i]
+        if($parameter -ceq '-DatabaseCompatibilityConfirmed'){$command+=' '+$parameter;continue}
+        if($parameter -cnotin $valueParameters -or $i+1 -ge $Arguments.Count){throw 'Unexpected installer PowerShell argument'}
+        $i++;$command+=' '+$parameter+" '"+$Arguments[$i].Replace("'","''")+"'"
+    }
+    $catch=@'
+} catch {
+    $diagnostic=@($_.InvocationInfo.PositionMessage,$_.ScriptStackTrace) -join [Environment]::NewLine
+    $bytes=[Text.UTF8Encoding]::new($false).GetBytes($diagnostic)
+    $file=[IO.File]::Open(DIAGNOSTIC_LITERAL,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+    try{$file.Write($bytes,0,$bytes.Length);$file.Flush($true)}finally{$file.Dispose()}
+    throw 'Exact installer child failed; inspect private failure diagnostic'
+}
+'@
+    $catch=$catch.Replace('DIAGNOSTIC_LITERAL',("'"+$Diagnostic.Replace("'","''")+"'"))
+    return '$ErrorActionPreference=''Stop''; try { '+$command+"`n"+$catch
+}
 if($FunctionsOnly){return}
 if($env:OS -cne 'Windows_NT' -or $env:COMPUTERNAME -cne 'MEMORY-WINLAB' -or
     $OperationId -eq [guid]::Empty -or $InstallOperationId -eq [guid]::Empty -or $InstallOperationId -eq $OperationId -or $BuildOperationId -eq [guid]::Empty -or
@@ -123,11 +162,17 @@ function Save-CoreInstall{
     if([IO.File]::Exists($target)){[IO.File]::Replace($partial,$target,[NullString]::Value)}else{[IO.File]::Move($partial,$target)}
 }
 function Invoke-CoreInstallerProcess([string]$Exe,[string[]]$Arguments,[string]$Label,[string]$PgPassword=''){
+    if($Label -in @('preview','install')){
+        $command=New-CoreInstallerDiagnosticCommand $Arguments (Join-Path $root ($Label+'.failure.log'))
+        $Arguments=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command',$command)
+    }
     $info=[Diagnostics.ProcessStartInfo]::new();$info.FileName=$Exe;$info.Arguments=($Arguments | ForEach-Object {ConvertTo-NativeCommandArgument $_}) -join ' '
     $info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.WorkingDirectory=$root;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
     $info.EnvironmentVariables.Clear();$info.EnvironmentVariables['SystemRoot']=$env:SystemRoot;$info.EnvironmentVariables['WINDIR']=$env:SystemRoot
     $info.EnvironmentVariables['OS']='Windows_NT';$info.EnvironmentVariables['COMPUTERNAME']='MEMORY-WINLAB'
     $info.EnvironmentVariables['PROCESSOR_ARCHITECTURE']='AMD64'
+    $knownFolders=Get-CoreInstallKnownFolderEnvironment
+    foreach($key in $knownFolders.Keys){$info.EnvironmentVariables[$key]=$knownFolders[$key]}
     $info.EnvironmentVariables['PATH']=$env:SystemRoot+'\System32'
     foreach($key in @('HOME','USERPROFILE','APPDATA','LOCALAPPDATA','TEMP','TMP')){$info.EnvironmentVariables[$key]=$root}
     if($PgPassword){$info.EnvironmentVariables['PGPASSWORD']=$PgPassword}

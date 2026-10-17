@@ -90,5 +90,19 @@ try{
     try{Copy-CoreInstallFile $selected (Join-Path $payload 'changed-wrapper.exe') $wrapperPin 'memory-windows-service.exe'}catch{$failure=$_.Exception.Message}
     if($failure -cne 'Pinned core installation input unavailable or changed: memory-windows-service.exe'){throw 'Component mismatch was not opaque and exact'}
     if(Test-Path (Join-Path $payload 'changed-wrapper.exe')){throw 'Changed wrapper was copied'}
+    $fakeOperator=Join-Path $root "fake'operator.ps1";$diagnostic=Join-Path $root 'private.failure.log'
+    Write-CoreInstallNew $fakeOperator ([Text.Encoding]::UTF8.GetBytes("throw 'synthetic installer failure'"))
+    $command=New-CoreInstallerDiagnosticCommand @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$fakeOperator) $diagnostic
+    $commandTokens=$null;$commandErrors=$null
+    $null=[Management.Automation.Language.Parser]::ParseInput($command,[ref]$commandTokens,[ref]$commandErrors)
+    if($commandErrors.Count){throw 'Diagnostic invocation has parser errors'}
+    Reject-CoreInstall {& ([scriptblock]::Create($command))}
+    if(-not [IO.File]::ReadAllText($diagnostic).Contains('fake')){throw 'Private child stack/source position was not retained'}
+    Reject-CoreInstall {New-CoreInstallerDiagnosticCommand @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$fakeOperator,'-Unknown','value') $diagnostic}
+    if($env:OS -eq 'Windows_NT'){
+        $folders=Get-CoreInstallKnownFolderEnvironment
+        if($folders.ProgramData -cne [Environment]::GetFolderPath('CommonApplicationData') -or
+            $folders.ALLUSERSPROFILE -cne $folders.ProgramData){throw 'Known CommonApplicationData was not bound explicitly'}
+    }
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}
 Write-Output 'Core installation parser and pure helpers passed; SCM/native execution was not attempted.'
