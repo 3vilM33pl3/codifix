@@ -52,7 +52,12 @@ docker run "${common[@]}" --network none --tmpfs /candidate:rw,nosuid,nodev,exec
   fi
   python3 packaging/ca-bookworm/abi.py --architecture "$arch" --sysroot "$sysroot" "${binaries[@]}" > "/work/output/abi-${arch}.json"
   "${runner[@]}" "${binaries[0]}" --version
-  for executable in "${binaries[@]}"; do "${runner[@]}" "$executable" --help > /dev/null; done
+  for executable in "${binaries[@]:0:3}"; do "${runner[@]}" "$executable" --help > /dev/null; done
+  # The gateway takes a private config path, not Clap flags. With no arguments
+  # it must launch and stop before config access, networking or database work.
+  gateway_status=0
+  gateway_output=$("${runner[@]}" "${binaries[3]}" 2>&1) || gateway_status=$?
+  [[ $gateway_status == 1 && $gateway_output == "Error: \"expected private gateway configuration file\"" ]]
   test -s /candidate/package/usr/share/memory-layer/web/index.html
   test -s /candidate/package/usr/libexec/memory-layer/releases/release.py
   dpkg-deb -f "$package" Package Version Architecture Depends

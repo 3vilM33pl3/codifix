@@ -24,9 +24,13 @@ export PATH="$work/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export DEBIAN_FRONTEND=noninteractive
 check_binary() {
   [[ $(/usr/bin/memory --version) == 'memory 2.1.0' ]]
-  for executable in memory memory-area memory-area-import memory-federation-gateway; do
+  for executable in memory memory-area memory-area-import; do
     "/usr/bin/$executable" --help > /dev/null
   done
+  # Gateway has positional private-config arguments, not general --help flags.
+  local gateway_status=0 gateway_output
+  gateway_output=$(/usr/bin/memory-federation-gateway 2>&1) || gateway_status=$?
+  [[ $gateway_status == 1 && $gateway_output == 'Error: "expected private gateway configuration file"' ]]
   test -s /usr/share/memory-layer/web/index.html
   test -s /usr/libexec/memory-layer/releases/release.py
 }

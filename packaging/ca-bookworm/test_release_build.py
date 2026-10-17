@@ -67,6 +67,8 @@ class ReleaseBuildTests(unittest.TestCase):
         self.assertNotIn("/candidate:rw,nosuid,nodev,exec,size=1g", preparation)
         self.assertIn("--read-only", validation)
         self.assertNotIn("--privileged", validation)
+        self.assertIn("${binaries[@]:0:3}", validation[-3])
+        self.assertIn("expected private gateway configuration file", validation[-3])
         self.assertNotEqual(self.build().returncode, 0, "must never overwrite an earlier release build")
 
     def test_rejects_mutable_inputs_and_shared_work(self):
