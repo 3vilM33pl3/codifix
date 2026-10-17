@@ -58,9 +58,9 @@ operational evidence directory below.
 
 ## Remaining work
 
-- Finish Mac app cache exposure and contribution/watch activation after the
-  successful fresh enrollment and read synchronization described below.
-  Publish final release packages after the corrected candidate completes.
+- Publish final release packages after the corrected candidate completes.
+  The Mac runtime, sync and original watchers are restored as described below;
+  its private app build does not establish signed/notarized distribution.
 - Refresh running client sessions. Codifix desktop plugin is installed/enabled;
   the legacy plugin is disabled with its cache retained. Primary MCP project
   access and both scoped stdio wrappers passed. Watch manager, Workshop/Homelab
@@ -164,19 +164,36 @@ Fresh subscriptions now synchronize successfully: Homelab reached cursor
 990/through 990 and Workshop 3582/through 3582, both caught up with zero errors.
 Their branded persistent sync jobs are running. Old subscription IDs, profiles,
 projections and legacy Keychain records remain retained as historical evidence.
-Normal app cache exposure and contribution/watch activation remain in progress.
+Normal browsing now exposes only the current subscriptions, avoiding duplicate
+historical views while retaining the old profiles and projections on disk.
 
 The fresh-device binding operator in `107aa90f` records exact old/new bindings
 in the existing immutable receipt table, then updates the disabled local binding
 atomically. It checks the original scope, retired/fresh spaces, drained queue and
 pinned approval/bootstrap evidence. Twelve focused tests passed against real
 PostgreSQL/schema 85, plus the two existing retirement/same-device checks. The
-existing same-device function and all applied migrations are unchanged. Actual
-manifests are prepared; application awaits the bounded independent review and
-transition from the retained cold launcher to normal operational configuration.
+existing same-device function and all applied migrations are unchanged. Astra
+reviewed both actual sealed manifests, and both transitions are now applied.
+Each changed only the local binding and added its immutable receipt; all other
+existing table rows and schema were verified unchanged at the transition.
+
+Seven persistent jobs are running: PostgreSQL, two area services, two sync jobs
+and both original-scope watchers. The six application jobs successfully restarted
+from their unchanged persistent plists, and both areas remained healthy. Separate
+pinned operational configurations leave the cold-bound helper inputs intact.
+Original watcher checkpoints are preserved; no new provider/model calls were
+enabled. Cookie-backed reads of both original projects returned HTTP 200, and
+fresh history reads passed. One truthful Workshop cutover note produced two normal
+curated records; both received accepted owner receipts. Workshop then caught up
+to cursor 3586. This establishes Workshop upload acceptance; no new Homelab
+upload was tested. The six original accepted outbox rows/receipts and all 3,188
+recovery-file hashes remain intact. Astra's final evidence review found no
+concrete blocker. Full OS reboot and pixel-level UI acceptance were not tested.
 
 Private evidence: `mac-actual-evidence/` (including `company-approval.jsonl`,
-`company-approval.png`, and `fresh-binding-review.json`),
+`company-approval.png`, `fresh-binding-review.json`,
+`fresh-binding-apply-result.json`, `current-functional-result.json`,
+`current-restart-result.json`, and `final-complete-runtime.json`),
 `mac-actual-read-result.json` and `mac-actual-retirement-result.json`.
 
 The original Mac company origins initially returned 502 because application
