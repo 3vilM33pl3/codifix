@@ -44,6 +44,7 @@ chmod 755 "$work/prior/usr/bin/memory"
 printf '# preserved operator configuration\n[service]\nbind_addr = "127.0.0.1:18371"\n' > "$work/prior/etc/memory-layer/memory-layer.toml"
 dpkg-deb --root-owner-group --build "$work/prior" "$work/prior.deb"
 dpkg -i "$work/prior.deb"
+printf '\n# operator changed this after installing the prior package\n' >> /etc/memory-layer/memory-layer.toml
 printf 'retain local runtime data\n' > /var/lib/memory-layer/acceptance-sentinel
 before=$(sha256sum /etc/memory-layer/memory-layer.toml /var/lib/memory-layer/acceptance-sentinel)
 dpkg --force-confold -i "$package"
