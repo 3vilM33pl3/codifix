@@ -49,12 +49,12 @@ $inventory=@(Get-ChildItem -LiteralPath $code -Recurse -File | Sort-Object FullN
     @{path=$_.FullName;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()}
 })
 $driver='C:\MemoryLab\inputs\guest-rust-proof.mjs'
-@{format='memory-native-rust-proof-input-v1';source_commit=$head;files=$inventory;
+$inputRecord=@{format='memory-native-rust-proof-input-v1';source_commit=$head;files=$inventory;
   script_sha256=(Get-FileHash -LiteralPath $PSCommandPath).Hash.ToLowerInvariant();
   driver_sha256=(Get-FileHash -LiteralPath $driver).Hash.ToLowerInvariant();
   helper_sha256=(Get-FileHash -LiteralPath (Join-Path $root 'evaluation-helper.exe')).Hash.ToLowerInvariant();
-  compiler_version='1.99.1';msvc_version='14.44.35207';sdk_version='10.0.26100.0'} |
-    ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $root 'inventory.json') -Encoding UTF8
+  compiler_version='1.99.1';msvc_version='14.44.35207';sdk_version='10.0.26100.0'}
+[IO.File]::WriteAllText((Join-Path $root 'inventory.json'), ($inputRecord | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
 $process=Start-Process -FilePath $node -ArgumentList @($driver,$SourceRoot,$root) -NoNewWindow -PassThru `
     -RedirectStandardOutput (Join-Path $root 'stdout.log') -RedirectStandardError (Join-Path $root 'stderr.log')
 $null=$process.Handle
