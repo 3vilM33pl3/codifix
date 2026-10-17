@@ -90,5 +90,30 @@ candidate run; the failed run cannot establish package acceptance.
 The private Monolith ledger records exact database/role/container/path mappings
 and bounded cold preparation commands. Its mappings still need instance-specific
 rehearsal and final client/privilege checks. Mac immutable runtime-journal rebinding
-is under separate review. Neither ledger preparation nor the six populated data
+passed Astra source review and 12 focused tests; native rebinding remains pending. Neither ledger preparation nor the six populated data
 rehearsals establishes the full operational cutover. No live cutover occurred.
+
+## Corrected candidate preparation
+
+The first hosted run also passed required-database/source/security validation,
+Linux arm64 packaging and Apple-silicon standard/update package acceptance.
+Mac Intel and Linux amd64 were still building at this checkpoint. The verified
+Apple-silicon artifacts bind to the original `95130a0c` source, are unsigned and
+not notarized, and contain no bundled runtime. They do not establish acceptance
+of later source changes.
+
+The [fresh native Mac runtime](native-macos-runtime.md) passed staged validation.
+The [immutable runtime helper](macos-runtime-rebind.md) passed its 12 tests and
+Astra review. Review then found automatic loop/auth bootstrap writes after
+migration verification. Commit `15e1f828` returns after successful verification
+when both read-only and verify-only are selected. Four real-database schema
+checks passed, including SELECT-only startup with unchanged loop/auth/audit/
+migration snapshots, rejection of invalid history, and retained writable
+bootstrap. Astra's follow-up review found no further concrete automatic writer
+or egress under the helper's cold configuration; native process observation is
+still required.
+
+[Current TUI captures](tui-captures.md) use disposable synthetic data. Active
+user docs and embedded help were refreshed, while historical source evidence
+and exact old objects in cutover instructions remain preserved. The final
+candidate run must include these source corrections; no live cutover occurred.
