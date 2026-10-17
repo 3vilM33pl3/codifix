@@ -60,7 +60,9 @@ authorization technique described below, rehearsed with that instance's exact
 mapping. Keep disabled restore-check databases disabled. The shared host dev
 cluster requires its own client and privilege inventory and remains separate
 from Workshop; do not stop unrelated PostgreSQL services or change authentication
-rules to make the rename possible.
+rules to make the rename possible. The [four-cluster SQL/authentication rehearsal](../docs/reviews/codifix-rename/evidence/monolith-name-rehearsal.md)
+passed 106 checks using synthetic credentials and fixture-bound catalog IDs;
+it does not establish a live cluster match or a populated operational transfer.
 
 The disposable hosted installer check covers fresh installation, retained
 configuration/data, repair and removal. It is not a populated old-name cutover
