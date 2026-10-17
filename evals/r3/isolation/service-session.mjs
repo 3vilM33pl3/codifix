@@ -114,10 +114,10 @@ async function openSession(options, deps) {
   const directory = native ? await nativeDirectory(execution, [snapshotBinary, memoryBinary], deps)
     : await fileSystem.mkdtemp(path.join(os.tmpdir(), 'memory-r3-service-session-'));
   const env = native ? { SystemRoot: systemRoot, WINDIR: systemRoot, PATH: '', HOME: directory,
-    USERPROFILE: directory, TEMP: directory, TMP: directory, MEMORY_LAYER_PROFILE: 'prod' }
-    : { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_PROFILE: 'prod' };
+    USERPROFILE: directory, TEMP: directory, TMP: directory, CODIFIX_PROFILE: 'prod' }
+    : { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, CODIFIX_PROFILE: 'prod' };
   const owner = childProcess(spawnProcess, snapshotBinary, [], { cwd: directory,
-    env: { ...env, MEMORY_LAYER_TEST_DATABASE_URL: databaseUrl, MEMORY_LAYER_TEST_REQUIRE_DB: '1' },
+    env: { ...env, CODIFIX_TEST_DATABASE_URL: databaseUrl, CODIFIX_TEST_REQUIRE_DB: '1' },
     stdio: ['pipe', 'pipe', 'pipe'] });
   let pending, unavailable = false, closing = false, active = false, proxy;
   const lines = createInterface({ input: owner.child.stdout });

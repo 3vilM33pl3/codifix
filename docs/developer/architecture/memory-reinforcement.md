@@ -15,7 +15,7 @@ accurate, current, and well-worded. It has two halves:
    memory, improves its wording, queues a correction for human review, or
    flags it — it never silently rewrites content on weak evidence.
 
-Crate: `crates/mem-reinforce`. Service wiring: `crates/mem-service`
+Crate: `crates/codifix-reinforce`. Service wiring: `crates/codifix-service`
 (`src/reinforcement.rs`, `src/repository/handlers/reinforcement.rs`).
 
 ## Scoring model

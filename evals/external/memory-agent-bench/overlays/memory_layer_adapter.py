@@ -88,7 +88,7 @@ class MemoryLayerAdapter:
         self.api_token = (
             _env_first(
                 "MEMORY_AGENT_BENCH_MEMORY_API_TOKEN",
-                "MEMORY_LAYER_API_TOKEN",
+                "CODIFIX_API_TOKEN",
                 "MEMORY_SERVICE_API_TOKEN",
             )
             or agent_config.get("memory_api_token")

@@ -1,8 +1,8 @@
-# Bundled Memory Layer stack: PostgreSQL + pgvector, the service, and the web UI.
+# Bundled Codifix stack: PostgreSQL + pgvector, the service, and the web UI.
 #
 #   docker compose up
 #
-# then open http://localhost:4040 and run `memory demo` to load a showcase
+# then open http://localhost:4040 and run `codifix demo` to load a showcase
 # project. Keyless by default (lexical retrieval needs no API keys); add an
 # OPENAI_API_KEY and flip the [features]/[embeddings] flags to enable LLM
 # curation and semantic search.
@@ -22,16 +22,16 @@ services:
       timeout: 5s
       retries: 20
 
-  memory:
-    image: memory-layer:local
+  codifix:
+    image: codifix:local
     build: .
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      MEMORY_LAYER__DATABASE__URL: postgresql://memory:memory@postgres:5432/memory
-      MEMORY_LAYER__SERVICE__BIND_ADDR: 0.0.0.0:4040
-      MEMORY_LAYER__SERVICE__API_TOKEN: memory-local-token
+      CODIFIX__DATABASE__URL: postgresql://memory:memory@postgres:5432/memory
+      CODIFIX__SERVICE__BIND_ADDR: 0.0.0.0:4040
+      CODIFIX__SERVICE__API_TOKEN: memory-local-token
     ports:
       - "4040:4040"
 

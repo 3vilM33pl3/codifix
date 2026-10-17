@@ -6,7 +6,7 @@ If you are new, start with the TUI. It shows the main product surface: cited mem
 
 ![Codifix query answer](../img/tui/query-tab.png)
 
-![How Codifix turns project work into cited context](../img/codifix-flow.png)
+![How Codifix turns project work into cited context](../img/codifix-flow.svg)
 
 ## Table of Contents
 

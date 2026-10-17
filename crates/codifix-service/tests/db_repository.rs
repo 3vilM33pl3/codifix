@@ -641,7 +641,7 @@ async fn loop_repository_routes_trigger_events_and_dedupes() {
     .expect("read routed loop run");
     assert!(
         loaded_run.memory_proposals.len() >= 4,
-        "context_pack_refresh should emit pending codifix proposals"
+        "context_pack_refresh should emit pending memory proposals"
     );
     assert!(
         loaded_run
@@ -786,7 +786,7 @@ async fn loop_repository_approves_memory_proposal_and_writes_provenance() {
         run_id: None,
         target_memory_id: None,
         candidate: serde_json::json!({
-            "canonical_text": "Loop codifix proposals store reviewed durable memory text.",
+            "canonical_text": "Loop memory proposals store reviewed durable memory text.",
             "summary": "Loop proposal approval writes memory",
             "memory_type": "implementation",
             "tags": ["loop-engineering", "proposal"]
@@ -837,7 +837,7 @@ async fn loop_repository_approves_memory_proposal_and_writes_provenance() {
     assert_eq!(memory.summary, "Loop proposal approval writes memory");
     assert_eq!(
         memory.canonical_text,
-        "Loop codifix proposals store reviewed durable memory text."
+        "Loop memory proposals store reviewed durable memory text."
     );
     assert_eq!(memory.sources.len(), 2);
     assert!(

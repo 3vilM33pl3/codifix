@@ -15,10 +15,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 TMUX = os.environ.get("TMUX_BIN", "tmux")
-PROJECT = os.environ.get("MEMORY_LAYER_SCREENSHOT_PROJECT", "memory")
-TUI_BIN = os.environ.get("MEMORY_LAYER_TUI_BIN", str(ROOT / "target" / "debug" / "memory"))
+PROJECT = os.environ.get("CODIFIX_SCREENSHOT_PROJECT", "memory")
+TUI_BIN = os.environ.get("CODIFIX_TUI_BIN", str(ROOT / "target" / "debug" / "memory"))
 WATCH_CMD = os.environ.get(
-    "MEMORY_LAYER_WATCH_CMD",
+    "CODIFIX_WATCH_CMD",
     f"{ROOT / 'target' / 'debug' / 'memory'} watcher run --project {PROJECT}",
 )
 WIDTH = 204
@@ -27,7 +27,7 @@ OUTPUT_DIR = ROOT / "docs" / "img" / "tui"
 SITE_OUTPUT_DIR = ROOT / "docs-site" / "public" / "images" / "tui"
 DEFAULT_FG = (230, 236, 245)
 DEFAULT_BG = (22, 31, 46)
-FONT_NAME = os.environ.get("MEMORY_LAYER_SCREENSHOT_FONT", "DejaVuSansMono.ttf")
+FONT_NAME = os.environ.get("CODIFIX_SCREENSHOT_FONT", "DejaVuSansMono.ttf")
 FONT_SIZE = 14
 PADDING_X = 20
 PADDING_Y = 18

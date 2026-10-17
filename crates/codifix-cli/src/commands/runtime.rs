@@ -2296,9 +2296,9 @@ pub(in crate::commands) struct BundleArgs {
 
 #[derive(Debug, Subcommand)]
 pub(in crate::commands) enum BundleCommand {
-    #[command(about = "Export a project codifix bundle to a zip archive.", after_help = BUNDLE_EXPORT_AFTER_HELP)]
+    #[command(about = "Export a project memory bundle to a zip archive.", after_help = BUNDLE_EXPORT_AFTER_HELP)]
     Export(ExportArgs),
-    #[command(about = "Import a project codifix bundle from a zip archive.", after_help = BUNDLE_IMPORT_AFTER_HELP)]
+    #[command(about = "Import a project memory bundle from a zip archive.", after_help = BUNDLE_IMPORT_AFTER_HELP)]
     Import(ImportArgs),
 }
 
@@ -3144,7 +3144,7 @@ pub(in crate::commands) enum LoopsCommand {
     Reject(LoopApprovalDecisionArgs),
     #[command(about = "Edit a loop approval request proposed action.", after_help = LOOPS_GROUP_AFTER_HELP)]
     EditApproval(LoopApprovalEditArgs),
-    #[command(about = "List loop codifix proposals.", after_help = LOOPS_GROUP_AFTER_HELP)]
+    #[command(about = "List loop memory proposals.", after_help = LOOPS_GROUP_AFTER_HELP)]
     MemoryProposals(LoopMemoryProposalsArgs),
     #[command(about = "Create a pending loop memory proposal.", after_help = LOOPS_GROUP_AFTER_HELP)]
     CreateMemoryProposal(LoopMemoryProposalCreateArgs),

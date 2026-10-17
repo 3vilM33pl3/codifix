@@ -52,7 +52,7 @@ export async function runResponseDiagnostic(root, settingsPath, signal = new Abo
   // The contract pins the Rust manifest identity through the real approval gate.
   const { spawnSync } = await import('node:child_process');
   const plan = spawnSync(binaries.memory, ['eval','campaign','plan','--manifest',path.join(root,'campaign.json')], {
-    env: { PATH: '/usr/bin:/bin', HOME: path.join(root,'private'), MEMORY_LAYER_PROFILE: 'prod' },
+    env: { PATH: '/usr/bin:/bin', HOME: path.join(root,'private'), CODIFIX_PROFILE: 'prod' },
     encoding: 'utf8', timeout: 20000, maxBuffer: 1048576,
   });
   if (plan.status !== 0) throw Error('diagnostic approval manifest invalid');

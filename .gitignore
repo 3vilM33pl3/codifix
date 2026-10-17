@@ -24,3 +24,7 @@ __pycache__/
 /clients/typescript/node_modules
 /clients/typescript/dist
 __pycache__/
+
+# Codifix state and credentials; legacy exclusions remain until cutover.
+/.codifix
+/codifix-postgres-connection.txt

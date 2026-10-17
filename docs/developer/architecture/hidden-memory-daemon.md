@@ -1,6 +1,6 @@
 # Hidden Memory Daemon
 
-This page is a design document for the watcher/automation daemon and is intended for developers working on Memory Layer internals.
+This page is a design document for the watcher/automation daemon and is intended for developers working on Codifix internals.
 
 ## Table of Contents
 
@@ -78,7 +78,7 @@ It should ignore:
 ## Related Docs
 
 - [Architecture Overview](overview.md)
-- [How Memory Layer Works](how-it-works.md)
+- [How Codifix Works](how-it-works.md)
 - [Developer Documentation](../README.md)
 - trivial edits without durable significance
 - repeated duplicate windows

@@ -15,8 +15,8 @@ const memory = process.env.MEMORY_R3_CLI_BIN;
 const names = ['MEMORY_R3_BUDGET_BIN', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN',
   'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE'];
 const available = !!memory && names.every(n => process.env[n]);
-const database = process.env.MEMORY_LAYER_TEST_DATABASE_URL;
-const integration = available && !!database && process.env.MEMORY_LAYER_TEST_REQUIRE_DB === '1';
+const database = process.env.CODIFIX_TEST_DATABASE_URL;
+const integration = available && !!database && process.env.CODIFIX_TEST_REQUIRE_DB === '1';
 if (process.env.MEMORY_R3_REQUIRE_PAID_LAUNCHER === '1' && !integration) throw Error('required paid-launcher fixture configuration missing');
 async function fixture(t, reviewed = true) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-paid-'));

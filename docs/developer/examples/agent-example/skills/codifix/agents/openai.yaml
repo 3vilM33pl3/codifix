@@ -1,5 +1,5 @@
-# Minimal agent hint file for the memory-layer skill.
+# Minimal agent hint file for the codifix skill.
 # Extend this if you want per-agent metadata later.
-name: memory-layer
+name: codifix
 version: 0.9.0
 entrypoint: SKILL.md

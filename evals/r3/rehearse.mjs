@@ -35,19 +35,19 @@ export async function rehearse(argv = process.argv.slice(2), environment = proce
   const wire = flags.includes('--wire');
   const mediated = flags.includes('--mediated') || wire;
   const root = path.resolve(destination);
-  const databaseUrl = environment.MEMORY_LAYER_TEST_DATABASE_URL;
+  const databaseUrl = environment.CODIFIX_TEST_DATABASE_URL;
   const binaries = {
     memory: environment.MEMORY_R3_CLI_BIN, snapshot: environment.MEMORY_R3_SNAPSHOT_BIN,
     score: environment.MEMORY_R3_SCORE_BIN, retriever: environment.MEMORY_R3_RETRIEVER_BIN,
     ...(mediated ? { budget: environment.MEMORY_R3_BUDGET_BIN } : {}),
   };
   const images = { node: environment.MEMORY_R3_TEST_IMAGE, rust: environment.MEMORY_R3_RUST_IMAGE };
-  if (!databaseUrl || environment.MEMORY_LAYER_TEST_REQUIRE_DB !== '1' || Object.values(binaries).some(value => !value || !path.isAbsolute(value))
+  if (!databaseUrl || environment.CODIFIX_TEST_REQUIRE_DB !== '1' || Object.values(binaries).some(value => !value || !path.isAbsolute(value))
       || (!native && Object.values(images).some(value => !/^sha256:[a-f0-9]{64}$/.test(value)))) throw Error('explicit disposable database, binaries and immutable images required');
   if (native && mediated) throw Error('native bootstrap supports deterministic zero-spend rehearsal only');
   if (native && Object.values(images).some(value => value !== undefined)) throw Error('native bootstrap cannot contain Linux images');
   if (!native && (environment.MEMORY_R3_NATIVE_EXECUTION !== undefined || environment.MEMORY_R3_NATIVE_COMPILER !== undefined)) throw Error('native profile requires explicit --native selection');
-  let env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: os.tmpdir(), MEMORY_LAYER_PROFILE: 'prod' };
+  let env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: os.tmpdir(), CODIFIX_PROFILE: 'prod' };
   const run = runProcess ?? ((binary, args, options = {}) => new Promise((resolve, reject) => {
     const child = spawn(binary, args, { env, stdio: 'inherit', shell: false, windowsHide: true, ...options });
     const interrupt = () => child.kill(native ? 'SIGKILL' : 'SIGINT');
@@ -99,7 +99,7 @@ export async function rehearse(argv = process.argv.slice(2), environment = proce
     if (hash(nativeGuest) !== profile.guest.sha256) throw Error('native guest changed before its private copy');
     const systemRoot = environment.SystemRoot ?? 'C:\\Windows';
     if (!/^[A-Za-z]:\\Windows$/i.test(systemRoot) || !Number.isSafeInteger(callerPid) || callerPid < 1) throw Error('invalid native bootstrap host');
-    env = { SystemRoot: systemRoot, WINDIR: systemRoot, PATH: '', MEMORY_LAYER_PROFILE: 'prod' };
+    env = { SystemRoot: systemRoot, WINDIR: systemRoot, PATH: '', CODIFIX_PROFILE: 'prod' };
     let job;
     try { job = JSON.parse((await invokeHelper(profile.helper.path, ['--verify-outer-job', String(callerPid)], env)).stdout); }
     catch { throw Error('native bootstrap requires a verified outer Job; no output created'); }
@@ -197,7 +197,7 @@ export async function rehearse(argv = process.argv.slice(2), environment = proce
     }
     if (native) throw Error('native bootstrap prepared; protected controller IPC integration is required before execution');
     const code = await run(processExecutable, [path.join(root, 'runtime/rehearsal-controller.mjs')], {
-      cwd: root, env: { ...env, HOME: staging, MEMORY_LAYER_TEST_DATABASE_URL: databaseUrl, MEMORY_LAYER_TEST_REQUIRE_DB: '1' } });
+      cwd: root, env: { ...env, HOME: staging, CODIFIX_TEST_DATABASE_URL: databaseUrl, CODIFIX_TEST_REQUIRE_DB: '1' } });
     process.exitCode = code;
   } finally {
     // A controller can retain its own separate service staging on ambiguous

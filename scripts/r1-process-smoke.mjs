@@ -91,7 +91,7 @@ model = "fixture"
 create_enabled = true
 `, {mode:0o600});
   const child = spawn(binary, ['--config',config,'service','run'], {
-    cwd:directory, env:{PATH:process.env.PATH, MEMORY_LAYER_PROFILE:'prod'}, stdio:['ignore','pipe','pipe'],
+    cwd:directory, env:{PATH:process.env.PATH, CODIFIX_PROFILE:'prod'}, stdio:['ignore','pipe','pipe'],
   });
   children.push(child);
   let output = '';

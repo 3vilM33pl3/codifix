@@ -34,7 +34,7 @@ try {
   await fs.writeFile(file, JSON.stringify(manifest, null, 2) + '\n');
   const runtime = await packagePaidRuntime(root, inputs);
   const planned = spawnSync(path.join(root, runtime.binaries.memory.path), ['eval', 'campaign', 'plan', '--manifest', file, '--split', 'development'],
-    { env: { PATH: '/usr/bin:/bin', HOME: path.join(root, 'private'), MEMORY_LAYER_PROFILE: 'prod' }, encoding: 'utf8', timeout: 20000, maxBuffer: 1048576 });
+    { env: { PATH: '/usr/bin:/bin', HOME: path.join(root, 'private'), CODIFIX_PROFILE: 'prod' }, encoding: 'utf8', timeout: 20000, maxBuffer: 1048576 });
   if (planned.status !== 0) throw Error('locked draft invalid');
   const plan = JSON.parse(planned.stdout);
   console.log(JSON.stringify({ manifest: file, draft_manifest_sha256: plan.manifest_sha256, task_executions: plan.work.length,

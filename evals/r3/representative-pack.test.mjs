@@ -71,7 +71,7 @@ test('explicit held-out fixture packs remain separate, draft and non-promotable'
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-held-out-cli-'));
   t.after(() => fs.rm(directory, { recursive: true }));
   const out = path.join(directory, 'pack');
-  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_PROFILE: 'prod' };
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, CODIFIX_PROFILE: 'prod' };
   assert.equal(spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', out, '--held-out'], { env }).status, 0);
   const manifestPath = path.join(out, 'campaign.json');
   const manifest = JSON.parse(await fs.readFile(manifestPath));
@@ -97,7 +97,7 @@ test('existing campaign CLI loads representative suites and refuses tampering or
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-representative-cli-'));
   t.after(() => fs.rm(directory, { recursive: true }));
   const out = path.join(directory, 'pack');
-  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_PROFILE: 'prod' };
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, CODIFIX_PROFILE: 'prod' };
   assert.equal(spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', out, '--one-family-per-track'], { env }).status, 0);
   const manifestPath = path.join(out, 'campaign.json');
   const plan = split => spawnSync(binary, ['eval', 'campaign', 'plan', '--manifest', manifestPath, '--split', split], {
@@ -126,7 +126,7 @@ test('complete development allocation plans all 660 executions but cannot become
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-development-cli-'));
   t.after(() => fs.rm(directory, { recursive: true }));
   const out = path.join(directory, 'pack');
-  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_PROFILE: 'prod' };
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, CODIFIX_PROFILE: 'prod' };
   assert.equal(spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', out], { env }).status, 0);
   const manifestPath = path.join(out, 'campaign.json');
   const plan = split => spawnSync(binary, ['eval', 'campaign', 'plan', '--manifest', manifestPath, '--split', split], {

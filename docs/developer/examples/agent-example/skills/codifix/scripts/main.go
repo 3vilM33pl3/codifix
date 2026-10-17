@@ -77,25 +77,25 @@ func run(args []string) int {
 }
 
 func printUsage() {
-	fmt.Fprintln(os.Stderr, "Usage: go run ./.agents/skills/memory-layer/scripts/main.go <query-memory|capture-task|curate-memory> [args]")
+	fmt.Fprintln(os.Stderr, "Usage: go run ./.agents/skills/codifix/scripts/main.go <query-memory|capture-task|curate-memory> [args]")
 }
 
 func resolveCommand() ([]string, error) {
-	if explicit := strings.TrimSpace(os.Getenv("MEMCTL_BIN")); explicit != "" {
+	if explicit := strings.TrimSpace(os.Getenv("CODIFIX_BIN")); explicit != "" {
 		fields := strings.Fields(explicit)
 		if len(fields) == 0 {
-			return nil, errors.New("MEMCTL_BIN is set but empty")
+			return nil, errors.New("CODIFIX_BIN is set but empty")
 		}
 		return fields, nil
 	}
-	if _, err := exec.LookPath("memory"); err == nil {
-		return []string{"memory"}, nil
+	if _, err := exec.LookPath("codifix"); err == nil {
+		return []string{"codifix"}, nil
 	}
-	return nil, errors.New("Memory Layer CLI not found. Install `memory`, or set MEMCTL_BIN to an explicit command.")
+	return nil, errors.New("Codifix CLI not found. Install `memory`, or set CODIFIX_BIN to an explicit command.")
 }
 
 func defaultProject() string {
-	if project := strings.TrimSpace(os.Getenv("MEMORY_LAYER_PROJECT")); project != "" {
+	if project := strings.TrimSpace(os.Getenv("CODIFIX_PROJECT")); project != "" {
 		return project
 	}
 	cwd, err := os.Getwd()

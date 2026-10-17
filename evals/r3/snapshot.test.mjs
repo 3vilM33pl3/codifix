@@ -13,7 +13,7 @@ import { preparedContext, runOfflineKnowledge } from './isolation/knowledge.mjs'
 
 const snapshot = process.env.MEMORY_R3_SNAPSHOT_BIN;
 const memory = process.env.MEMORY_R3_CLI_BIN;
-const database = process.env.MEMORY_LAYER_TEST_DATABASE_URL;
+const database = process.env.CODIFIX_TEST_DATABASE_URL;
 const image = process.env.MEMORY_R3_TEST_IMAGE;
 const scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
 if (process.env.MEMORY_R3_REQUIRE_SNAPSHOT === '1' && (!snapshot || !memory || !database)) throw Error('required snapshot/service configuration missing');
@@ -29,7 +29,7 @@ test('snapshot owner rejects arbitrary operations and unsafe source identifiers 
       { project: 'synthetic', source: '../private/labels.json', text: 'NEVER_ECHO_SYNTHETIC_CONTENT' },
     ] },
   ]) {
-    const result = spawnSync(snapshot, [], { env: { PATH: '/usr/bin:/bin', MEMORY_LAYER_TEST_REQUIRE_DB: '1' },
+    const result = spawnSync(snapshot, [], { env: { PATH: '/usr/bin:/bin', CODIFIX_TEST_REQUIRE_DB: '1' },
       input: JSON.stringify(input) + '\n', encoding: 'utf8', timeout: 5000 });
     assert.equal(result.status, 1);
     assert.equal(result.stdout, '');
@@ -50,7 +50,7 @@ test('supplied-vector snapshot profiles and coverage fail before database access
     { embedding: null },
   ]) {
     const input = { operation: 'prepare', semantic_time: '2026-01-01T00:00:00Z', documents: [document], embedding, ...change };
-    const result = spawnSync(snapshot, [], { env: { PATH: '/usr/bin:/bin', MEMORY_LAYER_TEST_REQUIRE_DB: '1' },
+    const result = spawnSync(snapshot, [], { env: { PATH: '/usr/bin:/bin', CODIFIX_TEST_REQUIRE_DB: '1' },
       input: JSON.stringify(input) + '\n', encoding: 'utf8', timeout: 5000 });
     assert.equal(result.status, 1);
     assert.equal(result.stdout, '');
@@ -62,8 +62,8 @@ test('supplied-vector snapshot profiles and coverage fail before database access
 test('snapshot helper owns sealed resets and a real foreground Memory service', { skip: !snapshot || !memory || !database }, async t => {
   assert(path.isAbsolute(snapshot) && path.isAbsolute(memory));
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-snapshot-'));
-  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: root, MEMORY_LAYER_PROFILE: 'prod',
-    MEMORY_LAYER_TEST_DATABASE_URL: database, MEMORY_LAYER_TEST_REQUIRE_DB: '1' };
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: root, CODIFIX_PROFILE: 'prod',
+    CODIFIX_TEST_DATABASE_URL: database, CODIFIX_TEST_REQUIRE_DB: '1' };
   const owner = spawn(snapshot, [], { env, cwd: root, stdio: ['pipe', 'pipe', 'pipe'] });
   let pending;
   let ownerError = '';
@@ -130,7 +130,7 @@ test('snapshot helper owns sealed resets and a real foreground Memory service', 
     `[offline]\nenabled = false\n[cluster]\nenabled = false\n[mcp]\nenabled = false\n`, { mode: 0o600 });
   // No inherited development config, tokens, plugins or provider credentials.
   service = spawn(memory, ['--config', config, 'service', 'run'], {
-    cwd: root, env: { PATH: env.PATH, HOME: root, MEMORY_LAYER_PROFILE: 'prod' }, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: root, env: { PATH: env.PATH, HOME: root, CODIFIX_PROFILE: 'prod' }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   service.stdout.resume(); service.stderr.resume();
   const url = `http://127.0.0.1:${port}`;

@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-memory_cmd="/workspace/target/debug/memory --config /workspace/evals/docker/app-build-sequence/config.eval.toml"
+memory_cmd="/workspace/target/debug/codifix --config /workspace/evals/docker/app-build-sequence/config.eval.toml"
 eval_suite="${MEMORY_EVAL_SUITE:-/workspace/evals/suites/app-build-sequence-codex-v1}"
 
 mkdir -p "$CODEX_HOME"

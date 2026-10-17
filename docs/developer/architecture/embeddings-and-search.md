@@ -1,9 +1,9 @@
 # Embeddings and Search
 
-How Memory Layer turns project memories into vectors, stores them, and
+How Codifix turns project memories into vectors, stores them, and
 uses them to answer questions. Pair with
 [Architecture Overview](overview.md) for the wider picture and
-[How Memory Layer Works](how-it-works.md) for the end-to-end runtime
+[How Codifix Works](how-it-works.md) for the end-to-end runtime
 model.
 
 ## Table of Contents
@@ -28,14 +28,14 @@ the embedding model actually receives — the summary contributes to
 every chunk's vector, which helps short memories rank well even when
 only their body matches a query.
 
-Code: `split_search_chunks` in `crates/mem-search/src/lib.rs` at
+Code: `split_search_chunks` in `crates/codifix-search/src/lib.rs` at
 line 1344; called from `rebuild_memory_chunks` at line 290.
 
 ## How vectors are produced
 
-`EmbeddingService` (`crates/mem-search/src/lib.rs`) is a thin wrapper
+`EmbeddingService` (`crates/codifix-search/src/lib.rs`) is a thin wrapper
 around a trait object: `Arc<dyn EmbeddingBackend>`. Each backend
-lives in `crates/mem-search/src/embedding_backend.rs` and speaks its
+lives in `crates/codifix-search/src/embedding_backend.rs` and speaks its
 provider's native REST dialect. The service chooses a backend from
 `config.embeddings.provider`:
 
@@ -136,11 +136,11 @@ index; semantic lookups do a filtered scan instead. That is cheap
 today and is the first thing to revisit if you grow to 100k+ chunks.
 
 Code: `upsert_chunk_embedding` in
-`crates/mem-search/src/lib.rs:901`.
+`crates/codifix-search/src/lib.rs:901`.
 
 ## How the search path uses embeddings
 
-`query_memory` at `crates/mem-search/src/lib.rs:159` runs a lexical
+`query_memory` at `crates/codifix-search/src/lib.rs:159` runs a lexical
 and a semantic pass in parallel, merges them, then re-ranks.
 
 ### Lexical pass
@@ -211,7 +211,7 @@ answer-writing pass.
 ## Maintenance surfaces
 
 ### `/v1/reembed` → `reembed_project_chunks`
-(`crates/mem-search/src/lib.rs:370`)
+(`crates/codifix-search/src/lib.rs:370`)
 
 Finds chunks that have no embedding in the currently active space
 and embeds their `search_text`. Idempotent. Run after:
@@ -225,7 +225,7 @@ never get embeddings even if their `memory_chunks` rows are still
 around.
 
 ### `/v1/prune-embeddings` → `prune_project_embeddings`
-(`crates/mem-search/src/lib.rs:444`)
+(`crates/codifix-search/src/lib.rs:444`)
 
 ```sql
 DELETE FROM memory_chunk_embeddings mce
@@ -246,7 +246,7 @@ fully populated and queries against it return reasonable results.
 ### Model migration recipe
 
 1. Update `embeddings.model` (or `base_url`, or `provider`) in
-   `memory-layer.toml`. A new `space_key` is implicit.
+   `codifix.toml`. A new `space_key` is implicit.
 2. Restart the service (picks up the new config).
 3. Hit `/v1/reembed` to populate vectors in the new space for every
    active, non-tombstone chunk. Both spaces now coexist.
@@ -258,17 +258,17 @@ fully populated and queries against it return reasonable results.
 
 | What | Where |
 |---|---|
-| `EmbeddingService`, `embed_texts`, `EmbeddingPurpose` | `crates/mem-search/src/lib.rs` + `embedding_backend.rs` |
-| `EmbeddingBackend` trait + OpenAI/Voyage/Cohere/Gemini impls | `crates/mem-search/src/embedding_backend.rs` |
-| `split_search_chunks` (chunker) | `crates/mem-search/src/lib.rs:1344` |
-| `rebuild_memory_chunks` | `crates/mem-search/src/lib.rs:290` |
-| `upsert_chunk_embedding` | `crates/mem-search/src/lib.rs:901` |
-| `query_memory` (entry point) | `crates/mem-search/src/lib.rs:159` |
-| `fetch_lexical_candidates` | `crates/mem-search/src/lib.rs:596` |
-| `fetch_semantic_candidates` | `crates/mem-search/src/lib.rs:764` |
-| `merge_candidates`, `rank_candidate` | `crates/mem-search/src/lib.rs:972, 1030` |
-| `reembed_project_chunks` | `crates/mem-search/src/lib.rs:370` |
-| `prune_project_embeddings` | `crates/mem-search/src/lib.rs:444` |
+| `EmbeddingService`, `embed_texts`, `EmbeddingPurpose` | `crates/codifix-search/src/lib.rs` + `embedding_backend.rs` |
+| `EmbeddingBackend` trait + OpenAI/Voyage/Cohere/Gemini impls | `crates/codifix-search/src/embedding_backend.rs` |
+| `split_search_chunks` (chunker) | `crates/codifix-search/src/lib.rs:1344` |
+| `rebuild_memory_chunks` | `crates/codifix-search/src/lib.rs:290` |
+| `upsert_chunk_embedding` | `crates/codifix-search/src/lib.rs:901` |
+| `query_memory` (entry point) | `crates/codifix-search/src/lib.rs:159` |
+| `fetch_lexical_candidates` | `crates/codifix-search/src/lib.rs:596` |
+| `fetch_semantic_candidates` | `crates/codifix-search/src/lib.rs:764` |
+| `merge_candidates`, `rank_candidate` | `crates/codifix-search/src/lib.rs:972, 1030` |
+| `reembed_project_chunks` | `crates/codifix-search/src/lib.rs:370` |
+| `prune_project_embeddings` | `crates/codifix-search/src/lib.rs:444` |
 | `memory_chunks` table | `migrations/0001_init.sql`, `0004_pgvector.sql` |
 | `memory_chunk_embeddings` table | `migrations/0009_multi_embedding_spaces.sql` |
 | Version filter (`is_tombstone`, `version_no`) | `migrations/0013_memory_versions.sql` |

@@ -705,10 +705,10 @@ fn print_loop_approvals(response: &codifix_record::LoopApprovalsResponse) {
 
 fn print_loop_memory_proposals(response: &codifix_record::LoopMemoryProposalsResponse) {
     if response.proposals.is_empty() {
-        println!("No loop codifix proposals found.");
+        println!("No loop memory proposals found.");
         return;
     }
-    println!("Loop codifix proposals: {}", response.proposals.len());
+    println!("Loop memory proposals: {}", response.proposals.len());
     for proposal in &response.proposals {
         println!(
             "- {} loop={} type={} status={} confidence={:.2} created={}",

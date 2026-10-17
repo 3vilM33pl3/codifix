@@ -1,6 +1,6 @@
 # Authentication And Authorization Architecture
 
-Memory Layer has two explicit operating modes. `single_user` preserves the
+Codifix has two explicit operating modes. `single_user` preserves the
 local browser bootstrap and installation-owner token. Both modes accept explicitly
 issued, project-scoped service tokens through the same authorization boundary.
 `multi_user` additionally enables Authentik browser identity and removes anonymous
@@ -22,7 +22,7 @@ flowchart LR
 ```
 
 Authentik authenticates people. OpenBao is the preferred distributor for
-machine secrets. Memory Layer does not call OpenBao at runtime and OpenBao does
+machine secrets. Codifix does not call OpenBao at runtime and OpenBao does
 not replace OIDC browser identity.
 
 ## Principal Model
@@ -129,6 +129,6 @@ permission to disclose a remote answer.
 - Browser Origin or CSRF failure: `403`.
 - No primary available to a relay: `503`.
 
-The implementation is split under `crates/mem-service/src/auth/`; public config
+The implementation is split under `crates/codifix-service/src/auth/`; public config
 and response contracts live in `mem-api`, while `web/src/features/access/` owns
 the browser administration surface.

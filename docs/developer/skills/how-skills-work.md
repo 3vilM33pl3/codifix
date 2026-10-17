@@ -1,11 +1,11 @@
 # How Skills Work
 
-This page explains how the Memory Layer skill system fits together in this repository.
+This page explains how the Codifix skill system fits together in this repository.
 
 It covers two different things:
 
 - how the **agent runtime** discovers and selects skills
-- how **Memory Layer** bootstraps and ships the repo-local skill files
+- how **Codifix** bootstraps and ships the repo-local skill files
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ There are three layers:
 
 1. the agent runtime decides whether a skill matches a turn
 2. the selected skill defines the workflow the agent should follow
-3. Memory Layer commands and the shared Go helper do the actual work
+3. Codifix commands and the shared Go helper do the actual work
 
 The important split is:
 
@@ -32,7 +32,7 @@ The important split is:
 - the **skill** tells the agent what to do
 - `memory` does **not** decide whether the agent should use a skill
 
-The current repo-local Memory Layer bundle uses a Go-based helper under `.agents/skills/memory-layer/scripts/`, so `go` must be available on `PATH` for those helper commands to run.
+The current repo-local Codifix bundle uses a Go-based helper under `.agents/skills/codifix/scripts/`, so `go` must be available on `PATH` for those helper commands to run.
 
 ## Short Description vs `SKILL.md`
 
@@ -55,9 +55,9 @@ At runtime, a skill is selected when either:
 - the user explicitly names it
 - or the request clearly matches the skill description
 
-For the `memory-layer` skill, those matches are things like:
+For the `codifix` skill, those matches are things like:
 
-- initializing or refreshing repo-local Memory Layer setup for a project
+- initializing or refreshing repo-local Codifix setup for a project
 - project-specific questions about this repo
 - asking what changed or what is known already
 - storing durable project knowledge
@@ -99,7 +99,7 @@ There are three important memory-skill copies in this repository:
 
 1. canonical live skill bundle
    - `.agents/skills/`
-   - the umbrella skill is `.agents/skills/memory-layer/`
+   - the umbrella skill is `.agents/skills/codifix/`
    - the focused skills are:
      - `.agents/skills/memory-project-init/`
      - `.agents/skills/memory-github-init/`
@@ -113,7 +113,7 @@ There are three important memory-skill copies in this repository:
    - installed as `skill-template`
    - used by `memory init` / `memory wizard` to copy the bundled skills into a repo
 3. developer example skill
-   - `docs/developer/examples/agent-example/skills/memory-layer/`
+   - `docs/developer/examples/agent-example/skills/codifix/`
    - useful as a reference, but not the canonical current live skill
 
 When these drift, the live repo-local bundle should be treated as authoritative.
@@ -135,7 +135,7 @@ memory upgrade
 
 `memory upgrade` backs up replaced skill directories under the user-local project runtime `skill-backups/` directory before copying from the template. It avoids replacing newer project-local skills unless `--force` is used.
 
-The relevant logic lives in `crates/mem-cli/src/main.rs`:
+The relevant logic lives in `crates/codifix-cli/src/main.rs`:
 
 - `discover_skill_template_dir()`
 - `sync_memory_skill_bundle()`
@@ -144,10 +144,10 @@ The relevant logic lives in `crates/mem-cli/src/main.rs`:
 
 The template is discovered from installed locations such as:
 
-- `/usr/share/memory-layer/skill-template`
-- `~/.local/share/memory-layer/skill-template` or `$XDG_DATA_HOME/memory-layer/skill-template` for local Linux installs
-- `/usr/local/share/memory-layer/skill-template` for the macOS `.pkg`
-- `$(brew --prefix)/share/memory-layer/skill-template` for Homebrew
+- `/usr/share/codifix/skill-template`
+- `~/.local/share/codifix/skill-template` or `$XDG_DATA_HOME/codifix/skill-template` for local Linux installs
+- `/usr/local/share/codifix/skill-template` for the macOS `.pkg`
+- `$(brew --prefix)/share/codifix/skill-template` for Homebrew
 - or, during source/dev use, the repo-local `.agents/skills/`
 
 This is why the same skill can exist in three forms:
@@ -158,7 +158,7 @@ This is why the same skill can exist in three forms:
 
 ## Related Docs
 
-- [Memory Layer Skill](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/docs/developer/skills/memory-layer-skill.md)
+- [Codifix Skill](codifix-skill.md)
 - [Architecture Overview](../architecture/overview.md)
-- [How Memory Layer Works](../architecture/how-it-works.md)
-- [Agent Example Skill](../examples/agent-example/skills/memory-layer/SKILL.md)
+- [How Codifix Works](../architecture/how-it-works.md)
+- [Agent Example Skill](../examples/agent-example/skills/codifix/SKILL.md)

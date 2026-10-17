@@ -8,4 +8,4 @@
 services:
   memory:
     environment:
-      MEMORY_LAYER__SERVICE__READ_ONLY: ${CLASSROOM_READ_ONLY:-false}
+      CODIFIX__SERVICE__READ_ONLY: ${CLASSROOM_READ_ONLY:-false}

@@ -1,4 +1,4 @@
-# Bundled Memory Layer service image: builds the web UI and the release binary,
+# Bundled Codifix service image: builds the web UI and the release binary,
 # then ships a slim runtime. Used by the top-level compose.yaml so a user gets a
 # working stack (Postgres + pgvector + service + web UI) with one command.
 #
@@ -26,17 +26,17 @@ COPY . .
 # we make the index dimension-safe so migrations apply cleanly on boot. This
 # mirrors evals/docker/app-build-sequence/Dockerfile.
 RUN sed -i 's/ON memory_chunks USING hnsw (embedding vector_cosine_ops);/ON memory_chunks USING hnsw ((embedding::vector(1536)) vector_cosine_ops) WHERE embedding IS NOT NULL AND vector_dims(embedding) = 1536;/' migrations/0004_pgvector.sql
-RUN cargo build --release --features full --bin memory
+RUN cargo build --release --features full --bin codifix
 
 # --- Stage 3: runtime ---
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates postgresql-client \
   && rm -rf /var/lib/apt/lists/*
-COPY --from=build /src/target/release/memory /usr/local/bin/memory
-COPY --from=web /web/dist /usr/share/memory-layer/web
-COPY deploy/config.docker.toml /etc/memory-layer/config.toml
-ENV MEMORY_LAYER_PROFILE=prod
-ENV MEMORY_LAYER_CONFIG=/etc/memory-layer/config.toml
+COPY --from=build /src/target/release/codifix /usr/local/bin/codifix
+COPY --from=web /web/dist /usr/share/codifix/web
+COPY deploy/config.docker.toml /etc/codifix/config.toml
+ENV CODIFIX_PROFILE=prod
+ENV CODIFIX_CONFIG=/etc/codifix/config.toml
 EXPOSE 4040
-CMD ["memory", "service", "run"]
+CMD ["codifix", "service", "run"]

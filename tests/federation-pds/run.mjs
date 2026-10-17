@@ -94,9 +94,9 @@ async function runtimeTest() {
   await writeFile(fixture, JSON.stringify({ base: `http://${network.IPAddress}:2583`,
     repository: state.did, token: state.accessJwt, signing_key: state.signingKey }), { mode: 0o600 });
   const testEnv = { ...process.env, MEMORY_FEDERATION_PDS_FIXTURE: fixture, CODIFIX_TEST_REQUIRE_DB: '1' };
-  delete testEnv.MEMORY_LAYER_CLIENT_TOKEN;
+  delete testEnv.CODIFIX_CLIENT_TOKEN;
   delete testEnv.DATABASE_URL;
-  delete testEnv.MEMORY_LAYER_FEDERATION_CONFIG;
+  delete testEnv.CODIFIX_FEDERATION_CONFIG;
   const child = spawn('cargo', ['test', '-p', 'codifix-federation-runtime', '--test', 'c_workflow', '--locked', '--', '--nocapture'],
     { cwd: join(directory, '../..'), env: testEnv, stdio: 'inherit' });
   const timer = setTimeout(() => child.kill('SIGTERM'), 540_000);

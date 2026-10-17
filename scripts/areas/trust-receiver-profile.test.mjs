@@ -16,7 +16,7 @@ test('selected CA Trust receiver profile is PostgreSQL 17 and inactive', () => {
   assert.equal(TRUST_RECEIVER_PROFILE.database, 'memory_trust');
   assert.equal(TRUST_RECEIVER_PROFILE.database_port, 5433);
   assert.equal(TRUST_RECEIVER_PROFILE.role, 'memory_trust');
-  assert.equal(TRUST_RECEIVER_PROFILE.service, 'memory-layer@trust.service');
+  assert.equal(TRUST_RECEIVER_PROFILE.service, 'codifix@trust.service');
   assert.equal(TRUST_RECEIVER_PROFILE.port, 8091);
   assert.equal(TRUST_RECEIVER_PROFILE.active, false);
   assert.equal(validateTrustReceiverObservation(observation()).postgres_version, '17.11');

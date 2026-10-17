@@ -24,7 +24,7 @@ PROFILE = {
     "postgres_version": "17.11", "client_version": "17.11",
     "extensions": {"vector": "0.8.6", "pgcrypto": "1.3", "pg_trgm": "1.6"},
     "database": "memory_trust", "database_port": 5433, "role": "memory_trust",
-    "service": "memory-layer@trust.service", "port": 8091, "active": False,
+    "service": "codifix@trust.service", "port": 8091, "active": False,
 }
 SCHEMA_SHA256 = "2ce8b07f9c8fc252b0162d158ccb8e57082c2186306cdc489c9343ec91a115dc"
 CATALOG_SHA256 = "ec075904170f4e45d739bf971215f511d701cddffc432eef46cabfe3c41199eb"

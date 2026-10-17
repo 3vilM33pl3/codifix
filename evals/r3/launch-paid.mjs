@@ -13,7 +13,7 @@ import { openCampaignDispatch } from './campaign-dispatch.mjs';
 function cli(binary, root, args, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, ['eval', 'campaign', ...args], { cwd: root,
-      env: { PATH: '/usr/bin:/bin', HOME: path.join(root, 'private'), MEMORY_LAYER_PROFILE: 'prod' },
+      env: { PATH: '/usr/bin:/bin', HOME: path.join(root, 'private'), CODIFIX_PROFILE: 'prod' },
       stdio: ['ignore', 'pipe', 'pipe'] });
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
     let stdout = '', stderr = '';

@@ -50,7 +50,7 @@ def main():
     if not os.path.isabs(binary) or not os.path.isabs(config):
         raise RehearsalFailure("explicit rehearsal paths required")
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "C.UTF-8",
-           "TERM": "xterm-256color", "MEMORY_LAYER_PROFILE": "prod"}
+           "TERM": "xterm-256color", "CODIFIX_PROFILE": "prod"}
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(os.path.dirname(config))

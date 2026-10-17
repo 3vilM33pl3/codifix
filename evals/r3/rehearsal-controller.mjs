@@ -23,7 +23,7 @@ const configuration = JSON.parse(configurationBytes);
 const configurationSha256 = createHash('sha256').update(configurationBytes).digest('hex');
 const native = configuration.execution?.kind === 'windows-native-v1';
 if (!manifest.smoke_only || manifest.label_status !== 'draft' || manifest.limits.microusd !== 0
-    || process.env.MEMORY_LAYER_TEST_REQUIRE_DB !== '1') throw Error('offline disposable rehearsal only');
+    || process.env.CODIFIX_TEST_REQUIRE_DB !== '1') throw Error('offline disposable rehearsal only');
 if ((process.platform === 'win32' && !native) || (configuration.execution !== undefined && !native)
     || (native && (configuration.syntheticWire || manifest.provider_budget || manifest.preparation_budget
       || configuration.socket !== undefined || configuration.images !== undefined
@@ -35,8 +35,8 @@ const journal = native ? await createWindowsHostJournal(configuration.execution)
 if (journal) await journal.read(path.join(root, 'private'), 'runtime.json', { sha256: configurationSha256 });
 const env = native ? { SystemRoot: process.env.SystemRoot, WINDIR: process.env.SystemRoot,
   PATH: path.dirname(configuration.binaries.node.path), HOME: process.env.HOME, USERPROFILE: process.env.HOME,
-  TEMP: process.env.HOME, TMP: process.env.HOME, MEMORY_LAYER_PROFILE: 'prod' }
-  : { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME, MEMORY_LAYER_PROFILE: 'prod' };
+  TEMP: process.env.HOME, TMP: process.env.HOME, CODIFIX_PROFILE: 'prod' }
+  : { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME, CODIFIX_PROFILE: 'prod' };
 let activeCli, stopping = false, dispatcher;
 const interrupted = () => { stopping = true; activeCli?.kill(native ? 'SIGKILL' : 'SIGINT'); void dispatcher?.close(); };
 process.once('SIGINT', interrupted);
@@ -86,7 +86,7 @@ try {
     if (wireProvider) {
       providerSession = await openProviderCampaignSession({ provider: wireProvider, offline: true, split: 'development',
         snapshotBinary: configuration.binaries.snapshot.path, memoryBinary: configuration.binaries.memory.path,
-        databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL,
+        databaseUrl: process.env.CODIFIX_TEST_DATABASE_URL,
         configuration: { root, manifestSha256: plan.manifest_sha256, nodeImage: configuration.images.node, rustImage: configuration.images.rust,
           scoreBinary: configuration.binaries.score.path, retrieverBinary: configuration.binaries.retriever.path,
           budgetBinary: configuration.binaries.budget.path,
@@ -115,7 +115,7 @@ try {
         payload: { model: syntheticEmbeddingModel, purpose, input }, allowance: { input_tokens: 64, output_tokens: 0, microusd: 0 },
         timeoutMs: 10000, invoke: async payload => ({ output: syntheticVector(payload.input), usage: { input_tokens: 1, output_tokens: 0, microusd: 0 } }) });
       session = await openPreparedSession({ snapshotBinary: configuration.binaries.snapshot.path,
-        memoryBinary: configuration.binaries.memory.path, databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL,
+        memoryBinary: configuration.binaries.memory.path, databaseUrl: process.env.CODIFIX_TEST_DATABASE_URL,
         semanticTime: manifest.semantic_time, documents, embedding, ...(native ? { execution: configuration.execution } : {}) });
       if (mediator) for (const document of documents) {
         baselineEmbeddings.set(`${document.project}:${document.source}`, await embedding.embed(document.text, 'document'));

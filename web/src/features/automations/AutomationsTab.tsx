@@ -328,7 +328,7 @@ export function AutomationsTab({
         <div className="detail-header">
           <div>
             <h2>Approval queue</h2>
-            <p className="muted">Pending risky actions and codifix proposals waiting for review.</p>
+            <p className="muted">Pending risky actions and memory proposals waiting for review.</p>
           </div>
           <span className={approvalQueue.length ? "badge status-connecting" : "badge badge-active"}>
             {approvalQueue.length} pending
@@ -536,7 +536,7 @@ export function AutomationsTab({
                         <h3>Memory proposals</h3>
                         {activeLoopRun.memory_proposals.length
                           ? activeLoopRun.memory_proposals.map((proposal) => renderMemoryProposal(proposal))
-                          : <p className="muted">No codifix proposals recorded for this run.</p>}
+                          : <p className="muted">No memory proposals recorded for this run.</p>}
                       </div>
                       <div className="detail-section">
                         <h3>Approvals</h3>

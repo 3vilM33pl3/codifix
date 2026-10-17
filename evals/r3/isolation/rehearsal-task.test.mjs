@@ -11,7 +11,7 @@ import { syntheticServiceEmbedding } from '../synthetic-embedding.mjs';
 
 const snapshotBinary = process.env.MEMORY_R3_SNAPSHOT_BIN;
 const memoryBinary = process.env.MEMORY_R3_CLI_BIN;
-const databaseUrl = process.env.MEMORY_LAYER_TEST_DATABASE_URL;
+const databaseUrl = process.env.CODIFIX_TEST_DATABASE_URL;
 const nodeImage = process.env.MEMORY_R3_TEST_IMAGE;
 const rustImage = process.env.MEMORY_R3_RUST_IMAGE;
 const scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
@@ -31,7 +31,7 @@ test('representative tasks execute all knowledge conditions and real hidden Rust
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-rehearsal-task-'));
   t.after(() => fs.rm(directory, { recursive: true }));
   const root = path.join(directory, 'pack');
-  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_PROFILE: 'prod' };
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, CODIFIX_PROFILE: 'prod' };
   assert.equal(spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', root, '--one-family-per-track'], { env }).status, 0);
   const manifest = JSON.parse(await fs.readFile(path.join(root, 'campaign.json')));
   const planResult = spawnSync(memoryBinary, ['eval', 'campaign', 'plan', '--manifest', path.join(root, 'campaign.json')], { env, encoding: 'utf8' });

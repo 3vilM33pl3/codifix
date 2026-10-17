@@ -1375,7 +1375,7 @@ pub async fn list_memory_scores(
     .bind(limit)
     .fetch_all(pool)
     .await
-    .context("list codifix scores")
+    .context("list memory scores")
 }
 
 /// Validation run row as read back for listings and review.

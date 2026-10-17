@@ -8,7 +8,7 @@ The documentation website source lives in [`../docs-site`](../docs-site/README.m
 
 ![Codifix cited query answer](img/tui/query-tab.png)
 
-![How Codifix turns project work into cited context](img/codifix-flow.png)
+![How Codifix turns project work into cited context](img/codifix-flow.svg)
 
 ## Highlights
 

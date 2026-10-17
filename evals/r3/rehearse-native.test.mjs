@@ -23,7 +23,7 @@ function fixture({ native = true, jobChange, ioChange, helperFailure, corruptCop
   const execution = { kind: 'windows-native-v1', profile, profile_sha256: nativeProfileHash(profile) };
   const bytes = new Map([node, guest, helper, compiler, ...Object.values(bins)].map(pin => [pin.path, Buffer.from(paths.basename(pin.path))]));
   const executionFile = 'C:\\private\\execution.json'; bytes.set(executionFile, Buffer.from(JSON.stringify(execution)));
-  const environment = { MEMORY_LAYER_TEST_REQUIRE_DB: '1', MEMORY_LAYER_TEST_DATABASE_URL: 'postgresql://PRIVATE_SECRET@localhost/disposable',
+  const environment = { CODIFIX_TEST_REQUIRE_DB: '1', CODIFIX_TEST_DATABASE_URL: 'postgresql://PRIVATE_SECRET@localhost/disposable',
     MEMORY_R3_CLI_BIN: bins.memory.path, MEMORY_R3_SNAPSHOT_BIN: bins.snapshot.path,
     MEMORY_R3_SCORE_BIN: bins.score.path, MEMORY_R3_RETRIEVER_BIN: bins.retriever.path,
     SystemRoot: 'C:\\Windows', OPENAI_API_KEY: 'PROVIDER_SECRET', ANTHROPIC_API_KEY: 'PROVIDER_SECRET',
@@ -56,7 +56,7 @@ function fixture({ native = true, jobChange, ioChange, helperFailure, corruptCop
     runProcess: async (binary, args, settings) => {
       assert(args[0].endsWith('build-representative-pack.mjs'), 'prepare-only must not launch a controller');
       if (native) assert(privateReady);
-      assert.equal(settings.env.MEMORY_LAYER_TEST_DATABASE_URL, undefined);
+      assert.equal(settings.env.CODIFIX_TEST_DATABASE_URL, undefined);
       assert.equal(settings.env.OPENAI_API_KEY, undefined);
       runs.push({ binary, args, settings });
       bytes.set(paths.join(root, 'campaign.json'), Buffer.from(JSON.stringify({ smoke_only: true, label_status: 'draft',
@@ -66,7 +66,7 @@ function fixture({ native = true, jobChange, ioChange, helperFailure, corruptCop
     invokeHelper: async (binary, argv, env) => {
       helpers.push({ binary, argv, env });
       assert.equal(writes.length, 0); assert.equal(directories.length, 0);
-      assert.equal(env.OPENAI_API_KEY, undefined); assert.equal(env.MEMORY_LAYER_TEST_DATABASE_URL, undefined);
+      assert.equal(env.OPENAI_API_KEY, undefined); assert.equal(env.CODIFIX_TEST_DATABASE_URL, undefined);
       if (helperFailure === argv[0]) throw Error('private helper failure');
       if (argv[0] === '--verify-outer-job') {
         const value = { format: 'memory-windows-trusted-outer-job-v1', caller_pid: 123, helper_pid: 124, kill_on_close: true, breakaway_allowed: false };

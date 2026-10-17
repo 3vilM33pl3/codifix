@@ -1,6 +1,6 @@
 # Graph And Curation Foundations
 
-This document defines the baseline direction for Memory Layer's future
+This document defines the baseline direction for Codifix's future
 knowledge graph, code structure graph, specialized curation, and code-analysis
 work.
 

@@ -6,10 +6,10 @@ For the domain terminology and safety model, see [ADR 0001](../adr/0001-loop-aut
 
 ## Runtime Boundaries
 
-- `crates/mem-record` (`loops` module) owns the public request and response types for loop definitions, settings, runs, approvals, and trigger routing.
-- `crates/mem-loops` owns pure loop domain logic: built-in definitions, effective-setting resolution, policy decisions, budget checks, and trigger eligibility decisions.
-- `crates/mem-service/src/repository/handlers/loops.rs` owns database-backed registration, settings mutation, trigger-event persistence, run ledger writes, approval records, and route handlers.
-- `crates/mem-cli/src/commands/loops.rs` is the operator CLI over the service API.
+- `crates/codifix-record` (`loops` module) owns the public request and response types for loop definitions, settings, runs, approvals, and trigger routing.
+- `crates/codifix-loops` owns pure loop domain logic: built-in definitions, effective-setting resolution, policy decisions, budget checks, and trigger eligibility decisions.
+- `crates/codifix-service/src/repository/handlers/loops.rs` owns database-backed registration, settings mutation, trigger-event persistence, run ledger writes, approval records, and route handlers.
+- `crates/codifix-cli/src/commands/loops.rs` is the operator CLI over the service API.
 
 ## Trigger Routing
 
@@ -54,5 +54,5 @@ cargo test -p mem-loops --all-targets
 cargo test -p mem-service --all-targets
 ```
 
-Database-backed trigger routing is covered in `crates/mem-service/tests/db_repository.rs` when `MEMORY_LAYER_TEST_DATABASE_URL` is configured.
+Database-backed trigger routing is covered in `crates/codifix-service/tests/db_repository.rs` when `CODIFIX_TEST_DATABASE_URL` is configured.
 

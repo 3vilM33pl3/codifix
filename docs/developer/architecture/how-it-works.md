@@ -1,6 +1,6 @@
-# How Memory Layer Works
+# How Codifix Works
 
-This page explains the current implementation of Memory Layer in detail. It is written for a senior developer who wants to understand the runtime model, data model, control flow, and the tradeoffs behind the design.
+This page explains the current implementation of Codifix in detail. It is written for a senior developer who wants to understand the runtime model, data model, control flow, and the tradeoffs behind the design.
 
 If you want installation instructions instead, use [Getting Started](../../user/getting-started.md).
 
@@ -31,7 +31,7 @@ If you want installation instructions instead, use [Getting Started](../../user/
 
 ## Mental Model
 
-Memory Layer is a project-scoped memory system for coding agents and the developers working with them.
+Codifix is a project-scoped memory system for coding agents and the developers working with them.
 
 At a high level it does three things:
 
@@ -61,43 +61,43 @@ Curated memory is intentionally smaller and more durable:
 - confidence and importance
 - provenance back to the task or files that produced it
 
-That split is what keeps the system auditable. Memory Layer does not pretend that every stored fact appeared fully formed. It keeps the raw source material, then derives canonical memory from it.
+That split is what keeps the system auditable. Codifix does not pretend that every stored fact appeared fully formed. It keeps the raw source material, then derives canonical memory from it.
 
 ## Workspace Layout
 
 The repository is a Rust workspace with these crates:
 
-- `crates/mem-record` / `crates/mem-config`
+- `crates/codifix-record` / `crates/codifix-config`
   Shared DTOs, config loading, enums, and transport message types.
-- `crates/mem-cli`
+- `crates/codifix-cli`
   The user-facing CLI, TUI, wizard, doctor, scan flow, and repo bootstrap logic.
-- `crates/mem-service`
+- `crates/codifix-service`
   The backend service. It owns HTTP routes, the Cap'n Proto streaming transport, migrations on startup, and orchestration of capture/query/curate operations.
-- `crates/mem-mcp`
+- `crates/codifix-mcp`
   The read-only MCP adapter. It exposes tools, resource templates, prompts, stdio transport, and the service-mounted Streamable HTTP transport while reusing the existing service HTTP API.
-- `crates/mem-ingest`
+- `crates/codifix-ingest`
   Normalization of captured task payloads into candidate facts.
-- `crates/mem-curate`
+- `crates/codifix-curate`
   Deterministic curation, dedupe, canonicalization, and provenance assembly.
-- `crates/mem-search`
+- `crates/codifix-search`
   Retrieval, ranking, and answer synthesis over PostgreSQL-backed memory.
-- `crates/mem-watch`
+- `crates/codifix-watch`
   The optional background watcher that creates raw captures during work and curates in batches.
 
 Outside the crates:
 
 - `migrations/`
   PostgreSQL schema.
-- `.agents/memory-layer.toml`
+- `.agents/codifix.toml`
   Project-owned memory behavior. This is the intended customization layer for scan/analyzer/retrieval behavior.
 - `.agents/skills/`
-  The repo-local Memory Layer skill bundle. The umbrella skill and shared helper scripts live under `memory-layer/`, and the focused workflow skills live beside it. This is generated/runtime scaffolding, not the main user-edited memory config.
+  The repo-local Codifix skill bundle. The umbrella skill and shared helper scripts live under `codifix/`, and the focused workflow skills live beside it. This is generated/runtime scaffolding, not the main user-edited memory config.
 - `packaging/debian/`
   Debian and systemd assets.
 
 ## Configuration Resolution
 
-Memory Layer uses layered configuration.
+Codifix uses layered configuration.
 
 Effective config is resolved in this order:
 
@@ -105,36 +105,36 @@ Effective config is resolved in this order:
 2. shared/global config
 3. user-local project `config.toml`
 4. legacy repo-local `.mem/config.toml` if no user-local project config exists
-5. `MEMORY_LAYER__...` environment overrides
+5. `CODIFIX__...` environment overrides
 
 Shared/global config normally lives in:
 
-- `/etc/memory-layer/memory-layer.toml` for Debian installs
-- `~/.config/memory-layer/memory-layer.toml` for local installs
+- `/etc/codifix/codifix.toml` for Debian installs
+- `~/.config/codifix/codifix.toml` for local installs
 
 Project overrides live in user-local project directories:
 
-- Linux config: `~/.config/memory-layer/projects/<project-key>/config.toml`
-- Linux state/runtime: `~/.local/state/memory-layer/projects/<project-key>/runtime/`
-- Linux cache/indexes: `~/.cache/memory-layer/projects/<project-key>/`
+- Linux config: `~/.config/codifix/projects/<project-key>/config.toml`
+- Linux state/runtime: `~/.local/state/codifix/projects/<project-key>/runtime/`
+- Linux cache/indexes: `~/.cache/codifix/projects/<project-key>/`
 
 Secrets can come from:
 
-- `/etc/memory-layer/memory-layer.env`
-- `~/.config/memory-layer/memory-layer.env`
-- user-local project `memory-layer.env`
-- legacy `.mem/memory-layer.env`
+- `/etc/codifix/codifix.env`
+- `~/.config/codifix/codifix.env`
+- user-local project `codifix.env`
+- legacy `.mem/codifix.env`
 
 The loader in `mem-api` also normalizes some legacy config keys during deserialization so older shared configs can coexist with newer repo-local overrides.
 
 ## Repository Bootstrap
 
-`memory init` and `memory wizard` both prepare a repository for Memory Layer.
+`memory init` and `memory wizard` both prepare a repository for Codifix.
 
 The repo-local bootstrap creates:
 
 - `.mem/project.toml`
-- `.agents/memory-layer.toml`
+- `.agents/codifix.toml`
 - `.agents/skills/`
 
 Operational config, runtime state, caches, sockets, and secrets live in user-local project directories. The repo keeps only the small `.mem/project.toml` marker and agent-visible `.agents/` files. The same backend and database may serve many repos, but each repo still needs its own slug and skill installation.
@@ -166,7 +166,7 @@ Write-capable flows now require an explicit `writer_id`.
 Resolution order is:
 
 1. CLI flag `--writer-id`
-2. `MEMORY_LAYER_WRITER_ID`
+2. `CODIFIX_WRITER_ID`
 3. `[writer].id` in config
 
 The value is stored on `sessions.writer_id` and carried in capture payloads. That does two things:
@@ -387,7 +387,7 @@ The broad pipeline is:
 9. refresh `memory_relations` for the new or replacement memory against other active memories in the same project
 10. record the curation run and any replacement events
 
-Canonical memories remain immutable. When curation decides that a new candidate updates an older memory, it writes a new version with the same `canonical_id` and a higher `version_no` rather than editing or deleting the previous row. Delete operations write a tombstone version. Default reads use the latest non-tombstone version for each canonical memory. Project policy for replacement decisions lives in `.agents/memory-layer.toml` under `[curation].replacement_policy`.
+Canonical memories remain immutable. When curation decides that a new candidate updates an older memory, it writes a new version with the same `canonical_id` and a higher `version_no` rather than editing or deleting the previous row. Delete operations write a tombstone version. Default reads use the latest non-tombstone version for each canonical memory. Project policy for replacement decisions lives in `.agents/codifix.toml` under `[curation].replacement_policy`.
 
 The important tradeoff here is determinism over maximum semantic richness. The current implementation favors predictable, inspectable behavior and provenance-backed memory over aggressive inference.
 
@@ -492,7 +492,7 @@ Two details matter here:
 
 1. The watcher now distinguishes between a file merely being dirty and new activity actually happening. Re-seeing the same dirty files on every poll does not reset the idle timer.
 2. The dedupe fingerprint includes file modification state, not just file names, so repeated edits in the same files can still create new raw captures.
-3. Filesystem events are coalesced and ignored top-level trees are not recursively subscribed, keeping build output and agent transcript churn from consuming CPU while Memory Layer is otherwise idle.
+3. Filesystem events are coalesced and ignored top-level trees are not recursively subscribed, keeping build output and agent transcript churn from consuming CPU while Codifix is otherwise idle.
 
 Legacy per-project watcher services and manual foreground watchers still exist for compatibility and diagnostics, but the manager-first model is the primary path for normal agent work.
 
@@ -507,7 +507,7 @@ It:
 1. reads high-value repo files
 2. reads recent git history
 3. builds or reuses a local repository index under the user-local project cache
-4. runs parser-backed analyzers for enabled languages from `.agents/memory-layer.toml`
+4. runs parser-backed analyzers for enabled languages from `.agents/codifix.toml`
 5. builds a structured dossier from indexed evidence
 6. sends that dossier to an OpenAI-compatible model
 7. validates the returned candidate memories

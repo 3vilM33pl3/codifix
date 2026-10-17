@@ -1,17 +1,17 @@
 ---
-name: memory-layer
+name: codifix
 description: Query project memory before answering project-specific questions; capture completed task context; curate raw captures into durable canonical memory with provenance.
 ---
 
-# Memory Layer Skill
+# Codifix Skill
 
-This is an illustrative single-skill example for integration reference. The canonical live setup for this repository is now a Memory Layer skill bundle under `.agents/skills/`, with the umbrella skill at:
+This is an illustrative single-skill example for integration reference. The canonical live setup for this repository is now a Codifix skill bundle under `.agents/skills/`, with the umbrella skill at:
 
-- `.agents/skills/memory-layer/SKILL.md`
+- `.agents/skills/codifix/SKILL.md`
 
 ## Purpose
 
-This skill integrates Codex with the local memory-layer service.
+This skill integrates Codex with the local codifix service.
 
 Use this skill when:
 - the user asks a project-specific question like “how do we do X here?”
@@ -40,17 +40,17 @@ Do not use this skill for:
 
 ### Query memory
 ```bash
-go run ./.agents/skills/memory-layer/scripts/main.go query-memory "<question>"
+go run ./.agents/skills/codifix/scripts/main.go query-memory "<question>"
 ```
 
 ### Capture completed task
 ```bash
-go run ./.agents/skills/memory-layer/scripts/main.go capture-task <payload.json>
+go run ./.agents/skills/codifix/scripts/main.go capture-task <payload.json>
 ```
 
 ### Curate memory
 ```bash
-go run ./.agents/skills/memory-layer/scripts/main.go curate-memory
+go run ./.agents/skills/codifix/scripts/main.go curate-memory
 ```
 
 This illustrative example also assumes `go` is available on `PATH`, because the shared helper in `scripts/` is Go-based.
@@ -283,6 +283,6 @@ Use this simple heuristic:
 ## References
 
 See:
-- `./.agents/skills/memory-layer/references/architecture.md`
-- `./.agents/skills/memory-layer/references/query-contract.md`
-- `./.agents/skills/memory-layer/references/curation-rules.md`
+- `./.agents/skills/codifix/references/architecture.md`
+- `./.agents/skills/codifix/references/query-contract.md`
+- `./.agents/skills/codifix/references/curation-rules.md`

@@ -1,6 +1,6 @@
 # Built-In MCP Server
 
-Memory Layer includes a first-class MCP server in `crates/mem-mcp`.
+Codifix includes a first-class MCP server in `crates/codifix-mcp`.
 
 The crate is a protocol adapter over the existing `mem-service` HTTP API. It does not read PostgreSQL directly and does not create a second persistence or query path. This keeps authentication, retrieval behavior, resume logic, watcher summaries, replacement proposal reads, and activity formats aligned with the normal CLI, TUI, and web UI.
 

@@ -14,8 +14,8 @@ COPY --from=pgvector /usr/lib/postgresql/15/lib/vector.so /usr/lib/postgresql/15
 COPY --from=pgvector /usr/share/postgresql/15/extension/vector* /usr/share/postgresql/15/extension/
 COPY --from=pgvector /usr/share/doc/pgvector /usr/share/doc/pgvector
 
-LABEL dev.memory-layer.fixture="trust-receiver-pg15"
-LABEL dev.memory-layer.postgres="15.18"
-LABEL dev.memory-layer.pgvector="0.8.6"
-LABEL dev.memory-layer.postgres-source="docker.io/library/postgres@sha256:752791ad6ccfc6fbfcf4d9b43413c8642901f1c2008ebdc1423ea32fd66fd4f1"
-LABEL dev.memory-layer.pgvector-source="docker.io/pgvector/pgvector@sha256:a6579dded3ff4ed3d9565ae54ab253e2cb7ae24c5d1eb3bec8a89e73f038b68a"
+LABEL dev.codifix.fixture="trust-receiver-pg15"
+LABEL dev.codifix.postgres="15.18"
+LABEL dev.codifix.pgvector="0.8.6"
+LABEL dev.codifix.postgres-source="docker.io/library/postgres@sha256:752791ad6ccfc6fbfcf4d9b43413c8642901f1c2008ebdc1423ea32fd66fd4f1"
+LABEL dev.codifix.pgvector-source="docker.io/pgvector/pgvector@sha256:a6579dded3ff4ed3d9565ae54ab253e2cb7ae24c5d1eb3bec8a89e73f038b68a"

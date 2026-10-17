@@ -12,7 +12,7 @@ import { dispatchModel } from './model-dispatch.mjs';
 
 const snapshotBinary = process.env.MEMORY_R3_SNAPSHOT_BIN;
 const memoryBinary = process.env.MEMORY_R3_CLI_BIN;
-const databaseUrl = process.env.MEMORY_LAYER_TEST_DATABASE_URL;
+const databaseUrl = process.env.CODIFIX_TEST_DATABASE_URL;
 const image = process.env.MEMORY_R3_TEST_IMAGE;
 const scoreBinary = process.env.MEMORY_R3_SCORE_BIN;
 const budgetBinary = process.env.MEMORY_R3_BUDGET_BIN;

@@ -1,6 +1,6 @@
-# Memory Layer Architecture
+# Codifix Architecture
 
-This page is a short architecture overview for developers. For the detailed runtime model, use [How Memory Layer Works](how-it-works.md). For the curated memory categories themselves, use [Memory Types Reference](memory-types.md).
+This page is a short architecture overview for developers. For the detailed runtime model, use [How Codifix Works](how-it-works.md). For the curated memory categories themselves, use [Memory Types Reference](memory-types.md).
 
 ## Table of Contents
 
@@ -12,7 +12,7 @@ This page is a short architecture overview for developers. For the detailed runt
 
 ## Overview
 
-Memory Layer is a local-first project memory system.
+Codifix is a local-first project memory system.
 
 Its job is simple:
 
@@ -37,13 +37,13 @@ The architecture is split into five parts:
 
 ## Architecture Diagram
 
-This diagram shows the main runtime boundaries. For deeper write and query pipeline diagrams, see [How Memory Layer Works](how-it-works.md).
+This diagram shows the main runtime boundaries. For deeper write and query pipeline diagrams, see [How Codifix Works](how-it-works.md).
 
 ```mermaid
 flowchart LR
     subgraph ProjectRepo["Project repository"]
         Skills["Repo-local skills<br/>.agents/skills"]
-        ProjectConfig["Project marker and config<br/>.mem/project.toml<br/>.agents/memory-layer.toml"]
+        ProjectConfig["Project marker and config<br/>.mem/project.toml<br/>.agents/codifix.toml"]
         CLI["memory CLI"]
         TUI["Terminal UI"]
         WebUI["Web UI"]
@@ -54,7 +54,7 @@ flowchart LR
         Watchers["Agent-linked watchers"]
     end
 
-    subgraph ServiceHost["Local Memory Layer runtime"]
+    subgraph ServiceHost["Local Codifix runtime"]
         Service["mem-service<br/>HTTP, WebSocket, Cap'n Proto"]
         Search["mem-search<br/>lexical, semantic, graph, rerank"]
         Curate["mem-curate and mem-ingest<br/>capture, normalize, curate"]
@@ -98,8 +98,8 @@ flowchart LR
 
 ### Skill
 
-The repo-local Memory Layer skill bundle in `.agents/skills/` tells Codex when to:
-- initialise or refresh Memory Layer setup for a target project
+The repo-local Codifix skill bundle in `.agents/skills/` tells Codex when to:
+- initialise or refresh Codifix setup for a target project
 - query memory before answering project-specific questions
 - resume after interruptions
 - review pending memory replacement proposals
@@ -108,10 +108,10 @@ The repo-local Memory Layer skill bundle in `.agents/skills/` tells Codex when t
 - verify plan-backed work before claiming completion
 - remember meaningful work
 
-The umbrella skill lives in `.agents/skills/memory-layer/`, and the focused skills live beside it.
-The bundle is the main driver for coding agent interaction with Memory Layer. In practice, the
+The umbrella skill lives in `.agents/skills/codifix/`, and the focused skills live beside it.
+The bundle is the main driver for coding agent interaction with Codifix. In practice, the
 skill workflow decides when the agent should use memory, while the shared Go helper in
-`.agents/skills/memory-layer/scripts/` is the execution path that actually calls `memory`.
+`.agents/skills/codifix/scripts/` is the execution path that actually calls `memory`.
 That repo-local helper runs through `go run`, so `go` must be available on `PATH` anywhere the
 skill bundle is expected to execute.
 
@@ -134,7 +134,7 @@ The CLI currently uses two transports:
 - a localhost HTTP API kept as the compatibility and fallback surface
 - a persistent Cap'n Proto connection for live TUI subscriptions
 
-Initialized repositories keep a tiny project marker under `.mem/project.toml`, agent-visible behavior under `.agents/`, and operational project config/state/cache under user-local Memory Layer directories. Shared defaults live in the global config and project-local values can override them when needed.
+Initialized repositories keep a tiny project marker under `.mem/project.toml`, agent-visible behavior under `.agents/`, and operational project config/state/cache under user-local Codifix directories. Shared defaults live in the global config and project-local values can override them when needed.
 
 ### Backend Service (`memory service`)
 
@@ -219,7 +219,7 @@ It does not write directly to database tables. It only orchestrates the existing
 
 ## Related Docs
 
-- [How Memory Layer Works](how-it-works.md)
+- [How Codifix Works](how-it-works.md)
 - [Loop Automation Control Plane](loop-automation.md)
 - [Graph And Curation Foundations](graph-and-curation-foundations.md)
 - [Hidden Memory Daemon](hidden-memory-daemon.md)

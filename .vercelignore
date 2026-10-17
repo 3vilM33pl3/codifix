@@ -15,3 +15,7 @@ docs-site/.source
 *.log
 __pycache__
 *.pyc
+
+# Codifix state and credentials; legacy exclusions remain until cutover.
+.codifix
+codifix-postgres-connection.txt

@@ -1,6 +1,6 @@
 # Memory Types Reference
 
-This page explains the curated memory types used by Memory Layer today.
+This page explains the curated memory types used by Codifix today.
 
 It is a developer reference, not a user tutorial. It focuses on:
 
@@ -10,7 +10,7 @@ It is a developer reference, not a user tutorial. It focuses on:
 - how the type is stored in PostgreSQL
 - how type-specific behavior affects query, curation, and the TUI
 
-The live source of truth for the type list is [`MemoryType` in `mem-record`](https://github.com/3vilM33pl3/codifix/blob/b56292a19a12aa74b6e8d723c7a95b78f7b818cf/crates/mem-record/src/memory.rs).
+The live source of truth for the type list is [`MemoryType` in `codifix-record`](../../../crates/codifix-record/src/memory.rs).
 
 ## Table of Contents
 
@@ -34,7 +34,7 @@ It is not:
 - a watcher event kind
 - an activity feed kind
 
-The important split in Memory Layer is:
+The important split in Codifix is:
 
 - raw captures hold task payloads and evidence
 - curated memory entries hold durable reusable knowledge
@@ -52,7 +52,7 @@ That type then affects:
 
 ## Current Type List
 
-Memory Layer currently supports these curated memory types:
+Codifix currently supports these curated memory types:
 
 - `architecture`
 - `convention`
@@ -155,7 +155,7 @@ Typical triggers:
 
 Examples:
 
-- “Memory Layer keeps PostgreSQL localhost-only and exposes `mem-service` instead.”
+- “Codifix keeps PostgreSQL localhost-only and exposes `mem-service` instead.”
 - “The watcher manager is Linux/systemd-first in v1 rather than cross-platform.”
 
 ### `incident`
@@ -238,7 +238,7 @@ Typical triggers:
 Examples:
 
 - “The repo-local skill bundle requires `go` on `PATH` because helpers run through `go run`.”
-- “The shared service token is stored in the adjacent `memory-layer.env` file.”
+- “The shared service token is stored in the adjacent `codifix.env` file.”
 
 ### `domain_fact`
 
@@ -501,7 +501,7 @@ outcome or isolated diagnostic lesson is not a consolidated insight.
 
 ## How Types Get Triggered
 
-Memory Layer uses two broad paths for type assignment.
+Codifix uses two broad paths for type assignment.
 
 ### 1. Explicit structured candidates
 

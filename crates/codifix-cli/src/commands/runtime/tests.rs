@@ -1135,7 +1135,7 @@ fn packaging_installs_shell_completions() {
         assert!(contents.contains("completion\", \"fish") || contents.contains("completion fish"));
         assert!(contents.contains("bash-completion") || contents.contains("bash_completion"));
         assert!(contents.contains("_codifix"));
-        assert!(contents.contains("memory.fish"));
+        assert!(contents.contains("codifix.fish"));
     }
 }
 

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1696" height="804" viewBox="0 0 1696 804" role="img" aria-labelledby="title desc">
-  <title id="title">How Memory Layer turns project work into cited context</title>
+  <title id="title">How Codifix turns project work into cited context</title>
   <desc id="desc">A left-to-right infographic showing work capture, curation, storage, retrieval, and faster agent re-entry.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -43,7 +43,7 @@
   <circle cx="1545" cy="665" r="260" fill="#dbeaf6" opacity="0.58"/>
   <path d="M119 706 C 329 585, 487 759, 677 643 S 1020 548, 1199 640 S 1467 713, 1614 573" fill="none" stroke="#fffaf2" stroke-width="78" stroke-linecap="round" opacity="0.45"/>
 
-  <text x="96" y="94" class="tiny">Memory Layer mental model</text>
+  <text x="96" y="94" class="tiny">Codifix mental model</text>
   <text x="96" y="158" class="title">Project work becomes cited context</text>
   <text x="98" y="200" class="subtitle">Capture evidence, curate durable memory, connect it to code and activity, then help the next agent start with proof.</text>
 

@@ -1,4 +1,4 @@
-# Memory Layer Architecture
+# Codifix Architecture
 
 ## Overview
 
@@ -46,7 +46,7 @@ This design keeps the model logic thin, makes the runtime inspectable, and avoid
 ### Main Components
 
 #### 1. Codex Skill
-A repo-local Skill in `.agents/skills/memory-layer/` tells Codex when to:
+A repo-local Skill in `.agents/skills/codifix/` tells Codex when to:
 - query memory before answering project-specific questions
 - capture task context after meaningful work
 - curate raw captures into durable memory
@@ -68,7 +68,7 @@ Responsibilities:
 
 The CLI talks to the backend over localhost HTTP.
 
-#### 3. Backend Service (`memory-layer`)
+#### 3. Backend Service (`codifix`)
 A Rust daemon running under systemd.
 
 Responsibilities:
@@ -162,10 +162,10 @@ This two-layer model makes the system debuggable, reprocessable, and safer to ev
 ## Repository Structure
 
 ```text
-memory-layer/
+codifix/
   .agents/
     skills/
-      memory-layer/
+      codifix/
         SKILL.md
         agents/
           openai.yaml
@@ -190,8 +190,8 @@ memory-layer/
       control
       postinst
       prerm
-      memory-layer.service
-      memory-layer.env
+      codifix.service
+      codifix.env
 
   migrations/
   docs/
@@ -585,9 +585,9 @@ Service requirements:
 - journald-friendly structured logs
 
 Runtime directories:
-- `/etc/memory-layer/`
-- `/var/lib/memory-layer/`
-- `/var/log/memory-layer/`
+- `/etc/codifix/`
+- `/var/lib/codifix/`
+- `/var/log/codifix/`
 
 ---
 

@@ -9,7 +9,7 @@ export const TRUST_RECEIVER_PROFILE = Object.freeze({
   database: 'memory_trust',
   database_port: 5433,
   role: 'memory_trust',
-  service: 'memory-layer@trust.service',
+  service: 'codifix@trust.service',
   port: 8091,
   active: false,
 });

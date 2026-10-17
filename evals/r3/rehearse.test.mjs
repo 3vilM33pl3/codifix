@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 
-const names = ['MEMORY_LAYER_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_CLI_BIN',
+const names = ['CODIFIX_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_CLI_BIN',
   'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN'];
 const wire = process.env.MEMORY_R3_WIRE === '1';
 const mediated = process.env.MEMORY_R3_MEDIATED === '1' || wire;
@@ -31,7 +31,7 @@ test(`existing campaign CLI completes a real 75-dispatch ${wire ? 'HTTP-mediated
     else console.error(`${verified ? 'Verified' : 'Failed'} rehearsal diagnostics retained at ${directory}`);
   });
   const root = path.join(directory, 'pack');
-  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_TEST_REQUIRE_DB: '1' };
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, CODIFIX_TEST_REQUIRE_DB: '1' };
   for (const name of names) env[name] = process.env[name];
   const originalBins = path.join(directory, 'build-outputs');
   await fs.mkdir(originalBins, { mode: 0o700 });
@@ -116,7 +116,7 @@ test(`existing campaign CLI completes a real 75-dispatch ${wire ? 'HTTP-mediated
   assert(!report.harness_valid && !report.official_evidence && !report.quality_passed, 'pending judgments are not silently approved');
   assert(report.execution_valid);
   assert.equal(report.pending_knowledge_reviews, 60);
-  assert(!JSON.stringify(artifact).includes(env.MEMORY_LAYER_TEST_DATABASE_URL));
+  assert(!JSON.stringify(artifact).includes(env.CODIFIX_TEST_DATABASE_URL));
   const runtime = JSON.parse(await fs.readFile(path.join(root, 'private/runtime.json')));
   for (const binary of Object.values(runtime.binaries)) {
     assert(binary.path.startsWith(path.join(root, 'private/executables') + '/'));

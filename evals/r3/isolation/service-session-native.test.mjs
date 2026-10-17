@@ -122,8 +122,8 @@ test('native prepared service verifies outer Job and private ACL before any cred
     assert.equal(settings.env.OPENAI_API_KEY, undefined); assert.equal(settings.env.ANTHROPIC_API_KEY, undefined);
     assert.equal(settings.env.TEMP, f.directory);
   }
-  assert.equal(f.children[0].settings.env.MEMORY_LAYER_TEST_DATABASE_URL, f.options.databaseUrl);
-  assert.equal(f.children[1].settings.env.MEMORY_LAYER_TEST_DATABASE_URL, undefined);
+  assert.equal(f.children[0].settings.env.CODIFIX_TEST_DATABASE_URL, f.options.databaseUrl);
+  assert.equal(f.children[1].settings.env.CODIFIX_TEST_DATABASE_URL, undefined);
   assert(f.events.indexOf('kill-service') < f.events.indexOf('release'));
   assert(f.events.indexOf('release') < f.events.indexOf('remove-config'));
   await session.close();
@@ -184,19 +184,19 @@ test('POSIX session retains private mode, explicit environment and graceful owne
   await session.withInstance('r3-alpha', async instance => instance.query('History?'));
   assert.equal(f.helperCalls.length, 0);
   assert.deepEqual(f.writes[0].settings, { flag: 'wx', mode: 0o600 });
-  assert.deepEqual(f.children[1].settings.env, { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/private/session', MEMORY_LAYER_PROFILE: 'prod' });
+  assert.deepEqual(f.children[1].settings.env, { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/private/session', CODIFIX_PROFILE: 'prod' });
   assert.equal(f.children[1].child.signalCode, 'SIGINT');
   await session.close();
 });
 
 const nativeExecutionFile = process.env.MEMORY_R3_NATIVE_EXECUTION;
 const live = process.platform === 'win32' && nativeExecutionFile && process.env.MEMORY_R3_SNAPSHOT_BIN
-  && process.env.MEMORY_R3_CLI_BIN && process.env.MEMORY_LAYER_TEST_DATABASE_URL;
+  && process.env.MEMORY_R3_CLI_BIN && process.env.CODIFIX_TEST_DATABASE_URL;
 if (process.env.MEMORY_R3_REQUIRE_NATIVE_SERVICE === '1' && !live) throw Error('required native prepared-service configuration missing');
 test('real native prepared session resets scoped reads under the outer trusted Job', { skip: !live, timeout: 120000 }, async () => {
   const execution = JSON.parse(await fs.readFile(nativeExecutionFile, 'utf8'));
   const session = await openPreparedSession({ execution, snapshotBinary: process.env.MEMORY_R3_SNAPSHOT_BIN,
-    memoryBinary: process.env.MEMORY_R3_CLI_BIN, databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL,
+    memoryBinary: process.env.MEMORY_R3_CLI_BIN, databaseUrl: process.env.CODIFIX_TEST_DATABASE_URL,
     semanticTime: '2026-10-17T00:00:00Z',
     documents: [{ project: 'r3-native', source: 'public/source.md', text: 'Retain acknowledgement history before retry.' }] });
   try {

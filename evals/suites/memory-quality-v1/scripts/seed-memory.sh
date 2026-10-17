@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Seeds the deterministic fixture memories for memory-quality-v1.
 # Point MEMORY_EVAL_MEMORY_CMD at the CLI + config for the target stack,
-# e.g. "cargo run --bin memory --" for the dev profile.
+# e.g. "cargo run --bin codifix --" for the dev profile.
 set -eu
 
 memory_cmd="${MEMORY_EVAL_MEMORY_CMD:-memory}"

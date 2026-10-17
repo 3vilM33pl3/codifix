@@ -1,6 +1,6 @@
 cff-version: 1.2.0
-message: "If you use Memory Layer or its evaluation suites in research, please cite it as below."
-title: "Memory Layer"
+message: "If you use Codifix or its evaluation suites in research, please cite it as below."
+title: "Codifix"
 abstract: >-
   A local-first, evidence-backed memory system for coding agents: captured
   work is curated into durable, citable memories; retrieval combines lexical,
@@ -13,8 +13,8 @@ type: software
 authors:
   - family-names: "Van Acker"
     given-names: "Olivier"
-repository-code: "https://github.com/3vilM33pl3/memory"
-url: "https://www.memory-layer.dev"
+repository-code: "https://github.com/3vilM33pl3/codifix"
+url: "https://codifix.dev"
 license: AGPL-3.0-or-later
 keywords:
   - memory systems

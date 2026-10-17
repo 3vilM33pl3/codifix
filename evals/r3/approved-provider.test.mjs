@@ -22,7 +22,7 @@ async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'r3-approved-provider-'));
   t.after(() => fs.rm(root, { recursive: true }));
   const pack = path.join(root, 'pack'), manifestPath = path.join(pack, 'campaign.json');
-  const env = { PATH: '/usr/bin:/bin', MEMORY_LAYER_PROFILE: 'prod' };
+  const env = { PATH: '/usr/bin:/bin', CODIFIX_PROFILE: 'prod' };
   const built = spawnSync(process.execPath, ['evals/r3/build-representative-pack.mjs', pack, '--one-family-per-track'], { env, encoding: 'utf8' });
   assert.equal(built.status, 0, built.stderr);
   const manifest = JSON.parse(await fs.readFile(manifestPath));
@@ -177,9 +177,9 @@ test('already cancelled owner does not inspect configuration or read credentials
   await assert.rejects(withApprovedProvider({}, () => assert.fail('owner entered'), AbortSignal.abort()), /cancelled/);
 });
 
-const sessionNames = ['MEMORY_LAYER_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN',
+const sessionNames = ['CODIFIX_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN',
   'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE'];
-const sessionAvailable = available && process.env.MEMORY_LAYER_TEST_REQUIRE_DB === '1' && sessionNames.every(name => process.env[name]);
+const sessionAvailable = available && process.env.CODIFIX_TEST_REQUIRE_DB === '1' && sessionNames.every(name => process.env[name]);
 if (process.env.MEMORY_R3_REQUIRE_APPROVED_SESSION === '1' && !sessionAvailable) throw Error('required approved-session configuration missing');
 test('approved owner prepares a sealed service and executes knowledge and a complete coding sequence',
   { skip: !sessionAvailable, timeout: 300000 }, async t => {
@@ -191,7 +191,7 @@ test('approved owner prepares a sealed service and executes knowledge and a comp
       driverSha256: f.manifest.assets.find(a => a.path === 'private/approved-campaign-session.mjs').sha256,
       configurationSha256: profile.configuration_evidence.sha256, serviceBuild: 'synthetic-approved-session-test' };
     const session = { offline: false, split: 'development', configuration,
-      memoryBinary: memory, snapshotBinary: process.env.MEMORY_R3_SNAPSHOT_BIN, databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL };
+      memoryBinary: memory, snapshotBinary: process.env.MEMORY_R3_SNAPSHOT_BIN, databaseUrl: process.env.CODIFIX_TEST_DATABASE_URL };
     const contract = async (id, limits) => {
       const directory = path.join(f.pack, 'run', id, 'provider');
       await fs.mkdir(directory, { recursive: true, mode: 0o700 });

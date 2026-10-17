@@ -120,7 +120,7 @@ First run read-only inspection from a private directory, substituting only
 independently verified digests:
 
 ```sh
-/usr/bin/python3 -I -S /usr/libexec/memory-layer/trust_receiver.py inspect \
+/usr/bin/python3 -I -S /usr/libexec/codifix/trust_receiver.py inspect \
   --bundle /private/received/bundle \
   --manifest-sha256 EXACT_MANIFEST_SHA256 \
   --target /private/receiver-target.json \
@@ -130,7 +130,7 @@ independently verified digests:
 Only after the grouped restore approval, run:
 
 ```sh
-/usr/bin/python3 -I -S /usr/libexec/memory-layer/trust_receiver.py restore \
+/usr/bin/python3 -I -S /usr/libexec/codifix/trust_receiver.py restore \
   --bundle /private/received/bundle \
   --manifest-sha256 EXACT_MANIFEST_SHA256 \
   --target /private/receiver-target.json \

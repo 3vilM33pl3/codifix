@@ -10,7 +10,7 @@ import { openProviderCampaignSession } from './provider-campaign-session.mjs';
 import { createProviderBindings } from './provider-profile.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const names = ['MEMORY_LAYER_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_CLI_BIN', 'MEMORY_R3_BUDGET_BIN',
+const names = ['CODIFIX_TEST_DATABASE_URL', 'MEMORY_R3_SNAPSHOT_BIN', 'MEMORY_R3_CLI_BIN', 'MEMORY_R3_BUDGET_BIN',
   'MEMORY_R3_TEST_IMAGE', 'MEMORY_R3_RUST_IMAGE', 'MEMORY_R3_SCORE_BIN', 'MEMORY_R3_RETRIEVER_BIN'];
 const available = names.every(name => process.env[name]);
 if (process.env.MEMORY_R3_REQUIRE_PROVIDER_SESSION === '1' && !available) throw Error('required provider-session configuration missing');
@@ -75,7 +75,7 @@ async function setup(t) {
     const dir = path.join(root, 'run', id, 'provider'); await fs.mkdir(dir, { recursive: true, mode: 0o700 }); return dir;
   };
   return { root, manifest, directoryFor, options: {
-    offline: true, split: 'development', databaseUrl: process.env.MEMORY_LAYER_TEST_DATABASE_URL,
+    offline: true, split: 'development', databaseUrl: process.env.CODIFIX_TEST_DATABASE_URL,
     snapshotBinary: process.env.MEMORY_R3_SNAPSHOT_BIN ?? '/unused/snapshot', memoryBinary: process.env.MEMORY_R3_CLI_BIN ?? '/unused/memory',
     configuration: { root, manifestSha256: 'a'.repeat(64), budgetBinary: process.env.MEMORY_R3_BUDGET_BIN ?? '/unused/budget',
       scoreBinary: process.env.MEMORY_R3_SCORE_BIN, retrieverBinary: process.env.MEMORY_R3_RETRIEVER_BIN,

@@ -91,7 +91,7 @@ prerequisites, not proofs of transport authentication or human approval.
 This versioned neutral-domain extension now has its own schema-v2 adapter and
 eight-variant round-trip/unknown-field tests in `mem-atproto::publication`. The
 six spike Lexicons and MST fixtures are unchanged. The additional unpublished
-`dev.memory-layer.unspecced.publication` wrapper carries a validated neutral
+`dev.codifix.unspecced.publication` wrapper carries a validated neutral
 delivery; its permissive Lexicon `unknown` field is not a semantic validator.
 Rust validates schema, identifiers, known fields and digests before acceptance.
 Unknown extensions survive at the adapter boundary; unknown semantic kinds or
@@ -118,7 +118,7 @@ remain D/E/deployment gates.
 
 ## Namespace ownership and publication gate
 
-- `dev.memory-layer.unspecced.*` is an unpublished fixture namespace, never a
+- `dev.codifix.unspecced.*` is an unpublished fixture namespace, never a
   stable external contract. Existing spike records remain readable in tests.
 - Production publication requires recorded control of the reverse-DNS namespace
   and explicit approval of its owner. Ownership is **not verified by this file**;

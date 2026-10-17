@@ -46,7 +46,7 @@ export async function prepareResponseDiagnostic(sourceRoot, destination) {
   const memory = path.join(sourceRoot,runtime.binaries.memory.path);
   const plan = root => {
     const result = spawnSync(memory,['eval','campaign','plan','--manifest',path.join(root,'campaign.json')], {
-      env: { PATH: '/usr/bin:/bin', HOME: path.join(root,'private'), MEMORY_LAYER_PROFILE: 'prod' },
+      env: { PATH: '/usr/bin:/bin', HOME: path.join(root,'private'), CODIFIX_PROFILE: 'prod' },
       encoding: 'utf8', timeout: 20000, maxBuffer: 1048576,
     });
     if (result.status !== 0) throw Error('invalid diagnostic approval manifest');

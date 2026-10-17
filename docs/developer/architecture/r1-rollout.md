@@ -82,7 +82,7 @@ principal authority before work and every result.
 1. Inspect the exact project and 1–200 current active non-tombstone version UUIDs.
    Save that selection and choose one fresh operation UUID. Never modify existing
    job inputs/statuses directly to force a retry.
-2. Supply `MEMORY_LAYER_REPAIR_DATABASE_URL` through the approved secret mechanism
+2. Supply `CODIFIX_REPAIR_DATABASE_URL` through the approved secret mechanism
    without exposing it in shell history, then explicitly run:
 
 ```sh

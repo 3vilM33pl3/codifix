@@ -62,13 +62,13 @@ cat > "$payload" <<'JSON'
       "sources": [{"file_path": "docs/local-only.md", "source_kind": "file", "excerpt": "local-only dependency-free fixture"}]
     },
     {
-      "canonical_text": "Graph evidence for the continuity query workflow is anchored in crates/mem-search/src/lib.rs. Interpret graph-aware retrieval as related files and graph candidates augmenting normal lexical and semantic results.",
+      "canonical_text": "Graph evidence for the continuity query workflow is anchored in crates/codifix-search/src/lib.rs. Interpret graph-aware retrieval as related files and graph candidates augmenting normal lexical and semantic results.",
       "summary": "Graph-aware retrieval uses related files and graph candidates.",
       "memory_type": "reference",
       "confidence": 0.9,
       "importance": 3,
       "tags": ["mi-graph", "mi-query"],
-      "sources": [{"file_path": "crates/mem-search/src/lib.rs", "source_kind": "file", "excerpt": "query workflow graph evidence"}]
+      "sources": [{"file_path": "crates/codifix-search/src/lib.rs", "source_kind": "file", "excerpt": "query workflow graph evidence"}]
     },
     {
       "canonical_text": "Memory feature search should follow the existing input event interaction pattern: filter visible feature cards as the user types, keep controls keyboard accessible, and avoid reloads.",
