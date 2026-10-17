@@ -39,7 +39,7 @@ $git='C:\MemoryLab\Tools\git\cmd\git.exe';$head=(& $git -C $SourceRoot rev-parse
 if($LASTEXITCODE -or $head -cnotmatch '^[0-9a-f]{40}$'){throw 'Committed verifier source required'}
 $proof=[ordered]@{format='memory-native-installed-core-verification-v1';operation_id=$InstallOperationId.ToString();state='running'
     lab_only=$true;release_candidate=$false;original_receipt_sha256=(Get-CoreInstallHash $oldPath)
-    verifier_commit=$head;verifier_sha256=(Get-CoreInstallHash $PSCommandPath);memory_sha256=$core.binary_sha256
+    helper_source_commit=$head;verifier_sha256=(Get-CoreInstallHash $PSCommandPath);memory_sha256=$core.binary_sha256
     service_name=$name;service_sid=$sid;checks=@();real_provider_calls=0;reboot_verified=$false;upgrade_verified=$false;sync_verified=$false}
 $proofPath=Join-Path $root 'installed-verification.json'
 if(Test-Path -LiteralPath $proofPath){throw 'Preserve existing installed verification evidence'}
