@@ -153,6 +153,7 @@ export async function rehearse(argv = process.argv.slice(2), environment = proce
       manifest.assets.push({ path: relative, sha256: createHash('sha256').update(bytes).digest('hex'), kind: 'configuration' });
     };
     for (const relative of ['rehearsal-controller.mjs', 'campaign-dispatch.mjs', 'offline-driver.mjs', 'embedding-evidence.mjs', 'synthetic-embedding.mjs', 'request-mediator.mjs', 'isolation/container.mjs', 'isolation/guest.mjs',
+      'windows-dispatch-auth.mjs', 'windows-dispatch-client.mjs', 'windows-host-journal.mjs',
       'isolation/execution.mjs', 'isolation/native-windows.mjs', 'isolation/native-guest.mjs',
       'synthetic-wire-provider.mjs', 'provider-profile.mjs', 'context-reservation.mjs', 'provider-campaign-session.mjs', 'provider-transport.mjs', 'provider-diagnostics.mjs', 'responses-call.mjs', 'responses-request.mjs', 'responses-receipt.mjs', 'embeddings-call.mjs',
       'isolation/rust.mjs', 'isolation/sequence.mjs', 'isolation/knowledge.mjs', 'isolation/service-session.mjs', 'isolation/embedding-proxy.mjs',
