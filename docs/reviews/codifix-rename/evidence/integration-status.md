@@ -126,3 +126,21 @@ stable, rc.1 and six-digit RC versions; all three pass, and shell syntax passes.
 This is a test harness correction; native lifecycle acceptance still requires
 rerunning it. Run `39068466765` at `3701fd10` was cancelled while pending with
 zero jobs so the replacement candidate can include this correction.
+
+## Current candidate and populated functional reads
+
+Corrected unpublished candidate [run 39068603586](https://github.com/3vilM33pl3/memory/actions/runs/39068603586)
+is pinned to `afbde0b8d7bccaef05d6cdacc8e3c5bd9ed80eb3`, version 3.0.0-rc.1,
+`publish=false`. It is queued behind the first run's ongoing Mac Intel build;
+no corrected-candidate acceptance is claimed yet. Later commits only add docs
+and private-rehearsal evidence; they do not alter that candidate's Rust/package
+code.
+
+[Workshop HTTP reads](populated-workshop-reads.md) and
+[restored Mac cache HTTP reads](populated-mac-cache-reads.md) now pass against
+separate populated disposable clones. Successful reads preserve all 161 table
+fingerprints and normalized schema, including original provenance/version and
+remote-origin citation identities. A separate intentional anonymous cache denial
+adds exactly one security audit row while preserving every original row; this
+is recorded separately, not deleted or hidden. Vectors/attachment bytes remain
+unexercised. These are local service tests, not live Mac installation/enrolment.
