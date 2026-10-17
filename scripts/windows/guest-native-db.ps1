@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][string]$SourceRoot,
       [Parameter(Mandatory=$true)][guid]$OperationId,
-      [ValidateSet('Area','Service','Supervisor','Fleet','Workspace','Portability')][string]$Scope='Area')
+      [ValidateSet('Area','Service','Supervisor','Fleet','Workspace','Portability','Repository')][string]$Scope='Area')
 $ErrorActionPreference='Stop'
 if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB' -or
     $OperationId -eq [guid]::Empty -or $SourceRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+$') { throw 'Explicit disposable native database source required' }
@@ -20,7 +20,7 @@ $head=(& $git -C $SourceRoot rev-parse HEAD)
 if ($LASTEXITCODE -or $head -cnotmatch '^[0-9a-f]{40}$') { throw 'Committed source required' }
 $changes=(& $git -C $SourceRoot status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -or $changes) { throw 'Clean database test source required' }
-$label=switch ($Scope) { 'Service' {'native-service-db'} 'Supervisor' {'native-supervisor'} 'Fleet' {'native-pds-fleet'} 'Workspace' {'native-workspace-db'} 'Portability' {'native-portability-db'} default {'native-db'} }
+$label=switch ($Scope) { 'Service' {'native-service-db'} 'Supervisor' {'native-supervisor'} 'Fleet' {'native-pds-fleet'} 'Workspace' {'native-workspace-db'} 'Portability' {'native-portability-db'} 'Repository' {'native-repository-db'} default {'native-db'} }
 $root=Join-Path 'C:\MemoryLab\runs' ($OperationId.ToString()+'\'+$label)
 if (Test-Path -LiteralPath $root) { throw 'Retain existing database test evidence; use a new operation identity' }
 New-Item -ItemType Directory -Path $root | Out-Null
@@ -34,6 +34,9 @@ if ($LASTEXITCODE -or ($compiler -join "`n") -notmatch '(?m)^host: x86_64-pc-win
 $lock=Join-Path $SourceRoot 'Cargo.lock'; $lockHash=(Get-FileHash -LiteralPath $lock).Hash.ToLowerInvariant()
 $receipt=[ordered]@{format='memory-native-database-tests-v1';source_commit=$head;lock_sha256=$lockHash;compiler=($compiler -join "`n")
     state='running';required_database=$true;native_database='PostgreSQL17/127.0.0.1:55471';scope=$Scope;workflow_verified=$false}
+if($Scope -eq 'Repository'){
+    $receipt.packages=@('mem-service');$receipt.test_target='db_repository';$receipt.whole_workspace_verified=$false
+}
 if($Scope -eq 'Portability'){
     $receipt.packages=@('mem-cli','mem-config','mem-eval','mem-federation-runtime')
     $receipt.whole_workspace_verified=$false
@@ -89,6 +92,7 @@ try {
     }
     $program=$cargo
     $arguments=if ($Scope -eq 'Service') { @('test','--locked','-p','mem-service','--lib','--','--test-threads=1') }
+        elseif ($Scope -eq 'Repository') { @('test','--locked','-p','mem-service','--test','db_repository','--','--test-threads=1') }
         # Gather every failing test binary in one consolidated pass instead of
         # repeatedly stopping at the first crate and rebuilding to find the next.
         elseif ($Scope -eq 'Workspace') { @('test','--workspace','--all-targets','--locked','--no-fail-fast','--','--test-threads=1') }

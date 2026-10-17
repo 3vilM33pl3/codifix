@@ -7,6 +7,14 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_repository_rerun_selects_only_the_native_database_repository_target(self):
+        script=(Path(__file__).parent/'guest-native-db.ps1').read_text()
+        self.assertIn("'Repository' {'native-repository-db'}",script)
+        self.assertIn("$receipt.test_target='db_repository'",script)
+        branch=script.split("elseif ($Scope -eq 'Repository')",1)[1].split("elseif",1)[0]
+        self.assertIn("'-p','mem-service','--test','db_repository'",branch)
+        self.assertNotIn("'--workspace'",branch)
+
     def test_portability_rerun_is_exactly_four_packages_not_workspace(self):
         script=(Path(__file__).parent/'guest-native-db.ps1').read_text()
         self.assertIn("'Portability' {'native-portability-db'}",script)

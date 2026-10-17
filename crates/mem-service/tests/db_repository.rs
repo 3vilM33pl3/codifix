@@ -1535,8 +1535,8 @@ async fn loop_repository_draft_pr_creates_isolated_workspace_for_approved_issue(
                 "labels": ["agent-ready"],
                 "approved": true,
                 "run_checks": true,
-                "allowed_commands": ["sh"],
-                "checks": [{"program": "sh", "args": ["-c", "true"]}]
+                "allowed_commands": ["git"],
+                "checks": [{"program": "git", "args": ["--version"]}]
             })),
         },
     )
