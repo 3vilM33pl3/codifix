@@ -90,4 +90,33 @@ foreach($change in @('foreign-id','interval','duration','stop','extra-repetition
     }
     Reject { Assert-OnboardingTask $copy $syncPlan $powerShell $encoded $digest $expected $resolve }
 }
+# Native CIM exposes enum numbers and a bare local SAM principal. Only these
+# exact enum values have the same semantics as the reviewed symbolic defaults.
+$numeric=$registered | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+$numeric.Principal.UserId='memorylab';$numeric.Principal.LogonType=3;$numeric.Principal.RunLevel=0;$numeric.Settings.MultipleInstances=2
+$resolvedNames=[Collections.Generic.List[string]]::new()
+$resolveLocal={param($User)
+    $resolvedNames.Add($User)
+    if($User -cnotin @('MEMORY-WINLAB\memorylab',([Environment]::MachineName+'\memorylab'))){throw 'unknown local identity'}
+    'S-1-5-21-1-2-3-1001'
+}
+Assert-OnboardingTask $numeric $syncPlan $powerShell $encoded $digest $expected $resolveLocal
+if(-not $resolvedNames.Contains([Environment]::MachineName+'\memorylab') -or $resolvedNames.Contains('memorylab')) { throw 'Bare SAM lookup used an ambient domain' }
+foreach($change in @('logon0','logon2','logon4','level1','instances0','instances1','instances3','foreign-principal','foreign-principal-sid','upn-principal','new-principal-policy')) {
+    $copy=$numeric | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    switch($change){
+        'logon0' {$copy.Principal.LogonType=0}
+        'logon2' {$copy.Principal.LogonType=2}
+        'logon4' {$copy.Principal.LogonType=4}
+        'level1' {$copy.Principal.RunLevel=1}
+        'instances0' {$copy.Settings.MultipleInstances=0}
+        'instances1' {$copy.Settings.MultipleInstances=1}
+        'instances3' {$copy.Settings.MultipleInstances=3}
+        'foreign-principal' {$copy.Principal.UserId='someone-else'}
+        'foreign-principal-sid' {$copy.Principal.UserId='S-1-5-21-1-2-3-9999'}
+        'upn-principal' {$copy.Principal.UserId='memorylab@other.example'}
+        'new-principal-policy' {$copy.Principal | Add-Member -NotePropertyName ProcessTokenSidType -NotePropertyValue 2}
+    }
+    Reject { Assert-OnboardingTask $copy $syncPlan $powerShell $encoded $digest $expected $resolveLocal }
+}
 Write-Output 'Portable Windows onboarding policy checks passed; native execution remains unverified.'

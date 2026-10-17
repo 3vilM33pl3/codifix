@@ -121,12 +121,18 @@ function ConvertTo-OnboardingPolicyValue($Value) {
 }
 function Resolve-OnboardingTriggerSid([string]$User, [string]$ExpectedSid, [scriptblock]$Resolver) {
     if ($User -ceq $ExpectedSid) { return $ExpectedSid }
-    # Scheduler may serialize an exact SID as its registered domain\user name.
-    # Resolve only that bounded account spelling, never reinterpret a foreign SID.
-    if ($User.Length -gt 256 -or $User -notmatch '^[^\\/\x00-\x1f]{1,128}\\[^\\/\x00-\x1f]{1,128}$') { throw 'Foreign sync trigger identity' }
+    # Scheduler may serialize the SID as domain\user or a bare LOCAL SAM name.
+    # Qualify bare names explicitly: never let lookup choose an ambient domain.
+    if ($User.Length -gt 256 -or $User -match '^S-\d-') { throw 'Foreign sync identity' }
+    if ($User -match '^[^\\/:@\x00-\x1f]{1,128}$') { $User=[Environment]::MachineName + '\' + $User }
+    if ($User -notmatch '^[^\\/:@\x00-\x1f]{1,128}\\[^\\/:@\x00-\x1f]{1,128}$') { throw 'Foreign sync identity' }
     $resolved=& $Resolver $User
-    if ($resolved -isnot [string] -or $resolved -cne $ExpectedSid) { throw 'Foreign sync trigger identity' }
+    if ($resolved -isnot [string] -or $resolved -cne $ExpectedSid) { throw 'Foreign sync identity' }
     return $ExpectedSid
+}
+function Resolve-OnboardingEnum([string]$Value, [string]$Symbolic, [string]$Numeric) {
+    if ($Value -cne $Symbolic -and $Value -cne $Numeric) { throw 'Unsupported task policy enumeration' }
+    return $Symbolic
 }
 function Get-OnboardingTaskPolicy($Task, [string]$ExpectedSid, [scriptblock]$Resolver) {
     $policy=[ordered]@{actions=(ConvertTo-OnboardingPolicyValue @($Task.Actions));principal=(ConvertTo-OnboardingPolicyValue $Task.Principal)
@@ -134,6 +140,10 @@ function Get-OnboardingTaskPolicy($Task, [string]$ExpectedSid, [scriptblock]$Res
     # Only registration defaults observed on Windows are normalized. All other
     # principal, action, trigger and settings fields remain in the exact digest.
     if ($null -eq $policy.principal['Id'] -or $policy.principal['Id'] -ceq 'Author') { $policy.principal['Id']='Author' }
+    $policy.principal['UserId']=Resolve-OnboardingTriggerSid $policy.principal['UserId'] $ExpectedSid $Resolver
+    $policy.principal['LogonType']=Resolve-OnboardingEnum $policy.principal['LogonType'] 'Interactive' '3'
+    $policy.principal['RunLevel']=Resolve-OnboardingEnum $policy.principal['RunLevel'] 'Limited' '0'
+    $policy.settings['MultipleInstances']=Resolve-OnboardingEnum $policy.settings['MultipleInstances'] 'IgnoreNew' '2'
     foreach ($trigger in $policy.triggers) {
         $trigger['UserId']=Resolve-OnboardingTriggerSid $trigger['UserId'] $ExpectedSid $Resolver
         $repetition=$trigger['Repetition']
@@ -147,13 +157,13 @@ function Get-OnboardingTaskPolicy($Task, [string]$ExpectedSid, [scriptblock]$Res
 function Assert-OnboardingTask($Task, $Plan, [string]$PowerShell, [string]$Arguments, [string]$Digest, $ExpectedTask,
     [scriptblock]$ResolveUser = { param($User) ([Security.Principal.NTAccount]::new($User)).Translate([Security.Principal.SecurityIdentifier]).Value }) {
     if ($Task.Description -cne ('Memory Layer reviewed device sync ' + $Digest) -or $Task.TaskName -cne $Plan.task.name -or
-        $Task.Principal.UserId -cne $Plan.task.user_sid -or [string]$Task.Principal.LogonType -cne 'Interactive' -or
-        [string]$Task.Principal.RunLevel -cne 'Limited' -or @($Task.Actions).Count -ne 1 -or
+        (Resolve-OnboardingTriggerSid $Task.Principal.UserId $Plan.task.user_sid $ResolveUser) -cne $Plan.task.user_sid -or [string]$Task.Principal.LogonType -cnotin @('Interactive','3') -or
+        [string]$Task.Principal.RunLevel -cnotin @('Limited','0') -or @($Task.Actions).Count -ne 1 -or
         $Task.Actions[0].Execute -ine $PowerShell -or $Task.Actions[0].Arguments -cne $Arguments -or
         $Task.Actions[0].WorkingDirectory -ine $Plan.release_root -or @($Task.Triggers).Count -ne 1 -or
         $Task.Triggers[0].CimClass.CimClassName -cne 'MSFT_TaskLogonTrigger' -or
         (Resolve-OnboardingTriggerSid $Task.Triggers[0].UserId $Plan.task.user_sid $ResolveUser) -cne $Plan.task.user_sid -or -not $Task.Triggers[0].Enabled -or
-        [string]$Task.Settings.MultipleInstances -cne 'IgnoreNew' -or -not $Task.Settings.Enabled -or
+        [string]$Task.Settings.MultipleInstances -cnotin @('IgnoreNew','2') -or -not $Task.Settings.Enabled -or
         [string]$Task.Settings.ExecutionTimeLimit -cne 'PT0S' -or $null -eq $ExpectedTask -or
         (Get-NativeInputDigest (Get-OnboardingTaskPolicy $Task $Plan.task.user_sid $ResolveUser)) -cne
         (Get-NativeInputDigest (Get-OnboardingTaskPolicy $ExpectedTask $Plan.task.user_sid $ResolveUser))) { throw 'Existing sync task differs; do not adopt or replace it' }
