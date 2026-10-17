@@ -4,6 +4,8 @@ use std::sync::atomic::AtomicBool;
 
 #[cfg(unix)]
 mod launcher;
+#[cfg(windows)]
+mod launcher_windows;
 #[cfg(unix)]
 mod sandbox;
 
