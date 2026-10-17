@@ -219,7 +219,7 @@ switch($Kind){
             # Verification covers all prepared files; only production paths enter
             # a runtime bundle. The two disposable proof probes remain outside.
             if($member.path -cin @('probe-native-sqlite.cjs','probe-stdio.mjs')){Assert-PackHash $source $member.sha256;continue}
-            if($member.path -cnotmatch '^(?:package\.json|pnpm-lock\.yaml|pds-server\.mjs|http-stdio\.mjs|node_modules/.+)$'){throw 'Unexpected prepared PDS root member; review before selecting'}
+            if($member.path -cnotmatch '^(?:package\.json|pnpm-lock\.yaml|patches/[A-Za-z0-9_@.+-]+\.patch|pds-server\.mjs|http-stdio\.mjs|node_modules/.+)$'){throw 'Unexpected prepared PDS root member; review before selecting'}
             Copy-PackFile $source ('pds/'+$member.path) $member.sha256
         }
         foreach($name in @('vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll')){Copy-PackFile (Join-Path $pgBin $name) ('node/'+$name) (Get-PackHash (Join-Path $pgBin $name))}

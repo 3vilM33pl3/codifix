@@ -1,0 +1,13 @@
+diff --git a/dist/actor-store/blob/transactor.js b/dist/actor-store/blob/transactor.js
+index 01010034cfc16e15c9632733088ec1a7b880691a..ad224358515a809e000003d2a19cffba562f2983 100644
+--- a/dist/actor-store/blob/transactor.js
++++ b/dist/actor-store/blob/transactor.js
+@@ -1,7 +1,5 @@
+ import crypto from 'node:crypto';
+-import * as FileTypeModule from 'file-type';
+-const FileType = ((m) => m.default ?? m)(FileTypeModule);
+-const { fromStream: fileTypeFromStream } = FileType;
++import { fileTypeFromStream } from 'file-type';
+ import PQueue from 'p-queue';
+ import { SECOND, cloneStream, streamSize } from '@atproto/common';
+ import { cidForRawHash, getBlobCidString, parseCid, } from '@atproto/lex-data';

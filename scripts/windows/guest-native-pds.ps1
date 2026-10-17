@@ -33,6 +33,10 @@ Run-Checked 'icacls.exe' @($root,'/inheritance:r','/grant:r',"*${sid}:(OI)(CI)F"
 $upstream = Join-Path $SourceRoot 'packaging\windows-pds\upstream'
 Assert-Hash (Join-Path $upstream 'package.json') $manifest.package_sha256
 Assert-Hash (Join-Path $upstream 'pnpm-lock.yaml') $manifest.lock_sha256
+foreach ($patch in $manifest.security_patches.PSObject.Properties) {
+    if ($patch.Name -cnotmatch '^[A-Za-z0-9_@.+-]+\.patch$') { throw 'Invalid reviewed PDS patch name' }
+    Assert-Hash (Join-Path $upstream "patches\$($patch.Name)") $patch.Value
+}
 $node = Join-Path $tools 'node-v24.18.1-win-x64\node.exe'
 if ((& $node --version) -ne 'v24.18.1') { throw 'Pinned native Node is required' }
 $python = Join-Path $tools 'python-3.13.9\python.exe'
@@ -56,6 +60,16 @@ foreach ($name in @('package.json','pnpm-lock.yaml')) {
         }
     } else { Copy-Item -LiteralPath (Join-Path $upstream $name) -Destination $target }
 }
+$patchRoot = Join-Path $runtime 'patches'
+New-Item -ItemType Directory -Force $patchRoot | Out-Null
+foreach ($patch in $manifest.security_patches.PSObject.Properties) {
+    $target = Join-Path $patchRoot $patch.Name
+    if (Test-Path $target) {
+        Assert-Hash $target $patch.Value
+    } else {
+        Copy-Item -LiteralPath (Join-Path $upstream "patches\$($patch.Name)") -Destination $target
+    }
+}
 $env:PATH = "$(Split-Path $node);$(Split-Path $python);$env:PATH"
 $env:npm_config_python = $python
 $env:npm_config_build_from_source = 'true'
@@ -71,6 +85,9 @@ try {
 } finally { Pop-Location }
 Assert-Hash (Join-Path $runtime 'package.json') $manifest.package_sha256
 Assert-Hash (Join-Path $runtime 'pnpm-lock.yaml') $manifest.lock_sha256
+foreach ($patch in $manifest.security_patches.PSObject.Properties) {
+    Assert-Hash (Join-Path $patchRoot $patch.Name) $patch.Value
+}
 foreach ($name in @('pds-server.mjs','http-stdio.mjs','probe-stdio.mjs')) {
     Copy-Item -LiteralPath (Join-Path $SourceRoot "packaging\windows-pds\$name") -Destination (Join-Path $runtime $name) -Force
 }

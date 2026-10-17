@@ -237,6 +237,11 @@ class BuildToolsManifestTests(unittest.TestCase):
         package = json.loads((upstream / 'package.json').read_text())
         self.assertEqual(package['packageManager'], 'pnpm@' + manifest['pnpm']['version'])
         self.assertEqual(package['pnpm']['onlyBuiltDependencies'], ['better-sqlite3'])
+        self.assertEqual(set(manifest['security_patches']),
+                         {Path(name).name for name in package['pnpm']['patchedDependencies'].values()})
+        for name, digest in manifest['security_patches'].items():
+            self.assertEqual(hashlib.sha256((upstream / 'patches' / name).read_bytes()).hexdigest(), digest)
+        self.assertEqual(package['pnpm']['overrides']['key-encoder>elliptic'], '-')
         self.assertEqual(len(manifest['pnpm']['sha512']), 128)
         script = (root / 'guest-native-pds.ps1').read_text()
         for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", '--frozen-lockfile',

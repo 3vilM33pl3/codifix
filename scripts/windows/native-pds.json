@@ -3,8 +3,12 @@
   "node_version": "24.18.1",
   "pds_version": "0.5.27",
   "source_revision": "374cf1d4ba782d4391bbb73e4e2d3f320d4846d6",
-  "package_sha256": "c0e7740808e0d6bc26a9fd773162f780a45665b0cff2137a256157f3cff77fd5",
-  "lock_sha256": "23a8c97e01dff561266a6dcf67a4b74b25e98ebc695e6fa17c60ddf964160f73",
+  "package_sha256": "02d55b497d78fcbc17516c377a243bce7f703c2fc4f6fe2d642be4b6923a986d",
+  "lock_sha256": "c1e11d5d91e43aebe3e52e61aea198dbc2b3009b474a89ad9715f03a36de2621",
+  "security_patches": {
+    "@atproto__pds@0.5.27.patch": "a7822b2ede85720e3591115354d3448a89c44e9acb6d740eaf3470779bc8c1b4",
+    "key-encoder@2.0.3.patch": "fde72177f9e69d1f45ecef4600b856f3734727966c8e89663947b8cf7100bf71"
+  },
   "pnpm": {
     "version": "10.34.1",
     "url": "https://registry.npmjs.org/pnpm/-/pnpm-10.34.1.tgz",
