@@ -64,8 +64,8 @@ Linux)
     if command -v dpkg >/dev/null 2>&1 && [ -n "$deb_arch" ]; then
         head_line "Installing Codifix from the latest .deb release"
         api="https://api.github.com/repos/$REPO/releases/latest"
-        deb_url="$(curl -fsSL "$api" | grep -o "https://[^\"]*_${deb_arch}\\.deb\"" | sed 's/"$//' | head -1)"
-        [ -n "$deb_url" ] || fail "could not find a .deb asset in the latest release"
+        deb_url="$(curl -fsSL "$api" | grep -o "https://[^\"]*/codifix_[0-9][^/\"]*_${deb_arch}\\.deb\"" | sed 's/"$//' | head -1)"
+        [ -n "$deb_url" ] || fail "latest release has no Codifix .deb; use the explicitly reviewed candidate package until Codifix stable is published"
         tmp="$(mktemp -d)"
         trap 'rm -rf "$tmp"' EXIT
         say "Downloading $(basename "$deb_url")..."
