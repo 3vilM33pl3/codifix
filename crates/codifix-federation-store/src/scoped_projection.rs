@@ -68,12 +68,16 @@ impl ProjectProjectionStore {
     }
     /// The trusted onboarding operator supplies these identities, not an
     /// untrusted page. This cannot merge with local authoritative memories.
+    pub async fn require_active(&self) -> Result<()> {
+        crate::require_active(&self.pool, self.scope.space).await
+    }
     pub async fn initialize(
         pool: PgPool,
         subscription: Uuid,
         device: Uuid,
         scope: ProjectScope,
     ) -> Result<Self> {
+        crate::require_active(&pool, scope.space).await?;
         if subscription.is_nil() || device.is_nil() || !scope.valid() {
             return Err(StoreError::Binding);
         }
@@ -121,6 +125,7 @@ impl ProjectProjectionStore {
     /// Altered bytes under one nonce fail before any projection/cursor effect.
     /// Page, accepted projection and cursor commit together under one row lock.
     pub async fn apply_verified(&self, page: &ProjectPage) -> Result<u64> {
+        crate::require_active(&self.pool, self.scope.space).await?;
         if !page.request.valid()
             || page.request.device != self.device
             || page.request.scope != self.scope

@@ -5,11 +5,46 @@ use codifix_record::*;
 use sqlx::{Postgres, Row, Transaction, types::Json};
 use uuid::Uuid;
 
+async fn require_active_binding(
+    tx: &mut Transaction<'_, Postgres>,
+    binding: &LaptopContributionBinding,
+) -> Result<()> {
+    let retired: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM codifix_retired_federation_spaces WHERE space=$1)",
+    )
+    .bind(binding.scope.space_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if retired {
+        return Err(Error::Conflict);
+    }
+    Ok(())
+}
+/// Release-specific, one-time operator action. Never rewrites origins or outbox bindings.
+pub async fn rebind_retired_project(
+    tx: &mut Transaction<'_, Postgres>,
+    project: Uuid,
+    old: &LaptopContributionBinding,
+    new: &LaptopContributionBinding,
+    manifest_sha256: &str,
+) -> Result<()> {
+    old.validate().map_err(|_| Error::Invalid("old binding"))?;
+    new.validate().map_err(|_| Error::Invalid("new binding"))?;
+    sqlx::query("SELECT codifix_rebind_laptop_project($1,$2,$3,$4)")
+        .bind(project)
+        .bind(Json(old))
+        .bind(Json(new))
+        .bind(manifest_sha256)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
 pub async fn bind_project(
     tx: &mut Transaction<'_, Postgres>,
     local_project: Uuid,
     binding: &LaptopContributionBinding,
 ) -> Result<()> {
+    require_active_binding(tx, binding).await?;
     binding
         .validate()
         .map_err(|_| Error::Invalid("curated device binding"))?;
@@ -43,6 +78,7 @@ pub async fn claim(
     tx: &mut Transaction<'_, Postgres>,
     binding: &LaptopContributionBinding,
 ) -> Result<Option<ClaimedContribution>> {
+    require_active_binding(tx, binding).await?;
     binding
         .validate()
         .map_err(|_| Error::Invalid("claim binding"))?;
@@ -136,6 +172,7 @@ pub async fn acknowledge(
     claim: &ClaimedContribution,
     receipt: &DeviceContributionReceipt,
 ) -> Result<()> {
+    require_active_binding(tx, &claim.contribution.binding).await?;
     if receipt.operation_id != claim.contribution.operation_id
         || receipt.binding != claim.contribution.binding
         || receipt.local_memory_id != claim.contribution.local_memory_id
@@ -172,6 +209,7 @@ pub async fn release(
     claim: &ClaimedContribution,
     blocked: bool,
 ) -> Result<()> {
+    require_active_binding(tx, &claim.contribution.binding).await?;
     let result=sqlx::query("UPDATE laptop_curated_outbox SET state=$3,blocked_reason=CASE WHEN $3='blocked' THEN 'authority_denied' ELSE NULL END,lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE operation_id=$1 AND lease_token=$2 AND state='running' AND lease_until>clock_timestamp()")
         .bind(claim.contribution.operation_id).bind(claim.lease_token).bind(if blocked {"blocked"} else {"queued"}).execute(&mut **tx).await?;
     if result.rows_affected() != 1 {
@@ -238,6 +276,7 @@ pub async fn reconcile_resolution(
     binding: &LaptopContributionBinding,
     status: &DeviceContributionStatus,
 ) -> Result<()> {
+    require_active_binding(tx, binding).await?;
     let Some(resolution) = &status.resolution else {
         return Ok(());
     };

@@ -149,11 +149,11 @@ async fn federation_local_human_cli_real_session_and_csrf() {
         .join("; ");
     let csrf = cookies
         .split("; ")
-        .find_map(|v| v.strip_prefix("memory_csrf="))
+        .find_map(|v| v.strip_prefix("codifix_csrf="))
         .unwrap();
     let session = cookies
         .split("; ")
-        .find_map(|v| v.strip_prefix("memory_session="))
+        .find_map(|v| v.strip_prefix("codifix_session="))
         .unwrap();
     let path = format!(
         "{url}/v1/projects/{}/federation/{}",

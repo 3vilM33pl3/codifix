@@ -106,3 +106,11 @@ pub(crate) fn pack(root: Cid, blocks: &BTreeMap<Cid, Vec<u8>>) -> Vec<u8> {
     }
     out
 }
+
+/// Synthetic pre-Codifix signature; never use this known fixture key in production.
+pub fn retired_attestation(message: &[u8]) -> (String, Vec<u8>) {
+    let signer = Secp256k1Keypair::import(&[3; 32]).unwrap();
+    let mut bytes = b"memory-private-gateway-attestation-v1\0".to_vec();
+    bytes.extend_from_slice(message);
+    (signer.did(), signer.sign(&bytes).unwrap())
+}

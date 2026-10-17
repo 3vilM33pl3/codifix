@@ -71,6 +71,9 @@ pub async fn set_local_grant(
     grant: &LocalSpaceGrant,
     enabled: bool,
 ) -> Result<()> {
+    if enabled {
+        crate::require_active(&mut **tx, grant.space).await?;
+    }
     if actor.read_only
         || actor.project != grant.project
         || !actor.permissions.contains(Permission::AuthManage)
@@ -135,6 +138,7 @@ pub async fn authorize_source_intent(
     instance: InstanceId,
     intent: &PublicationIntent,
 ) -> Result<()> {
+    crate::require_active(pool, known.space()).await?;
     let mut tx = pool.begin().await?;
     let grant = load_grant(&mut tx, access, known.space(), instance).await?;
     known
@@ -150,6 +154,7 @@ pub async fn retry_source_work(
     space: SpaceId,
     instance: InstanceId,
 ) -> Result<()> {
+    crate::require_active(pool, space).await?;
     if access.read_only
         || !access.permissions.contains(Permission::MemoryCurate)
         || !access.permissions.contains(Permission::BundleExport)
@@ -178,6 +183,7 @@ pub async fn review_and_share(
     expected: &SourceSelection,
     evidence: &[ReviewedEvidence],
 ) -> Result<Uuid> {
+    crate::require_active(&mut **tx, known.space()).await?;
     let grant = load_grant(tx, access, known.space(), instance).await?;
     sqlx::query("SELECT canonical_id FROM memory_canonical_state WHERE project_id=$1 AND canonical_id=$2 FOR UPDATE")
         .bind(access.project).bind(canonical.as_uuid()).fetch_one(&mut **tx).await?;
@@ -305,6 +311,7 @@ pub async fn prepare_source_changes(
     instance: InstanceId,
     limit: u32,
 ) -> Result<u32> {
+    crate::require_active(pool, known.space()).await?;
     if !(1..=1000).contains(&limit) {
         return Err(StoreError::Limits);
     }

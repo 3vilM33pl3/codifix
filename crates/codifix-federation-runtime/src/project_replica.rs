@@ -331,6 +331,7 @@ impl ProjectReplica {
         transport: &impl ProjectDeviceTransport,
         max_pages: u32,
     ) -> Result<ProjectSyncProgress> {
+        self.projection.require_active().await?;
         if !(1..=128).contains(&max_pages) {
             return Err(RuntimeError::Configuration);
         }

@@ -1203,6 +1203,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "codifix-agenttop",
+ "codifix-atproto-verify",
  "codifix-config",
  "codifix-consolidate",
  "codifix-curate",

@@ -172,6 +172,7 @@ impl GatewayServer {
         Ok(self)
     }
     pub async fn publish_one(&self, pds: &PdsPublisher) -> Result<WorkerOutcome> {
+        self.store.ensure_active(self.fence).await?;
         if self
             .security
             .trust()
@@ -223,6 +224,7 @@ impl GatewayServer {
     /// a shared publication sequence. Success requires exact PDS read-back and
     /// signed repository inclusion before the durable receipt becomes visible.
     pub async fn publish_addressed_one(&self, pds: &PdsPublisher) -> Result<bool> {
+        self.store.ensure_active(self.fence).await?;
         if !self.addressed_enabled {
             return Ok(false);
         }
@@ -275,6 +277,7 @@ impl GatewayServer {
         }
     }
     pub async fn delete_addressed_one(&self, pds: &PdsPublisher) -> Result<bool> {
+        self.store.ensure_active(self.fence).await?;
         if !self.addressed_enabled {
             return Ok(false);
         }

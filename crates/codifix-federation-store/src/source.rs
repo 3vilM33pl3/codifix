@@ -22,6 +22,7 @@ pub async fn queue_intent(
     grant: Option<&LocalSpaceGrant>,
     intent: &PublicationIntent,
 ) -> Result<()> {
+    crate::require_active(&mut **tx, intent.envelope.space).await?;
     known_space
         .authorize_publication(access, grant, &intent.envelope)
         .map_err(StoreError::LocalPolicy)?;
@@ -53,6 +54,7 @@ pub(crate) async fn persist_intent(
     principal: uuid::Uuid,
     intent: &PublicationIntent,
 ) -> Result<()> {
+    crate::require_active(&mut **tx, intent.envelope.space).await?;
     let e = &intent.envelope;
     sqlx::query("INSERT INTO federation_source_outbox (space,publisher,record_id,project_id,locator,envelope,principal_id) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING")
         .bind(e.space.as_uuid()).bind(e.publisher.as_uuid()).bind(e.record_id.as_uuid())
@@ -80,6 +82,7 @@ pub async fn pending_intents(
     publisher: InstanceId,
     limit: u32,
 ) -> Result<Vec<PublicationIntent>> {
+    crate::require_active(pool, space).await?;
     if !(1..=1000).contains(&limit) {
         return Err(StoreError::Limits);
     }
@@ -102,6 +105,7 @@ pub async fn record_acceptance(
     tx: &mut Transaction<'_, Postgres>,
     delivery: &PublicationDelivery,
 ) -> Result<()> {
+    crate::require_active(&mut **tx, delivery.envelope.space).await?;
     let e = &delivery.envelope;
     let expected =
         PublicationDelivery::new(delivery.sequence, delivery.locator.clone(), e.clone())?;

@@ -186,6 +186,7 @@ impl crate::InstanceSync {
         &self,
         record: codifix_federation::expertise::AddressedExpertiseRecord,
     ) -> crate::Result<AddressedReceipt> {
+        self.require_active().await?;
         if record.sender != self.instance {
             return Err(RuntimeError::Unauthorized);
         }
@@ -206,6 +207,7 @@ impl crate::InstanceSync {
     }
 
     pub async fn claim_addressed_expertise(&self) -> crate::Result<Option<AddressedQuestionLease>> {
+        self.require_active().await?;
         match self
             .client
             .expertise(self.instance, ExpertiseOperation::AddressedClaim)
@@ -221,6 +223,7 @@ impl crate::InstanceSync {
         lease: &AddressedQuestionLease,
         record: codifix_federation::expertise::AddressedExpertiseRecord,
     ) -> crate::Result<AddressedReceipt> {
+        self.require_active().await?;
         if record.sender != self.instance || record.request_id != lease.record.request_id {
             return Err(RuntimeError::Unauthorized);
         }
@@ -245,6 +248,7 @@ impl crate::InstanceSync {
         request_id: Uuid,
         kind: &str,
     ) -> crate::Result<Option<AddressedDelivery>> {
+        self.require_active().await?;
         match self
             .client
             .expertise(
@@ -265,6 +269,7 @@ impl crate::InstanceSync {
         &self,
         limit: u32,
     ) -> crate::Result<Vec<AddressedDelivery>> {
+        self.require_active().await?;
         match self
             .client
             .expertise(self.instance, ExpertiseOperation::AddressedInbox { limit })
@@ -279,6 +284,7 @@ impl crate::InstanceSync {
         after: Option<codifix_federation::publication::RecordKey>,
         limit: u32,
     ) -> crate::Result<Vec<codifix_federation::expertise::CapabilityAdvertisement>> {
+        self.require_active().await?;
         match self
             .client
             .expertise(self.instance, ExpertiseOperation::Discover { after, limit })
@@ -294,6 +300,7 @@ impl crate::InstanceSync {
         &self,
         q: &codifix_federation::expertise::ExpertiseQuestion,
     ) -> crate::Result<codifix_federation_store::QuestionResult> {
+        self.require_active().await?;
         if q.requester != self.instance || q.space != self.client.space {
             return Err(RuntimeError::Unauthorized);
         }
@@ -322,6 +329,7 @@ impl crate::InstanceSync {
         &self,
         question: codifix_federation::expertise::ExpertiseQuestion,
     ) -> crate::Result<codifix_federation_store::QuestionResult> {
+        self.require_active().await?;
         if question.requester != self.instance {
             return Err(RuntimeError::Unauthorized);
         }
@@ -338,6 +346,7 @@ impl crate::InstanceSync {
         &self,
         lease: &codifix_federation_store::QuestionLease,
     ) -> crate::Result<()> {
+        self.require_active().await?;
         match self
             .client
             .expertise(
@@ -355,6 +364,7 @@ impl crate::InstanceSync {
     pub async fn claim_expertise_question(
         &self,
     ) -> crate::Result<Option<codifix_federation_store::QuestionLease>> {
+        self.require_active().await?;
         match self
             .client
             .expertise(self.instance, ExpertiseOperation::Claim)
@@ -373,6 +383,7 @@ impl crate::InstanceSync {
         lease: &codifix_federation_store::QuestionLease,
         answer: &codifix_federation::expertise::ExpertiseAnswer,
     ) -> crate::Result<()> {
+        self.require_active().await?;
         let (snapshot, ad) = codifix_federation_store::eligible_question_collection(
             tx,
             access,
@@ -404,6 +415,7 @@ impl crate::InstanceSync {
         daily_tokens: u32,
         tokens: u32,
     ) -> crate::Result<()> {
+        self.require_active().await?;
         match self
             .client
             .expertise(
@@ -422,6 +434,7 @@ impl crate::InstanceSync {
         }
     }
     pub async fn claim_expertise_delivery(&self) -> crate::Result<Option<AnswerDeliveryLease>> {
+        self.require_active().await?;
         match self
             .client
             .expertise(self.instance, ExpertiseOperation::ClaimDelivery)
@@ -437,6 +450,7 @@ impl crate::InstanceSync {
         access: &codifix_federation::publication::LocalProjectAccess,
         lease: &AnswerDeliveryLease,
     ) -> crate::Result<()> {
+        self.require_active().await?;
         self.client
             .authorize_held_delivery(tx, access, self.instance, lease)
             .await

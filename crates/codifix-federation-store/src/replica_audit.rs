@@ -11,6 +11,37 @@ pub fn receipt_matches(
     authority: codifix_federation::publication::InstanceId,
     keys: &[ReceiptKey],
 ) -> Result<()> {
+    receipt_matches_purpose(
+        receipt,
+        delivery,
+        authority,
+        keys,
+        "codifix-publication-receipt-v1",
+    )
+}
+/// Historical validation is deliberately a separate entry point; active receive
+/// and persist_receipts never call it.
+pub fn retired_receipt_matches(
+    receipt: &AuditReceipt,
+    delivery: &PublicationDelivery,
+    authority: codifix_federation::publication::InstanceId,
+    keys: &[ReceiptKey],
+) -> Result<()> {
+    receipt_matches_purpose(
+        receipt,
+        delivery,
+        authority,
+        keys,
+        "memory-publication-receipt-v1",
+    )
+}
+fn receipt_matches_purpose(
+    receipt: &AuditReceipt,
+    delivery: &PublicationDelivery,
+    authority: codifix_federation::publication::InstanceId,
+    keys: &[ReceiptKey],
+    purpose: &str,
+) -> Result<()> {
     let key = keys
         .iter()
         .rev()
@@ -18,7 +49,7 @@ pub fn receipt_matches(
         .ok_or(StoreError::Binding)?;
     let c = &receipt.claims;
     c.policy.validate()?;
-    if c.purpose != "codifix-publication-receipt-v1"
+    if c.purpose != purpose
         || c.space != delivery.envelope.space
         || c.authority != authority
         || c.sequence != delivery.sequence.get()
@@ -47,6 +78,7 @@ impl ReplicaStore {
     }
     /// Explicit trusted key distribution. Never learn keys from remote pages.
     pub async fn enroll_trust(&self, keys: &[ReceiptKey]) -> Result<()> {
+        crate::require_active(&self.pool, self.space).await?;
         validate_key_schedule(keys)?;
         let mut tx = self.pool.begin().await?;
         let cursor: i64 = sqlx::query_scalar(

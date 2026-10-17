@@ -23,6 +23,9 @@ pub struct DeviceProjectionStore {
     scope: ProjectScope,
 }
 impl DeviceProjectionStore {
+    pub async fn require_active(&self) -> Result<()> {
+        crate::require_active(&self.pool, self.scope.space).await
+    }
     pub async fn initialize(
         pool: sqlx::PgPool,
         subscription: Uuid,
@@ -294,6 +297,7 @@ pub async fn refresh_device_replica(
     tx: &mut Transaction<'_, Postgres>,
     scope: &ProjectScope,
 ) -> Result<u64> {
+    crate::require_active(&mut **tx, scope.space).await?;
     if !scope.valid() {
         return Err(StoreError::Binding);
     }
@@ -370,6 +374,7 @@ pub async fn device_replica_page(
     tx: &mut Transaction<'_, Postgres>,
     request: &DeviceReplicaRequest,
 ) -> Result<DeviceReplicaPage> {
+    crate::require_active(&mut **tx, request.scope.space).await?;
     if !request.valid() {
         return Err(StoreError::Binding);
     }
@@ -404,6 +409,7 @@ pub async fn initialize_device_projection(
     device: Uuid,
     scope: &ProjectScope,
 ) -> Result<()> {
+    crate::require_active(&mut **tx, scope.space).await?;
     if subscription.is_nil() || device.is_nil() || !scope.valid() {
         return Err(StoreError::Binding);
     }
@@ -430,6 +436,7 @@ pub async fn apply_device_replica_page(
     subscription: Uuid,
     page: &DeviceReplicaPage,
 ) -> Result<u64> {
+    crate::require_active(&mut **tx, page.request.scope.space).await?;
     if !page.valid() {
         return Err(StoreError::Binding);
     }

@@ -36,6 +36,13 @@ pub struct PublishedPage {
 }
 
 impl GatewayStore {
+    pub async fn ensure_active(&self, fence: WriterFence) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx, fence).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -43,6 +50,7 @@ impl GatewayStore {
     /// Explicit bootstrap only. Opening an existing space never changes its
     /// authority or steals the writer epoch. No HTTP authentication is implied.
     pub async fn initialize(&self, space: SpaceId, authority: InstanceId) -> Result<WriterFence> {
+        crate::require_active(&self.pool, space).await?;
         let mut tx = self.pool.begin().await?;
         sqlx::query("INSERT INTO federation_gateway_spaces (space,authority,writer_epoch,projection) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING")
             .bind(space.as_uuid()).bind(authority.as_uuid()).bind(Uuid::new_v4())
@@ -91,6 +99,7 @@ impl GatewayStore {
         tx: &mut Transaction<'_, Postgres>,
         fence: WriterFence,
     ) -> Result<InstanceId> {
+        crate::require_active(&mut **tx, fence.space).await?;
         let row = sqlx::query("SELECT authority,writer_epoch FROM federation_gateway_spaces WHERE space=$1 FOR UPDATE")
             .bind(fence.space.as_uuid()).fetch_one(&mut **tx).await?;
         if row.try_get::<Uuid, _>("writer_epoch")? != fence.epoch {
@@ -193,6 +202,7 @@ impl GatewayStore {
         after: u32,
         limit: u32,
     ) -> Result<PublishedPage> {
+        crate::require_active(&self.pool, space).await?;
         if !(1..=1000).contains(&limit) {
             return Err(StoreError::Limits);
         }

@@ -29,6 +29,7 @@ impl InstanceSync {
     /// Only retained, cryptographically verified local publications; no network
     /// whole-space pull is performed on behalf of a device.
     pub async fn verified_project_sources(&self) -> Result<(PublicationState, Vec<AuditReceipt>)> {
+        self.require_active().await?;
         let (state, receipts) = self.replica.audited_snapshot().await?;
         self.client
             .trust
@@ -39,12 +40,14 @@ impl InstanceSync {
         &self,
         request: &ProjectFeedRegistration,
     ) -> Result<ProjectBindingReceipt> {
+        self.require_active().await?;
         self.client.register_project(request).await
     }
     pub async fn project_delivery_page(
         &self,
         request: &ProjectPageRequest,
     ) -> Result<SignedProjectPage> {
+        self.require_active().await?;
         self.client.project_page(request).await
     }
     /// Repeat verification after local locks are reacquired: the short-lived

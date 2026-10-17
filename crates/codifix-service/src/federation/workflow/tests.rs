@@ -17,6 +17,7 @@ mod f1_instances;
 mod local_human_cli;
 mod project_bindings;
 mod requester;
+mod retirement;
 mod status_health;
 mod synchronization;
 mod two_instance;
@@ -1027,7 +1028,7 @@ async fn federation_http_scope_csrf_read_only_and_limits_fail_closed() {
     let csrf = format!("csrf-{}", Uuid::new_v4());
     sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,expires_at) VALUES($1,$2,$3,$4,now()+interval '1 hour')")
         .bind(Uuid::new_v4()).bind(f.writer_id).bind(crate::auth::hash_secret(&session)).bind(crate::auth::hash_secret(&csrf)).execute(&f.pool).await.unwrap();
-    let cookies = format!("memory_session={session}; memory_csrf={csrf}");
+    let cookies = format!("codifix_session={session}; codifix_csrf={csrf}");
     assert_eq!(
         client
             .post(f.path("/reviews"))

@@ -365,6 +365,40 @@ pub(crate) async fn context(
     if request.streams.is_empty() || request.streams.len() > 16 {
         return Err(bad_request("select between one and sixteen shared streams"));
     }
+    let pool = state.pool()?;
+    if codifix_federation_store::retired_space(&pool, path.space)
+        .await
+        .map_err(store_error)?
+        .is_some()
+    {
+        if principal.credential_source == CredentialSource::AnonymousSingleUser {
+            return Err(ApiError::unauthorized(
+                "retained federation requires an authenticated local principal",
+            ));
+        }
+        let project: Uuid = sqlx::query_scalar("SELECT id FROM projects WHERE slug=$1")
+            .bind(&path.slug)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|_| unavailable())?
+            .ok_or_else(|| ApiError::not_found("selected local project not found"))?;
+        let access = LocalProjectAccess {
+            principal: principal.id,
+            project,
+            permissions: principal.permissions_for_project(&path.slug),
+            read_only: state.config.service.read_only,
+        };
+        return Ok(Json(
+            codifix_federation_runtime::retired_context(
+                &pool,
+                path.space,
+                &access,
+                &request.streams,
+            )
+            .await
+            .map_err(runtime_error)?,
+        ));
+    }
     let (runtime, access) = binding(&state, &principal, &path.slug, path.space).await?;
     Ok(Json(
         runtime

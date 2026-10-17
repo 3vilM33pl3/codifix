@@ -134,6 +134,7 @@ impl DeviceProjectReplica {
         client: &ScopedDeviceClient,
         max_pages: u32,
     ) -> Result<ProjectSyncProgress> {
+        codifix_federation_store::require_active(&self.pool, self.binding.scope.space).await?;
         let result = self.synchronize_once(client, max_pages).await;
         let error = match &result {
             Ok(_) => None,

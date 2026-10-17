@@ -16,7 +16,7 @@
 /docs-site/node_modules
 /docs-site/.next
 /docs-site/.source
-/formal/memory-federation/.lake
+/formal/codifix-federation/.lake
 /demo/output
 __pycache__/
 *.pyc

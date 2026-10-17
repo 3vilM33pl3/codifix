@@ -37,6 +37,25 @@ impl DetachedVerifier {
             .map_err(|_| VerifyError::Signature)
     }
 }
+/// Verification primitive for an explicitly retired, pinned historical log.
+/// Active attestations must use DetachedVerifier; this type never signs data.
+#[derive(Clone)]
+pub struct RetiredAttestationVerifier(String);
+impl RetiredAttestationVerifier {
+    pub fn new(key: String) -> Result<Self> {
+        validate_signing_key(&key)?;
+        Ok(Self(key))
+    }
+    pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<()> {
+        if message.len() > MAX_MESSAGE || signature.len() != 64 {
+            return Err(VerifyError::Limit);
+        }
+        let mut bytes = b"memory-private-gateway-attestation-v1\0".to_vec();
+        bytes.extend_from_slice(message);
+        atrium_crypto::verify::verify_signature(&self.0, &bytes, signature)
+            .map_err(|_| VerifyError::Signature)
+    }
+}
 fn domain_message(message: &[u8]) -> Result<Vec<u8>> {
     if message.len() > MAX_MESSAGE {
         return Err(VerifyError::Limit);

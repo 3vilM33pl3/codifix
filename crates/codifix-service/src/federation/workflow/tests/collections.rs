@@ -38,7 +38,7 @@ async fn collection_http_requires_exact_review_and_queues_metadata_only() {
     sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,expires_at) VALUES($1,$2,$3,$4,now()+interval '1 hour')")
         .bind(Uuid::new_v4()).bind(f.writer_id).bind(crate::auth::hash_secret(&session)).bind(crate::auth::hash_secret(&csrf)).execute(&f.pool).await.unwrap();
     let client = reqwest::Client::new();
-    let cookie = format!("memory_session={session}; memory_csrf={csrf}");
+    let cookie = format!("codifix_session={session}; codifix_csrf={csrf}");
     let post = |path: &str, body: Value| {
         client
             .post(f.path(path))
@@ -277,7 +277,7 @@ async fn collection_http_requires_exact_review_and_queues_metadata_only() {
     let admin_session = format!("admin-{}", Uuid::new_v4());
     sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,expires_at) VALUES($1,$2,$3,$4,now()+interval '1 hour')")
         .bind(Uuid::new_v4()).bind(f.root_id).bind(crate::auth::hash_secret(&admin_session)).bind(crate::auth::hash_secret(&csrf)).execute(&f.pool).await.unwrap();
-    let admin_cookie = format!("memory_session={admin_session}; memory_csrf={csrf}");
+    let admin_cookie = format!("codifix_session={admin_session}; codifix_csrf={csrf}");
     let grant = |target: Uuid, enabled: bool, confirmed: bool| {
         client
             .post(f.path(&grant_path))

@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod car;
 mod detached;
-pub use detached::{DetachedSigner, DetachedVerifier};
+pub use detached::{DetachedSigner, DetachedVerifier, RetiredAttestationVerifier};
 mod mst_store;
 pub use car::MAX_CAR_BYTES;
 use car::{block, parse_car};

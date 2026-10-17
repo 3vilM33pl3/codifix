@@ -96,7 +96,7 @@ pub(crate) async fn query(
         .laptop_cache
         .as_ref()
         .ok_or_else(|| ApiError::not_found("laptop cache unavailable"))?;
-    let matches: Vec<_> = config
+    let mut matches: Vec<_> = config
         .subscriptions
         .iter()
         .filter(|s| {
@@ -104,6 +104,27 @@ pub(crate) async fn query(
                 && s.replication_mode == LaptopCacheReplicationMode::CuratedProjectV1
         })
         .collect();
+    // Multiple explicit subscriptions may retain an old read-only view. Ordinary
+    // project queries select the current contribution binding; the subscription-
+    // addressed cache endpoints still open the exact historical view.
+    if matches.len() > 1 {
+        let saved: Option<sqlx::types::Json<LaptopContributionBinding>> = sqlx::query_scalar(
+            "SELECT binding FROM laptop_curated_bindings WHERE local_project_id=$1",
+        )
+        .bind(project)
+        .fetch_optional(&pool)
+        .await
+        .map_err(ApiError::sql)?;
+        if let Some(sqlx::types::Json(saved)) = saved {
+            matches.retain(|s| {
+                s.device_id == saved.device_id
+                    && s.company_id == saved.scope.company_id
+                    && s.owner_instance_id == saved.scope.owner_instance_id
+                    && s.space_id == saved.scope.space_id
+                    && s.project_id == saved.scope.project_id
+            });
+        }
+    }
     if matches.len() != 1 {
         return Err(ApiError::forbidden(
             "exact selected project replica required",

@@ -99,9 +99,7 @@ fn unpublished_lexicons_have_distinct_ids() {
     for (name, value) in [
         (
             QUESTION_COLLECTION,
-            include_str!(
-                "../publication-lexicons/dev.codifix.unspecced.expertiseQuestion.json"
-            ),
+            include_str!("../publication-lexicons/dev.codifix.unspecced.expertiseQuestion.json"),
         ),
         (
             ANSWER_COLLECTION,

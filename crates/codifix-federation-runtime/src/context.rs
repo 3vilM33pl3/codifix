@@ -83,6 +83,7 @@ impl InstanceSync {
         provider: &impl ExternalModel,
         question: &str,
     ) -> Result<String> {
+        self.require_active().await?;
         if access.read_only
             || !access.permissions.contains(Permission::BundleExport)
             || !local_providers.contains(provider.id())
@@ -118,6 +119,73 @@ impl InstanceSync {
             question:question.to_owned(),untrusted_context:context,
         }).await
     }
+}
+/// Offline historical read. Neither a configured active worker nor gateway
+/// availability is consulted, and no retired signature enters active ingestion.
+pub async fn retired_context(
+    pool: &sqlx::PgPool,
+    space: SpaceId,
+    access: &LocalProjectAccess,
+    streams: &[StreamId],
+) -> Result<UntrustedContext> {
+    let marker = codifix_federation_store::retired_space(pool, space)
+        .await?
+        .ok_or(RuntimeError::Unauthorized)?;
+    codifix_federation_store::authorize_source_pull(pool, access, space, marker.local_instance)
+        .await?;
+    let (state, receipts) = verify_retired_history(pool, space).await?;
+    select_context(&state, &receipts, streams)
+}
+/// Trusted local operator verification only. Possession of this DB-backed API
+/// grants no service access, active ingestion or network/provider authority.
+pub async fn verify_retired_history(
+    pool: &sqlx::PgPool,
+    space: SpaceId,
+) -> Result<(PublicationState, Vec<AuditReceipt>)> {
+    let marker = codifix_federation_store::retired_space(pool, space)
+        .await?
+        .ok_or(RuntimeError::Unauthorized)?;
+    let (replica, checkpoint) = codifix_federation_store::ReplicaStore::open_retained(
+        pool.clone(),
+        space,
+        marker.local_instance,
+    )
+    .await?;
+    let (state, receipts) = replica.audited_snapshot().await?;
+    if state.sequence() != checkpoint.cursor || receipts.len() != state.accepted().len() {
+        return Err(RuntimeError::InvalidResponse);
+    }
+    let verifiers = checkpoint
+        .keys
+        .iter()
+        .map(|k| {
+            codifix_atproto_verify::RetiredAttestationVerifier::new(k.public_key.clone())
+                .map_err(|_| RuntimeError::InvalidResponse)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut previous = None;
+    for (record, receipt) in state.accepted().iter().zip(&receipts) {
+        codifix_federation_store::retired_receipt_matches(
+            receipt,
+            record,
+            checkpoint.authority,
+            &checkpoint.keys,
+        )?;
+        if record.envelope.space != space || receipt.claims.previous != previous {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        let bytes = codifix_federation::CanonicalJsonCodec::encode(&receipt.claims)
+            .map_err(|_| RuntimeError::InvalidResponse)?;
+        let index = usize::try_from(receipt.claims.key_generation - 1)
+            .map_err(|_| RuntimeError::InvalidResponse)?;
+        verifiers
+            .get(index)
+            .ok_or(RuntimeError::InvalidResponse)?
+            .verify(&bytes, &receipt.signature)
+            .map_err(|_| RuntimeError::InvalidResponse)?;
+        previous = Some(codifix_federation_store::audit_digest(receipt)?);
+    }
+    Ok((state, receipts))
 }
 fn select_context(
     state: &PublicationState,

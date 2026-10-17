@@ -63,6 +63,7 @@ default = ["offline"]
 offline = ["dep:duckdb"]
 
 [dev-dependencies]
+codifix-atproto-verify = { path = "../codifix-atproto-verify", features = ["test-fixtures"] }
 codifix-test-support = { path = "../codifix-test-support" }
 codifix-supervisor = { path = "../codifix-supervisor" }
 

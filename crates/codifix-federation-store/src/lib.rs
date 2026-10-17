@@ -32,10 +32,12 @@ pub use expertise_mailbox::*;
 mod projection;
 mod publisher;
 mod replica;
+mod retirement;
+pub use retirement::*;
 mod retention;
 pub use retention::*;
 mod replica_audit;
-pub use replica_audit::receipt_matches;
+pub use replica_audit::{receipt_matches, retired_receipt_matches};
 mod sharing;
 mod workflow;
 pub use workflow::*;
@@ -67,6 +69,8 @@ pub enum StoreError {
     LocalPolicy(LocalPolicyReject),
     #[error("record not applied: {0:?}")]
     Outcome(PublicationOutcome),
+    #[error("federation space is permanently retired from execution")]
+    Retired,
     #[error("stale gateway writer epoch")]
     Fenced,
     #[error("expired or superseded publication attempt lease")]

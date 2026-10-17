@@ -120,6 +120,7 @@ impl crate::InstanceSync {
         &self,
         page: &DeviceReplicaPage,
     ) -> Result<SignedDeviceReplicaPage> {
+        self.require_active().await?;
         self.client.attest_device_replica(page).await
     }
     pub fn verify_device_replica(

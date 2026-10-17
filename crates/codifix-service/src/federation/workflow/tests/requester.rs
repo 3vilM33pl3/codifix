@@ -251,7 +251,7 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
     sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,expires_at) VALUES($1,$2,$3,$4,now()+interval '1 hour')")
         .bind(session_id).bind(f.writer_id).bind(crate::auth::hash_secret(&session)).bind(crate::auth::hash_secret(&csrf)).execute(&f.pool).await.unwrap();
     let client = reqwest::Client::new();
-    let cookies = format!("memory_session={session}; memory_csrf={csrf}");
+    let cookies = format!("codifix_session={session}; codifix_csrf={csrf}");
     let post = |path: &str, body: Value| {
         client
             .post(f.path(path))
@@ -508,7 +508,7 @@ async fn browser_preparation_and_submission_are_scoped_confirmed_and_committed_f
     assert_eq!(
         client
             .get(f.path(&result_path))
-            .header("cookie", format!("memory_session={other_session}"))
+            .header("cookie", format!("codifix_session={other_session}"))
             .send()
             .await
             .unwrap()

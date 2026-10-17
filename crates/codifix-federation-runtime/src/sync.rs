@@ -224,6 +224,10 @@ pub struct InstanceSync {
     pub(crate) instance: InstanceId,
 }
 impl InstanceSync {
+    pub(crate) async fn require_active(&self) -> Result<()> {
+        Ok(codifix_federation_store::require_active(&self.pool, self.client.space).await?)
+    }
+
     pub async fn new(pool: PgPool, client: GatewayClient, instance: InstanceId) -> Result<Self> {
         let replica =
             ReplicaStore::initialize(pool.clone(), client.space, instance, client.authority)
@@ -242,9 +246,11 @@ impl InstanceSync {
     /// Authenticated, fresh gateway metadata; local project authorization is
     /// deliberately checked by the owning service before and after this call.
     pub async fn gateway_status(&self) -> Result<crate::GatewayStatus> {
+        self.require_active().await?;
         self.client.status(self.instance).await
     }
     pub async fn catch_up(&self) -> Result<u32> {
+        self.require_active().await?;
         let mut after = self.verified_snapshot().await?.sequence();
         // One bounded page per tick: unrelated local work stays responsive.
         let page = self.client.pull(after, 32).await?;
@@ -255,6 +261,7 @@ impl InstanceSync {
         Ok(after)
     }
     pub async fn resynchronize(&self) -> Result<u32> {
+        self.require_active().await?;
         self.client.resynchronize(&self.replica).await
     }
     /// Crypto validation also runs on retained receipts after restart/offline
@@ -274,6 +281,7 @@ impl InstanceSync {
         Ok(())
     }
     pub async fn cycle(&self, access: &LocalProjectAccess) -> Result<u32> {
+        self.require_active().await?;
         let space = self.client.space.as_uuid();
         let instance = self.instance.as_uuid();
         let due:bool=sqlx::query_scalar("SELECT retry_at<=clock_timestamp() FROM federation_replicas WHERE space=$1 AND receiver=$2")
@@ -310,6 +318,7 @@ impl InstanceSync {
     /// the background worker's identity or permissions to that owner. Failures
     /// here do not change the shared pull scheduler's retry state.
     pub async fn publish_pending(&self, access: &LocalProjectAccess) -> Result<u32> {
+        self.require_active().await?;
         codifix_federation_store::authorize_source_pull(
             &self.pool,
             access,

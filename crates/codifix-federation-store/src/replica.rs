@@ -13,6 +13,48 @@ pub struct ReplicaStore {
 }
 
 impl ReplicaStore {
+    /// Read-only open: never initializes a row or enrols/replaces trust keys.
+    pub async fn open_retained(
+        pool: PgPool,
+        space: SpaceId,
+        receiver: InstanceId,
+    ) -> Result<(Self, crate::RetiredReplicaCheckpoint)> {
+        let marker = crate::retired_space(&pool, space)
+            .await?
+            .ok_or(StoreError::Binding)?;
+        if marker.local_instance != receiver {
+            return Err(StoreError::Binding);
+        }
+        let checkpoints: Vec<_> = marker
+            .replicas
+            .into_iter()
+            .filter(|c| c.receiver == receiver)
+            .collect();
+        if checkpoints.len() != 1 {
+            return Err(StoreError::Binding);
+        }
+        let checkpoint = checkpoints.into_iter().next().ok_or(StoreError::Binding)?;
+        crate::validate_key_schedule(&checkpoint.keys)?;
+        let fingerprint: String =
+            sqlx::query_scalar("SELECT codifix_retained_history_sha256($1,$2)")
+                .bind(space.as_uuid())
+                .bind(receiver.as_uuid())
+                .fetch_one(&pool)
+                .await?;
+        if fingerprint != checkpoint.history_sha256 {
+            return Err(StoreError::Corrupt);
+        }
+        Ok((
+            Self {
+                pool,
+                space,
+                receiver,
+                authority: checkpoint.authority,
+            },
+            checkpoint,
+        ))
+    }
+
     /// Explicit trusted configuration: it is never inferred from received data.
     pub async fn initialize(
         pool: PgPool,
@@ -20,6 +62,7 @@ impl ReplicaStore {
         receiver: InstanceId,
         authority: InstanceId,
     ) -> Result<Self> {
+        crate::require_active(&pool, space).await?;
         sqlx::query("INSERT INTO federation_replicas (space,receiver,authority,projection) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING")
             .bind(space.as_uuid()).bind(receiver.as_uuid()).bind(authority.as_uuid())
             .bind(snapshot(&PublicationState::new(space,authority))).execute(&pool).await?;
@@ -117,6 +160,7 @@ impl ReplicaStore {
         batch: &[PublicationDelivery],
         receipts: Option<&[crate::AuditReceipt]>,
     ) -> Result<u32> {
+        crate::require_active(&self.pool, self.space).await?;
         if verified_authority != self.authority {
             return Err(StoreError::Binding);
         }
@@ -164,6 +208,7 @@ impl ReplicaStore {
         history: &[PublicationDelivery],
         receipts: Option<&[crate::AuditReceipt]>,
     ) -> Result<u32> {
+        crate::require_active(&self.pool, self.space).await?;
         if verified_authority != self.authority {
             return Err(StoreError::Binding);
         }

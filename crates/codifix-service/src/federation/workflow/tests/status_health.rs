@@ -49,7 +49,7 @@ async fn status_rechecks_credentials_project_membership_and_grant_after_gateway_
             sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,expires_at) VALUES($1,$2,$3,$4,clock_timestamp()+interval '1 hour')")
                 .bind(session_id).bind(f.reader_id).bind(crate::auth::hash_secret(&session))
                 .bind(crate::auth::hash_secret("synthetic-csrf")).execute(&f.pool).await.unwrap();
-            request = request.header("cookie", format!("memory_session={session}"));
+            request = request.header("cookie", format!("codifix_session={session}"));
         } else {
             request = request.bearer_auth(&f.reader);
         }
