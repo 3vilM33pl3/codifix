@@ -1,10 +1,38 @@
-# Codifix rename: CA console checks pending
+# Codifix rename: CA console inventory and remaining checks
 
 CA is console-administered only. SSH is deliberately disabled: do not enable it,
 request SSH certificates or renew a login. Preserve Step CA, OpenBao, issuance,
 trust, credentials, firewall and the existing host security boundary.
+Ask Olivier before any CA installation, service/configuration change, migration,
+retirement or recovery mutation. Read-only follow-ups are coordinated through
+Notion's CURRENT ACTION and RESULT INBOX page bodies.
 
-## Exact read-only console commands
+## Received inventory, 17 October 2026
+
+The CA-local agent returned the pinned helper report in
+[RESULT INBOX](https://app.notion.com/p/3e78990715f481cd935ff0a897040e4e),
+captured at `2026-10-17T21:17:38.259836+00:00`. Monolith independently matched
+the posted JSON SHA-256:
+`b5c7e46b37a999af9d4a2100bf3a6a3cffd47d06fdce7beeb5f703ca62ff357b`.
+The exact JSON is retained privately, rather than republishing host metadata.
+
+- Debian 12/aarch64, glibc 2.36; legacy `memory 2.1.0-rc.4`, no `codifix` binary.
+- Named Trust service active; generic service and SSH masked/inactive; no port-22
+  listener observed. Step CA and OpenBao processes active.
+- Local PostgreSQL port 5433 has `memory_trust`, schema 65, zero failed migrations,
+  508 canonical histories and 557 memory-entry versions.
+- Inventory does **not** bind that database to the running application. Effective
+  process configuration/socket correlation and recovery/offline coverage remain
+  pending. Missing sandbox capabilities are not permission to install tooling;
+  the separate Pi artifact's glibc 2.43 requirement is not a rename prerequisite.
+
+The next bounded console request must inspect the named process, its process-view
+credential and local PostgreSQL connection metadata without printing secrets.
+Existing recovery receipts need exact operator-supplied paths and a reviewed
+schema; do not recursively search arbitrary backup/private directories. An old
+installation receipt is not proof of a current matched recovery bundle.
+
+## Completed inventory procedure (historical reference)
 
 Transfer `deploy/areas/ca-preflight.sh` from commit `4eca6946` through the existing
 approved local transfer mechanism. No network installer or package is needed.
@@ -37,12 +65,14 @@ is authorized by this inventory handoff itself.
 
 ## Remote health evidence, 17 October 2026
 
-- `https://ca.metatao.net/health`: verified HTTPS, HTTP 200, `status: ok`.
-- `https://openbao.metatao.net/v1/sys/health`: TLS negotiation returned
-  `TLSV1_ALERT_INTERNAL_ERROR`; no HTTP health result. OpenBao health is unverified.
-  Do not bypass TLS verification or alter its configuration to complete this check.
+- At 21:25 UTC, `https://ca.metatao.net/health`: verified HTTPS, HTTP 200,
+  `status: ok`.
+- At 21:25 UTC, canonical `https://secrets.metatao.net/v1/sys/health`: verified
+  HTTPS, HTTP 200, initialized, unsealed, active (not standby), version 2.5.1.
+  Earlier TLS failure on `openbao.metatao.net` was a different hostname; no TLS
+  bypass or configuration change was needed to check the canonical endpoint.
 
 HTTPS endpoint health does not establish local service/database ownership.
-All CA host-local inventory, restore, retirement and install checks remain pending
-until console results are supplied. No CA SSH connection or host mutation was made
-for this follow-up.
+Host inventory is received; binding, recovery coverage and restore validation
+remain pending. Retirement and installation have not been authorized or performed.
+No CA SSH connection or host mutation was made for this follow-up.

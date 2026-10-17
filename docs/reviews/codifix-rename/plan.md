@@ -111,8 +111,11 @@ Before new remote federation effects, a matched backup restore is available. Aft
 ## Current operational boundary
 
 CA is console-administered only; SSH remains disabled and no certificate renewal
-is required. Follow [the exact read-only console handoff](ca-console-checks.md);
-host-local checks remain pending returned results. Current source checks and
+is required. Ask Olivier before any CA change. The
+[read-only console inventory](ca-console-checks.md) has been received and its
+report checksum verified; process/database binding, recovery coverage and restore
+validation remain pending. Coordinate remaining observations through Notion's
+CURRENT ACTION and RESULT INBOX. Current source checks and
 private rehearsal evidence are in [integration status](evidence/integration-status.md)
 and [federation preservation](evidence/federation-slice.md). Source-level checked
 items do not establish native installation, final recovery or live cutover.
