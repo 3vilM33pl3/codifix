@@ -35,7 +35,7 @@ async fn fixture() -> Option<(
     // The disposable fixture owns the actual pool. This configuration-only URL
     // exercises the guarded native target shape without provisioning a cluster.
     f.state.config.database.url =
-        "postgresql://synthetic@127.0.0.1:55432/memory_laptop_workshop".into();
+        "postgresql://synthetic@127.0.0.1:55432/codifix_laptop_workshop".into();
     f.state.config.laptop_cache = Some(LaptopCacheConfig {
         subscriptions: vec![binding.clone()],
     });
@@ -765,7 +765,7 @@ async fn unbound_changed_and_remote_cache_reads_fail_without_fallback_or_initial
         StatusCode::SERVICE_UNAVAILABLE
     );
     f.state.config.database.url =
-        "postgresql://synthetic@server.example.invalid:5432/memory_laptop_workshop".into();
+        "postgresql://synthetic@server.example.invalid:5432/codifix_laptop_workshop".into();
     assert_eq!(
         list(State(f.state.clone()), Extension(actor), peer())
             .await

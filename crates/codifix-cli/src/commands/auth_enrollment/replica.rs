@@ -467,7 +467,7 @@ mod native {
                 schema_version: 1,
                 company: "https://company.example.invalid".into(),
                 subscription: Uuid::new_v4(),
-                local_database_url: "postgresql://laptop@127.0.0.1:55432/memory_laptop_workshop"
+                local_database_url: "postgresql://laptop@127.0.0.1:55432/codifix_laptop_workshop"
                     .into(),
                 bootstrap,
                 allow_loopback_development: false,

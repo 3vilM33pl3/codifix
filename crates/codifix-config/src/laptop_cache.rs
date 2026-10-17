@@ -62,7 +62,7 @@ impl AppConfig {
                                 .parse::<std::net::IpAddr>()
                                 .is_ok_and(|ip| ip.is_loopback())
                         })
-                        && u.path() == format!("/memory_laptop_{}", area.name)
+                        && u.path() == format!("/codifix_laptop_{}", area.name)
                 })
         });
         let mut seen = std::collections::BTreeSet::new();
@@ -123,7 +123,7 @@ mod tests {
         serde_json::from_value(serde_json::json!({
             "area":{"name":"workshop","instance_id":Uuid::new_v4()},
             "service":{"bind_addr":"127.0.0.1:55440","read_only":true},
-            "database":{"url":"postgresql://laptop:synthetic@127.0.0.1:55432/memory_laptop_workshop"},
+            "database":{"url":"postgresql://laptop:synthetic@127.0.0.1:55432/codifix_laptop_workshop"},
             "laptop_cache":{"subscriptions":[{"subscription_id":Uuid::new_v4(),"device_id":Uuid::new_v4(),"company_id":Uuid::new_v4(),"owner_instance_id":Uuid::new_v4(),"project_id":Uuid::new_v4(),"space_id":Uuid::new_v4()}]},
             "cluster":{"enabled":false},"background_work":{"enabled":false,"internal_automation":false},"automation":{"enabled":false},
             "offline":{"enabled":false},"provenance":{"reverify_enabled":false},"procedural":{"enabled":false},
@@ -179,23 +179,24 @@ mod tests {
     #[test]
     fn laptop_cache_requires_literal_loopback_and_exact_database_before_migrations() {
         for url in [
-            "postgresql://laptop:synthetic@127.0.0.1:55432/memory_laptop_workshop",
-            "postgres://laptop@[::1]:55432/memory_laptop_workshop",
+            "postgresql://laptop:synthetic@127.0.0.1:55432/codifix_laptop_workshop",
+            "postgres://laptop@[::1]:55432/codifix_laptop_workshop",
         ] {
             let mut c = fixture();
             c.database.url = url.into();
             c.validate_laptop_cache().unwrap();
         }
         for url in [
-            "postgresql://laptop@server.example.invalid:55432/memory_laptop_workshop",
-            "postgresql://laptop@127.0.0.1/memory_laptop_workshop",
-            "postgresql://laptop@127.0.0.1:55432/memory_laptop_general",
+            "postgresql://laptop@127.0.0.1:55432/memory_laptop_workshop",
+            "postgresql://laptop@server.example.invalid:55432/codifix_laptop_workshop",
+            "postgresql://laptop@127.0.0.1/codifix_laptop_workshop",
+            "postgresql://laptop@127.0.0.1:55432/codifix_laptop_general",
             "postgresql://laptop@127.0.0.1:55432/shared",
-            "postgresql://laptop@127.0.0.1:55432/memory_laptop_workshop?host=other",
-            "postgresql://laptop@127.0.0.1:55432/memory_laptop_workshop#option",
-            "postgresql://@127.0.0.1:55432/memory_laptop_workshop",
-            "postgresql://laptop@remote.example.invalid/shared?application_name=@127.0.0.1:55432/memory_laptop_workshop",
-            "postgresql://laptop@remote.example.invalid/shared#@127.0.0.1:55432/memory_laptop_workshop",
+            "postgresql://laptop@127.0.0.1:55432/codifix_laptop_workshop?host=other",
+            "postgresql://laptop@127.0.0.1:55432/codifix_laptop_workshop#option",
+            "postgresql://@127.0.0.1:55432/codifix_laptop_workshop",
+            "postgresql://laptop@remote.example.invalid/shared?application_name=@127.0.0.1:55432/codifix_laptop_workshop",
+            "postgresql://laptop@remote.example.invalid/shared#@127.0.0.1:55432/codifix_laptop_workshop",
         ] {
             let mut c = fixture();
             c.database.url = url.into();

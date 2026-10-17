@@ -55,7 +55,7 @@ impl PreparedProjectSubscription {
             company: self.company.clone(),
             subscription: self.subscription,
             local_database_url: format!(
-                "postgresql://validation@127.0.0.1:55432/memory_laptop_{}",
+                "postgresql://validation@127.0.0.1:55432/codifix_laptop_{}",
                 self.bootstrap.scope.area
             ),
             bootstrap: self.bootstrap.clone(),
@@ -154,7 +154,7 @@ impl LocalProjectReplicaProfile {
             || db.username().is_empty()
             || db.query().is_some()
             || db.fragment().is_some()
-            || db.path() != format!("/memory_laptop_{}", self.bootstrap.scope.area)
+            || db.path() != format!("/codifix_laptop_{}", self.bootstrap.scope.area)
         {
             return Err(RuntimeError::Configuration);
         }
@@ -177,7 +177,8 @@ mod tests {
             schema_version: 1,
             company: "https://company.example.invalid".into(),
             subscription: Uuid::new_v4(),
-            local_database_url: "postgresql://laptop@127.0.0.1:55432/memory_laptop_workshop".into(),
+            local_database_url: "postgresql://laptop@127.0.0.1:55432/codifix_laptop_workshop"
+                .into(),
             allow_loopback_development: false,
             bootstrap: DeviceProjectSubscription {
                 schema_version: 1,
@@ -243,11 +244,12 @@ mod tests {
     fn profile_does_not_allow_server_database_or_origin_fallback() {
         assert!(profile().validate().is_ok());
         for url in [
-            "postgresql://laptop@db.example.invalid:5432/memory_laptop_workshop",
+            "postgresql://laptop@127.0.0.1:55432/memory_laptop_workshop",
+            "postgresql://laptop@db.example.invalid:5432/codifix_laptop_workshop",
             "postgresql://laptop@127.0.0.1:5432/memory",
-            "postgresql://laptop@127.0.0.1:5432/memory_laptop_general",
-            "postgresql://laptop@127.0.0.1:5432/memory_laptop_workshop?host=db.example.invalid",
-            "postgresql://laptop@127.0.0.1/memory_laptop_workshop",
+            "postgresql://laptop@127.0.0.1:5432/codifix_laptop_general",
+            "postgresql://laptop@127.0.0.1:5432/codifix_laptop_workshop?host=db.example.invalid",
+            "postgresql://laptop@127.0.0.1/codifix_laptop_workshop",
         ] {
             let mut value = profile();
             value.local_database_url = url.into();

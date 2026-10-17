@@ -262,7 +262,8 @@ server database credentials or PDS/gateway secrets are downloaded. Passwords are
 not in process arguments, logs or the metadata journal. The private local
 profiles add their own loopback database URL for the scoped replica client.
 
-Each area gets a distinct `memory_laptop_<area>` database and non-superuser login,
+The dedicated cluster administrator is `codifix_onboarding_admin`. Each area
+gets a distinct `codifix_laptop_<area>` database and non-superuser login,
 a distinct loopback API port and a new local area identity. Its installed Codifix
 service applies the existing embedded migration inventory, not duplicated SQL
 migrations. Background work, reinforcement (including validation), consolidation,

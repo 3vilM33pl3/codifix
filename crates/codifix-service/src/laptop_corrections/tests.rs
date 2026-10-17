@@ -25,7 +25,7 @@ async fn staged_downloaded_corrections_are_scoped_replayable_and_atomic() {
     config.auth.mode = AuthMode::SingleUser;
     config.service.read_only = false;
     config.service.bind_addr = "127.0.0.1:55440".into();
-    config.database.url = "postgresql://synthetic@127.0.0.1:55432/memory_laptop_workshop".into();
+    config.database.url = "postgresql://synthetic@127.0.0.1:55432/codifix_laptop_workshop".into();
     config.llm.model.clear();
     config.background_work.internal_automation = false;
     config.provenance.reverify_enabled = false;

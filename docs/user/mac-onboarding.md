@@ -383,7 +383,7 @@ credentials are loaded from Keychain and are never stored in the profile. The
 profile contains a separately generated **local** PostgreSQL connection, pinned
 company/device/project/area/owner/space/catalog identity, and the public gateway
 receipt-key schedule. Its database must be an explicit loopback address/port and
-`memory_laptop_workshop`, `memory_laptop_homelab` or `memory_laptop_general`.
+`codifix_laptop_workshop`, `codifix_laptop_homelab` or `codifix_laptop_general`.
 No fallback, database migration or remote-database connection occurs here.
 
 Sync checks current project consent and the authenticated control-plane bootstrap

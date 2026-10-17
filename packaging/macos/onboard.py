@@ -381,7 +381,7 @@ def client_launcher(value):
 
 
 def database_url(value, area, password):
-    return f"postgresql://memory_laptop_{area}:{password}@127.0.0.1:{value['plan']['input']['pg_port']}/memory_laptop_{area}"
+    return f"postgresql://codifix_laptop_{area}:{password}@127.0.0.1:{value['plan']['input']['pg_port']}/codifix_laptop_{area}"
 
 
 def local_profile(value, metadata, secret):
@@ -416,7 +416,7 @@ def verify_files(value):
     expected = {"pg_hba.conf": b"local all all reject\nhost all all 127.0.0.1/32 scram-sha-256\nhost all all 0.0.0.0/0 reject\nhost all all ::0/0 reject\n",
                 "postgresql.conf": b"listen_addresses = '127.0.0.1'\npassword_encryption = 'scram-sha-256'\nshared_preload_libraries = ''\n",
                 "admin-password": (secret["admin"] + "\n").encode()}
-    all_roles = {"memory_onboarding_admin": secret["admin"], **{f"memory_laptop_{name}": s["password"] for name, s in secret["areas"].items()}}
+    all_roles = {"codifix_onboarding_admin": secret["admin"], **{f"codifix_laptop_{name}": s["password"] for name, s in secret["areas"].items()}}
     for role, password in all_roles.items():
         expected[role + ".pgpass"] = f"127.0.0.1:{value['plan']['input']['pg_port']}:*:{role}:{password}\n".encode()
     if any(files.bytes_at(root / name) != content for name, content in expected.items()):
@@ -452,7 +452,7 @@ def apply(journal, digest, confirm, native):
                 files.missing(secrets_file, files.encoded(secret))
             secret = secrets_at(value)
             files.missing(root / "admin-password", (secret["admin"] + "\n").encode())
-            all_roles = {"memory_onboarding_admin": secret["admin"], **{f"memory_laptop_{name}": s["password"] for name, s in secret["areas"].items()}}
+            all_roles = {"codifix_onboarding_admin": secret["admin"], **{f"codifix_laptop_{name}": s["password"] for name, s in secret["areas"].items()}}
             for role, password in all_roles.items():
                 files.missing(root / (role + ".pgpass"), f"127.0.0.1:{plan['input']['pg_port']}:*:{role}:{password}\n".encode())
             files.missing(root / "pg_hba.conf", b"local all all reject\nhost all all 127.0.0.1/32 scram-sha-256\nhost all all 0.0.0.0/0 reject\nhost all all ::0/0 reject\n")
@@ -476,7 +476,7 @@ def apply(journal, digest, confirm, native):
                 if cluster.exists() and any(cluster.iterdir()):
                     raise Refused("partial initdb has no receipt/version; inspect retained data, never clear or reinitialize")
                 native.command([Path(plan["input"]["postgres"]["bin_dir"]) / "initdb", "-D", cluster,
-                                "--username=memory_onboarding_admin", "--auth-local=reject", "--auth-host=scram-sha-256",
+                                "--username=codifix_onboarding_admin", "--auth-local=reject", "--auth-host=scram-sha-256",
                                 "--encoding=UTF8", "--no-locale", "--no-clean", "--pwfile", root / "admin-password"], timeout=120)
             if files.bytes_at(marker, 16).decode().strip() != str(plan["input"]["postgres"]["major"]):
                 raise Refused("cluster major differs; no upgrade/reset")
@@ -490,7 +490,7 @@ def apply(journal, digest, confirm, native):
         secret = secrets_at(value)
         for area in plan["input"]["areas"]:
             name = area["name"]
-            role = "memory_laptop_" + name
+            role = "codifix_laptop_" + name
             def database():
                 password = secret["areas"][name]["password"]
                 sql = f"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='{role}') THEN CREATE ROLE {role} LOGIN PASSWORD '{password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION; END IF; END $$;\nSELECT 'CREATE DATABASE {role} OWNER {role}' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='{role}') \\gexec\n"

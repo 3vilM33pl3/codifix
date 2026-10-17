@@ -128,7 +128,7 @@ class Native:
     def bootstrap(self, plist):
         self.command(["/bin/launchctl", "bootstrap", f"gui/{os.getuid()}", plist])
 
-    def sql(self, plan, root, database, script, *, role="memory_onboarding_admin"):
+    def sql(self, plan, root, database, script, *, role="codifix_onboarding_admin"):
         env = clean_env()
         env["PGPASSFILE"] = str(root / f"{role}.pgpass")
         return self.command([Path(plan["input"]["postgres"]["bin_dir"]) / "psql", "-X", "-w",
@@ -136,7 +136,7 @@ class Native:
                              "-U", role, "-d", database, "-v", "ON_ERROR_STOP=1", "-At"],
                             data=script.encode(), env=env)[1]
 
-    def wait(self, plan, root, database, script, *, role="memory_onboarding_admin"):
+    def wait(self, plan, root, database, script, *, role="codifix_onboarding_admin"):
         import time
         for _ in range(20):
             try:

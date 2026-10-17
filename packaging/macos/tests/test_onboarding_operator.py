@@ -64,7 +64,7 @@ class FakeNative:
             self.lose_bootstrap = False
             raise files.Refused("synthetic accepted bootstrap reply lost")
     def sql(self, plan, root, database, script, **kwargs):
-        self.sql_calls.append((database, kwargs.get("role", "memory_onboarding_admin"), script))
+        self.sql_calls.append((database, kwargs.get("role", "codifix_onboarding_admin"), script))
         return "t"
     def wait(self, *args, **kwargs):
         self.sql(*args, **kwargs)
@@ -328,6 +328,23 @@ class OperatorContract(unittest.TestCase):
         value = self.apply()
         root = Path(self.input["root"])
         self.assertEqual(len(self.fake.bootstraps), 7)
+        initdb = next(args for args in self.fake.commands if Path(args[0]).name == "initdb")
+        self.assertIn("--username=codifix_onboarding_admin", initdb)
+        admin_pgpass = root / "codifix_onboarding_admin.pgpass"
+        self.assertTrue(admin_pgpass.is_file())
+        self.assertEqual(stat.S_IMODE(admin_pgpass.stat().st_mode), 0o600)
+        self.assertFalse((root / "memory_onboarding_admin.pgpass").exists())
+        for area in ("workshop", "homelab", "general"):
+            role = "codifix_laptop_" + area
+            config = tomllib.loads((root / (area + ".toml")).read_text())
+            self.assertTrue(config["database"]["url"].startswith("postgresql://" + role + ":"))
+            pgpass = root / (role + ".pgpass")
+            self.assertTrue(pgpass.is_file())
+            self.assertEqual(stat.S_IMODE(pgpass.stat().st_mode), 0o600)
+            self.assertIn("CREATE DATABASE " + role + " OWNER " + role,
+                          "\n".join(script for _, _, script in self.fake.sql_calls))
+        self.assertFalse(any("memory_laptop_" in script or role.startswith("memory_")
+                             for _, role, script in self.fake.sql_calls))
         jobs = [data for data in self.fake.bootstraps if ".sync." in data["Label"]]
         self.assertTrue(all(j["StartInterval"] == 300 and j["RunAtLoad"] for j in jobs))
         self.assertEqual(legacy.read_text(), "read-only existing config")
@@ -335,7 +352,7 @@ class OperatorContract(unittest.TestCase):
         for file in (root / "profiles").iterdir():
             profile = files.read(file)
             area = profile["bootstrap"]["scope"]["area"]
-            self.assertIn("@127.0.0.1:55432/memory_laptop_" + area, profile["local_database_url"])
+            self.assertIn("@127.0.0.1:55432/codifix_laptop_" + area, profile["local_database_url"])
             self.assertEqual(stat.S_IMODE(file.stat().st_mode), 0o600)
         raw = json.dumps(value)
         secret = files.read(root / "local-secrets.json")
@@ -344,6 +361,16 @@ class OperatorContract(unittest.TestCase):
             self.assertNotIn(s["password"], raw)
             self.assertNotIn(s["api_token"], raw)
         self.assertFalse(any("restart" in " ".join(args) or "stop" in args for args in self.fake.commands))
+
+    def test_native_sql_uses_codifix_admin_and_matching_private_password_file(self):
+        native = native_module.Native()
+        plan = {"input": {"postgres": {"bin_dir": str(self.pg)}, "pg_port": 55432}}
+        with patch.object(native, "command", return_value=(0, "t")) as command:
+            native.wait(plan, self.root, "postgres", "SELECT true;")
+        args = command.call_args.args[0]
+        self.assertEqual(args[args.index("-U") + 1], "codifix_onboarding_admin")
+        self.assertEqual(command.call_args.kwargs["env"]["PGPASSFILE"],
+                         str(self.root / "codifix_onboarding_admin.pgpass"))
 
     def test_clean_mac_creates_only_missing_launchagents_after_confirmation(self):
         directory = self.home / "Library/LaunchAgents"
