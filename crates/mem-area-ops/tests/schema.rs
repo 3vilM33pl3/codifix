@@ -65,8 +65,17 @@ fn failure(output: Output, message: &str) {
     assert!(String::from_utf8_lossy(&output.stderr).contains(message));
 }
 fn request(fixture: &Fixture, dir: &std::path::Path) -> Command {
-    let plan = success(command().arg("schema-plan").output().unwrap());
-    assert_eq!(plan["migration_head"], 84);
+    request_profile(fixture, dir, "current", 84)
+}
+fn request_profile(fixture: &Fixture, dir: &std::path::Path, profile: &str, head: i64) -> Command {
+    let plan = success(
+        command()
+            .args(["schema-plan", "--profile", profile])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(plan["migration_head"], head);
+    assert_eq!(plan["profile"], profile);
     let descriptor = json!({"format_version":1,"instance_id":Uuid::new_v4(),"area":"trust",
         "connection":{"kind":"loopback","port":fixture.options.get_port()},
         "database":fixture.name,"username":fixture.options.get_username(),
@@ -76,6 +85,7 @@ fn request(fixture: &Fixture, dir: &std::path::Path) -> Command {
     private_fixture::write(&path, &bytes);
     let mut cmd = command();
     cmd.arg("initialize-schema")
+        .args(["--profile", profile])
         .arg("--target")
         .arg(path)
         .arg("--target-sha256")
@@ -140,8 +150,69 @@ async fn cli_initializes_without_bootstrap_and_refuses_reinitialization() {
     }
     connection.close().await.unwrap();
     failure(cmd.output().unwrap(), "empty dedicated database");
-    // The exact schema made by the shipped command accepts the existing
-    // reviewed importer, including tombstones and provenance, without bootstrap.
+    fixture.cleanup().await;
+}
+
+#[test]
+fn historical_profile_is_explicit_distinct_and_not_an_arbitrary_head() {
+    let current = success(command().arg("schema-plan").output().unwrap());
+    let historical = success(
+        command()
+            .args(["schema-plan", "--profile", "area-import-65"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(current["profile"], "current");
+    assert_eq!(current["migration_head"], 84);
+    assert_eq!(historical["profile"], "area-import-65");
+    assert_eq!(historical["migration_head"], 65);
+    assert_ne!(current["schema_sha256"], historical["schema_sha256"]);
+    failure(
+        command()
+            .args(["schema-plan", "--profile", "area-import84"])
+            .output()
+            .unwrap(),
+        "invalid migration arguments",
+    );
+}
+
+#[tokio::test]
+async fn explicit_historical_import_upgrades_without_receipt_relabeling_or_replay_authority() {
+    let Some(fixture) = Fixture::new().await else {
+        return;
+    };
+    let directory = private();
+    let mut cmd = request_profile(&fixture, directory.path(), "area-import-65", 65);
+    confirm(&mut cmd);
+    // A current-schema digest cannot authorize the historical profile, even
+    // with all execution assertions; the still-fresh target stays untouched.
+    let current = success(command().arg("schema-plan").output().unwrap());
+    let mut wrong_args: Vec<_> = cmd.get_args().map(std::ffi::OsStr::to_owned).collect();
+    let digest_index = wrong_args
+        .iter()
+        .position(|arg| arg == "--schema-sha256")
+        .unwrap()
+        + 1;
+    wrong_args[digest_index] = current["schema_sha256"].as_str().unwrap().into();
+    failure(
+        command().args(wrong_args).output().unwrap(),
+        "execution assertions",
+    );
+    let mut untouched = fixture.connect().await;
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM pg_tables WHERE schemaname='public'")
+            .fetch_one(&mut untouched)
+            .await
+            .unwrap(),
+        0
+    );
+    untouched.close().await.unwrap();
+    let report = success(cmd.output().unwrap());
+    assert_eq!(report["profile"], "area-import-65");
+    assert_eq!(report["creates_credentials"], false);
+    assert_eq!(report["starts_services"], false);
+    // The explicit historical target accepts existing reviewed history without
+    // changing either the source-supported heads or importer catalog/receipts.
     let source = support::database().await.unwrap();
     support::seed(&source.pool).await;
     let mut captured = support::capture(&source.pool).await;
@@ -167,6 +238,51 @@ async fn cli_initializes_without_bootstrap_and_refuses_reinitialization() {
         support::rows(&target, "public.memory_entries").await,
         support::rows(&source.pool, "public.memory_entries").await
     );
+    let receipts = support::rows(&target, "public.area_import_receipts").await;
+    assert_eq!(
+        sqlx::query_scalar::<_, i32>("SELECT target_migration FROM area_import_receipts")
+            .fetch_one(&target)
+            .await
+            .unwrap(),
+        65
+    );
+    mem_test_support::run_migrations(&target).await.unwrap();
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT max(version) FROM _sqlx_migrations")
+            .fetch_one(&target)
+            .await
+            .unwrap(),
+        84
+    );
+    assert_eq!(
+        support::rows(&target, "public.area_import_receipts").await,
+        receipts
+    );
+    assert_eq!(
+        support::rows(&target, "public.memory_entries").await,
+        support::rows(&source.pool, "public.memory_entries").await
+    );
+    assert_eq!(
+        mem_area_store::import_partition(&target, support::TARGET, support::OPERATION, &partition)
+            .await
+            .unwrap_err(),
+        mem_area_store::ImportError::Schema
+    );
+    for table in [
+        "auth_principals",
+        "onboarding_devices",
+        "laptop_curated_bindings",
+        "laptop_curated_outbox",
+        "device_replica_records",
+    ] {
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(&format!("SELECT count(*) FROM {table}"))
+                .fetch_one(&target)
+                .await
+                .unwrap(),
+            0
+        );
+    }
     target.close().await;
     source.cleanup().await.unwrap();
     fixture.cleanup().await;

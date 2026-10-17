@@ -46,6 +46,7 @@ fn migrations() -> Migrator {
 #[derive(Debug, Serialize)]
 pub struct SchemaPlan {
     pub status: &'static str,
+    pub profile: Profile,
     pub migration_head: i64,
     pub migrations: usize,
     pub schema_sha256: String,
@@ -53,7 +54,31 @@ pub struct SchemaPlan {
     pub starts_services: bool,
 }
 
+/// Fixed reviewed profiles, never an arbitrary caller-supplied migration head.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, clap::ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum Profile {
+    #[default]
+    Current,
+    /// Inactive historical import only; upgrade normally before activation.
+    #[value(name = "area-import-65")]
+    #[serde(rename = "area-import-65")]
+    AreaImport65,
+}
+impl Profile {
+    fn head(self) -> i64 {
+        match self {
+            Self::Current => HEAD,
+            Self::AreaImport65 => 65,
+        }
+    }
+}
+
 fn describe(migrator: &Migrator) -> Result<SchemaPlan> {
+    describe_profile(migrator, Profile::Current)
+}
+
+fn describe_profile(migrator: &Migrator, profile: Profile) -> Result<SchemaPlan> {
     let mut identity = Vec::new();
     for (index, migration) in migrator.iter().enumerate() {
         if migration.version != index as i64 + 1 || migration.no_tx {
@@ -64,13 +89,14 @@ fn describe(migrator: &Migrator) -> Result<SchemaPlan> {
         identity.extend_from_slice(&migration.checksum);
         identity.extend_from_slice(hash(migration.sql.as_bytes()).as_bytes());
     }
-    if migrator.iter().count() != HEAD as usize {
+    if migrator.iter().count() != profile.head() as usize {
         return Err(Failure::Schema);
     }
     Ok(SchemaPlan {
         status: "schema_plan_only_no_database_connection",
-        migration_head: HEAD,
-        migrations: HEAD as usize,
+        profile,
+        migration_head: profile.head(),
+        migrations: profile.head() as usize,
         schema_sha256: hash(&identity),
         creates_credentials: false,
         starts_services: false,
@@ -80,6 +106,26 @@ fn describe(migrator: &Migrator) -> Result<SchemaPlan> {
 /// Metadata only. The compiled migration head cannot silently grow on upgrade.
 pub fn plan() -> Result<SchemaPlan> {
     describe(&migrations())
+}
+
+fn migrations_for(profile: Profile) -> Result<Migrator> {
+    let mut migrator = migrations();
+    // Even a historical profile must not hide an unreviewed future schema.
+    describe(&migrator)?;
+    if profile == Profile::AreaImport65 {
+        migrator.migrations = Cow::Owned(
+            migrator
+                .iter()
+                .filter(|m| m.version <= 65)
+                .cloned()
+                .collect(),
+        );
+    }
+    Ok(migrator)
+}
+
+pub fn plan_profile(profile: Profile) -> Result<SchemaPlan> {
+    describe_profile(&migrations_for(profile)?, profile)
 }
 
 pub struct Initialization {
@@ -95,8 +141,12 @@ pub struct Initialization {
 /// deliberately refuses replays into any initialized database. An ambiguous
 /// acknowledgement requires inspection, never automatic drop/reinitialization.
 pub async fn initialize(request: &Initialization) -> Result<SchemaPlan> {
-    let migrator = migrations();
-    let mut report = describe(&migrator)?;
+    initialize_profile(request, Profile::Current).await
+}
+
+pub async fn initialize_profile(request: &Initialization, profile: Profile) -> Result<SchemaPlan> {
+    let migrator = migrations_for(profile)?;
+    let mut report = describe_profile(&migrator, profile)?;
     if !request.execute
         || !request.writers_stopped
         || !request.fresh_database
@@ -200,7 +250,7 @@ OR EXISTS(SELECT 1 FROM pg_subscription WHERE subdbid=(SELECT oid FROM pg_databa
             return Err(Failure::Schema);
         }
         let expected = match table.as_str() {
-            "_sqlx_migrations" => HEAD,
+            "_sqlx_migrations" => migrator.iter().count() as i64,
             "supervisor_authorities" | "supervisor_journal_heads" => 4,
             "timeline_position" | "loop_global_state" => 1,
             _ => 0,
@@ -221,7 +271,7 @@ OR EXISTS(SELECT 1 FROM pg_subscription WHERE subdbid=(SELECT oid FROM pg_databa
     .fetch_all(&mut *transaction)
     .await
     .map_err(|_| Failure::Schema)?;
-    if history.len() != HEAD as usize {
+    if history.len() != migrator.iter().count() {
         return Err(Failure::Schema);
     }
     for (row, migration) in history.iter().zip(migrator.iter()) {

@@ -141,9 +141,14 @@ enum Command {
         output_dir: PathBuf,
     },
     /// Inspect the exact compiled schema preparation digest; no DB connection.
-    SchemaPlan,
+    SchemaPlan {
+        #[arg(long, value_enum, default_value_t = mem_area_ops::schema::Profile::Current)]
+        profile: mem_area_ops::schema::Profile,
+    },
     /// Initialize schema only in a fresh empty local DB; never start a service.
     InitializeSchema {
+        #[arg(long, value_enum, default_value_t = mem_area_ops::schema::Profile::Current)]
+        profile: mem_area_ops::schema::Profile,
         #[arg(long)]
         target: PathBuf,
         #[arg(long)]
@@ -321,8 +326,9 @@ async fn run(cli: Cli) -> Result<(), Failure> {
             &selection_sha256,
             &output_dir,
         ),
-        Command::SchemaPlan => print(&mem_area_ops::schema::plan()?),
+        Command::SchemaPlan { profile } => print(&mem_area_ops::schema::plan_profile(profile)?),
         Command::InitializeSchema {
+            profile,
             target,
             target_sha256,
             schema_sha256,
@@ -330,14 +336,17 @@ async fn run(cli: Cli) -> Result<(), Failure> {
             writers_stopped,
             fresh_database,
         } => print(
-            &mem_area_ops::schema::initialize(&mem_area_ops::schema::Initialization {
-                target,
-                target_sha256,
-                schema_sha256,
-                execute,
-                writers_stopped,
-                fresh_database,
-            })
+            &mem_area_ops::schema::initialize_profile(
+                &mem_area_ops::schema::Initialization {
+                    target,
+                    target_sha256,
+                    schema_sha256,
+                    execute,
+                    writers_stopped,
+                    fresh_database,
+                },
+                profile,
+            )
             .await?,
         ),
         Command::VerifyPayload {
