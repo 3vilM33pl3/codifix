@@ -160,11 +160,14 @@ fn completed_output_is_reused_after_restart_without_another_call_or_charge() {
         )
         .unwrap();
     assert_eq!(output, expected);
-    assert!(
-        !fs::read_to_string(f.0.join("journal"))
-            .unwrap()
-            .contains("PRIVATE_SYNTHETIC_OUTPUT")
-    );
+    {
+        use std::io::Seek;
+        let mut observer = budget.journal_test_reader();
+        observer.rewind().unwrap();
+        let mut journal = String::new();
+        observer.read_to_string(&mut journal).unwrap();
+        assert!(!journal.contains("PRIVATE_SYNTHETIC_OUTPUT"));
+    }
     drop(budget);
     let mut budget = f.budget(true);
     let reused = results

@@ -283,7 +283,13 @@ impl ProviderResults {
             );
         } else {
             // Recovery may follow a process crash before the original fsync.
-            File::open(&path)?.sync_all()?;
+            // Windows FlushFileBuffers requires write access even when no
+            // bytes are changed. Never truncate or recreate a recovered result.
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&path)?
+                .sync_all()?;
             #[cfg(unix)]
             File::open(&self.directory)?.sync_all()?;
             budget.settle_result(request_id, receipt.usage, Some(hash))?;

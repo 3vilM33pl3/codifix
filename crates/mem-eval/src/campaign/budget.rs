@@ -141,6 +141,16 @@ pub struct RequestBudget {
 }
 
 impl RequestBudget {
+    #[cfg(test)]
+    pub(super) fn journal_test_reader(&self) -> File {
+        // Duplicate the owning file handle, not a second path-based open:
+        // Windows mandatory byte-range locks reject the latter even in this
+        // process. Production locking and the journal format are unchanged.
+        self.file
+            .try_clone()
+            .expect("duplicate owned budget handle")
+    }
+
     pub(crate) fn identity(&self) -> &str {
         &self.manifest_sha256
     }
@@ -836,14 +846,20 @@ mod tests {
             output_tokens: 3,
             microusd: 4,
         };
+        let mut observer = budget.journal_test_reader();
         let output = budget
             .dispatch("one", &identity(), allowance(), || {
-                let saved = std::fs::read_to_string(&path).expect("durable reservation visible");
+                observer.rewind().expect("rewind owned journal reader");
+                let mut saved = String::new();
+                observer
+                    .read_to_string(&mut saved)
+                    .expect("durable reservation visible");
                 assert!(saved.contains("reserved"));
                 assert!(!saved.contains("settled"));
                 Ok(("fake answer", used))
             })
             .expect("fake dispatch");
+        drop(observer);
         assert_eq!(output, "fake answer");
         assert_eq!(budget.ledger().tokens, 8);
         assert_eq!(budget.ledger().microusd, 4);
