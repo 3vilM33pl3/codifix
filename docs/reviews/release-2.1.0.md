@@ -17,12 +17,12 @@ capture `3acbd25f-7ad2-4354-81e3-d02912e611a7`, baseline `0f5fd703`.
 - [x] Freeze one clean source commit for all builds.
 - [x] Consolidated local required-database Rust and frontend verification.
 - [x] Linux Bookworm-compatible packages and ABI/install verification.
-- [ ] Both Mac architectures, standard and runtime-preserving update packages.
+- [x] Both Mac architectures, standard and runtime-preserving update packages.
 - [x] Windows native ZIP/user MSI/server-tools MSI and disposable package checks.
-- [ ] Astra final review, exact artifact inventory and checksums.
-- [ ] Publish stable/latest release and verify downloaded assets.
-- [ ] Update both Homebrew formulae to verified published source hash.
-- [ ] Commit/push evidence, verify approved plan and remember result.
+- [x] Astra final review, exact artifact inventory and checksums.
+- [x] Publish stable/latest release and verify downloaded assets.
+- [x] Update both Homebrew formula entrypoints to verified published source hash.
+- [ ] Commit/push final evidence, verify approved plan and remember result.
 
 ## Boundaries
 
@@ -116,5 +116,50 @@ Subsequent formula/evidence commits do not change that artifact source commit.
   checksums independently pass. The manifest records build 1, MSI version 2.1.1,
   ten executable DLL inventories, unsigned status and `native_stack_bundled: false`.
 
-Intel Mac verification, publication and Homebrew remain pending until recorded
-below; the successful lanes above alone do not complete this release.
+- Intel Mac job `117380577821` passes native architecture/dependency checks,
+  actual installation of both variants and sentinel-only runtime preservation.
+  Downloaded package checksums and source-bound metadata independently pass.
+- Astra's bounded final review finds no publication blocker. It independently
+  confirms the tag, successful run, latest/non-prerelease status and published
+  limitations; it does not substitute for native acceptance or checksum checks.
+
+## Published result
+
+[Memory Layer v2.1.0](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0)
+was published at **2026-10-17 11:56:39 UTC**, with `draft: false` and
+`prerelease: false`; the GitHub latest-release endpoint returns `v2.1.0`.
+The immutable tag resolves to the frozen commit above. Every job in run
+`39027168771`, including publication, succeeds.
+
+All **43 published assets** were downloaded independently to
+`/data/tmp/memory-release-210-verification.yDdFH4Ss/published`.
+Aggregate `SHA256SUMS`, every individual `.sha256`, both Linux per-platform sums,
+and all inventory sizes/digests pass. The inventory contains 19 payloads plus its
+own checksummed JSON; ten payloads are primary packages. The source archive's
+embedded Git commit matches the frozen source. This is content verification,
+not a claim of publisher signing.
+
+| Primary artifact | SHA-256 |
+| --- | --- |
+| `memory-layer_2.1.0_amd64.deb` | `a44c86b11e237c38c9deccd4303f5ce4fda75d462dca1eb88472ab1f4cc349b4` |
+| `memory-layer_2.1.0_arm64.deb` | `fc33018d81488499e56dc53ca5b164ec1d3ca901450581e6de7dec4610e97193` |
+| `memory-layer-2.1.0-macos-x86_64.pkg` | `0d9954a17e77510b82a1845f5921d12a7aec6784f924e8341dc365b1f8abb7ae` |
+| `memory-layer-2.1.0-macos-x86_64-application-update.pkg` | `9b2b579cab24eee995c80096b268944214309b982a98299a6a0bf34147d8dc3d` |
+| `memory-layer-2.1.0-macos-aarch64.pkg` | `cb6f1d4deb1c5f922a8fba3c8a53a8f212b86c5c58f1ba5467b6713ffee0cfdf` |
+| `memory-layer-2.1.0-macos-aarch64-application-update.pkg` | `d3217f48b8fc917cdcb842900ee2a7a0de0968d527cbfea1bc5d35e7e035ce0a` |
+| `memory-layer-2.1.0-windows-x86_64-build.1.zip` | `efedd5340e489b594de8516981a0cae71bf32d8a4146303f21e2e56b2a16d232` |
+| `memory-layer-2.1.0-windows-x86_64-build.1.msi` | `832adbc609b096988efbe10fa274619ca1caabcf29e89388eb78092cd4f3dc04` |
+| `memory-layer-2.1.0-windows-x86_64-build.1-server-tools.msi` | `cf0b2bb57a2aa0cc97088cbd8c6f25a80b2d66fc0fa00bd7ed75b62a25b014f6` |
+| `memory-2.1.0.tar.gz` | `f003ddd96c6b957e6b524e4035582939a7511a14261307bf814462921bd44dd6` |
+
+Homebrew commit `b4562ef9` updates `Formula/memory-layer.rb` with that verified
+published source URL/hash. `packaging/macos/homebrew/memory-layer.rb` is a
+`require_relative` forwarding entrypoint, not an independently maintained copy;
+both resolve the same updated formula. Both pass Ruby syntax checks and a
+stubbed, non-installing metadata-load assertion. No `brew install`, live service
+restart or existing installation upgrade was performed.
+
+The published [release instructions](../../releases/2.1.0.md) retain package
+prerequisites, migration/recovery guidance, unsigned/notarization status, the RSA
+limitation and Windows-preview/unbundled-stack boundaries. Full Windows parity,
+clean-PC runtime acceptance, paid R3 evaluation and live upgrades remain separate.
