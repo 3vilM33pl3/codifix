@@ -5,17 +5,23 @@ description: "Install Memory Layer on Windows with the native x86_64 MSI/ZIP, Do
 
 # Windows
 
-Memory Layer publishes native Windows x86_64 release artifacts:
+Memory Layer 2.1.0 publishes native Windows x86_64 **preview** artifacts:
 
-- `memory-layer-2.0.0-windows-x86_64.msi`
-- `memory-layer-2.0.0-windows-x86_64.zip`
+- `memory-layer-2.1.0-windows-x86_64-build.1.msi`
+- `memory-layer-2.1.0-windows-x86_64-build.1.zip`
+- `memory-layer-2.1.0-windows-x86_64-build.1-server-tools.msi`
+
+The packages include client/operator executables, Web assets and skills, not a
+complete native PostgreSQL/PDS/Pi stack. The machine-level server-tools MSI does
+not provision dependencies or start services. Full Windows parity and supervisor
+acceptance remain unfinished; consult the release's exact verified capability list.
 
 Windows ARM64 is not a release target yet.
 
 ## Native MSI
 
 Download the MSI and matching checksum from the
-[v2.0.0 release](https://github.com/3vilM33pl3/memory/releases/tag/v2.0.0),
+[v2.1.0 release](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0),
 verify it, and run the installer. The per-user installer places
 `memory.exe`, the bundled web UI, skill templates, README, example config, and
 PowerShell completion under `%LOCALAPPDATA%\Programs\Memory Layer`, then adds

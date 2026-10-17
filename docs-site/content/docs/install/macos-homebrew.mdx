@@ -33,11 +33,17 @@ brew install --HEAD 3vilM33pl3/memory/memory-layer
 
 ## Native .pkg
 
-The [v2.0.0 release](https://github.com/3vilM33pl3/memory/releases/tag/v2.0.0)
+The [v2.1.0 release](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0)
 publishes separate native installers and matching checksums:
 
-- Intel Mac: `memory-layer-2.0.0-macos-x86_64.pkg`
-- Apple Silicon Mac: `memory-layer-2.0.0-macos-aarch64.pkg`
+- Intel Mac: `memory-layer-2.1.0-macos-x86_64.pkg`
+- Apple Silicon Mac: `memory-layer-2.1.0-macos-aarch64.pkg`
+
+These standard packages require separately configured PostgreSQL/pgvector. If
+Memory already has a bundled runtime, choose the architecture-matched
+`-application-update.pkg` instead: it preserves that runtime, its data and helper
+launcher. The standard package refuses to overwrite a bundled runtime. Do not
+switch an existing bundled installation to Homebrew as an implicit migration.
 
 Download the package for your Mac, run it, then continue with the same setup
 commands:
