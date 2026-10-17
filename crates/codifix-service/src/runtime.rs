@@ -502,6 +502,10 @@ pub(crate) async fn connect_primary_pool(config: &AppConfig) -> Result<PgPool> {
     }
     if config.database.migrations == codifix_config::DatabaseMigrationMode::VerifyOnly {
         schema::verify_history(&pool).await?;
+        if config.service.read_only {
+            // An owner-prepared read-only deployment must not bootstrap loops or auth.
+            return Ok(pool);
+        }
     } else {
         let mut migrator = compatible_migrator();
         if config.profile == codifix_config::Profile::Dev {
