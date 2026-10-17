@@ -129,7 +129,7 @@ The loader in `mem-api` also normalizes some legacy config keys during deseriali
 
 ## Repository Bootstrap
 
-`memory init` and `memory wizard` both prepare a repository for Codifix.
+`codifix init` and `codifix wizard` both prepare a repository for Codifix.
 
 The repo-local bootstrap creates:
 
@@ -249,7 +249,7 @@ The critical integrity rule is that canonical memory is not just loose text. It 
 
 ## Write Path: Explicit Remember
 
-The simplest write path is `memory remember`.
+The simplest write path is `codifix remember`.
 
 ### Write Capture Curation Flow
 
@@ -259,7 +259,7 @@ The diagram below shows the common write path and the watcher-driven variant. Th
 flowchart TD
     subgraph Sources["Capture sources"]
         Skill["Agent skill<br/>remember-task"]
-        CLI["memory remember<br/>or capture"]
+        CLI["codifix remember<br/>or capture"]
         Watcher["watcher manager<br/>and watchers"]
         Scan["scan and import flows"]
     end
@@ -321,11 +321,11 @@ Because capture and curation are separate backend operations, partial success is
 possible if the CLI process times out or is interrupted. Treat the write path as
 inspectable rather than atomic from the user's perspective:
 
-1. Check `memory activities --project <slug> --kind capture_task` for the raw
+1. Check `codifix activities --project <slug> --kind capture_task` for the raw
    capture.
-2. Run `memory curate --project <slug> --batch-size <n>` if a capture exists but
+2. Run `codifix curate --project <slug> --batch-size <n>` if a capture exists but
    no memory is queryable yet.
-3. Verify with `memory query --project <slug> --question <task-specific text>`.
+3. Verify with `codifix query --project <slug> --question <task-specific text>`.
 
 If `curate` reports `input_count = 0`, either no raw captures are pending or the
 previous `remember` already consumed them. Query is the final confirmation that a
@@ -476,7 +476,7 @@ Activity is now contextual rather than a top-level TUI tab. The backend still ke
 
 ## Watcher Model
 
-The recommended watcher model is agent-linked. `memory watcher manager` runs as a user service, detects live agent sessions with a lightweight command-only process scan, bootstraps each repo when needed, and starts one `memory watcher run` process per repository. Multiple sessions in one repository share that watcher; a stable live session is retained as its owner until reconciliation requires a replacement. The manager deliberately does not watch transcript files because their write volume is unrelated to session lifecycle and caused unnecessary idle CPU work.
+The recommended watcher model is agent-linked. `codifix watcher manager` runs as a user service, detects live agent sessions with a lightweight command-only process scan, bootstraps each repo when needed, and starts one `codifix watcher run` process per repository. Multiple sessions in one repository share that watcher; a stable live session is retained as its owner until reconciliation requires a replacement. The manager deliberately does not watch transcript files because their write volume is unrelated to session lifecycle and caused unnecessary idle CPU work.
 
 Repository watchers use pruned, non-recursive directory subscriptions rather than one recursive whole-tree subscription. Ignored path components are excluded at any depth, nested Git repositories are treated as ownership boundaries, and polling runs only when the platform event source cannot be created.
 
@@ -500,7 +500,7 @@ That makes the watcher materially more useful than a naive “check git status e
 
 ## Scan Flow
 
-`memory scan` is a bootstrap path for existing repositories.
+`codifix scan` is a bootstrap path for existing repositories.
 
 It:
 
@@ -521,7 +521,7 @@ For the exact current behavior, limits, dossier contents, validation rules, and 
 
 The system exposes several layers of observability:
 
-- `memory doctor` for setup diagnostics
+- `codifix doctor` for setup diagnostics
 - `GET /healthz` for backend/database health
 - project overview endpoints for counts and recent activity
 - watcher audit logs in the user-local project runtime directory

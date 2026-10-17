@@ -6,8 +6,8 @@ The crate is a protocol adapter over the existing `mem-service` HTTP API. It doe
 
 ## Transports
 
-- **stdio:** `memory mcp run` constructs the adapter in the CLI process and serves it through the official Rust MCP SDK stdio transport.
-- **Streamable HTTP:** `memory service run` mounts the official Rust MCP SDK `StreamableHttpService` at `[mcp].http_path`, `/mcp` by default.
+- **stdio:** `codifix mcp run` constructs the adapter in the CLI process and serves it through the official Rust MCP SDK stdio transport.
+- **Streamable HTTP:** `codifix service run` mounts the official Rust MCP SDK `StreamableHttpService` at `[mcp].http_path`, `/mcp` by default.
 
 The HTTP mount validates `Origin` when present and accepts either
 `Authorization: Bearer <token>` or `x-api-token: <token>`. In multi-user mode it
@@ -45,7 +45,7 @@ The `memory_route_cross_project_task` prompt documents this sequence for clients
 Stdio can safely use local process context:
 
 1. explicit tool `project`
-2. `memory mcp run --project`
+2. `codifix mcp run --project`
 3. current initialized repo slug
 
 HTTP cannot trust cwd, so HTTP tool calls must pass `project` explicitly. `memory_search_all` has no `project` argument because it deliberately searches every project and returns routing metadata instead.

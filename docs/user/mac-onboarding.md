@@ -37,11 +37,11 @@ downloads every five minutes while online.
 ## Guided first-run candidate
 
 An operator-built package containing the reviewed runtime includes
-`memory-onboard`. The existing lightweight package does not include that launcher.
+`codifix-onboard`. The existing lightweight package does not include that launcher.
 With your existing projects folder, start:
 
 ```bash
-memory-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
+codifix-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
   --runtime /ABS/INSTALLED-RUNTIME/runtime-prerequisites.json \
   --name "My Mac" --workspace-parent "$HOME/Projects" \
   --state "$HOME/Library/Application Support/codifix/onboarding"
@@ -135,8 +135,8 @@ new review, not automatic substitution. After the journey completes, separately
 approve the owning-human Codex/OpenAI and Claude/Anthropic grants with:
 
 ```bash
-memory-onboard journey-agents --journal "$HOME/Library/Application Support/codifix/onboarding/journey.json"
-memory-onboard journey-status --journal "$HOME/Library/Application Support/codifix/onboarding/journey.json"
+codifix-onboard journey-agents --journal "$HOME/Library/Application Support/codifix/onboarding/journey.json"
+codifix-onboard journey-status --journal "$HOME/Library/Application Support/codifix/onboarding/journey.json"
 ```
 
 These commands enable no paid model calls. Current implementation supports the

@@ -28,7 +28,7 @@ Benchmark mapping:
   evidence.
 
 Every item can carry `reasoning_mode`, `memory_capability`, `difficulty`, and
-`claim`. `memory eval compare` groups results by `eval_type`, `reasoning_mode`,
+`claim`. `codifix eval compare` groups results by `eval_type`, `reasoning_mode`,
 and `memory_capability`, so a high aggregate score cannot hide that Memory only
 helped one kind of task.
 
@@ -49,7 +49,7 @@ MEMORY_EVAL_REPEAT=5 \
 docker compose -f evals/docker/memory-improvement/compose.yml run --rm eval
 ```
 
-The Docker stack starts Postgres with pgvector, the Memory service,
+The Docker stack starts Postgres with pgvector, the Codifix service,
 deterministic seed memories, graph extraction, and the eval runner. The seed
 facts are not in the fixture repository, so the no-memory condition cannot
 discover them by reading files.
@@ -59,7 +59,7 @@ discover them by reading files.
 Compare repeated run artifacts:
 
 ```bash
-memory eval compare \
+codifix eval compare \
   --baseline 'target/memory-evals/*no-memory*.json' \
   --candidate 'target/memory-evals/*full-memory*.json' \
   --out target/memory-evals/memory-improvement-v1-comparison.json \
@@ -69,7 +69,7 @@ memory eval compare \
 Render a Markdown report:
 
 ```bash
-memory eval report \
+codifix eval report \
   --comparison target/memory-evals/memory-improvement-v1-comparison.json \
   --markdown \
   --out target/memory-evals/memory-improvement-v1-report.md

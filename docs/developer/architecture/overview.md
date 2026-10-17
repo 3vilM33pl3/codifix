@@ -44,7 +44,7 @@ flowchart LR
     subgraph ProjectRepo["Project repository"]
         Skills["Repo-local skills<br/>.agents/skills"]
         ProjectConfig["Project marker and config<br/>.mem/project.toml<br/>.agents/codifix.toml"]
-        CLI["memory CLI"]
+        CLI["Codifix CLI"]
         TUI["Terminal UI"]
         WebUI["Web UI"]
     end
@@ -136,7 +136,7 @@ The CLI currently uses two transports:
 
 Initialized repositories keep a tiny project marker under `.mem/project.toml`, agent-visible behavior under `.agents/`, and operational project config/state/cache under user-local Codifix directories. Shared defaults live in the global config and project-local values can override them when needed.
 
-### Backend Service (`memory service`)
+### Backend Service (`codifix service`)
 
 The backend owns:
 - API routes
@@ -168,9 +168,9 @@ PostgreSQL stores:
 - search chunks
 - curation runs
 
-### Automation (`memory watcher`)
+### Automation (`codifix watcher`)
 
-`memory watcher` is an optional background process. The recommended local automation model is the agent-linked watcher manager, which detects live agent sessions and starts one watcher per repository. Concurrent sessions in the same repository share that watcher. Legacy per-project watcher services and manual foreground watchers remain compatibility paths.
+`codifix watcher` is an optional background process. The recommended local automation model is the agent-linked watcher manager, which detects live agent sessions and starts one watcher per repository. Concurrent sessions in the same repository share that watcher. Legacy per-project watcher services and manual foreground watchers remain compatibility paths.
 
 It does not write directly to database tables. It only orchestrates the existing persistence path.
 
@@ -179,13 +179,13 @@ It does not write directly to database tables. It only orchestrates the existing
 ### Query Flow
 
 1. User asks a project-specific question
-2. Skill or CLI runs `memory query`
+2. Skill or CLI runs `codifix query`
 3. Backend retrieves project memory from PostgreSQL
 4. Ranked results and provenance are returned
 
 ### Live TUI Flow
 
-1. `memory tui` loads an initial project snapshot
+1. `codifix tui` loads an initial project snapshot
 2. It opens a persistent Cap'n Proto connection to the backend
 3. It subscribes to project-level and selected-memory updates
 4. Backend pushes snapshot refreshes after relevant writes
@@ -194,7 +194,7 @@ It does not write directly to database tables. It only orchestrates the existing
 ### Remember Flow
 
 1. Meaningful work is completed
-2. Skill, user, or automation daemon runs `memory remember`
+2. Skill, user, or automation daemon runs `codifix remember`
 3. CLI builds a capture request
 4. Backend stores a raw capture
 5. Backend curates it into canonical memory
@@ -203,7 +203,7 @@ It does not write directly to database tables. It only orchestrates the existing
 ### Automation Flow
 
 1. the watcher manager detects an agent session, or a user starts a legacy/manual watcher
-2. `memory watcher` observes file and command activity for a repo
+2. `codifix watcher` observes file and command activity for a repo
 3. It accumulates a task window
 4. After idle time or explicit flush, it decides whether to create a raw capture
 5. After enough raw captures accumulate, it can trigger curation

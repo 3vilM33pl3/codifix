@@ -85,7 +85,7 @@ example, an isolated container may run `npm --prefix web ci --ignore-scripts
 --no-audit --no-fund` with `npm_config_cache=/work/npm-cache`; no model endpoint
 is used. Source compilation, Web tests, packaging and runtime checks then run
 with **network none**, a read-only container root, non-root UID, no capabilities,
-no new privileges, bounded CPU/codifix/PIDs and only private build inputs mounted.
+no new privileges, bounded CPU/memory/PIDs and only private build inputs mounted.
 Do not repair a missing cache by adding host credentials or network to compilation.
 
 ## Repeat the phases

@@ -140,12 +140,12 @@ noise and rows orphaned by retention pruning.
 ## API and CLI
 
 - `GET /v1/projects/{project}/memory-scores?needs_review=&limit=` /
-  `memory scores --project P [--needs-review]`
-- `POST /v1/memory/{id}/validate` / `memory validate <id> [--dry-run|--execute]`
+  `codifix scores --project P [--needs-review]`
+- `POST /v1/memory/{id}/validate` / `codifix validate <id> [--dry-run|--execute]`
   (manual trigger: bypasses the threshold, respects the daily budget)
 - `GET /v1/projects/{project}/validation-runs?review=pending` /
-  `memory review list --project P [--all]`
-- `POST /v1/validation-runs/{id}/review` / `memory review apply|reject <run-id>`
+  `codifix review list --project P [--all]`
+- `POST /v1/validation-runs/{id}/review` / `codifix review apply|reject <run-id>`
 
 Timeline events use `ActivityKind::MemoryValidation`; LLM calls appear in
 the existing LLM audit stream.
@@ -198,7 +198,7 @@ Tuning guidance:
 - **Cost**: worst-case LLM usage is `daily_validation_cap` runs/day; each
   run is one bounded chat call (≤1200 output tokens by default).
 - **Rollout**: enable `validation_enabled` with `validation_dry_run = true`
-  first and watch `memory review list --all`; then disable dry-run; only
+  first and watch `codifix review list --all`; then disable dry-run; only
   enable `auto_apply_rewording` once you trust the verdicts.
 
 ## Degradation and safety

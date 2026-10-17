@@ -45,7 +45,7 @@ The important split in Codifix is:
 
 That type then affects:
 
-- filtering in `memory query`
+- filtering in `codifix query`
 - rendering and filtering in the TUI
 - curation and replacement behavior in a few special cases
 - how future readers interpret the memory
@@ -284,7 +284,7 @@ Should not contain:
 
 Typical triggers:
 
-- explicit `memory remember --type documentation`
+- explicit `codifix remember --type documentation`
 - inferred curation when text mentions docs, documentation, README, guides, screenshots, the front page, or GitHub Pages
 - structured candidates from scan or agent workflows
 
@@ -317,14 +317,14 @@ Should not contain:
 
 Typical triggers:
 
-- `memory checkpoint start-task`
+- `codifix checkpoint start-task`
 - repo-local `start-task-execution` helper when an agent begins direct no-plan work
 
 Important current behavior:
 
 - `task` is a start marker for work in progress
 - `checkpoint start-task` curates the exact raw capture it wrote and fails if the active `task` memory cannot be verified
-- direct tasks should later produce an `implementation` memory through `memory remember`
+- direct tasks should later produce an `implementation` memory through `codifix remember`
 - task memories use `task-thread:<thread_key>` tags so follow-up implementation memories can be related by curation
 
 Examples:
@@ -348,7 +348,7 @@ Should not contain:
 
 Typical triggers:
 
-- `memory checkpoint start-execution`
+- `codifix checkpoint start-execution`
 - plan resaves for the same thread when the approved plan changes materially
 
 Important current behavior:
@@ -379,8 +379,8 @@ Should not contain:
 
 Typical triggers:
 
-- `memory checkpoint finish-execution` after successful checklist verification
-- `memory remember` for non-plan completed work
+- `codifix checkpoint finish-execution` after successful checklist verification
+- `codifix remember` for non-plan completed work
 - explicit structured candidates supplied by callers
 
 Important current behavior:
@@ -412,8 +412,8 @@ Should not contain:
 
 Typical triggers:
 
-- explicit `memory remember --type refactor`
-- `memory remember` or `memory checkpoint finish-execution` when title, summary, notes, or completed plan items clearly mention refactor/no-functional-change work
+- explicit `codifix remember --type refactor`
+- `codifix remember` or `codifix checkpoint finish-execution` when title, summary, notes, or completed plan items clearly mention refactor/no-functional-change work
 - inferred curation when raw task evidence uses refactor or behavior-preserving language
 
 Important current behavior:
@@ -509,13 +509,13 @@ Some flows choose the type up front and send it as part of the capture payload.
 
 Current important examples:
 
-- `memory checkpoint start-execution`
+- `codifix checkpoint start-execution`
   - writes a structured `plan` candidate
-- `memory checkpoint start-task`
+- `codifix checkpoint start-task`
   - writes a structured `task` candidate for direct no-plan work
-- `memory checkpoint finish-execution`
+- `codifix checkpoint finish-execution`
   - writes a structured `implementation` or `refactor` candidate after successful verification
-- `memory remember`
+- `codifix remember`
   - now writes a structured `implementation` candidate by default, or a `refactor` candidate when behavior-preserving refactor language is detected
 - `scan`
   - converts accepted scan candidates into explicit typed structured candidates
@@ -693,7 +693,7 @@ Important current special cases:
 
 The type is visible in:
 
-- `memory query --type <memory_type>`
+- `codifix query --type <memory_type>`
 - TUI memory filters and type pills
 - project overview type breakdowns
 - query/search result metadata

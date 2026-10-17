@@ -250,7 +250,7 @@ fully populated and queries against it return reasonable results.
 2. Restart the service (picks up the new config).
 3. Hit `/v1/reembed` to populate vectors in the new space for every
    active, non-tombstone chunk. Both spaces now coexist.
-4. Verify recall on the new space with `memory query` against a
+4. Verify recall on the new space with `codifix query` against a
    known-good question.
 5. Hit `/v1/prune-embeddings` to remove the old space.
 

@@ -232,11 +232,11 @@ graph projection, and status reporting.
 
 Current behavior:
 
-- `memory graph extract` reuses the local repository index and persists code
+- `codifix graph extract` reuses the local repository index and persists code
   graph facts.
-- `memory graph extract --dry-run` previews extraction without writing database
+- `codifix graph extract --dry-run` previews extraction without writing database
   rows or index files.
-- `memory graph status` reports the latest completed extraction run.
+- `codifix graph status` reports the latest completed extraction run.
 - Identical completed runs are reused unless `--force` is supplied.
 - Existing memory query and TUI behavior are unchanged by default.
 

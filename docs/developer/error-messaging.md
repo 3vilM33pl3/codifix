@@ -16,8 +16,8 @@ HTTP error responses keep the legacy `error` string and add structured diagnosti
   "severity": "warning",
   "explanation": "The memory write can succeed while follow-up provider work fails at the provider boundary.",
   "fix_hint": "Restore provider quota/billing or disable automatic creation for the failing backend until quota is available.",
-  "doctor_hint": "memory doctor",
-  "command_hint": "memory embeddings list",
+  "doctor_hint": "codifix doctor",
+  "command_hint": "codifix embeddings list",
   "diagnostic": {
     "code": "embedding_quota_exceeded"
   }
@@ -55,7 +55,7 @@ Do not persist every validation error. Bad user input should usually remain an i
 
 Automatic embedding creation runs after capture/curation. It must be best-effort: a provider quota or auth failure should not turn an already-saved memory into a failed curation request. Instead, the service returns the successful curation response with `warnings` and records a diagnostic activity.
 
-Explicit maintenance commands such as `memory reembed`, `memory reindex`, and embedding prune operations remain strict. If the user explicitly asked for embedding maintenance, provider/database failures should fail the command, but the response should include the structured diagnostic and fix hints.
+Explicit maintenance commands such as `codifix reembed`, `codifix reindex`, and embedding prune operations remain strict. If the user explicitly asked for embedding maintenance, provider/database failures should fail the command, but the response should include the structured diagnostic and fix hints.
 
 ## Reviewed Paths
 

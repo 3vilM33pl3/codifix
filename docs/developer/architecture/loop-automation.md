@@ -37,7 +37,7 @@ The pure router in `mem-loops` is intentionally simple:
 3. Combine unsupported trigger, disabled loop, paused/snoozed loop, global kill switch, and exhausted budget reasons.
 4. Start a control-plane run only when the trigger is supported and no skipped reasons remain.
 
-Manual `memory loops run` calls still record a trigger event, but they use the manual path so the global kill switch does not block deliberate operator runs. Routed trigger events are non-manual and are blocked by the global kill switch.
+Manual `codifix loops run` calls still record a trigger event, but they use the manual path so the global kill switch does not block deliberate operator runs. Routed trigger events are non-manual and are blocked by the global kill switch.
 
 ## Persistence
 
