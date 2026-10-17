@@ -48,8 +48,14 @@ function Get-NativeInstancePlan {
         [guid]$ExpectedSpaceId = [guid]::Empty, [guid]$StatusAudienceId = [guid]::Empty)
     if ($Name -cnotmatch '^[a-z][a-z0-9-]{0,47}$') { throw 'Use a lowercase instance name, maximum 48 characters' }
     if ($ReleaseIdentity -notmatch '^windows-v\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?-build\.\d+$') { throw 'Invalid Windows release identity' }
-    if ($ExecutableName -notin @('memory.exe', 'memory-federation-gateway.exe')) { throw 'Unsupported service executable' }
+    if ($ExecutableName -notin @('memory.exe', 'memory-federation-gateway.exe','memory-pds-pipe.exe')) { throw 'Unsupported service executable' }
     if ($ExpectedInstanceId -eq [guid]::Empty) { throw 'An exact expected instance UUID is required' }
+    if($ExecutableName -ceq 'memory-pds-pipe.exe'){
+        if($HealthUri -or $ExpectedSpaceId -ne [guid]::Empty -or $StatusAudienceId -ne [guid]::Empty){throw 'Native PDS readiness uses its protected local pipe, not HTTP/gateway bindings'}
+        return [pscustomobject][ordered]@{service_name="MemoryLayer-$Name";account="NT SERVICE\MemoryLayer-$Name";name=$Name
+            release_identity=$ReleaseIdentity;executable_name=$ExecutableName;health_uri=$null
+            expected_instance_id=$ExpectedInstanceId.ToString();readiness_mode='native_pipe_public_xrpc_v1'}
+    }
     if ($ExecutableName -eq 'memory-federation-gateway.exe') {
         if ($HealthUri -or $ExpectedSpaceId -eq [guid]::Empty -or $StatusAudienceId -eq [guid]::Empty) { throw 'Gateway needs exact space/authority/audience, not a Memory health URL' }
         return [pscustomobject][ordered]@{
@@ -80,7 +86,48 @@ function Get-NativeInstancePlan {
 function Get-NativeServiceArguments([string]$ExecutableName, [string]$ConfigPath) {
     if ($ExecutableName -eq 'memory.exe') { return @('--config', $ConfigPath, 'service', 'run') }
     if ($ExecutableName -eq 'memory-federation-gateway.exe') { return @($ConfigPath) }
+    if ($ExecutableName -eq 'memory-pds-pipe.exe') { return @($ConfigPath) }
     throw 'Unsupported service executable'
+}
+
+function Assert-NativePdsServiceConfig($Config,$Runtime,$RuntimePlan,[string]$Name,[string]$State,[string]$ConfigurationDirectory,[string]$EnvironmentSha256){
+    Assert-NativeRuntimeFields $Config @('schema_version','pipe','node','node_sha256','entry','entry_sha256','helper_sha256','environment')
+    Assert-NativeRuntimeFields $Config.pipe @('name','server_sid','client_sid')
+    Assert-NativeRuntimeFields $Config.environment @('path','sha256')
+    if($Config.schema_version -ne 1 -or $Runtime.runtime_kind -cne 'memory-native-pds-runtime' -or
+        $Config.pipe.name -cne "\\.\pipe\memory-pds-$Name" -or
+        $Config.pipe.server_sid -cnotmatch '^S-1-5-80-(?:\d+-){4}\d+$' -or
+        $Config.pipe.client_sid -cnotmatch '^S-1-5-80-(?:\d+-){4}\d+$' -or $Config.pipe.server_sid -ceq $Config.pipe.client_sid -or
+        $Config.node -cne $Runtime.node_executable -or $Config.entry -cne $Runtime.pds_entrypoint -or
+        $Config.environment.path -cne (Join-Path $ConfigurationDirectory 'pds-environment.json') -or
+        $EnvironmentSha256 -cnotmatch '^[0-9a-f]{64}$' -or $Config.environment.sha256 -cne $EnvironmentSha256){throw 'Native PDS config differs from exact runtime, service/pipe or protected environment'}
+    $pins=Assert-NativePdsPathPatch $RuntimePlan.path_patch
+    foreach($pair in @(@('node/node.exe','node_sha256'),@('pds/pds-server.mjs','entry_sha256'),@('pds/http-stdio.mjs','helper_sha256'))){
+        $member=@($RuntimePlan.payload_files | Where-Object {$_.name -ceq $pair[0]})
+        if($member.Count -ne 1 -or $Config.($pair[1]) -cne $member[0].sha256){throw 'Native PDS executable/adapter digest differs from pinned runtime'}
+    }
+}
+function Assert-NativePdsEnvironment($Environment,[string]$State){
+    $names=@($Environment.PSObject.Properties.Name)
+    if($names.Count -lt 1 -or $names.Count -gt 64){throw 'Bounded explicit PDS environment required'}
+    foreach($name in $names){
+        if($name -cnotmatch '^PDS_[A-Z0-9_]+$' -or $name.Length -gt 128 -or $Environment.$name -isnot [string] -or
+            $Environment.$name.Length -gt 8192 -or $Environment.$name.Contains([char]0)){throw 'Only bounded PDS environment strings are accepted'}
+    }
+    if($Environment.PDS_DATA_DIRECTORY -cne (Join-Path $State 'data') -or
+        $Environment.PDS_BLOBSTORE_DISK_LOCATION -cne (Join-Path $State 'data\blobs') -or
+        $Environment.PDS_DEV_MODE -cne 'false' -or $Environment.PDS_DISABLE_SSRF_PROTECTION -cne 'false' -or
+        $Environment.PDS_INVITE_REQUIRED -cne 'true' -or -not $Environment.PDS_HOSTNAME -or
+        -not $Environment.PDS_JWT_SECRET -or -not $Environment.PDS_ADMIN_PASSWORD -or
+        -not $Environment.PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX){throw 'PDS state must be service-local with required credentials and unchanged protection policies'}
+}
+function Test-NativePdsReadiness($Ready,[string]$ServerSid,[string]$ClientSid,[string]$PipeName){
+    try{
+        $observed=[DateTimeOffset]::Parse($Ready.observed_at);$now=[DateTimeOffset]::UtcNow
+        return $Ready.schema_version -eq 1 -and $Ready.server_sid -ceq $ServerSid -and $Ready.client_sid -ceq $ClientSid -and
+            $Ready.pipe_name -ceq $PipeName -and $Ready.readiness_scope -ceq 'verified_pipe_peer_and_public_xrpc_only' -and
+            $observed -ge $now.AddSeconds(-30) -and $observed -le $now.AddSeconds(1)
+    }catch{return $false}
 }
 
 function Assert-NativeGatewayConfig($Config, [guid]$Space, [guid]$Authority, [guid]$Audience) {

@@ -20,6 +20,8 @@ mod pds_pipe;
 pub use pds_pipe::PdsNamedPipe;
 #[cfg(windows)]
 pub use pds_pipe::serve as serve_native_pds_pipe;
+#[cfg(windows)]
+pub use pds_pipe::{PdsPipeStatus, check_status as check_native_pds_pipe_status};
 mod private_files;
 mod project_delivery;
 pub use credentials::{CredentialMode, CredentialState, GatewayCredentialStatus, MaintenanceState};

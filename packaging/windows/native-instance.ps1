@@ -12,12 +12,14 @@ param(
     [string]$HealthUri,
     [Parameter(Mandatory = $true)][guid]$ExpectedInstanceId,
     [ValidatePattern('^[0-9a-f]{64}$')][string]$ExpectedInputSha256,
-    [ValidateSet('memory.exe', 'memory-federation-gateway.exe')][string]$ExecutableName = 'memory.exe',
+    [ValidateSet('memory.exe', 'memory-federation-gateway.exe','memory-pds-pipe.exe')][string]$ExecutableName = 'memory.exe',
     [guid]$ExpectedSpaceId = [guid]::Empty,
     [guid]$StatusAudienceId = [guid]::Empty,
     [string]$NativeRuntimeManifestPath,
     [ValidatePattern('^[0-9a-f]{64}$')][string]$NativeRuntimeManifestSha256,
     [guid]$NativeRuntimeOperationId = [guid]::Empty,
+    [string]$PdsEnvironmentPath,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$PdsEnvironmentSha256,
     [Parameter(Mandatory = $true)][ValidateLength(1, 1024)][string]$RecoveryReference,
     [switch]$DatabaseCompatibilityConfirmed
 )
@@ -97,18 +99,43 @@ $release = Join-Path $releasesRoot $plan.release_identity
 $state = Join-Path (Join-Path $root 'instances') $Name
 $configurationRoot = Join-Path $root 'configurations'
 $configurationDirectory = Join-Path $configurationRoot $Name
-$installedConfig = Join-Path $configurationDirectory $(if ($ExecutableName -eq 'memory.exe') { 'memory-layer.toml' } else { 'gateway.json' })
+$installedConfig = Join-Path $configurationDirectory $(if ($ExecutableName -eq 'memory.exe') { 'memory-layer.toml' } elseif($ExecutableName -eq 'memory-pds-pipe.exe'){'pds-pipe.json'} else { 'gateway.json' })
 $command = @((Join-Path $release 'bin\memory-windows-service.exe'), '--name', $plan.service_name, '--directory', $state, '--', (Join-Path $release "bin\$ExecutableName")) + @(Get-NativeServiceArguments $ExecutableName $installedConfig)
 $binaryPath = ($command | ForEach-Object { ConvertTo-NativeCommandArgument $_ }) -join ' '
 $operationAction = if ($Action -eq 'Preview') { $PreviewAction } else { $Action }
 $binding = [ordered]@{ action = $operationAction; recovery_reference = $RecoveryReference; plan = $plan; manifest_sha256 = $ManifestSha256; package_sha256 = $zipEntry[0].sha256; config_fingerprint = $configHash; binary_path = $binaryPath }
 $runtimeBinding=$null
+$runtimeKind=if($ExecutableName -ceq 'memory-pds-pipe.exe'){'memory-native-pds-runtime'}else{'memory-native-postgres-runtime'}
 if ($NativeRuntimeManifestPath -or $NativeRuntimeManifestSha256 -or $NativeRuntimeOperationId -ne [guid]::Empty) {
     if (-not $NativeRuntimeManifestPath -or -not $NativeRuntimeManifestSha256 -or $NativeRuntimeOperationId -eq [guid]::Empty) { throw 'Local native runtime binding requires manifest path, digest and verified operation ID together' }
-    $previewLease=Open-NativePrerequisiteLease $NativeRuntimeManifestPath $NativeRuntimeManifestSha256 $NativeRuntimeOperationId
-    try { $runtimeBinding=$previewLease.binding; $binding.native_runtime=$runtimeBinding }
+    $previewLease=Open-NativePrerequisiteLease $NativeRuntimeManifestPath $NativeRuntimeManifestSha256 $NativeRuntimeOperationId $runtimeKind
+    try {
+        $runtimeBinding=$previewLease.binding; $binding.native_runtime=$runtimeBinding
+        if($ExecutableName -ceq 'memory-pds-pipe.exe'){
+            $pdsConfig=[Text.Encoding]::UTF8.GetString($configBytes) | ConvertFrom-Json
+            Assert-NativePdsServiceConfig $pdsConfig $runtimeBinding $previewLease.plan $Name $state $configurationDirectory $PdsEnvironmentSha256
+        }
+    }
     finally { Close-NativePrerequisiteLease $previewLease }
 }
+$pdsEnvironmentBytes=$null
+if($ExecutableName -ceq 'memory-pds-pipe.exe'){
+    if(-not $runtimeBinding -or -not $PdsEnvironmentPath -or -not $PdsEnvironmentSha256){throw 'Native PDS requires exact patched runtime and protected environment inputs'}
+    Assert-NoReparse $PdsEnvironmentPath
+    $environmentGuard=[MemoryLayer.ProtectedRelease]::Open((Split-Path -Parent ([IO.Path]::GetFullPath($PdsEnvironmentPath))))
+    try{
+        $allowed=@('S-1-5-18','S-1-5-32-544',[Security.Principal.WindowsIdentity]::GetCurrent().User.Value,$pdsConfig.pipe.server_sid)
+        $acl=Get-Acl -LiteralPath $PdsEnvironmentPath
+        if($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $allowed){throw 'Private PDS environment owner differs'}
+        foreach($ace in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])){
+            if($ace.AccessControlType -eq 'Allow' -and [int64]$ace.FileSystemRights -ne 0 -and $ace.IdentityReference.Value -notin $allowed){throw 'Private PDS environment has another reader'}
+        }
+        if((Get-Item -LiteralPath $PdsEnvironmentPath).Length -gt 64KB -or (Get-Hash $PdsEnvironmentPath) -cne $PdsEnvironmentSha256){throw 'Private PDS environment differs from reviewed digest'}
+        $pdsEnvironmentBytes=[IO.File]::ReadAllBytes($PdsEnvironmentPath)
+        Assert-NativePdsEnvironment ([Text.Encoding]::UTF8.GetString($pdsEnvironmentBytes) | ConvertFrom-Json) $state
+    }finally{$environmentGuard.Dispose()}
+    $binding.pds_environment_sha256=$PdsEnvironmentSha256
+}elseif($PdsEnvironmentPath -or $PdsEnvironmentSha256){throw 'PDS environment inputs do not apply to other service roles'}
 $inputDigest = Get-NativeInputDigest $binding
 if ($Action -eq 'Preview') {
     [ordered]@{ action = $operationAction; recovery_reference = $RecoveryReference; plan = $plan; native_runtime=$runtimeBinding; input_sha256 = $inputDigest; release_directory = $release; state_directory = $state; signing_status = $manifest.signing_status; native_stack_bundled = $manifest.native_stack_bundled; database_backup_performed = $false } | ConvertTo-Json -Depth 8
@@ -133,7 +160,7 @@ try {
     # Retain exact runtime/receipt handles through service changes. This is file
     # identity verification, not proof that PostgreSQL is running or reachable.
     if ($runtimeBinding) {
-        $runtimeLease=Open-NativePrerequisiteLease $NativeRuntimeManifestPath $NativeRuntimeManifestSha256 $NativeRuntimeOperationId
+        $runtimeLease=Open-NativePrerequisiteLease $NativeRuntimeManifestPath $NativeRuntimeManifestSha256 $NativeRuntimeOperationId $runtimeKind
         if ((Get-NativeInputDigest $runtimeLease.binding) -cne (Get-NativeInputDigest $runtimeBinding)) { throw 'Native runtime changed after preview' }
     }
     $journalPath = Join-Path $operationRoot 'journal.json'
@@ -227,6 +254,7 @@ try {
     else { Invoke-Sc @('config', $plan.service_name, 'binPath=', $binaryPath, 'start=', 'demand') }
     Invoke-Sc @('sidtype', $plan.service_name, 'unrestricted')
     $sid = ([Security.Principal.NTAccount]::new($plan.account)).Translate([Security.Principal.SecurityIdentifier]).Value
+    if($ExecutableName -ceq 'memory-pds-pipe.exe' -and $pdsConfig.pipe.server_sid -cne $sid){throw 'Configured PDS pipe server SID differs from exact SCM virtual account; service remains stopped'}
     foreach ($path in @($root, (Join-Path $root 'instances'), $configurationRoot, (Split-Path -Parent $releasesRoot), $releasesRoot)) {
         Set-NativePrivateDirectory $path $sid -SharedAncestor
     }
@@ -235,6 +263,20 @@ try {
     # Shared release bytes are readable but not writable by virtual services.
     $readRule = [Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($sid), 'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
     $releaseAcl = Get-Acl -LiteralPath $release; $releaseAcl.AddAccessRule($readRule); Set-Acl -LiteralPath $release -AclObject $releaseAcl
+    if($ExecutableName -ceq 'memory-pds-pipe.exe'){
+        $runtimeDirectory=$runtimeBinding.runtime_directory
+        $runtimeRoot=Split-Path -Parent $runtimeDirectory
+        foreach($ancestor in @((Split-Path -Parent $runtimeRoot),$runtimeRoot)){Set-NativePrivateDirectory $ancestor $sid -SharedAncestor}
+        $acl=Get-Acl -LiteralPath $runtimeDirectory;$acl.AddAccessRule($readRule);Set-Acl -LiteralPath $runtimeDirectory -AclObject $acl
+        $environmentTarget=Join-Path $configurationDirectory 'pds-environment.json'
+        if(Test-Path -LiteralPath $environmentTarget){
+            Assert-NoReparse $environmentTarget
+            if((Get-Hash $environmentTarget) -cne $PdsEnvironmentSha256){throw 'Existing private PDS environment differs; explicit configuration change required'}
+        }else{
+            $file=[IO.File]::Open($environmentTarget,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+            try{$file.Write($pdsEnvironmentBytes,0,$pdsEnvironmentBytes.Length);$file.Flush($true)}finally{$file.Dispose()}
+        }
+    }
     if (-not (Test-Path -LiteralPath $installedConfig)) {
         $temporaryConfig = Join-Path $configurationDirectory ([guid]::NewGuid().ToString() + '.config.tmp')
         $file = [IO.File]::Open($temporaryConfig, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
@@ -257,6 +299,17 @@ try {
                 $status = ($output -join "`n") | ConvertFrom-Json
                 if ($probeExit -eq 0 -and (Test-NativeGatewayReadiness $status $ExpectedSpaceId $ExpectedInstanceId $StatusAudienceId) -and (Get-Service -Name $plan.service_name).Status -eq 'Running') { $ready = $true; break }
             } catch { }
+            Start-Sleep -Seconds 1
+        }
+    } elseif($ExecutableName -eq 'memory-pds-pipe.exe') {
+        $probe=Join-Path $release 'bin\memory-pds-pipe.exe'
+        for($attempt=0;$attempt -lt 30;$attempt++){
+            try{
+                $output=@(& $probe check-status $installedConfig --service-name $plan.service_name 2>$null)
+                $probeExit=$LASTEXITCODE;$status=($output -join "`n") | ConvertFrom-Json
+                if($probeExit -eq 0 -and (Test-NativePdsReadiness $status $sid $pdsConfig.pipe.client_sid $pdsConfig.pipe.name) -and
+                    (Get-Service -Name $plan.service_name).Status -eq 'Running'){$ready=$true;break}
+            }catch{}
             Start-Sleep -Seconds 1
         }
     } else {
@@ -283,6 +336,6 @@ try {
     Invoke-Sc @('config', $plan.service_name, 'start=', 'delayed-auto')
     Write-NativeJournal $registrationPath ([ordered]@{ schema_version = 1; operation_id = $OperationId.ToString(); expected_instance_id = $plan.expected_instance_id; installer_version = $manifest.installer_version; release_identity = $plan.release_identity; manifest_sha256 = $ManifestSha256; binary_path = $binaryPath; config_fingerprint = $configHash; native_runtime=$runtimeBinding })
     Save-Phase 'completed'
-    $readiness = if ($ExecutableName -eq 'memory.exe') { 'exact-instance readiness verified' } else { 'signed gateway space/authority/current Pull and writer fence verified; PDS publication health is separate' }
+    $readiness = if ($ExecutableName -eq 'memory.exe') { 'exact-instance readiness verified' } elseif($ExecutableName -eq 'memory-pds-pipe.exe'){'PDS pipe peer and public XRPC verified; repository/account readiness remains separate'} else { 'signed gateway space/authority/current Pull and writer fence verified; PDS publication health is separate' }
     Write-Output "Completed: $OperationId ($($plan.service_name)); $readiness; data preserved"
 } finally { if ($releaseGuard) { $releaseGuard.Dispose() }; Close-NativePrerequisiteLease $runtimeLease; $lock.Dispose() }

@@ -2,9 +2,9 @@
 //! ACLs exist before accepting the first client. The child has private stdio,
 //! never a PDS TCP listener. One request executes at a time; ambiguous child
 //! failure stops the broker rather than resending an immutable mutation.
-use super::{PdsNamedPipe, native, wire};
+use super::{PdsNamedPipe, environment_bytes, native, wire};
 use crate::{Result, RuntimeError};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     mem::size_of,
@@ -38,6 +38,86 @@ struct Config {
     entry: PathBuf,
     entry_sha256: String,
     helper_sha256: String,
+    #[serde(default)]
+    environment: Option<EnvironmentFile>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EnvironmentFile {
+    path: PathBuf,
+    sha256: String,
+}
+
+fn read_config(path: &Path) -> Result<Config> {
+    let config: Config = serde_json::from_slice(&crate::private_files::read(path, 64 * 1024)?)
+        .map_err(|_| RuntimeError::Configuration)?;
+    if config.schema_version != 1 {
+        return Err(RuntimeError::Configuration);
+    }
+    config.pipe.validate()?;
+    Ok(config)
+}
+
+#[derive(Serialize)]
+pub struct PdsPipeStatus {
+    schema_version: u32,
+    pub server_sid: String,
+    client_sid: String,
+    pipe_name: String,
+    readiness_scope: &'static str,
+    observed_at: String,
+}
+
+/// Administrator-only service-aware read. No environment bytes, bearer or PDS
+/// repository contents enter this unauthenticated public-XRPC health probe.
+pub async fn check_status(path: &Path, service_name: &str) -> Result<PdsPipeStatus> {
+    use mem_platform_files::windows::{ServiceInput, ServiceReader};
+    let reader =
+        ServiceReader::for_named_service(service_name).map_err(|_| RuntimeError::Unauthorized)?;
+    let bytes = ServiceInput::open(path, 64 * 1024, &reader)
+        .and_then(|input| input.read(64 * 1024))
+        .map_err(|_| RuntimeError::Configuration)?;
+    let config: Config = serde_json::from_slice(&bytes).map_err(|_| RuntimeError::Configuration)?;
+    if config.schema_version != 1 {
+        return Err(RuntimeError::Configuration);
+    }
+    config.pipe.validate()?;
+    let request = reqwest::Client::new()
+        .get("http://memory-pds.invalid/xrpc/com.atproto.server.describeServer")
+        .build()
+        .map_err(|_| RuntimeError::Configuration)?;
+    let response = native::send(&config.pipe, request).await?;
+    if !response.status().is_success() {
+        return Err(RuntimeError::Unavailable);
+    }
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|_| RuntimeError::Unavailable)?;
+    if bytes.len() > 64 * 1024 {
+        return Err(RuntimeError::InvalidResponse);
+    }
+    let value: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|_| RuntimeError::InvalidResponse)?;
+    if !value.get("availableUserDomains").is_some_and(|domains| {
+        domains.as_array().is_some_and(|domains| {
+            domains.len() <= 100
+                && domains
+                    .iter()
+                    .all(|domain| domain.as_str().is_some_and(|domain| domain.len() <= 253))
+        })
+    }) {
+        return Err(RuntimeError::InvalidResponse);
+    }
+    Ok(PdsPipeStatus {
+        schema_version: 1,
+        server_sid: config.pipe.server_sid,
+        client_sid: config.pipe.client_sid,
+        pipe_name: config.pipe.name,
+        readiness_scope: "verified_pipe_peer_and_public_xrpc_only",
+        observed_at: chrono::Utc::now().to_rfc3339(),
+    })
 }
 
 fn verify(path: &Path, expected: &str, limit: u64) -> Result<()> {
@@ -96,12 +176,7 @@ fn create(policy: &PdsNamedPipe, first: bool) -> Result<NamedPipeServer> {
 }
 
 pub async fn serve(path: &Path) -> Result<()> {
-    let config: Config = serde_json::from_slice(&crate::private_files::read(path, 64 * 1024)?)
-        .map_err(|_| RuntimeError::Configuration)?;
-    if config.schema_version != 1 {
-        return Err(RuntimeError::Configuration);
-    }
-    config.pipe.validate()?;
+    let config = read_config(path)?;
     let raw = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, GetCurrentProcessId()) };
     if raw.is_null() {
         return Err(RuntimeError::Configuration);
@@ -132,12 +207,18 @@ pub async fn serve(path: &Path) -> Result<()> {
         .stderr(Stdio::piped());
     for (name, value) in std::env::vars_os() {
         let key = name.to_string_lossy().to_ascii_uppercase();
-        if key.starts_with("PDS_")
+        if (config.environment.is_none() && key.starts_with("PDS_"))
             || matches!(
                 key.as_str(),
                 "PATH" | "SYSTEMROOT" | "TEMP" | "TMP" | "NODE_EXTRA_CA_CERTS" | "LOG_LEVEL"
             )
         {
+            command.env(name, value);
+        }
+    }
+    if let Some(environment) = &config.environment {
+        let bytes = crate::private_files::read(&environment.path, 64 * 1024)?;
+        for (name, value) in environment_bytes(&bytes, &environment.sha256)? {
             command.env(name, value);
         }
     }

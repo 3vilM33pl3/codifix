@@ -12,6 +12,34 @@ pub struct PdsNamedPipe {
     pub client_sid: String,
 }
 
+#[cfg(any(windows, test))]
+fn environment_bytes(
+    bytes: &[u8],
+    expected: &str,
+) -> Result<std::collections::BTreeMap<String, String>> {
+    use sha2::{Digest, Sha256};
+    if expected.len() != 64 || format!("{:x}", Sha256::digest(bytes)) != expected {
+        return Err(RuntimeError::Configuration);
+    }
+    let values: std::collections::BTreeMap<String, String> =
+        serde_json::from_slice(bytes).map_err(|_| RuntimeError::Configuration)?;
+    if values.is_empty()
+        || values.len() > 64
+        || values.iter().any(|(name, value)| {
+            !name.starts_with("PDS_")
+                || name.len() > 128
+                || !name
+                    .bytes()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == b'_')
+                || value.len() > 8192
+                || value.contains('\0')
+        })
+    {
+        return Err(RuntimeError::Configuration);
+    }
+    Ok(values)
+}
+
 impl PdsNamedPipe {
     pub fn validate(&self) -> Result<()> {
         let name = self
@@ -56,6 +84,8 @@ mod native;
 mod server;
 #[cfg(windows)]
 pub use server::serve;
+#[cfg(windows)]
+pub use server::{PdsPipeStatus, check_status};
 #[cfg(any(windows, test))]
 mod wire;
 #[cfg(windows)]
@@ -64,6 +94,27 @@ pub(crate) use native::send;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn private_environment_binds_exact_bytes_and_rejects_non_pds_or_unbounded_values() {
+        use sha2::{Digest, Sha256};
+        let bytes = br#"{"PDS_ADMIN_PASSWORD":"synthetic-only"}"#;
+        let digest = format!("{:x}", Sha256::digest(bytes));
+        assert_eq!(
+            environment_bytes(bytes, &digest).expect("bound environment")["PDS_ADMIN_PASSWORD"],
+            "synthetic-only"
+        );
+        assert!(environment_bytes(bytes, &"0".repeat(64)).is_err());
+        for value in [
+            serde_json::json!({"OPENAI_API_KEY":"never"}),
+            serde_json::json!({"pds_lowercase":"no"}),
+            serde_json::json!({"PDS_ADMIN_PASSWORD":"a".repeat(8193)}),
+            serde_json::json!({"PDS_BAD":"nul\0value"}),
+            serde_json::json!({}),
+        ] {
+            let bytes = serde_json::to_vec(&value).expect("fixture");
+            assert!(environment_bytes(&bytes, &format!("{:x}", Sha256::digest(&bytes))).is_err());
+        }
+    }
     fn config() -> PdsNamedPipe {
         PdsNamedPipe {
             name: r"\\.\pipe\memory-pds-company-1".into(),

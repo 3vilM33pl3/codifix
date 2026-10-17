@@ -81,7 +81,7 @@ function Open-NativePrerequisiteLease([string]$ManifestPath, [string]$ManifestSh
         $binding=Get-NativePrerequisiteBinding $plan $ManifestSha256 $OperationId $root $receipt $ExpectedKind
         $guards.Add([MemoryLayer.ProtectedRelease]::Open($binding.runtime_directory))
         Assert-NativePayload $binding.runtime_directory $plan.payload_files
-        return [pscustomobject]@{binding=$binding;guards=$guards}
+        return [pscustomobject]@{binding=$binding;guards=$guards;plan=$plan}
     } catch { foreach ($guard in $guards) { $guard.Dispose() }; throw }
 }
 
