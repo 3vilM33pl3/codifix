@@ -37,8 +37,7 @@ when repeated instructions or project knowledge should survive future sessions.
 - Default to delegating independent subtasks to subagents. Keep coordination and
   final integration with the main agent, and verify subagent results. Handle
   simple tasks directly when delegation would add overhead.
-- Keep at most two subagents active; cheaper available helpers may handle narrow
-  docs/GitHub work.
+- Cheaper available helpers may handle narrow docs/GitHub work.
 - These project defaults supersede the older GPT-5.4 engineering preference.
   Claude model settings and provider credentials remain independent.
 
