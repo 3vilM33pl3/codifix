@@ -58,7 +58,8 @@ operational evidence directory below.
 
 ## Remaining work
 
-- Finish Mac sync after the Local Network permission step below.
+- Finish Mac app cache exposure and contribution/watch activation after the
+  successful fresh enrollment and read synchronization described below.
   Publish final release packages after the corrected candidate completes.
 - Refresh running client sessions. Codifix desktop plugin is installed/enabled;
   the legacy plugin is disabled with its cache retained. Primary MCP project
@@ -96,7 +97,10 @@ These builds do not gate the running Monolith applications.
 Corrected unpublished candidate run `39073102523` is running at source
 `66c2d1ecc4ca9b0c052e1d854f71a0703f998b71`, including the gateway fix. The crash
 recovery snapshot showed Linux amd64/arm64 and Apple Silicon builds active with
-no failures reported. No public release or tag has been published.
+no failures reported. The later 22:56 UTC snapshot confirms release contract,
+source archive and full source/security validation succeeded, including the Rust
+audit with its documented RSA exception. Five platform builds remain running.
+No public release or tag has been published.
 
 Crash recovery reconfirmed all three Monolith area health checks. The initial
 Mac installer authentication blocker is resolved.
@@ -142,13 +146,37 @@ data retained. Both original sync profiles retain their original company origin
 (`memory.metatao.net`) and distinct owner identities; company origin and area
 owner endpoint are separate bindings.
 
-The next actual blocker is macOS Local Network permission for the renamed
-Network Access helper. An unauthenticated native diagnostic using the same
-reqwest features returns HTTP 401 over SSH but `No route to host (os error 65)`
-in GUI context, before TLS. No trust-store change is needed. Olivier has been
-asked to enable Codifix Network Access under Privacy & Security → Local Network.
-Sync/watch restoration remains pending that permission; complete UI acceptance
-is not yet claimed. Private evidence: `mac-actual-evidence/`,
+Olivier enabled Local Network access for the renamed helper. Authenticated
+requests then reached the company service but returned HTTP 409: the retained
+enrollment referred to historical project/federation bindings. The normal fresh
+enrollment flow, already selected in the original plan, resolves that conflict
+without rewriting immutable server records. Both offline queues and unresolved
+contribution queues were empty; six accepted contribution receipts are retained.
+
+Normal logout revoked the old device. Olivier signed in through Authentik, and
+the portal recorded approval of replacement device
+`7a1172f3-3e42-4150-a8d4-8e49969a9deb` for exactly the original Workshop and
+Homelab project scopes, with offline/contributions enabled and the same 30-day
+grant duration. Both server outcomes are confirmed. A transient Authentik page
+error cleared after reload; no authentication configuration was changed.
+
+Fresh subscriptions now synchronize successfully: Homelab reached cursor
+990/through 990 and Workshop 3582/through 3582, both caught up with zero errors.
+Their branded persistent sync jobs are running. Old subscription IDs, profiles,
+projections and legacy Keychain records remain retained as historical evidence.
+Normal app cache exposure and contribution/watch activation remain in progress.
+
+The fresh-device binding operator in `107aa90f` records exact old/new bindings
+in the existing immutable receipt table, then updates the disabled local binding
+atomically. It checks the original scope, retired/fresh spaces, drained queue and
+pinned approval/bootstrap evidence. Twelve focused tests passed against real
+PostgreSQL/schema 85, plus the two existing retirement/same-device checks. The
+existing same-device function and all applied migrations are unchanged. Actual
+manifests are prepared; application awaits the bounded independent review and
+transition from the retained cold launcher to normal operational configuration.
+
+Private evidence: `mac-actual-evidence/` (including `company-approval.jsonl`,
+`company-approval.png`, and `fresh-binding-review.json`),
 `mac-actual-read-result.json` and `mac-actual-retirement-result.json`.
 
 The original Mac company origins initially returned 502 because application
