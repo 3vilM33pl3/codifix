@@ -4,7 +4,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { authenticateWindowsDispatchRequest, signWindowsDispatchResponse, validateWindowsDispatchEndpoint } from './windows-dispatch-auth.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const key = work => JSON.stringify([work.case_id, work.condition, work.repeat]);
@@ -26,9 +27,9 @@ async function exclusiveJson(directory, name, value) {
 }
 
 export async function openCampaignDispatch(options) {
-  const { prepare, execute, verify, onProgress, ...plain } = options;
+  const { prepare, execute, verify, onProgress, native, ...plain } = options;
   const { root, directory, socket, manifestSha256, work, offline, preparation } = structuredClone(plain);
-  if (![root, directory, socket].every(p => typeof p === 'string' && path.isAbsolute(p))
+  if (![root, directory, ...(native ? [] : [socket])].every(p => typeof p === 'string' && path.isAbsolute(p))
       || !/^[a-f0-9]{64}$/.test(manifestSha256) || !Array.isArray(work) || !work.length || work.length > 100000
       || !work.every(validWork)
       || new Set(work.map(key)).size !== work.length || typeof offline !== 'boolean'
@@ -36,15 +37,24 @@ export async function openCampaignDispatch(options) {
       || (preparation && typeof prepare !== 'function') || (onProgress !== undefined && typeof onProgress !== 'function')) {
     throw Error('invalid campaign dispatch contract');
   }
+  if (native && (!offline || preparation || socket !== undefined
+      || !/^[a-f0-9]{64}$/.test(native.configurationSha256)
+      || native.endpointPath !== path.join(root, 'private/dispatch-endpoint.json')
+      || !['create','write','read'].every(name => typeof native.journal?.[name] === 'function'))) {
+    throw Error('explicit zero-spend native dispatch contract required');
+  }
   // An exclusive directory is also the cross-process fence. Never remove it on
   // close. A crashed owner is not evidence that its provider call was free.
-  await fs.mkdir(directory, { mode: 0o700 });
-  await syncDirectory(path.dirname(directory));
-  await exclusiveJson(directory, 'identity.json', { version: 1, manifest_sha256: manifestSha256,
+  if (native) await native.journal.create(directory);
+  else { await fs.mkdir(directory, { mode: 0o700 }); await syncDirectory(path.dirname(directory)); }
+  const store = (name, value) => native ? native.journal.write(directory, name, value) : exclusiveJson(directory, name, value);
+  await store('identity.json', { version: 1, manifest_sha256: manifestSha256,
     offline, work_items: work.length, preparation });
   let cursor = 0, prepared = !preparation, active, stopping = false, failed = false;
   const receipts = new Map(), lifetime = new AbortController();
+  let endpoint;
   const server = http.createServer(async (request, response) => {
+    let transportProof;
     response.on('error', () => {});
     try {
       if (stopping || request.method !== 'POST' || request.url !== '/dispatch') throw Error('unavailable');
@@ -55,7 +65,9 @@ export async function openCampaignDispatch(options) {
         chunks.push(chunk);
       }
       if (stopping) throw Error('stopping');
-      const bytes = Buffer.concat(chunks), dispatch = JSON.parse(bytes);
+      const bytes = Buffer.concat(chunks);
+      if (native) transportProof = authenticateWindowsDispatchRequest(endpoint, request.headers, bytes);
+      const dispatch = JSON.parse(bytes);
       if (dispatch.version !== 1 || dispatch.offline !== offline
           || (offline && dispatch.maximum_microusd !== 0)
           || !Number.isSafeInteger(dispatch.maximum_microusd) || dispatch.maximum_microusd < 0
@@ -77,14 +89,14 @@ export async function openCampaignDispatch(options) {
           try {
             await verify();
             if (stopping) throw Error('stopping');
-            await exclusiveJson(directory, `${id}.attempt.json`, { version: 1, request_sha256: digest, id });
+            await store(`${id}.attempt.json`, { version: 1, request_sha256: digest, id });
             if (stopping) throw Error('stopping');
             const result = preparing ? await prepare(dispatch.provider_budget, lifetime.signal)
               : await execute(dispatch.work, dispatch.provider_budget, lifetime.signal);
             await verify();
             if (stopping) throw Error('stopped before receipt');
             // Persist before reply: a broken socket cannot cause re-execution.
-            await exclusiveJson(directory, `${id}.receipt.json`, { version: 1, request_sha256: digest, id, result });
+            await store(`${id}.receipt.json`, { version: 1, request_sha256: digest, id, result });
             if (preparing) prepared = true;
             else { cursor++; onProgress?.(cursor, work.length); }
             return result;
@@ -105,18 +117,29 @@ export async function openCampaignDispatch(options) {
       try { if (replaying) await verify(); }
       catch { failed = true; lifetime.abort(); throw Error('changed dispatch authority'); }
       if (stopping) throw Error('stopped before delivery');
-      response.writeHead(200, { 'Content-Type': 'application/json' });
-      response.end(JSON.stringify(result));
+      const output = Buffer.from(JSON.stringify(result));
+      response.writeHead(200, { 'Content-Type': 'application/json',
+        ...(native ? signWindowsDispatchResponse(endpoint, transportProof, 200, output) : {}) });
+      response.end(output);
     } catch {
-      response.writeHead(409, { 'Content-Type': 'text/plain' });
-      response.end('R3 dispatch refused or uncertain; no automatic repeat.');
+      const output = Buffer.from('R3 dispatch refused or uncertain; no automatic repeat.');
+      response.writeHead(409, { 'Content-Type': 'text/plain',
+        ...(native && transportProof ? signWindowsDispatchResponse(endpoint, transportProof, 409, output) : {}) });
+      response.end(output);
     }
   });
   server.requestTimeout = 30000;
   server.headersTimeout = 10000;
   try {
-    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(socket, resolve); });
-    await fs.chmod(socket, 0o600);
+    await new Promise((resolve, reject) => { server.once('error', reject);
+      server.listen(native ? { host: '127.0.0.1', port: 0, exclusive: true } : socket, resolve); });
+    if (native) {
+      endpoint = validateWindowsDispatchEndpoint({ format: 'memory-r3-windows-loopback-v1', host: '127.0.0.1',
+        port: server.address().port, session_id: randomUUID(), key: randomBytes(32).toString('hex'),
+        manifest_sha256: manifestSha256, configuration_sha256: native.configurationSha256 },
+      { manifestSha256, configurationSha256: native.configurationSha256 });
+      await native.journal.write(path.dirname(native.endpointPath), path.basename(native.endpointPath), endpoint);
+    } else await fs.chmod(socket, 0o600);
   } catch (error) {
     server.closeAllConnections();
     if (server.listening) await new Promise(resolve => server.close(resolve));
@@ -141,10 +164,11 @@ export async function openCampaignDispatch(options) {
 
 // Read-only reconciliation. This never repairs files, clears a fence, resumes a
 // provider or returns answer/request payloads. Partial/corrupt writes fail closed.
-export async function inspectCampaignDispatch(directory) {
+export async function inspectCampaignDispatch(directory, { journal } = {}) {
   const stat = await fs.lstat(directory);
-  if (!stat.isDirectory() || stat.isSymbolicLink() || (stat.mode & 0o077)) throw Error('private dispatch directory required');
+  if (!stat.isDirectory() || stat.isSymbolicLink() || (!journal && (stat.mode & 0o077))) throw Error('private dispatch directory required');
   const read = async name => {
+    if (journal) return journal.read(directory, name);
     const file = path.join(directory, name), stat = await fs.lstat(file);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maximum) throw Error('invalid dispatch evidence');
     return JSON.parse(await fs.readFile(file));
