@@ -1,5 +1,29 @@
 # Debian 12 candidate builds (off-CA only)
 
+## Public release orchestration
+
+For a frozen public release, build this directory's Dockerfile, capture its image
+ID, and invoke from the Git checkout:
+
+```sh
+mkdir -m 700 /absolute/build-volume/linux-amd64
+bash packaging/ca-bookworm/release.sh FULL_COMMIT /absolute/build-volume/linux-amd64 sha256:IMAGE_ID amd64
+```
+
+Use a separate private work directory for `arm64`. CI may restore only the
+`memory-cargo`, `memory-target` and `npm-cache` subdirectories to reuse matching
+inputs; source and output directories must be new. The helper archives the exact
+Git object, fetches public dependencies in a separate container without host
+credentials, then compiles offline. It emits Debian packages, source/builder
+provenance, per-architecture checksums, complete static ELF ABI reports and
+native AMD64 or explicit QEMU ARM64 version/help checks under `WORK/output`.
+These checks do not install packages or activate services; disposable package
+installation and application-level acceptance remain separate release checks.
+
+```sh
+python3 packaging/ca-bookworm/test_release_build.py
+```
+
 This directory targets the CA's observed Debian 12 / AArch64 / glibc 2.36
 userspace. It never upgrades the CA, installs host libraries, grants Pi provider
 access or makes an ARM64 emulator into CA sandbox evidence. The source boundary
