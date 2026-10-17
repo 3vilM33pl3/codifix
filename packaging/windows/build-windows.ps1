@@ -26,6 +26,8 @@ $CargoTargetDir = if ($env:CARGO_TARGET_DIR) {
 $Version = (Select-String -Path (Join-Path $RootDir 'Cargo.toml') -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1).Matches.Groups[1].Value
 if (-not $Version) { $Version = '0.1.0' }
 . (Join-Path $ScriptDir 'release-identity.ps1')
+. (Join-Path $ScriptDir 'runtime-dependencies.ps1')
+& (Join-Path $ScriptDir 'test-runtime-dependencies.ps1')
 $Identity = Get-WindowsReleaseIdentity -ApplicationVersion $Version -InstallerBuild $InstallerBuild
 $MsiVersion = $Identity.installer_version
 $SourceCommit = (& git -C $RootDir rev-parse HEAD).Trim()
@@ -421,6 +423,7 @@ foreach ($artifact in @($ZipPath, $MsiPath, $ServerToolsMsiPath)) {
 $artifacts = @($ZipPath, $MsiPath, $ServerToolsMsiPath) | ForEach-Object {
     [ordered]@{ name = (Split-Path -Leaf $_); sha256 = (Get-FileHash -Algorithm SHA256 $_).Hash.ToLowerInvariant(); bytes = (Get-Item $_).Length }
 }
+$runtimeDependencies = Get-WindowsRuntimeDependencies -Binaries @($Executables | ForEach-Object { Join-Path $StageDir "bin\$_" })
 $manifest = [ordered]@{
     schema_version = 1
     platform = 'windows-x86_64'
@@ -439,6 +442,8 @@ $manifest = [ordered]@{
     capabilities = @('per-user-client')
     first_party_executables = $Executables
     native_stack_bundled = $false
+    runtime_dependencies = $runtimeDependencies
+    runtime_prerequisites = @('Microsoft Visual C++ v14 x64 Redistributable (installed separately)')
     payload_files = @(Get-ChildItem -LiteralPath $StageDir -Recurse -File | Sort-Object FullName | ForEach-Object {
         [ordered]@{ name = (Get-RelativePath $StageDir $_.FullName).Replace('\', '/'); sha256 = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant() }
     })

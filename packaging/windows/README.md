@@ -22,6 +22,19 @@ The unsigned per-user MSI installs under `%LOCALAPPDATA%\Programs\Memory Layer`,
 
 The portable ZIP uses the same `bin`/`share` layout. Add the extracted `bin` directory to `PATH` before running `memory`.
 
+Both ZIP and MSI variants require the **Microsoft Visual C++ v14 x64
+Redistributable**, installed separately. Use the latest supported x64 package
+from [Microsoft](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist);
+its version must be at least as recent as the MSVC build tools used for the
+application. Memory's installers do not download or install it. Visual Studio
+itself is not an end-user prerequisite.
+
+The Windows release manifest records each packaged executable's actual direct
+DLL imports from native `dumpbin /DEPENDENTS`, its inspection-tool version and
+whether v14 CRT imports are present. Inspection errors fail the build; this is
+not proof of complete transitive DLL closure or execution on a clean PC without
+the redistributable. Run `test-runtime-dependencies.ps1` for parser contracts.
+
 `-SkipBuild` reuses only a successful build receipt for the same committed source,
 with unchanged executable and Web asset hashes. A failed compiler/build tool
 does not silently package an older executable.
