@@ -16,6 +16,7 @@ const load = name => import(pathToFileURL(path.join(sourceRoot, 'evals/r3/isolat
 const { nativeProfileHash } = await load('native-windows.mjs');
 const { runOfflineExecution } = await load('execution.mjs');
 const { createKnowledgeRunner } = await load('knowledge.mjs');
+const { createModelAgent } = await load('model-agent.mjs');
 const bound = async file => ({ path: file, sha256: createHash('sha256').update(await fs.readFile(file)).digest('hex') });
 const code = path.join(root, 'code');
 const node = await bound(path.join(code, 'node.exe'));
@@ -78,11 +79,50 @@ assert.equal(negative.assessment.citations_valid, false);
 assert.equal(negative.assessment.success, false);
 assert.equal(negative.assessment.critical_failure, true);
 assert.equal(positive.providerRequests + negative.providerRequests, 0);
+let fakeCalls = 0;
+const agent = createModelAgent({ taskId: 'native-model-proof', nativeExecution: execution, runNative: run,
+  model: { provider: 'synthetic', resolved_id: 'fake-native-proof', reasoning: 'none' },
+  allowance: { input_tokens: 100, output_tokens: 100, microusd: 0 }, maxCalls: 2, taskTimeoutMs: 60000,
+  invoke() { throw Error('A provider must never be invoked by this proof'); },
+  mediator: { async dispatch(request) {
+    fakeCalls++;
+    assert(!JSON.stringify(request.payload).includes(root));
+    assert(!JSON.stringify(request.payload).includes('PRIVATE_RUBRIC_SYNTHETIC_ONLY'));
+    return { output: request.payload.previous ? { kind: 'finish' } : { kind: 'command', tool: 'node',
+      args: ['-e', 'const fs=require("node:fs");const p="source.json";const v=JSON.parse(fs.readFileSync(p));v.count++;fs.writeFileSync(p,JSON.stringify(v));'] },
+      usage: { input_tokens: 10, output_tokens: 5, microusd: 0 }, invoked: true };
+  } } });
+const modeled = await agent({ execution, files: { 'source.json': '{"count":0}' },
+  argv: [node.path, '-e', 'process.exit(0)'], exportPaths: ['source.json'], timeoutMs: 20000, stepId: 'one-step' });
+assert.equal(modeled.exitCode, 0);
+assert.equal(JSON.parse(Buffer.from(modeled.files['source.json'], 'base64')).count, 1);
+assert.deepEqual(modeled.commandExecutions.map(item => item.kind), ['model-command','final-export']);
+assert.equal(fakeCalls, 2);
+// These are expected *execution* failures, not successful benchmark answers.
+// Inspect the helper receipt and trusted driver error so broken startup or
+// uncertain cleanup cannot masquerade as an output/deadline-control pass.
+for (const [kind, command, message] of [
+  ['output', 'process.stdout.write("x".repeat(2*1024*1024))', 'native command output budget exceeded'],
+  ['timeout', 'setTimeout(()=>{},60000)', 'native command deadline expired'],
+]) {
+  const before = new Set(await fs.readdir(profile.io_root));
+  await assert.rejects(run({ argv: [node.path, '-e', command], files: {}, exportPaths: [], timeoutMs: 5000 }), /native evaluation failed/);
+  const added = (await fs.readdir(profile.io_root)).filter(name => !before.has(name));
+  assert.equal(added.length, 1);
+  const resultRoot = path.join(profile.io_root, added[0], 'result');
+  const receipt = JSON.parse(await fs.readFile(path.join(resultRoot, 'result.json')));
+  assert.equal(receipt.state, 'failed');
+  assert.equal(receipt.reason, 'execution_failed', `${kind} must not hide uncertain cleanup`);
+  assert.equal(receipt.exit_code, 1);
+  assert((await fs.readFile(path.join(resultRoot, 'stderr.bin'), 'utf8')).includes(message));
+}
 await fs.writeFile(path.join(root, 'result.json'), JSON.stringify({
   format: 'memory-native-evaluation-proof-v1', state: 'succeeded',
   profile_sha256: execution.profile_sha256, observations,
   private_project_denied: true, hidden_grader_denied: true, provider_environment_absent: true,
   knowledge_citations_verified: true, invented_citation_rejected: true,
   human_judgments_unresolved: true, provider_requests: 0, official_evidence: false,
+  fake_model_callbacks: fakeCalls, native_model_command_and_final_export_verified: true,
+  oversized_output_rejected: true, deadline_failure_reaped: true,
   rust_grading_verified: false, campaign_verified: false, disk_hard_limit_enforced: false,
 }), { flag: 'wx' });
