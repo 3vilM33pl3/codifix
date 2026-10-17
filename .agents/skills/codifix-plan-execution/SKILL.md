@@ -4,7 +4,7 @@ version: 3.0.0-rc.1
 description: Save the approved plan and checkpoint when execution starts, and verify all plan checkbox items are complete before claiming the task is finished
 ---
 
-# Memory Plan Execution Skill
+# Codifix Plan Execution Skill
 
 Use this skill when:
 - a planning session has ended and the user approved execution

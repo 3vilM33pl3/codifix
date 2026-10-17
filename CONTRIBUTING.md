@@ -84,7 +84,7 @@ delete `target/`: it also holds non-cache artifacts. Moving the build directory
 with `CARGO_TARGET_DIR` can relieve a full filesystem, but does not reduce total
 storage usage.
 
-The repository's Memory helpers explicitly use the installed Workshop API for
+The repository's Codifix helpers explicitly use the installed Workshop API for
 durable project notes through `.agents/codifix-command.json`. Dev helper
 tests can set `CODIFIX_BIN` to a preserved source executable to avoid rebuilding;
 an explicit `cargo run` override may trigger a full rebuild. See

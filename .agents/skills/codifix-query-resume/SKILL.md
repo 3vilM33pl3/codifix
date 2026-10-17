@@ -4,7 +4,7 @@ version: 3.0.0-rc.1
 description: Query curated project memory before answering repo-specific questions, and use resume to get back into flow after interruptions
 ---
 
-# Memory Query And Resume Skill
+# Codifix Query And Resume Skill
 
 Use this skill when:
 - the user asks how this repository works

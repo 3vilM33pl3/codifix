@@ -4,7 +4,7 @@ version: 3.0.0-rc.1
 description: Review pending Codifix replacement proposals interactively inside the LLM CLI; explain why each memory update was proposed, gather codebase proof when needed, and approve or reject only after explicit confirmation
 ---
 
-# Memory Proposal Review Skill
+# Codifix Proposal Review Skill
 
 Use this skill when:
 - the user asks to review proposed memories, pending memory updates, or the curation review queue

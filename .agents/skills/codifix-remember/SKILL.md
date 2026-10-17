@@ -4,7 +4,7 @@ version: 3.0.0-rc.1
 description: Remember meaningful completed work by capturing task context and curating it into durable project memory with provenance
 ---
 
-# Memory Remember Skill
+# Codifix Remember Skill
 
 Use this skill when:
 - meaningful repository work is complete

@@ -4,7 +4,7 @@ version: 3.0.0-rc.1
 description: Guide first-time GitHub repository initialization for a Codifix project; use when setting up or auditing GitHub remotes, repository metadata, Actions workflows, secrets, variables, branch protection, required checks, or Codifix repo onboarding, with discovery and dry-run review before write-capable changes
 ---
 
-# Memory GitHub Init Skill
+# Codifix GitHub Init Skill
 
 Use this skill when:
 - the user asks to set up, initialize, connect, or audit a GitHub repository for a project

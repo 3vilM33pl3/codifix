@@ -4,7 +4,7 @@ version: 3.0.0-rc.1
 description: Record a task memory before starting direct no-plan implementation work when the user asks to implement, fix, change, add, update, release, install, or otherwise mutate the repository without first approving a plan
 ---
 
-# Memory Direct Task Start Skill
+# Codifix Direct Task Start Skill
 
 Use this skill when:
 - the user gives an actionable implementation instruction

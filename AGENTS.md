@@ -1,4 +1,4 @@
-# Memory Repo Agent Guide
+# Codifix Repo Agent Guide
 
 Treat this file as the table of contents for working in this repository. Keep it
 short, load only the linked docs you need, and update the durable source of truth
