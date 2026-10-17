@@ -20,6 +20,22 @@ native AMD64 or explicit QEMU ARM64 version/help checks under `WORK/output`.
 These checks do not install packages or activate services; disposable package
 installation and application-level acceptance remain separate release checks.
 
+The release workflow runs the Debian package lifecycle separately on native
+GitHub-hosted AMD64 and ARM64 Linux runners, never the active Monolith or CA:
+
+```sh
+sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env MEMORY_HOSTED_INSTALL_TEST=yes \
+  bash packaging/ca-bookworm/install-test.sh /absolute/path/memory-layer_2.1.0_amd64.deb
+```
+
+This requires a clean runner without an existing Memory installation and a
+matching native architecture. It exercises fresh install, upgrade from an
+explicitly synthetic `2.0.1` package, same-version repair and removal, preserving
+configuration/data sentinels. Package hooks run against an observed `systemctl`
+stub; no service is activated. Native launch and installer behavior on Ubuntu
+are recorded separately from complete Bookworm ELF ABI verification. Database
+provisioning and a running application are not claimed by this check.
+
 ```sh
 python3 packaging/ca-bookworm/test_release_build.py
 ```
