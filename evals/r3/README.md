@@ -334,6 +334,9 @@ explicit native first-party executable variables, and the disposable database
 settings above. Run the reviewed profile's Node inside its trusted outer Job;
 the helper verifies that Job and creates the private UUID parent before any
 pack writes. The bootstrap rejects Linux images, `--mediated` and `--wire`.
+The existing native helper now has a bounded prepare-only launcher that creates
+this outer Job; see the [exact native bootstrap recipe](native-bootstrap.md).
+The full native campaign guard stays closed until native proof is accepted.
 
 Native first-party executable copies keep `.exe` names. The pack locks its
 private Node copy, the Windows driver sidecar and the required native execution
