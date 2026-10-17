@@ -210,8 +210,8 @@ pub(super) fn command_is_manager_for_profile(command: &str, profile: Profile) ->
 }
 
 pub(super) fn command_looks_dev_stack(command: &str) -> bool {
-    command.contains("target/debug/memory")
-        || command.contains("target/release/memory")
+    command.contains("target/debug/codifix")
+        || command.contains("target/release/codifix")
         || command.contains("CODIFIX_PROFILE=dev")
         || command.contains("CODIFIX_PROFILE=\"dev\"")
         || command.contains("CODIFIX_PROFILE='dev'")

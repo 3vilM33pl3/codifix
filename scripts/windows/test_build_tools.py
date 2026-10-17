@@ -32,7 +32,7 @@ class BuildToolsManifestTests(unittest.TestCase):
         script=(Path(__file__).parent/'guest-native-db.ps1').read_text()
         for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", "'test-password.dpapi'",
                          "$verified.production -ne $false", "'--all-targets'", "'--test-threads=1'",
-                         "$env:MEMORY_LAYER_TEST_REQUIRE_DB='1'", 'ZeroFreeBSTR',
+                         "$env:CODIFIX_TEST_REQUIRE_DB='1'", 'ZeroFreeBSTR',
                          'WaitForExit(7200000)', 'workflow_verified=$false']:
             self.assertIn(required,script)
         self.assertNotIn('Invoke-WebRequest',script)

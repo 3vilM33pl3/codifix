@@ -17,7 +17,7 @@ if (process.platform !== 'win32' || process.env.COMPUTERNAME !== 'MEMORY-WINLAB'
     || !/^C:\\MemoryLab\\runs\\[0-9a-f-]{36}\\native-pds-fleet$/.test(root ?? '')
     || !/^S-1-5-21-(?:\d+-){3}\d+$/.test(sid ?? '')
     || (mode !== undefined && mode !== '--fleet' && !accountOnly)
-    || (!accountOnly && process.env.MEMORY_LAYER_TEST_REQUIRE_DB !== '1')) throw Error('Explicit disposable native fleet required');
+    || (!accountOnly && process.env.CODIFIX_TEST_REQUIRE_DB !== '1')) throw Error('Explicit disposable native fleet required');
 const node = 'C:\\MemoryLab\\Tools\\node-v24.18.1-win-x64\\node.exe';
 const binary = 'C:\\MemoryLab\\build\\product-msvc\\x86_64-pc-windows-msvc\\debug\\codifix-pds-pipe.exe';
 const digest = async file => createHash('sha256').update(await fs.readFile(file)).digest('hex');

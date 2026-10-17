@@ -137,8 +137,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      MEMORY_LAYER_TEST_DATABASE_URL: postgres://memory:memory@localhost:55433/memory_test
-      MEMORY_LAYER_TEST_REQUIRE_DB: "1"
+      CODIFIX_TEST_DATABASE_URL: postgres://memory:memory@localhost:55433/memory_test
+      CODIFIX_TEST_REQUIRE_DB: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -258,8 +258,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      MEMORY_LAYER_TEST_DATABASE_URL: postgres://memory:memory@localhost:55432/memory_test
-      MEMORY_LAYER_TEST_REQUIRE_DB: "1"
+      CODIFIX_TEST_DATABASE_URL: postgres://memory:memory@localhost:55432/memory_test
+      CODIFIX_TEST_REQUIRE_DB: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable

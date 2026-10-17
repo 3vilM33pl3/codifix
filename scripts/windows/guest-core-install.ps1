@@ -126,7 +126,7 @@ $identity=[Security.Principal.WindowsIdentity]::GetCurrent();$principal=[Securit
 if($identity.Name -ine 'MEMORY-WINLAB\memorylab' -or -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){
     throw 'Exact elevated MEMORY-WINLAB memorylab task required'
 }
-foreach($key in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','DATABASE_URL','MEMORY_LAYER_TEST_DATABASE_URL')){
+foreach($key in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','DATABASE_URL','CODIFIX_TEST_DATABASE_URL')){
     if([Environment]::GetEnvironmentVariable($key)){throw 'Ambient provider/database credentials rejected'}
 }
 Assert-CoreInstallPath $SourceRoot;Assert-CoreInstallPath $WebRoot

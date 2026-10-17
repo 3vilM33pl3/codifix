@@ -9,7 +9,6 @@ use reqwest::{
     Client, Url,
     header::{COOKIE, HeaderMap, ORIGIN, SET_COOKIE},
 };
-use uuid::Uuid;
 
 fn client() -> Result<Client> {
     Ok(Client::builder()

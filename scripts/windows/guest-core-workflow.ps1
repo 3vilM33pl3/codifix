@@ -9,7 +9,7 @@ $ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'
 if($env:OS -cne 'Windows_NT' -or $env:COMPUTERNAME -cne 'MEMORY-WINLAB' -or
     $OperationId -eq [guid]::Empty -or $BuildOperationId -eq [guid]::Empty -or
     $SourceRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+$') {throw 'Explicit disposable native lab required'}
-foreach($name in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','DATABASE_URL','MEMORY_LAYER_TEST_DATABASE_URL')){
+foreach($name in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','DATABASE_URL','CODIFIX_TEST_DATABASE_URL')){
     if([Environment]::GetEnvironmentVariable($name)){throw 'Ambient credentials rejected'}
 }
 $build=Get-Content "C:\MemoryLab\runs\$BuildOperationId\product-build\result.json" -Raw | ConvertFrom-Json

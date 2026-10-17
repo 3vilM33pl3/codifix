@@ -56,7 +56,7 @@ async function probe(services, environment = env) {
 let started = false;
 let cleaned = true;
 async function runtimeTest() {
-  if (!process.env.MEMORY_LAYER_TEST_DATABASE_URL) {
+  if (!process.env.CODIFIX_TEST_DATABASE_URL) {
     throw new Error('--runtime requires an explicitly disposable test PostgreSQL URL with CREATE DATABASE rights');
   }
   const runtimeEnv = { ...env, GATE_PHASE: 'runtime' };
@@ -93,7 +93,7 @@ async function runtimeTest() {
   const fixture = join(runtime, 'pds-fixture.json');
   await writeFile(fixture, JSON.stringify({ base: `http://${network.IPAddress}:2583`,
     repository: state.did, token: state.accessJwt, signing_key: state.signingKey }), { mode: 0o600 });
-  const testEnv = { ...process.env, MEMORY_FEDERATION_PDS_FIXTURE: fixture, MEMORY_LAYER_TEST_REQUIRE_DB: '1' };
+  const testEnv = { ...process.env, MEMORY_FEDERATION_PDS_FIXTURE: fixture, CODIFIX_TEST_REQUIRE_DB: '1' };
   delete testEnv.MEMORY_LAYER_CLIENT_TOKEN;
   delete testEnv.DATABASE_URL;
   delete testEnv.MEMORY_LAYER_FEDERATION_CONFIG;

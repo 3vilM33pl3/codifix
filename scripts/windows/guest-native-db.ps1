@@ -7,7 +7,7 @@ param([Parameter(Mandatory=$true)][string]$SourceRoot,
 $ErrorActionPreference='Stop'
 if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB' -or
     $OperationId -eq [guid]::Empty -or $SourceRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+$') { throw 'Explicit disposable native database source required' }
-foreach ($name in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','DATABASE_URL','MEMORY_LAYER_TEST_DATABASE_URL')) {
+foreach ($name in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','DATABASE_URL','CODIFIX_TEST_DATABASE_URL')) {
     if ([Environment]::GetEnvironmentVariable($name)) { throw 'Native database proof rejects ambient provider/database credentials' }
 }
 $pg='C:\MemoryLab\NativePostgres'
@@ -50,9 +50,9 @@ Push-Location $SourceRoot
 try {
     # Only this synthetic VM test principal. The credential never enters command
     # arguments, source files, receipts or the host's configuration.
-    $env:MEMORY_LAYER_TEST_DATABASE_URL='postgresql://memorylab_test:'+ [uri]::EscapeDataString($password)+'@127.0.0.1:55471/postgres'
+    $env:CODIFIX_TEST_DATABASE_URL='postgresql://memorylab_test:'+ [uri]::EscapeDataString($password)+'@127.0.0.1:55471/postgres'
     $password=$null
-    $env:MEMORY_LAYER_TEST_REQUIRE_DB='1'
+    $env:CODIFIX_TEST_REQUIRE_DB='1'
     $env:CARGO_TARGET_DIR='C:\MemoryLab\build\product-msvc'
     $env:CARGO_BUILD_TARGET='x86_64-pc-windows-msvc'; $env:CARGO_BUILD_JOBS='2'
     # Portable Git is a pinned lab prerequisite, not a machine-wide install.
@@ -124,7 +124,7 @@ try {
     $receipt.state='succeeded'
 } catch { $receipt.state='failed'; throw }
 finally {
-    $env:MEMORY_LAYER_TEST_DATABASE_URL=$null; $env:MEMORY_LAYER_TEST_REQUIRE_DB=$null; $password=$null
+    $env:CODIFIX_TEST_DATABASE_URL=$null; $env:CODIFIX_TEST_REQUIRE_DB=$null; $password=$null
     $env:MEMORY_PI_WINDOWS_SANDBOX_CONFIG=$null; $env:MEMORY_PI_WINDOWS_SANDBOX_CONFIG_SHA256=$null
     Pop-Location
     $receipt | ConvertTo-Json | Set-Content -LiteralPath $result -Encoding UTF8

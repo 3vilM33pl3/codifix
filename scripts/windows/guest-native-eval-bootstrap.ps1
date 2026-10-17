@@ -66,7 +66,7 @@ if($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB' -or
 }
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 if($identity.Name -ine 'MEMORY-WINLAB\memorylab' -or [Diagnostics.Process]::GetCurrentProcess().SessionId -eq 0){throw 'Ordinary interactive memorylab identity required'}
-foreach($name in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','AZURE_OPENAI_API_KEY','DATABASE_URL','MEMORY_LAYER_TEST_DATABASE_URL')){
+foreach($name in @('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','AZURE_OPENAI_API_KEY','DATABASE_URL','CODIFIX_TEST_DATABASE_URL')){
     if([Environment]::GetEnvironmentVariable($name)){throw 'Prepare-only fixture rejects ambient provider/database credentials'}
 }
 Assert-EvalPath $SourceRoot
