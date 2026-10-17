@@ -58,7 +58,7 @@ operational evidence directory below.
 
 ## Remaining work
 
-- Finish Mac sync/client wiring after the local Keychain transfer below.
+- Finish Mac sync after the Local Network permission step below.
   Publish final release packages after the corrected candidate completes.
 - Refresh running client sessions. Codifix desktop plugin is installed/enabled;
   the legacy plugin is disabled with its cache retained. Primary MCP project
@@ -127,19 +127,28 @@ fingerprints unchanged during those reads. Astra independently reviewed the
 preservation, activation and read evidence; no core-runtime blocker remains.
 
 The native desktop app is copied from the successful private test build; this
-does not establish signed/notarized distribution. Company sync still needs
-local Keychain access for two original items: SSH returns OSStatus `-25308`.
-Olivier has been asked to run the reviewed additive transfer locally:
+does not establish signed/notarized distribution. Olivier completed the reviewed
+additive Keychain transfer and allowed the Codifix executable to read the two
+existing credentials. The completed transfer command was:
 
 ```bash
 /usr/bin/swift /Users/olivier/.local/state/codifix-rename-20261017/macos-state.swift --apply --company-origin https://memory.metatao.net
 ```
 
-Original credentials and profiles remain preserved. After transfer, rewire the
-copied app profile to the actual native Workshop endpoint and restore the
-original sync/watch functions. The old profile points at a separate source-dev
-backend, not the native cache. Sync reconnection and complete UI acceptance are
-not yet claimed. Private evidence: `mac-actual-evidence/`,
+Original credentials and profiles remain preserved. The copied app profile now
+points to native Workshop at port 55441 with its original UUID; the application
+is open. The obsolete separate source-dev process is stopped with its DuckDB
+data retained. Both original sync profiles retain their original company origin
+(`memory.metatao.net`) and distinct owner identities; company origin and area
+owner endpoint are separate bindings.
+
+The next actual blocker is macOS Local Network permission for the renamed
+Network Access helper. An unauthenticated native diagnostic using the same
+reqwest features returns HTTP 401 over SSH but `No route to host (os error 65)`
+in GUI context, before TLS. No trust-store change is needed. Olivier has been
+asked to enable Codifix Network Access under Privacy & Security → Local Network.
+Sync/watch restoration remains pending that permission; complete UI acceptance
+is not yet claimed. Private evidence: `mac-actual-evidence/`,
 `mac-actual-read-result.json` and `mac-actual-retirement-result.json`.
 
 The original Mac company origins initially returned 502 because application
