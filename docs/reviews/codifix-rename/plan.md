@@ -116,3 +116,20 @@ host-local checks remain pending returned results. Current source checks and
 private rehearsal evidence are in [integration status](evidence/integration-status.md)
 and [federation preservation](evidence/federation-slice.md). Source-level checked
 items do not establish native installation, final recovery or live cutover.
+
+## Disposable development scope
+
+Dev/test memories are disposable; durable project knowledge remains in Workshop.
+The rename does not require preserving dev rows, OIDs or passwords. At cutover,
+stop only the identified project-dev service/processes and retain their current
+configuration privately. Leave shared PostgreSQL and unknown legacy consumers
+untouched. A fresh dedicated Codifix dev database/login may be provisioned only
+through existing, verified database/role-management privileges, then bound to a
+separate dev overlay and checked for `status=ok`, `database=up`. The CLI does not
+implicitly create these database credentials.
+
+If that authority is unavailable, keep the known dev service stopped and record
+fresh dev provisioning as pending; it need not block durable Workshop cutover.
+Do not label every old shared catalog object inactive without client inventory,
+rename shared roles blindly, change host authentication or route dev to Workshop.
+Unresolved shared legacy objects remain explicit pending rename work.
