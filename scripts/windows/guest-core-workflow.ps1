@@ -98,12 +98,18 @@ function Invoke-Owned([string]$Exe,[string[]]$Arguments,[string]$Label,[string]$
 }
 function Finish-Owned($Run){
     $p=$Run.process
-    if(-not $p.WaitForExit(60000)){& "$env:SystemRoot\System32\taskkill.exe" /PID $p.Id /T /F | Out-Null;$p.WaitForExit();throw 'Owned core command deadline'}
+    if(-not $p.WaitForExit(60000)){$p.Kill();$p.WaitForExit();throw 'Owned core command deadline'}
     $p.WaitForExit();$out=$Run.stdout.GetAwaiter().GetResult();$err=$Run.stderr.GetAwaiter().GetResult()
     [IO.File]::WriteAllText((Join-Path $root ($Run.label+'.stdout.log')),$out)
     [IO.File]::WriteAllText((Join-Path $root ($Run.label+'.stderr.log')),$err)
     if($p.ExitCode){throw ('Owned core command failed: '+$Run.label)}
     return $out
+}
+function Stop-Owned($Run){
+    if(-not $Run.process.HasExited){$Run.process.Kill();$Run.process.WaitForExit()}
+    [IO.File]::WriteAllText((Join-Path $root ($Run.label+'.stdout.log')),$Run.stdout.GetAwaiter().GetResult())
+    [IO.File]::WriteAllText((Join-Path $root ($Run.label+'.stderr.log')),$Run.stderr.GetAwaiter().GetResult())
+    $Run.process.Dispose()
 }
 Add-Type -AssemblyName System.Net.Http
 $handler=[Net.Http.HttpClientHandler]::new();$handler.UseProxy=$false;$handler.AllowAutoRedirect=$false
@@ -153,15 +159,12 @@ try{
             $receipt.checks+=@('main-memories-list','lexical-search','history','cli-query')
             if($hasWeb){$page=Request '/';if($page -notmatch '<html|<!doctype'){throw 'Web root did not serve HTML'};$receipt.checks+='web-root'}
         }else{$receipt.checks+='restart-preserves-memory-and-search'}
-        & "$env:SystemRoot\System32\taskkill.exe" /PID $service.process.Id /T /F | Out-Null
-        $service.process.WaitForExit();$service=$null
+        Stop-Owned $service;$service=$null
     }
     $receipt.state='succeeded';$receipt.curated_memory_id=$memoryId
 }catch{$receipt.state='failed';throw}
 finally{
-    if($service){if(-not $service.process.HasExited){& "$env:SystemRoot\System32\taskkill.exe" /PID $service.process.Id /T /F | Out-Null;$service.process.WaitForExit()}
-        [IO.File]::WriteAllText((Join-Path $root 'service.stdout.log'),$service.stdout.GetAwaiter().GetResult())
-        [IO.File]::WriteAllText((Join-Path $root 'service.stderr.log'),$service.stderr.GetAwaiter().GetResult())}
+    if($service){Stop-Owned $service}
     $password=$null;$token=$null;$client.Dispose();$handler.Dispose()
     $receipt.observed_at=[DateTime]::UtcNow.ToString('o');Save-Receipt
 }
