@@ -181,6 +181,28 @@ impl IsolatedDatabase {
         })
     }
     pub async fn new() -> Option<Self> {
+        Self::create(compatible_migrator()).await
+    }
+
+    /// Genuine historical schema in a newly created disposable database only.
+    /// Existing databases are never downgraded or relabeled by this helper.
+    pub async fn new_through_migration(head: i64) -> Option<Self> {
+        let mut migrator = compatible_migrator();
+        assert!(
+            migrator.iter().any(|migration| migration.version == head),
+            "unknown test schema head"
+        );
+        migrator.migrations = std::borrow::Cow::Owned(
+            migrator
+                .iter()
+                .filter(|migration| migration.version <= head)
+                .cloned()
+                .collect(),
+        );
+        Self::create(migrator).await
+    }
+
+    async fn create(migrator: sqlx::migrate::Migrator) -> Option<Self> {
         let admin = migrated_pool().await?;
         let name = format!("memory_fixture_{}", Uuid::new_v4().simple());
         // Identifier is generated here from ASCII prefix and UUID, never input.
@@ -194,7 +216,8 @@ impl IsolatedDatabase {
             .connect_with(options)
             .await
             .expect("connect isolated test database");
-        run_migrations(&pool)
+        migrator
+            .run(&pool)
             .await
             .expect("migrate isolated test database");
         Some(Self {

@@ -36,7 +36,9 @@ pub fn hash(value: &str) -> String {
 }
 
 pub async fn database() -> Option<IsolatedDatabase> {
-    IsolatedDatabase::new().await
+    // Source snapshots remain explicitly supported only through migration65.
+    // Start genuinely at that head; never strip modern tables or fake a head.
+    IsolatedDatabase::new_through_migration(65).await
 }
 
 pub async fn execute(pool: &PgPool, sql: &str) {
