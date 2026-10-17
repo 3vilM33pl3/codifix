@@ -93,7 +93,7 @@ jobs:
               - "scripts/check-codex-plugin.py"
               - "docs/user/codex-desktop-plugin.md"
             formal:
-              - "formal/memory-federation/**"
+              - "formal/codifix-federation/**"
               - "fixtures/federation/traces/**"
               - "fixtures/federation/publication-traces/**"
               - "crates/codifix-federation/**"
@@ -182,7 +182,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
         with:
-          lake-package-directory: formal/memory-federation
+          lake-package-directory: formal/codifix-federation
           build: true
           test: true
           lint: false

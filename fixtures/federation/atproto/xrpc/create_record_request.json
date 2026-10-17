@@ -1,7 +1,7 @@
 {
-  "collection": "dev.memory-layer.unspecced.memoryVersion",
+  "collection": "dev.codifix.unspecced.memoryVersion",
   "record": {
-    "$type": "dev.memory-layer.unspecced.memoryVersion",
+    "$type": "dev.codifix.unspecced.memoryVersion",
     "author": "did:example:alice",
     "authoredAt": "2026-09-04T09:30:00.000000Z",
     "canonicalId": "canonical:123e4567-e89b-12d3-a456-426614174001",
@@ -30,6 +30,6 @@
     "versionNo": 7
   },
   "repo": "did:web:memory.example",
-  "rkey": "c2e4b992-8931-5bee-99c2-f9c87fba49cb",
+  "rkey": "50d367d6-6893-5e11-ac30-e92c114baeaf",
   "validate": true
 }

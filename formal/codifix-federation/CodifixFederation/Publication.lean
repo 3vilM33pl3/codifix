@@ -7,7 +7,7 @@ open Lean
    positive u32 inputs. Digests/authentication are established before this model.
    Evidence bytes/review digests are validated before this model. Durable storage
    and transport cryptography are not modeled here. -/
-namespace MemoryFederation.Publication
+namespace CodifixFederation.Publication
 
 inductive Kind where
   | grant | revoke | memory | state | evidence | proposal | resolve | relation | expertise
@@ -391,4 +391,4 @@ theorem replay_equals_fold (s : State) (records : List Command) :
   | nil => rfl
   | cons r rest ih => simpa [replay] using ih (apply s r).1
 
-end MemoryFederation.Publication
+end CodifixFederation.Publication

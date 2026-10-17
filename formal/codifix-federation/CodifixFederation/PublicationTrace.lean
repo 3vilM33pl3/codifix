@@ -1,9 +1,9 @@
-import MemoryFederation.Publication
-import MemoryFederation.Trace
+import CodifixFederation.Publication
+import CodifixFederation.Trace
 
 open Lean
 
-namespace MemoryFederation.Publication
+namespace CodifixFederation.Publication
 
 structure Summary where
   origin : Nat
@@ -111,4 +111,4 @@ def runPublicationFixtures : IO Unit := do
       (fixture.records.foldl (fun s r => (apply s r).1) {})
     IO.println s!"checked {fixture.name}"
 
-end MemoryFederation.Publication
+end CodifixFederation.Publication

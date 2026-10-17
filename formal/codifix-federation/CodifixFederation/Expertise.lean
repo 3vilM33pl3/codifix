@@ -1,9 +1,9 @@
-import MemoryFederation.PublicationInvariants
+import CodifixFederation.PublicationInvariants
 
 /- The advertisement part of F1, under the publication model's prerequisites.
    These theorems do not model HTTP, review UI, cryptography, model execution,
    source freshness, mailbox leases or gateway policy freshness. -/
-namespace MemoryFederation.Publication
+namespace CodifixFederation.Publication
 
 theorem expertise_owned_authorized_monotonic (s : State) (r : Command)
     (h : expertiseDecision s r = "applied") :
@@ -62,4 +62,4 @@ theorem revoked_asker_denied (s : State) (rev : Command) (responder : Nat)
 theorem collection_withdrawn_denies (s : State) (requester responder : Nat) :
     mayAsk s requester responder false true = false := by simp [mayAsk]
 
-end MemoryFederation.Publication
+end CodifixFederation.Publication

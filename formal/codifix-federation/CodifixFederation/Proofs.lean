@@ -1,6 +1,6 @@
-import MemoryFederation.Model
+import CodifixFederation.Model
 
-namespace MemoryFederation
+namespace CodifixFederation
 
 theorem duplicate_replay_idempotent
     (state : ReplicaState)
@@ -459,4 +459,4 @@ theorem membership_requires_root_publisher
   · simp [applyRecord, hUnseen, authorityValid, hGrant, hPublisher]
   · simp [applyRecord, hUnseen, authorityValid, hRevoke, hPublisher]
 
-end MemoryFederation
+end CodifixFederation

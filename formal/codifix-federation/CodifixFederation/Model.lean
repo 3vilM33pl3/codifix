@@ -2,7 +2,7 @@ import Lean
 
 open Lean
 
-namespace MemoryFederation
+namespace CodifixFederation
 
 abbrev PrincipalId := String
 abbrev RequestId := String
@@ -429,4 +429,4 @@ def summarize (state : ReplicaState) : FinalSummary :=
     canonicalHeads := latestHeads state.histories
   }
 
-end MemoryFederation
+end CodifixFederation

@@ -155,7 +155,7 @@ async function run(args) {
     const session = JSON.parse(await readFile(`${ROOT}/state/session.json`, 'utf8'));
     const state = JSON.parse(await readFile(`${ROOT}/state/journal.json`, 'utf8'));
     assert.equal(state.phase, 'active'); assert.equal(session.did, config.repository);
-    const record = { $type: 'dev.memory-layer.unspecced.rehearsal', purpose: 'Synthetic isolated SDK and signed-CAR verification only', id: randomUUID() };
+    const record = { $type: 'dev.codifix.unspecced.rehearsal', purpose: 'Synthetic isolated SDK and signed-CAR verification only', id: randomUUID() };
     const rkey = randomUUID();
     diagnostic = 'verify_publish';
     const created = await json(`${config.pds_origin}/xrpc/com.atproto.repo.createRecord`, { method: 'POST', token: session.access_jwt,

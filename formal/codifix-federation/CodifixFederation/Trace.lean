@@ -1,8 +1,8 @@
-import MemoryFederation.Proofs
+import CodifixFederation.Proofs
 
 open Lean
 
-namespace MemoryFederation
+namespace CodifixFederation
 
 def parseFixture (path : System.FilePath) : IO TraceFixture := do
   let raw ← IO.FS.readFile path
@@ -57,4 +57,4 @@ def runFixturesFrom (traceDir : System.FilePath) (names : List String) : IO Unit
 def runDefaultFixtures : IO Unit :=
   runFixturesFrom defaultTraceDir defaultFixtureNames
 
-end MemoryFederation
+end CodifixFederation

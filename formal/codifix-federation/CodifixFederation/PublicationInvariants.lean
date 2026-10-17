@@ -1,6 +1,6 @@
-import MemoryFederation.Publication
+import CodifixFederation.Publication
 
-namespace MemoryFederation.Publication
+namespace CodifixFederation.Publication
 
 theorem applied_preflight (s : State) (r : Command)
     (h : (apply s r).2 = "applied") :
@@ -196,4 +196,4 @@ theorem applied_membership_requires_configured_authority (s : State) (r : Comman
     · contradiction
     · simpa using ‹¬ (r.publisher ≠ 1 ∨ 1 ∉ s.managers)›
 
-end MemoryFederation.Publication
+end CodifixFederation.Publication

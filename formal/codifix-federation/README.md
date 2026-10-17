@@ -11,7 +11,7 @@ authenticated replication core:
 - memory version histories with evidence references
 - replay detection and equivocation checks
 
-The proofs are in `MemoryFederation/Proofs.lean`. The executable and tests read
+The proofs are in `CodifixFederation/Proofs.lean`. The executable and tests read
 the shared JSON traces under `../../fixtures/federation/traces/`.
 
 The nine traces now include distinct original author/authenticated publisher and
@@ -24,7 +24,7 @@ reattributing an accepted source/locator is not an additional Lean theorem.
 
 ## Origin-owned publication model
 
-`MemoryFederation/Publication.lean` separately models the publication reducer's
+`CodifixFederation/Publication.lean` separately models the publication reducer's
 eight record variants. Five shared JSON traces under
 `../../fixtures/federation/publication-traces/` run through both this model and
 the real Rust reducer during `lake test` / Rust integration tests. The legacy
@@ -37,7 +37,7 @@ next state revision, revocation denying subsequent memory application, and
 recursive replay equality with the reference fold. The version statements are
 one-step transition invariants, not a theorem about the complete Rust service.
 
-`MemoryFederation/PublicationInvariants.lean` additionally proves causal dependency
+`CodifixFederation/PublicationInvariants.lean` additionally proves causal dependency
 existence, publishing membership for every data variant, evidence origin/space
 binding and scoped reference existence, changed-binding rejection, proposals not
 rewriting versions, origin/pending/causal requirements for resolution, stale
@@ -69,11 +69,11 @@ Local commands:
 ```bash
 ~/.elan/bin/lake build
 ~/.elan/bin/lake test
-~/.elan/bin/lake exe memory_federation_tests
+~/.elan/bin/lake exe codifix_federation_tests
 ~/.elan/bin/lake env leanchecker
 ```
 
-The Lake package name matches the `MemoryFederation` root module. The pinned
+The Lake package name matches the `CodifixFederation` root module. The pinned
 lean-action infers that module name for both leanchecker and nanoda. Its nanoda
 helper does not recognize Lake's top-level TOML package name, so this project
 uses `lakefile.lean`, not a nonstandard `[package]` TOML workaround. The root

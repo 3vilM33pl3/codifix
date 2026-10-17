@@ -216,7 +216,7 @@ async function runtime() {
   }
   const state = JSON.parse(readFileSync('/gate-state/recovery-state.json', 'utf8'));
   const base = 'http://pds-recovery:2583';
-  const collection = 'dev.memory-layer.unspecced.publication';
+  const collection = 'dev.codifix.unspecced.publication';
   const schemas = new Lexicons(readdirSync('/gate/publication-lexicons').map(file =>
     JSON.parse(readFileSync(`/gate/publication-lexicons/${file}`, 'utf8'))));
   const records = []; let cursor;
