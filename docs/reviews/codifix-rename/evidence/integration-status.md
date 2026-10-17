@@ -1,0 +1,54 @@
+# Integration checkpoint — 17 October 2026
+
+Candidate source is 3.0.0-rc.1. This is implementation/rehearsal evidence, not a
+published release or a completed fleet cutover. See the separate federation
+snapshot evidence and [CA console checks](../ca-console-checks.md).
+
+## Verified source gates
+
+- 32 workspace package versions plus Web/docs/skills/plugin candidate versions
+  agree. Cargo third-party packages and npm dependency entries are unchanged.
+- MCP: 16 tests passed, including the `codifix_memory_history` discovery name.
+- Current schema 85 and historical import 65: 15 tests passed against explicitly
+  disposable PostgreSQL. Existing migrations remain byte-for-byte unchanged.
+- Web: 293 tests passed and production build passed.
+- CA read-only preflight: 13 stubbed safety/metadata tests passed. It explicitly
+  inventories both legacy Memory and candidate Codifix units and versions.
+- Installer: three mocked execution tests prove legacy/latest or wrong-architecture
+  assets cause refusal before download/install; matching Codifix selection works.
+- Windows source tests: 71 run, three native skips, no failures.
+- R3 source tests for renamed environment flags: 149 total, 76 passed, 73 native
+  or explicit optional skips. No paid evaluation was run.
+- Historical staging tests now bind the preserved schema-61 prefix rather than
+  incorrectly assuming that no later migrations exist: 15 passed, one optional skip.
+- macOS onboarding database defaults: operator 29 and first-run 13 tests passed.
+- The namespace change changed CAR block hash order. The resource-bomb test now
+  selects the smallest valid frame to isolate the block-count bound; all 11
+  verifier tests passed. No security limit was relaxed.
+
+Consolidated all-target Rust testing is still in progress. Native Windows and
+Mac Intel/ARM installer/signing acceptance, real-client credentials, fresh
+federation enrollment, final coordinated backup/restore and live cutover remain
+open. Previously recorded Mac app unit coverage is 55 tests with four explicit
+live-service skips; its signed UI build succeeded but automation could not start,
+so no UI test execution is claimed.
+
+## Operational checkpoint
+
+Only the old Monolith watcher manager and this repository's Workshop watcher
+were stopped: they were recreating legacy bootstrap files in the renamed source.
+Both were verified inactive. Definitions, before-state metadata and generated
+files were preserved privately under the rename recovery directory. Keep them
+paused until correctly configured Codifix watchers replace them. Other live
+applications/databases and laptop services were not changed by this checkpoint.
+
+All four Monolith database seeds and two Mac database seeds were restored into
+isolated PostgreSQL for rehearsal. These are per-database snapshots taken while
+writers were active, not a final coordinated recovery set or permission-restoration
+claim. Original dumps remain unchanged. Mac credentials were inspected as metadata;
+no Keychain transfer was applied. DNS, GitHub repository identity and published
+release status remain unchanged.
+
+CA SSH is deliberately disabled and must stay disabled. Its HTTPS health endpoint
+returned 200/ok; OpenBao TLS negotiation failed, leaving OpenBao health unverified.
+All host-local CA checks remain pending console results.
