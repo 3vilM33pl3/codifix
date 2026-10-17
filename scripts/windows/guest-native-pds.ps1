@@ -91,6 +91,20 @@ foreach ($patch in $manifest.security_patches.PSObject.Properties) {
 foreach ($name in @('pds-server.mjs','http-stdio.mjs','probe-stdio.mjs')) {
     Copy-Item -LiteralPath (Join-Path $SourceRoot "packaging\windows-pds\$name") -Destination (Join-Path $runtime $name) -Force
 }
+# A frozen lock does not remove every obsolete file from an interrupted/reused
+# hoisted tree. Test the actual installed dependency resolution before issuing a
+# receipt; stale elliptic or missing API patches must require a fresh staging
+# directory, never silently pass because the lock alone audits clean.
+$previousTestRoot = $env:MEMORY_PDS_TEST_ROOT
+$previousLogEnabled = $env:LOG_ENABLED
+try {
+    $env:MEMORY_PDS_TEST_ROOT = $runtime
+    $env:LOG_ENABLED = 'false'
+    Run-Checked $node @('--test',(Join-Path $SourceRoot 'packaging\windows-pds\security.test.mjs'))
+} finally {
+    $env:MEMORY_PDS_TEST_ROOT = $previousTestRoot
+    $env:LOG_ENABLED = $previousLogEnabled
+}
 $entries = @(Get-ChildItem -LiteralPath $runtime -Recurse -Force)
 if ($entries | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }) {
     throw 'Native runtime contains a reparse point; no deployment claim'

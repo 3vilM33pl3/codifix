@@ -64,6 +64,14 @@ initialization with private HTTP describeServer/unauthorized-write requests.
 These are dependency/API checks, **not** a new native Windows full-fleet or
 signed-repository acceptance pass. No existing installation was changed.
 
+Use a **fresh empty installation directory** for dependency preparation. An
+existing hoisted `node_modules` can retain obsolete files even after a frozen
+lock update. The native preparation operator therefore runs these tests against
+its actual installed runtime before issuing a receipt; resolving stale elliptic
+fails preparation. It does not delete or repair an existing runtime in place.
+For an isolated test installation outside this folder, set
+`MEMORY_PDS_TEST_ROOT` to its absolute directory when invoking the Node tests.
+
 The upstream package declares MIT. Dependencies retain their individual package
 licences; native bundling must include their notices. The lock includes exact
 package integrity values. Native proof uses the overlaid lock and patches with a hoisted layout

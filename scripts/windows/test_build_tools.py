@@ -245,7 +245,8 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertEqual(len(manifest['pnpm']['sha512']), 128)
         script = (root / 'guest-native-pds.ps1').read_text()
         for required in ["$env:COMPUTERNAME -ne 'MEMORY-WINLAB'", '--frozen-lockfile',
-                         '--ignore-scripts', "'rebuild','better-sqlite3'", 'pds_protocol_verified=$false']:
+                         '--ignore-scripts', "'rebuild','better-sqlite3'", 'pds_protocol_verified=$false',
+                         '$env:MEMORY_PDS_TEST_ROOT = $runtime', 'security.test.mjs']:
             self.assertIn(required, script)
 
     def test_native_postgres_inputs_and_lab_boundary(self):
